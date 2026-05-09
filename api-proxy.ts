@@ -11,6 +11,7 @@ import https from 'https';
 import { URL, fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
+import { gunzipSync } from 'zlib';
 import {
   resolveClaudeEndpoint,
   resolveOpenAIEndpoint,
@@ -159,6 +160,90 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Brave Search proxy (used by Ideator's web_search tool).
+    // Brave does not enable CORS, so the browser cannot call it directly —
+    // the apiKey travels in the JSON body, never in the URL or in logs.
+    if (pathname === '/api/search/brave') {
+      const body = await parseBody(req);
+      const apiKey = body.apiKey as string | undefined;
+      const query = body.query as string | undefined;
+      const count = (body.count as number | undefined) ?? 5;
+
+      if (!apiKey) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing required parameter: apiKey' }));
+        return;
+      }
+      if (!query) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing required parameter: query' }));
+        return;
+      }
+
+      const params = new URLSearchParams({
+        q: query,
+        count: String(Math.max(1, Math.min(20, count))),
+      });
+      const targetUrl = `https://api.search.brave.com/res/v1/web/search?${params}`;
+
+      console.log(`[Proxy] Brave search request: "${query}" (count=${count})`);
+
+      // Binary-safe path with gzip handling. The generic makeRequest helper
+      // collects chunks via toString() which corrupts compressed bodies, so
+      // Brave needs its own request — Brave returns gzip when we send the
+      // Accept-Encoding header and the browser would then choke on the
+      // bytes ("malformed (non-UTF8) data").
+      const braveResult = await new Promise<{
+        status: number;
+        buffer: Buffer;
+        encoding: string;
+      }>((resolve, reject) => {
+        const url = new URL(targetUrl);
+        const upstream = https.request(
+          {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname + url.search,
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip',
+              'X-Subscription-Token': apiKey,
+            },
+          },
+          (upstreamRes) => {
+            const chunks: Buffer[] = [];
+            upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
+            upstreamRes.on('end', () =>
+              resolve({
+                status: upstreamRes.statusCode || 500,
+                buffer: Buffer.concat(chunks),
+                encoding: String(
+                  upstreamRes.headers['content-encoding'] || ''
+                ),
+              })
+            );
+            upstreamRes.on('error', reject);
+          }
+        );
+        upstream.on('error', reject);
+        upstream.end();
+      });
+
+      let bodyBuf = braveResult.buffer;
+      if (braveResult.encoding.toLowerCase().includes('gzip')) {
+        try {
+          bodyBuf = gunzipSync(bodyBuf);
+        } catch (err) {
+          console.error('[Proxy] Brave gunzip failed:', err);
+        }
+      }
+
+      res.writeHead(braveResult.status, { 'Content-Type': 'application/json' });
+      res.end(bodyBuf);
+      return;
+    }
+
     // Beat schema endpoint
     if (pathname === '/api/schema/beats') {
       const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -186,5 +271,6 @@ server.listen(PORT, () => {
   console.log('[API Proxy] Endpoints:');
   console.log('  POST /api/ai/openai - OpenAI-compatible proxy');
   console.log('  POST /api/ai/claude - Claude proxy');
+  console.log('  POST /api/search/brave - Brave Search proxy (Ideator)');
   console.log('  GET  /api/schema/beats - Beat definitions schema');
 });

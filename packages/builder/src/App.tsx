@@ -6,8 +6,12 @@ import { Inspector } from './components/Inspector';
 import { StoryPreview } from './components/preview/StoryPreview';
 import { PreviewWindow } from './pages/PreviewWindow';
 import { DebugWindow } from './pages/DebugWindow';
+import { IdeatorWindow } from './pages/IdeatorWindow';
 import { previewWindowManager, type PreviewWindowState } from './services/PreviewWindowManager';
 import { debugWindowManager } from './services/DebugWindowManager';
+import { ideatorWindowManager } from './services/IdeatorWindowManager';
+import { getAIService } from './services';
+import type { StoryGenerationRequest } from './types/ai';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
@@ -122,6 +126,11 @@ const isPreviewWindowRoute = () => typeof window !== 'undefined' && window.locat
 // Check if we're in the debug window route (pop-out Debug Tools)
 const isDebugWindowRoute = () => typeof window !== 'undefined' && window.location.hash === '#/debug-window';
 
+// Check if we're in the Ideator window route (pop-out ideation tool).
+// Uses startsWith because the hash may carry a ?title=… query string.
+const isIdeatorWindowRoute = () =>
+  typeof window !== 'undefined' && window.location.hash.startsWith('#/ideator-window');
+
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
 
@@ -218,6 +227,11 @@ function App() {
   // Pop-out debug tools window
   if (isDebugWindowRoute()) {
     return <DebugWindow />;
+  }
+
+  // Pop-out Ideator ideation window
+  if (isIdeatorWindowRoute()) {
+    return <IdeatorWindow />;
   }
 
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -5073,6 +5087,57 @@ function App() {
   }, [actions, markChanged, createProject, syncProjectData, saveNow, runAIDebug, globalSettings, setGlobalSettings, pauseAutoSave, resumeAutoSave]);
 
   /**
+   * Handle handoff from the Ideator pop-out. The user has confirmed the
+   * synthesized StoryGenerationRequest; we run it through the existing
+   * story generator and then feed the result into handleStoryGenerated so
+   * it flows through the same validation/theme/auto-layout path as the
+   * in-app Story Generator dialog.
+   *
+   * Errors are alerted on the main window — the pop-out has already shown
+   * a "Sent" confirmation and the user can iterate from there if needed.
+   */
+  const handleIdeatorSubmit = useCallback(
+    async (request: StoryGenerationRequest) => {
+      console.log('[App] Ideator submitted request:', request);
+      const aiService = getAIService();
+      if (!aiService.isReady()) {
+        alert(
+          'AI service is not configured. Open AI → Configure AI and add an API key before using Ideator.'
+        );
+        return;
+      }
+
+      try {
+        const story = await aiService.generateStory(request);
+        await handleStoryGenerated(story);
+        ideatorWindowManager.notifyGenerationComplete();
+      } catch (error) {
+        console.error('[App] Ideator handoff failed:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        ideatorWindowManager.notifyGenerationFailed(message);
+        alert(`Failed to generate story from Ideator prompt:\n${message}`);
+      }
+    },
+    [handleStoryGenerated]
+  );
+
+  // Open the Ideator pop-out, passing the current project title and id so
+  // saved sessions are scoped to this project.
+  const handleOpenIdeator = useCallback(() => {
+    ideatorWindowManager.open({
+      projectTitle: state.title || undefined,
+      projectId: currentProject?.id,
+    });
+  }, [state.title, currentProject?.id]);
+
+  // Subscribe once so the Ideator pop-out's SUBMIT_REQUEST messages land
+  // in handleIdeatorSubmit with its latest closure.
+  useEffect(() => {
+    const unsubscribe = ideatorWindowManager.onSubmit(handleIdeatorSubmit);
+    return unsubscribe;
+  }, [handleIdeatorSubmit]);
+
+  /**
    * Handle AI-generated beat from natural language description
    */
   const handleBeatCreated = useCallback((beatData: any) => {
@@ -5388,6 +5453,7 @@ function App() {
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
         onStoryGenerated={handleStoryGenerated}
         onBeatCreated={handleBeatCreated}
+        onIdeator={handleOpenIdeator}
         onSaveProject={handleSaveProject}
         onRenameProject={handleRenameProject}
         isUntitledProject={isUntitledProject}

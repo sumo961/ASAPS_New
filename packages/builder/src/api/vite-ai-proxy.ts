@@ -13,6 +13,7 @@
 import type { Plugin } from 'vite';
 import { request as httpsRequest } from 'https';
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'http';
+import { gunzipSync } from 'zlib';
 
 /**
  * Make an outgoing request using Node.js native https/http modules
@@ -535,12 +536,117 @@ export function viteAIProxyPlugin(): Plugin {
         }
       });
 
-      // Handle OPTIONS preflight for AI and TTS routes
+      // -----------------------------------------------------------------------
+      // Brave Search proxy (used by the Ideator web_search tool).
+      // Brave does not enable CORS, so the browser cannot call the API
+      // directly — the apiKey travels in the JSON body server-side only.
+      // -----------------------------------------------------------------------
+      server.middlewares.use(async (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        if (req.url !== '/api/search/brave') return next();
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        try {
+          const body = await readBody(req);
+          const parsed = JSON.parse(body);
+          const apiKey = parsed.apiKey as string | undefined;
+          const query = parsed.query as string | undefined;
+          const count = (parsed.count as number | undefined) ?? 5;
+
+          if (!apiKey) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required parameter: apiKey' }));
+            return;
+          }
+          if (!query) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required parameter: query' }));
+            return;
+          }
+
+          const params = new URLSearchParams({
+            q: query,
+            count: String(Math.max(1, Math.min(20, count))),
+          });
+          const endpoint = `https://api.search.brave.com/res/v1/web/search?${params}`;
+          console.log(`[Vite Brave Proxy] "${query}" (count=${count})`);
+
+          // Brave's docs ask for Accept-Encoding: gzip and may return a gzipped
+          // body. We must gunzip server-side before forwarding — the browser
+          // sees Content-Type: application/json with no Content-Encoding, so
+          // forwarding raw gzip bytes produces "malformed (non-UTF8) data".
+          const result = await new Promise<{
+            status: number;
+            buffer: Buffer;
+            encoding: string;
+          }>((resolve, reject) => {
+            const url = new URL(endpoint);
+            const upstream = httpsRequest(
+              {
+                hostname: url.hostname,
+                port: 443,
+                path: url.pathname + url.search,
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json',
+                  'Accept-Encoding': 'gzip',
+                  'X-Subscription-Token': apiKey,
+                },
+              },
+              (upstreamRes: IncomingMessage) => {
+                const chunks: Buffer[] = [];
+                upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
+                upstreamRes.on('end', () =>
+                  resolve({
+                    status: upstreamRes.statusCode || 500,
+                    buffer: Buffer.concat(chunks),
+                    encoding: String(
+                      upstreamRes.headers['content-encoding'] || ''
+                    ),
+                  })
+                );
+                upstreamRes.on('error', reject);
+              }
+            );
+            upstream.on('error', reject);
+            upstream.setTimeout(TTS_TIMEOUT_MS, () => {
+              upstream.destroy(new Error('Request timeout'));
+            });
+            upstream.end();
+          });
+
+          let bodyBuf = result.buffer;
+          if (result.encoding.toLowerCase().includes('gzip')) {
+            try {
+              bodyBuf = gunzipSync(bodyBuf);
+            } catch (err) {
+              console.error('[Vite Brave Proxy] gunzip failed:', err);
+            }
+          }
+
+          res.writeHead(result.status, { 'Content-Type': 'application/json' });
+          res.end(bodyBuf);
+        } catch (error) {
+          console.error('[Vite Brave Proxy] Error:', error);
+          const isTimeout = error instanceof Error && error.message === 'Request timeout';
+          res.writeHead(isTimeout ? 504 : 500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: isTimeout ? 'Request timeout' : 'Brave proxy request failed',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          }));
+        }
+      });
+
+      // Handle OPTIONS preflight for AI, TTS, and search routes
       server.middlewares.use((req, res, next) => {
         if (req.method !== 'OPTIONS') return next();
         const PREFLIGHT_ROUTES = [
           '/api/ai/openai', '/api/ai/claude',
           '/api/tts/openai', '/api/tts/elevenlabs', '/api/tts/elevenlabs/voices',
+          '/api/search/brave',
         ];
         if (!PREFLIGHT_ROUTES.includes(req.url || '')) return next();
 

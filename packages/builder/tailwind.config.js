@@ -23,6 +23,7 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-in': 'slideIn 0.3s ease-out',
+        'indeterminate': 'indeterminate 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite',
       },
       keyframes: {
         fadeIn: {
@@ -32,6 +33,10 @@ export default {
         slideIn: {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(0)' },
+        },
+        indeterminate: {
+          '0%':   { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
         },
       },
     },

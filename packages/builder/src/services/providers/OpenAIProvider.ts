@@ -1305,6 +1305,7 @@ Respond with JSON in this format:
   async generateConversationTurn(request: {
     systemPrompt: string;
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    maxTokens?: number;
   }): Promise<{ text: string }> {
     this.ensureReady();
 
@@ -1316,7 +1317,7 @@ Respond with JSON in this format:
       })),
     ];
 
-    const requestBody = this.buildChatRequest(messages as any, 1000, 0.8);
+    const requestBody = this.buildChatRequest(messages as any, request.maxTokens ?? 1000, 0.8);
 
     let response;
     if (this.useProxy) {
