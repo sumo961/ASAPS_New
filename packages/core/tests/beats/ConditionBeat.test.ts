@@ -973,4 +973,115 @@ describe('ConditionBeat', () => {
       expect(restored.falseTarget).toBe(original.falseTarget);
     });
   });
+
+  /**
+   * Discriminator-typed field persistence (issue #113).
+   *
+   * Pre-fix, ConditionBeat had instance fields for variable / counter /
+   * sentiment / mood / emotion / trait, but goal / characterVariant / XR
+   * fields were silently dropped between `addBeat()` + `updateParameters()`
+   * and `getParameters()`. The Inspector then read undefined for those
+   * fields even though the AI authored them correctly. These tests
+   * exercise the App.tsx flow: construct empty, updateParameters with a
+   * post-pipeline shape, getParameters echoes back.
+   */
+  describe('discriminator-typed field persistence (goal / variant / XR)', () => {
+    function roundTrip(updates: Record<string, any>): Record<string, any> {
+      const beat = new ConditionBeat({
+        id: 'b',
+        name: 'test',
+        type: 'conditionBeat',
+        conditionType: updates.conditionType,
+        trueTarget: 'next',
+      });
+      beat.updateParameters(updates);
+      return beat.getParameters();
+    }
+
+    it('persists goal fields through updateParameters → getParameters', () => {
+      const out = roundTrip({
+        conditionType: 'goal',
+        character: 'mara',
+        goalId: 'reconcile_with_player',
+        goalStatus: 'met',
+        operator: '==',
+      });
+      expect(out.conditionType).toBe('goal');
+      expect(out.character).toBe('mara');
+      expect(out.goalId).toBe('reconcile_with_player');
+      expect(out.goalStatus).toBe('met');
+      expect(out.operator).toBe('==');
+    });
+
+    it('persists characterVariant fields', () => {
+      const out = roundTrip({
+        conditionType: 'characterVariant',
+        character: 'alex',
+        variantId: 'introvert',
+        operator: '==',
+      });
+      expect(out.conditionType).toBe('characterVariant');
+      expect(out.character).toBe('alex');
+      expect(out.variantId).toBe('introvert');
+    });
+
+    it('persists gpsProximity fields', () => {
+      const out = roundTrip({
+        conditionType: 'gpsProximity',
+        targetLat: 40.7128,
+        targetLng: -74.006,
+        radiusMeters: 25,
+        proximityMode: 'within',
+        operator: '<=',
+      });
+      expect(out.conditionType).toBe('gpsProximity');
+      expect(out.targetLat).toBe(40.7128);
+      expect(out.targetLng).toBe(-74.006);
+      expect(out.radiusMeters).toBe(25);
+      expect(out.proximityMode).toBe('within');
+    });
+
+    it('persists indoorProximity fields', () => {
+      const out = roundTrip({
+        conditionType: 'indoorProximity',
+        beaconUuid: 'B0F0-1234-5678-AAAA',
+        beaconRangeMeters: 3,
+        proximityMode: 'within',
+        operator: '<=',
+      });
+      expect(out.conditionType).toBe('indoorProximity');
+      expect(out.beaconUuid).toBe('B0F0-1234-5678-AAAA');
+      expect(out.beaconRangeMeters).toBe(3);
+    });
+
+    it('persists permissionGranted fields', () => {
+      const out = roundTrip({
+        conditionType: 'permissionGranted',
+        permission: 'location',
+        operator: '==',
+      });
+      expect(out.conditionType).toBe('permissionGranted');
+      expect(out.permission).toBe('location');
+    });
+
+    it('preserves goal values across toJSON / new instance round-trip', () => {
+      const original = new ConditionBeat({
+        id: 'b',
+        name: 'test',
+        type: 'conditionBeat',
+        conditionType: 'goal',
+        trueTarget: 'next',
+      });
+      original.updateParameters({
+        character: 'mara',
+        goalId: 'g1',
+        goalStatus: 'met',
+      });
+
+      const json = original.toJSON();
+      const restored = new ConditionBeat(json);
+      expect(restored.goalId).toBe('g1');
+      expect(restored.goalStatus).toBe('met');
+    });
+  });
 });

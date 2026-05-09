@@ -52,6 +52,29 @@ export class ConditionBeat extends Beat {
   // compares (current - story-start value); { bookmark: name } compares
   // (current - bookmarked value). See Condition.baseline in types.
   public baseline?: 'literal' | 'initial' | { bookmark: string };
+  // Goal-specific parameters (Step 8). goalId names the authored goal;
+  // goalStatus is the compared status ('open' | 'met' | 'failed' |
+  // 'abandoned'). The runtime reads either goalStatus directly or
+  // value (string) for back-compat.
+  public goalId?: string;
+  public goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
+  // characterVariant-specific parameter — the variant id under test.
+  public variantId?: string;
+  // XR-condition fields (v0.9.48 / S3+).
+  // gpsProximity: targetLat/Lng + radiusMeters; runtime measures
+  //   haversine distance from cached SensorService location.
+  // indoorProximity: beaconUuid + beaconRangeMeters; runtime reads
+  //   cached beacon distance from SensorService.
+  // permissionGranted: permission name (e.g. 'location' | 'beacons').
+  // proximityMode discriminates 'within' vs 'outside' for both
+  // proximity types.
+  public targetLat?: number;
+  public targetLng?: number;
+  public radiusMeters?: number;
+  public beaconUuid?: string;
+  public beaconRangeMeters?: number;
+  public permission?: string;
+  public proximityMode?: 'within' | 'outside';
 
   constructor(config: BeatConfig & {
     conditionType?: string;
@@ -118,6 +141,18 @@ export class ConditionBeat extends Beat {
     this.emotionName = conditionObj.emotionName || (params as any).emotionName || (config as any).emotionName;
     this.traitName = conditionObj.traitName || (params as any).traitName || (config as any).traitName;
     this.baseline = conditionObj.baseline ?? (params as any).baseline ?? (config as any).baseline;
+    // Goal / characterVariant / XR parameters — same conditionObj-priority
+    // pattern as the other affect-stack fields above.
+    this.goalId = conditionObj.goalId || (params as any).goalId || (config as any).goalId;
+    this.goalStatus = conditionObj.goalStatus || (params as any).goalStatus || (config as any).goalStatus;
+    this.variantId = conditionObj.variantId || (params as any).variantId || (config as any).variantId;
+    this.targetLat = conditionObj.targetLat ?? (params as any).targetLat ?? (config as any).targetLat;
+    this.targetLng = conditionObj.targetLng ?? (params as any).targetLng ?? (config as any).targetLng;
+    this.radiusMeters = conditionObj.radiusMeters ?? (params as any).radiusMeters ?? (config as any).radiusMeters;
+    this.beaconUuid = conditionObj.beaconUuid || (params as any).beaconUuid || (config as any).beaconUuid;
+    this.beaconRangeMeters = conditionObj.beaconRangeMeters ?? (params as any).beaconRangeMeters ?? (config as any).beaconRangeMeters;
+    this.permission = conditionObj.permission || (params as any).permission || (config as any).permission;
+    this.proximityMode = conditionObj.proximityMode || (params as any).proximityMode || (config as any).proximityMode;
 
     // Build condition object based on type
     this.condition = this.buildCondition();
@@ -241,6 +276,16 @@ export class ConditionBeat extends Beat {
       emotionName: this.emotionName,
       traitName: this.traitName,
       baseline: this.baseline,
+      goalId: this.goalId,
+      goalStatus: this.goalStatus,
+      variantId: this.variantId,
+      targetLat: this.targetLat,
+      targetLng: this.targetLng,
+      radiusMeters: this.radiusMeters,
+      beaconUuid: this.beaconUuid,
+      beaconRangeMeters: this.beaconRangeMeters,
+      permission: this.permission,
+      proximityMode: this.proximityMode,
     };
   }
 
@@ -476,6 +521,61 @@ export class ConditionBeat extends Beat {
       this.emotionName = params.emotionName;
     } else if (conditionObj.emotionName !== undefined) {
       this.emotionName = conditionObj.emotionName;
+    }
+
+    // Goal / characterVariant / XR fields — same persistence pattern.
+    // Without these, AI-generated goal/variant/XR conditions silently
+    // lose their fields between addBeat + updateParameters and the
+    // Inspector reads back undefined.
+    if (params.goalId !== undefined) {
+      this.goalId = params.goalId;
+    } else if (conditionObj.goalId !== undefined) {
+      this.goalId = conditionObj.goalId;
+    }
+    if (params.goalStatus !== undefined) {
+      this.goalStatus = params.goalStatus;
+    } else if (conditionObj.goalStatus !== undefined) {
+      this.goalStatus = conditionObj.goalStatus;
+    }
+    if (params.variantId !== undefined) {
+      this.variantId = params.variantId;
+    } else if (conditionObj.variantId !== undefined) {
+      this.variantId = conditionObj.variantId;
+    }
+    if (params.targetLat !== undefined) {
+      this.targetLat = params.targetLat;
+    } else if (conditionObj.targetLat !== undefined) {
+      this.targetLat = conditionObj.targetLat;
+    }
+    if (params.targetLng !== undefined) {
+      this.targetLng = params.targetLng;
+    } else if (conditionObj.targetLng !== undefined) {
+      this.targetLng = conditionObj.targetLng;
+    }
+    if (params.radiusMeters !== undefined) {
+      this.radiusMeters = params.radiusMeters;
+    } else if (conditionObj.radiusMeters !== undefined) {
+      this.radiusMeters = conditionObj.radiusMeters;
+    }
+    if (params.beaconUuid !== undefined) {
+      this.beaconUuid = params.beaconUuid;
+    } else if (conditionObj.beaconUuid !== undefined) {
+      this.beaconUuid = conditionObj.beaconUuid;
+    }
+    if (params.beaconRangeMeters !== undefined) {
+      this.beaconRangeMeters = params.beaconRangeMeters;
+    } else if (conditionObj.beaconRangeMeters !== undefined) {
+      this.beaconRangeMeters = conditionObj.beaconRangeMeters;
+    }
+    if (params.permission !== undefined) {
+      this.permission = params.permission;
+    } else if (conditionObj.permission !== undefined) {
+      this.permission = conditionObj.permission;
+    }
+    if (params.proximityMode !== undefined) {
+      this.proximityMode = params.proximityMode;
+    } else if (conditionObj.proximityMode !== undefined) {
+      this.proximityMode = conditionObj.proximityMode;
     }
 
     // Rebuild condition object from extracted canonical values
