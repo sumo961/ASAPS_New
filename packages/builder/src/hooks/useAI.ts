@@ -254,17 +254,12 @@ export function useAI() {
     // 100ms is fast enough to feel live, slow enough to actually flush.
     const callerOnProgress = request.onProgress;
     let lastUiUpdate = 0;
-    let setStateCount = 0;
     const wrappedRequest: StoryGenerationRequest = {
       ...request,
       onProgress: (chars: number) => {
         const now = performance.now();
         if (now - lastUiUpdate >= 100) {
           lastUiUpdate = now;
-          setStateCount++;
-          if (setStateCount <= 3 || setStateCount % 25 === 0) {
-            console.log(`[useAI] setState #${setStateCount}: generationProgress = ${chars}`);
-          }
           setState(prev => ({ ...prev, generationProgress: chars }));
         }
         callerOnProgress?.(chars);

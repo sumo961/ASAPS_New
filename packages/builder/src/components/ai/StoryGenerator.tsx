@@ -30,12 +30,6 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
 }) => {
   const { isConfigured, isGenerating, error, generateStory, clearError, cancelGeneration, currentProvider, generationProgress } = useAI();
 
-  // Diagnostic: log on every render during generation to verify whether
-  // setState is actually triggering the re-renders we expect.
-  if (isGenerating) {
-    console.log(`[StoryGenerator] render — isGenerating=${isGenerating} generationProgress=${generationProgress}`);
-  }
-
   const [prompt, setPrompt] = useState('');
   const [genre, setGenre] = useState<string>('');
   const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');

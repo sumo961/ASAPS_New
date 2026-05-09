@@ -164,7 +164,6 @@ export class OpenAIProvider extends BaseAIProvider {
     // shape the buffered path returns so downstream code can stay
     // identical: `response.choices[0].message.content`.
     if (isStreaming && response.body) {
-      console.log('[OpenAIProvider] entering streaming branch, onProgress=', !!onProgress);
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = '';
@@ -175,12 +174,9 @@ export class OpenAIProvider extends BaseAIProvider {
         chunkCount++;
         accumulated += decoder.decode(value, { stream: true });
         if (onProgress) onProgress(accumulated.length);
-        if (chunkCount === 1 || chunkCount % 50 === 0) {
-          console.log(`[OpenAIProvider] chunk ${chunkCount}, total ${accumulated.length} chars`);
-        }
       }
       accumulated += decoder.decode();
-      console.log(`[OpenAIProvider] stream done, ${chunkCount} chunks, ${accumulated.length} total chars`);
+      console.log(`[OpenAIProvider] stream complete: ${chunkCount} chunks, ${accumulated.length} chars`);
       return {
         choices: [{ message: { content: accumulated } }],
         // Synthesize a finish_reason so existing truncation-detection
