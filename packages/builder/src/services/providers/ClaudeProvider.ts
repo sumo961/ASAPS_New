@@ -568,15 +568,24 @@ Respond with JSON in this format:
       result: string;
     }> = [];
     const maxIter = request.maxIterations ?? 5;
+    // Honour user-configured maxTokens (matches the pattern in
+    // buildChatRequest elsewhere in this file). 1500 was too tight for
+    // tool loops where the model wants to think before calling — bumped
+    // default to 8192.
+    const toolLoopMaxTokens = this.config?.maxTokens || 8192;
 
     for (let iter = 0; iter < maxIter; iter++) {
       const requestBody = {
         model: this.model,
-        max_tokens: 1500,
+        max_tokens: toolLoopMaxTokens,
         system: request.systemPrompt,
         tools: request.tools,
         messages,
       };
+      console.log(
+        `[ClaudeProvider] tool-loop iter ${iter}/${maxIter}, ` +
+          `${messages.length} messages, requesting up to ${requestBody.max_tokens} tokens`,
+      );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let response: any;
@@ -591,6 +600,13 @@ Respond with JSON in this format:
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const blocks = (response.content ?? []) as any[];
       const toolUses = blocks.filter(b => b?.type === 'tool_use');
+      const textLen = blocks
+        .filter(b => b?.type === 'text')
+        .reduce((n, b) => n + String(b.text ?? '').length, 0);
+      console.log(
+        `[ClaudeProvider] iter ${iter} response: stop=${response.stop_reason}, ` +
+          `text_len=${textLen}, tool_uses=${toolUses.length}`,
+      );
 
       if (toolUses.length === 0) {
         // No tools requested — concatenate any text blocks and return.
@@ -599,6 +615,7 @@ Respond with JSON in this format:
           .map(b => String(b.text ?? ''))
           .join('\n')
           .trim();
+        console.log(`[ClaudeProvider] tool-loop done at iter ${iter}, returning ${text.length} chars`);
         return { text, toolCalls };
       }
 

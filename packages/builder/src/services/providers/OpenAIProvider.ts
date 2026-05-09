@@ -1394,17 +1394,21 @@ Respond with JSON in this format:
     }> = [];
     const maxIter = request.maxIterations ?? 5;
 
+    // Reasoning models (Kimi K2.6, Moonshot reasoning variants) can emit
+    // several thousand tokens of reasoning_content before the tool_calls
+    // portion of the message even starts. The previous hardcoded 1500
+    // truncated mid-arguments-JSON, which silently cascaded into
+    // malformed tool input and loop stalls. Honour the user-configured
+    // maxTokens (matches buildChatRequest behavior elsewhere in this
+    // file), default to 8192 so reasoning_content has room to breathe.
+    const toolLoopMaxTokens = this.config?.maxTokens ?? 8192;
+
     for (let iter = 0; iter < maxIter; iter++) {
       const requestBody = {
         model: this.model || 'gpt-4o',
         messages,
         tools: openaiTools,
-        // Reasoning models (Kimi K2.6, Moonshot reasoning variants) can
-        // emit several thousand tokens of reasoning_content before the
-        // tool_calls portion of the message even starts. 1500 tokens was
-        // truncating mid-arguments-JSON, which cascaded into malformed
-        // tool input and silent loop spins. Bumped to 4096.
-        max_tokens: 4096,
+        max_tokens: toolLoopMaxTokens,
       };
       console.log(
         `[OpenAIProvider] tool-loop iter ${iter}/${maxIter}, ` +
