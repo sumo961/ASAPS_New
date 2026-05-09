@@ -2179,6 +2179,12 @@
           "required": false,
           "description": "Beat to restart to"
         },
+        "connection": {
+          "type": "connection",
+          "required": false,
+          "description": "Alias of restartTarget — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target.",
+          "ui": { "hidden": true }
+        },
         "resetOnRestart": {
           "type": "boolean",
           "required": false,
