@@ -148,8 +148,28 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   // Basic Info Tab
   const renderBasicTab = () => (
     <div className="space-y-4">
+      {/* ID — the canonical reference key. Frozen after creation because
+          conditions, sentiments, AI prompts, and saved-state snapshots
+          all key off this value; renaming would break references. Shown
+          read-only so authors can verify what's referenced from elsewhere
+          (e.g. when the Inspector's Toward / Character autocomplete shows
+          the lowercase slug, this is what they're seeing). */}
       <div>
-        <label className="block text-sm font-medium mb-1">Internal Name</label>
+        <label className="block text-sm font-medium mb-1">ID</label>
+        <input
+          type="text"
+          value={editedCharacter.id}
+          readOnly
+          className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-700 font-mono text-sm cursor-not-allowed"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Frozen after creation. Used everywhere a character is referenced —
+          conditions, sentiment targets, AI prompts, save-state.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Code Name</label>
         <input
           type="text"
           value={editedCharacter.name}
@@ -157,7 +177,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="e.g., player, old_wizard"
         />
-        <p className="text-xs text-gray-500 mt-1">Used in code and exports (no spaces)</p>
+        <p className="text-xs text-gray-500 mt-1">
+          Short label used in AI prompts and exports. Often matches the ID
+          in lowercase but can differ — this is editable, the ID is not.
+        </p>
       </div>
 
       <div>
