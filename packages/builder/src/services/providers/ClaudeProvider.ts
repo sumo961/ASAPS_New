@@ -226,11 +226,12 @@ export class ClaudeProvider extends BaseAIProvider {
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
       const thinkingBudget = this.getThinkingBudget();
 
+      // `temperature` is omitted: newer Anthropic models reject it as
+      // deprecated, and extended thinking requires it to equal 1 or be
+      // omitted anyway. The API default is fine for story generation.
       const requestBody: any = {
         model: this.model,
         max_tokens: maxTokens,
-        // Extended thinking requires temperature=1.0; regular calls use the configured value.
-        temperature: thinkingBudget ? 1.0 : (this.config?.temperature || 0.7),
         system: systemPrompt,
         messages: [
           {
@@ -314,10 +315,10 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating dialog with Claude...');
 
     return this.withRetry(async () => {
+      // `temperature` omitted — newer Anthropic models reject it as deprecated.
       const requestBody = {
         model: this.model,
         max_tokens: 4000,
-        temperature: this.config?.temperature || 0.7,
         system: systemPrompt,
         messages: [
           {
@@ -370,10 +371,10 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating beat suggestions with Claude...');
 
     return this.withRetry(async () => {
+      // `temperature` omitted — newer Anthropic models reject it as deprecated.
       const requestBody = {
         model: this.model,
         max_tokens: 3000,
-        temperature: this.config?.temperature || 0.6,
         system: systemPrompt,
         messages: [
           {
@@ -445,10 +446,10 @@ Respond with JSON in this format:
     console.log('[ClaudeProvider] Creating beat from natural language with Claude...');
 
     return this.withRetry(async () => {
+      // `temperature` omitted — newer Anthropic models reject it as deprecated.
       const requestBody = {
         model: this.model,
         max_tokens: 2000,
-        temperature: this.config?.temperature || 0.7,
         system: systemPrompt,
         messages: [
           {
@@ -503,10 +504,10 @@ Respond with JSON in this format:
         content: m.content,
       }));
 
+    // `temperature` omitted — newer Anthropic models reject it as deprecated.
     const requestBody = {
       model: this.model,
       max_tokens: request.maxTokens ?? 1000,
-      temperature: this.config?.temperature ?? 0.8,
       system: request.systemPrompt,
       messages: claudeMessages,
     };
