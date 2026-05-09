@@ -1435,11 +1435,23 @@ Respond with JSON in this format:
       // Echo the assistant's tool_calls message back into history. OpenAI
       // requires the tool_call_id on the subsequent role:tool messages to
       // match an id from this assistant message.
-      messages.push({
+      //
+      // Kimi-specific: when reasoning is enabled, the response message
+      // includes a `reasoning_content` field. Kimi rejects subsequent
+      // requests with 400 "thinking is enabled but reasoning_content is
+      // missing in assistant tool call message" if we don't echo it
+      // back. Forward it when present; non-Kimi providers ignore the
+      // extra field.
+      const echoMessage: Record<string, unknown> = {
         role: 'assistant',
         content: message.content ?? null,
         tool_calls: requestedToolCalls,
-      });
+      };
+      const reasoningContent = (message as Record<string, unknown>)?.reasoning_content;
+      if (reasoningContent !== undefined && reasoningContent !== null) {
+        echoMessage.reasoning_content = reasoningContent;
+      }
+      messages.push(echoMessage);
 
       // Run each tool. Keep sequential ordering (Anthropic-side rationale
       // applies here too — deterministic chip ordering in the UI store).
