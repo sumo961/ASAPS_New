@@ -1333,4 +1333,155 @@ Respond with JSON in this format:
 
     return { text: content.trim() };
   }
+
+  /**
+   * Multi-turn chat with tool use, OpenAI-compatible flavour.
+   *
+   * Mirrors ClaudeProvider.generateChatWithTools so Ideator (and any
+   * future tool-using flow) can run against OpenAI / Kimi / Moonshot /
+   * any OpenAI-compatible endpoint that supports function calling.
+   *
+   * The request shape matches Claude's: tools is an array of
+   * Anthropic-style { name, description, input_schema } specs. We
+   * translate to OpenAI's { type: 'function', function: { name,
+   * description, parameters } } on the way in, and translate
+   * tool_calls (with arguments as JSON strings) back to the Anthropic
+   * { name, input } shape on the way out so Ideator's executor and
+   * onToolUse callbacks see a consistent contract regardless of
+   * provider.
+   *
+   * Tool-result framing is OpenAI's: role="tool" messages with
+   * tool_call_id pairs the result to its originating tool_calls entry.
+   * The assistant message containing tool_calls must be echoed back
+   * verbatim before the tool messages, mirroring the Anthropic
+   * requirement on the Claude side.
+   */
+  async generateChatWithTools(request: {
+    systemPrompt: string;
+    messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    tools: Array<{ name: string; description: string; input_schema: unknown }>;
+    executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
+    onToolUse?: (name: string, input: Record<string, unknown>) => void;
+    maxIterations?: number;
+  }): Promise<{
+    text: string;
+    toolCalls: Array<{ name: string; input: Record<string, unknown>; result: string }>;
+  }> {
+    this.ensureReady();
+
+    // OpenAI requires the system prompt as a regular message rather than a
+    // top-level field. Build the running message array with system first.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const messages: any[] = [
+      { role: 'system', content: request.systemPrompt },
+      ...request.messages.map((m) => ({ role: m.role, content: m.content })),
+    ];
+
+    // Translate Anthropic-style tool specs to OpenAI function-calling shape.
+    const openaiTools = request.tools.map((t) => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.input_schema,
+      },
+    }));
+
+    const toolCalls: Array<{
+      name: string;
+      input: Record<string, unknown>;
+      result: string;
+    }> = [];
+    const maxIter = request.maxIterations ?? 5;
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      const requestBody = {
+        model: this.model || 'gpt-4o',
+        messages,
+        tools: openaiTools,
+        max_tokens: 1500,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let response: any;
+      if (this.useProxy) {
+        response = await this.makeProxyRequest(requestBody);
+      } else {
+        // OpenAI SDK types `function.parameters` strictly; we accept
+        // unknown here to keep the Anthropic-style ChatToolSpec shape
+        // portable across providers. Runtime is fine.
+        response = await this.client!.chat.completions.create(requestBody as any);
+      }
+
+      const choice = response.choices?.[0];
+      const message = choice?.message;
+      const requestedToolCalls = message?.tool_calls as
+        | Array<{
+            id: string;
+            type: 'function';
+            function: { name: string; arguments: string };
+          }>
+        | undefined;
+
+      if (!requestedToolCalls || requestedToolCalls.length === 0) {
+        // No tools requested — return the assistant text. Some providers
+        // (Kimi reasoning models) sometimes return null content alongside
+        // tool_calls; clamp to empty string so downstream synthesis
+        // doesn't choke.
+        const text = (message?.content ?? '').toString().trim();
+        return { text, toolCalls };
+      }
+
+      // Echo the assistant's tool_calls message back into history. OpenAI
+      // requires the tool_call_id on the subsequent role:tool messages to
+      // match an id from this assistant message.
+      messages.push({
+        role: 'assistant',
+        content: message.content ?? null,
+        tool_calls: requestedToolCalls,
+      });
+
+      // Run each tool. Keep sequential ordering (Anthropic-side rationale
+      // applies here too — deterministic chip ordering in the UI store).
+      for (const tc of requestedToolCalls) {
+        const name = tc.function?.name ?? '';
+        let input: Record<string, unknown> = {};
+        try {
+          input = tc.function?.arguments
+            ? (JSON.parse(tc.function.arguments) as Record<string, unknown>)
+            : {};
+        } catch {
+          // Malformed arguments JSON — treat as empty input. The tool
+          // implementation can decide how to handle missing fields.
+          input = {};
+        }
+
+        try {
+          request.onToolUse?.(name, input);
+        } catch {
+          /* host UI errors must never break the loop */
+        }
+
+        let result: string;
+        try {
+          result = await request.executeTool(name, input);
+        } catch (err) {
+          result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        toolCalls.push({ name, input, result });
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: result,
+        });
+      }
+    }
+
+    return {
+      text:
+        '(Reached the maximum number of tool steps for this turn — let me know what you would like to focus on.)',
+      toolCalls,
+    };
+  }
 }

@@ -1871,7 +1871,10 @@ Return ONLY the corrected JSON, no explanation needed.
 
     if (!provider.generateChatWithTools) {
       throw new Error(
-        `Provider "${provider.name}" does not support tool-use chat (only Claude does in this build)`
+        `Provider "${provider.name}" does not support tool-use chat. ` +
+          `Claude and OpenAI-compatible providers (OpenAI, Kimi, Moonshot) ` +
+          `support it; local-only Ollama variants without function-call ` +
+          `support do not.`
       );
     }
 

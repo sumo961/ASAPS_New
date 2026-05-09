@@ -114,7 +114,17 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
       }
 
       const braveKey = getSavedBraveApiKey();
-      const useTools = !!braveKey && currentProvider === 'claude';
+      // Brave-via-tool-use works on any provider that supports function
+      // calling. Claude uses Anthropic's tool-use schema; OpenAI / Kimi /
+      // Moonshot / OpenAI-compatible endpoints use OpenAI function-calling.
+      // Both flavours are implemented in their respective providers'
+      // generateChatWithTools (translation between schemas happens inside
+      // OpenAIProvider). Local-only providers (Ollama variants without
+      // tool-call support) will fall back at AIService.generateChatWithTools
+      // which throws; we catch and surface to the user. Until then —
+      // anyone with a Brave key and a Claude OR OpenAI-compatible
+      // provider gets web search.
+      const useTools = !!braveKey && (currentProvider === 'claude' || currentProvider === 'openai');
 
       const systemPrompt = buildInterviewSystemPrompt({
         projectTitle,
@@ -134,9 +144,9 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
               return `Unknown tool: ${name}`;
             }
             const r = await executor(input);
-            // Append a chip BEFORE returning the text to Claude — the user
-            // sees the search land in the transcript regardless of whether
-            // Claude's eventual reply mentions it.
+            // Append a chip BEFORE returning the text to the model — the
+            // user sees the search land in the transcript regardless of
+            // whether the model's eventual reply mentions it.
             addMessage({
               role: 'assistant',
               content: '',

@@ -447,7 +447,11 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             />
             <p className="mt-1 text-xs text-gray-500">
               When set, Ideator can search the web mid-conversation to bring in
-              context on the topic you're discussing. Get a free key at{' '}
+              context on the topic you're discussing. Works on any provider
+              that supports tool/function calling — Claude, OpenAI, Kimi /
+              Moonshot, and OpenAI-compatible endpoints. Local-only Ollama
+              variants without function-call support fall back to chat-only.
+              Get a free key at{' '}
               <span className="font-mono">api.search.brave.com</span>. Leave
               empty to use Ideator without web search.
             </p>
