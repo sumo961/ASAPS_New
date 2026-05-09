@@ -1,5 +1,177 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-09: Streaming Progress UI + ConditionBeat Sentiment Persistence (v0.9.52)
+
+### Overview
+
+Three reliability + UX improvements that round out the v0.9.51 schema
+refactor and address gaps surfaced during testing:
+
+  - **Streaming progress UI** (task #112): live "Generating… N chars"
+    char counter in the StoryGenerator dialog, plus the operational
+    win of warm connections that should eliminate the 504 timeouts
+    seen with the buffered path on slow models.
+  - **ConditionBeat sentiment field persistence**: Inspector showed
+    empty Toward/Emotion fields on AI-generated sentiment conditions
+    even though the saved debug had the correct values — `ConditionBeat.
+    updateParameters` was the broken bridge.
+  - **`updateAffect.effects` schema declaration**: silenced the
+    AIValidator false-positive warning on every v0.9.45+ canonical
+    multi-row affect bundle.
+
+No new authoring features. The v0.9.51 architectural goal (one
+schema-driven path) holds — these are bug fixes against gaps
+discovered while exercising it on real AI generations.
+
+### Streaming progress UI (commits 551a1df + 34b99e2 + 5be0b81)
+
+Two real wins, only one of them visible:
+
+**Operational (more important than the visible part):** The buffered
+proxy path leaves the connection idle for minutes during reasoning
+pauses; intermediaries (Cloudflare, our proxy, fetch defaults)
+eventually decide it's dead and 504 the connection. With streaming,
+content tokens flow continuously, the connection stays warm, and
+the 504 class of failure goes away. Verified live on Kimi: 7,490
+upstream chunks over 144 seconds in one test, all delivered without
+a single timeout.
+
+**Visible:** The Cancel-button area shows "Generating… 12,345 chars"
+with the count ticking up live. Useful as a "yes, it's still working"
+indicator during 30-90s generations.
+
+**Architecture:**
+
+  - **Vite proxy (`vite-ai-proxy.ts`)**: when request body has
+    `stream: true`, route to `streamingProxyRequest` which opens an
+    SSE connection to OpenAI/Claude, parses chunk frames inline,
+    extracts the assistant's content delta, and forwards plain text
+    content tokens to the client as chunked text/plain. Headers
+    `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering:
+    no` defeat downstream buffering.
+
+  - **OpenAIProvider.makeProxyRequest**: detects `stream: true`,
+    reads `response.body` via `getReader()` + `TextDecoder`,
+    accumulates content, calls `onProgress(charsReceived)` per
+    chunk. Wraps the assembled string in `{ choices: [{ message:
+    { content } }] }` so downstream code is identical to the
+    buffered path — schema-driven pipeline, JSON parse, normalize
+    all stay unchanged.
+
+  - **Plumbing**: `StoryGenerationRequest` gains
+    `onProgress?: (chars) => void` alongside `signal`. AIService
+    spreads the request through to providers. `useAI.generateStory`
+    wraps the caller's onProgress with a 10Hz-throttled version that
+    updates a new `generationProgress: number` state field.
+    StoryGenerator dialog reads that field and shows the live
+    counter.
+
+  - **React 18 throttle**: state updates inside a tight async
+    streaming loop get collapsed by React 18's automatic batching
+    — chunks arrive dozens of times per second and the scheduler
+    coalesces all setState calls into one. Throttle to 10Hz (one
+    update per 100ms) gives React's scheduler enough breathing room
+    between updates to flush actual renders.
+
+**Direct API path** (Ollama, etc.) intentionally NOT switched to
+streaming: local servers don't have the intermediary-timeout
+problem the proxy was solving.
+
+**Cheap version per task scope**: progress UI without incremental
+JSON parsing. Per-beat live preview deferred — would need a
+tolerant streaming JSON parser, beat-completion detection, and
+graceful handling of mid-beat truncation. Worth doing separately
+if there's appetite.
+
+### ConditionBeat sentiment field persistence (commit 52f851e)
+
+Concrete user report: an AI-generated sentiment conditionBeat had
+the correct shape in the saved debug —
+
+```
+"conditionType": "sentiment", "character": "alex",
+"sentimentTarget": "player", "sentimentEmotion": "trust",
+"baseline": "initial"
+```
+
+— but the Inspector rendered Toward (target) and Emotion fields as
+empty. Inspector reads from `localBeat.parameters?.sentimentTarget`,
+saved beat HAD that key, yet Inspector saw undefined.
+
+**Trace:** `App.tsx handleStoryGenerated` calls
+`actions.addBeat(type, position, {id, name})` to create a fresh
+ConditionBeat with no parameters, then `beat.updateParameters(params)`
+with the post-pipeline shape including sentimentTarget at top
+level. `ConditionBeat.updateParameters` handles `variableName`,
+`value`, `operator`, `character`, `traitName`, `baseline` — but
+DOES NOT handle `sentimentTarget`, `sentimentEmotion`, `moodAxis`,
+or `emotionName`. Those fields stay undefined on the instance,
+`getParameters()` returns undefined for them, Inspector renders
+empty.
+
+The constructor at line 116 handled all these correctly — but the
+update path that the AI flow uses was missing them. Added the four
+fields with the same direct-params-priority-over-conditionObj
+pattern the existing code uses.
+
+**Discovered scope creep, logged for later (#113):** ConditionBeat
+has no instance fields at all for `goalId`, `goalStatus`, `variantId`
+(characterVariant), or any XR-condition field (`targetLat`,
+`targetLng`, `radiusMeters`, `beaconUuid`, `beaconRangeMeters`,
+`permission`, `proximityMode`). Those condition types are silently
+broken end-to-end: schema declares them, Inspector renders fields
+for them, pipeline flattens them onto top-level params, but the
+Beat class never learned to store them. Out of scope for this
+release; tracked separately.
+
+### updateAffect.effects schema declaration (commit b77eaf0)
+
+v0.9.45 migrated `updateAffect` to a multi-row Effects[] shape via
+ChoiceEffectsEditor, but the schema's parameter list never got the
+`effects` declaration alongside the legacy single-row fields
+(`moodValenceDelta`, `sentimentTarget`, `sentimentDelta`, …). AI
+generations that emit the canonical effects array triggered
+"Parameter 'effects' not defined in schema for beat type
+'updateAffect'" warnings on every story.
+
+Declared `effects: { type: array, required: false, ui: hidden }`
+with description clarifying it's the v0.9.45+ canonical form.
+ChoiceEffectsEditor handles editing — Inspector should not render
+it as a raw textarea.
+
+### Bonus: cleaner upstream error messages
+
+Carry-over from late v0.9.51 testing (commit af7866b): both
+OpenAIProvider and ClaudeProvider now read upstream error bodies
+as text first, attempt JSON.parse, and fall back to clipped raw
+text when parsing fails. CDN/Envoy 5xx errors with plaintext
+bodies (e.g. "upstream connect error and disconnect/reset before
+headers...") now surface as readable error messages instead of
+"SyntaxError: Unexpected token 'u'".
+
+### Files modified
+
+**Streaming UI:**
+- `packages/builder/src/api/vite-ai-proxy.ts` — streamingProxyRequest,
+  SSE parser, timing diagnostics
+- `packages/builder/src/services/providers/OpenAIProvider.ts` —
+  streaming branch, accumulator + onProgress per chunk
+- `packages/builder/src/types/ai.ts` — onProgress on StoryGenerationRequest
+- `packages/builder/src/hooks/useAI.ts` — generationProgress state,
+  throttled wrapper
+- `packages/builder/src/components/ai/StoryGenerator.tsx` —
+  live char counter in button text
+
+**ConditionBeat sentiment:**
+- `packages/core/src/beats/ConditionBeat.ts` —
+  moodAxis / sentimentTarget / sentimentEmotion / emotionName in
+  updateParameters
+
+**Schema:**
+- `beat-definitions/core-beats.json` — updateAffect.effects parameter
+
+---
+
 ## 2026-05-08: Schema-Driven Normalize/Validate Pipeline + Cancel Button (v0.9.51)
 
 ### Overview
