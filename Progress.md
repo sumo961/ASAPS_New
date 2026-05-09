@@ -9,8 +9,8 @@ Two user-visible additions:
   - **Ideator** — a conversational ideation pop-out that interviews
     authors about a complex issue, optionally researches via Brave
     Search, then synthesizes a `StoryGenerationRequest` that flows
-    through the existing AI generator. Originally built by a student
-    contributor on a v0.9.33 fork; integrated into current main with
+    through the existing AI generator. Built in collaboration with
+    @ChidaluOC on a v0.9.33 fork; integrated into current main with
     the schema-driven pipeline + Cancel button + streaming intact.
   - **Character ID clarity** — UI fixes for two reported confusions:
     the Character Editor mislabeled `name` as "Internal Name" when
@@ -24,9 +24,11 @@ during the Ideator merge process.
 
 ### Ideator (PR #2 — feat/ideator-integration)
 
-The student's branch had been waiting at v0.9.33 for almost two
+@ChidaluOC's branch had been waiting at v0.9.33 for almost two
 months with a single coherent commit ("completed first iteration for
-user test"). Manual port preserved his architecture verbatim while
+user test"). The feature was authored in collaboration — concept,
+brief and seed prompt by Hartmut Koenitz; implementation by
+@ChidaluOC. Manual port preserved his architecture verbatim while
 sidestepping all the v0.9.34–v0.9.52 churn between branches.
 
 **Architecture** (he understood our existing patterns):
@@ -82,9 +84,10 @@ preserved):**
     forwarded to Claude as text). Plus `temperature` removed from
     all five Claude request bodies — newer Anthropic models reject
     it as deprecated, and extended thinking has always required it
-    to equal 1 or be omitted. The student had this fix; I dismissed
-    it in PR notes ("our path still works") which turned out to be
-    wrong on the model the user is actually running. Restored.
+    to equal 1 or be omitted. @ChidaluOC's branch had this fix; I
+    dismissed it in PR notes ("our path still works") which turned
+    out to be wrong on the model the user is actually running.
+    Restored.
   - `services/providers/OpenAIProvider.ts` — maxTokens? on
     generateConversationTurn so Ideator's synthesis step can cap
     higher than 1000
