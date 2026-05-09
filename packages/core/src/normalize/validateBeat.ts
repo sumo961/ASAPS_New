@@ -70,7 +70,17 @@ export function validateBeat(
     // requirements.
     if (beatSpec.nested && Object.prototype.hasOwnProperty.call(beatSpec.nested, name)) continue;
     const value = params[name];
-    if (value === undefined || value === null || value === '') {
+    // Empty string counts as missing ONLY for string-typed fields. For
+    // `any` / `number` / `boolean` / `array` / `object`, an empty string
+    // could be a legitimate placeholder (e.g. setVariable.value="" on a
+    // type=fictionalTime / operation=set beat where the runtime ignores
+    // value). Without this carve-out, post-pipeline validation rejects
+    // shapes the runtime accepts.
+    const isMissing =
+      value === undefined ||
+      value === null ||
+      (value === '' && (spec.type === undefined || spec.type === 'string'));
+    if (isMissing) {
       errors.push({
         path: `${path}.parameters.${name}`,
         message: `Required parameter '${name}' is missing`,

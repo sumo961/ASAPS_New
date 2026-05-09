@@ -164,3 +164,77 @@ describe('validateBeat — reference resolution', () => {
     void refIndex;
   });
 });
+
+describe('validateBeat — empty-string-as-missing semantics (issue #120)', () => {
+  it("treats '' as missing for required string-typed fields", () => {
+    // addRemoveInventory.item is type=string, required=true. Empty string is missing.
+    const beat = {
+      id: 'b',
+      type: 'addRemoveInventory',
+      parameters: {
+        action: 'add',
+        item: '',
+        character: 'player',
+        connection: { target: 'next' },
+      },
+    };
+    const result = validateBeat(beat, schema, {
+      characterIds: new Set(),
+      beatIds: new Set(),
+      clusterNames: new Set(),
+      assetIds: new Set(),
+    });
+    expect(result.errors.find(e => e.message.includes("'item'"))).toBeDefined();
+  });
+
+  it("does NOT treat '' as missing for required `any`-typed fields", () => {
+    // setVariable.value is type=any, required=true. The AI emits value="" as a
+    // placeholder for type=fictionalTime / operation=set beats where the runtime
+    // ignores value. Empty string must NOT be flagged as missing for `any`.
+    const beat = {
+      id: 'b',
+      type: 'setVariable',
+      parameters: {
+        type: 'fictionalTime',
+        operation: 'set',
+        name: 'variable',
+        value: '',
+        timeYear: 2024,
+        timeMonth: 1,
+        timeDay: 1,
+        timeHour: 9,
+        timeMinute: 0,
+        connection: { target: 'next' },
+      },
+    };
+    const result = validateBeat(beat, schema, {
+      characterIds: new Set(),
+      beatIds: new Set(),
+      clusterNames: new Set(),
+      assetIds: new Set(),
+    });
+    expect(result.errors.find(e => e.message.includes("'value'"))).toBeUndefined();
+    // And the fictionalTime fields should pass through cleanly with no warnings
+    expect(result.warnings.find(w => /timeYear|timeMonth|timeDay|timeHour|timeMinute/.test(w.message))).toBeUndefined();
+  });
+
+  it("still flags genuinely missing (undefined) `any` values", () => {
+    const beat = {
+      id: 'b',
+      type: 'setVariable',
+      parameters: {
+        type: 'variable',
+        name: 'gold',
+        // value omitted entirely — this IS missing
+        connection: { target: 'next' },
+      },
+    };
+    const result = validateBeat(beat, schema, {
+      characterIds: new Set(),
+      beatIds: new Set(),
+      clusterNames: new Set(),
+      assetIds: new Set(),
+    });
+    expect(result.errors.find(e => e.message.includes("'value'"))).toBeDefined();
+  });
+});

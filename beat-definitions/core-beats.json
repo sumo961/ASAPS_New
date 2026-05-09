@@ -946,35 +946,71 @@
       "category": "invisible",
       "displayName": "Set Variable/Counter",
       "icon": "🔧",
-      "description": "Modify story variables or counters",
+      "description": "Modify story variables or counters (or fictional-time clock)",
       "connectionType": "single",
       "parameters": {
         "type": {
           "type": "string",
           "required": true,
           "default": "variable",
-          "description": "Type: variable or counter"
+          "description": "Discriminator: 'variable' | 'counter' | 'fictionalTime'. Drives which fields below are read at runtime."
         },
         "name": {
           "type": "string",
           "required": true,
-          "description": "Variable or counter name"
+          "description": "Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead)"
         },
         "value": {
           "type": "any",
           "required": true,
-          "description": "New value (string for variables, number for counters)"
+          "description": "New value (string for variables, number for counters). For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value."
         },
         "operation": {
           "type": "string",
           "required": false,
           "default": "set",
-          "description": "For counters: set or change. For variables: set only"
+          "description": "Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'."
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Next beat after variable/counter is set"
+        },
+        "timeYear": {
+          "type": "number",
+          "required": false,
+          "description": "type='fictionalTime' / operation='set' only. Year component (e.g. 2024).",
+          "ui": { "hidden": true }
+        },
+        "timeMonth": {
+          "type": "number",
+          "required": false,
+          "description": "type='fictionalTime' / operation='set' only. Month component (1-12).",
+          "ui": { "hidden": true }
+        },
+        "timeDay": {
+          "type": "number",
+          "required": false,
+          "description": "type='fictionalTime' / operation='set' only. Day component (1-31).",
+          "ui": { "hidden": true }
+        },
+        "timeHour": {
+          "type": "number",
+          "required": false,
+          "description": "type='fictionalTime' / operation='set' only. Hour component (0-23).",
+          "ui": { "hidden": true }
+        },
+        "timeMinute": {
+          "type": "number",
+          "required": false,
+          "description": "type='fictionalTime' / operation='set' only. Minute component (0-59).",
+          "ui": { "hidden": true }
+        },
+        "timeUnit": {
+          "type": "string",
+          "required": false,
+          "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'months' | 'years'.",
+          "ui": { "hidden": true }
         }
       },
       "transitions": false,
