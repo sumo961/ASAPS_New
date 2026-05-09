@@ -1,5 +1,215 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-09: Ideator Conversational Ideation Tool + Character ID Clarity (v0.9.53)
+
+### Overview
+
+Two user-visible additions:
+
+  - **Ideator** — a conversational ideation pop-out that interviews
+    authors about a complex issue, optionally researches via Brave
+    Search, then synthesizes a `StoryGenerationRequest` that flows
+    through the existing AI generator. Originally built by a student
+    contributor on a v0.9.33 fork; integrated into current main with
+    the schema-driven pipeline + Cancel button + streaming intact.
+  - **Character ID clarity** — UI fixes for two reported confusions:
+    the Character Editor mislabeled `name` as "Internal Name" when
+    the actual canonical reference is `id` (which the editor never
+    showed), and the Inspector's sentiment-target autocomplete
+    rendered options ambiguously in Chrome (looking like duplicate
+    `elena` / `Elena` entries).
+
+Plus the AudioManager async-Promise-executor lint fix that landed
+during the Ideator merge process.
+
+### Ideator (PR #2 — feat/ideator-integration)
+
+The student's branch had been waiting at v0.9.33 for almost two
+months with a single coherent commit ("completed first iteration for
+user test"). Manual port preserved his architecture verbatim while
+sidestepping all the v0.9.34–v0.9.52 churn between branches.
+
+**Architecture** (he understood our existing patterns):
+  - Pop-out window route (`#/ideator-window`) renders IdeatorWindow,
+    mirroring PreviewWindow / DebugWindow
+  - IdeatorWindowManager mirrors PreviewWindowManager /
+    DebugWindowManager, including cross-window message contracts
+  - Conversation runs through Claude with optional Brave Search
+    tool-use; falls back to plain conversation when Brave key isn't
+    set or active provider isn't Claude
+  - Per-project session storage keyed by project id
+  - Synthesizes a StoryGenerationRequest, posts back to main via
+    SUBMIT_REQUEST wire message, hand-off flows through the existing
+    handleStoryGenerated path (same validation, theme, auto-layout,
+    schema-driven pipeline as the in-app Story Generator dialog)
+
+**New (17 files, ~2,500 LoC additive):**
+
+```
+packages/builder/src/components/ai/ideator/
+  IdeatorChat.tsx           — conversation transcript view
+  IdeatorComposer.tsx       — input field + readiness signal
+  IdeatorHeader.tsx         — pop-out header
+  PromptPreviewPanel.tsx    — synthesized prompt review/edit
+  braveConfig.ts            — API key storage helpers
+  braveSearch.ts            — Brave Search API wrapper
+  ideatorSessionStore.ts    — per-project session persistence
+  ideatorStore.ts           — Zustand live conversation store
+  idnPrinciples.ts          — IDN seed prompt content
+  promptSynthesis.ts        — transcript → StoryGenerationRequest
+  systemPrompt.ts           — Claude system prompt
+  types.ts                  — shared types incl. wire-message contract
+  useIdeator.ts             — orchestrator hook
+  webSearchTool.ts          — Brave tool wiring for Claude tool-use
+packages/builder/src/pages/IdeatorWindow.tsx
+packages/builder/src/services/IdeatorWindowManager.ts
+```
+
+**Modified existing files (additive only — current v0.9.52 work
+preserved):**
+  - `types/ai.ts` — new tool-use types (ChatToolSpec, ChatToolCall,
+    ChatWithToolsRequest, ChatWithToolsResponse), maxTokens? on
+    ConversationTurnRequest
+  - `services/AIService.ts` — generateConversationTurn / generateChatWithTools
+    delegates
+  - `hooks/useAI.ts` — same two methods exposed; neither toggles
+    isGenerating (Ideator manages its own status so the conversation
+    UI doesn't block other AI features in the main window)
+  - `services/providers/ClaudeProvider.ts` — generateChatWithTools
+    method with tool-use loop (max 5 iterations, sequential tool
+    execution, echoes Claude's full assistant message before
+    tool_result so Anthropic correlates ids, tool errors caught and
+    forwarded to Claude as text). Plus `temperature` removed from
+    all five Claude request bodies — newer Anthropic models reject
+    it as deprecated, and extended thinking has always required it
+    to equal 1 or be omitted. The student had this fix; I dismissed
+    it in PR notes ("our path still works") which turned out to be
+    wrong on the model the user is actually running. Restored.
+  - `services/providers/OpenAIProvider.ts` — maxTokens? on
+    generateConversationTurn so Ideator's synthesis step can cap
+    higher than 1000
+  - `api/vite-ai-proxy.ts` — `/api/search/brave` route alongside
+    our streaming proxy; gunzips Brave's compressed responses before
+    forwarding (raw gzip would otherwise be misinterpreted as
+    malformed UTF-8 by the browser)
+  - `api-proxy.ts` (root) — same Brave route for non-Vite hosts
+  - `Header.tsx` — "Ideate with Ideator" entry in the AI menu
+    (positioned above Generate Story so the prompt-shaping flow is
+    offered first)
+  - `AIConfigDialog.tsx` — Brave Search API key field (independent
+    of LLM provider; optional — Ideator falls back to chat-only when
+    unset)
+  - `App.tsx` — isIdeatorWindowRoute, handleIdeatorSubmit,
+    handleOpenIdeator, useEffect subscribing to
+    ideatorWindowManager.onSubmit
+  - `tailwind.config.js` — `indeterminate` animation for the
+    progress bar
+
+**Two follow-up fixes during PR review:**
+
+(1) **Cross-window back-channel recovery.** Hard-reloading the main
+builder mid-flow (to pick up the temperature fix) lost the
+IdeatorWindowManager's reference to the still-open pop-out. The
+pop-out's window.opener survived (so SUBMIT_REQUEST flowed inbound
+fine), but notifyGenerationComplete silently no-op'd because
+`this.ideatorWindow` was null. Story generated successfully on the
+canvas; pop-out stayed stuck on "Generating your story… 06:39".
+
+Fix: in handleMessage, capture event.source as the pop-out reference
+on every incoming message. Browser sets event.source to the actual
+sender Window — exactly what postMessage needs to send replies. After
+this, even a main reload doesn't permanently break the back-channel.
+
+(2) **AudioManager async-Promise-executor lint blocker.** PR's
+build (20.x) CI was failing on a pre-existing ESLint error in
+`packages/renderer/src/audio/AudioManager.ts:925` — the
+`new Promise(async (resolve, reject) => { ... })` anti-pattern.
+Refactored to a plain async method body (same return type,
+correct error propagation, no anti-pattern). Pre-existing issue
+(introduced in commit d20c483c during the XR work), fixed here to
+unblock the merge. Tag-triggered desktop builds don't run this lint
+check which is why v0.9.50/.51/.52 shipped despite the latent issue.
+
+**Compatibility notes vs current v0.9.52:**
+  - Ideator calls `aiService.generateStory(request)` without `signal`
+    / `onProgress` — both optional in v0.9.52, so this works fine
+  - The schema-driven normalize/validate pipeline runs transparently
+    on the synthesized story
+  - Cancel button works during Ideator's final generateStory call
+  - Ideator's per-project session store is independent of the main
+    project's auto-save and IndexedDB persistence
+
+### Character ID clarity (PR #3 — fix/character-id-clarity)
+
+User reported the Inspector's "Toward (target)" autocomplete looked
+like it was offering duplicate entries (`elena` + `Elena` stacked)
+for a character with `id="elena"`, `name="Elena"`. Two compounding
+issues, both fixed.
+
+**Character Editor mislabeled `name` as "Internal Name".** The
+actual canonical reference for a character is `id`, which the editor
+never exposed. Authors saw `name: "Elena"` under a label suggesting
+it was THE id, then got confused when the autocomplete showed
+`"elena"` lowercase elsewhere.
+
+`CharacterEditor.tsx` now adds a read-only ID field at the top of
+the Basic tab (frozen because conditions, sentiment refs, AI prompts,
+and saved-state snapshots all key off it; renaming would break
+references). Renamed "Internal Name" → "Code Name" and clarified in
+helper text that it's a separate, editable label distinct from the
+ID.
+
+**Inspector's `<datalist>` rendered ambiguously in Chrome.** Chrome
+shows each option as a two-line entry: the option's value on top,
+inner text below. With `<option value="elena">Elena</option>`
+Chrome stacked them visually, making it look like two duplicate
+items.
+
+`Inspector.tsx` now expands the option's inner text to include
+the role and (when name differs from id) the slug, so value and
+label read as one descriptive line:
+
+```jsx
+<option value="elena">Elena (player character)</option>
+<option value="iris">Iris (NPC)</option>
+```
+
+Only one datalist had this issue (sentiment-target-suggestions in
+conditionBeat's sentiment block). The six other character-picking
+spots are `<select>` elements which only show the inner text — no
+ambiguity. Left those alone.
+
+**The runtime was already tolerant** —
+`packages/core/src/utils/characterRef.ts:resolveCharacter` resolves
+any ref string against `id` first, then falls back to `name` /
+`displayName` case-insensitively. So existing data works either way;
+this release is purely UI clarification.
+
+### Files modified
+
+**Ideator integration (PR #2):**
+- 17 new files under `packages/builder/src/components/ai/ideator/`,
+  `packages/builder/src/pages/IdeatorWindow.tsx`,
+  `packages/builder/src/services/IdeatorWindowManager.ts`
+- `packages/builder/src/types/ai.ts`
+- `packages/builder/src/services/AIService.ts`
+- `packages/builder/src/hooks/useAI.ts`
+- `packages/builder/src/services/providers/ClaudeProvider.ts`
+- `packages/builder/src/services/providers/OpenAIProvider.ts`
+- `packages/builder/src/api/vite-ai-proxy.ts`
+- `api-proxy.ts`
+- `packages/builder/src/components/Header.tsx`
+- `packages/builder/src/components/ai/AIConfigDialog.tsx`
+- `packages/builder/src/App.tsx`
+- `packages/builder/tailwind.config.js`
+- `packages/renderer/src/audio/AudioManager.ts` (lint blocker fix)
+
+**Character ID clarity (PR #3):**
+- `packages/builder/src/components/characters/CharacterEditor.tsx`
+- `packages/builder/src/components/Inspector.tsx`
+
+---
+
 ## 2026-05-09: Streaming Progress UI + ConditionBeat Sentiment Persistence (v0.9.52)
 
 ### Overview
