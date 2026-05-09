@@ -141,6 +141,21 @@ class IdeatorWindowManager {
     const message = event.data as IdeatorWireMessage;
     if (!message || typeof message.type !== 'string') return;
 
+    // Recover the pop-out reference from event.source whenever it arrives.
+    // Critical if the main builder was hard-reloaded between opening the
+    // Ideator and the pop-out posting back: our ideatorWindow ref was
+    // wiped during the reload, but the pop-out still holds window.opener
+    // and can reach us. Capturing event.source restores the back-channel
+    // so notifyGenerationComplete / notifyGenerationFailed can land.
+    if (
+      event.source &&
+      event.source !== window &&
+      this.ideatorWindow !== event.source
+    ) {
+      this.ideatorWindow = event.source as Window;
+      console.log('[IdeatorWindowManager] Recovered pop-out reference from event.source');
+    }
+
     switch (message.type) {
       case 'SUBMIT_REQUEST': {
         const req = message.payload?.request;
