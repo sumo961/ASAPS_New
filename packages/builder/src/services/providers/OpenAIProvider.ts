@@ -1399,8 +1399,17 @@ Respond with JSON in this format:
         model: this.model || 'gpt-4o',
         messages,
         tools: openaiTools,
-        max_tokens: 1500,
+        // Reasoning models (Kimi K2.6, Moonshot reasoning variants) can
+        // emit several thousand tokens of reasoning_content before the
+        // tool_calls portion of the message even starts. 1500 tokens was
+        // truncating mid-arguments-JSON, which cascaded into malformed
+        // tool input and silent loop spins. Bumped to 4096.
+        max_tokens: 4096,
       };
+      console.log(
+        `[OpenAIProvider] tool-loop iter ${iter}/${maxIter}, ` +
+          `${messages.length} messages, requesting up to ${requestBody.max_tokens} tokens`,
+      );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let response: any;
@@ -1422,6 +1431,12 @@ Respond with JSON in this format:
             function: { name: string; arguments: string };
           }>
         | undefined;
+      console.log(
+        `[OpenAIProvider] iter ${iter} response: finish=${choice?.finish_reason}, ` +
+          `content_len=${(message?.content ?? '').length}, ` +
+          `tool_calls=${requestedToolCalls?.length ?? 0}, ` +
+          `has_reasoning=${!!(message as any)?.reasoning_content}`,
+      );
 
       if (!requestedToolCalls || requestedToolCalls.length === 0) {
         // No tools requested — return the assistant text. Some providers
@@ -1429,6 +1444,7 @@ Respond with JSON in this format:
         // tool_calls; clamp to empty string so downstream synthesis
         // doesn't choke.
         const text = (message?.content ?? '').toString().trim();
+        console.log(`[OpenAIProvider] tool-loop done at iter ${iter}, returning ${text.length} chars`);
         return { text, toolCalls };
       }
 
