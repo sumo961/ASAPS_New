@@ -164,6 +164,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('debug:message-to-main', handler);
   },
 
+  // Ideator window operations (pop-out conversational ideation tool).
+  // Mirrors `preview` and `debug`. The pop-out is opened by the main builder
+  // via IPC (since Electron's setWindowOpenHandler denies window.open),
+  // exchanges JSON-shaped wire messages defined in
+  // packages/builder/src/components/ai/ideator/types.ts.
+  ideator: {
+    open: (options: { projectTitle?: string; projectId?: string } = {}) =>
+      ipcRenderer.invoke('ideator:open', options),
+    close: () => ipcRenderer.invoke('ideator:close'),
+    isOpen: () => ipcRenderer.invoke('ideator:is-open'),
+    sendMessage: (message: any) => ipcRenderer.invoke('ideator:send-message', message),
+    ping: () => ipcRenderer.send('ideator:ping'),
+    /** Called from the ideator pop-out to push the synthesized
+     *  StoryGenerationRequest (and any future replies) back to the
+     *  main builder. The renderer-side IdeatorWindowManager listens
+     *  via onIdeatorMessageToMain. */
+    sendToMain: (message: any) => ipcRenderer.send('ideator:send-to-main', message),
+  },
+  onIdeatorMessage: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('ideator:message', handler);
+    return () => ipcRenderer.removeListener('ideator:message', handler);
+  },
+  onIdeatorReady: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('ideator:ready', handler);
+    return () => ipcRenderer.removeListener('ideator:ready', handler);
+  },
+  onIdeatorClosed: (callback: () => void) => {
+    ipcRenderer.on('ideator:closed', callback);
+    return () => ipcRenderer.removeListener('ideator:closed', callback);
+  },
+  onIdeatorMessageToMain: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('ideator:message-to-main', handler);
+    return () => ipcRenderer.removeListener('ideator:message-to-main', handler);
+  },
+
   // Story injection from MCP server
   onStoryInject: (callback: (data: any) => void) => {
     const handler = (_: unknown, data: any) => callback(data);

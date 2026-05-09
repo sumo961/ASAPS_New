@@ -217,15 +217,35 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
    * progress block so the author knows work is happening.
    */
   const submitRequest = useCallback((req: StoryGenerationRequest) => {
-    if (!window.opener) {
-      setError('Cannot hand off: the main builder window is not available.');
-      return;
-    }
     setStatus('submitting');
     const message: IdeatorWireMessage = {
       type: 'SUBMIT_REQUEST',
       payload: { request: req },
     };
+    // Two transports — choose by environment:
+    //   1. Electron desktop: window.opener is null because the pop-out
+    //      was launched via BrowserWindow, not window.open. Route via the
+    //      ideator IPC bridge exposed in the preload.
+    //   2. Web build: standard postMessage to window.opener with origin
+    //      check on the receiving side.
+    const electronApi = (window as any).electronAPI?.ideator;
+    if (electronApi?.sendToMain) {
+      try {
+        electronApi.sendToMain(message);
+        setStatus('generating');
+        return;
+      } catch (err) {
+        setError(
+          `Failed to hand off request via Electron IPC: ${err instanceof Error ? err.message : String(err)}`
+        );
+        setStatus('previewing');
+        return;
+      }
+    }
+    if (!window.opener) {
+      setError('Cannot hand off: the main builder window is not available.');
+      return;
+    }
     try {
       window.opener.postMessage(message, window.location.origin);
       setStatus('generating');
@@ -240,19 +260,41 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
   /**
    * Listen for completion / failure messages from the main builder. These
    * arrive after aiService.generateStory() resolves on the opener side.
+   * In Electron we listen via the ideator IPC bridge instead of window
+   * postMessage; in the web build we use the standard postMessage path.
+   * Plus PING the main on mount so the manager knows we're ready and
+   * can flush any pending state.
    */
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      const message = event.data as IdeatorWireMessage | undefined;
-      if (!message || typeof message.type !== 'string') return;
+    const electronApi = (window as any).electronAPI?.ideator;
 
+    const handleWireMessage = (message: IdeatorWireMessage | undefined) => {
+      if (!message || typeof message.type !== 'string') return;
       if (message.type === 'GENERATION_COMPLETE') {
         setStatus('handed_off');
       } else if (message.type === 'GENERATION_FAILED') {
         setError(message.payload?.error ?? 'Story generation failed.');
         setStatus('previewing');
       }
+    };
+
+    if (electronApi?.ping && (window as any).electronAPI?.onIdeatorMessage) {
+      // Electron: subscribe via IPC bridge, ping main once we're ready.
+      const unsubscribe = (window as any).electronAPI.onIdeatorMessage(
+        (message: IdeatorWireMessage) => handleWireMessage(message),
+      );
+      try {
+        electronApi.ping();
+      } catch {
+        /* not fatal */
+      }
+      return unsubscribe;
+    }
+
+    // Web build: postMessage path with origin check.
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      handleWireMessage(event.data as IdeatorWireMessage | undefined);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);

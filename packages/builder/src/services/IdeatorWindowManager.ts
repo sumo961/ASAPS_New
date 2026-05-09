@@ -24,10 +24,40 @@ class IdeatorWindowManager {
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<StateChangeCallback>();
   private submitListeners = new Set<SubmitCallback>();
+  /** Electron build flag: detected once at construction. When true, the
+   *  manager routes open / close / sendMessage / etc. through the
+   *  electronAPI.ideator IPC bridge instead of window.open + postMessage,
+   *  because Electron's setWindowOpenHandler denies window.open. */
+  private isElectron: boolean = false;
+  /** Set by the Electron `ideator:closed` listener; tracks whether the
+   *  pop-out is open in the IPC world (where `Window.closed` is N/A). */
+  private electronWindowOpen: boolean = false;
 
   constructor() {
-    if (typeof window !== 'undefined') {
+    this.isElectron = typeof window !== 'undefined'
+      && !!(window as any).electronAPI?.ideator?.open;
+
+    if (typeof window !== 'undefined' && !this.isElectron) {
       window.addEventListener('message', this.handleMessage);
+    }
+
+    if (this.isElectron) {
+      const api = (window as any).electronAPI;
+      api.onIdeatorClosed?.(() => this.cleanup());
+      api.onIdeatorReady?.(() => {
+        this.electronWindowOpen = true;
+        this.notifyListeners();
+      });
+      // Forward messages the pop-out pushes back (SUBMIT_REQUEST etc.).
+      // Synthesize a MessageEvent-shaped object so handleMessage's logic
+      // is unchanged across web and Electron.
+      api.onIdeatorMessageToMain?.((message: any) => {
+        this.handleMessage({
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+          data: message,
+          source: null,
+        } as MessageEvent);
+      });
     }
   }
 
@@ -52,6 +82,7 @@ class IdeatorWindowManager {
   }
 
   isWindowOpen(): boolean {
+    if (this.isElectron) return this.electronWindowOpen;
     return this.ideatorWindow !== null && !this.ideatorWindow.closed;
   }
 
@@ -62,6 +93,21 @@ class IdeatorWindowManager {
    * a round-trip postMessage handshake.
    */
   open(opts: { projectTitle?: string; projectId?: string } = {}): boolean {
+    if (this.isElectron) {
+      const api = (window as any).electronAPI;
+      try {
+        api.ideator.open(opts);
+        // Mark optimistically; the true ready state is delivered via
+        // `ideator:ready` (the pop-out PINGs us when it mounts).
+        this.electronWindowOpen = true;
+        this.notifyListeners();
+        return true;
+      } catch (err) {
+        console.error('[IdeatorWindowManager] Electron open failed:', err);
+        return false;
+      }
+    }
+
     if (this.isWindowOpen()) {
       this.ideatorWindow?.focus();
       return true;
@@ -105,6 +151,11 @@ class IdeatorWindowManager {
   }
 
   close(): void {
+    if (this.isElectron) {
+      (window as any).electronAPI?.ideator?.close?.();
+      this.cleanup();
+      return;
+    }
     if (this.ideatorWindow && !this.ideatorWindow.closed) {
       this.ideatorWindow.close();
     }
@@ -129,6 +180,14 @@ class IdeatorWindowManager {
 
   private postToWindow(message: IdeatorWireMessage): void {
     if (!this.isWindowOpen()) return;
+    if (this.isElectron) {
+      try {
+        (window as any).electronAPI?.ideator?.sendMessage?.(message);
+      } catch (err) {
+        console.warn('[IdeatorWindowManager] Electron sendMessage failed:', err);
+      }
+      return;
+    }
     try {
       this.ideatorWindow!.postMessage(message, window.location.origin);
     } catch (err) {
@@ -184,6 +243,7 @@ class IdeatorWindowManager {
       this.checkInterval = null;
     }
     this.ideatorWindow = null;
+    this.electronWindowOpen = false;
     this.notifyListeners();
   }
 

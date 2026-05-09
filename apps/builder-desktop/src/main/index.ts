@@ -269,6 +269,7 @@ function checkForUpdatesManually(): void {
 let mainWindow: BrowserWindow | null = null;
 let previewWindow: BrowserWindow | null = null;
 let debugWindow: BrowserWindow | null = null;
+let ideatorWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 
 function createWindow(): void {
@@ -1096,6 +1097,106 @@ ipcMain.on('debug:ping', () => {
 ipcMain.on('debug:send-to-main', (_, message: any) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('debug:message-to-main', message);
+  }
+});
+
+// ============================================================================
+// Ideator Window IPC handlers
+// ============================================================================
+// Pop-out conversational ideation tool. Mirrors the Preview / Debug Window
+// setup: a dedicated BrowserWindow opened via IPC because the main window's
+// setWindowOpenHandler denies window.open. Wire-message contract documented
+// in packages/builder/src/components/ai/ideator/types.ts (IdeatorWireMessage).
+// ============================================================================
+
+function createIdeatorWindow(options: { projectTitle?: string; projectId?: string } = {}): void {
+  if (ideatorWindow && !ideatorWindow.isDestroyed()) {
+    ideatorWindow.focus();
+    return;
+  }
+
+  const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
+
+  ideatorWindow = new BrowserWindow({
+    width: 900,
+    height: 800,
+    x: mainBounds.x + 80,
+    y: mainBounds.y + 80,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    title: 'ASAPS Ideator',
+    show: false,
+  });
+
+  ideatorWindow.once('ready-to-show', () => {
+    ideatorWindow?.show();
+  });
+
+  // Build the hash route with optional ?title= / ?projectId= so the
+  // IdeatorWindow page can show project context.
+  const params = new URLSearchParams();
+  if (options.projectTitle) params.set('title', options.projectTitle);
+  if (options.projectId) params.set('projectId', options.projectId);
+  const queryString = params.toString();
+  const hash = queryString ? `/ideator-window?${queryString}` : '/ideator-window';
+
+  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    ideatorWindow.loadURL(`${devUrl}#${hash}`);
+  } else {
+    ideatorWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      hash,
+    });
+  }
+
+  ideatorWindow.on('closed', () => {
+    ideatorWindow = null;
+    mainWindow?.webContents.send('ideator:closed');
+  });
+}
+
+ipcMain.handle('ideator:open', async (_, options: { projectTitle?: string; projectId?: string } = {}) => {
+  createIdeatorWindow(options);
+  return true;
+});
+
+ipcMain.handle('ideator:close', async () => {
+  if (ideatorWindow && !ideatorWindow.isDestroyed()) {
+    ideatorWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle('ideator:is-open', async () => {
+  return ideatorWindow !== null && !ideatorWindow.isDestroyed();
+});
+
+// Main → ideator pop-out (e.g. GENERATION_COMPLETE / GENERATION_FAILED)
+ipcMain.handle('ideator:send-message', async (_, message: any) => {
+  if (ideatorWindow && !ideatorWindow.isDestroyed()) {
+    ideatorWindow.webContents.send('ideator:message', message);
+    return true;
+  }
+  return false;
+});
+
+// Ideator pop-out announces readiness so the manager can flush any pending state.
+ipcMain.on('ideator:ping', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('ideator:ready');
+  }
+});
+
+// Ideator pop-out → main builder (SUBMIT_REQUEST is the load-bearing one;
+// the user's confirmed StoryGenerationRequest comes back this way and main
+// runs aiService.generateStory() on it).
+ipcMain.on('ideator:send-to-main', (_, message: any) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('ideator:message-to-main', message);
   }
 });
 
