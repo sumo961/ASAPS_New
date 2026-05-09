@@ -1326,9 +1326,34 @@ Respond with JSON in this format:
       response = await this.client!.chat.completions.create(requestBody);
     }
 
-    const content = response.choices[0]?.message?.content;
+    const choice = response.choices?.[0];
+    const message = choice?.message;
+    const content = message?.content;
     if (!content) {
-      throw new Error('No response from OpenAI');
+      const finishReason = choice?.finish_reason ?? 'unknown';
+      const hasReasoning = !!(message as Record<string, unknown> | undefined)?.reasoning_content;
+      console.error(
+        `[OpenAIProvider] Empty content in conversation-turn response. ` +
+          `finish_reason=${finishReason}, has_reasoning_content=${hasReasoning}, ` +
+          `keys=${Object.keys(message ?? {}).join(',')}`,
+      );
+      // Distinguish the most common causes so the user sees a useful
+      // message instead of just "no response":
+      //   - finish=length: model ran out of tokens. On reasoning models
+      //     (Kimi K2.6) this often means reasoning_content consumed the
+      //     whole budget before any visible content was emitted.
+      //   - has_reasoning + no content: the model only "thought" and
+      //     never produced an answer — same root cause, different shape.
+      //   - other: connection drop or unexpected response shape.
+      if (finishReason === 'length' || hasReasoning) {
+        throw new Error(
+          'The model produced no visible content (it spent its whole token budget on internal reasoning). ' +
+            'Try again — and if this keeps happening, raise Max Tokens in AI settings.',
+        );
+      }
+      throw new Error(
+        `No response from OpenAI (finish_reason=${finishReason}). The connection may have dropped — try again.`,
+      );
     }
 
     return { text: content.trim() };

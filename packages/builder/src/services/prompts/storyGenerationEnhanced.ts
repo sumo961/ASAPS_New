@@ -1196,6 +1196,39 @@ When player picks up an item, they MUST learn something about it in the very nex
 ✓ CORRECT: pickProp "Old Photo" → infoText describing what the photo shows → next beat
 ✓ CORRECT: pickProp "Secret Letter" → infoText revealing letter contents → dialogTree
 
+❌ **Hidden scene jumps via invisible beats**
+When an invisible beat (setVariable, conditionBeat, addRemoveInventory) connects two dialog scenes with different speakers or locations, the player jumps abruptly with no narrative breath. From the player's POV the new character materializes out of nowhere.
+✗ WRONG: dialogTree "Joseph at home" → setVariable confidedInFamily=true → dialogTree "Isabelle Borg: Mark left his laptop with me..."
+   Joseph was in a living room. Where did Isabelle come from? When did this happen?
+✓ CORRECT: dialogTree "Joseph at home" → setVariable → infoText (1-2 sentences) "Later that evening, you meet Mark's editor at a quiet café in Sliema. She slides a battered laptop across the table." → dialogTree "Isabelle Borg"
+✓ Always insert a transitional infoText (Narrator, 1-2 sentences) when:
+   - The next beat changes location
+   - The next beat introduces a speaker not established as already present in the current scene
+   - In-world time passes (later, the next morning, days later)
+✓ The transition answers three questions: when did this happen, where are we now, how did the player get here. Keep it brief — this is connective tissue, not a new scene.
+
+❌ **Restating information the player already learned**
+Each beat should ADD to what the player knows, not repeat earlier information using different words.
+✗ WRONG: beat A (Dr. Xuereb): "If they know you have this, the Church and the Ministry will bury you."
+        beat B (Minister): "Close this case. The Church, the families, the historical files — leave them."
+   Both convey "powerful institutions are pressuring you" with overlapping institutions named. The player learns nothing new in beat B.
+✓ CORRECT: Each later beat ESCALATES or COMPLICATES prior information, not echoes it.
+   - If beat A is an abstract warning, beat B is the pressure ARRIVING — with specifics not previously known (a name, a deadline, a personal cost).
+   - If beat A names the threats, beat B reveals who's behind them, what they're willing to do, or what the player must give up.
+✓ Before drafting each beat, scan all prior reachable beats: what does the player already know? What does THIS beat add that they don't?
+
+❌ **Choice text declares intent the next beat ignores**
+Choice text declares the player's intent ("Let it go", "Drop the case", "Walk away", "Some things should stay buried"). When the very next beat has the player still actively pursuing the same line of inquiry, the choice was meaningless — worse, it actively misled the player about the outcome.
+✗ WRONG: dialogTree (Joseph): choices = [
+    "I have proof — great-grandfather was involved." → setVariable confidedInFamily=true → beat_12_editor (meeting Mark's editor about publishing),
+    "You're right. Some things should stay buried." → setVariable confidedInFamily=false → beat_12_editor (meeting Mark's editor about publishing)
+  ]
+  The "stay buried" choice flips a flag but the player IMMEDIATELY meets the journalist's editor — they're still pushing the case forward. The player's stated decision was overruled by the next beat with no narrative justification.
+✓ CORRECT: A "stop / drop it / walk away" choice must produce a narratively distinct path. Two acceptable shapes:
+   1. Honour the choice: the next beat reflects the player having stopped (e.g., infoText "You drive home in silence. The case stays closed.") leading to an early ending or a quieter path.
+   2. External forces override the choice — and the next beat shows that explicitly: e.g., infoText "Two days later, Isabelle Borg's number flashes on your screen. You almost don't pick up. Then you do." This makes clear the player isn't seeking the next scene; it's coming to them.
+✓ Rewrite the choice text if it doesn't actually match what happens next. "Some things should stay buried" must NOT lead to a beat where the player chooses what to do with buried evidence.
+
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
 **BEFORE setting a condition threshold, calculate whether it can actually be reached!**

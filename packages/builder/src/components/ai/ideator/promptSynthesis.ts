@@ -93,12 +93,16 @@ export async function synthesizeStoryRequest(
   ];
 
   // Synthesis emits a JSON object whose `prompt` field is 2–6 paragraphs
-  // of natural language, so the default 1000-token chat-turn cap is too
-  // small and causes mid-string truncation. Give it room to breathe.
+  // of natural language. Reasoning models (Kimi K2.6, Moonshot reasoning
+  // variants) spend several thousand tokens on reasoning_content BEFORE
+  // emitting any visible content; at 4000 the JSON was sometimes
+  // truncated mid-string or — worse — the response arrived empty
+  // because the model used the entire budget on internal reasoning.
+  // 8000 gives reasoning room and keeps the JSON whole.
   const { text } = await aiService.generateConversationTurn({
     systemPrompt: system,
     messages: wrapped,
-    maxTokens: 4000,
+    maxTokens: 8000,
   });
 
   const json = extractJson(text);
