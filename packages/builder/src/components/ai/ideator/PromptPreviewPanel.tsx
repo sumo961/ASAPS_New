@@ -102,6 +102,9 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
   const [complexity, setComplexity] = useState<StoryGenerationRequest['complexity']>(
     draft.complexity ?? 'moderate'
   );
+  const [affectDepth, setAffectDepth] = useState<StoryGenerationRequest['affectDepth']>(
+    draft.affectDepth ?? 'auto'
+  );
   const [includeAIBeats, setIncludeAIBeats] = useState<boolean>(
     draft.includeAIBeats ?? false
   );
@@ -111,6 +114,7 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
     setGenre(draft.genre ?? '');
     setLength(draft.length ?? 'medium');
     setComplexity(draft.complexity ?? 'moderate');
+    setAffectDepth(draft.affectDepth ?? 'auto');
     setIncludeAIBeats(draft.includeAIBeats ?? false);
   }, [draft]);
 
@@ -121,6 +125,7 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
       prompt: trimmed,
       length,
       complexity,
+      affectDepth,
       includeAIBeats,
     };
     if (genre.trim().length > 0) req.genre = genre.trim();
@@ -213,7 +218,29 @@ export const PromptPreviewPanel: React.FC<PromptPreviewPanelProps> = ({
               <option value="complex">Complex</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Affect depth
+              <span
+                className="ml-1 text-gray-400 cursor-help"
+                title="How much character interiority (mood, traits, goals, sentiment) to deploy. 'auto' lets the model pick from the prompt; 'rich' forces full deployment for emotional drama."
+              >
+                ⓘ
+              </span>
+            </label>
+            <select
+              value={affectDepth}
+              onChange={e => setAffectDepth(e.target.value as any)}
+              disabled={busy}
+              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:bg-gray-50"
+            >
+              <option value="auto">Auto (model picks)</option>
+              <option value="sparse">Sparse</option>
+              <option value="standard">Standard</option>
+              <option value="rich">Rich</option>
+            </select>
+          </div>
+          <div className="col-span-2 flex items-end">
             <label className="flex items-center gap-2 text-sm text-gray-700 py-1.5">
               <input
                 type="checkbox"

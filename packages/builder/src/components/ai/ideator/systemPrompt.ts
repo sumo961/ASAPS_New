@@ -137,6 +137,23 @@ markdown fences):
     //                variability, systemic causation, or 4+ endings
     //                that diverge meaningfully.
     // Default to "moderate" only if unclear.
+  "affectDepth": "auto" | "sparse" | "standard" | "rich",
+    // How heavily the generated story should deploy ASAPS's character
+    // affect system (mood, traits, goals, sentiment Effects, dossier
+    // reflection):
+    //   "sparse"   — puzzles, quizzes, educational modules, or trivially
+    //                branching narratives. Characters are speakers only.
+    //   "standard" — most narrative prompts with emotionally salient
+    //                moments but emotion isn't the foreground subject.
+    //   "rich"     — mental health, relationships at the foreground,
+    //                character development/growth, interactive drama,
+    //                explorable-story framing. Pick "rich" whenever the
+    //                conversation centred on inner life, emotional arcs,
+    //                guilt/grief/love, or characters who change.
+    //   "auto"     — let the downstream generator pick from the prompt.
+    // Choose explicitly when the conversation gives you signal — don't
+    // reflexively pick "auto" when "rich" or "sparse" would be more
+    // honest.
   "includeAIBeats": boolean // true if the conversation implied the story
                            // should adapt to each play session (AI-generated
                            // beats); false if it sounds pre-authored.

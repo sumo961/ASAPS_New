@@ -56,6 +56,14 @@ function validate(parsed: any): StoryGenerationRequest {
   ) {
     req.complexity = parsed.complexity;
   }
+  if (
+    parsed.affectDepth === 'auto' ||
+    parsed.affectDepth === 'sparse' ||
+    parsed.affectDepth === 'standard' ||
+    parsed.affectDepth === 'rich'
+  ) {
+    req.affectDepth = parsed.affectDepth;
+  }
   if (typeof parsed.includeAIBeats === 'boolean') {
     req.includeAIBeats = parsed.includeAIBeats;
   }
