@@ -1,6 +1,6 @@
 {
   "name": "@asaps/builder-desktop",
-  "version": "0.9.53",
+  "version": "0.9.54",
   "description": "ASAPS Desktop Builder - Native authoring tool for macOS and Windows",
   "author": "Hartmut Koenitz",
   "private": true,
