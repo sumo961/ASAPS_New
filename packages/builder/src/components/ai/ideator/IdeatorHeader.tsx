@@ -1,21 +1,24 @@
 /**
- * Title bar for the Ideator pop-out. Shows the tool name, the project
- * context, and a reset action. Close is handled by the browser chrome —
- * the window was opened with window.open so the user has a standard
- * close button.
+ * Title bar for the Ideator pop-out. Shows the tool name and a reset
+ * action. Close is handled by the browser chrome — the window was
+ * opened with window.open so the user has a standard close button.
+ *
+ * Note: the project title used to appear as a subtitle here ("Shaping
+ * ideas for 'X'") but it was misleading — the conversation does not
+ * depend on the open project's content, and the generated story is
+ * landed in a freshly-created project, not into the open one. The
+ * subtitle implied a wrong dependency. Removed.
  */
 
 import React from 'react';
 import { Sparkles, RotateCcw } from 'lucide-react';
 
 interface IdeatorHeaderProps {
-  projectTitle?: string;
   onReset: () => void;
   disableReset: boolean;
 }
 
 export const IdeatorHeader: React.FC<IdeatorHeaderProps> = ({
-  projectTitle,
   onReset,
   disableReset,
 }) => {
@@ -36,9 +39,7 @@ export const IdeatorHeader: React.FC<IdeatorHeaderProps> = ({
         <div>
           <h1 className="text-base font-semibold text-gray-900">Ideator</h1>
           <p className="text-xs text-gray-500">
-            {projectTitle
-              ? `Shaping ideas for "${projectTitle}"`
-              : 'Shape the idea before generating the story'}
+            Shape the idea before generating the story
           </p>
         </div>
       </div>

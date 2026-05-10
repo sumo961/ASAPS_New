@@ -62,7 +62,6 @@ export const IdeatorWindow: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-white">
       <IdeatorHeader
-        projectTitle={projectTitle}
         onReset={resetConversation}
         disableReset={resetDisabled}
       />
