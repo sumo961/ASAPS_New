@@ -292,11 +292,37 @@ export class ClaudeProvider extends BaseAIProvider {
       + (request.affectDepth ?? 'auto') + ')...');
 
     return this.withRetry(async () => {
-      // Use configured maxTokens if available
-      // For story generation, we need high token limits for complex branching narratives
-      // Kimi K2 supports 256K context, Claude supports 200K+
-      const defaultMaxTokens = 32000;
+      // Use configured maxTokens if available, else scale a default to the
+      // requested reasoning effort.
+      //
+      // CRITICAL (per platform.claude.com/docs/en/api/messages): thinking
+      // tokens COUNT AGAINST max_tokens. In adaptive mode there is no
+      // separate thinking budget — Claude decides how much to think,
+      // bounded only by max_tokens. So a 32K cap at xhigh effort can
+      // burn 20K+ on thinking and leave too little for the JSON output,
+      // resulting in mid-JSON truncation (observed: response truncated
+      // at 10K → 30K → 42K chars across three retries with xhigh).
+      //
+      // Scale headroom by effort so a default install just works without
+      // requiring users to manually bump Max Tokens.
+      const defaultMaxTokensFor = (effort: string | undefined): number => {
+        switch (effort) {
+          case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
+          case 'high':  return 64000;
+          case 'medium': return 48000;
+          case 'low':
+          case 'minimal':
+          case 'none':
+          default: return 32000;
+        }
+      };
+      const defaultMaxTokens = defaultMaxTokensFor(this.config?.reasoningEffort);
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
+      console.log(
+        `[ClaudeProvider] generateStory max_tokens=${maxTokens} ` +
+          `(default=${defaultMaxTokens}, configured=${this.config?.maxTokens ?? 'unset'}, ` +
+          `effort=${this.config?.reasoningEffort ?? 'unset'})`,
+      );
 
       // `temperature` is omitted: newer Anthropic models reject it as
       // deprecated, and extended thinking requires it to equal 1 or be
@@ -362,7 +388,14 @@ export class ClaudeProvider extends BaseAIProvider {
           storyData = JSON.parse(repaired);
           console.log('[ClaudeProvider] JSON repair successful!');
         } catch (repairError) {
-          throw new Error(`Failed to parse AI response (truncated): The response was cut off. Try generating a shorter story.`);
+          const effort = this.config?.reasoningEffort ?? 'unset';
+          const thinkingHint =
+            this.requiresAdaptiveThinking() && (effort === 'high' || effort === 'xhigh')
+              ? ` Thinking tokens count against max_tokens on this model and ${effort} effort can consume a large share — raise Max Tokens in AI settings (currently ${maxTokens}) or lower reasoning effort.`
+              : ` Raise Max Tokens in AI settings (currently ${maxTokens}).`;
+          throw new Error(
+            `Failed to parse AI response (truncated at ${jsonMatch[0].length} chars).${thinkingHint}`,
+          );
         }
       }
 
