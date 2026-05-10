@@ -34,8 +34,24 @@ const STAGE_WIDTH = 1024;
 const STAGE_HEIGHT = 768;
 
 // Proxy endpoint for CORS-blocked requests (custom baseUrls)
-const CLAUDE_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/claude';
-const OPENAI_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/openai';
+// Match OpenAIProvider's logic: prefer same-origin proxy (Vite dev plugin
+// at port 5173) over the legacy stand-alone api server on :3001 which
+// requires a separate `npm run dev:api`. The hardcoded :3001 fallback
+// caused ERR_CONNECTION_REFUSED at runtime when the user hadn't started
+// dev:api, even though the same builder-side calls (story-gen, Ideator)
+// worked fine through the Vite plugin.
+//
+// In production Electron the port is not 5173, so we fall back to :3001
+// which the packaged build is expected to provide. (See
+// OpenAIProvider.ts:41-43 — the same heuristic lives there.)
+const isViteDev =
+  typeof window !== 'undefined' && window.location?.port === '5173';
+const CLAUDE_PROXY_ENDPOINT = isViteDev
+  ? '/api/ai/claude'
+  : 'http://localhost:3001/api/ai/claude';
+const OPENAI_PROXY_ENDPOINT = isViteDev
+  ? '/api/ai/openai'
+  : 'http://localhost:3001/api/ai/openai';
 
 /**
  * Strip thinking/reasoning blocks from AI responses.
