@@ -2010,6 +2010,53 @@ export function buildEnhancedUserPrompt(request: StoryGenerationRequest): string
     parts.push(`Genre: ${request.genre}`);
   }
 
+  // Genre-specific craft rules. Mystery / detective / thriller stories
+  // suffer a recurring failure mode where "evidence" beats announce the
+  // full conclusion as a single line of prose, so the player is told the
+  // answer at the same moment they are asked the question. Inject the
+  // distribution rule when the genre warrants it.
+  const mysteryGenres = ['mystery', 'detective', 'thriller', 'crime', 'noir', 'whodunit', 'investigation'];
+  const isMystery =
+    !!request.genre &&
+    mysteryGenres.some((g) => request.genre!.toLowerCase().includes(g));
+  if (isMystery) {
+    parts.push(`🔍 MYSTERY / INVESTIGATION CRAFT RULES
+
+In this genre, evidence beats must DISTRIBUTE the answer across multiple
+discoveries, not announce it. The player should connect fragments — the
+prose should never connect them first.
+
+❌ WRONG (single beat states the secret, the date, the question):
+   infoText "The laptop emails: 'Warehouse 7, 1942 — the real origin of
+   the fortune.' Galea Trading was founded in 1946. What happened in
+   those four years?"
+   The player learns the answer at the same moment they are asked.
+
+✓ CORRECT (each beat is one fragment; meaning emerges from combination):
+   Beat A (laptop, path 1): a draft email never sent — "If this comes
+     out, every name on the founder's medal burns."
+   Beat B (notebook, path 2): a page reading "Antonio G., Sept 1942,
+     6 crates" beside pages dated 1944, 1945, 1946.
+   Beat C (archive, optional): the company seal is dated 1942 — four
+     years before the company legally existed.
+   The player connects A + B + C and infers the founding wealth came
+   from somewhere pre-1946. The prose never says it.
+
+✓ Each evidence beat answers AT MOST one question and raises AT LEAST
+   one new question. If a single beat would resolve multiple, split it
+   across discoveries on different paths.
+
+✓ Reserve the full reveal beat for AFTER the player has visited at
+   least two evidence beats and made at least one path commitment. The
+   reveal synthesizes what THE PLAYER has gathered — it does not
+   reveal what the prose has been quietly announcing all along.
+
+✓ Suspects, ministers, witnesses should NOT confess the central
+   secret on first meeting. Their early appearances reveal motive,
+   pressure, deflection — they confirm the secret only after the
+   player has accumulated enough fragments to confront them with it.`);
+  }
+
   const lengthGuide = {
     short: '8-15 beats. A story fragment or proof-of-concept. Good for testing ideas or simple linear narratives.',
     medium: '15-30 beats. A complete short story with meaningful branching, state tracking, and satisfying conclusions.',
