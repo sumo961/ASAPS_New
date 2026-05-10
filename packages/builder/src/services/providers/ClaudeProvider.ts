@@ -67,6 +67,11 @@ export class ClaudeProvider extends BaseAIProvider {
    * Returns undefined when thinking should NOT be enabled (unset, 'none', or
    * when pointed at a custom baseUrl — most Claude-compatible proxies don't
    * support the thinking parameter).
+   *
+   * Used only for older Claude models that still accept the legacy
+   * `thinking.type='enabled'` + `budget_tokens` shape. Newer models
+   * (Opus 4.7, Sonnet 4.6, Haiku 4.5+) require the adaptive shape via
+   * applyThinkingConfig().
    */
   private getThinkingBudget(): number | undefined {
     if (this.useProxy) return undefined;
@@ -79,6 +84,72 @@ export class ClaudeProvider extends BaseAIProvider {
       case 'high':    return 20000;
       case 'xhigh':   return 32000;
       default:        return undefined;
+    }
+  }
+
+  /**
+   * Whether the current model uses the newer adaptive-thinking API shape
+   * (thinking.type='adaptive' + output_config.effort) instead of the
+   * legacy thinking.type='enabled' + budget_tokens shape.
+   *
+   * As of 2026-05, the newer shape is required by claude-opus-4-7,
+   * claude-sonnet-4-6, claude-haiku-4-5+. Older models still accept the
+   * legacy shape. The API rejects mixing the two: sending the legacy
+   * shape to a newer model returns 400 with the message
+   * "thinking.type.enabled is not supported for this model".
+   */
+  private requiresAdaptiveThinking(): boolean {
+    const m = this.model.toLowerCase();
+    // claude-{opus,sonnet,haiku}-X-Y where X >= 4 AND Y >= 5, or X >= 5
+    const match = m.match(/^claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
+    if (!match) return false;
+    const [, majorStr, minorStr] = match;
+    const major = parseInt(majorStr, 10);
+    const minor = parseInt(minorStr, 10);
+    if (major >= 5) return true;
+    if (major === 4 && minor >= 5) return true;
+    return false;
+  }
+
+  /**
+   * Translate the user's reasoningEffort to Anthropic's adaptive-mode
+   * effort levels. Anthropic supports low / medium / high; our internal
+   * dial has minimal/low/medium/high/xhigh, so xhigh caps at high.
+   */
+  private getAdaptiveEffort(): 'low' | 'medium' | 'high' | undefined {
+    if (this.useProxy) return undefined;
+    const effort = this.config?.reasoningEffort;
+    if (!effort || effort === 'none') return undefined;
+    switch (effort) {
+      case 'minimal':
+      case 'low':     return 'low';
+      case 'medium':  return 'medium';
+      case 'high':
+      case 'xhigh':   return 'high';
+      default:        return undefined;
+    }
+  }
+
+  /**
+   * Apply the appropriate thinking-config shape to a request body based
+   * on the model. Mutates requestBody in place. Logs which shape and
+   * level got applied.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private applyThinkingConfig(requestBody: any): void {
+    if (this.requiresAdaptiveThinking()) {
+      const effort = this.getAdaptiveEffort();
+      if (effort) {
+        requestBody.thinking = { type: 'adaptive' };
+        requestBody.output_config = { effort };
+        console.log(`[ClaudeProvider] Adaptive thinking enabled, effort=${effort}`);
+      }
+    } else {
+      const thinkingBudget = this.getThinkingBudget();
+      if (thinkingBudget) {
+        requestBody.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
+        console.log(`[ClaudeProvider] Extended thinking enabled, budget=${thinkingBudget}`);
+      }
     }
   }
 
@@ -224,7 +295,6 @@ export class ClaudeProvider extends BaseAIProvider {
       // Kimi K2 supports 256K context, Claude supports 200K+
       const defaultMaxTokens = 32000;
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
-      const thinkingBudget = this.getThinkingBudget();
 
       // `temperature` is omitted: newer Anthropic models reject it as
       // deprecated, and extended thinking requires it to equal 1 or be
@@ -241,10 +311,7 @@ export class ClaudeProvider extends BaseAIProvider {
         ],
       };
 
-      if (thinkingBudget) {
-        requestBody.thinking = { type: 'enabled', budget_tokens: thinkingBudget };
-        console.log(`[ClaudeProvider] Extended thinking enabled, budget=${thinkingBudget}`);
-      }
+      this.applyThinkingConfig(requestBody);
 
       let response;
 
