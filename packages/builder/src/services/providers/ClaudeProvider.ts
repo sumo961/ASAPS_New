@@ -113,10 +113,12 @@ export class ClaudeProvider extends BaseAIProvider {
 
   /**
    * Translate the user's reasoningEffort to Anthropic's adaptive-mode
-   * effort levels. Anthropic supports low / medium / high; our internal
-   * dial has minimal/low/medium/high/xhigh, so xhigh caps at high.
+   * effort levels. Per platform.claude.com/docs/en/api/messages, valid
+   * effort values are low | medium | high | xhigh | max. Our internal
+   * dial has minimal/low/medium/high/xhigh — minimal collapses to
+   * low; everything else is a direct passthrough.
    */
-  private getAdaptiveEffort(): 'low' | 'medium' | 'high' | undefined {
+  private getAdaptiveEffort(): 'low' | 'medium' | 'high' | 'xhigh' | undefined {
     if (this.useProxy) return undefined;
     const effort = this.config?.reasoningEffort;
     if (!effort || effort === 'none') return undefined;
@@ -124,8 +126,8 @@ export class ClaudeProvider extends BaseAIProvider {
       case 'minimal':
       case 'low':     return 'low';
       case 'medium':  return 'medium';
-      case 'high':
-      case 'xhigh':   return 'high';
+      case 'high':    return 'high';
+      case 'xhigh':   return 'xhigh';
       default:        return undefined;
     }
   }
