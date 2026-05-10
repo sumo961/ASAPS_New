@@ -112,14 +112,31 @@ markdown fences):
   "genre": string,         // e.g. "drama", "speculative fiction",
                            // "documentary-style", "slice of life". One or
                            // two words. Omit the field if genuinely unclear.
-  "length": "short" | "medium" | "long",      // Default to "medium" if
-                                              // unclear.
-  "complexity": "linear" | "moderate" | "complex",  // Branching complexity.
-                                              // Default to "moderate". Use
-                                              // "complex" when the author
-                                              // emphasized plural
-                                              // perspectives, variability,
-                                              // or systemic causation.
+  "length": "short" | "medium" | "long",
+    // Map content to length, don't reflexively default to "medium":
+    //   "short"  — a single-sitting fragment with one or two key choices
+    //              and a single contained scene or moment.
+    //   "medium" — a defined arc on a single timescale (days, weeks), 1–2
+    //              secondary characters, a clear single emotional axis.
+    //   "long"   — stories that span multiple months/seasons, involve a
+    //              3+ character ensemble, weave parallel arcs, or
+    //              describe four or more ending shapes. Use "long"
+    //              whenever the prompt names secondary characters whose
+    //              own inner lives matter (e.g. a parent with their own
+    //              psychological burdens, an absent figure who shapes
+    //              the protagonist).
+    // Default to "medium" ONLY if the conversation didn't establish a
+    // clear scope. If the recap mentioned multi-month timescales or 3+
+    // characters with named inner lives, choose "long".
+  "complexity": "linear" | "moderate" | "complex",
+    // Branching complexity:
+    //   "linear"   — one main spine with cosmetic side-paths.
+    //   "moderate" — 4–6 meaningful decision points with state tracking
+    //                and 2–3 endings.
+    //   "complex"  — emphasis on plural perspectives, replay value,
+    //                variability, systemic causation, or 4+ endings
+    //                that diverge meaningfully.
+    // Default to "moderate" only if unclear.
   "includeAIBeats": boolean // true if the conversation implied the story
                            // should adapt to each play session (AI-generated
                            // beats); false if it sounds pre-authored.
