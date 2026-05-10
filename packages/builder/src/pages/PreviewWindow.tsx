@@ -177,7 +177,14 @@ function createAIServiceAdapter(): IAIService | null {
         }
 
         const content = response.content[0];
-        if (content.type === 'text') return content.text;
+        if (content.type === 'text') {
+          // Strip <thinking>/<think>/<reasoning> blocks. Opus 4.7 with extended
+          // thinking can include them; if they reach AI Summary or AI infoText
+          // beats unstripped, the renderer can show only an empty box because
+          // the runtime mounts the text as HTML and unknown elements collapse.
+          // OpenAI's generateContent and Claude's other methods already do this.
+          return stripThinkingBlocks(content.text);
+        }
         throw new Error('Unexpected response type from Claude');
       },
 
@@ -239,7 +246,7 @@ function createAIServiceAdapter(): IAIService | null {
         }
 
         const content = response.content[0];
-        if (content.type === 'text') return { text: content.text.trim() };
+        if (content.type === 'text') return { text: stripThinkingBlocks(content.text) };
         throw new Error('Unexpected response type from Claude');
       },
 
