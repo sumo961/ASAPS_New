@@ -5,7 +5,9 @@
 
 /**
  * Check if a model requires max_completion_tokens instead of max_tokens
- * Modern OpenAI models (GPT-4o, o1, o3, GPT-5) require the newer parameter
+ * Modern OpenAI models (GPT-4o, o1, o3, GPT-5) require the newer parameter.
+ * Moonshot Kimi K2 (incl. K2.5, K2.6, kimi-k2-thinking) deprecated
+ * max_tokens in favour of max_completion_tokens (per platform.kimi.ai docs).
  */
 export function requiresMaxCompletionTokens(model: string): boolean {
   const m = model.toLowerCase();
@@ -19,6 +21,8 @@ export function requiresMaxCompletionTokens(model: string): boolean {
   if (m.startsWith('o3')) return true;
   // o4 series (future-proofing)
   if (m.startsWith('o4')) return true;
+  // Moonshot Kimi K2 series — max_tokens is deprecated upstream.
+  if (m.includes('kimi-k2')) return true;
   // Default: use max_tokens for older/third-party models
   return false;
 }
