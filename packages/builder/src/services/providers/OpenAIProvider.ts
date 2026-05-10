@@ -932,6 +932,7 @@ export class OpenAIProvider extends BaseAIProvider {
       // 128k+ context windows, so we use 32000 as the baseline for story generation.
       // User can override via config.maxTokens.
       const defaultMaxTokens = 32000;
+      const effectiveMaxTokens = this.config?.maxTokens ?? defaultMaxTokens;
 
       const requestBody = this.buildChatRequest(
         [
@@ -950,7 +951,12 @@ export class OpenAIProvider extends BaseAIProvider {
 
       let response;
 
-      console.log('[OpenAIProvider] generateStory useProxy:', this.useProxy);
+      console.log(
+        `[OpenAIProvider] generateStory useProxy=${this.useProxy}, ` +
+          `effectiveMaxTokens=${effectiveMaxTokens} ` +
+          `(default=${defaultMaxTokens}, configured=${this.config?.maxTokens ?? 'unset'})`,
+      );
+      const startedAt = Date.now();
       if (this.useProxy) {
         // Use proxy for all non-local endpoints (including default OpenAI).
         // Stream by default — keeps the connection warm during long
@@ -967,8 +973,17 @@ export class OpenAIProvider extends BaseAIProvider {
           signal: request.signal,
         });
       }
+      const elapsedMs = Date.now() - startedAt;
+      const elapsedHuman =
+        elapsedMs >= 60000
+          ? `${(elapsedMs / 60000).toFixed(1)}min`
+          : `${(elapsedMs / 1000).toFixed(1)}s`;
 
-      console.log('[OpenAIProvider] Response received:', JSON.stringify(response).substring(0, 500));
+      console.log(
+        `[OpenAIProvider] Response received in ${elapsedHuman} ` +
+          `(content_len=${(response.choices?.[0]?.message?.content ?? '').length}, ` +
+          `finish_reason=${response.choices?.[0]?.finish_reason ?? 'unknown'})`,
+      );
       const content = response.choices[0]?.message?.content;
       if (!content) {
         console.error('[OpenAIProvider] No content in response. Full response:', JSON.stringify(response));
@@ -989,7 +1004,18 @@ export class OpenAIProvider extends BaseAIProvider {
         storyData = JSON.parse(jsonString);
       } catch (parseError) {
         console.error('[OpenAIProvider] JSON parse error:', parseError);
+        console.error(
+          `[OpenAIProvider] Generation took ${elapsedHuman}; ` +
+            `accumulated content_len=${content.length}, ` +
+            `extracted JSON candidate_len=${jsonString.length}, ` +
+            `effectiveMaxTokens=${effectiveMaxTokens}, ` +
+            `finish_reason=${response.choices?.[0]?.finish_reason ?? 'unknown'}`,
+        );
         console.error('[OpenAIProvider] First 500 chars:', jsonString.substring(0, 500));
+        console.error(
+          '[OpenAIProvider] Last 500 chars (where truncation usually shows):',
+          jsonString.substring(Math.max(0, jsonString.length - 500)),
+        );
 
         // Extract error position if available and log context around it
         const errorMsg = parseError instanceof Error ? parseError.message : '';
@@ -1023,10 +1049,20 @@ export class OpenAIProvider extends BaseAIProvider {
               console.error(repaired.substring(start, pos) + '>>>ERROR HERE<<<' + repaired.substring(pos, end));
               console.error('[OpenAIProvider] ---END---');
             }
-            throw new Error(`Invalid JSON in response (repair failed): ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. The model may have hit token limits.`);
+            throw new Error(
+              `Invalid JSON in response after ${elapsedHuman} ` +
+                `(${content.length} chars produced, max_tokens=${effectiveMaxTokens}, repair failed): ` +
+                `${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. ` +
+                `If the JSON appears truncated, raise Max Tokens in AI settings (currently ${effectiveMaxTokens}).`,
+            );
           }
         } else {
-          throw new Error(`Invalid JSON in response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. The model may have hit token limits - try a simpler prompt or increase max tokens.`);
+          throw new Error(
+            `Invalid JSON in response after ${elapsedHuman} ` +
+              `(${content.length} chars produced, max_tokens=${effectiveMaxTokens}): ` +
+              `${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. ` +
+              `If the JSON appears truncated, raise Max Tokens in AI settings (currently ${effectiveMaxTokens}).`,
+          );
         }
       }
 
