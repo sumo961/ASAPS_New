@@ -1,5 +1,78 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-11: Kimi end-to-end, Claude Opus 4.7 thinking, story-gen craft rules (v0.9.54)
+
+### Overview
+
+A long session of fixes that took Kimi from "tool-loop stalls and JSON truncation" to fully working end-to-end (Ideator interview, story generation, AI runtime beats), got Claude Opus 4.7 working with Anthropic's new adaptive-thinking API shape (legacy `thinking.type=enabled` was deprecated upstream between sessions), and tightened the AI story-gen system prompt with three new craft rules plus genre-gated mystery guidance.
+
+No new user-facing feature in this release — every change either unblocks a previously broken AI path, makes a failure mode debuggable, or improves the craft of what the AI produces.
+
+### Kimi end-to-end
+
+- **Tool-loop `reasoning_content` echo** (`511bc77f`) — Kimi reasoning models include a `reasoning_content` field in tool-call response messages and reject the next request with 400 "thinking is enabled but reasoning_content is missing" if we don't echo it back. Forward when present.
+- **`max_completion_tokens` per Moonshot docs** (`eb9fa9ad`) — `max_tokens` is deprecated on Moonshot's API for Kimi K2.x; switched detection so Kimi takes the same code path as GPT-5/o-series.
+- **Tool-loop honours user `maxTokens`** (`bd3d8856`) — was hardcoded to 1500 which truncated mid-arguments-JSON on Kimi reasoning; now respects config with 8192 default. Added per-iter diagnostic logs on both providers.
+- **Story-gen tool-loop diagnostics** (`988f52a0`) — duration, accumulated length, last 500 chars, configured max_tokens on JSON-parse failures so the next stall is debuggable in one screenshot.
+
+### Claude Opus 4.7 compatibility
+
+- **Adaptive thinking shape** (`bca3ab2b`) — Anthropic deprecated `thinking.type='enabled'` for Claude 4.5+ models in favour of `thinking.type='adaptive'` + `output_config.effort`. Detect by model-ID regex (`claude-{opus,sonnet,haiku}-{4-5+,5+}`) and emit the correct shape per model. Older models keep the legacy `budget_tokens` shape.
+- **xhigh preserved** (`09f6af76`) — initial fix capped `xhigh` at `high`; per platform.claude.com docs the valid range is `low|medium|high|xhigh|max`. Saved lesson to feedback memory.
+- **Effort-scaled max_tokens** (`e2085684`) — in adaptive mode thinking tokens count against `max_tokens` with no separate budget control. Scaled defaults: `xhigh → 96000`, `high → 64000`, `medium → 48000`, `low/none → 32000`. Truncation error rewritten to surface actual length + configured cap + thinking-eats-budget hint.
+
+### Story-generation prompt craft (universal rules)
+
+Added three new anti-pattern entries to `storyGenerationEnhanced.ts` (commit `b537d742`), motivated by a Kimi-generated story that had abrupt scene jumps, repeated information, and choices whose intent the next beat ignored:
+
+1. **Hidden scene jumps via invisible beats** — when `setVariable`/`conditionBeat` connects two dialog scenes with different speakers or locations, require a 1-2 sentence transitional infoText.
+2. **Restating information the player already learned** — escalate or complicate prior info, don't echo it with different wording.
+3. **Choice text declares intent the next beat ignores** — a "let it go / drop the case" choice must produce a narratively distinct path, not just flip a flag while the next beat behaves identically.
+
+### Story-generation prompt craft (mystery-gated)
+
+- **Evidence-distribution rules for mystery / detective / thriller / crime / noir** (`a36d701b`) — genre-substring-matched. Evidence beats must distribute fragments across multiple discoveries; full reveal beat reserved for after at least two evidence beats and a path commitment; suspects don't confess the central secret on first meeting. Non-mystery genres see the prompt unchanged.
+
+### Ideator improvements
+
+- **Interview-loop tightened without disturbing Claude** (`5b7b37b0`) — dropped "err on the side of one more question" (which Kimi read as a hard rule and over-asked), added a recap-then-final-grounding-question pattern, added "do not loop on dimensions already covered" with explicit dimension list. Claude's 11-turn dimension-walking unaffected; Kimi's previous 13-turn loops should consolidate.
+- **Synthesis maxTokens 4000 → 8000** (`b537d742`) — Kimi reasoning models can spend several thousand tokens on `reasoning_content` before emitting JSON; 4000 sometimes truncated.
+- **Content-mapped length / complexity** (`8b985c39`) — replaced "default to medium" with content heuristics so multi-month / 3+ character / 4+ ending stories map to `long`, mental-health/relationships-foregrounded prompts map to `complex`.
+- **Affect Depth in handoff form** (`fb71d339`) — `PromptPreviewPanel` was missing the affectDepth dropdown that `StoryGenerator.tsx` already had. Synthesizer now also emits an `affectDepth` field based on the conversation content (rich for emotional drama / mental health, sparse for puzzles/educational), pre-populating the form.
+
+### Runtime AI fixes
+
+- **Claude `generateContent` strips thinking blocks** (`0e5d0da0`) — the only Claude path that didn't, so AI Summary on Opus 4.7 rendered as title + empty box when extended-thinking-style `<thinking>` tags reached the renderer. Brought into consistency with OpenAI's path and Claude's other methods.
+- **Runtime proxy endpoint resolves same-origin** (`b26850d2`) — the runtime AI adapter hardcoded `:3001/api/ai/...` which requires a separately-running `dev:api` server. Now mirrors OpenAIProvider's logic: same-origin `/api/ai/...` when on port 5173, `:3001` fallback otherwise.
+- **Reasoning-model headroom at runtime** (`516491a5`) — `AIInfoTextBeat` hardcodes `maxTokens: 250` (fine for non-reasoning), but Kimi reasoning shared that budget with `reasoning_content` and the visible content arrived empty. Added an `effectiveMaxTokens(model, requested)` shim that bumps the floor to 4096 for reasoning models.
+
+### Diagnostics
+
+- **Per-iter tool-loop logs** on both providers (`bd3d8856`, `26ea87c6`).
+- **Empty-content error message** distinguishes "model spent budget on reasoning" vs "connection dropped" (`b537d742`).
+- **`max_tokens` decision log** at the start of every Claude story-gen call (`e2085684`).
+
+### Architectural decisions filed for follow-up
+
+Three planned-work memories saved during this session:
+
+1. **Unify runtime AI adapter with builder AIService** — PreviewWindow's per-provider adapter duplicates AIService/provider classes; every quirk fix has to be applied twice. Today's runtime-proxy and stripThinkingBlocks fixes were both band-aids on this.
+2. **Story variables/counters dropped on AI-gen import** — generated `variables[]` mixes booleans and numeric counters; ASAPS has global variables + character-scoped counters and no global counters concept. Long-term direction: have the AI tag counters with `ownerCharacter`. Justified by character-specific HUD use case and the "two characters with `health`" namespace collision.
+3. **Don't guess at API field value ranges** (feedback memory) — saved after capping xhigh at high before checking the docs. Always WebFetch the provider's docs page before writing a mapping switch.
+
+### Files modified
+
+- `packages/builder/src/services/providers/ClaudeProvider.ts` — adaptive thinking, effort-scaled max_tokens, tool-loop maxTokens + diag
+- `packages/builder/src/services/providers/OpenAIProvider.ts` — reasoning_content echo, tool-loop maxTokens + diag, story-gen failure diagnostics
+- `packages/builder/src/services/providers/openai-utils.ts` — Kimi K2 added to max_completion_tokens detection
+- `packages/builder/src/pages/PreviewWindow.tsx` — same-origin proxy endpoint, reasoning headroom, stripThinkingBlocks consistency
+- `packages/builder/src/components/ai/ideator/systemPrompt.ts` — interview rules, content-mapped length/complexity, affectDepth synthesis
+- `packages/builder/src/components/ai/ideator/promptSynthesis.ts` — synthesis maxTokens bump, affectDepth parsing
+- `packages/builder/src/components/ai/ideator/PromptPreviewPanel.tsx` — Affect Depth dropdown
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` — three universal anti-patterns + mystery genre rules
+
+---
+
 ## 2026-05-09: Ideator Conversational Ideation Tool + Character ID Clarity (v0.9.53)
 
 ### Overview
