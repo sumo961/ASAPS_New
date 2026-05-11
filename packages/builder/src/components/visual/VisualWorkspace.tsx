@@ -4755,6 +4755,35 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             onZoomChange={(z: number) => { vbeZoomRef.current = z; }}
             initialScroll={vbeScrollRef.current}
             onScrollChange={(s: { left: number; top: number }) => { vbeScrollRef.current = s; }}
+            onResetLayout={() => {
+              // Reset this beat's element positions to the default layout
+              // computed by initializeLocationsFromSchema. Useful when a
+              // layout-math fix lands and the user wants to opt this beat
+              // into the new defaults without deleting and re-adding it.
+              // Destructive (any manual edits are lost) — confirm first.
+              if (!beat) return;
+              const confirmed = window.confirm(
+                "Reset this beat's element positions to the default layout? Manual position edits on this beat will be lost. This goes into the undo history."
+              );
+              if (!confirmed) return;
+              const params = beat.getParameters ? beat.getParameters() : {};
+              // Clear the persisted locations so the initializer recomputes
+              // from scratch (the function skips beats that already have
+              // locations elsewhere; here we explicitly wipe + re-init).
+              beat.locations = new Map();
+              const freshElements = initializeLocationsFromSchema(
+                beat,
+                params,
+                projectSettings,
+              );
+              // Capture snapshot for undo, then apply
+              snapshotRef.current = visualElements.map((el) => ({ ...el }));
+              setVisualElements(freshElements);
+              syncElementsToBeatLocations(freshElements, beat);
+              setHasChanges(true);
+              setSelectedElementIds([]);
+              commitSnapshot('Reset layout to default');
+            }}
           />
         )}
       </div>

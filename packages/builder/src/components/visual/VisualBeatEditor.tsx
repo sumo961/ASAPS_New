@@ -23,6 +23,7 @@ import {
   Group,
   Ungroup,
   Eye,
+  LayoutGrid,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
@@ -156,6 +157,14 @@ interface VisualBeatEditorProps {
   themeAssets?: ThemeAssetUrls | null;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  /**
+   * Reset this beat's positioned elements to the schema-default layout.
+   * Invoked from the toolbar's "Reset layout" button (visible when set).
+   * The parent is responsible for the actual reset — it has the full
+   * Beat object and projectSettings needed by initializeLocationsFromSchema.
+   * Skip the button entirely by leaving this undefined.
+   */
+  onResetLayout?: () => void;
   /** Per-beat override for countdown meter visibility */
   overrideCountdownMeter?: boolean;
   /** DialogTree presentation mode - when chat mode, show ChatDialogView preview */
@@ -199,6 +208,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   themeAssets,
   onInteractionStart,
   onInteractionEnd,
+  onResetLayout,
   overrideCountdownMeter,
   presentationMode,
   panoramaViewport,
@@ -1020,6 +1030,25 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
+
+        {/*
+         * Reset layout button — re-runs initializeLocationsFromSchema on
+         * the current beat, throwing away any manual position edits and
+         * restoring the default layout. Useful after layout-math fixes
+         * land (existing beats keep their saved positions; this is the
+         * affordance to opt into the new defaults without deleting and
+         * re-adding the beat). Confirmation lives in the parent's
+         * onResetLayout handler.
+         */}
+        {onResetLayout && (
+          <button
+            onClick={onResetLayout}
+            className="p-2 rounded hover:bg-gray-100"
+            title="Reset Layout to Default (discards manual position edits)"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Alignment buttons - show when 2+ elements selected */}
         {selectedElements.length >= 2 && (
