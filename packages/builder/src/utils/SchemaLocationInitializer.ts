@@ -371,13 +371,16 @@ export function initializeLocationsFromSchema(
       if (isAIContentBeat) {
         const originalHeight = height;
         height = Math.min(height, 70);
-        // Tight but non-overlapping gap. -5 caused the title box's
-        // bottom edge to render INSIDE the text box's top edge (visible
-        // overlap in screenshots). +8 gives a hair of separation while
-        // still feeling tight; the renderer's internal box padding
-        // (~20px per side) supplies the visual breathing room between
-        // rendered text on each side.
-        currentY = y + height + 8;
+        // Inter-box gap. Calibration history:
+        //   15 → felt like too much air (boxes feel separated, almost
+        //        unrelated)
+        //   -5 → boxes literally overlapped (borders crossed)
+        //   +8 → at 84% preview scale renders as ~6-7px which still
+        //        reads as 'touching' to the eye
+        //   +24 → clear visible separation at scale without floating
+        // The renderer's per-box padding handles the rest of the
+        // visual breathing room.
+        currentY = y + height + 24;
         console.log(`[SchemaLocationInitializer] AI title: y=${y}, height=${height} (was ${originalHeight}), nextY=${currentY}`);
       } else {
         currentY = y + height + 40; // Space after title
