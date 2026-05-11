@@ -359,7 +359,14 @@ export function initializeLocationsFromSchema(
       if (buttonNameLower.includes('start') || buttonNameLower.includes('continue') ||
           buttonNameLower.includes('restart') || buttonNameLower.includes('credits') ||
           buttonNameLower.includes('submit')) {
-        y = stageHeight - 150; // Near bottom for action buttons
+        // Action buttons live near the stage bottom. 150px-from-bottom
+        // (was) left ~110px of dead air below the button; shifting to
+        // 100px-from-bottom uses that wasted space while keeping a
+        // visible bottom margin. Sync the buttonAreaTop reference in
+        // the AI text/summary path below so the text box's available
+        // height grows by the same amount, preserving the gap above
+        // the button.
+        y = stageHeight - 100;
       } else {
         y = currentY;
         currentY += height + 20; // Stack vertically
@@ -372,15 +379,12 @@ export function initializeLocationsFromSchema(
         const originalHeight = height;
         height = Math.min(height, 70);
         // Inter-box gap. Calibration history:
-        //   15 → felt like too much air (boxes feel separated, almost
-        //        unrelated)
-        //   -5 → boxes literally overlapped (borders crossed)
-        //   +8 → at 84% preview scale renders as ~6-7px which still
-        //        reads as 'touching' to the eye
-        //   +24 → clear visible separation at scale without floating
-        // The renderer's per-box padding handles the rest of the
-        // visual breathing room.
-        currentY = y + height + 24;
+        //   15  → comfortable but felt like too much air w/o content
+        //   -5  → boxes literally overlapped (borders crossed)
+        //   +8  → reads as touching at 84% preview scale
+        //   +24 → barely visible separation at preview scale
+        //   +50 → clearly separated, comfortable rhythm
+        currentY = y + height + 50;
         console.log(`[SchemaLocationInitializer] AI title: y=${y}, height=${height} (was ${originalHeight}), nextY=${currentY}`);
       } else {
         currentY = y + height + 40; // Space after title
@@ -413,7 +417,12 @@ export function initializeLocationsFromSchema(
         currentY = 60; // Start higher for title-less AI beats
       }
       y = currentY;
-      const buttonAreaTop = stageHeight - 150; // Button is at stageHeight - 150
+      // Must stay in sync with the action-button y-position above
+      // (currently stageHeight - 100). Computing availableHeight against
+      // this reference + buttonGap keeps a fixed visible separation
+      // between text-box bottom and button top regardless of where the
+      // button sits.
+      const buttonAreaTop = stageHeight - 100;
       const buttonGap = 50; // visible separation between text-box bottom and button top
       const availableHeight = buttonAreaTop - y - buttonGap;
       const minTextHeight = 250; // floor so short placeholder doesn't render a tiny box
