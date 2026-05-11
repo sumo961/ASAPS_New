@@ -365,8 +365,17 @@ export function initializeLocationsFromSchema(
       // For AI beats, cap title height and reduce gap
       if (isAIContentBeat) {
         const originalHeight = height;
-        height = Math.min(height, 80); // Cap title height for AI beats
-        currentY = y + height + 15; // Smaller gap after title
+        // Cap title height at 70 (was 80) — the title text is centered
+        // vertically inside its box, and the renderer adds 20px padding
+        // each side regardless. A smaller cap tightens the visual.
+        height = Math.min(height, 70);
+        // Negative gap reads as "remove visual air". The renderer's
+        // internal box padding (20px each side) already provides plenty
+        // of breathing room between the title's text-bottom and the
+        // body-text's text-top — we don't need to add another gap on
+        // top of that. Bringing this from 15 → -5 closes the visible
+        // air the user reported.
+        currentY = y + height - 5;
         console.log(`[SchemaLocationInitializer] AI title: y=${y}, height=${height} (was ${originalHeight}), nextY=${currentY}`);
       } else {
         currentY = y + height + 40; // Space after title
@@ -380,18 +389,37 @@ export function initializeLocationsFromSchema(
       y = currentY + 20; // Extra gap before summary
       currentY = y + height + 30;
     } else if ((locationName === 'text' || locationName === 'summary') && isAIContentBeat) {
-      // For AI content beats, text/summary element should fill available space
-      // If this is the first element (no title), start higher
+      // For AI content beats, size the text box for comfortable display
+      // of typical AI-fetched content while leaving a CLEAR visual gap
+      // above the Continue button. With requireScrollToBottom enabled on
+      // these beat types, longer-than-expected content scrolls within
+      // the box and the gradient '↓ Scroll for more' indicator appears.
+      //
+      // Two bugs fixed here:
+      //   1. The old formula `Math.max(height, Math.min(availableHeight,
+      //      400))` returned the LARGER of (autoSized height) and (cap).
+      //      When autoSized came in big, height could exceed
+      //      availableHeight and overflow into the button area. The new
+      //      formula clamps height TO availableHeight as a hard ceiling.
+      //   2. The button gap was 30px, which on stage at 84% scale read
+      //      as ~25px — visually close to "touching". Increased to 50px
+      //      so the separation is clearly readable.
       if (beat.type === 'aiInfoText' && currentY === 100) {
         currentY = 60; // Start higher for title-less AI beats
       }
       y = currentY;
-      // Calculate available height: from currentY to button area
       const buttonAreaTop = stageHeight - 150; // Button is at stageHeight - 150
-      const availableHeight = buttonAreaTop - y - 30; // Leave 30px gap above button
+      const buttonGap = 50; // visible separation between text-box bottom and button top
+      const availableHeight = buttonAreaTop - y - buttonGap;
+      const minTextHeight = 250; // floor so short placeholder doesn't render a tiny box
+      const maxTextHeight = Math.min(availableHeight, 400); // hard ceiling
       const originalHeight = height;
-      height = Math.max(height, Math.min(availableHeight, 400)); // Use available space, cap at 400
-      console.log(`[SchemaLocationInitializer] AI ${locationName}: y=${y}, height=${height} (was ${originalHeight}), availableHeight=${availableHeight}, buttonAreaTop=${buttonAreaTop}`);
+      height = Math.min(Math.max(height, minTextHeight), maxTextHeight);
+      console.log(
+        `[SchemaLocationInitializer] AI ${locationName}: y=${y}, height=${height} ` +
+          `(was ${originalHeight}), availableHeight=${availableHeight}, ` +
+          `buttonAreaTop=${buttonAreaTop}, buttonGap=${buttonGap}`,
+      );
       currentY = y + height + 20;
     } else {
       // Stack other elements
