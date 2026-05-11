@@ -98,6 +98,13 @@ const BEAT_TYPE_GUIDE = `
 🚨🚨🚨 **titleScreen** - Story opening (MANDATORY FIRST BEAT!) 🚨🚨🚨
 - Use: Start of EVERY story - this MUST be the first beat (beat_0)
 - Parameters: title, author, startButtonText
+  - title: Keep SHORT — 2-5 words, ≤40 characters. Single line in a
+    hero-sized box; long titles ("The Quiet Weight of Her Many Voices in
+    a Time of Silence", 56 chars) wrap to two lines and crowd the
+    subtitle below. "The Weight of Her Voice", "How to Hold Someone",
+    "The Silent Archive" — punchy, evocative, short.
+  - author: A short subtitle or byline, also ≤40 characters. Same
+    one-line constraint.
 - Connections: Single → first story beat (usually infoText)
 - ⚠️⚠️⚠️ CRITICAL: beat_0 MUST ALWAYS be type "titleScreen"!
 - ❌ WRONG: Starting with infoText, dialogTree, or any other beat type
@@ -740,7 +747,12 @@ Fictional time condition example (CORRECT format):
     - jsonPath: JSONPath to extract data (e.g., "$.current.temp_c")
   - For AI query mode:
     - query: What to search/answer (supports \${variable} interpolation)
-  - title: Title above content (auto-derived from query if not set)
+  - title: Title above content (auto-derived from query if not set).
+    Keep titles SHORT — 2-5 words, ≤35 characters. The title renders on a
+    single line in a header box; long titles like "Transport options in
+    Bergen, Norway's Coastal Hub" (49 chars) wrap to two lines and break
+    the layout. Prefer punchy framings: "Bergen Transport", "Getting
+    Around Bergen", "Bergen Commuter Mix" — NOT subtitle-style sentences.
   - maxWords: Maximum words in response
   - fallbackText: Text if fetch fails (REQUIRED)
   - buttonText: Continue button label

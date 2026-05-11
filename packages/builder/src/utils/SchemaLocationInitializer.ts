@@ -442,7 +442,44 @@ export function initializeLocationsFromSchema(
     }
 
     // Use standard font sizes - let content scroll if needed
-    const fontSize = locationDef.fontSize || 16;
+    let fontSize = locationDef.fontSize || 16;
+
+    // Defensive shrink for title elements that would overflow the box.
+    // Primary fix is the prompt-side rule asking the AI to keep titles
+    // short (≤35-40 chars). This is the backstop: if the AI produces
+    // something long anyway, the title shrinks rather than wrapping.
+    //
+    // Applies to: titleScreen.title, titleScreen.author, and the title
+    // location on AI content beats (onlineContent, aiInfoText, aiSummary).
+    // Only kicks in when the title text actually would not fit at the
+    // schema's preferred font size — short titles render at full size
+    // unchanged.
+    const isHeroTitle =
+      (beat.type === 'titleScreen' && (locationName === 'title' || locationName === 'author')) ||
+      (isAIContentBeat && locationName === 'title');
+    if (isHeroTitle && defaultText) {
+      // Estimated text width at the current fontSize (no padding — we
+      // only need to see whether the text itself fits the available
+      // inner width of the box).
+      const horizontalPadding = 40; // text-element padding (20px × 2)
+      const innerWidth = Math.max(0, width - horizontalPadding - 4);
+      // Same charWidth multiplier as autoSizeText.
+      const widthAt = (fs: number) => defaultText.length * (fs * 0.58);
+      // Shrink in 2px steps down to a floor of 14px. If even 14px doesn't
+      // fit, give up — the title is exceptionally long and will wrap;
+      // that's a content problem the prompt rule is meant to catch.
+      const minTitleFontSize = 14;
+      while (fontSize > minTitleFontSize && widthAt(fontSize) > innerWidth) {
+        fontSize -= 2;
+      }
+      if (fontSize !== (locationDef.fontSize || 16)) {
+        console.log(
+          `[SchemaLocationInitializer] title shrank: ${locationDef.fontSize || 16} → ${fontSize}px ` +
+            `(text="${defaultText.substring(0, 40)}${defaultText.length > 40 ? '...' : ''}", innerWidth=${innerWidth})`,
+        );
+      }
+    }
+
     console.log(`[SchemaLocationInitializer] ${beat.type}/${locationName}: fontSize=${fontSize}, locationDef.fontSize=${locationDef.fontSize}`);
 
     // Determine if this element should require scroll-to-bottom.
