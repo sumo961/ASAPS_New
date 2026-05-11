@@ -306,10 +306,15 @@ export function initializeLocationsFromSchema(
 
     // Auto-size text elements based on content
     if (defaultText && (elementType === 'text' || elementType === 'dialog' || elementType === 'button')) {
+      // Button minWidth bumped 120 → 160: the renderer applies its own
+      // button padding on top of what autoSizeText estimates, and short
+      // labels like "Learn More" sized at the old 120 minimum ended up
+      // wrapping to two lines at play time ("Learn / More"). 160 gives a
+      // safe margin without making buttons look balloon-shaped.
       const sized = autoSizeText(
         defaultText,
         locationDef.fontSize || 16,
-        elementType === 'button' ? 120 : 200,
+        elementType === 'button' ? 160 : 200,
         elementType === 'button' ? 400 : 800,
         elementType === 'button'
       );
@@ -365,17 +370,14 @@ export function initializeLocationsFromSchema(
       // For AI beats, cap title height and reduce gap
       if (isAIContentBeat) {
         const originalHeight = height;
-        // Cap title height at 70 (was 80) — the title text is centered
-        // vertically inside its box, and the renderer adds 20px padding
-        // each side regardless. A smaller cap tightens the visual.
         height = Math.min(height, 70);
-        // Negative gap reads as "remove visual air". The renderer's
-        // internal box padding (20px each side) already provides plenty
-        // of breathing room between the title's text-bottom and the
-        // body-text's text-top — we don't need to add another gap on
-        // top of that. Bringing this from 15 → -5 closes the visible
-        // air the user reported.
-        currentY = y + height - 5;
+        // Tight but non-overlapping gap. -5 caused the title box's
+        // bottom edge to render INSIDE the text box's top edge (visible
+        // overlap in screenshots). +8 gives a hair of separation while
+        // still feeling tight; the renderer's internal box padding
+        // (~20px per side) supplies the visual breathing room between
+        // rendered text on each side.
+        currentY = y + height + 8;
         console.log(`[SchemaLocationInitializer] AI title: y=${y}, height=${height} (was ${originalHeight}), nextY=${currentY}`);
       } else {
         currentY = y + height + 40; // Space after title
