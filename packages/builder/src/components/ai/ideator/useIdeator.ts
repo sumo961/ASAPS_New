@@ -24,8 +24,10 @@ import {
 import type { IdeatorWireMessage } from './types';
 import type { StoryGenerationRequest } from '../../../types/ai';
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface UseIdeatorOptions {
-  projectTitle?: string;
+  // projectTitle was here for the now-removed system-prompt context line.
+  // Kept the empty interface in case future options land.
 }
 
 const OPENING_TURN =
@@ -35,8 +37,7 @@ const OPENING_TURN =
   "To start: what's the issue, theme, or question you've been turning over in " +
   "your head — the one you'd like the audience to sit with?";
 
-export function useIdeator(opts: UseIdeatorOptions = {}) {
-  const { projectTitle } = opts;
+export function useIdeator(_opts: UseIdeatorOptions = {}) {
   const {
     messages,
     status,
@@ -127,7 +128,6 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
       const useTools = !!braveKey && (currentProvider === 'claude' || currentProvider === 'openai');
 
       const systemPrompt = buildInterviewSystemPrompt({
-        projectTitle,
         webSearchAvailable: useTools,
       });
 
@@ -195,7 +195,6 @@ export function useIdeator(opts: UseIdeatorOptions = {}) {
       generateChatWithTools,
       generateConversationTurn,
       isConfigured,
-      projectTitle,
       setError,
       setStatus,
     ]

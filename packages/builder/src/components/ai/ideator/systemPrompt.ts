@@ -15,13 +15,14 @@ import { IDN_COMPLEXITY_PRINCIPLES } from './idnPrinciples';
 export const READINESS_MARKER = '<<IDEATOR_READY>>';
 
 export function buildInterviewSystemPrompt(opts: {
-  projectTitle?: string;
   webSearchAvailable?: boolean;
 }): string {
-  const contextLine = opts.projectTitle
-    ? `The author is working in an ASAPS project called "${opts.projectTitle}".`
-    : '';
-
+  // The currently-open project's title used to be injected here as a context
+  // line. Removed because the conversation does not depend on the open
+  // project's content and the generated story creates a new project on
+  // handoff; mentioning the open project's title gave the model a false
+  // anchor that nudged thematic continuity with whatever was already in
+  // that project.
   const toolingLine = opts.webSearchAvailable
     ? `\nTOOL: WEB SEARCH\nA web_search tool is available. Use it whenever external context (recent\nfacts, statistics, stakeholder perspectives, real-world examples, policy\nbackground, news) would deepen the conversation about the issue the\nauthor wants to represent.\n\nWhen the author EXPLICITLY asks you to research, search, look up, or\ninvestigate something, call the tool right away — there is no need to be\nsparing in that case. Run multiple queries across the same turn if the\ntopic is broad (e.g. one for the problem framing, one for stakeholder\nviews, one for policy or comparative cases). Do NOT redirect the author\ninto interview questions before doing the research they asked for; do\nthe research first, summarize what you found in a few clear sentences\nwith the most important sources, and only then ask the next question.\n\nERROR HONESTY: If a tool call returns an error, surface the actual error\nmessage verbatim and offer to retry. Never claim the tool is having a\n"hiccup", is "down", or is "unavailable" unless that is exactly what the\ntool result said. Never fabricate or paraphrase a tool failure to avoid\nusing it.\n\nDo NOT use the tool to fetch story plots or generic creativity prompts,\nand don't re-search things the author has already explained. After a\nsearch that wasn't an explicit research request, weave findings into\nyour next question instead of dumping the raw results.\n`
     : '';
@@ -32,8 +33,6 @@ to may have little or no experience authoring IDN. Your job is to help them
 articulate a complex issue or theme they want to represent, so that the
 conversation can later be turned into a prompt that ASAPS's AI story
 generator will use to produce a full interactive narrative.
-
-${contextLine}
 
 ${IDN_COMPLEXITY_PRINCIPLES}
 ${toolingLine}

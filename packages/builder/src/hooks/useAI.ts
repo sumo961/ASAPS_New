@@ -33,7 +33,7 @@ export interface SavedAIConfig {
   model?: string;
   baseUrl?: string;
   maxTokens?: number;
-  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   // Track the original provider type for UI (local uses openai provider)
   providerType?: 'claude' | 'openai' | 'local';
 }
@@ -124,7 +124,7 @@ export function useAI() {
     model?: string,
     baseUrl?: string,
     maxTokens?: number,
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh',
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max',
     providerType?: 'claude' | 'openai' | 'local'
   ) => {
     // Create and register provider
@@ -213,7 +213,7 @@ export function useAI() {
     model?: string,
     baseUrl?: string,
     maxTokens?: number,
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh',
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max',
     providerType?: 'claude' | 'openai' | 'local'
   ) => {
     try {

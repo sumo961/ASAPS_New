@@ -91,7 +91,7 @@ export interface GlobalSettings {
     model?: string;
     baseUrl?: string;
     maxTokens?: number;
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   };
   tts?: {
     provider?: 'web-speech' | 'openai' | 'elevenlabs' | 'custom';

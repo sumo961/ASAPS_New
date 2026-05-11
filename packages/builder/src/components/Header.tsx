@@ -62,7 +62,7 @@ interface HeaderProps {
     model?: string;
     baseUrl?: string;
     maxTokens?: number;
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   }) => void;
   onCurrentProjectDeleted?: () => void;
   triggerNewProject?: number;

@@ -1229,6 +1229,15 @@ Choice text declares the player's intent ("Let it go", "Drop the case", "Walk aw
    2. External forces override the choice — and the next beat shows that explicitly: e.g., infoText "Two days later, Isabelle Borg's number flashes on your screen. You almost don't pick up. Then you do." This makes clear the player isn't seeking the next scene; it's coming to them.
 ✓ Rewrite the choice text if it doesn't actually match what happens next. "Some things should stay buried" must NOT lead to a beat where the player chooses what to do with buried evidence.
 
+❌ **Character variants with displayName identical to the base character's name**
+A character variant is the alternate version a character can transition into via setCharacterVariant (e.g. "Sam (after disclosure)", "Elena, freed"). The variant's displayName is what the author sees in the editor's variant dropdown and what the speaker label reads as during play. If the displayName is identical to the base character's name, the UI cannot visually distinguish base from variant — the variant dropdown shows the same string twice and the speaker label can't communicate that a transition happened.
+✗ WRONG:
+  Character "Sam" with variants: [ { "id": "sam_post_disclosure", "displayName": "Sam", ... } ]
+  Editor's variant dropdown reads: "Sam" / "Sam"  — useless. Player sees no change in speaker label after the variant switch.
+✓ CORRECT: every variant's displayName MUST be visibly distinct from the base character's name AND from every other variant of the same character. Use a parenthetical or a qualifier:
+  Character "Sam" with variants: [ { "id": "sam_post_disclosure", "displayName": "Sam (after disclosure)" }, { "id": "sam_in_recovery", "displayName": "Sam, in recovery" } ]
+✓ The id stays machine-readable (snake_case, scoped); the displayName carries the narrative signal of the transition.
+
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
 **BEFORE setting a condition threshold, calculate whether it can actually be reached!**

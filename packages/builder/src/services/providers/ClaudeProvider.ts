@@ -83,6 +83,10 @@ export class ClaudeProvider extends BaseAIProvider {
       case 'medium':  return 10000;
       case 'high':    return 20000;
       case 'xhigh':   return 32000;
+      // 'max' is a Claude 4.5+ adaptive-mode tier; older 'enabled'-shape
+      // models don't have a documented equivalent. Cap at xhigh so the
+      // legacy path stays valid; the adaptive path passes 'max' through.
+      case 'max':     return 32000;
       default:        return undefined;
     }
   }
@@ -118,7 +122,7 @@ export class ClaudeProvider extends BaseAIProvider {
    * dial has minimal/low/medium/high/xhigh — minimal collapses to
    * low; everything else is a direct passthrough.
    */
-  private getAdaptiveEffort(): 'low' | 'medium' | 'high' | 'xhigh' | undefined {
+  private getAdaptiveEffort(): 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined {
     if (this.useProxy) return undefined;
     const effort = this.config?.reasoningEffort;
     if (!effort || effort === 'none') return undefined;
@@ -128,6 +132,7 @@ export class ClaudeProvider extends BaseAIProvider {
       case 'medium':  return 'medium';
       case 'high':    return 'high';
       case 'xhigh':   return 'xhigh';
+      case 'max':     return 'max';
       default:        return undefined;
     }
   }
@@ -307,6 +312,7 @@ export class ClaudeProvider extends BaseAIProvider {
       // requiring users to manually bump Max Tokens.
       const defaultMaxTokensFor = (effort: string | undefined): number => {
         switch (effort) {
+          case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
           case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
           case 'high':  return 64000;
           case 'medium': return 48000;

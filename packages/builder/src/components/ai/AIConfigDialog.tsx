@@ -74,7 +74,7 @@ export interface AIConfigDialogProps {
     model?: string;
     baseUrl?: string;
     maxTokens?: number;
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   }) => void;
 }
 
@@ -92,7 +92,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   const [baseUrl, setBaseUrl] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState<
-    '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+    '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   >('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -368,7 +368,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
-              <option value="xhigh">X-High (max depth)</option>
+              <option value="xhigh">X-High</option>
+              <option value="max">Max (Claude 4.5+ only)</option>
             </select>
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'claude'

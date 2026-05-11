@@ -42,7 +42,7 @@ export const IdeatorWindow: React.FC = () => {
     submitRequest,
     backToChat,
     resetConversation,
-  } = useIdeator({ projectTitle });
+  } = useIdeator();
 
   const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
   const assistantSuggestsReady = Boolean(lastAssistant?.readinessSignal);

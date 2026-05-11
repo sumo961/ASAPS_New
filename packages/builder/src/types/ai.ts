@@ -26,10 +26,13 @@ export interface AIProviderConfig {
   maxTokens?: number;
 
   /**
-   * Reasoning effort for GPT-5 class reasoning models.
-   * Supported values vary by model; gpt-5.2 defaults to 'none'.
+   * Reasoning effort for reasoning-capable models (GPT-5 series, Claude
+   * 4.5+ adaptive thinking, Kimi K2.x). Supported values and meaning vary
+   * by model: 'max' is currently honoured by Claude adaptive thinking; on
+   * other providers it caps at the next-highest available tier.
+   * gpt-5.2 defaults to 'none'.
    */
-  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
   /** Custom base URL for API-compatible providers (e.g., ANTHROPIC_BASE_URL) */
   baseUrl?: string;
