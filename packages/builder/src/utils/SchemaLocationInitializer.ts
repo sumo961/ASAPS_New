@@ -109,8 +109,16 @@ function autoSizeText(
   maxWidth: number,
   isButton: boolean = false
 ): { width: number; height: number } {
-  // Approximate character width - use 0.42 to match renderer's proportional font measurement
-  const charWidth = fontSize * 0.42;
+  // Per-character width multiplier for layout estimation. Earlier value 0.42
+  // matched a narrow monospace assumption and consistently *underestimated*
+  // real proportional-font rendering — titles like "How to Hold Someone" got
+  // sized to fit "on paper" but wrapped to 2 lines in the browser, and
+  // because the height was computed for 1 line the overflow slid into the
+  // next element. 0.58 is closer to typical proportional fonts
+  // (system-ui / Inter / sans-serif at the sizes we use). The cost is
+  // slightly wider boxes when the heuristic is loose; the benefit is that
+  // titles don't unexpectedly wrap.
+  const charWidth = fontSize * 0.58;
   // Padding to match renderer: buttons 24 horizontal (12*2), text 40 (20*2)
   const horizontalPadding = isButton ? 24 : 40;
   // Border width: 2px per side × 2 = 4px total (renderer uses box-sizing: border-box)
@@ -315,6 +323,17 @@ export function initializeLocationsFromSchema(
         width = Math.max(width, minAITextWidth);
       }
 
+      // TitleScreen's title and author are visual centerpieces — fit-to-text
+      // is the wrong default because it produces a cramped box that's
+      // sensitive to small text-measurement errors and tends to wrap. Give
+      // them a generous floor of 75% of stage width so titles like "How to
+      // Hold Someone" sit on one line in a hero-sized box, and so the
+      // subtitle has room to breathe.
+      if (beat.type === 'titleScreen' && (locationName === 'title' || locationName === 'author')) {
+        const minTitleScreenWidth = Math.floor(stageWidth * 0.75);
+        width = Math.max(width, minTitleScreenWidth);
+      }
+
       // Cap height for endScreen messages to leave room for buttons
       if (beat.type === 'endScreen' && locationName === 'message') {
         const maxMessageHeight = stageHeight - 250; // Leave room for button at bottom
@@ -384,11 +403,33 @@ export function initializeLocationsFromSchema(
     const fontSize = locationDef.fontSize || 16;
     console.log(`[SchemaLocationInitializer] ${beat.type}/${locationName}: fontSize=${fontSize}, locationDef.fontSize=${locationDef.fontSize}`);
 
-    // Determine if this element should require scroll-to-bottom
-    // For AI summary beats with medium/long summaries, the summary element should require scrolling
-    const shouldRequireScroll = beat.type === 'aiSummary' &&
-      locationName === 'summary' &&
-      (params.maxLength === 'medium' || params.maxLength === 'long');
+    // Determine if this element should require scroll-to-bottom.
+    //
+    // For AI-runtime content beats the box is sized at generation time from
+    // the placeholder (e.g. "[Online content will appear here]") because the
+    // real content isn't known yet. When the real AI-fetched content
+    // arrives at play time it is typically much longer and overflows the
+    // fixed-height box, sliding under the Continue button (visible bug:
+    // 'Berlin's Commuter Mix' onlineContent rendered the button on top of
+    // the last paragraph of text).
+    //
+    // Enabling requireScrollToBottom on these elements does two things via
+    // the existing renderer support:
+    //  1. The text element gets overflow:auto + the gradient ScrollIndicator
+    //     ("↓ Scroll for more") that auto-hides after the first scroll.
+    //  2. The Continue button is gated until the user actually reaches the
+    //     bottom, so they can't miss content.
+    //
+    // For aiSummary we keep the existing gate on medium/long maxLength
+    // (short summaries fit and don't need scrolling). For onlineContent
+    // and aiInfoText there's no maxLength knob — the real content size is
+    // unknown so we always enable scrolling on their text element.
+    const shouldRequireScroll =
+      (beat.type === 'aiSummary' &&
+        locationName === 'summary' &&
+        (params.maxLength === 'medium' || params.maxLength === 'long')) ||
+      (beat.type === 'onlineContent' && locationName === 'text') ||
+      (beat.type === 'aiInfoText' && locationName === 'text');
 
     // Create element
     const element: VisualElement = {
