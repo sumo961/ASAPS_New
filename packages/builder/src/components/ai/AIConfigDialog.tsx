@@ -42,7 +42,7 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
     name: 'OpenAI',
     description: 'GPT-5 (reasoning capable)',
     defaultBaseUrl: '',
-    defaultModel: 'gpt-5.2',
+    defaultModel: 'gpt-5.5',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Get your API key from platform.openai.com',
@@ -374,7 +374,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'claude'
                 ? 'Claude 4+ extended thinking allocates a thinking budget before responding. Temperature is forced to 1.0 when enabled. Only applies to the direct Anthropic endpoint; most Claude-compatible proxies do not support this.'
-                : 'GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.2 defaults to none).'}
+                : 'GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.5 defaults to none).'}
             </p>
           </div>
 

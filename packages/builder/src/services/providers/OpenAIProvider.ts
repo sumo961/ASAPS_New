@@ -33,7 +33,7 @@ import { requiresMaxCompletionTokens, isReasoningModel } from './openai-utils';
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
   private client: OpenAI | null = null;
-  private model: string = 'gpt-5.2';
+  private model: string = 'gpt-5.5';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
@@ -79,7 +79,7 @@ export class OpenAIProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'gpt-5.2';
+      this.model = config.model || 'gpt-5.5';
 
       // Disable response_format for third-party providers that may not support it
       // (e.g., Moonshot, DeepSeek, local Ollama, etc.)
@@ -235,8 +235,14 @@ export class OpenAIProvider extends BaseAIProvider {
     }
 
     if (reasoningEffort !== undefined) {
-      // SDK types may lag newest GPT-5 levels (minimal, xhigh); cast to allow them.
-      requestBody.reasoning_effort = reasoningEffort as any;
+      // OpenAI's reasoning_effort accepts none|minimal|low|medium|high|xhigh
+      // per developers.openai.com/api/docs/guides/reasoning. 'max' is an
+      // Anthropic-only tier we expose in the UI; cap it at 'xhigh' on the
+      // OpenAI side so a global 'max' setting doesn't error out for users
+      // who switch providers without changing reasoning effort. SDK types
+      // may also lag the newest GPT-5 levels, so cast to allow them.
+      const effortForOpenAI = reasoningEffort === 'max' ? 'xhigh' : reasoningEffort;
+      requestBody.reasoning_effort = effortForOpenAI as any;
     }
 
     // Use shared utility to check if model supports temperature

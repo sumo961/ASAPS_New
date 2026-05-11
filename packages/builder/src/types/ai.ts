@@ -30,7 +30,7 @@ export interface AIProviderConfig {
    * 4.5+ adaptive thinking, Kimi K2.x). Supported values and meaning vary
    * by model: 'max' is currently honoured by Claude adaptive thinking; on
    * other providers it caps at the next-highest available tier.
-   * gpt-5.2 defaults to 'none'.
+   * gpt-5.5 defaults to 'none'.
    */
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 

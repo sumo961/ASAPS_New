@@ -315,7 +315,7 @@ function createAIServiceAdapter(): IAIService | null {
     };
   } else {
     // OpenAI provider (also used for local/Ollama)
-    const model = savedConfig.model || 'gpt-5.2';
+    const model = savedConfig.model || 'gpt-5.5';
 
     // Create client - for local URLs, include baseURL; for remote custom URLs, we use proxy
     const client = !useProxy ? new OpenAI({

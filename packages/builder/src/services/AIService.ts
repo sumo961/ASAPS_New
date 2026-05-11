@@ -2216,7 +2216,7 @@ Always be helpful and try to interpret the user's intent, even if the command is
     // OpenAI provider
     if (provider.name === 'openai' && provider.client) {
       const response = await provider.client.chat.completions.create({
-        model: provider.model || 'gpt-5.2',
+        model: provider.model || 'gpt-5.5',
         max_tokens: 4096,
         temperature: 0.3,
         messages: [
