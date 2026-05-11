@@ -1,5 +1,67 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-11: Visual-first-impression pass — layout fixes for AI-generated stories, gpt-5.5 default, long-title handling (v0.9.55)
+
+### Overview
+
+A focused visual-quality release. People see before they think — AI-generated stories had layout problems that hurt first-impression credibility even when the content was fine. Six iterations of calibration on the title→text→button stack produced a layout that reads cleanly at preview scale. Plus: a Reset Layout button so existing beats can opt into new layout math without delete-and-re-add, the GPT default bumped to gpt-5.5, three follow-ups from v0.9.54 (Ideator system-prompt cleanup, variant naming rule, max effort tier), and long-title handling at both prompt and layout layers.
+
+### Layout fixes (the visual-first-impression pass)
+
+Six commits of iteration on AI-content-beat layouts (`onlineContent`, `aiInfoText`, `aiSummary`) and `titleScreen`. All live in `SchemaLocationInitializer.ts`. The AI doesn't emit positions for these beats — our default-position code computes them — so every issue was on our side, not in the AI output.
+
+Net effect, compared to v0.9.54:
+
+- **`autoSizeText` charWidth multiplier `0.42 → 0.58`** (`5fef9d05`). The 0.42 was a narrow monospace assumption that underestimated real proportional-font rendering, so titles like "How to Hold Someone" got sized to fit "on paper" but wrapped to 2 lines in the browser. 0.58 matches real fonts at our sizes; titles stop wrapping spontaneously.
+- **TitleScreen `title` and `author` get visual-centerpiece width** (`5fef9d05`). Default to at least 75% of stage width so the hero element of the screen actually feels hero-sized.
+- **OnlineContent / AIInfoText get `requireScrollToBottom`** (`5fef9d05`). The renderer's existing scroll-indicator + button-gate machinery handles long AI-fetched content gracefully; previously only `aiSummary` had this opted in.
+- **Text-box height clamp fixed** (`785317f1`). The old formula `Math.max(height, Math.min(availableHeight, 400))` could overflow into the button area when autoSized came in big. New formula clamps to availableHeight as a hard ceiling.
+- **Title→text gap calibration** (`785317f1`, `31d36161`, `86b4d77c`). Three rounds: started at +15 (felt like too much air), went to -5 (boxes overlapped), +8 (read as touching at scale), +24 (barely visible), settled at +50 (comfortable rhythm). Calibration history captured in code comments so the next contributor doesn't revisit this.
+- **Button `minWidth 120 → 160`** (`14196057`). "Learn More" / "Continue" / "Play Again" were wrapping to two lines because autoSizeText's estimate didn't account for the renderer's actual button padding.
+- **Action buttons moved `stageHeight - 150 → stageHeight - 100`** (`86b4d77c`). The text box ended up against the button while ~110px of dead space sat below the button; moving the button down 50px uses that space and brings the action closer to the visual stop point.
+- **Reset Layout button** (`6445b106`). New `LayoutGrid` icon in the Visual Editor toolbar that re-runs `initializeLocationsFromSchema` on the current beat, with confirmation dialog and undo support. Without this, existing beats couldn't opt into new layout math — they'd be stuck on whatever positions were saved at creation time.
+
+### Long-title handling
+
+Two-pronged (`d1fc7281`):
+
+- **Primary (prompt-side)**: `storyGenerationEnhanced.ts` now explicitly tells the AI:
+  - `titleScreen.title`: 2-5 words, ≤40 chars
+  - `titleScreen.author`: ≤40 chars
+  - `onlineContent.title`: 2-5 words, ≤35 chars
+  With concrete short-and-good examples ("Bergen Transport", "Getting Around Bergen") and the offending long-title counterexample.
+- **Defensive (layout-side)**: When the AI ignores the rule or emits a long title anyway, the title's font size auto-shrinks in 2px steps until the text fits the box inner width, down to a 14px floor. Short titles render at full size unchanged.
+
+### GPT default model + Anthropic max effort tier
+
+- **Default OpenAI model `gpt-5.2 → gpt-5.5`** across 8 callsites (`c9472504`). Verified per `developers.openai.com/api/docs/guides/reasoning` that GPT-5 reasoning levels are `none | minimal | low | medium | high | xhigh` — no `max` upstream, so the Claude-only label on our `max` tier is correct.
+- **`max` reasoning tier exposed in UI** (`ea5d1aaa`). New option in the AI Config dropdown labelled "Max (Claude 4.5+ only)". Wired through 5 files. ClaudeProvider passes `max` through to adaptive mode unchanged; legacy `enabled`-shape models cap at xhigh's budget (32000). Default `max_tokens` for `max` effort = 128k since thinking spans are larger.
+- **OpenAI defensive cap** (`c9472504`). If a user sets `max` globally and switches to an OpenAI provider, `OpenAIProvider.buildChatRequest` caps the effort at `xhigh` before sending so the request doesn't 400.
+
+### Ideator follow-ups (the planned-work from v0.9.54)
+
+- **System-prompt `projectTitle` removed** (`f3ccc12c`, `ea5d1aaa`). The visible "Shaping ideas for X" subtitle was removed in f3ccc12c; ea5d1aaa finishes the cleanup by dropping the model-side context line too. The conversation now has zero anchor to the open project's identity, which matches the fact that the generated story creates a new project on handoff (not modifying the open one).
+- **Variant displayName uniqueness rule** added to `storyGenerationEnhanced.ts` (`ea5d1aaa`). Triggered by "How to Hold Someone" generating Sam's variant with `displayName: "Sam"` (identical to the base character name); the variant dropdown showed "Sam" twice with no visual distinction. New rule: every variant's displayName must be visibly distinct (e.g. "Sam (after disclosure)").
+
+### Files modified
+
+- `packages/builder/src/utils/SchemaLocationInitializer.ts` — six commits of layout calibration + font auto-shrink
+- `packages/builder/src/components/visual/VisualBeatEditor.tsx` — Reset Layout toolbar button
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — Reset Layout handler wiring
+- `packages/builder/src/components/ai/ideator/systemPrompt.ts` — projectTitle removal
+- `packages/builder/src/components/ai/ideator/useIdeator.ts` — projectTitle removal
+- `packages/builder/src/pages/IdeatorWindow.tsx` — projectTitle removal
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts` — variant rule + long-title rules
+- `packages/builder/src/services/providers/ClaudeProvider.ts` — max effort tier
+- `packages/builder/src/services/providers/OpenAIProvider.ts` — gpt-5.5 default, max effort cap
+- `packages/builder/src/services/providers/openai-utils.ts` — (carried from v0.9.54)
+- `packages/builder/src/services/AIService.ts` — gpt-5.5 default
+- `packages/builder/src/services/AIConfigDialog.tsx` — max effort dropdown
+- `packages/builder/src/components/Header.tsx`, `hooks/useAI.ts`, `storage/types.ts`, `types/ai.ts` — reasoningEffort type widened to include 'max'
+- `packages/builder/src/components/preview/StoryPreview.tsx`, `pages/PreviewWindow.tsx`, `components/export/HtmlExportDialog.tsx`, `export/HtmlExporter.ts` — gpt-5.5 default
+
+---
+
 ## 2026-05-11: Kimi end-to-end, Claude Opus 4.7 thinking, story-gen craft rules (v0.9.54)
 
 ### Overview
