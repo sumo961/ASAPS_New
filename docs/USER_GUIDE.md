@@ -1329,6 +1329,94 @@ The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anth
 
 Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. GPT-5 reasoning uses `max_completion_tokens` and ignores temperature; `gpt-5.5` defaults to `none` when no tier is selected.
 
+## Ideate with Ideator
+
+The **Ideator** is a conversational front door to story generation. Instead of cold-starting at a blank prompt box, you talk through the issue, theme, or experience you want to represent — and Ideator interviews you, shapes what it hears into a rich generation prompt, and hands it off to the story generator.
+
+Use Ideator when:
+
+- You know the *issue* you want to explore but haven't pinned down the story
+- You're representing something complex (mental health, a policy debate, a relationship, an ethical dilemma) and a one-line prompt feels reductive
+- You want a partner that pushes you to think about perspectives, stakes, and audience reflection before generating
+
+### Opening Ideator
+
+1. Click **AI** in the header
+2. Select **Ideate with Ideator** from the top of the dropdown
+
+Ideator opens in a **separate pop-out window**, distinct from the main builder. You can keep the builder visible alongside it. The pop-out has its own header ("Ideator — Shape the idea before generating the story") and a **Reset** button to discard the current transcript and start over.
+
+> The generated story always lands as a **new project** in the main builder. Your currently-open project is never modified by Ideator. This is intentional: the conversation isn't anchored to whatever you happen to have open.
+
+### How the conversation works
+
+Ideator behaves like a thoughtful thesis advisor in conversation:
+
+- Asks **one focused question per turn** (no question stacking)
+- Starts by inviting you to describe the issue in your own words — not the plot
+- Paraphrases what you said before moving on, so you know you were understood
+- Offers two or three concrete alternatives when you get stuck, rather than putting words in your mouth
+- Keeps responses short — two or three sentences is usually plenty
+- Doesn't loop back on a dimension it already covered
+
+Under the hood, Ideator is steered by the **IDN-for-complexity** framing from the project's theoretical foundation. Over the course of the conversation it will progressively draw out:
+
+| Dimension | What it surfaces |
+|-----------|------------------|
+| **Plurality of perspectives** | Which stakeholders experience the issue differently — and which ones the audience should inhabit |
+| **Systemic causation** | The feedback loops, pressures, and tradeoffs behind the issue (not a single villain) |
+| **Agency → consequence chains** | Meaningful decision points and the short/long-term consequences each path could reveal |
+| **Variability and replay** | Where the story should branch, what state should be tracked, what outcomes vary |
+| **Audience as proto-citizen** | What you want the audience to question, feel, or reconsider — not just "learn" |
+
+You don't have to cover these in order. Ideator follows what you give it, and you can ask *it* clarifying questions too.
+
+### Optional: Brave Search for live research
+
+If you set a **Brave Search API key** in the AI Config dialog (AI → Configure AI, near the bottom), Ideator can search the web mid-conversation to bring in current facts, stakeholder perspectives, policy background, or comparative cases. When it searches, you'll see a small purple **"Searched: '…' (N results)"** chip appear inline in the transcript, so the research path is always visible — useful both for trust and (if relevant) for thesis documentation.
+
+A few practical notes:
+
+- Brave is **optional**. Without a key, Ideator works fine in chat-only mode.
+- Web search runs through **tool/function calling**, which works on Claude, OpenAI, Kimi / Moonshot, and OpenAI-compatible endpoints. Local-only Ollama variants without function-call support fall back to chat-only automatically.
+- If you ask Ideator to look something up, it will run the search right away rather than redirecting you back into interview questions first.
+- A free Brave Search key is available at `api.search.brave.com`.
+
+### Signaling you're done
+
+When Ideator believes it has enough context, it will do a brief recap — playing back what it gathered as a short bulleted list — and ask if you want to add one final detail. After your reply, a **Generate Prompt** button lights up in the composer.
+
+You can also signal readiness at any time yourself: just tell Ideator you're done, and the button appears. Your signal overrides Ideator's.
+
+### Reviewing the synthesized prompt
+
+Clicking **Generate Prompt** swaps the chat view for a **Review your prompt** panel. This is the handoff form. Ideator distills the entire transcript into a single generation prompt and pre-fills the knobs that ASAPS's story generator needs:
+
+- **Prompt** — 2–6 paragraphs of natural language covering the issue, perspectives, tensions, the kinds of choices the audience should face, the tone, and what you want them to reflect on. Fully editable.
+- **Genre** (optional) — e.g. "drama", "speculative fiction", "documentary-style"
+- **Length** — *Short* (single-sitting fragment), *Medium* (defined arc on one timescale), or *Long* (multi-month timescales, ensemble cast, parallel arcs). Auto-mapped from the conversation, not reflexively defaulted.
+- **Branching complexity** — *Linear*, *Moderate* (4–6 decision points, 2–3 endings), or *Complex* (plural perspectives, replay value, 4+ meaningfully different endings)
+- **Affect depth** — How heavily the story should deploy ASAPS's character affect system (mood, traits, goals, sentiment effects, dossier reflection):
+  - *Sparse* — puzzles, quizzes, educational modules; characters are speakers only
+  - *Standard* — emotionally salient moments but emotion isn't the foreground subject
+  - *Rich* — mental-health stories, relationships at the foreground, interactive drama, character growth
+  - *Auto* — let the model pick from the prompt
+
+  Ideator picks this for you based on the conversation — "rich" for emotional drama, "sparse" for puzzles — so you usually don't have to think about it.
+- **Include AI-powered beats** — Check this if the generated story should adapt at runtime (AI Dialog Trees, AI Info Text, etc.) rather than being fully pre-authored.
+
+Edit anything. When you're happy, click **Send to Story Generator**.
+
+If something feels off, click **Back to conversation** — the transcript is preserved and you can keep talking.
+
+### What happens on submit
+
+The synthesized request flows through the **same** AI story generation pipeline as the in-app Generate Story dialog (see below). The pop-out shows a progress strip with rotating phase labels (*"Outlining the story arc…"*, *"Drafting beat content…"*, etc.) and an elapsed-time counter. Generation usually takes 30–90 seconds.
+
+When it's done, the finished story appears in the main builder as a **brand-new project**. Your previously open project is untouched. You can close the Ideator pop-out, or keep it open to review the conversation that produced the story.
+
+> **Heads up:** the Ideator pop-out's conversation lives only as long as the window is open. There's no resume-later for past sessions yet — if you close the window mid-conversation, the transcript is gone. If you've gathered something good, hit **Generate Prompt** to capture it as an editable prompt before closing.
+
 ## AI Story Generation
 
 Start with a concept, get a complete story structure:
