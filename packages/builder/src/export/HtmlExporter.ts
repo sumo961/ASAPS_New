@@ -100,7 +100,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     </div>
   </div>
 
-  <script>
+  <script data-cfasync="false">
     // Mobile device detection
     window.ASAPS_MOBILE = (function() {
       // URL override for testing: append ?mobile=1 to force mobile mode
@@ -132,7 +132,7 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
   <!-- Player bundle -->
   {{PLAYER_SCRIPT}}
 
-  <script>
+  <script data-cfasync="false">
     (function() {
       // Detect iframe mode
       if (window.parent !== window) {
@@ -262,7 +262,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
       {{AI_TRANSLATION_SECTION}}
     </div>
   </div>
-  <script>
+  <script data-cfasync="false">
     (function() {
       var panel = document.getElementById('lang-panel');
       var toggle = document.getElementById('lang-toggle');
@@ -283,7 +283,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
     </div>
   </div>
 
-  <script>
+  <script data-cfasync="false">
     // Mobile device detection
     window.ASAPS_MOBILE = (function() {
       // URL override for testing: append ?mobile=1 to force mobile mode
@@ -387,7 +387,7 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
 
   {{PLAYER_SCRIPT}}
 
-  <script>
+  <script data-cfasync="false">
     (function() {
       if (window.parent !== window) {
         document.body.classList.add('iframe-mode');
@@ -425,9 +425,9 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
     </div>
 
   <!-- JSZip for AI translation (internet required anyway) -->
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+  <script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
 
-  <script>
+  <script data-cfasync="false">
     // --- AI On-the-Fly Translation ---
     window.ASAPS_AI_TRANSLATE = (function() {
       var cache = {};
@@ -998,6 +998,22 @@ async function exportAsFolder(
       })
     : 'null';
 
+  // Build TTS config (mirrors single-file export)
+  const ttsEnabledFlag = options.ttsEnabled ?? true;
+  const ttsConfig = options.ttsProvider && options.ttsProvider !== 'web-speech'
+    ? JSON.stringify({
+        provider: options.ttsProvider,
+        apiKey: options.ttsApiKey || undefined,
+        model: options.ttsModel || undefined,
+        baseUrl: options.ttsBaseUrl || undefined,
+        speakerVoices: options.ttsSpeakerVoices || undefined,
+        defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+        enabled: ttsEnabledFlag,
+      })
+    : options.ttsProvider === 'web-speech'
+      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag })
+      : 'null';
+
   // Get mobile settings from project
   const mobileScalingMode = project.globalSettings?.project?.mobileScalingMode || 'auto';
   const mobileFontScale = project.globalSettings?.project?.mobileFontScale || 1.0;
@@ -1010,6 +1026,9 @@ async function exportAsFolder(
     .replace("'{{STORY_URL}}'", "'story.asaps.zip'")
     .replace("'{{STORY_DATA}}'", "''")  // Empty for folder mode
     .replace('{{AI_CONFIG}}', aiConfig)
+    .replace('{{TTS_CONFIG}}', ttsConfig)
+    .replace('{{TTS_LANGUAGE}}', project.globalSettings?.translation?.sourceLanguage || 'en')
+    .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
     .replace('{{PLAYER_SCRIPT}}', playerScript);
@@ -1056,7 +1075,7 @@ async function getPlayerScript(): Promise<string> {
 
         // Encode as base64 data URL to avoid any HTML escaping issues
         const base64Script = btoa(unescape(encodeURIComponent(script)));
-        scriptTag = `<script src="data:text/javascript;base64,${base64Script}"></script>`;
+        scriptTag = `<script data-cfasync="false" src="data:text/javascript;base64,${base64Script}"></script>`;
         break;
       }
     } catch (e) {
@@ -1089,7 +1108,7 @@ async function getPlayerScript(): Promise<string> {
   console.error('[HtmlExporter] Could not load player-web bundle from any path');
 
   // Fallback: Show error with instructions
-  return `<script>
+  return `<script data-cfasync="false">
 // ASAPS Player Web - Bundle not found
 (function() {
   window.ASAPSPlayer = {
