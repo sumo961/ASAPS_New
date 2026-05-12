@@ -139,11 +139,61 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             storyData = bytes.buffer;
             console.log('[WebPlayer] Decoded to ArrayBuffer, size:', storyData.byteLength);
           } else if (story.startsWith('http') || story.startsWith('/') || story.endsWith('.zip')) {
-            // URL - fetch the story
+            // URL - fetch the story.
+            //
+            // Two failure modes seen in the wild that previously left the
+            // spinner spinning forever:
+            //   1. The fetch itself hangs (slow CDN / network / server) —
+            //      we add a 30s timeout via AbortController so a hang
+            //      surfaces as a clear error.
+            //   2. The server returns 200 OK but the bytes are NOT a zip
+            //      (typical SPA fallback: a 404 returns index.html with
+            //      200 status, or the .zip path resolves to an HTML
+            //      directory listing). We validate the first 2 bytes
+            //      against the ZIP magic 'PK' below — see the post-fetch
+            //      check after this if/else block.
             console.log('[WebPlayer] Fetching story from URL:', story);
-            const response = await fetch(story);
+            const FETCH_TIMEOUT_MS = 30000;
+            const abortController = new AbortController();
+            const timeoutId = window.setTimeout(
+              () => abortController.abort(),
+              FETCH_TIMEOUT_MS,
+            );
+            let response: Response;
+            try {
+              response = await fetch(story, { signal: abortController.signal });
+            } catch (fetchErr) {
+              window.clearTimeout(timeoutId);
+              if ((fetchErr as Error)?.name === 'AbortError') {
+                throw new Error(
+                  `Story download timed out after ${FETCH_TIMEOUT_MS / 1000}s. ` +
+                    `URL: ${story}. Check that the file is reachable and your server is responsive.`,
+                );
+              }
+              throw fetchErr;
+            }
+            window.clearTimeout(timeoutId);
             if (!response.ok) {
-              throw new Error(`Failed to fetch story: ${response.status}`);
+              throw new Error(
+                `Failed to fetch story: HTTP ${response.status}. URL: ${story}. ` +
+                  `Make sure '${story}' is present at the same path as your index.html.`,
+              );
+            }
+            // Soft-validate content type — many static hosts mislabel .zip
+            // as text/html when serving a soft-404 fallback. Warn but
+            // continue; the magic-byte check below is the real gate.
+            const contentType = response.headers.get('content-type') ?? '';
+            if (
+              contentType &&
+              !contentType.includes('zip') &&
+              !contentType.includes('octet-stream') &&
+              !contentType.includes('binary')
+            ) {
+              console.warn(
+                `[WebPlayer] Unexpected Content-Type for story fetch: '${contentType}'. ` +
+                  `Expected application/zip or application/octet-stream. ` +
+                  `Server may be returning a fallback HTML page instead of the zip.`,
+              );
             }
             storyData = await response.arrayBuffer();
             console.log('[WebPlayer] Fetched story, size:', storyData.byteLength);
@@ -160,6 +210,45 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           }
         } else {
           throw new Error('Invalid story data type');
+        }
+
+        // Validate the storyData starts with the ZIP magic 'PK' (0x50 0x4B).
+        // All zip variants begin with these two bytes. If the bytes are
+        // something else, we know early that loadStory would fail (or
+        // worse, hang) — instead we surface an actionable error.
+        //
+        // Common causes when this fires for a folder-export deployment:
+        //   - server returned an HTML page (404 fallback / directory
+        //     index) for a path it couldn't resolve, instead of the zip
+        //   - story file is corrupted, partial, or empty
+        //   - the file at the URL is not actually a zip
+        //
+        // Common causes for the data-URL / raw-base64 path:
+        //   - the embedded base64 was truncated during HTML serialization
+        //   - the source story zip was already broken
+        if (storyData.byteLength < 4) {
+          throw new Error(
+            `Story file is too small (${storyData.byteLength} bytes) to be a valid zip. ` +
+              `Check that the file was downloaded completely.`,
+          );
+        }
+        const firstBytes = new Uint8Array(storyData, 0, 4);
+        const isZip = firstBytes[0] === 0x50 && firstBytes[1] === 0x4b;
+        if (!isZip) {
+          // Decode the first 16 bytes to a string so the user can see WHAT
+          // came back. If it starts with '<' it's almost certainly an HTML
+          // fallback from the server.
+          const previewBytes = new Uint8Array(storyData, 0, Math.min(16, storyData.byteLength));
+          let preview = '';
+          for (let i = 0; i < previewBytes.length; i++) {
+            const b = previewBytes[i];
+            preview += b >= 32 && b < 127 ? String.fromCharCode(b) : `\\x${b.toString(16).padStart(2, '0')}`;
+          }
+          const looksLikeHtml = preview.startsWith('<') || preview.toLowerCase().includes('<!doc');
+          const hint = looksLikeHtml
+            ? `The data starts with '<' which suggests the server returned an HTML page instead of the zip — typical when the path is wrong or the server doesn't serve .zip files. Check that 'story.asaps.zip' exists at the same URL path as your index.html.`
+            : `Expected a zip file starting with 'PK' but got bytes starting with '${preview}'. The file may be corrupted or wasn't a zip to begin with.`;
+          throw new Error(`Story is not a valid zip file. ${hint}`);
         }
 
         if (!mounted) return;
