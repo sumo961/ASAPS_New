@@ -1,5 +1,39 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-12: HTML export endless-loading fixes — Rocket Loader opt-out, folder-mode placeholder bug, runtime hardening (v0.9.56)
+
+### Overview
+
+A targeted bug-fix release driven by a field report: HTML exports deployed to web servers were producing endless loading screens. Investigation surfaced three independent failure modes — two in the exporter, one in the runtime player — all of which could mask each other depending on the deployment. The release fixes all three so the symptoms can't co-occur in the same export.
+
+### The bugs (and fixes)
+
+**1. Folder-mode export was leaking literal `{{TTS_CONFIG}}` into the HTML** (`4a867c08`).
+
+`exportAsFolder()` only ran 9 of the 12 `.replace()` calls that the HTML template requires. The unreplaced `{{TTS_CONFIG}}`, `{{TTS_LANGUAGE}}`, and `{{SHOW_SESSION_LOG}}` placeholders were emitted verbatim into the inline `window.ASAPS_CONFIG = {…}` block, producing `Unexpected token '{'` when the browser parsed the page. `ASAPS_CONFIG` was therefore never assigned, and every downstream access threw `Cannot read properties of undefined (reading 'mobileScalingMode')`. Single-file mode was unaffected — it has all 12 replacements wired up correctly. The fix adds the missing `ttsConfig` JSON construction (mirroring the single-file branch) and the three missing replacements.
+
+**2. Cloudflare Rocket Loader was rewriting the inline scripts** (`4a867c08`).
+
+On Cloudflare-fronted sites with Rocket Loader enabled (a common default optimization), inline `<script>` tags get rewritten and asynchronously reordered. For our export this had two effects: the large `window.ASAPS_CONFIG = {…}` object literal got mangled into a parse error, and the base64-data-URL player bundle loaded before the config script, so even when the config did execute, the player ran first and saw `ASAPS_CONFIG` undefined. Added `data-cfasync="false"` to all 9 `<script>` tags in the export templates — Cloudflare's documented opt-out. This is harmless on non-Cloudflare deployments.
+
+**3. Runtime player hung silently on bad zip downloads** (`5f135fbd`).
+
+When the URL-fetch branch in `player-web` received a non-zip response (e.g. an HTML SPA fallback page when the zip path is wrong, or a slow/incomplete download), `JSZip.loadAsync()` either threw a vague error or hung indefinitely. Added two defenses: a 30-second AbortController-based fetch timeout, and a ZIP magic-byte check (`PK` / `0x50 0x4B` at offset 0) on the received ArrayBuffer with a specific user-facing error message — "server returned an HTML page instead of the zip" when the first byte is `<`, with a hex preview of the first 16 bytes otherwise.
+
+### Files modified
+
+- `packages/builder/src/export/HtmlExporter.ts` — folder-mode replacements, `data-cfasync="false"` on all 9 script tags in both templates
+- `packages/player-web/src/WebPlayer.tsx` — fetch timeout, ZIP magic-byte validation, specific error messages
+
+### Deferred (filed for follow-up)
+
+Two related improvements were scoped into the original bug report but deferred to keep this release focused:
+
+- **Content-Type validation surface** — when the magic-byte check fails AND `Content-Type` is `text/html`, give the user a specific actionable error with server-config guidance (nginx/Apache/Netlify snippets) for serving `.zip` files correctly.
+- **Pre-export size warning for single-file exports** — embedded-base64 stories above ~25 MB choke Safari and OOM on mobile browsers. Detect this at export time and recommend folder mode with a one-click switch.
+
+---
+
 ## 2026-05-11: Visual-first-impression pass — layout fixes for AI-generated stories, gpt-5.5 default, long-title handling (v0.9.55)
 
 ### Overview
