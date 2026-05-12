@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.45.95*
+*Last revised against build 0.9.56.107*
 
 ---
 
@@ -1282,7 +1282,18 @@ Elements stack on top of each other. A character should appear in front of the b
 | Add Prop | Place item/object |
 | Add Hotspot | Create click zone |
 | Toggle Grid | Show alignment grid |
-| Zoom | Adjust view scale |
+| Zoom | Adjust view scale (in / out / reset) |
+| Reset Layout | Re-run the default layout for this beat, discarding any manual position edits |
+
+When you select two or more elements at once, alignment and distribution buttons appear (align left/right/top/bottom/center, distribute horizontally/vertically); selecting two or more elements also reveals group/ungroup controls.
+
+### Reset Layout
+
+The **Reset Layout** button (grid icon, next to Reset Zoom) is the escape hatch when you've nudged elements around on a beat and want to return to the default schema-driven layout — or when a new ASAPS release ships improved default layouts and you want to opt this beat in without deleting and re-creating it.
+
+Clicking it asks you to confirm (manual position edits on this beat will be lost), then re-runs ASAPS's default layout for the beat type. The reset goes into the undo history, so **Ctrl/Cmd+Z** restores the previous layout if you change your mind.
+
+This is especially useful for AI-content beats — `onlineContent`, `aiInfoText`, `aiSummary`, and `titleScreen` — whose default layouts were re-calibrated in v0.9.55. Existing beats keep their saved positions; Reset Layout is how you adopt the new defaults on a beat-by-beat basis.
 
 ---
 
@@ -1299,10 +1310,24 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 2. Select **Configure AI** from the dropdown
 3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended)
-   - **OpenAI** - GPT models
+   - **OpenAI** - GPT models (default model: **gpt-5.5**)
    - **Ollama** - Local models (free, no API key needed)
 4. Enter your API key (for cloud providers)
 5. Adjust settings (model, temperature, etc.)
+
+### Reasoning Effort / Extended Thinking
+
+The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anthropic and *Reasoning effort (GPT-5)* on OpenAI) controls how much "thinking budget" the model is given before responding:
+
+| Tier | Behaviour |
+|------|-----------|
+| **Auto (model default)** | Lets the model pick — usually the safe choice |
+| **None** | No reasoning, fastest, cheapest |
+| **Minimal** / **Low** / **Medium** / **High** | Progressively more thinking budget |
+| **X-High** | Most thinking the OpenAI tiers expose; OpenAI providers cap here internally |
+| **Max (Claude 4.5+ only)** | Anthropic-only top tier on Claude 4.5+ models. Selecting it on other providers silently falls back to X-High |
+
+Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. GPT-5 reasoning uses `max_completion_tokens` and ignores temperature; `gpt-5.5` defaults to `none` when no tier is selected.
 
 ## AI Story Generation
 
@@ -1749,6 +1774,16 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 - **TTS language** - The project's source language is automatically embedded; when translations are bundled, switching languages also switches TTS speech language
 - **Save/resume** - Interactors can save progress and resume later (via browser storage)
 - **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
+
+### Deployment & Troubleshooting
+
+When you host an HTML export online (rather than just double-clicking a single-file export), a few infrastructure quirks occasionally show up:
+
+- **Cloudflare Rocket Loader.** Exported HTML marks all script tags with `data-cfasync="false"` so Cloudflare's Rocket Loader leaves them alone. Stories hosted behind Cloudflare should work out of the box. If you've heavily customised your Cloudflare settings and the player still won't initialise, disabling Rocket Loader for the domain is the safe baseline.
+- **Folder-mode (multi-file) exports.** If the player gets stuck on the loading spinner, it's almost always one of two things and the player will now tell you which:
+  - *"Story download timed out after 30s"* — the server is slow or unreachable. Check that `story.asaps.zip` is actually deployed alongside `index.html`.
+  - *"The server returned an HTML page instead of the zip"* — your host returned a 404 fallback or a directory listing instead of the `.zip`. Usually a path or MIME-type misconfiguration. Make sure `story.asaps.zip` is at the same URL path as `index.html` and that the server serves `.zip` files with `application/zip` (or at least `application/octet-stream`).
+- **Single-file exports** sidestep both of these — there's no separate `.zip` to fetch — but produce larger HTML files. Use folder-mode when your story has heavy assets and you want fast initial loads.
 
 ### Export Steps
 
