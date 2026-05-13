@@ -1,5 +1,70 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-13: Ideator sessions UI, AI runtime hardening, endScreen layout, craft rules (v0.9.57)
+
+### Overview
+
+A field-driven release. Started as a "Ideator should have a sessions UI" feature and an "add traits/variants prompt rule" craft fix, then a single test export of an AI-generated story surfaced five distinct rendering and runtime bugs in HTML exports that compounded each other — text overflowing buttons, buttons overlapping each other, an endScreen rendering 33% larger than the rest of the story, AI-runtime beats leaking raw JSON to the screen, and a choice label whose text happened to contain the word "text" rendering the dialog narrative instead. All fixed.
+
+### Ideator: sessions UI + Markdown export
+
+The IndexedDB-backed session store (`ideatorSessionStore.ts`) had been scaffolded in v0.9.53 but no UI ever called it — the User Guide added 2026-05-12 (v0.9.56) explicitly documented the absence ("transcript dies with the window"). This release wires it up.
+
+- **`SessionsPanel.tsx`** (new) — modal listing past conversations newest-first, each row with timestamp, status badge (In progress / Has draft prompt / Handed off), turn count, first-user-message preview, and Load / Export / Delete actions. Click-outside-to-close.
+- **`exportTranscript.ts`** (new) — pure-function Markdown serializer. Renders metadata header (created/updated timestamps, status), each turn as `**You:** … **Ideator:** …`, web-search chips as blockquotes, synthesized prompt + knobs (if reached). Filename slugged from first user message.
+- **`useIdeator.persistCurrentSession`** — called at three save points: end of sendMessage, end of generatePrompt, on GENERATION_COMPLETE. Session ID generated lazily on first user message.
+- **`loadSavedSession`** + **`startNewSession`** exposed from the hook.
+- **IdeatorHeader** gained three buttons (History / Export / New) alongside the existing Reset.
+- "Saving, resuming, and exporting sessions" section added to the User Guide; the v0.9.56 "Heads up — transcript dies with the window" note flipped.
+
+### Story-gen craft rules: traits + variants required at rich tier
+
+Two new anti-patterns in the rich-affect prompt, addressing real gaps observed in "The Weight of Late Light" (the v0.9.56 test generation): rich-tier output with **zero traits on any character** and **zero variants despite an explicit `bookmarkAffectState` naming a character transition**.
+
+- **Traits required** — every character appearing in more than one beat MUST have at least 3 Big Five dimensions populated. Map description to traits explicitly ("disciplined, settled life" → high conscientiousness; "depressive silences" → high neuroticism). Use archetype presets or hand-tune. Without traits, runtime emotion-modulation is uniform across the cast and rich tier collapses into decorated-standard.
+- **Variants required at bookmarked transitions** — if you emit `bookmarkAffectState` whose name describes a character state change (`after_disclosure`, `after_depressive`, `post_betrayal`), you must also define a variant on that character with a visibly distinct displayName, shifted initialMood, and at least one shifted initialSentiment — plus a `setCharacterVariant` Effect at the transition.
+
+Mirrored to both MCP server copies (`mcp-server/src/utils/aiHelper.ts`, `mcp-server-desktop/src/index.ts`) per the existing duplicate-prompts arrangement.
+
+### HTML export runtime: three independent layout/rendering bugs
+
+The same test export ("The Weight of Late Light", 38 beats, rich affect) reproduced three problems on the deployed HTML player that the in-app Preview Window did not show. Field reports plus chrome-devtools inspection traced each:
+
+1. **`calculateSmartTextBoxDimensions` charWidth = 0.42** (`PositionedBeatView.tsx:116`). The smart-sizing math estimated 0.42 × font-size for character width — same number the v0.9.55 builder fix had already corrected to 0.58 in `SchemaLocationInitializer`. The runtime kept the old value, so for the twine theme's Courier monospace at 18px, the renderer estimated ~79 chars/line when reality was ~55. Auto-grown text boxes ended up sized for 10 lines of content that actually needed 14, and the overflow rendered on top of the action button. Fixed to 0.58.
+2. **Credits + Restart button overlap** (`DefaultLocationGenerator.ts:142`). The button-placement branch had explicit cases for `restartButton` (fixed at `stageHeight - 120`) but `creditsButton` fell through to a generic stack at `currentY` (right under the text). Both ended up centered at the same x. Now placed side-by-side at `stageHeight - 100`: restart on the right (primary action), credits on the left.
+3. **`message` location fontSize = 24** (`DefaultLocationGenerator.ts:22`). `LOCATION_TYPE_MAP.message` had a legacy 24-px default — sized for "The End." placeholder messages but a third bigger than the body-text `text` location (18). AI-generated literary endings with full paragraphs rendered visibly oversized vs the surrounding story and triggered the smart-text-box to grow into a 921×631 monster fighting both buttons. Dropped to 18 to align with body text.
+
+### AI runtime beat parser hardening
+
+The same export surfaced an aiInfoText beat rendering as **raw JSON** in the player — `{"text": "...", "suggestions": [...]}` blocked on screen with no prose. Two compounding causes, both fixed:
+
+- **`WebAIProvider.generateContent` had no reasoning-model headroom** (`packages/player-web/src/WebAIProvider.ts`). AIInfoTextBeat asks for `maxTokens: 250` (sized for the requested 2-3 sentences). On reasoning models (GPT-5, Kimi-K2, o1/o3), the hidden `reasoning_content` consumes that budget entirely, returning truncated JSON. Mirrored the v0.9.54 PreviewWindow shim: `effectiveMaxTokens(model, requested)` floors reasoning-model budgets at 4096 tokens, leaves non-reasoning models untouched. The shim lives inline (with its own `isReasoningModel` substring detector) so player-web doesn't take a cross-package dependency on builder's `openai-utils`.
+- **`AIInfoTextBeat.generateText` leaked raw response on parse failure** (`packages/core/src/beats/AIInfoTextBeat.ts`). The previous parser had two failure paths — "no JSON match" and "JSON.parse threw" — both of which set `text = rawResponse` and rendered raw braces to the user. Two-stage extraction now: stage 1 full JSON.parse, stage 2 tolerant regex on `"text"\s*:\s*"((?:[^"\\]|\\.)*)"` to salvage the field even from truncated JSON, then `fallbackText` if even that fails. Under no path does raw JSON reach the screen.
+
+### Dialog-tree button rendering: text/dialog/npc false-positive
+
+A field report showed a `dialogTree` beat where the third choice rendered as the dialog narrative instead of the choice label. Traced to `PositionedBeatView.tsx:4977` — the text-element fallback branch matched any location whose name contained the substrings "text", "dialog", or "npc" and returned `content.text`. The third choice's text was *"Say no, warmly. Tell him you'll be asleep, and to text you the score with the first coffee."* — the word "text" inside the choice label hijacked the branch. Gated the keyword fallback on `loc.kind !== 'button'` so explicit-kind buttons take the choice-label path correctly; the legacy fallback still applies to unkinded text/dialog elements.
+
+### Progress estimate updated in Ideator handoff progress strip
+
+`PromptPreviewPanel`'s "This usually takes 30-90 seconds" line — accurate when the only generator was GPT-4-class with default reasoning — has been wrong for over a year. Now reads "1-3 minutes; long, complex, or reasoning-heavy runs (high/xhigh/max effort, GPT-5 / Claude Opus / Kimi K2) often take 5-10+ minutes. Feel free to leave this window open." User Guide section matched.
+
+### Files modified
+
+- **Ideator UI:** `packages/builder/src/components/ai/ideator/SessionsPanel.tsx` (new), `exportTranscript.ts` (new), `useIdeator.ts`, `IdeatorHeader.tsx`, `PromptPreviewPanel.tsx`, `packages/builder/src/pages/IdeatorWindow.tsx`
+- **Craft rules:** `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/core/src/prompts/affectPrompt.ts`, `mcp-server/src/utils/aiHelper.ts`, `mcp-server-desktop/src/index.ts`
+- **Runtime layout:** `packages/renderer/src/components/PositionedBeatView.tsx` (smart-sizing charWidth + dialog text-element gate), `packages/renderer/src/utils/DefaultLocationGenerator.ts` (button placement + message fontSize)
+- **AI runtime:** `packages/player-web/src/WebAIProvider.ts` (effectiveMaxTokens shim), `packages/core/src/beats/AIInfoTextBeat.ts` (two-stage JSON salvage)
+- **Docs:** `docs/USER_GUIDE.md` (Ideator section, time estimate)
+- **Generated:** `packages/core/src/generated/beat-types.ts` (schema 2.2 → 2.3 — restartConnection alias, fictional-time setVariable updates)
+
+### Deferred to follow-up
+
+- **Per-machine vs per-project session scoping for Ideator.** The session store has a `projectId` field and IDB secondary index; current UI lists all sessions across projects (rationale: Ideator's output creates new projects on handoff, so binding to whatever's open doesn't match the feature). If per-project filtering becomes useful, the index is ready.
+- **Auto-resume most-recent session on Ideator open.** Considered, rejected as too surprising. Resume is explicit via the Sessions panel.
+
+---
+
 ## 2026-05-12: HTML export endless-loading fixes — Rocket Loader opt-out, folder-mode placeholder bug, runtime hardening (v0.9.56)
 
 ### Overview
