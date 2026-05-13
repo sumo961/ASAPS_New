@@ -111,9 +111,14 @@ export function calculateSmartTextBoxDimensions(
   /** Extra horizontal space consumed by inline content (e.g., speaker portrait) */
   inlineContentWidth: number = 0
 ): { width: number; height: number; needsScroll: boolean; xOffset: number; yOffset: number } {
-  // Estimate text dimensions
-  // Use 0.42 ratio for proportional fonts - measured from actual rendering
-  const charWidth = fontSize * 0.42;
+  // Estimate text dimensions.
+  // 0.58 is the average char-width ratio that fits both proportional fonts
+  // (where 0.5-0.6 of font-size is typical) and monospace fonts (Courier ≈
+  // 0.6). The previous 0.42 underestimated real width by ~30%, sizing the
+  // box for ~80 chars/line when the renderer actually fit ~55 — content
+  // overflowed past the bottom edge into the action button area. Matches
+  // the calibration the builder's SchemaLocationInitializer uses (v0.9.55).
+  const charWidth = fontSize * 0.58;
   const lineHeight = fontSize * 1.5;
   const contentPadding = padding * 2; // Padding on both sides
 
@@ -4976,8 +4981,19 @@ function getContentForLocation(
 
   // Dialog Tree specific elements
   if (beatType === 'dialogTree') {
-    // Text element for dialog content (handles both 'text' and 'dialog' kinds)
-    if (loc.kind === 'text' || loc.kind === 'dialog' || nameLower.includes('text') || nameLower.includes('dialog') || nameLower.includes('npc')) {
+    // Text element for dialog content (handles both 'text' and 'dialog' kinds).
+    // The keyword fallback is gated on the location NOT being a button —
+    // otherwise a choice text containing the word "text" (e.g. "...text you
+    // the score...") would match here instead of the button branch below
+    // and render the dialog narrative in place of the choice label.
+    if (
+      loc.kind === 'text' ||
+      loc.kind === 'dialog' ||
+      (loc.kind !== 'button' &&
+        (nameLower.includes('text') ||
+          nameLower.includes('dialog') ||
+          nameLower.includes('npc')))
+    ) {
       return content.text || '';
     }
     // Button elements - match by choice text or index

@@ -394,14 +394,32 @@ Keep \`dossierPolicy\` at default \`reAnchor\` for everyone.
   background) for the protagonist
 - "interactive drama" / "explorable story" framing
 
-**At rich**: deploy the full system. Major characters get \`traits\`
-(use archetype presets when fitting), \`goals\` with priorities,
-optionally \`variants\` for the protagonist or a key character.
-\`dossierPolicy: 'reflection'\` on characters meant to evolve, paired
-with \`addReflection\` Effects on important moments. Use Effect
-templates (empathetic-max, boundary-respecting, etc.) liberally as the
-basis for choice effects. Multi-row effect bundles on emotionally
-significant choices.
+**At rich**: deploy the full system.
+
+- **\`traits\` is REQUIRED** on every character who appears in more than
+  one beat — at least 3 of the 5 Big Five dimensions populated. Map the
+  character description to traits explicitly ("disciplined, settled life"
+  → high conscientiousness; "depressive silences" → high neuroticism;
+  "funny, brilliant, restless" → high openness + extraversion). Use an
+  archetype preset (anxious-introvert, conscientious-leader, recluse,
+  hothead, etc.) when one fits, or hand-tune. Without traits, runtime
+  emotion-modulation is uniform across the cast and the rich tier
+  collapses into decorated-standard.
+- **\`goals\`** with priorities for major characters.
+- **\`variants\` REQUIRED when you bookmark a character transition.** If
+  you emit a \`bookmarkAffectState\` whose name describes a character's
+  state change (e.g. \`after_disclosure\`, \`after_depressive\`,
+  \`post_betrayal\`), you must also define a variant on that character
+  with a visibly distinct displayName, shifted initialMood, and at least
+  one shifted initialSentiment — and a \`setCharacterVariant\` Effect at
+  the transition. The bookmark is the runtime snapshot; the variant is
+  the authorial shift the player sees. Other variants (multiple
+  personas, archetype switches) remain optional.
+- **\`dossierPolicy: 'reflection'\`** on characters meant to evolve,
+  paired with \`addReflection\` Effects on important moments.
+- **Effect templates** (empathetic-max, boundary-respecting, etc.) as
+  the basis for choice effects. Multi-row effect bundles on emotionally
+  significant choices.
 
 **Conditions must match the Effects** — see the SYMMETRY RULE above.
 A rich-tier story without affect-aware conditionBeats is just decorated

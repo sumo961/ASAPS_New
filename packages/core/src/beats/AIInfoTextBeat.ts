@@ -388,8 +388,15 @@ The "suggestions" array should contain ideas for story variables that would impr
     let text = '';
     this._aiSuggestions = [];
 
+    // Two-stage extraction. Stage 1: try a full JSON.parse on the first
+    // {...} block that mentions "text". Stage 2 (when stage 1 fails — usually
+    // because the reasoning model ran out of budget mid-array and returned
+    // truncated JSON): salvage the "text" field via a tolerant regex on the
+    // raw response. If the response doesn't look like JSON at all, treat it
+    // as plain prose. Only fall through to fallbackText when we have nothing
+    // — under no path should we ever render raw JSON braces to the user.
+    const looksLikeJson = /^\s*\{/.test(rawResponse);
     try {
-      // Try to extract JSON from response (may be wrapped in markdown code blocks)
       const jsonMatch = rawResponse.match(/\{[\s\S]*"text"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -398,14 +405,28 @@ The "suggestions" array should contain ideas for story variables that would impr
           this._aiSuggestions = parsed.suggestions.filter((s: unknown) => typeof s === 'string' && s.trim());
         }
         console.log(`[AIInfoTextBeat ${this.id}] Parsed JSON response, suggestions:`, this._aiSuggestions);
-      } else {
-        // Fallback to plain text
+      } else if (!looksLikeJson) {
+        // No JSON markers — model returned plain prose.
         text = rawResponse;
+      } else {
+        // Looks like JSON but no closing brace found (truncated mid-array).
+        text = '';
       }
     } catch {
-      // JSON parse failed, use raw response as text
-      console.warn(`[AIInfoTextBeat ${this.id}] Failed to parse JSON, using raw response`);
-      text = rawResponse;
+      console.warn(`[AIInfoTextBeat ${this.id}] Failed to parse JSON, attempting salvage`);
+      text = '';
+    }
+
+    // Stage 2 salvage: regex out the "text" value even from broken JSON.
+    if (!text && looksLikeJson) {
+      const textFieldMatch = rawResponse.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (textFieldMatch) {
+        text = textFieldMatch[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+        console.log(`[AIInfoTextBeat ${this.id}] Salvaged text from truncated JSON (${text.length} chars)`);
+      }
     }
 
     // Clean up the text

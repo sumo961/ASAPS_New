@@ -1344,7 +1344,7 @@ Use Ideator when:
 1. Click **AI** in the header
 2. Select **Ideate with Ideator** from the top of the dropdown
 
-Ideator opens in a **separate pop-out window**, distinct from the main builder. You can keep the builder visible alongside it. The pop-out has its own header ("Ideator — Shape the idea before generating the story") and a **Reset** button to discard the current transcript and start over.
+Ideator opens in a **separate pop-out window**, distinct from the main builder. You can keep the builder visible alongside it. The pop-out has its own header ("Ideator — Shape the idea before generating the story") and a row of conversation-management controls on the right: **Sessions** (open past conversations), **Export** (download the current one as Markdown), **New** (save current and start fresh), and **Reset** (discard current).
 
 > The generated story always lands as a **new project** in the main builder. Your currently-open project is never modified by Ideator. This is intentional: the conversation isn't anchored to whatever you happen to have open.
 
@@ -1411,11 +1411,20 @@ If something feels off, click **Back to conversation** — the transcript is pre
 
 ### What happens on submit
 
-The synthesized request flows through the **same** AI story generation pipeline as the in-app Generate Story dialog (see below). The pop-out shows a progress strip with rotating phase labels (*"Outlining the story arc…"*, *"Drafting beat content…"*, etc.) and an elapsed-time counter. Generation usually takes 30–90 seconds.
+The synthesized request flows through the **same** AI story generation pipeline as the in-app Generate Story dialog (see below). The pop-out shows a progress strip with rotating phase labels (*"Outlining the story arc…"*, *"Drafting beat content…"*, etc.) and an elapsed-time counter. Short stories typically finish in **1–3 minutes**; long, complex, or reasoning-heavy generations (high/xhigh/max effort on GPT-5, Claude Opus, or Kimi K2) often run **5–10+ minutes**. You can leave the window open or come back to it — the finished story appears in the main builder when it's ready.
 
 When it's done, the finished story appears in the main builder as a **brand-new project**. Your previously open project is untouched. You can close the Ideator pop-out, or keep it open to review the conversation that produced the story.
 
-> **Heads up:** the Ideator pop-out's conversation lives only as long as the window is open. There's no resume-later for past sessions yet — if you close the window mid-conversation, the transcript is gone. If you've gathered something good, hit **Generate Prompt** to capture it as an editable prompt before closing.
+### Saving, resuming, and exporting sessions
+
+Every conversation you have with Ideator is **auto-saved to this machine** as you go. There's no manual save button — the moment you send your first message, Ideator gives the session an ID and persists every subsequent turn (including web-search chips and the synthesized prompt, if you reach that point) to IndexedDB in the background. Closing the window is safe; nothing is lost.
+
+- **Sessions** (history icon) — opens a panel listing every conversation saved on this machine, newest first. Each row shows when you last touched it, how many turns it has, a status badge (*In progress* / *Has draft prompt* / *Handed off*), and the first thing you typed as a preview. Use **Load** to drop a past session back into the active window, the **download** icon to export just that conversation as Markdown, or the **trash** icon to delete it permanently.
+- **Export** (download icon) — downloads the current conversation as a Markdown file (`ideator-YYYY-MM-DD-HH-MM-<slug>.md`). The file includes metadata (created/updated timestamps, status), every turn formatted as a readable transcript, web-search chips as block-quotes, and the synthesized prompt + knobs if you've reached the preview. Useful for thesis documentation, sharing with a co-author, or just keeping a record outside the app.
+- **New** — saves the current conversation in the session list and starts a fresh one with the opening question.
+- **Reset** — discards the current transcript and starts over. The previous conversation **stays in Sessions** until you delete it from there.
+
+Sessions live in your browser's IndexedDB for the app's origin — they are **not synced** across machines, and they are not bound to any project (Ideator's output creates a new project on handoff, so per-project scoping wouldn't match how the feature is used). If you want a conversation accessible elsewhere, export it as Markdown.
 
 ## AI Story Generation
 

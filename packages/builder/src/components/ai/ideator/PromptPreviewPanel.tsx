@@ -70,8 +70,10 @@ const GenerationProgress: React.FC = () => {
         {GENERATION_PHASES[phaseIdx]}
       </div>
       <div className="text-[11px] text-purple-600 leading-snug">
-        This usually takes 30–90 seconds. You can leave this window open —
-        the finished story will appear in the main builder.
+        Short stories take 1–3 minutes; long, complex, or reasoning-heavy
+        runs (high/xhigh/max effort, GPT-5 / Claude Opus / Kimi K2) often
+        take 5–10+ minutes. Feel free to leave this window open — the
+        finished story will appear in the main builder when it's ready.
       </div>
     </div>
   );

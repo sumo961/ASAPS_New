@@ -19,7 +19,7 @@ const LOCATION_TYPE_MAP: Record<string, { kind: 'text' | 'button' | 'dialog' | '
   'author': { kind: 'text', fontSize: 20 },
   'text': { kind: 'dialog', fontSize: 18 },
   'summary': { kind: 'dialog', fontSize: 16 },  // For AI Summary beat
-  'message': { kind: 'text', fontSize: 24 },
+  'message': { kind: 'text', fontSize: 18 },  // Aligned with 'text' for consistent body-text feel across endScreen and infoText. The legacy 24 was sized for short "The End" messages but reads oversized for long literary endings.
   'prompt': { kind: 'dialog', fontSize: 18 },
   'question': { kind: 'dialog', fontSize: 18 },
   'dialog': { kind: 'dialog', fontSize: 16 },
@@ -144,8 +144,20 @@ export function generateDefaultLocations(
         // Position below content with some spacing, but not further than bottom area
         y = Math.min(currentY + 80, stageHeight - 150);
       } else if (locationName === 'restartButton') {
-        // Restart button at bottom for aiSummary/endScreen
-        y = stageHeight - 120;
+        // Restart button at bottom for aiSummary/endScreen — primary action,
+        // sit on the right when a credits button is also present (paired
+        // side-by-side via the centerX offsets below).
+        y = stageHeight - 100;
+        if (beatType === 'endScreen' || beatType === 'aiSummary') {
+          x = centerX + 20;
+        }
+      } else if (locationName === 'creditsButton') {
+        // Credits button is secondary — sit to the LEFT of restart on the
+        // same baseline. Previously this fell through to currentY which
+        // placed it inside the text area and made it overlap restart at the
+        // same x; both ended up rendered on top of each other.
+        y = stageHeight - 100;
+        x = centerX - width - 20;
       } else {
         // Other buttons stack
         y = currentY;

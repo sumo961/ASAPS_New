@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.2.0
- * Generated: 2026-05-04T23:57:01.464Z
+ * Schema Version: 2.3.0
+ * Generated: 2026-05-12T23:30:38.829Z
  */
 
 // ============================================
@@ -273,6 +273,8 @@ export interface EndScreenParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat for restart (usually beat 0) */
   restartConnection?: Connection | undefined;
+  /** Alias of restartConnection — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target. */
+  connection?: Connection | undefined;
 }
 
 /**
@@ -310,21 +312,33 @@ export interface PanoramaParameters {
 }
 
 /**
- * Set Variable/Counter - Modify story variables or counters
+ * Set Variable/Counter - Modify story variables or counters (or fictional-time clock)
  * Category: invisible
  * Connection Type: single
  */
 export interface SetVariableParameters {
-  /** Type: variable or counter */
+  /** Discriminator: 'variable' | 'counter' | 'fictionalTime'. Drives which fields below are read at runtime. */
   type: string;
-  /** Variable or counter name */
+  /** Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead) */
   name: string;
-  /** New value (string for variables, number for counters) */
+  /** New value (string for variables, number for counters). For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value. */
   value: any;
-  /** For counters: set or change. For variables: set only */
+  /** Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'. */
   operation?: string | undefined;
   /** Next beat after variable/counter is set */
   connection: Connection;
+  /** type='fictionalTime' / operation='set' only. Year component (e.g. 2024). */
+  timeYear?: number | undefined;
+  /** type='fictionalTime' / operation='set' only. Month component (1-12). */
+  timeMonth?: number | undefined;
+  /** type='fictionalTime' / operation='set' only. Day component (1-31). */
+  timeDay?: number | undefined;
+  /** type='fictionalTime' / operation='set' only. Hour component (0-23). */
+  timeHour?: number | undefined;
+  /** type='fictionalTime' / operation='set' only. Minute component (0-59). */
+  timeMinute?: number | undefined;
+  /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'months' | 'years'. */
+  timeUnit?: string | undefined;
 }
 
 /**
@@ -397,7 +411,7 @@ export interface AddRemoveInventoryParameters {
   action: string;
   /** Item name */
   item: string;
-  /** Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount) */
+  /** Number of items to add/remove/transfer. Can be a number or variable name (e.g., $goldAmount). The runtime accepts both forms; the schema declares string because it's the most general (variable refs need to be strings). The pipeline coerces emitted numbers/booleans to string so AI output validates without per-field carve-outs. */
   quantity?: string | undefined;
   /** Character name (for add/remove) */
   character: string;
@@ -433,12 +447,14 @@ export interface UpdateAffectParameters {
   emotionDelta?: number | undefined;
   /** Next beat after the affect update */
   connection: Connection;
+  /** v0.9.45+ canonical shape — an ordered list of Effects (mood nudge, sentiment delta, emotion fire, goal status, variant switch, bookmark, …). When present, this replaces the legacy single-row fields above (moodValenceDelta, sentimentTarget, …). The migration helpers in core promote legacy shapes into this array on load. */
+  effects?: Effect[] | undefined;
 }
 
 /**
- * GPS Location - Show a map with a target GPS coordinate. In trigger modes, wait for the player to walk into (or out of) a radius around the point. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.
+ * GPS Location - Show one or more GPS-anchored locations on a map. Each location has its own next-beat target and Effects bundle (counters, mood, sentiment, etc) — the first location the player crosses into (or out of) wins, like a movement choice on a map. The runtime probes GPS permission via ensureXRPermission and falls back per the project's LocationSettings.onPermissionDenied policy.
  * Category: xr
- * Connection Type: single
+ * Connection Type: multiple
  */
 export interface GpsLocationParameters {
   /** Behaviour mode: 'display' shows the map with a continue button (no waiting); 'trigger-on-arrival' resolves when the player enters the radius; 'trigger-on-departure' resolves when the player leaves it. */
@@ -466,6 +482,30 @@ export interface GpsLocationParameters {
 }
 
 /**
+ * Indoor Location - Show a floor plan for this beat with one or more target Bluetooth beacons. Each beat carries its own floor plan + dimensions, so different beats can show different rooms or scales. Each location has its own (x, y) on this floor plan, beaconUuid, target beat, and Effects bundle. The first beacon the player walks within radius wins.
+ * Category: xr
+ * Connection Type: multiple
+ */
+export interface IndoorLocationParameters {
+  /** Behaviour mode: 'display' shows the floor plan with a continue button; 'trigger-on-arrival' resolves when the player enters the radius around the target beacon; 'trigger-on-departure' resolves when the player leaves it. */
+  mode: string;
+  /** UUID of the target beacon — must match a beacon configured in Project Settings → Location & XR → Indoor venue → Beacons. */
+  targetBeaconUuid: string;
+  /** Proximity radius in metres. Falls back to LocationSettings.defaultProximityRadiusM when unset, then 5m (room-scale default — indoor is tighter than outdoor). */
+  radiusMeters?: number | undefined;
+  /** Instructional text shown over the floor plan (e.g. 'Find the artefact in the east wing'). */
+  text?: string | undefined;
+  /** Continue button label (display mode). */
+  buttonText?: string | undefined;
+  /** Optional skip / cancel button label. */
+  cancelButtonText?: string | undefined;
+  /** Optional timeout in milliseconds. Beat resolves with 'timeout' if no arrival / departure / skip within this window. */
+  timeoutMs?: number | undefined;
+  /** Next beat after the indoor-location beat resolves. */
+  connection: Connection;
+}
+
+/**
  * Input Text - Prompts user for text input and stores in a variable or character display name
  * Category: visible
  * Connection Type: single
@@ -475,7 +515,7 @@ export interface InputTextParameters {
   prompt: string;
   /** Save input to: 'variable', 'characterName', or 'counter' */
   saveToType: string;
-  /** Variable name to store the input (when saveToType='variable') */
+  /** Variable name to store the input (when saveToType='variable'). AI sometimes emits 'variableName' — pipeline aliases it to 'variable'. */
   variable?: string | undefined;
   /** Character ID to update display name (when saveToType='characterName') */
   characterId?: string | undefined;
@@ -679,6 +719,8 @@ export interface AiSummaryParameters {
   showCredits?: boolean | undefined;
   /** Beat to restart to */
   restartTarget?: string | undefined;
+  /** Alias of restartTarget — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target. */
+  connection?: Connection | undefined;
   /** Reset state on restart */
   resetOnRestart?: boolean | undefined;
   /** Clear all variables */
@@ -831,6 +873,7 @@ export type BeatType =
   | 'addRemoveInventory'
   | 'updateAffect'
   | 'gpsLocation'
+  | 'indoorLocation'
   | 'inputText'
   | 'keypad'
   | 'hyperText'
@@ -862,6 +905,7 @@ export interface BeatParameterMap {
   'addRemoveInventory': AddRemoveInventoryParameters;
   'updateAffect': UpdateAffectParameters;
   'gpsLocation': GpsLocationParameters;
+  'indoorLocation': IndoorLocationParameters;
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
   'hyperText': HyperTextParameters;

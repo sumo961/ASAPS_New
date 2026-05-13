@@ -7,12 +7,15 @@
  * back to the opener window for handoff to the main story generator.
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { IdeatorHeader } from '../components/ai/ideator/IdeatorHeader';
 import { IdeatorChat } from '../components/ai/ideator/IdeatorChat';
 import { IdeatorComposer } from '../components/ai/ideator/IdeatorComposer';
 import { PromptPreviewPanel } from '../components/ai/ideator/PromptPreviewPanel';
+import { SessionsPanel } from '../components/ai/ideator/SessionsPanel';
 import { useIdeator } from '../components/ai/ideator/useIdeator';
+import { useIdeatorStore } from '../components/ai/ideator/ideatorStore';
+import { exportSessionMarkdown } from '../components/ai/ideator/exportTranscript';
 
 /**
  * Read the optional ?title=... parameter from the hash so the pop-out can
@@ -42,7 +45,14 @@ export const IdeatorWindow: React.FC = () => {
     submitRequest,
     backToChat,
     resetConversation,
+    loadSavedSession,
+    startNewSession,
   } = useIdeator();
+
+  const sessionId = useIdeatorStore(s => s.sessionId);
+  const sessionCreatedAt = useIdeatorStore(s => s.sessionCreatedAt);
+
+  const [sessionsOpen, setSessionsOpen] = useState(false);
 
   const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
   const assistantSuggestsReady = Boolean(lastAssistant?.readinessSignal);
@@ -59,11 +69,28 @@ export const IdeatorWindow: React.FC = () => {
     status === 'submitting' ||
     status === 'generating';
 
+  // A conversation is worth exporting once the user has spoken at least once.
+  const canExport = messages.some(m => m.role === 'user' && m.kind !== 'tool_use');
+
+  const handleExport = useCallback(() => {
+    exportSessionMarkdown({
+      messages,
+      createdAt: sessionCreatedAt ?? Date.now(),
+      lastUpdatedAt: Date.now(),
+      handedOff: status === 'handed_off',
+      draftRequest: draftRequest ?? undefined,
+    });
+  }, [messages, sessionCreatedAt, status, draftRequest]);
+
   return (
     <div className="flex flex-col h-screen bg-white">
       <IdeatorHeader
         onReset={resetConversation}
+        onNewSession={startNewSession}
+        onOpenSessions={() => setSessionsOpen(true)}
+        onExport={handleExport}
         disableReset={resetDisabled}
+        canExport={canExport}
       />
 
       {!isConfigured && (
@@ -100,6 +127,13 @@ export const IdeatorWindow: React.FC = () => {
           />
         </>
       )}
+
+      <SessionsPanel
+        open={sessionsOpen}
+        onClose={() => setSessionsOpen(false)}
+        currentSessionId={sessionId}
+        onLoad={loadSavedSession}
+      />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 /**
- * Title bar for the Ideator pop-out. Shows the tool name and a reset
- * action. Close is handled by the browser chrome — the window was
- * opened with window.open so the user has a standard close button.
+ * Title bar for the Ideator pop-out. Shows the tool name and the row of
+ * conversation-level actions (History, Export, New, Reset). Close is
+ * handled by the browser chrome — the window was opened with window.open
+ * so the user has a standard close button.
  *
  * Note: the project title used to appear as a subtitle here ("Shaping
  * ideas for 'X'") but it was misleading — the conversation does not
@@ -11,23 +12,40 @@
  */
 
 import React from 'react';
-import { Sparkles, RotateCcw } from 'lucide-react';
+import { Sparkles, RotateCcw, History, Download, FilePlus } from 'lucide-react';
 
 interface IdeatorHeaderProps {
   onReset: () => void;
+  onNewSession: () => void;
+  onOpenSessions: () => void;
+  onExport: () => void;
   disableReset: boolean;
+  /** True when the conversation has at least one real exchange to export. */
+  canExport: boolean;
 }
 
 export const IdeatorHeader: React.FC<IdeatorHeaderProps> = ({
   onReset,
+  onNewSession,
+  onOpenSessions,
+  onExport,
   disableReset,
+  canExport,
 }) => {
   const handleReset = () => {
     if (disableReset) return;
     const confirmed = window.confirm(
-      'Reset the conversation? The current transcript will be discarded.'
+      'Reset the conversation? The current transcript will be discarded. (It will remain in Past Sessions until you delete it there.)'
     );
     if (confirmed) onReset();
+  };
+
+  const handleNew = () => {
+    if (disableReset) return;
+    const confirmed = window.confirm(
+      'Start a new conversation? The current one will be saved in Past Sessions — you can come back to it any time.'
+    );
+    if (confirmed) onNewSession();
   };
 
   return (
@@ -44,15 +62,43 @@ export const IdeatorHeader: React.FC<IdeatorHeaderProps> = ({
         </div>
       </div>
 
-      <button
-        onClick={handleReset}
-        disabled={disableReset}
-        className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-        title="Discard the current conversation and start over"
-      >
-        <RotateCcw className="w-3.5 h-3.5" />
-        Reset
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={onOpenSessions}
+          className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          title="Open past sessions saved on this machine"
+        >
+          <History className="w-3.5 h-3.5" />
+          Sessions
+        </button>
+        <button
+          onClick={onExport}
+          disabled={!canExport}
+          className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Download the current conversation as a Markdown file"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export
+        </button>
+        <button
+          onClick={handleNew}
+          disabled={disableReset}
+          className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Save current and start a new conversation"
+        >
+          <FilePlus className="w-3.5 h-3.5" />
+          New
+        </button>
+        <button
+          onClick={handleReset}
+          disabled={disableReset}
+          className="px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Discard the current conversation and start over"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset
+        </button>
+      </div>
     </div>
   );
 };

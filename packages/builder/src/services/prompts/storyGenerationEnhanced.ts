@@ -1250,6 +1250,19 @@ A character variant is the alternate version a character can transition into via
   Character "Sam" with variants: [ { "id": "sam_post_disclosure", "displayName": "Sam (after disclosure)" }, { "id": "sam_in_recovery", "displayName": "Sam, in recovery" } ]
 ✓ The id stays machine-readable (snake_case, scoped); the displayName carries the narrative signal of the transition.
 
+❌ **Rich-affect stories with no traits on the major characters** (rich tier only)
+At affectDepth='rich' the prompt has already declared "personality / emotion-driven story / character growth at the foreground." Without populated traits[], every character's emotion deltas at runtime are uniform — high-Neuroticism characters react the same as low-Neuroticism ones, and the rich tier collapses into "decorated standard". The runtime trait-modulation only fires when traits are populated.
+✗ WRONG: rich-tier interactive drama generated with traits set to [] on every character. The schema is "rich" but the runtime is "standard".
+✓ CORRECT: at rich, every character who appears in more than one beat MUST have a traits[] array with at least 3 Big Five dimensions populated. Use an archetype preset when one fits (anxious-introvert, conscientious-leader, free-spirit, recluse, hothead, peacekeeper, stoic, trickster, narcissist, balanced) — or hand-tune. Map character description to traits explicitly: "disciplined, settled life" → high conscientiousness, low neuroticism; "depressive silences, mid-career stall" → high neuroticism, low conscientiousness; "funny, brilliant, restless" → high openness, moderate extraversion.
+
+❌ **Bookmarking a character's transition without authoring the variant**
+If you emit a bookmarkAffectState Effect whose name describes a character's state change (e.g. "after_disclosure", "after_depressive_episode", "post_betrayal", "after_recovery"), you are signalling that the character is meaningfully different in the second half of the story. That difference belongs in a variant on the character, not just in the affect snapshot. The bookmark captures the runtime affect state for later comparison; the variant captures the authorial shift the player should see (different displayName / mood seed / sentiment seeds / portrait).
+✗ WRONG: story emits bookmarkAffectState with bookmarkName "after_depressive" related to character Theo, but theo.variants is []. Post-bookmark scenes read the same name "Theo" with the same baseline mood — the player never sees that he changed.
+✓ CORRECT: alongside the bookmark beat, define a variant on the character with a visibly distinct displayName, a shifted initialMood and at least one shifted initialSentiment that reflects the bookmark moment. Use a setCharacterVariant Effect at the appropriate transition point so the runtime swaps to the variant when the player crosses that threshold.
+  Example: Theo's "after_depressive" bookmark pairs with:
+    variants: [ { "id": "theo_after_disclosure", "displayName": "Theo (after the silence)", "initialMood": { "valence": -0.3, "arousal": -0.1 }, "initialSentiments": [ { "target": "frances", "emotion": "gratitude", "strength": 0.4 } ] } ]
+    A setCharacterVariant Effect (target "theo", variantId "theo_after_disclosure") on the choice that elicits the disclosure.
+
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
 **BEFORE setting a condition threshold, calculate whether it can actually be reached!**

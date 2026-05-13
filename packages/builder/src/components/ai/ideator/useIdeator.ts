@@ -21,7 +21,12 @@ import {
   webSearchToolSpec,
   WEB_SEARCH_TOOL_NAME,
 } from './webSearchTool';
-import type { IdeatorWireMessage } from './types';
+import {
+  loadSession,
+  newSessionId,
+  saveSession,
+} from './ideatorSessionStore';
+import type { IdeatorStatus, IdeatorWireMessage } from './types';
 import type { StoryGenerationRequest } from '../../../types/ai';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -73,6 +78,77 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
     addMessage({ role: 'assistant', content: OPENING_TURN });
     setStatus('interviewing');
   }, [messages.length, addMessage, setStatus]);
+
+  /**
+   * Save the current conversation to IndexedDB. Generates a session id on
+   * first save. Called after every save-worthy state change (assistant turn
+   * lands, draft synthesized, handed-off). Failures are logged but never
+   * thrown — losing a save shouldn't disrupt the live conversation.
+   */
+  const persistCurrentSession = useCallback(async () => {
+    const state = useIdeatorStore.getState();
+    const hasRealUserMsg = state.messages.some(
+      m => m.role === 'user' && m.kind !== 'tool_use'
+    );
+    if (!hasRealUserMsg) return; // nothing meaningful to persist yet
+
+    let sessionId = state.sessionId;
+    let createdAt = state.sessionCreatedAt;
+    if (!sessionId) {
+      sessionId = newSessionId();
+      createdAt = Date.now();
+      state.setSessionId(sessionId, createdAt);
+    }
+
+    try {
+      await saveSession({
+        id: sessionId,
+        createdAt: createdAt ?? Date.now(),
+        lastUpdatedAt: Date.now(),
+        messages: state.messages,
+        draftRequest: state.draftRequest ?? undefined,
+        handedOff: state.status === 'handed_off',
+      });
+    } catch (err) {
+      console.warn('[Ideator] Failed to save session:', err);
+    }
+  }, []);
+
+  /**
+   * Load a previously saved session into the live store. The seeded opening
+   * effect won't re-fire because `messages` is non-empty after hydration.
+   */
+  const loadSavedSession = useCallback(async (id: string): Promise<boolean> => {
+    const session = await loadSession(id);
+    if (!session) return false;
+    // Resume in the state that best matches what was saved. Most loaded
+    // sessions land in 'interviewing'; only those with a stored draft come
+    // back to the preview pane.
+    const resumedStatus: IdeatorStatus = session.handedOff
+      ? 'handed_off'
+      : session.draftRequest
+        ? 'previewing'
+        : 'interviewing';
+    useIdeatorStore.getState().hydrateFromSession({
+      sessionId: session.id,
+      sessionCreatedAt: session.createdAt,
+      messages: session.messages,
+      status: resumedStatus,
+      draftRequest: session.draftRequest ?? null,
+    });
+    seededOpeningRef.current = true;
+    return true;
+  }, []);
+
+  /**
+   * Start a new conversation from scratch, clearing the live store. The
+   * current saved session (if any) remains in IndexedDB and can be loaded
+   * again from the SessionsPanel.
+   */
+  const startNewSession = useCallback(() => {
+    reset();
+    seededOpeningRef.current = false;
+  }, [reset]);
 
   /**
    * Send a user turn, then call Claude with the full transcript so far and
@@ -188,6 +264,7 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
       });
 
       setStatus(hasSignal ? 'ready_to_synthesize' : 'interviewing');
+      void persistCurrentSession();
     },
     [
       addMessage,
@@ -195,6 +272,7 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
       generateChatWithTools,
       generateConversationTurn,
       isConfigured,
+      persistCurrentSession,
       setError,
       setStatus,
     ]
@@ -212,11 +290,12 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
       const { request } = await synthesizeStoryRequest(history);
       setDraftRequest(request);
       setStatus('previewing');
+      void persistCurrentSession();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStatus('ready_to_synthesize');
     }
-  }, [setDraftRequest, setError, setStatus]);
+  }, [persistCurrentSession, setDraftRequest, setError, setStatus]);
 
   /**
    * Send the final request to the opener window. We move to 'generating'
@@ -281,6 +360,7 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
       if (!message || typeof message.type !== 'string') return;
       if (message.type === 'GENERATION_COMPLETE') {
         setStatus('handed_off');
+        void persistCurrentSession();
       } else if (message.type === 'GENERATION_FAILED') {
         setError(message.payload?.error ?? 'Story generation failed.');
         setStatus('previewing');
@@ -307,7 +387,7 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [setError, setStatus]);
+  }, [persistCurrentSession, setError, setStatus]);
 
   /**
    * Leave the preview and return to the conversation without discarding
@@ -332,5 +412,7 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
     updateDraftRequest,
     backToChat,
     resetConversation: reset,
+    loadSavedSession,
+    startNewSession,
   };
 }
