@@ -27,28 +27,12 @@ import { CharacterAffectPanel } from '../components/characters/CharacterAffectPa
 import { MockSensorPanel } from '../components/preview/MockSensorPanel';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { buildChatRequestBody, isReasoningModel } from '../services/providers/openai-utils';
-
-/**
- * Apply reasoning-model headroom to a caller-requested maxTokens budget.
- *
- * Reasoning models (Kimi K2 series, GPT-5, o-series) count reasoning_content
- * within max_completion_tokens. A small budget like 250 tokens — fine for a
- * non-reasoning model emitting ~180 words of visible text — gets entirely
- * consumed by internal reasoning, leaving zero visible content.
- *
- * Beat-level callers like AIInfoTextBeat (250) and OnlineContentBeat
- * (~1000-2000) request budgets sized for visible-content models and don't
- * know whether the active model reasons. This shim bumps the floor to give
- * reasoning a few thousand tokens of room while still respecting larger
- * caller asks.
- */
-function effectiveMaxTokens(model: string, requested: number): number {
-  if (isReasoningModel(model)) {
-    return Math.max(requested, 4096);
-  }
-  return requested;
-}
+import {
+  buildChatRequestBody,
+  isReasoningModel,
+  effectiveMaxTokens,
+  stripThinkingBlocks,
+} from '../services/providers/openai-utils';
 
 // Stage dimensions (matching StoryPreview)
 const STAGE_WIDTH = 1024;
@@ -73,19 +57,6 @@ const CLAUDE_PROXY_ENDPOINT = isViteDev
 const OPENAI_PROXY_ENDPOINT = isViteDev
   ? '/api/ai/openai'
   : 'http://localhost:3001/api/ai/openai';
-
-/**
- * Strip thinking/reasoning blocks from AI responses.
- */
-function stripThinkingBlocks(text: string): string {
-  let result = text;
-  result = result.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  result = result.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-  result = result.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
-  result = result.replace(/^\s+/, '').replace(/\s+$/, '');
-  result = result.replace(/\n{3,}/g, '\n\n');
-  return result;
-}
 
 /**
  * Extract JSON from AI response using brace matching.

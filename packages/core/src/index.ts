@@ -17,6 +17,7 @@ export * from './persistence';
 export * from './translation';
 export * from './prompts';
 export * from './normalize';
+export * from './ai';
 
 // Package info
 export const version = '2.0.0';

@@ -4,6 +4,7 @@
  */
 
 import type { IAIService } from '@asaps/core';
+import { effectiveMaxTokens } from '@asaps/core';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
 
@@ -23,39 +24,6 @@ interface EmbeddedConfig {
 }
 
 const STORAGE_KEY = 'asaps-player-ai-config';
-
-/**
- * Reasoning-model detection — substring match on the model id. Kept inline
- * (rather than imported from builder) so player-web has no cross-package
- * dependency on the builder's openai-utils. Mirrors the same logic.
- */
-function isReasoningModel(model: string | undefined): boolean {
-  if (!model) return false;
-  const m = model.toLowerCase();
-  return m.startsWith('o1') ||
-         m.startsWith('o3') ||
-         m.startsWith('gpt-5') ||
-         m.includes('kimi-k2');
-}
-
-/**
- * Apply reasoning-model headroom to the caller-requested maxTokens budget.
- *
- * Reasoning models (Kimi K2, GPT-5, o-series) count their internal
- * reasoning_content against max_completion_tokens. AIInfoTextBeat asks for
- * just 250 tokens (sized for 2-3 sentences), which on a reasoning model can
- * be entirely consumed by hidden reasoning — the visible content then comes
- * back empty or truncated mid-JSON. Bumping to a 4096-token floor preserves
- * the caller's intent on non-reasoning models and gives reasoning models
- * enough room to complete their structured-JSON response. Mirrors the same
- * fix that lives in the builder-side PreviewWindow adapter.
- */
-function effectiveMaxTokens(model: string | undefined, requested: number): number {
-  if (isReasoningModel(model)) {
-    return Math.max(requested, 4096);
-  }
-  return requested;
-}
 
 /**
  * Get embedded AI config from creator (if provided during export)
