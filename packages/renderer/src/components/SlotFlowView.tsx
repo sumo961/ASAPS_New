@@ -26,6 +26,7 @@
  */
 
 import React from 'react';
+import type { SlotIntent } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 
@@ -37,6 +38,13 @@ interface SlotFlowViewProps {
   theme?: RenderThemeSettings;
   backgroundUrl?: string | null;
   backgroundColor: string;
+  /**
+   * Soft author layout preferences (preferredLines / anchors). Optional and
+   * currently inert here — the delivery path lands in this layer; the
+   * renderer consumes preferredLines + anchors in the next layer (Phase 1.5
+   * task 146). Absent → today's pure-flow behavior, unchanged.
+   */
+  slotIntent?: SlotIntent;
   /** Resolve a button click to the action id the beat expects. */
   onAction: (id: string) => void;
 }

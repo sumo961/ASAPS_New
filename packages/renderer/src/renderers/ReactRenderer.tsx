@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
-import type { Location, AnimationPath } from '@asaps/core';
+import type { Location, AnimationPath, SlotIntent } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
@@ -1907,6 +1907,12 @@ export class ReactRenderer extends BaseRenderer {
           ? 'transparent'
           : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
         console.log(`[ReactRenderer ${this.instanceId}] Rendering SLOT-MODE ${beatType} (no author locations)`);
+        // Soft author layout intent travels via renderer state (same
+        // uniform channel as currentBeatType) so no render-method signatures
+        // change. Absent on every existing beat → SlotFlowView ignores it →
+        // pure-flow behavior unchanged.
+        const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined)
+          ?? (content.slotIntent as SlotIntent | undefined);
         this.renderComponent(
           <SlotFlowView
             beatType={beatType}
@@ -1915,6 +1921,7 @@ export class ReactRenderer extends BaseRenderer {
             theme={this.theme}
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
+            slotIntent={slotIntent}
             onAction={this.handleAction}
           />
         );
