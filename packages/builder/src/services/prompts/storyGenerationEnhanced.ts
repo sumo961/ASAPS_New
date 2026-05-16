@@ -126,9 +126,10 @@ const BEAT_TYPE_GUIDE = `
 
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
-- Parameters: text, duration (seconds) - NO connection inside parameters!
+- Parameters: text, duration (in SECONDS, fractional allowed) - NO connection inside parameters!
+- ⚠️ CRITICAL: duration MUST be proportional to the text length, not a flat value. The screen auto-advances with NO continue button, so the reader must be able to finish reading. Compute it: duration ≈ ceil(wordCount / 200 * 60 * 1.5), with a minimum of 3. A flat small value (e.g. always 3 or 6) makes longer paragraphs flash past unread — this is a real, repeated generation bug. Examples by length: ~10 words → 5s; ~25 words → 12s; ~40 words → 18s; ~55 words → 25s; ~80 words → 36s.
 - Optional: textVariations (array of alternative texts) - one is randomly selected at runtime
-  Example: { "text": "Time passes...", "textVariations": ["Days go by...", "The hours slip away..."], "duration": 3 }
+  Example (12 words → ~6s): { "text": "Months pass. The correspondence resumes, but the rhythm between them has changed.", "duration": 6 }
 - ⚠️ NOTE: durScreen does NOT support backgroundAssetId - use infoText if you need a background
 - ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
 - ❌ WRONG: "parameters": { "text": "...", "duration": 3, "connection": { "target": "beat_5" } }
@@ -665,10 +666,10 @@ Fictional time condition example (CORRECT format):
   - maxSentences: Maximum sentences to generate (default: 2)
   - contextVariables: Specific variable names to include (optional)
   - wordsPerMinute: Reading speed for duration calculation (default: 200)
-  - minDuration: Minimum display time in milliseconds (default: 2000)
-  - maxDuration: Maximum display time in milliseconds (default: 15000)
+  - minDuration: Minimum display time in SECONDS (default: 3)
+  - maxDuration: Maximum display time in SECONDS (default: 45)
 - Connections: Single → auto-advances after calculated duration
-- Duration formula: (wordCount / wordsPerMinute) × 60 × 1000 ms, clamped to min/max
+- Duration is auto-calculated at runtime in SECONDS: ceil(wordCount / wordsPerMinute × 60 × 1.5), clamped to [minDuration, maxDuration]. You do not set duration directly for aiDurScreen — only the bounds.
 - Example: "Three days pass..." that adapts based on what the player accomplished
 
 **aiDialogTree** - AI-generated branching dialogue at runtime

@@ -3,6 +3,11 @@ import type { BeatConfig } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { IRenderer } from '../types';
 import type { DurScreenParameters } from '../generated/beat-types';
+import {
+  normalizeDurationToSeconds,
+  durationSecondsToMs,
+  suggestDurationSeconds,
+} from '../utils/duration';
 
 export class DurScreenBeat extends Beat {
   public text: string;
@@ -17,7 +22,18 @@ export class DurScreenBeat extends Beat {
     super(config);
     this.text = config.text || config.parameters?.text || '';
     this.textVariations = config.textVariations || config.parameters?.textVariations;
-    this.duration = config.duration || config.parameters?.duration || 3000;
+    // Canonical unit is SECONDS. normalizeDurationToSeconds applies the
+    // legacy-ms migration heuristic (value > 60 → ÷1000). If no duration was
+    // authored, suggest one from the text's word count so a new/AI beat is
+    // never under-timed (the original 3000 default was ms = 3s, and the AI
+    // emitted bare seconds the runtime then read as ms — both fixed here).
+    const rawDuration = config.duration ?? config.parameters?.duration;
+    this.duration = rawDuration != null
+      ? normalizeDurationToSeconds(rawDuration)
+      : suggestDurationSeconds(this.text);
+    if (!this.duration || this.duration <= 0) {
+      this.duration = suggestDurationSeconds(this.text);
+    }
     // node is now handled by Beat base class
   }
 
@@ -36,7 +52,9 @@ export class DurScreenBeat extends Beat {
   updateParameters(params: Record<string, any>): void {
     if (params.text !== undefined) this.text = params.text;
     if (params.textVariations !== undefined) this.textVariations = params.textVariations;
-    if (params.duration !== undefined) this.duration = params.duration;
+    if (params.duration !== undefined) {
+      this.duration = normalizeDurationToSeconds(params.duration);
+    }
     if (params.node !== undefined) this.node = params.node;
   }
 
@@ -67,7 +85,8 @@ export class DurScreenBeat extends Beat {
     const processedText = this.processText(selectedText, context);
 
     const locations = Array.from(this.locations.values());
-    await renderer.renderDurScreen(processedText, this.duration, locations);
+    // this.duration is canonical seconds; the renderer contract is ms.
+    await renderer.renderDurScreen(processedText, durationSecondsToMs(this.duration), locations);
     return this.getNextBeat(context);
   }
 }

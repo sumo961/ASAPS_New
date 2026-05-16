@@ -3,6 +3,11 @@ import type { BeatConfig } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
+import {
+  normalizeDurationToSeconds,
+  durationSecondsToMs,
+  suggestDurationSeconds,
+} from '../utils/duration';
 
 export interface AIDurScreenBeatParams {
   /** Prompt/context for AI to generate text */
@@ -90,8 +95,14 @@ export class AIDurScreenBeat extends Beat {
     this.maxSentences = params.maxSentences || config.maxSentences || 2;
     this.fallbackText = params.fallbackText || config.fallbackText || 'Continue...';
     this.wordsPerMinute = params.wordsPerMinute || config.wordsPerMinute || 200;
-    this.minDuration = params.minDuration || config.minDuration || 2000;
-    this.maxDuration = params.maxDuration || config.maxDuration || 15000;
+    // Canonical SECONDS. normalizeDurationToSeconds applies the legacy-ms
+    // heuristic so old projects (2000/15000 ms) become 2/15 s. New defaults
+    // raised: 15s max was below what a single dense paragraph needs (a
+    // 55-word block wants ~25s) and would clip the calculated duration.
+    const rawMin = params.minDuration ?? config.minDuration;
+    const rawMax = params.maxDuration ?? config.maxDuration;
+    this.minDuration = rawMin != null ? normalizeDurationToSeconds(rawMin) : 3;
+    this.maxDuration = rawMax != null ? normalizeDurationToSeconds(rawMax) : 45;
   }
 
   getParameters(): Record<string, any> {
@@ -122,22 +133,22 @@ export class AIDurScreenBeat extends Beat {
     if (params.maxSentences !== undefined) this.maxSentences = params.maxSentences;
     if (params.fallbackText !== undefined) this.fallbackText = params.fallbackText;
     if (params.wordsPerMinute !== undefined) this.wordsPerMinute = params.wordsPerMinute;
-    if (params.minDuration !== undefined) this.minDuration = params.minDuration;
-    if (params.maxDuration !== undefined) this.maxDuration = params.maxDuration;
+    if (params.minDuration !== undefined) this.minDuration = normalizeDurationToSeconds(params.minDuration);
+    if (params.maxDuration !== undefined) this.maxDuration = normalizeDurationToSeconds(params.maxDuration);
   }
 
   /**
-   * Calculate reading duration based on word count and reading speed
+   * Calculate reading duration in SECONDS from word count + reading speed,
+   * using the shared suggestDurationSeconds model (includes the slow-reader
+   * safety factor), clamped to the beat's [minDuration, maxDuration] seconds.
    */
   private calculateDuration(text: string): number {
-    // Count words (split by whitespace)
-    const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
-
-    // Calculate duration: (words / wordsPerMinute) * 60 seconds * 1000 ms
-    const calculatedDuration = (wordCount / this.wordsPerMinute) * 60 * 1000;
-
-    // Clamp between min and max
-    return Math.max(this.minDuration, Math.min(this.maxDuration, calculatedDuration));
+    const suggested = suggestDurationSeconds(text, {
+      wpm: this.wordsPerMinute,
+      floor: this.minDuration,
+    });
+    // Clamp between min and max (both seconds)
+    return Math.max(this.minDuration, Math.min(this.maxDuration, suggested));
   }
 
   protected async performAction(
@@ -152,7 +163,7 @@ export class AIDurScreenBeat extends Beat {
       console.warn(`[AIDurScreenBeat ${this.id}] AI service not configured, using fallback`);
       const processedFallback = this.processText(this.fallbackText, context);
       const duration = this.calculateDuration(processedFallback);
-      await renderer.renderDurScreen(processedFallback, duration, locations);
+      await renderer.renderDurScreen(processedFallback, durationSecondsToMs(duration), locations);
       return this.getNextBeat(context);
     }
 
@@ -204,14 +215,14 @@ export class AIDurScreenBeat extends Beat {
 
       console.log(`[AIDurScreenBeat ${this.id}] Displaying for ${duration}ms (${processedText.split(/\s+/).length} words at ${this.wordsPerMinute} WPM)`);
 
-      await renderer.renderDurScreen(processedText, duration, locations);
+      await renderer.renderDurScreen(processedText, durationSecondsToMs(duration), locations);
       return this.getNextBeat(context);
 
     } catch (error) {
       console.error(`[AIDurScreenBeat ${this.id}] Error:`, error);
       const processedFallback = this.processText(this.fallbackText, context);
       const duration = this.calculateDuration(processedFallback);
-      await renderer.renderDurScreen(processedFallback, duration, locations);
+      await renderer.renderDurScreen(processedFallback, durationSecondsToMs(duration), locations);
       return this.getNextBeat(context);
     }
   }

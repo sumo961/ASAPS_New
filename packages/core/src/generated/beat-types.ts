@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.4.0
- * Generated: 2026-05-16T01:19:29.249Z
+ * Schema Version: 2.5.0
+ * Generated: 2026-05-16T02:20:23.148Z
  */
 
 // ============================================
@@ -365,7 +365,7 @@ export interface DurScreenParameters {
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
   textVariations?: string[] | undefined;
-  /** Display duration in milliseconds */
+  /** Display duration in SECONDS (fractional allowed, e.g. 0.5). Set proportional to text length — roughly ceil(words / 200 * 60 * 1.5), minimum ~3s. Legacy projects storing milliseconds (value > 60) are auto-migrated to seconds on load. */
   duration: number;
   /** Who speaks this beat's text (for TTS voice and optional display) */
   speaker?: string | undefined;
@@ -805,9 +805,9 @@ export interface AiDurScreenParameters {
   fallbackText: string;
   /** Reading speed in words per minute (average adult: 200-250) */
   wordsPerMinute?: number | undefined;
-  /** Minimum display duration in milliseconds */
+  /** Minimum display duration in SECONDS. Legacy ms values (> 60) are auto-migrated to seconds on load. */
   minDuration?: number | undefined;
-  /** Maximum display duration in milliseconds */
+  /** Maximum display duration in SECONDS. Raised from the old 15s — a single dense paragraph (~55 words) needs ~25s, which the old ceiling clipped. Legacy ms values (> 60) are auto-migrated to seconds on load. */
   maxDuration?: number | undefined;
   /** Target beat after duration expires */
   connection?: Connection | undefined;

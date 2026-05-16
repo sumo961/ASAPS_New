@@ -1,6 +1,6 @@
 {
-  "schema": "asaps-beat-definitions-v2.4",
-  "version": "2.4.0",
+  "schema": "asaps-beat-definitions-v2.5",
+  "version": "2.5.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -1092,8 +1092,9 @@
         "duration": {
           "type": "number",
           "required": true,
-          "default": 3000,
-          "description": "Display duration in milliseconds"
+          "default": 5,
+          "description": "Display duration in SECONDS (fractional allowed, e.g. 0.5). Set proportional to text length — roughly ceil(words / 200 * 60 * 1.5), minimum ~3s. Legacy projects storing milliseconds (value > 60) are auto-migrated to seconds on load.",
+          "ui": { "control": "number", "min": 0.5, "step": 0.5, "label": "Duration (seconds)" }
         },
         "speaker": {
           "type": "string",
@@ -2584,27 +2585,27 @@
         "minDuration": {
           "type": "number",
           "required": false,
-          "default": 2000,
-          "description": "Minimum display duration in milliseconds",
+          "default": 3,
+          "description": "Minimum display duration in SECONDS. Legacy ms values (> 60) are auto-migrated to seconds on load.",
           "ui": {
             "control": "number",
-            "min": 500,
-            "max": 10000,
-            "step": 500,
-            "label": "Min Duration (ms)"
+            "min": 1,
+            "max": 30,
+            "step": 0.5,
+            "label": "Min Duration (seconds)"
           }
         },
         "maxDuration": {
           "type": "number",
           "required": false,
-          "default": 15000,
-          "description": "Maximum display duration in milliseconds",
+          "default": 45,
+          "description": "Maximum display duration in SECONDS. Raised from the old 15s — a single dense paragraph (~55 words) needs ~25s, which the old ceiling clipped. Legacy ms values (> 60) are auto-migrated to seconds on load.",
           "ui": {
             "control": "number",
-            "min": 2000,
-            "max": 60000,
-            "step": 1000,
-            "label": "Max Duration (ms)"
+            "min": 5,
+            "max": 120,
+            "step": 1,
+            "label": "Max Duration (seconds)"
           }
         },
         "connection": {

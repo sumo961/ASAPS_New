@@ -1,4 +1,10 @@
 export { PlayerContextBuilder, type PlayerContextOptions, type PlayerContextData } from './PlayerContextBuilder';
+export {
+  normalizeDurationToSeconds,
+  durationSecondsToMs,
+  suggestDurationSeconds,
+  type SuggestDurationOptions,
+} from './duration';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';
