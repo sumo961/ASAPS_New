@@ -1905,6 +1905,12 @@
         "text": "displayTemplate",
         "continueButton": "buttonText"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView (clamped-fluid font outside the stage transform). The runtime renderText path supplies content {text, buttonText}; body draws from 'text', the action is a single continue button. Instances with baked locations stay on the absolute path. See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
+        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay",
@@ -2351,6 +2357,13 @@
         "restartButton": "restartText",
         "creditsButton": "creditsText"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView. renderAISummary supplies {title, summary, showRestart, showCredits, restartText, creditsText}; title slot from 'title', body from 'summary', restart/credits action row (same EndScreenBeat substring contract). Baked-location instances stay absolute. See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "title", "role": "title", "source": "title" },
+        { "name": "summary", "role": "body", "source": "summary", "grow": true, "scroll": true },
+        { "name": "actions", "role": "action", "buttons": ["restartButton", "creditsButton"] }
+      ],
       "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
       "creditsLocationMapping": {
         "creditsTitle": "creditsPageTitle",
@@ -2462,6 +2475,12 @@
         "text": "fallbackText",
         "continueButton": "buttonText"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView. The runtime renderText path supplies content {text, buttonText} (text = the AI-generated or fallback text); body from 'text', single continue button. Baked-location instances stay absolute. See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
+        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay",

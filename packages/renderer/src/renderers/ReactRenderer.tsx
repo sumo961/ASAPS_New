@@ -2060,9 +2060,13 @@ export class ReactRenderer extends BaseRenderer {
 
     console.log(`[ReactRenderer.renderText] beatType=${beatType}, text.length=${text.length}, locations provided=${!!locations}, count=${locations?.length || 0}`);
 
-    // Use provided locations or generate default locations from schema
+    // Use provided locations or generate default locations from schema.
+    // authorPositioned gates slot mode (only effective for slot-declared
+    // beat types — onlineContent/aiInfoText; infoText/durScreen have no
+    // layoutMode in the schema so they always stay on the absolute path).
     const content = { text, buttonText };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
+    const authorPositioned = !!(locations && locations.length > 0);
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
 
     // Log each location's position and dimensions
     effectiveLocations.forEach((loc, i) => {
@@ -2070,7 +2074,7 @@ export class ReactRenderer extends BaseRenderer {
     });
 
     this.ttsSpeakCallback?.(text, this.currentSpeaker);
-    await this.renderPositionedBeat(beatType, content, effectiveLocations);
+    await this.renderPositionedBeat(beatType, content, effectiveLocations, true, undefined, authorPositioned);
   }
 
   async renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void> {
@@ -2547,12 +2551,15 @@ export class ReactRenderer extends BaseRenderer {
       creditsText: data.creditsText || 'Credits',
     };
 
-    // Use provided locations or generate default locations from schema
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('aiSummary', content);
+    // Use provided locations or generate default locations from schema.
+    // authorPositioned=false (no baked layout) + aiSummary's schema
+    // layoutMode:slot → SlotFlowView (title + summary body + restart/credits).
+    const authorPositioned = !!(locations && locations.length > 0);
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('aiSummary', content);
 
     // Return the user's action (e.g., 'restart', 'credits')
     this.ttsSpeakCallback?.(data.summary, this.currentSpeaker);
-    return this.renderPositionedBeat('aiSummary', content, effectiveLocations);
+    return this.renderPositionedBeat('aiSummary', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
   async renderCreditsPage(content: { creditsTitle: string; creditsBody: string; creditsCloseText: string }, locations?: Location[]): Promise<string> {

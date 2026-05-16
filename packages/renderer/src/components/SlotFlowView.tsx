@@ -46,6 +46,9 @@ interface SlotFlowViewProps {
 const DESIGN_WIDTH = 1024;
 // Comfortable reading ceiling for body prose (px). Caps the giant-text case.
 const BODY_CEILING = 28;
+// Title ceiling — larger than body but still bounded so AI-generated long
+// titles can't blow up the layout on wide displays.
+const TITLE_CEILING = 44;
 // Tap-target / button ceiling.
 const BUTTON_CEILING = 22;
 // Readable column width so body lines don't run edge-to-edge on wide screens.
@@ -71,19 +74,35 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   }
   const scope = scopeRef.current;
 
+  const titleSlot = slots.find(s => s.role === 'title');
   const bodySlot = slots.find(s => s.role === 'body');
   const actionSlot = slots.find(s => s.role === 'action');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
+  const authoredTitle = theme.fonts.titleFontSize ?? 32;
   const authoredButton = theme.fonts.buttonFontSize ?? 16;
 
-  // Fluid term: authored size at DESIGN_WIDTH, ±0.012px per px of viewport
-  // delta. clamp() bounds it by the (media-query-driven) floor var + ceiling.
-  const bodyFluid = `calc(${authoredBody}px + (100vw - ${DESIGN_WIDTH}px) * 0.012)`;
-  const buttonFluid = `calc(${authoredButton}px + (100vw - ${DESIGN_WIDTH}px) * 0.008)`;
+  // Fluid term: authored size at DESIGN_WIDTH, growing on wider viewports.
+  // The downward side is clamped to 0 via max() so a NARROW window never
+  // shrinks the font below the authored size — narrowing should rewrap the
+  // text at a readable size, not shrink it. (Aggressive downward scaling was
+  // the "AI Info Text too small / unbounded" bug.) clamp()'s floor var is
+  // the comfortable narrative minimum; the ceiling caps the giant case.
+  const grow = (k: number) => `max(0px, (100vw - ${DESIGN_WIDTH}px)) * ${k}`;
+  const bodyFluid = `calc(${authoredBody}px + ${grow(0.012)})`;
+  const titleFluid = `calc(${authoredTitle}px + ${grow(0.016)})`;
+  const buttonFluid = `calc(${authoredButton}px + ${grow(0.008)})`;
 
+  const titleText: string = titleSlot?.source ? (content[titleSlot.source] ?? '') : '';
   const bodyText: string = bodySlot?.source ? (content[bodySlot.source] ?? '') : '';
 
+  // Two action shapes: a single "continue" button (aiInfoText / onlineContent
+  // — the beat ignores the returned value, any click advances), or the
+  // restart/credits pair (endScreen / aiSummary — value is interpreted by
+  // EndScreenBeat's substring contract).
+  const actionButtons = actionSlot?.buttons ?? [];
+  const isContinueAction = actionButtons.includes('continueButton');
+  const continueText = content.buttonText || 'Continue';
   const showRestart = content.showRestart !== false;
   const showCredits = content.showCredits === true;
   const restartText = content.restartText || 'Play Again';
@@ -111,13 +130,17 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
   const handleRestart = () => onAction('restart');
   const handleCredits = () => onAction('credits');
+  const handleContinue = () => onAction('continue');
 
   return (
     <div className={`${scope} slotflow-root`} style={rootStyle}>
       <style>{`
-        .${scope} { --slotflow-body-floor: 16px; --slotflow-btn-floor: 16px; }
+        /* Comfortable NARRATIVE minimum — not the 16px absolute-legibility
+           floor. Long-form story prose below ~18px reads as cramped/lost
+           even though it's technically legible. */
+        .${scope} { --slotflow-body-floor: 18px; --slotflow-btn-floor: 16px; }
         @media (pointer: coarse) {
-          .${scope} { --slotflow-body-floor: 19px; --slotflow-btn-floor: 18px; }
+          .${scope} { --slotflow-body-floor: 20px; --slotflow-btn-floor: 18px; }
         }
         .${scope} .slotflow-scroll::-webkit-scrollbar { width: 8px; }
         .${scope} .slotflow-scroll::-webkit-scrollbar-thumb {
@@ -152,6 +175,20 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             justifyContent: 'center',
           }}
         >
+          {titleSlot && titleText && (
+            <div
+              style={{
+                fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
+                fontWeight: 700,
+                lineHeight: 1.25,
+                textAlign: 'center',
+                marginBottom: 'clamp(16px, 3vh, 32px)',
+                fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
+              }}
+            >
+              {titleText}
+            </div>
+          )}
           <div
             style={{
               whiteSpace: 'pre-wrap',
@@ -165,8 +202,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         </div>
       </div>
 
-      {/* Action slot — pinned, always visible, overlap-proof */}
-      {actionSlot && (showRestart || showCredits) && (
+      {/* Action slot — pinned, always visible, overlap-proof.
+          Single continue (aiInfoText/onlineContent) vs restart/credits
+          (endScreen/aiSummary). */}
+      {actionSlot && (
         <div
           style={{
             flexShrink: 0,
@@ -176,23 +215,35 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             padding: 'clamp(16px, 3vh, 28px) 16px',
           }}
         >
-          {showCredits && (
+          {isContinueAction ? (
             <button
               className="slotflow-btn"
-              onClick={handleCredits}
+              onClick={handleContinue}
               style={buttonStyle(theme, buttonFluid)}
             >
-              {creditsText}
+              {continueText}
             </button>
-          )}
-          {showRestart && (
-            <button
-              className="slotflow-btn"
-              onClick={handleRestart}
-              style={buttonStyle(theme, buttonFluid)}
-            >
-              {restartText}
-            </button>
+          ) : (
+            <>
+              {showCredits && (
+                <button
+                  className="slotflow-btn"
+                  onClick={handleCredits}
+                  style={buttonStyle(theme, buttonFluid)}
+                >
+                  {creditsText}
+                </button>
+              )}
+              {showRestart && (
+                <button
+                  className="slotflow-btn"
+                  onClick={handleRestart}
+                  style={buttonStyle(theme, buttonFluid)}
+                >
+                  {restartText}
+                </button>
+              )}
+            </>
           )}
         </div>
       )}

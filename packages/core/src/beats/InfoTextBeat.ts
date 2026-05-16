@@ -80,6 +80,13 @@ export class InfoTextBeat extends Beat {
     const processedText = this.processText(selectedText, context);
     const processedButtonText = this.processText(this.buttonText || 'Continue', context);
 
+    // Declare our own beat type so renderText() resolves schema-driven
+    // behavior for THIS beat, not a stale value left by a prior
+    // aiInfoText/onlineContent beat (which would wrongly route a plain
+    // infoText through responsive slot mode). infoText is not slot-mode in
+    // the schema, so this keeps it on the unchanged absolute path.
+    renderer.setState('currentBeatType', 'infoText');
+
     const locations = Array.from(this.locations.values());
     await renderer.renderText(processedText, processedButtonText, locations);
     return this.getNextBeat(context);

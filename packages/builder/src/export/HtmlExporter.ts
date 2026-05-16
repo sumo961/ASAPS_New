@@ -1065,10 +1065,15 @@ async function getPlayerScript(): Promise<string> {
   let scriptTag = '';
   let styleTag = '';
 
-  // Load JavaScript bundle
+  // Load JavaScript bundle.
+  // `cache: 'no-store'` is load-bearing: without it the browser HTTP-caches
+  // /player-web.js, so after a rebuild the export embeds the STALE bundle
+  // even though the dev server serves the fresh one. This caused repeated
+  // "I rebuilt but the export is old" iterations. Always fetch the current
+  // bundle at export time.
   for (const path of jsPaths) {
     try {
-      const response = await fetch(path);
+      const response = await fetch(path, { cache: 'no-store' });
       if (response.ok) {
         const script = await response.text();
         console.log('[HtmlExporter] Loaded player bundle from:', path, 'size:', script.length);
@@ -1083,10 +1088,10 @@ async function getPlayerScript(): Promise<string> {
     }
   }
 
-  // Load CSS bundle
+  // Load CSS bundle (same no-store rationale as the JS bundle above).
   for (const path of cssPaths) {
     try {
-      const response = await fetch(path);
+      const response = await fetch(path, { cache: 'no-store' });
       if (response.ok) {
         const css = await response.text();
         console.log('[HtmlExporter] Loaded player CSS from:', path, 'size:', css.length);

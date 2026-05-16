@@ -118,6 +118,12 @@ export class AIInfoTextBeat extends Beat {
   ): Promise<string | null> {
     const locations = Array.from(this.locations.values());
 
+    // Tag the render path with this beat's type so renderText() can resolve
+    // schema-driven behavior (e.g. responsive slot-mode layout). Without
+    // this, renderText defaults beatType to 'infoText' and aiInfoText never
+    // takes the SlotFlowView path. Mirrors OnlineContentBeat.
+    renderer.setState('currentBeatType', 'aiInfoText');
+
     // Check if AI service is available
     const aiService = renderer.getState('aiService');
     if (!aiService || typeof aiService.generateContent !== 'function') {
