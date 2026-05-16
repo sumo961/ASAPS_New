@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Beat, synthesizeEffectsFromLegacyParams } from '@asaps/core';
+import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds } from '@asaps/core';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
@@ -196,6 +196,9 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Stores source (untranslated) parameter values when in translation mode,
   // so we can show them as dimmed reference below the editable fields.
   const sourceParametersRef = useRef<Record<string, any>>({});
+  // durScreen: once the author manually edits the duration field, stop
+  // auto-recalculating it from the text. Resets per selected beat.
+  const durationManualRef = useRef(false);
 
   // Resize state
   const [internalWidth, setInternalWidth] = useState<number>(() => {
@@ -817,8 +820,10 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   useEffect(() => {
     if (!beat) return;
+      // New beat selected — duration starts in auto-track mode again.
+      durationManualRef.current = false;
       const beatData = beat.toJSON();
-      
+
       const connections = beat.getConnections ? beat.getConnections() : [];
       const uniqueConnections = Array.from(
         new Map(connections.map(c => [`${c.targetId}-${c.label}`, c])).values()
@@ -1161,6 +1166,32 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (translationState.translations.length > 0 && beat) {
       translationActions.syncBeatTranslations(beat.id, updatedBeat);
     }
+  };
+
+  /**
+   * durScreen-aware parameter change. As the author types the text, the
+   * duration auto-recalculates from word count (via the shared
+   * suggestDurationSeconds model) so a timed screen is never accidentally
+   * too short to read. Auto-tracking stops the moment the author manually
+   * edits the duration field (durationManualRef) — an intentional custom
+   * duration is then preserved. Resets to auto-track per selected beat.
+   */
+  const handleDurScreenParameterChange = (param: string, value: any) => {
+    if (param === 'duration') {
+      // A user edit of the duration field takes control away from auto-track.
+      durationManualRef.current = true;
+      handleParameterChange('duration', value);
+      return;
+    }
+    if (param === 'text') {
+      handleParameterChange('text', value);
+      if (!durationManualRef.current) {
+        // Programmatic resync — does NOT flip durationManualRef.
+        handleParameterChange('duration', suggestDurationSeconds(String(value ?? '')));
+      }
+      return;
+    }
+    handleParameterChange(param, value);
   };
 
   // Helper function to rebuild connections from local state and immediately update
@@ -1566,7 +1597,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
                     parameters={localBeat.parameters}
-                    onParameterChange={handleParameterChange}
+                    onParameterChange={beat.type === 'durScreen' ? handleDurScreenParameterChange : handleParameterChange}
                     availableTargets={availableTargets}
                     characters={getAvailableCharacters()}
                     playerCharacterName={playerCharacterName}
