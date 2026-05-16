@@ -26,7 +26,8 @@
  */
 
 import React from 'react';
-import type { SlotIntent } from '@asaps/core';
+import type { SlotIntent, SlotIntentResolution } from '@asaps/core';
+import { slotIntentFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 
@@ -39,12 +40,18 @@ interface SlotFlowViewProps {
   backgroundUrl?: string | null;
   backgroundColor: string;
   /**
-   * Soft author layout preferences (preferredLines / anchors). Optional and
-   * currently inert here — the delivery path lands in this layer; the
-   * renderer consumes preferredLines + anchors in the next layer (Phase 1.5
-   * task 146). Absent → today's pure-flow behavior, unchanged.
+   * Soft author layout preferences. Currently consumed: `preferredLines`
+   * (title). Anchors are carried but their repositioning is applied with
+   * the VE handles in the next layer (authoring-driven). Absent → today's
+   * pure-flow behavior, unchanged.
    */
   slotIntent?: SlotIntent;
+  /**
+   * Reports, per slot, which intents were applied vs overridden at the
+   * resolved viewport (override-visibility). The runtime ignores it; the
+   * Visual Editor consumes it to badge degraded preferences.
+   */
+  onResolve?: (resolutions: SlotIntentResolution[]) => void;
   /** Resolve a button click to the action id the beat expects. */
   onAction: (id: string) => void;
 }
@@ -70,6 +77,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   theme: themeProp,
   backgroundUrl,
   backgroundColor,
+  slotIntent,
+  onResolve,
   onAction,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
@@ -103,6 +112,65 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
   const titleText: string = titleSlot?.source ? (content[titleSlot.source] ?? '') : '';
   const bodyText: string = bodySlot?.source ? (content[bodySlot.source] ?? '') : '';
+
+  // ── preferredLines honoring for the title (soft) ──────────────────────
+  // The author can ask a title to be N lines. We bias toward it with a
+  // measured max-width, then check the ACTUAL rendered line count and
+  // report applied/overridden so the VE can surface degradation. Legibility
+  // and available width always win — this only nudges, never forces text
+  // under the floor or off-stage.
+  const titleSlotName = titleSlot?.name;
+  const titlePreferredLines =
+    titleSlotName != null
+      ? slotIntentFor(slotIntent, titleSlotName)?.preferredLines
+      : undefined;
+  const titleRef = React.useRef<HTMLDivElement | null>(null);
+  const [titleMaxWidth, setTitleMaxWidth] = React.useState<number | undefined>(undefined);
+  const onResolveRef = React.useRef(onResolve);
+  onResolveRef.current = onResolve;
+
+  React.useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el || !titleText) return;
+    if (!titlePreferredLines || titlePreferredLines < 1) {
+      // No preference for this title — clear any prior bias, report nothing.
+      if (titleMaxWidth !== undefined) setTitleMaxWidth(undefined);
+      return;
+    }
+    const cs = window.getComputedStyle(el);
+    const fontPx = parseFloat(cs.fontSize) || 16;
+    const lineHeightPx = fontPx * 1.25; // matches the title lineHeight below
+    const measuredLines = Math.max(1, Math.round(el.offsetHeight / lineHeightPx));
+
+    // First pass (no bias yet): if the title naturally renders on FEWER
+    // lines than wanted, narrow the box to coax it toward the target.
+    if (titleMaxWidth === undefined) {
+      if (measuredLines < titlePreferredLines) {
+        // scrollWidth at the current (wrapped) width underestimates the
+        // single-line width; approximate single-line width from content.
+        const singleLine = el.scrollWidth || el.offsetWidth;
+        // A touch generous so we don't overshoot to preferred+1.
+        const biased = Math.ceil((singleLine / titlePreferredLines) * 1.06);
+        setTitleMaxWidth(biased);
+        return; // re-measure next layout pass with the bias applied
+      }
+    }
+
+    // Report the outcome (applied vs overridden) for override-visibility.
+    const applied = measuredLines === titlePreferredLines;
+    const res: SlotIntentResolution = {
+      slot: titleSlotName!,
+      requested: { preferredLines: titlePreferredLines },
+      applied,
+      overrideReason: applied
+        ? undefined
+        : measuredLines > titlePreferredLines
+          ? `Title needs ${measuredLines} lines at this width to stay legible (wanted ${titlePreferredLines}).`
+          : `Title only fills ${measuredLines} line(s) here (wanted ${titlePreferredLines}); not enough text for the target at this width.`,
+    };
+    onResolveRef.current?.([res]);
+    // Depend on the inputs that change the measurement.
+  }, [titleText, titlePreferredLines, titleMaxWidth, titleSlotName, authoredTitle]);
 
   // Two action shapes: a single "continue" button (aiInfoText / onlineContent
   // — the beat ignores the returned value, any click advances), or the
@@ -185,6 +253,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         >
           {titleSlot && titleText && (
             <div
+              ref={titleRef}
               style={{
                 fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
                 fontWeight: 700,
@@ -192,6 +261,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 textAlign: 'center',
                 marginBottom: 'clamp(16px, 3vh, 32px)',
                 fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
+                // preferredLines bias: a measured max-width that coaxes the
+                // title toward the author's target line count. Stays
+                // centered; never exceeds the readable column.
+                ...(titleMaxWidth
+                  ? { maxWidth: titleMaxWidth, marginLeft: 'auto', marginRight: 'auto' }
+                  : {}),
               }}
             >
               {titleText}
