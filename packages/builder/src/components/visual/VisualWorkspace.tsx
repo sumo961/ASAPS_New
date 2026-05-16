@@ -23,6 +23,7 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
+import { SlotFlowView, isSlotModeBeatType, getSlotSpec } from '@asaps/renderer';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { getTranslationsForBeat } from '../../export/StoryTranslator';
 
@@ -1060,6 +1061,55 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   console.log('[VisualWorkspace] isDialogTreeBeat:', isDialogTreeBeat, 'phases:', flattenedPhases.length);
 
   const isPanoramaBeat = beat?.type === 'panorama';
+
+  // Responsive slot-mode: a slot-declared beat (endScreen / onlineContent /
+  // aiInfoText / aiSummary) that has NO author-baked pixel locations renders
+  // responsively at runtime. Show the FAITHFUL SlotFlowView here instead of
+  // the misleading pixel-positioned editor — and, by branching to a preview
+  // that never calls onElementsChange/syncElementsToBeatLocations, the beat
+  // can't accidentally bake locations[] and silently flip out of slot mode
+  // (the no-bake guard; this is the Phase-1.5 correctness fix).
+  const beatHasAuthorLocations = (beat?.locations?.size ?? 0) > 0;
+  const isSlotPreview =
+    !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations;
+  const slotSpec = isSlotPreview ? getSlotSpec(beat!.type) : null;
+  // Plain (non-memoized) derivation: the switch is trivial, and param edits
+  // from the Inspector mutate the same Beat instance without changing its
+  // identity — a useMemo keyed on `beat` would go stale on text edits.
+  // VisualWorkspace re-renders on beat updates, so recomputing here is both
+  // correct and cheap.
+  const slotPreviewParams =
+    isSlotPreview && beat ? beat.getParameters() : undefined;
+  const slotPreviewContent: Record<string, any> | null =
+    !isSlotPreview || !beat || !slotPreviewParams
+      ? null
+      : beat.type === 'endScreen'
+        ? {
+            message: slotPreviewParams.message ?? '',
+            showRestart: slotPreviewParams.showRestart,
+            showCredits: slotPreviewParams.showCredits,
+            restartText: slotPreviewParams.restartText,
+            creditsText: slotPreviewParams.creditsText,
+          }
+        : beat.type === 'aiSummary'
+          ? {
+              title: slotPreviewParams.title ?? '',
+              summary: slotPreviewParams.summary ?? slotPreviewParams.fallbackText ?? '',
+              showRestart: slotPreviewParams.showRestart,
+              showCredits: slotPreviewParams.showCredits,
+              restartText: slotPreviewParams.restartText,
+              creditsText: slotPreviewParams.creditsText,
+            }
+          : {
+              // onlineContent / aiInfoText — runtime fetches/generates the
+              // body; preview with the authored placeholder.
+              text:
+                slotPreviewParams.text ??
+                slotPreviewParams.displayTemplate ??
+                slotPreviewParams.fallbackText ??
+                '',
+              buttonText: slotPreviewParams.buttonText ?? 'Continue',
+            };
 
   // Memoized panorama projection type for PSV preview (equirectangular or cylindrical)
   const panoramaProjectionType = isPanoramaBeat && beat?.getParameters ? (beat.getParameters().projectionType || 'equirectangular') : 'equirectangular';
@@ -4701,6 +4751,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             handlePreviewPointerUp={handlePreviewPointerUp}
             handlePreviewResizeDown={handlePreviewResizeDown}
           />
+        ) : isSlotPreview && slotSpec && slotPreviewContent ? (
+          /* Responsive slot-mode: faithful read-only SlotFlowView preview.
+             This branch never wires onElementsChange/syncElementsToBeat-
+             Locations, so the beat cannot bake locations[] and silently
+             leave slot mode (the no-bake guard). Draggable intent handles +
+             viewport selector + override badges land in the next
+             increments. */
+          <div className="absolute inset-0">
+            <SlotFlowView
+              beatType={beat!.type}
+              slots={slotSpec}
+              content={slotPreviewContent}
+              theme={renderTheme ?? undefined}
+              backgroundUrl={backgroundUrl || null}
+              backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+              slotIntent={slotPreviewParams?.slotIntent}
+              onAction={() => { /* read-only preview — clicks inert in the editor */ }}
+            />
+            <div className="absolute top-2 left-2 px-2 py-1 rounded bg-black/55 text-white text-[11px] pointer-events-none">
+              Responsive layout (slot mode) — positions managed automatically; edit text &amp; buttons in the Inspector
+            </div>
+          </div>
         ) : (
           /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor

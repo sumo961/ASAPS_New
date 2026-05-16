@@ -43,6 +43,18 @@ export * from './animation/PathInterpolator';
 // Export panorama view component
 export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData, type PanoramaViewerApi } from './components/PanoramaView';
 
+// Responsive slot-mode rendering — exported so the Visual Editor can show
+// a FAITHFUL preview of slot-mode beats (the real component) instead of a
+// misleading pixel-positioned approximation, and reuse the schema-driven
+// slot registry.
+export { SlotFlowView } from './components/SlotFlowView';
+export {
+  isSlotModeBeatType,
+  getSlotSpec,
+  shouldUseSlotMode,
+  type SlotSpec,
+} from './utils/slotLayout';
+
 // Export mobile detection utilities
 export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';
 
