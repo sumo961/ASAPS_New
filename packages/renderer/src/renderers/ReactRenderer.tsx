@@ -9,6 +9,8 @@ import type { InventoryItemData, InventoryFrameConfig } from '../components/Char
 import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
+import { SlotFlowView } from '../components/SlotFlowView';
+import { shouldUseSlotMode, getSlotSpec } from '../utils/slotLayout';
 import { PanoramaView } from '../components/PanoramaView';
 // MapBeatLeaflet replaces the v0.9.48 MapBeatPlaceholder. Same props,
 // real interactive OpenStreetMap tiles + target/player markers + radius
@@ -1859,7 +1861,15 @@ export class ReactRenderer extends BaseRenderer {
     content: Record<string, any>,
     locations: Location[],
     waitForAction: boolean = true,
-    animations?: AnimationPath[]
+    animations?: AnimationPath[],
+    /**
+     * Whether this beat instance has author-persisted pixel locations.
+     * Defaults to `true` so EVERY existing caller and beat type keeps the
+     * unchanged absolute path — slot mode is strictly opt-in per-instance
+     * and only renderEndScreen passes `false` (when there are no baked
+     * locations). This is the zero-regression guard.
+     */
+    authorPositioned: boolean = true
   ): Promise<string> {
     console.log(`[ReactRenderer ${this.instanceId}] Rendering positioned ${beatType} with ${locations.length} elements`);
 
@@ -1882,6 +1892,33 @@ export class ReactRenderer extends BaseRenderer {
         };
       } else {
         resolve('');
+      }
+
+      // ── Responsive slot-mode branch (Phase 1, endScreen test bed) ──
+      // Renders OUTSIDE ScaledStage with clamped-fluid font. Activates ONLY
+      // for slot-declared beat types whose instance has no author-persisted
+      // pixel locations (authorPositioned=false). Every other beat / caller
+      // falls straight through to the unchanged absolute path below.
+      const slotSpec = shouldUseSlotMode(beatType, authorPositioned)
+        ? getSlotSpec(beatType)
+        : null;
+      if (slotSpec) {
+        const slotBg = this.backgroundImageUrl
+          ? 'transparent'
+          : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+        console.log(`[ReactRenderer ${this.instanceId}] Rendering SLOT-MODE ${beatType} (no author locations)`);
+        this.renderComponent(
+          <SlotFlowView
+            beatType={beatType}
+            slots={slotSpec}
+            content={content}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={slotBg}
+            onAction={this.handleAction}
+          />
+        );
+        return;
       }
 
       // Create element data using the shared helper, passing the asset, character, counter, and sprite resolvers
@@ -2475,13 +2512,18 @@ export class ReactRenderer extends BaseRenderer {
     const restartText = this.getState('restartText') || 'Play Again';
     const creditsText = this.getState('creditsText') || 'Credits';
 
-    // Use provided locations or generate default locations from schema
+    // Use provided locations or generate default locations from schema.
+    // `authorPositioned` = the beat had baked pixel locations. When false
+    // (no author layout — e.g. AI-generated or never opened in the Visual
+    // Editor) and the schema marks endScreen as slot-mode, renderPositionedBeat
+    // routes to the responsive SlotFlowView instead of absolute positioning.
     const content = { message, showRestart, showCredits, restartText, creditsText };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreen', content);
+    const authorPositioned = !!(locations && locations.length > 0);
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('endScreen', content);
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
     this.ttsSpeakCallback?.(message, this.currentSpeaker);
-    return this.renderPositionedBeat('endScreen', content, effectiveLocations);
+    return this.renderPositionedBeat('endScreen', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
   async renderAISummary(data: {

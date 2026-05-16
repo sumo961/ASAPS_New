@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.3.0
- * Generated: 2026-05-15T21:33:59.470Z
+ * Schema Version: 2.4.0
+ * Generated: 2026-05-15T23:39:35.099Z
  */
 
 // ============================================

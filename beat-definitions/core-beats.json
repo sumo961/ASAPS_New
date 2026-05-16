@@ -1,6 +1,6 @@
 {
-  "schema": "asaps-beat-definitions-v2.3",
-  "version": "2.3.0",
+  "schema": "asaps-beat-definitions-v2.4",
+  "version": "2.4.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -775,6 +775,12 @@
         "restartButton": "restartText",
         "creditsButton": "creditsText"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-1 responsive-slot test bed. When a beat instance has NO author-persisted locations, the runtime renders it via SlotFlowView (vertical flow, clamped-fluid font outside the stage-fit transform) instead of absolute positioning. Instances with baked locations stay on the absolute path unchanged. See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "message", "role": "body", "source": "message", "grow": true, "scroll": true },
+        { "name": "actions", "role": "action", "buttons": ["restartButton", "creditsButton"] }
+      ],
       "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
       "creditsLocationMapping": {
         "creditsTitle": "creditsPageTitle",

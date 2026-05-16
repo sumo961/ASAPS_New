@@ -905,7 +905,7 @@ const BUTTON_BEAT_TYPES = ['infoText', 'endScreen', 'aiSummary', 'aiInfoText', '
 const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
 
 // Default theme to use if none provided (matches Visual Novel preset style)
-const DEFAULT_THEME: RenderThemeSettings = {
+export const DEFAULT_THEME: RenderThemeSettings = {
   textBox: {
     backgroundColor: '#16213e',  // Dark blue surface
     borderColor: '#4a90d9',      // Blue border
