@@ -4938,7 +4938,15 @@ function getContentForLocation(
   // Try to use locationMapping from beat schema
   // ========================================
   const beatDef = (beatDefinitions as any).beatTypes[beatType];
-  if (beatDef?.locationMapping) {
+  // Defense-in-depth: NEVER schema-map a button location. A button's content
+  // is its choice label (resolved by beat-specific logic / the choices
+  // array), never a schema-mapped param. The substring match below
+  // (nameLower.includes(locationKey)) is otherwise fragile for choice
+  // labels — e.g. a choice "Send a short neutral text: …" substring-matches
+  // a {text:…} locationMapping and renders the narrator instead of the
+  // choice. (Compounds the stale-currentBeatType class; this guard makes
+  // the schema-map robust regardless of beatType correctness.)
+  if (beatDef?.locationMapping && loc.kind !== 'button') {
     // Try to find a mapping for this location
     for (const [locationKey, paramKey] of Object.entries(beatDef.locationMapping)) {
       if (nameLower.includes(locationKey.toLowerCase())) {

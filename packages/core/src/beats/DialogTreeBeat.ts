@@ -331,6 +331,16 @@ export class DialogTreeBeat extends Beat {
   ): Promise<string | null> {
     // Background is now handled centrally in Beat.execute()
 
+    // Declare our own beat type so renderChoices()/getContentForLocation
+    // resolve dialogTree's schema (locationMapping {dialog:text}), not a
+    // stale value left by a prior beat. Without this, a preceding infoText
+    // beat leaves currentBeatType='infoText' (locationMapping {text:text});
+    // getContentForLocation's schema-map then hijacks any CHOICE whose label
+    // contains the word "text" and renders the narrator in its place
+    // (observed: choices like "Send a short neutral text: …" replaced by the
+    // dialog narrative). Same class as the AIInfoTextBeat fix.
+    renderer.setState('currentBeatType', 'dialogTree');
+
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
 
