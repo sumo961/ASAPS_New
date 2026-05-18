@@ -1015,7 +1015,7 @@
         "timeUnit": {
           "type": "string",
           "required": false,
-          "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'months' | 'years'.",
+          "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'.",
           "ui": { "hidden": true }
         }
       },

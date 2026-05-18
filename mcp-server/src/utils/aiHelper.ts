@@ -100,7 +100,7 @@
  * - Set via setVariable with type "fictionalTime": operations "set", "advance", "subtract"
  * - Check via conditionBeat with type "fictionalTime": compare current time against a date/time
  * - Display: Shows automatically in Timer HUD when enabled in global settings
- * - Supports units: minutes, hours, days, months, years
+ * - Supports units: minutes, hours, days, weeks, months, years
  * - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
  * - Per-beat timeDisplayMode: "fictionalTime" (default), "manual" (custom text), "none" (hide HUD)
  *

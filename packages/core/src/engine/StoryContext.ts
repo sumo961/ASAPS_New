@@ -1485,14 +1485,25 @@ export class StoryContext extends EventEmitter {
    * Advance (or subtract with negative amount) the fictional time.
    * Uses JS Date transiently for correct month-length/leap-year arithmetic.
    */
-  advanceFictionalTime(amount: number, unit: 'minutes' | 'hours' | 'days' | 'months' | 'years'): void {
+  advanceFictionalTime(
+    amount: number,
+    unit: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'
+  ): void {
     const ft = this.state.fictionalTime;
     if (!ft) return;
     const d = new Date(ft.year, ft.month - 1, ft.day, ft.hour, ft.minute);
-    switch (unit) {
+    // Tolerate singular ("week") — the only realistic non-canonical form.
+    const u = unit === ('week' as typeof unit) ? 'weeks' : unit;
+    switch (u) {
       case 'minutes': d.setMinutes(d.getMinutes() + amount); break;
       case 'hours':   d.setHours(d.getHours() + amount); break;
       case 'days':    d.setDate(d.getDate() + amount); break;
+      // 'weeks' was missing — AI generation legitimately emits it as a
+      // natural story time-skip unit. Without this case the switch fell
+      // through and time silently never advanced (the "advances once to
+      // Jan 31 then stuck" bug: the first jump used 'days', every
+      // subsequent one used 'weeks' = no-op).
+      case 'weeks':   d.setDate(d.getDate() + amount * 7); break;
       case 'months':  d.setMonth(d.getMonth() + amount); break;
       case 'years':   d.setFullYear(d.getFullYear() + amount); break;
     }

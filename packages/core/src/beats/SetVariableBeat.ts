@@ -82,7 +82,7 @@ export class SetVariableBeat extends Beat {
     try {
       if (this.variableType === 'fictionalTime') {
         // Handle fictional time operations
-        const unit = (this.timeUnit || 'hours') as 'minutes' | 'hours' | 'days' | 'months' | 'years';
+        const unit = (this.timeUnit || 'hours') as 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years';
         if (this.operation === 'set') {
           context.setFictionalTime({
             year: this.timeYear ?? 2024,

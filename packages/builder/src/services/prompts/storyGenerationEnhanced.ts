@@ -520,7 +520,7 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
   - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
   - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)
-  - For "advance"/"subtract": specify value (amount) and timeUnit ("minutes"|"hours"|"days"|"months"|"years")
+  - For "advance"/"subtract": specify value (amount) and timeUnit ("minutes"|"hours"|"days"|"weeks"|"months"|"years")
   - No variableName needed for fictionalTime
   - Examples:
     - Set: { "type": "fictionalTime", "operation": "set", "timeYear": 1929, "timeMonth": 1, "timeDay": 15, "timeHour": 9, "timeMinute": 0 }
@@ -812,7 +812,7 @@ Stories can track in-story date/time progression (separate from real-time timers
 - **Subtract**: Use operation "subtract" for time travel or flashbacks (negative advancement)
 - **Check**: Use conditionBeat with type "fictionalTime" to branch based on date/time
 - **Display**: Fictional time automatically shows in the Timer HUD when enabled in global settings
-- Supports units: minutes, hours, days, months, years
+- Supports units: minutes, hours, days, weeks, months, years
 - Internal representation: { year, month, day, hour, minute } - uses JS Date for arithmetic (handles month lengths, leap years)
 - Display formats: time-12h ("9:00 AM"), time-24h ("21:00"), date ("4 April 1968"), datetime-12h/24h, day-number ("Day 3"), year ("1968")
 

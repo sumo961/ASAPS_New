@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.5.0
- * Generated: 2026-05-16T14:00:25.423Z
+ * Generated: 2026-05-18T01:20:46.416Z
  */
 
 // ============================================
@@ -337,7 +337,7 @@ export interface SetVariableParameters {
   timeHour?: number | undefined;
   /** type='fictionalTime' / operation='set' only. Minute component (0-59). */
   timeMinute?: number | undefined;
-  /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'months' | 'years'. */
+  /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'. */
   timeUnit?: string | undefined;
 }
 
