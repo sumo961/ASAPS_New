@@ -1152,6 +1152,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                         <option value="minutes">Minutes</option>
                         <option value="hours">Hours</option>
                         <option value="days">Days</option>
+                        <option value="weeks">Weeks</option>
                         <option value="months">Months</option>
                         <option value="years">Years</option>
                       </select>
