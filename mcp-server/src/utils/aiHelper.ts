@@ -1056,6 +1056,8 @@ FICTIONAL TIME SYSTEM:
 - Check via conditionBeat: type "fictionalTime" with compareTime
   - { "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } } }
 - Display: Shows in Timer HUD when enabled in global settings
+- CRITICAL — cumulative consistency: running clock = initial "set" + SUM of every "advance" on the played path. Whenever a later beat's prose names a month/season, the accumulated advances reaching it MUST land on/near that month. Do not under-author advances (e.g. don't stop the clock in August while text says December). Sum your advances from the set date and verify the final beats' implied date matches their narration.
+- CRITICAL — displayFormat must match advance granularity: if you only ever advance by days/weeks/months/years (never minutes/hours), the global displayFormat MUST be date-only ('date'/'day-number'/'year') — a datetime/time format would freeze at an arbitrary clock time (e.g. always "9:04 PM"), worse than no time. Only use a time-bearing format if you actually advance minutes/hours.
 - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
 
 CHARACTERS AND SPEAKERS:
