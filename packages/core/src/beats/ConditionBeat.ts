@@ -168,10 +168,15 @@ export class ConditionBeat extends Beat {
       case 'counter':
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val ?? 0;
+        // Optional counter owner. Undefined ⇒ story-global counter
+        // (unchanged); a Character ref scopes the read to that character's
+        // per-character counter store.
+        if (this.character) condition.character = this.character;
         break;
       case 'counterCompare':
         condition.counter1 = this.counter1;
         condition.counter2 = this.counter2;
+        if (this.character) condition.character = this.character;
         break;
       case 'timer':
         condition.timer = this.timer;
@@ -665,9 +670,12 @@ export class ConditionBeat extends Beat {
         reason = `${this.character}.trait.${this.traitName} (${v.toFixed(2)}) ${this.operator} ${compareValue} = ${conditionResult}`;
       } else {
         const currentValue = this.conditionType === 'counter'
-          ? context.getCounter(varName || '')
+          ? (this.character
+              ? context.getCharacterCounter(this.character, varName || '')
+              : context.getCounter(varName || ''))
           : context.getVariable(varName || '');
-        reason = `${varName} (${JSON.stringify(currentValue)}) ${this.operator} ${JSON.stringify(compareValue)} = ${conditionResult}`;
+        const ownerTag = this.conditionType === 'counter' && this.character ? `@${this.character}` : '';
+        reason = `${varName}${ownerTag} (${JSON.stringify(currentValue)}) ${this.operator} ${JSON.stringify(compareValue)} = ${conditionResult}`;
       }
 
       console.log(`ConditionBeat ${this.id}: ${reason}`);

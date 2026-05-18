@@ -443,7 +443,10 @@ export class StoryContext extends EventEmitter {
     }
     // Seed authored initial affect (mood + sentiments) into the runtime
     // state. No-op when no story or no characters declare initial affect.
-    if (story) this.seedCharacterAffectFromStory();
+    if (story) {
+      this.seedCharacterAffectFromStory();
+      this.seedCharacterCountersFromStory();
+    }
 
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
@@ -1574,8 +1577,16 @@ export class StoryContext extends EventEmitter {
         return false;
       }
 
-      const counter1Value = this.state.counters[condition.counter1] || 0;
-      const counter2Value = this.state.counters[condition.counter2] || 0;
+      // When `character` is set, both operands are read from that
+      // character's per-character counter store; omitted ⇒ story-global
+      // (unchanged).
+      const ccOwner = (condition as any).character as string | undefined;
+      const counter1Value = ccOwner
+        ? this.getCharacterCounter(ccOwner, condition.counter1)
+        : this.state.counters[condition.counter1] || 0;
+      const counter2Value = ccOwner
+        ? this.getCharacterCounter(ccOwner, condition.counter2)
+        : this.state.counters[condition.counter2] || 0;
 
       switch (condition.operator) {
         case '==': return counter1Value === counter2Value;
@@ -1930,16 +1941,23 @@ export class StoryContext extends EventEmitter {
 
     // Resolve left value based on condition type
     switch (condition.type) {
-      case 'counter':
-        leftValue = this.state.counters[varName] || 0;
+      case 'counter': {
+        // When `character` is set, read the character-scoped counter store
+        // (mirrors setVariable's owner model); omitted ⇒ story-global,
+        // unchanged.
+        const ctrOwner = (condition as any).character as string | undefined;
+        leftValue = ctrOwner
+          ? this.getCharacterCounter(ctrOwner, varName)
+          : this.state.counters[varName] || 0;
         // Ensure rightValue is numeric for counter comparisons (guards against undefined/NaN)
         if (rightValue === undefined || rightValue === null || Number.isNaN(Number(rightValue))) {
           rightValue = 0;
         } else {
           rightValue = Number(rightValue);
         }
-        console.log(`[StoryContext] Counter check: "${varName}" = ${leftValue}, comparing ${condition.operator} ${rightValue}, all counters:`, JSON.stringify(this.state.counters));
+        console.log(`[StoryContext] Counter check: "${varName}"${ctrOwner ? ` @${ctrOwner}` : ''} = ${leftValue}, comparing ${condition.operator} ${rightValue}`);
         break;
+      }
       case 'variable':
         leftValue = this.state.variables[varName];
         break;
@@ -2273,6 +2291,7 @@ export class StoryContext extends EventEmitter {
     // Re-seed authored initial affect after the wipe so a story restart
     // begins from the same emotional starting point each time.
     this.seedCharacterAffectFromStory();
+    this.seedCharacterCountersFromStory();
     this.emit('reset');
 
     // Emit change events so UI listeners (countdown meter, debug panel) update
@@ -2338,6 +2357,7 @@ export class StoryContext extends EventEmitter {
   setStory(story: Story): void {
     this.story = story;
     this.seedCharacterAffectFromStory();
+    this.seedCharacterCountersFromStory();
   }
 
   /**
@@ -2365,6 +2385,54 @@ export class StoryContext extends EventEmitter {
         this.state.activeCharacterVariants[char.id] = char.defaultVariantId;
       }
       this.seedCharacterAffectFor(char.id);
+    }
+  }
+
+  /**
+   * Seed each character's authored counters (Character.counters[]) into the
+   * runtime per-character store. Without this, an author defining
+   * "Wolf.health = 100" in the character editor never reaches
+   * `characterCounters` at runtime — reads return the 0 default and the
+   * meter never moves while a `setVariable type:counter` beat that targets
+   * the same character mutates a value the editor can't see. This connects
+   * the two halves of the per-character counter system.
+   *
+   * Only fills slots that are currently empty, mirroring affect seeding:
+   * a value already present (loaded from a saved game, or mutated by a beat
+   * that ran before this call) is never overwritten. Idempotent; called
+   * from the constructor, reset, and setStory.
+   */
+  seedCharacterCountersFromStory(): void {
+    const story = this.story;
+    if (!story) return;
+    const characters = (story as any).getCharacters?.() as
+      Array<{ id: string }> | undefined;
+    if (!characters) return;
+    for (const char of characters) {
+      if (!char?.id) continue;
+      const key = this.resolveCharRef(char.id);
+      if (!key) continue;
+      // Merged record so an active variant's counter overrides win, matching
+      // how affect seeding reads the merged character.
+      const merged = this.getMergedCharacter(key) as
+        | { counters?: Array<{ name?: string; value?: number }> }
+        | undefined;
+      const defs = merged?.counters;
+      if (!Array.isArray(defs) || defs.length === 0) continue;
+      for (const def of defs) {
+        const name = def?.name;
+        if (!name) continue;
+        if (!this.state.characterCounters[key]) this.state.characterCounters[key] = {};
+        if (this.state.characterCounters[key][name] !== undefined) continue;
+        const value = typeof def.value === 'number' ? def.value : 0;
+        this.state.characterCounters[key][name] = value;
+        this.emit('characterCounterChanged', {
+          characterRef: key,
+          name,
+          value,
+          previous: 0,
+        });
+      }
     }
   }
 

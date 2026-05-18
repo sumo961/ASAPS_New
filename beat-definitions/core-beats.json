@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -1016,6 +1016,12 @@
           "type": "string",
           "required": false,
           "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'.",
+          "ui": { "hidden": true }
+        },
+        "character": {
+          "type": "string",
+          "required": false,
+          "description": "type='counter' only. Counter owner. OMIT for a story-global counter (default, unchanged behavior — use for world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (use for per-character stats like health, trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'.",
           "ui": { "hidden": true }
         }
       },

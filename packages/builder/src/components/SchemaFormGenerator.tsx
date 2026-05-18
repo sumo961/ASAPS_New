@@ -1192,6 +1192,33 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Owner
+                  </label>
+                  <select
+                    value={parameters.character || ''}
+                    onChange={(e) => onParameterChange('character', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value="">Story-global (no character)</option>
+                    {(characters || [])
+                      .map((c: any) =>
+                        typeof c === 'string'
+                          ? { id: c, label: c }
+                          : { id: c?.id, label: c?.displayName || c?.name || c?.id }
+                      )
+                      .filter((c: any) => c.id)
+                      .map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Story-global for world/plot tallies; pick a character to scope this counter to that character (e.g. per-character health). Two characters can safely share a counter name when scoped.
+                  </p>
+                </div>
               </React.Fragment>
             );
           } else {

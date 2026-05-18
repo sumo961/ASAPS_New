@@ -653,6 +653,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           Add Counter
         </button>
       </div>
+      <p className="text-xs text-gray-500 -mt-2">
+        These counters are scoped to <strong>{editedCharacter.displayName || editedCharacter.name}</strong>. The
+        initial value here seeds the counter at story start. To change it during play, use a
+        <code className="mx-1">setVariable</code> beat (type = Counter) with <strong>Owner</strong> set to this character —
+        another character can safely use the same counter name.
+      </p>
 
       <div className="space-y-2">
         {editedCharacter.counters.map((counter, index) => (

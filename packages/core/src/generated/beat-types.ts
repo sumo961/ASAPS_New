@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.5.0
- * Generated: 2026-05-18T12:24:56.233Z
+ * Schema Version: 2.6.0
+ * Generated: 2026-05-18T19:25:14.321Z
  */
 
 // ============================================
@@ -339,6 +339,8 @@ export interface SetVariableParameters {
   timeMinute?: number | undefined;
   /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'. */
   timeUnit?: string | undefined;
+  /** type='counter' only. Counter owner. OMIT for a story-global counter (default, unchanged behavior — use for world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (use for per-character stats like health, trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'. */
+  character?: string | undefined;
 }
 
 /**

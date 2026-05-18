@@ -517,6 +517,13 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
   - Increment by 1: { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
   - Decrement by 5: { "type": "counter", "name": "sanity", "value": 5, "operation": "subtract" }
   - Set to specific: { "type": "counter", "name": "score", "value": 100, "operation": "set" }
+- COUNTER SCOPE — global vs per-character (type="counter" only):
+  - OMIT the "character" field for a story/world tally that belongs to the whole story (e.g. cluesFound, timesLied, daysElapsed). This is the default and what you want most of the time.
+  - SET "character" to a character's id ONLY when the counter is that one character's private stat (e.g. health, trust, suspicion). Two characters can then safely each have a "health" counter without colliding.
+  - The same name must be read with the same scope: a conditionBeat checking a per-character counter MUST also set "character" to that same character; a global counter must omit it. Mismatched scope reads the wrong (usually 0) value.
+  - A per-character counter's STARTING value should be defined on that character (in the character editor); the setVariable beat then changes it during play. Do not also re-initialize it with a separate global counter.
+  - Example (per-character): { "type": "counter", "name": "trust", "value": 2, "operation": "add", "character": "char_mother" }
+  - Example (global, unchanged): { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
   - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
   - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)

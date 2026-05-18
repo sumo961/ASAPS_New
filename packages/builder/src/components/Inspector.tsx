@@ -1765,9 +1765,25 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
+                          <select
+                            value={localBeat.parameters?.character || ''}
+                            onChange={(e) => handleParameterChange('character', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">Story-global (no character)</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Must match the owner the counter is written with (a character-scoped <code>setVariable</code> with the same Owner). Story-global reads the world counter.
+                          </p>
+                        </div>
                       </>
                     )}
-                    
+
                     {/* Counter Compare Condition */}
                     {localBeat.parameters?.conditionType === 'counterCompare' && (
                       <>
@@ -1823,6 +1839,22 @@ export const Inspector: React.FC<InspectorProps> = ({
                             noSelectionLabel="Select counter..."
                             className="w-full"
                           />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
+                          <select
+                            value={localBeat.parameters?.character || ''}
+                            onChange={(e) => handleParameterChange('character', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="">Story-global (no character)</option>
+                            {(characters || []).map((c) => (
+                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Both counters are read from this owner. Story-global reads the world counters.
+                          </p>
                         </div>
                       </>
                     )}

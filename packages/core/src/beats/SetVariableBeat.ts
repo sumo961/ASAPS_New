@@ -9,6 +9,10 @@ export class SetVariableBeat extends Beat {
   private variableName: string;
   private value: any;
   private operation: string;
+  // Optional counter owner. Omitted/empty ⇒ story-global counter (unchanged
+  // behavior). A Character id/name scopes the counter to that character's
+  // per-character store. Only meaningful when type='counter'.
+  private character?: string;
   // Fictional time properties
   private timeUnit: string;
   private timeYear: number;
@@ -31,6 +35,10 @@ export class SetVariableBeat extends Beat {
     this.variableName = config.parameters?.name || config.parameters?.variableName || config.variable || config.parameters?.variable || '';
     this.value = config.parameters?.value ?? config.value ?? '';
     this.operation = config.parameters?.operation || config.operation || 'set';
+    const charRaw =
+      (config.parameters as any)?.character ?? (config as any).character;
+    const charTrimmed = typeof charRaw === 'string' ? charRaw.trim() : '';
+    this.character = charTrimmed ? charTrimmed : undefined;
     // Fictional time properties
     this.timeUnit = config.parameters?.timeUnit || 'hours';
     this.timeYear = config.parameters?.timeYear ?? 2024;
@@ -46,6 +54,7 @@ export class SetVariableBeat extends Beat {
       name: this.variableName,
       value: this.value,
       operation: this.operation,
+      character: this.character,
       timeUnit: this.timeUnit,
       timeYear: this.timeYear,
       timeMonth: this.timeMonth,
@@ -62,6 +71,10 @@ export class SetVariableBeat extends Beat {
     if (params.variableName !== undefined) this.variableName = params.variableName; // AI variation
     if (params.value !== undefined) this.value = params.value;
     if (params.operation !== undefined) this.operation = params.operation;
+    if (params.character !== undefined) {
+      const t = typeof params.character === 'string' ? params.character.trim() : '';
+      this.character = t ? t : undefined;
+    }
     if (params.timeUnit !== undefined) this.timeUnit = params.timeUnit;
     if (params.timeYear !== undefined) this.timeYear = params.timeYear;
     if (params.timeMonth !== undefined) this.timeMonth = params.timeMonth;
@@ -100,8 +113,14 @@ export class SetVariableBeat extends Beat {
           console.log(`SetVariableBeat ${this.id}: FictionalTime subtract ${this.value} ${unit}`);
         }
       } else if (this.variableType === 'counter') {
-        // Handle counter operations
-        const currentValue = context.getCounter(this.variableName) || 0;
+        // Handle counter operations. When `character` is set, the counter is
+        // scoped to that character's per-character store (mirrors the
+        // inventory owner model); omitted ⇒ the story-global counter, exactly
+        // as before. Same arithmetic either way — only the store differs.
+        const scoped = !!this.character;
+        const currentValue = scoped
+          ? context.getCharacterCounter(this.character!, this.variableName)
+          : context.getCounter(this.variableName) || 0;
         const numValue = Number(this.value) || 0;
         let newValue: number;
 
@@ -130,8 +149,12 @@ export class SetVariableBeat extends Beat {
             break;
         }
 
-        context.setCounter(this.variableName, newValue);
-        console.log(`SetVariableBeat ${this.id}: Counter '${this.variableName}' ${this.operation} → ${newValue} (was ${currentValue})`);
+        if (scoped) {
+          context.setCharacterCounter(this.character!, this.variableName, newValue);
+        } else {
+          context.setCounter(this.variableName, newValue);
+        }
+        console.log(`SetVariableBeat ${this.id}: Counter '${this.variableName}'${scoped ? ` @${this.character}` : ''} ${this.operation} → ${newValue} (was ${currentValue})`);
       } else {
         // Handle variable (always set operation)
         context.setVariable(this.variableName, this.value);
