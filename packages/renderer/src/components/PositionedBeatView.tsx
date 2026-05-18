@@ -741,13 +741,16 @@ export function adjustElementsForCollisions(
   const preserveButtonLayout = beatType === 'endScreen' || beatType === 'endScreenCredits' || beatType === 'aiSummary';
 
   if (preserveButtonLayout) {
+    const lowestTextBottom = textBoxBounds.length > 0
+      ? Math.max(...textBoxBounds.map(b => b.bottom))
+      : 0;
+
     // Only push buttons down if they overlap text boxes, keep X and relative Y intact
-    const adjustedButtonElements = buttonElements.map(el => {
+    let adjustedButtonElements = buttonElements.map(el => {
       let newY = el.location.y;
       const buttonTop = el.location.y;
       const overlapsText = textBoxBounds.some(tb => buttonTop < tb.bottom + 10);
-      if (overlapsText) {
-        const lowestTextBottom = Math.max(...textBoxBounds.map(b => b.bottom));
+      if (overlapsText && lowestTextBottom > 0) {
         newY = Math.max(el.location.y, lowestTextBottom + 35);
       }
       if (newY !== el.location.y) {
@@ -755,6 +758,77 @@ export function adjustElementsForCollisions(
       }
       return el;
     });
+
+    // Repair degenerate baked layouts. Action buttons (restart / credits /
+    // begin-again …) that overlap EACH OTHER are never authorial intent — an
+    // author cannot have meant two mutually-unclickable buttons stacked at the
+    // same coordinate. AI-generated stories sometimes bake every button at the
+    // same default x/y; that defeats both slot mode and side-by-side default
+    // generation (authorPositioned=true keeps the absolute path). Detect mutual
+    // overlap and re-flow into a centered row (or vertical stack if it can't
+    // fit) — the same no-overlap guarantee the slot/default path provides.
+    // Non-overlapping author layouts are detected as clean and left untouched,
+    // so deliberate positioning is still respected.
+    if (adjustedButtonElements.length > 1) {
+      const W = (el: PositionedElementData) => el.location.width || 160;
+      const H = (el: PositionedElementData) => el.location.height || 44;
+      const rect = (el: PositionedElementData) => ({
+        left: el.location.x,
+        top: el.location.y,
+        right: el.location.x + W(el),
+        bottom: el.location.y + H(el),
+      });
+      const overlaps = (a: ReturnType<typeof rect>, b: ReturnType<typeof rect>) =>
+        !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+
+      let degenerate = false;
+      for (let i = 0; i < adjustedButtonElements.length && !degenerate; i++) {
+        for (let j = i + 1; j < adjustedButtonElements.length; j++) {
+          if (overlaps(rect(adjustedButtonElements[i]), rect(adjustedButtonElements[j]))) {
+            degenerate = true;
+            break;
+          }
+        }
+      }
+
+      if (degenerate) {
+        const gap = 24;
+        const widths = adjustedButtonElements.map(W);
+        const totalRowW = widths.reduce((s, w) => s + w, 0) + gap * (adjustedButtonElements.length - 1);
+        const fitsRow = totalRowW <= stageWidth - 40;
+        const baseY = Math.max(stageHeight - 100, lowestTextBottom + 35);
+
+        if (fitsRow) {
+          let cx = (stageWidth - totalRowW) / 2;
+          adjustedButtonElements = adjustedButtonElements.map((el, idx) => {
+            const placed = {
+              ...el,
+              location: { ...el.location, x: Math.round(cx), y: Math.round(baseY) },
+            };
+            cx += widths[idx] + gap;
+            return placed;
+          });
+        } else {
+          let y = baseY;
+          adjustedButtonElements = adjustedButtonElements.map((el, idx) => {
+            const placed = {
+              ...el,
+              location: {
+                ...el.location,
+                x: Math.round((stageWidth - widths[idx]) / 2),
+                y: Math.round(y),
+              },
+            };
+            y += H(el) + gap;
+            return placed;
+          });
+        }
+        console.log(
+          `[CollisionDetect] ${beatType}: ${adjustedButtonElements.length} action buttons overlapped each other (degenerate baked layout) → re-flowed ${fitsRow ? 'side-by-side' : 'stacked'}`
+        );
+      }
+    }
+
     return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
   }
 
