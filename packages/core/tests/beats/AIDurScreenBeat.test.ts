@@ -68,8 +68,10 @@ describe('AIDurScreenBeat', () => {
       expect(params.includeHistory).toBe(false);
       expect(params.maxSentences).toBe(2);
       expect(params.wordsPerMinute).toBe(200);
-      expect(params.minDuration).toBe(2000);
-      expect(params.maxDuration).toBe(15000);
+      // Canonical SECONDS (f4521177): defaults 3s / 45s; legacy ms inputs
+      // (> 60) are migrated by ÷1000.
+      expect(params.minDuration).toBe(3);
+      expect(params.maxDuration).toBe(45);
     });
 
     it('should create with custom parameters', () => {
@@ -99,8 +101,8 @@ describe('AIDurScreenBeat', () => {
       expect(params.includeHistory).toBe(true);
       expect(params.maxSentences).toBe(4);
       expect(params.wordsPerMinute).toBe(150);
-      expect(params.minDuration).toBe(3000);
-      expect(params.maxDuration).toBe(20000);
+      expect(params.minDuration).toBe(3); // 3000ms → 3s
+      expect(params.maxDuration).toBe(20); // 20000ms → 20s
       expect(params.contextVariables).toEqual(['location']);
     });
 
@@ -153,8 +155,8 @@ describe('AIDurScreenBeat', () => {
         includeCounters: true,
         maxSentences: 3,
         wordsPerMinute: 180,
-        minDuration: 1500,
-        maxDuration: 10000,
+        minDuration: 1.5, // 1500ms → 1.5s
+        maxDuration: 10, // 10000ms → 10s
       });
     });
   });
@@ -170,11 +172,11 @@ describe('AIDurScreenBeat', () => {
       beat.updateParameters({ wordsPerMinute: 300 });
       expect(beat.getParameters().wordsPerMinute).toBe(300);
 
-      beat.updateParameters({ minDuration: 5000 });
-      expect(beat.getParameters().minDuration).toBe(5000);
+      beat.updateParameters({ minDuration: 5000 }); // → 5s
+      expect(beat.getParameters().minDuration).toBe(5);
 
-      beat.updateParameters({ maxDuration: 25000 });
-      expect(beat.getParameters().maxDuration).toBe(25000);
+      beat.updateParameters({ maxDuration: 25000 }); // → 25s
+      expect(beat.getParameters().maxDuration).toBe(25);
     });
 
     it('should update AI-related parameters', () => {
@@ -315,20 +317,23 @@ describe('AIDurScreenBeat', () => {
         name: 'AI Duration',
         type: 'aiDurScreen',
         parameters: {
-          // 10 words at 200 WPM = 3000ms
+          // 10 words at 200 WPM = 3s (canonical SECONDS)
           fallbackText: 'One two three four five six seven eight nine ten.',
           wordsPerMinute: 200,
-          minDuration: 1000,
-          maxDuration: 30000,
+          minDuration: 1000, // → 1s
+          maxDuration: 30000, // → 30s
         },
       });
 
       await beat.execute(context, renderer);
 
-      // 10 words / 200 WPM * 60 * 1000 = 3000ms
+      // Seconds refactor (f4521177): suggestDurationSeconds applies a 1.5×
+      // safety margin + ceil so timed text isn't cut off, then clamps to
+      // [min,max]s. 10 words / 200 WPM = 3s → ×1.5 → ceil = 5s. renderDurScreen
+      // contract is still ms (durationSecondsToMs) → 5000.
       expect(renderer.renderDurScreen).toHaveBeenCalledWith(
         expect.any(String),
-        3000,
+        5000,
         expect.any(Array)
       );
     });
@@ -391,20 +396,20 @@ describe('AIDurScreenBeat', () => {
         name: 'AI Duration',
         type: 'aiDurScreen',
         parameters: {
-          // 20 words at 100 WPM = 12000ms
+          // 20 words at 100 WPM = 12s (canonical SECONDS)
           fallbackText: 'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty.',
           wordsPerMinute: 100,
-          minDuration: 1000,
-          maxDuration: 30000,
+          minDuration: 1000, // → 1s
+          maxDuration: 30000, // → 30s
         },
       });
 
       await beat.execute(context, renderer);
 
-      // 20 words / 100 WPM * 60 * 1000 = 12000ms
+      // 20 words / 100 WPM = 12s → ×1.5 safety → ceil = 18s → 18000ms.
       expect(renderer.renderDurScreen).toHaveBeenCalledWith(
         expect.any(String),
-        12000,
+        18000,
         expect.any(Array)
       );
     });

@@ -47,9 +47,11 @@ describe('DurScreenBeat', () => {
         type: 'durScreen',
       });
 
+      // durScreen duration is canonical SECONDS (f4521177). Legacy ms inputs
+      // (> 60) are heuristically migrated by ÷1000 on construction.
       const params = beat.getParameters();
       expect(params.text).toBe('');
-      expect(params.duration).toBe(3000);
+      expect(params.duration).toBe(3);
     });
 
     it('should create with custom text and duration', () => {
@@ -58,11 +60,11 @@ describe('DurScreenBeat', () => {
         name: 'Timed Text',
         type: 'durScreen',
         text: 'Three days later...',
-        duration: 5000,
+        duration: 5000, // legacy ms → migrated to 5s
       });
 
       expect(beat.text).toBe('Three days later...');
-      expect(beat.duration).toBe(5000);
+      expect(beat.duration).toBe(5);
     });
 
     it('should support parameters object format', () => {
@@ -72,12 +74,12 @@ describe('DurScreenBeat', () => {
         type: 'durScreen',
         parameters: {
           text: 'Meanwhile...',
-          duration: 2000,
+          duration: 2000, // legacy ms → migrated to 2s
         },
       });
 
       expect(beat.text).toBe('Meanwhile...');
-      expect(beat.duration).toBe(2000);
+      expect(beat.duration).toBe(2);
     });
 
     it('should initialize with text variations', () => {
@@ -115,13 +117,13 @@ describe('DurScreenBeat', () => {
         name: 'Timed Text',
         type: 'durScreen',
         text: 'The sun sets...',
-        duration: 4000,
+        duration: 4000, // legacy ms → migrated to 4s
         node: 'sunset_bg',
       });
 
       const params = beat.getParameters();
       expect(params.text).toBe('The sun sets...');
-      expect(params.duration).toBe(4000);
+      expect(params.duration).toBe(4);
       expect(params.node).toBe('sunset_bg');
     });
 
@@ -170,8 +172,8 @@ describe('DurScreenBeat', () => {
         type: 'durScreen',
       });
 
-      beat.updateParameters({ duration: 7000 });
-      expect(beat.duration).toBe(7000);
+      beat.updateParameters({ duration: 7000 }); // legacy ms → migrated to 7s
+      expect(beat.duration).toBe(7);
     });
 
     it('should update textVariations', () => {
