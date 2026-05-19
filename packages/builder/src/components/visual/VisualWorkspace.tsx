@@ -4809,6 +4809,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
             {activeTab === 'animations' && (
               <AnimationPanel
+                layoutMode={
+                  beat && !beatHasAuthorLocations
+                    ? isSpatialModeBeatType(beat.type)
+                      ? 'spatial'
+                      : isSlotModeBeatType(beat.type)
+                        ? 'slot'
+                        : 'absolute'
+                    : 'absolute'
+                }
                 animations={animations}
                 elements={visualElements}
                 stageWidth={projectSettings?.width || 1024}

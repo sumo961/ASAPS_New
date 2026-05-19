@@ -34,6 +34,18 @@ interface AnimationPanelProps {
 
   /** Callback when animations are updated */
   onAnimationsChange: (animations: AnimationPath[]) => void;
+
+  /**
+   * Layout mode of the current beat instance — drives the panel's mode-
+   * awareness. 'absolute' (default) keeps today's path-keyframe editor
+   * (AnimationPath operates on element x/y). 'slot' / 'spatial' replace it
+   * with a "responsive animation model lands here" explainer — the
+   * keyframes-over-baked-x/y model is meaningless in those modes since
+   * there are no authored x/y at runtime; the responsive analog (per-slot
+   * enter/exit/emphasis, spatial pan/zoom, hotspot reveal) is specced in
+   * project_responsive_layout_system memory (P3-anim) and arrives later.
+   */
+  layoutMode?: 'absolute' | 'slot' | 'spatial';
 }
 
 export const AnimationPanel: React.FC<AnimationPanelProps> = ({
@@ -44,6 +56,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   backgroundUrl,
   characters = [],
   onAnimationsChange,
+  layoutMode = 'absolute',
 }) => {
   const [editingAnimation, setEditingAnimation] = useState<AnimationPath | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -93,6 +106,42 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     const element = elements.find(el => el.id === elementId || el.name === elementId);
     return element ? `${element.type} (${element.name || element.text || element.id.slice(0, 8)})` : elementId;
   };
+
+  // Path-keyframe animations operate on absolute x/y — meaningless in slot/
+  // spatial (no authored x/y at runtime; layout is engine-resolved). The
+  // responsive analog (per-slot enter/exit/emphasis, spatial pan/zoom,
+  // hotspot reveal) is specced in project_responsive_layout_system memory
+  // (P3-anim) and arrives later. Until then this panel cleanly opts out
+  // for slot/spatial beats with an explainer — mirroring the Inspector
+  // mode-awareness cleanup (commit da112f8e).
+  if (layoutMode !== 'absolute') {
+    return (
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">Animations</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 p-4 text-sm text-gray-700">
+            <div className="font-medium text-gray-800 mb-2">
+              Path animations don't apply in {layoutMode} mode
+            </div>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              This beat's layout is managed responsively, so there are no
+              authored pixel coordinates to keyframe a path over. The
+              responsive animation model — per-slot
+              <span className="font-medium"> enter / exit / emphasis</span>
+              {layoutMode === 'spatial' ? ', spatial pan/zoom and hotspot reveal' : ''} —
+              is designed and lands as its own increment.
+            </p>
+            <p className="text-xs text-gray-500 mt-3 italic">
+              Element selection and intrinsic properties (Size, Scale,
+              Rotation) stay editable in the Elements tab.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
