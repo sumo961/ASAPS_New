@@ -524,6 +524,7 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
   - A per-character counter's STARTING value should be defined on that character (in the character editor); the setVariable beat then changes it during play. Do not also re-initialize it with a separate global counter.
   - Example (per-character): { "type": "counter", "name": "trust", "value": 2, "operation": "add", "character": "char_mother" }
   - Example (global, unchanged): { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
+  - SAME RULE for counter EFFECTS on choices/dialog nodes: an incrementCounter/setCounter effect may carry a "character" to scope to that character's per-character counter; omit it for a global counter. Example: { "type": "incrementCounter", "target": "trust", "value": 1, "character": "char_mother" }. (For these effects "target" is the counter name; the affect effects nudgeMood/fireEmotion/addSentiment instead use "target" as the character.)
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
   - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
   - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)

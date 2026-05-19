@@ -976,6 +976,7 @@ COUNTER OPERATIONS IN DIALOGTREE:
   - "counterValue": numeric value
 - Example choice: { "text": "Be friendly", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 1 }
 - This allows tracking relationships, skills, or any numeric game state
+- PER-CHARACTER COUNTERS: an incrementCounter/setCounter effect may include a "character" field to scope the counter to that character (e.g. per-character health/trust); omit it for a global tally. For these effects "target" is the counter name. A conditionBeat reading it must use the same scope. Example: { "type": "incrementCounter", "target": "trust", "value": 1, "character": "char_mother" }
 
 STATE REQUIREMENTS ("requires" on any beat):
 Any beat can declare state prerequisites via a "requires" field on parameters:

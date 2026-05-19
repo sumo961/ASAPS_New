@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Effect, EmotionDefinition } from '@asaps/core';
 import { SmartNameDropdown, type DropdownOption } from './SmartNameDropdown';
+import { CounterOwnerPicker } from '../components/CounterOwnerPicker';
 import type { AvailableCounter } from '../hooks/useAvailableCountersAndVariables';
 import type { AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import type { AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
@@ -298,6 +299,25 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 title="Character whose affect changes (id, name, or 'player')"
               />
             )
+          ) : effect.type === 'incrementCounter' || effect.type === 'setCounter' ? (
+            // A counter is the (name, owner) pair — pick it atomically so the
+            // selection can't be ambiguous between same-named per-character
+            // counters (e.g. Player.Health vs Merchant.Health).
+            <CounterOwnerPicker
+              compact
+              label="Counter"
+              counters={availableCounters}
+              characters={(availableCharacters || []).map((c) => ({
+                id: c.id,
+                name: c.name,
+                displayName: c.displayName,
+              }))}
+              name={effect.target || ''}
+              character={effect.character || ''}
+              onChange={(n, ch) =>
+                updateEffect(index, { target: n, character: ch || undefined })
+              }
+            />
           ) : (
             <SmartNameDropdown
               value={effect.target || ''}

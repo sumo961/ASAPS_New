@@ -360,6 +360,15 @@ export interface Effect {
     | 'bookmarkAffectState';
   target: string;
   value?: any;
+  /**
+   * Counter owner for `incrementCounter` / `setCounter` effects. Omitted ⇒
+   * the story-global counter (default, unchanged). A Character id/name
+   * scopes the counter to that character's per-character store — mirrors
+   * setVariable.character. NOTE: for counter effects `target` is the
+   * counter NAME (not the character); the affect effects instead use
+   * `target` as the character ref. Ignored for non-counter effect types.
+   */
+  character?: string;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
   // top-level rather than nested under `value` so the existing effect-editor
   // UI can wire them up like any other effect property.

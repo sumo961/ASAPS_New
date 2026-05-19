@@ -177,4 +177,29 @@ describe('Character-scoped counters', () => {
       expect(restored.getCharacterCounter('granny', 'health')).toBe(40);
     });
   });
+
+  describe('EFX — scoped counter effects (applyEffect)', () => {
+    it('incrementCounter with effect.character routes to the character store', () => {
+      const ctx = new StoryContext(undefined, makeStory([wolf, granny]));
+      ctx.applyEffect({ type: 'incrementCounter', target: 'health', value: -10, character: 'wolf' } as any);
+      expect(ctx.getCharacterCounter('wolf', 'health')).toBe(90);
+      expect(ctx.getCharacterCounter('granny', 'health')).toBe(40); // untouched
+      expect(ctx.getCounter('health')).toBe(0); // global untouched
+    });
+
+    it('setCounter with effect.character routes to the character store', () => {
+      const ctx = new StoryContext(undefined, makeStory([wolf]));
+      ctx.applyEffect({ type: 'setCounter', target: 'health', value: 7, character: 'wolf' } as any);
+      expect(ctx.getCharacterCounter('wolf', 'health')).toBe(7);
+      expect(ctx.getCounter('health')).toBe(0);
+    });
+
+    it('omitted owner is the unchanged global path', () => {
+      const ctx = new StoryContext(undefined, makeStory([wolf]));
+      ctx.applyEffect({ type: 'incrementCounter', target: 'score', value: 3 } as any);
+      ctx.applyEffect({ type: 'setCounter', target: 'score', value: 9 } as any);
+      expect(ctx.getCounter('score')).toBe(9);
+      expect(ctx.getCharacterCounter('wolf', 'score')).toBe(0);
+    });
+  });
 });

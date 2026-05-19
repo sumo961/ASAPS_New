@@ -2000,11 +2000,22 @@ export class StoryContext extends EventEmitter {
       case 'removeInventory':
         this.removeFromInventory(effect.target);
         break;
+      // When `effect.character` is set the counter is scoped to that
+      // character's per-character store (mirrors setVariable.character);
+      // omitted ⇒ the story-global counter, unchanged.
       case 'incrementCounter':
-        this.incrementCounter(effect.target, effect.value || 1);
+        if (effect.character) {
+          this.incrementCharacterCounter(effect.character, effect.target, effect.value || 1);
+        } else {
+          this.incrementCounter(effect.target, effect.value || 1);
+        }
         break;
       case 'setCounter':
-        this.setCounter(effect.target, effect.value ?? 0);
+        if (effect.character) {
+          this.setCharacterCounter(effect.character, effect.target, effect.value ?? 0);
+        } else {
+          this.setCounter(effect.target, effect.value ?? 0);
+        }
         break;
       // Step 4 / Phase A: character affect effects. The deltas live on the
       // effect record itself (`valenceDelta` / `arousalDelta` / `strengthDelta`)

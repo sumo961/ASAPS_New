@@ -27,6 +27,11 @@ interface CounterOwnerPickerProps {
   label: string;
   /** Optional helper line under the control. */
   help?: string;
+  /** Inline mode for tight rows (effect editor): no label/helper, compact
+   * select, custom inputs inline. */
+  compact?: boolean;
+  /** Wrapper class (compact callers size it within a flex row). */
+  className?: string;
 }
 
 const CUSTOM = '__custom__';
@@ -48,6 +53,8 @@ export const CounterOwnerPicker: React.FC<CounterOwnerPickerProps> = ({
   lockedCharacter,
   label,
   help,
+  compact = false,
+  className,
 }) => {
   const locked = lockedCharacter !== undefined;
 
@@ -101,52 +108,91 @@ export const CounterOwnerPicker: React.FC<CounterOwnerPickerProps> = ({
     onChange(counterName, owner);
   };
 
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <select
-        value={selectValue}
-        onChange={(e) => handleSelect(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-      >
-        <option value="">Select counter…</option>
-        {pairs.map((c) => (
-          <option key={`${c.characterId}:${c.name}`} value={`pair:${c.characterId}:${c.name}`}>
-            {(c.displayName || c.name)} — {c.characterName || 'Story-global'}
-          </option>
-        ))}
-        <option value={CUSTOM}>+ Type a counter name…</option>
-      </select>
+  const selectCls = compact
+    ? 'px-1.5 py-1 text-xs border rounded'
+    : 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm';
+  const inputCls = selectCls;
 
-      {inCustom && (
-        <div className="mt-2 space-y-2 pl-2 border-l-2 border-gray-200">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => onChange(e.target.value, character)}
-            placeholder="counter name (e.g. health)"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
-          {!locked && (
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Scope</label>
-              <select
-                value={character || ''}
-                onChange={(e) => onChange(name, e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="">Story-global (no character)</option>
-                {characters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.displayName || c.name || c.id}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+  const selectEl = (
+    <select
+      value={selectValue}
+      onChange={(e) => handleSelect(e.target.value)}
+      className={`${selectCls}${compact ? ' flex-1 min-w-[110px]' : ''}`}
+      title={compact && name ? `${name} — ${charLabel(character || '')}` : undefined}
+    >
+      <option value="">Select counter…</option>
+      {pairs.map((c) => (
+        <option key={`${c.characterId}:${c.name}`} value={`pair:${c.characterId}:${c.name}`}>
+          {(c.displayName || c.name)} — {c.characterName || 'Story-global'}
+        </option>
+      ))}
+      <option value={CUSTOM}>+ Type a counter name…</option>
+    </select>
+  );
+
+  const customEl = inCustom && (
+    <div
+      className={
+        compact
+          ? 'flex flex-wrap gap-1 items-center w-full'
+          : 'mt-2 space-y-2 pl-2 border-l-2 border-gray-200'
+      }
+    >
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => onChange(e.target.value, character)}
+        placeholder="counter name"
+        className={`${inputCls}${compact ? ' flex-1 min-w-[90px]' : ''}`}
+      />
+      {!locked && (
+        compact ? (
+          <select
+            value={character || ''}
+            onChange={(e) => onChange(name, e.target.value)}
+            className={`${selectCls} flex-shrink-0`}
+            title="Counter owner"
+          >
+            <option value="">Global</option>
+            {characters.map((c) => (
+              <option key={c.id} value={c.id}>{c.displayName || c.name || c.id}</option>
+            ))}
+          </select>
+        ) : (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Scope</label>
+            <select
+              value={character || ''}
+              onChange={(e) => onChange(name, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">Story-global (no character)</option>
+              {characters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.displayName || c.name || c.id}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
       )}
+    </div>
+  );
 
+  if (compact) {
+    return (
+      <div className={className || 'flex flex-wrap gap-1 items-center flex-1 min-w-[110px]'}>
+        {selectEl}
+        {customEl}
+      </div>
+    );
+  }
+
+  return (
+    <div className={className}>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {selectEl}
+      {customEl}
       <p className="text-xs text-gray-500 mt-1">
         {locked ? (
           <>Compared against the same owner as the first counter ({charLabel(lockedCharacter || '')}).</>
