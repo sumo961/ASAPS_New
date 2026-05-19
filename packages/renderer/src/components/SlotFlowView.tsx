@@ -195,6 +195,26 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // restart/credits pair (endScreen / aiSummary — value is interpreted by
   // EndScreenBeat's substring contract).
   const actionButtons = actionSlot?.buttons ?? [];
+
+  // 3d-3 — consume the action slot's anchor intent.
+  //  • h               → row alignment (left / center / right)
+  //  • relativeTo:'element' (edge:'below' body) → buttons hug the body
+  //    instead of being pinned to the stage bottom (body stops growing)
+  //  • gap             → space under the body (below-body) / row padding
+  // Absent → today's behavior (centered, pinned to the stage bottom).
+  const actionAnchor = actionSlot
+    ? slotIntentFor(slotIntent, actionSlot.name)?.anchor
+    : undefined;
+  const belowBody = actionAnchor?.relativeTo === 'element';
+  const actionJustify =
+    actionAnchor?.h === 'left'
+      ? 'flex-start'
+      : actionAnchor?.h === 'right'
+        ? 'flex-end'
+        : 'center';
+  const actionGap =
+    typeof actionAnchor?.gap === 'number' ? actionAnchor.gap : undefined;
+
   const isContinueAction = actionButtons.includes('continueButton');
   const continueText = content.buttonText || 'Continue';
   const showRestart = content.showRestart !== false;
@@ -244,11 +264,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         .${scope} .slotflow-btn:hover { background: ${theme.button?.hoverBackgroundColor || theme.button?.backgroundColor || '#333'}; }
       `}</style>
 
-      {/* Body slot — grows, scrolls, never pushes the action row */}
+      {/* Body slot — grows & scrolls (stage-bottom action), or sizes to
+          content so the action row hugs it (below-body anchor). Either way
+          it scrolls internally when content exceeds the column. */}
       <div
         className="slotflow-scroll"
         style={{
-          flex: 1,
+          flex: belowBody ? '0 1 auto' : 1,
+          maxHeight: belowBody ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
@@ -311,9 +334,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           style={{
             flexShrink: 0,
             display: 'flex',
-            justifyContent: 'center',
+            justifyContent: actionJustify,
             gap: 'clamp(12px, 2vw, 24px)',
-            padding: 'clamp(16px, 3vh, 28px) 16px',
+            // gap intent controls the space above the row (under the body in
+            // below-body mode; bottom inset stays comfortable either way).
+            paddingTop: actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)',
+            paddingBottom: 'clamp(16px, 3vh, 28px)',
+            paddingLeft: 16,
+            paddingRight: 16,
           }}
         >
           {isContinueAction ? (
