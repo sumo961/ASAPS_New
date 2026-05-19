@@ -2584,12 +2584,17 @@ export class ReactRenderer extends BaseRenderer {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
-    // Use provided locations or generate default locations from schema
+    // Use provided locations or generate default locations from schema.
+    // authorPositioned=false (no baked layout) + durScreen's schema
+    // layoutMode:slot → SlotFlowView (body-only timed text, no action row;
+    // it still auto-advances after `duration`). Baked instances stay
+    // absolute (zero regression). Mirrors renderText/renderEndScreen.
     const content = { text };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('durScreen', content);
+    const authorPositioned = !!(locations && locations.length > 0);
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('durScreen', content);
 
     this.ttsSpeakCallback?.(text, this.currentSpeaker);
-    await this.renderPositionedBeat('durScreen', content, effectiveLocations, false);
+    await this.renderPositionedBeat('durScreen', content, effectiveLocations, false, undefined, authorPositioned);
     await new Promise(resolve => setTimeout(resolve, duration));
   }
 

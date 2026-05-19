@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.7.0",
+  "version": "2.9.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -350,6 +350,12 @@
         "text": "text",
         "continueButton": "buttonText"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-2 responsive-slot (stack beats). infoText instances with NO author-persisted locations render via SlotFlowView (body from 'text', single continue button) — same renderText path / authorPositioned guard as aiInfoText. Baked-location instances stay absolute (zero regression). See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
+        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay"
@@ -1131,6 +1137,11 @@
       "locationMapping": {
         "text": "text"
       },
+      "layoutMode": "slot",
+      "layoutModeNote": "Phase-2 responsive-slot (stack beats). Body-only: timed text with NO action row — the beat auto-advances after its duration, the slot path is purely the responsive visual. renderDurScreen threads authorPositioned; baked-location instances stay absolute (zero regression). See project_responsive_layout_system memory.",
+      "slots": [
+        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "timedText"
