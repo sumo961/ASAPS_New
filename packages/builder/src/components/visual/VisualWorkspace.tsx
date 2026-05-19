@@ -25,7 +25,7 @@ import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-r
 import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
-import { SlotFlowView, isSlotModeBeatType, getSlotSpec } from '@asaps/renderer';
+import { SlotFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec } from '@asaps/renderer';
 
 // VE viewport presets for the slot-mode preview. Fixed presets are a real
 // W×H device rectangle so the WHOLE composition (side/top/bottom margins,
@@ -4202,6 +4202,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           <div className="flex-1 overflow-hidden">
             {activeTab === 'elements' && (
               <VisualPropertiesPanel
+                layoutMode={
+                  beat && !beatHasAuthorLocations
+                    ? isSpatialModeBeatType(beat.type)
+                      ? 'spatial'
+                      : isSlotModeBeatType(beat.type)
+                        ? 'slot'
+                        : 'absolute'
+                    : 'absolute'
+                }
                 backgroundAssetId={backgroundAssetId}
                 elements={visualElements}
                 selectedElements={selectedElementIds}

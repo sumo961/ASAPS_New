@@ -34,6 +34,15 @@ import { useFonts } from '../../hooks/useFonts';
 type TransitionType = 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
 
 interface VisualPropertiesPanelProps {
+  /**
+   * Layout mode of the current beat instance — drives Inspector mode-
+   * awareness. 'absolute' (default) keeps today's Transform (Position X/Y +
+   * Size + Scale + Rotation + pixel Z-Index). 'slot' / 'spatial' suppress
+   * absolute Position X/Y and pixel Z-Index (engine/anchor-managed in those
+   * modes) but KEEP Size, Scale and Rotation as element-intrinsic. See
+   * project_responsive_layout_system memory ("Left Inspector mode-awareness").
+   */
+  layoutMode?: 'absolute' | 'slot' | 'spatial';
   backgroundAssetId?: string;
   elements: VisualElement[];
   selectedElements: string[];
@@ -97,6 +106,7 @@ const formatBeatType = (beatType: string): string => {
 };
 
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
+  layoutMode = 'absolute',
   backgroundAssetId,
   elements,
   selectedElements,
@@ -997,41 +1007,53 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
 
                   return (
                     <>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">
-                          Position
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-xs text-gray-600">X</label>
-                            <input
-                              type="number"
-                              value={Math.round(effectiveX)}
-                              onChange={(e) => {
-                                const newEffectiveX = parseInt(e.target.value) || 0;
-                                // Convert effective X back to base X
-                                const baseX = newEffectiveX - (selected.width - effectiveWidth) / 2;
-                                onElementUpdate(selected.id, { x: Math.round(baseX) });
-                              }}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600">Y</label>
-                            <input
-                              type="number"
-                              value={Math.round(effectiveY)}
-                              onChange={(e) => {
-                                const newEffectiveY = parseInt(e.target.value) || 0;
-                                // Convert effective Y back to base Y
-                                const baseY = newEffectiveY - (selected.height - effectiveHeight) / 2;
-                                onElementUpdate(selected.id, { y: Math.round(baseY) });
-                              }}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                            />
+                      {layoutMode === 'absolute' ? (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Position
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-600">X</label>
+                              <input
+                                type="number"
+                                value={Math.round(effectiveX)}
+                                onChange={(e) => {
+                                  const newEffectiveX = parseInt(e.target.value) || 0;
+                                  // Convert effective X back to base X
+                                  const baseX = newEffectiveX - (selected.width - effectiveWidth) / 2;
+                                  onElementUpdate(selected.id, { x: Math.round(baseX) });
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600">Y</label>
+                              <input
+                                type="number"
+                                value={Math.round(effectiveY)}
+                                onChange={(e) => {
+                                  const newEffectiveY = parseInt(e.target.value) || 0;
+                                  // Convert effective Y back to base Y
+                                  const baseY = newEffectiveY - (selected.height - effectiveHeight) / 2;
+                                  onElementUpdate(selected.id, { y: Math.round(baseY) });
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        // Slot / spatial: position is engine/anchor-managed
+                        // (the layout engine resolves it from the slot's
+                        // role + slotIntent.anchor). Pixel X/Y is meaningless
+                        // here and was previously misleading. Size/Scale/
+                        // Rotation are element-intrinsic and STAY visible.
+                        <div className="text-xs text-gray-500 italic px-1 py-1.5 rounded bg-gray-50 border border-dashed border-gray-300">
+                          Position is managed by the {layoutMode === 'spatial' ? 'spatial' : 'slot'} layout.
+                          Edit anchor / preferred lines in the right-side panel or on the preview.
+                        </div>
+                      )}
 
                       {/* Size - shows effective size accounting for scale */}
                       <div>
@@ -1120,18 +1142,22 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </div>
                 </div>
 
-                {/* Z-Index */}
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Layer (Z-Index)
-                  </label>
-                  <input
-                    type="number"
-                    value={selected.z}
-                    onChange={(e) => onElementUpdate(selected.id, { z: parseInt(e.target.value) || 0 })}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                  />
-                </div>
+                {/* Z-Index — pixel stacking is meaningless in slot/spatial
+                    (the engine resolves layer order from slot role and the
+                    spatial vs flow split). Hidden there. */}
+                {layoutMode === 'absolute' && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">
+                      Layer (Z-Index)
+                    </label>
+                    <input
+                      type="number"
+                      value={selected.z}
+                      onChange={(e) => onElementUpdate(selected.id, { z: parseInt(e.target.value) || 0 })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    />
+                  </div>
+                )}
 
                 {/* Name */}
                 <div>
