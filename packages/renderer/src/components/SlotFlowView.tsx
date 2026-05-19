@@ -147,6 +147,29 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const onResolveRef = React.useRef(onResolve);
   onResolveRef.current = onResolve;
 
+  // P2.5-3 — re-resolve on viewport/orientation change. CSS clamp/vw/vh +
+  // media queries recompute automatically, but the JS-MEASURED title
+  // preferredLines bias + the onResolve report below do not — after a
+  // rotate the width-specific bias is wrong and the override badge stale.
+  // A coalesced tick re-runs the measurement (and resets the stale bias).
+  const [viewportTick, setViewportTick] = React.useState(0);
+  const lastTickRef = React.useRef(0);
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let raf = 0;
+    const bump = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setViewportTick(t => t + 1));
+    };
+    window.addEventListener('resize', bump);
+    window.addEventListener('orientationchange', bump);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', bump);
+      window.removeEventListener('orientationchange', bump);
+    };
+  }, []);
+
   React.useLayoutEffect(() => {
     const el = titleRef.current;
     if (!el || !titleText) return;
@@ -155,6 +178,17 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       if (titleMaxWidth !== undefined) setTitleMaxWidth(undefined);
       return;
     }
+    // Viewport/orientation changed → the width-specific bias is now wrong.
+    // Discard it and let the next pass re-run the two-pass measurement
+    // fresh at the new size (also refreshes the override report).
+    if (lastTickRef.current !== viewportTick) {
+      lastTickRef.current = viewportTick;
+      if (titleMaxWidth !== undefined) {
+        setTitleMaxWidth(undefined);
+        return;
+      }
+    }
+
     const cs = window.getComputedStyle(el);
     const fontPx = parseFloat(cs.fontSize) || 16;
     const lineHeightPx = fontPx * 1.25; // matches the title lineHeight below
@@ -187,8 +221,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           : `Title only fills ${measuredLines} line(s) here (wanted ${titlePreferredLines}); not enough text for the target at this width.`,
     };
     onResolveRef.current?.([res]);
-    // Depend on the inputs that change the measurement.
-  }, [titleText, titlePreferredLines, titleMaxWidth, titleSlotName, authoredTitle]);
+    // Depend on the inputs that change the measurement (incl. viewport tick
+    // so a rotate / resize re-resolves).
+  }, [titleText, titlePreferredLines, titleMaxWidth, titleSlotName, authoredTitle, viewportTick]);
 
   // Two action shapes: a single "continue" button (aiInfoText / onlineContent
   // — the beat ignores the returned value, any click advances), or the

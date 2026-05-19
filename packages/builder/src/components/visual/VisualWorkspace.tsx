@@ -843,6 +843,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Slot-mode preview: which simulated viewport, and the latest per-slot
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
+  // P2.5 — when the project orientation is 'flexible' the author still needs
+  // to check both ways; this is a preview-only toggle (does NOT change the
+  // project setting). When the policy is locked it is forced to the lock.
+  const [slotPreviewOrient, setSlotPreviewOrient] = useState<'portrait' | 'landscape'>('portrait');
   const [slotResolutions, setSlotResolutions] = useState<SlotIntentResolution[]>([]);
   // 3d-4 — transient gap while dragging the action grip. Live (uncommitted)
   // so the preview reflows per-frame WITHOUT spamming the undo stack; a
@@ -4868,8 +4872,29 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               SLOT_PREVIEW_VIEWPORTS[2];
             // Fixed device rect vs the "Editor" preset (fills the area).
             const isFixed = selVp.width != null && selVp.height != null;
-            const devW = selVp.width ?? 0;
-            const devH = selVp.height ?? 0;
+            // Project orientation policy → preview consequence. Phone/Tablet
+            // are orientation-variable; locked policy forces it, flexible
+            // uses the preview-only toggle. Authored = the design canvas and
+            // Desktop is inherently wide — both orientation-neutral.
+            const orientPolicy: 'flexible' | 'portrait' | 'landscape' =
+              (globalSettings?.project?.orientation as any) ?? 'flexible';
+            const effOrient: 'portrait' | 'landscape' =
+              orientPolicy === 'flexible' ? slotPreviewOrient : orientPolicy;
+            const orientable = selVp.id === 'phone' || selVp.id === 'tablet';
+            const rawW = selVp.width ?? 0;
+            const rawH = selVp.height ?? 0;
+            const lo = Math.min(rawW, rawH);
+            const hi = Math.max(rawW, rawH);
+            const devW = !isFixed
+              ? 0
+              : orientable
+                ? (effOrient === 'landscape' ? hi : lo)
+                : rawW;
+            const devH = !isFixed
+              ? 0
+              : orientable
+                ? (effOrient === 'landscape' ? lo : hi)
+                : rawH;
             // Available editor area (container minus its p-3 padding).
             const availW = Math.max(0, slotStageSize.w - 24);
             const availH = Math.max(0, slotStageSize.h - 24);
@@ -5089,6 +5114,49 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       </span>
                     </>
                   )}
+                  {/* P2.5 — orientation policy: indicator + setter (writes
+                      project.orientation via the app event bus). */}
+                  <span className="opacity-30">|</span>
+                  <span className="opacity-70">Orientation</span>
+                  <select
+                    value={orientPolicy}
+                    onChange={(e) =>
+                      window.dispatchEvent(
+                        new CustomEvent('asaps:setProjectOrientation', {
+                          detail: { orientation: e.target.value },
+                        })
+                      )
+                    }
+                    title="Project orientation policy (saved to settings). Layout stays width-responsive either way."
+                    className="px-1.5 py-0.5 rounded bg-white/10 border border-white/20 text-white"
+                  >
+                    <option value="flexible">Flexible</option>
+                    <option value="portrait">Portrait (locked)</option>
+                    <option value="landscape">Landscape (locked)</option>
+                  </select>
+                  {orientPolicy === 'flexible' && orientable ? (
+                    <div className="flex rounded overflow-hidden border border-white/20">
+                      {(['portrait', 'landscape'] as const).map((o) => (
+                        <button
+                          key={o}
+                          type="button"
+                          onClick={() => setSlotPreviewOrient(o)}
+                          title={`Preview in ${o} (does not change the project setting)`}
+                          className={`px-2 py-0.5 transition-colors ${
+                            effOrient === o
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white/5 hover:bg-white/10 text-white/80'
+                          }`}
+                        >
+                          {o === 'portrait' ? '▯' : '▭'}
+                        </button>
+                      ))}
+                    </div>
+                  ) : orientPolicy !== 'flexible' ? (
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/80 text-black font-medium">
+                      🔒 {orientPolicy}
+                    </span>
+                  ) : null}
                   {overridden.map(r => (
                     <span
                       key={r.slot}

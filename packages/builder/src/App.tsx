@@ -4331,6 +4331,25 @@ function App() {
     globalSettingsMutationsRef.current.setGlobalSettings = applyGlobalSettingsChange;
   }, [applyGlobalSettingsChange]);
 
+  // P2.5 — the Visual Editor's orientation indicator/setter writes
+  // project.orientation through the app event bus (same pattern as other
+  // asaps: cross-component actions) so it doesn't need a setter prop
+  // drilled through WorkspaceView.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const o = (e as CustomEvent).detail?.orientation;
+      if (o !== 'flexible' && o !== 'portrait' && o !== 'landscape') return;
+      const base = globalSettingsRef.current ?? globalSettings;
+      if (!base) return;
+      applyGlobalSettingsChange({
+        ...base,
+        project: { ...(base as any).project, orientation: o },
+      } as GlobalSettings);
+    };
+    window.addEventListener('asaps:setProjectOrientation', handler);
+    return () => window.removeEventListener('asaps:setProjectOrientation', handler);
+  }, [applyGlobalSettingsChange, globalSettings]);
+
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
     // Store the callback so we can call it when a character is selected
     characterSelectionCallbackRef.current = callback || null;

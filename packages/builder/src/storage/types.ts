@@ -24,6 +24,12 @@ export interface GlobalSettings {
     mobileScalingMode?: 'auto' | 'fit' | 'cover' | 'native';  // Mobile display mode
     mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0, default 1.0)
     showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
+    // P2.5 — device orientation policy. Width-responsiveness is ALWAYS on;
+    // this only locks the ORIENTATION axis. 'flexible' (default) = adapt to
+    // whichever way the device is held. 'portrait'/'landscape' = locked: the
+    // player shows a "rotate your device" overlay when held the other way so
+    // the layout is never rendered in the unsupported orientation.
+    orientation?: 'flexible' | 'portrait' | 'landscape';
   };
   colors: {
     pcolor: string;         // Button/choice background color (player actions)

@@ -17,6 +17,7 @@ interface GlobalSettings {
     aspectRatio: string;        // Aspect ratio (e.g., "4:3", "16:9")
     scalingMode: 'none' | 'fit' | 'fill' | 'stretch';  // How to scale content
     mobileScalingMode?: 'auto' | 'fit' | 'cover' | 'native';  // Mobile display mode
+    orientation?: 'flexible' | 'portrait' | 'landscape';  // Device orientation policy (P2.5)
     mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0)
     showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
   };
@@ -1047,6 +1048,24 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
                         Auto uses fit mode with enlarged text on mobile for readability. Cover fills the mobile screen but may crop stage edges. Fit keeps identical behavior on all devices. Native is for projects already designed at mobile dimensions — disables all mobile detection.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Orientation
+                      </label>
+                      <select
+                        value={settings.project.orientation || 'flexible'}
+                        onChange={(e) => handleChange('project', 'orientation', e.target.value)}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="flexible">Flexible (adapt to portrait or landscape)</option>
+                        <option value="portrait">Portrait only (lock — prompt to rotate)</option>
+                        <option value="landscape">Landscape only (lock — prompt to rotate)</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Layout stays width-responsive either way; this only locks the orientation axis. A locked project shows a "rotate your device" prompt when held the wrong way, so the layout is never drawn in the unsupported orientation.
                       </p>
                     </div>
 

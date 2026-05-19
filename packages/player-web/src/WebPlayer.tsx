@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
 import { WebSTTService } from './WebSTTProvider';
@@ -69,6 +69,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // Stage dimensions captured from the loaded story so the HUD overlay
   // can position screen-docked widgets correctly.
   const [stageDims, setStageDims] = useState<{ width: number; height: number } | null>(null);
+  const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
 
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
@@ -342,6 +343,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
+
+          // P2.5 — project orientation policy drives the rotate-device gate.
+          const orient = gs?.project?.orientation;
+          setOrientationPolicy(
+            orient === 'portrait' || orient === 'landscape' ? orient : 'flexible'
+          );
 
           // Note: PlayerEngine.setupResolvers() handles theme (incl. speakerDisplay),
           // character portrait resolver, and asset resolver — no need to duplicate here.
@@ -712,6 +719,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   };
 
   return (
+    <OrientationGate orientation={orientationPolicy}>
     <div className="asaps-player" style={containerStyle}>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
@@ -889,5 +897,6 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         }
       `}</style>
     </div>
+    </OrientationGate>
   );
 };

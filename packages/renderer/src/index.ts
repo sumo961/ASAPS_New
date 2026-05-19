@@ -48,6 +48,7 @@ export { PanoramaView, type PanoramaViewProps, type PanoramaHotspotData, type Pa
 // misleading pixel-positioned approximation, and reuse the schema-driven
 // slot registry.
 export { SlotFlowView } from './components/SlotFlowView';
+export { OrientationGate, type OrientationPolicy } from './components/OrientationGate';
 export {
   isSlotModeBeatType,
   getSlotSpec,
