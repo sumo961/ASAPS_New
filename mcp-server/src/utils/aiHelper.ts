@@ -1059,6 +1059,7 @@ FICTIONAL TIME SYSTEM:
 - Display: Shows in Timer HUD when enabled in global settings
 - CRITICAL — cumulative consistency: running clock = initial "set" + SUM of every "advance" on the played path. Whenever a later beat's prose names a month/season, the accumulated advances reaching it MUST land on/near that month. Do not under-author advances (e.g. don't stop the clock in August while text says December). Sum your advances from the set date and verify the final beats' implied date matches their narration.
 - CRITICAL — displayFormat must match advance granularity: if you only ever advance by days/weeks/months/years (never minutes/hours), the global displayFormat MUST be date-only ('date'/'day-number'/'year') — a datetime/time format would freeze at an arbitrary clock time (e.g. always "9:04 PM"), worse than no time. Only use a time-bearing format if you actually advance minutes/hours.
+- CRITICAL — prose time anchors must drive the clock: every concrete time/date phrase you write in beat prose must be backed by a fictionalTime beat so the HUD agrees with the text and never contradicts it. Absolute anchor ("it is 2 a.m.", "March 3rd") → a fictionalTime operation:"set" on/just before that beat with those components. Relative jump ("an hour later", "the next morning", "by then it was nearly 3") → a fictionalTime operation:"advance" of the matching amount before that beat. Sweep the narration for clock/calendar phrases; an unmatched one is a defect (the HUD lies). If a beat says "at 3", the clock at that beat must read ~3:00.
 - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
 
 CHARACTERS AND SPEAKERS:
@@ -1096,6 +1097,7 @@ ADVANCED BRANCHING PATTERNS:
    - Prefer keypad for numeric codes (visual keypad, auto-validation with correctCode/failTarget)
    - Use inputText for text-based passwords
 9. Reputation System: Multiple interactions modify relationship counter → conditionBeat determines NPC behavior
+10. Memory-token convergence: paths rejoin at ONE beat but a single word/phrase must differ by branch. Do NOT duplicate the beat per branch. Declare a variable (e.g. contactMode); each branch sets it via setVariable before the merge ("call" vs "voicemail"); write the one convergent beat with plain-brace interpolation: "Her mother's {contactMode} reduced her to something small." CRAFT: values must be grammatically drop-in (every value fits the sentence unchanged) — else rephrase value-neutral or split the differing clause into its own token. Use for word/short-phrase differences; reserve duplicate/conditionBeat-gated beats for whole-paragraph differences.
 
 PROCEDURAL GAME ELEMENTS (REQUIRED for engaging stories):
 Stories MUST include at least 2-3 of these mechanics:
