@@ -23,7 +23,8 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
-import type { SlotIntentResolution } from '@asaps/core';
+import type { SlotIntentResolution, SlotIntentEntry } from '@asaps/core';
+import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { SlotFlowView, isSlotModeBeatType, getSlotSpec } from '@asaps/renderer';
 
 // VE viewport presets for the slot-mode preview. `width: null` = "Fit"
@@ -827,6 +828,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
   const [slotResolutions, setSlotResolutions] = useState<SlotIntentResolution[]>([]);
+
+  // 3d-1 — shared slotIntent write-back. The control panel (3d-2) and drag
+  // handles (3d-4) both call this. It commits through the normal beat-param
+  // command/undo path (onBeatUpdate with { parameters }) and NEVER through
+  // syncElementsToBeatLocations, so the beat cannot accumulate locations[]
+  // and silently flip out of slot mode (the no-bake guard). `partial === null`
+  // clears the slot's intent.
+  const onSlotIntentChange = useCallback(
+    (slot: string, partial: Partial<SlotIntentEntry> | null) => {
+      if (!beat || !onBeatUpdate) return;
+      const cur = (beat.getParameters?.() ?? {}) as Record<string, any>;
+      const nextIntent = mergeSlotIntent(cur.slotIntent, slot, partial);
+      // In-memory update first so the faithful preview reflects it instantly
+      // (bumps _version → beatVersion → re-render); the command path then
+      // persists + makes it undoable like any Inspector param edit.
+      beat.updateParameters?.({ slotIntent: nextIntent });
+      onBeatUpdate(beat.id, {
+        parameters: { ...beat.getParameters(), slotIntent: nextIntent },
+      } as any);
+    },
+    [beat, onBeatUpdate]
+  );
   // Compatibility helper for single-select consumers
   const selectedElementId = selectedElementIds.length > 0 ? selectedElementIds[0] : null;
   const [hasChanges, setHasChanges] = useState(false);
@@ -4784,6 +4807,38 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             const overridden = slotResolutions.filter(r => !r.applied);
             const allApplied =
               slotResolutions.length > 0 && overridden.length === 0;
+            // Slot-intent control panel (3d-2): title preferredLines + the
+            // action slot's anchor. Slot names come from the schema spec so
+            // we target the right keys in slotIntent.
+            const titleSlotName = slotSpec!.find(s => s.role === 'title')?.name;
+            const actionSlotName = slotSpec!.find(s => s.role === 'action')?.name;
+            const curIntent = (slotPreviewParams?.slotIntent ?? {}) as Record<string, any>;
+            const titleLines: number | undefined =
+              titleSlotName ? curIntent[titleSlotName]?.preferredLines : undefined;
+            const actionAnchor = (actionSlotName ? curIntent[actionSlotName]?.anchor : undefined) ?? {};
+            const anchorMode: 'bottom' | 'belowBody' =
+              actionAnchor.relativeTo === 'element' ? 'belowBody' : 'bottom';
+            const anchorH: 'left' | 'center' | 'right' = actionAnchor.h ?? 'center';
+            const anchorGap: number =
+              typeof actionAnchor.gap === 'number' ? actionAnchor.gap : 16;
+            const setTitleLines = (n: number | null) =>
+              onSlotIntentChange(titleSlotName!, n == null ? { preferredLines: undefined } : { preferredLines: n });
+            const setAnchor = (patch: Record<string, any>) => {
+              const nextAnchor =
+                patch.__mode === 'bottom'
+                  ? { h: anchorH, v: 'bottom' as const, relativeTo: 'stage' as const, gap: anchorGap }
+                  : patch.__mode === 'belowBody'
+                    ? { h: anchorH, relativeTo: 'element' as const, relativeElementId: 'body', edge: 'below' as const, gap: anchorGap }
+                    : {
+                        ...(anchorMode === 'belowBody'
+                          ? { relativeTo: 'element' as const, relativeElementId: 'body', edge: 'below' as const }
+                          : { v: 'bottom' as const, relativeTo: 'stage' as const }),
+                        h: anchorH,
+                        gap: anchorGap,
+                        ...patch,
+                      };
+              onSlotIntentChange(actionSlotName!, { anchor: nextAnchor });
+            };
             return (
               <div className="absolute inset-0 flex flex-col bg-neutral-900">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0">
@@ -4819,6 +4874,102 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     <span className="px-1.5 py-0.5 rounded bg-emerald-600/80 text-white">
                       ✓ layout intent applied
                     </span>
+                  )}
+                </div>
+                {/* 3d-2 — slot-intent control panel (precise, discoverable;
+                    drag handles for the spatial anchor land in 3d-4). */}
+                <div className="flex items-center gap-3 px-3 py-1.5 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0 bg-white/[0.03]">
+                  {titleSlotName && (
+                    <div className="flex items-center gap-1">
+                      <span className="opacity-70">Title lines</span>
+                      <button
+                        type="button"
+                        className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30"
+                        disabled={(titleLines ?? 0) <= 1 && titleLines !== undefined}
+                        onClick={() =>
+                          setTitleLines(titleLines == null ? 1 : Math.max(1, titleLines - 1))
+                        }
+                      >
+                        −
+                      </button>
+                      <span className="w-7 text-center tabular-nums">
+                        {titleLines ?? 'auto'}
+                      </span>
+                      <button
+                        type="button"
+                        className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30"
+                        disabled={(titleLines ?? 0) >= 4}
+                        onClick={() =>
+                          setTitleLines(titleLines == null ? 2 : Math.min(4, titleLines + 1))
+                        }
+                      >
+                        +
+                      </button>
+                      {titleLines != null && (
+                        <button
+                          type="button"
+                          className="ml-1 px-1 rounded bg-white/5 hover:bg-white/15 opacity-70"
+                          title="Clear (auto)"
+                          onClick={() => setTitleLines(null)}
+                        >
+                          auto
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {actionSlotName && (
+                    <>
+                      <span className="opacity-30">|</span>
+                      <div className="flex items-center gap-1">
+                        <span className="opacity-70">Buttons</span>
+                        {(['bottom', 'belowBody'] as const).map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setAnchor({ __mode: m })}
+                            className={`px-1.5 py-0.5 rounded ${
+                              anchorMode === m
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white/5 hover:bg-white/15 text-white/80'
+                            }`}
+                            title={m === 'bottom' ? 'Pinned to bottom of stage' : 'Directly below the body text'}
+                          >
+                            {m === 'bottom' ? 'Stage bottom' : 'Below body'}
+                          </button>
+                        ))}
+                        <span className="opacity-50 ml-1">align</span>
+                        {(['left', 'center', 'right'] as const).map(h => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setAnchor({ h })}
+                            className={`w-6 py-0.5 rounded ${
+                              anchorH === h
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white/5 hover:bg-white/15 text-white/80'
+                            }`}
+                            title={h}
+                          >
+                            {h === 'left' ? '⟸' : h === 'right' ? '⟹' : '≡'}
+                          </button>
+                        ))}
+                        <span className="opacity-50 ml-1">gap</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={64}
+                          step={4}
+                          value={anchorGap}
+                          onChange={e => setAnchor({ gap: parseInt(e.target.value, 10) || 0 })}
+                          className="w-20 align-middle"
+                          title={`${anchorGap}px`}
+                        />
+                        <span className="w-7 tabular-nums opacity-70">{anchorGap}px</span>
+                      </div>
+                      <span className="opacity-40 italic">
+                        anchor preview lands in 3d-3
+                      </span>
+                    </>
                   )}
                 </div>
                 <div className="flex-1 min-h-0 flex justify-center p-3 overflow-auto">
