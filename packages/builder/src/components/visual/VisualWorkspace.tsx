@@ -41,6 +41,18 @@ const SLOT_PREVIEW_VIEWPORTS: ReadonlyArray<{
   { id: 'desktop', label: 'Desktop', width: 1440, coarse: false },
   { id: 'fit', label: 'Fit', width: null, coarse: false },
 ];
+
+// Preview-only filler for slot beats whose body is produced at runtime
+// (aiSummary / aiInfoText / onlineContent). Shown only when the beat has no
+// authored body/fallback, so the author can judge the real title+body+button
+// composition and reflow instead of an empty middle. NEVER persisted — it is
+// substituted into the preview content, not written back to the beat.
+const SLOT_PREVIEW_SAMPLE_BODY = [
+  "This is sample text shown only in the editor. When the story runs, this beat's content is generated live, so the real length will vary.",
+  "It stands in here at a realistic length so you can see how the title, body and buttons compose together, where the text wraps, and how the layout reflows at the phone, tablet and desktop widths.",
+  "Switch viewports above to watch it adapt; the title line-count and button anchor controls update this preview the same way they affect the running story.",
+  "Replace the prompt or add a fallback on the beat to preview your own wording instead of this placeholder.",
+].join('\n\n');
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { getTranslationsForBeat } from '../../export/StoryTranslator';
 
@@ -828,6 +840,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
   const [slotResolutions, setSlotResolutions] = useState<SlotIntentResolution[]>([]);
+  // 3d-4 — transient gap while dragging the action grip. Live (uncommitted)
+  // so the preview reflows per-frame WITHOUT spamming the undo stack; a
+  // single setAnchor commit fires on pointer-up.
+  const [slotGapDrag, setSlotGapDrag] = useState<{ startY: number; startGap: number; gap: number } | null>(null);
 
   // 3d-1 — shared slotIntent write-back. The control panel (3d-2) and drag
   // handles (3d-4) both call this. It commits through the normal beat-param
@@ -1137,7 +1153,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         : beat.type === 'aiSummary'
           ? {
               title: slotPreviewParams.title ?? '',
-              summary: slotPreviewParams.summary ?? slotPreviewParams.fallbackText ?? '',
+              summary:
+                (slotPreviewParams.summary ?? slotPreviewParams.fallbackText) ||
+                SLOT_PREVIEW_SAMPLE_BODY,
               showRestart: slotPreviewParams.showRestart,
               showCredits: slotPreviewParams.showCredits,
               restartText: slotPreviewParams.restartText,
@@ -1145,14 +1163,29 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             }
           : {
               // onlineContent / aiInfoText — runtime fetches/generates the
-              // body; preview with the authored placeholder.
+              // body; preview with the authored placeholder, or realistic
+              // sample filler when there is none so the author can judge
+              // the real composition.
               text:
-                slotPreviewParams.text ??
-                slotPreviewParams.displayTemplate ??
-                slotPreviewParams.fallbackText ??
-                '',
+                (slotPreviewParams.text ??
+                  slotPreviewParams.displayTemplate ??
+                  slotPreviewParams.fallbackText) ||
+                SLOT_PREVIEW_SAMPLE_BODY,
               buttonText: slotPreviewParams.buttonText ?? 'Continue',
             };
+
+  // True when the preview body above fell back to the editor-only sample
+  // (drives the "sample text" caption so it isn't mistaken for content).
+  const slotPreviewUsesSample =
+    isSlotPreview && !!beat && !!slotPreviewParams && beat.type !== 'endScreen'
+      ? !(
+          (beat.type === 'aiSummary'
+            ? (slotPreviewParams.summary ?? slotPreviewParams.fallbackText)
+            : (slotPreviewParams.text ??
+              slotPreviewParams.displayTemplate ??
+              slotPreviewParams.fallbackText)) || ''
+        )
+      : false;
 
   // Memoized panorama projection type for PSV preview (equirectangular or cylindrical)
   const panoramaProjectionType = isPanoramaBeat && beat?.getParameters ? (beat.getParameters().projectionType || 'equirectangular') : 'equirectangular';
@@ -4839,6 +4872,24 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       };
               onSlotIntentChange(actionSlotName!, { anchor: nextAnchor });
             };
+            // 3d-4 — live gap while dragging the action grip (uncommitted).
+            const liveGap = slotGapDrag ? slotGapDrag.gap : anchorGap;
+            const previewSlotIntent =
+              slotGapDrag && actionSlotName
+                ? {
+                    ...curIntent,
+                    [actionSlotName]: {
+                      ...(curIntent[actionSlotName] ?? {}),
+                      anchor: {
+                        ...(anchorMode === 'belowBody'
+                          ? { relativeTo: 'element', relativeElementId: 'body', edge: 'below' }
+                          : { v: 'bottom', relativeTo: 'stage' }),
+                        h: anchorH,
+                        gap: liveGap,
+                      },
+                    },
+                  }
+                : slotPreviewParams?.slotIntent;
             return (
               <div className="absolute inset-0 flex flex-col bg-neutral-900">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0">
@@ -4966,9 +5017,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         />
                         <span className="w-7 tabular-nums opacity-70">{anchorGap}px</span>
                       </div>
-                      <span className="opacity-40 italic">
-                        anchor preview lands in 3d-3
-                      </span>
                     </>
                   )}
                 </div>
@@ -4977,6 +5025,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     className="relative h-full bg-black shadow-xl ring-1 ring-white/15 shrink-0"
                     style={{ width: selVp.width ? `${selVp.width}px` : '100%' }}
                   >
+                    {slotPreviewUsesSample && (
+                      <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-medium pointer-events-none">
+                        Sample body — replaced by generated content at runtime
+                      </div>
+                    )}
                     <SlotFlowView
                       key={`slotprev-${beat!.id}-${selVp.id}`}
                       beatType={beat!.type}
@@ -4985,7 +5038,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       theme={renderTheme ?? undefined}
                       backgroundUrl={backgroundUrl || null}
                       backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
-                      slotIntent={slotPreviewParams?.slotIntent}
+                      slotIntent={previewSlotIntent}
                       previewWidth={selVp.width ?? undefined}
                       previewCoarse={selVp.coarse}
                       onResolve={(res) =>
@@ -5003,6 +5056,53 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       }
                       onAction={() => { /* read-only preview — clicks inert in the editor */ }}
                     />
+                    {/* 3d-4 — direct-manipulation gap grip: drag the action
+                        row up/down to set the gap (the spatial twin of the
+                        panel slider). Transient during drag (live reflow, no
+                        undo spam); one setAnchor commit on release. Mode/h
+                        stay panel-only — drag only the continuous axis. */}
+                    {actionSlotName && (
+                      <div
+                        role="slider"
+                        aria-label="Button gap"
+                        aria-valuenow={liveGap}
+                        title={`Drag to set button gap — ${liveGap}px`}
+                        onPointerDown={(e) => {
+                          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                          setSlotGapDrag({ startY: e.clientY, startGap: anchorGap, gap: anchorGap });
+                        }}
+                        onPointerMove={(e) => {
+                          setSlotGapDrag(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  gap: Math.max(
+                                    0,
+                                    Math.min(64, Math.round(prev.startGap + (prev.startY - e.clientY)))
+                                  ),
+                                }
+                              : prev
+                          );
+                        }}
+                        onPointerUp={() => {
+                          setSlotGapDrag(prev => {
+                            if (prev) {
+                              const quantized = Math.max(0, Math.min(64, Math.round(prev.gap / 4) * 4));
+                              setAnchor({ gap: quantized });
+                            }
+                            return null;
+                          });
+                        }}
+                        className={`absolute left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-1 px-3 h-5 rounded-full select-none touch-none cursor-ns-resize ${
+                          slotGapDrag ? 'bg-blue-500 text-white' : 'bg-white/70 text-black/70 hover:bg-white/90'
+                        }`}
+                        style={{ bottom: 6 }}
+                      >
+                        <span className="text-[10px] leading-none font-medium tracking-wide">
+                          ⇕ gap {liveGap}px
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
