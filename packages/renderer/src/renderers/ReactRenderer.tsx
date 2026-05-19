@@ -2079,13 +2079,18 @@ export class ReactRenderer extends BaseRenderer {
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundAssetId:`, backgroundAssetId);
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundImageUrl:`, this.backgroundImageUrl);
 
-    // Use provided locations or generate default locations from schema
+    // Use provided locations or generate default locations from schema.
+    // authorPositioned=false (no baked layout) + titleScreen's schema
+    // layoutMode:spatial → SpatialFlowView (background image under a
+    // responsive title + start-button flow). Baked instances stay absolute
+    // (zero regression). Mirrors renderText/renderEndScreen/renderDurScreen.
     const content = { title, author, buttonText };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('titleScreen', content);
+    const authorPositioned = !!(locations && locations.length > 0);
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('titleScreen', content);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
     this.ttsSpeakCallback?.(title, this.currentSpeaker);
-    await this.renderPositionedBeat('titleScreen', content, effectiveLocations);
+    await this.renderPositionedBeat('titleScreen', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
   async renderText(text: string, buttonText: string, locations?: Location[]): Promise<void> {

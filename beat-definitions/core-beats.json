@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.9.0",
+  "version": "2.10.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -292,6 +292,16 @@
         "author": "author",
         "startButton": "buttonText"
       },
+      "layoutMode": "spatial",
+      "layoutModeNote": "Phase-3 spatial composite (first consumer). The spatial image is the beat's background (passed by renderTitleScreen as imageUrl); the flow layer composites title + start button responsively over it. renderTitleScreen threads authorPositioned; baked-location instances stay absolute (zero regression). 'author'/subtitle is omitted from the slot decomposition for the first cut — authored projects that used it keep the absolute path. See project_responsive_layout_system memory.",
+      "spatialLayer": {
+        "source": "background",
+        "fit": "contain"
+      },
+      "slots": [
+        { "name": "title", "role": "title", "source": "title" },
+        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "titleScreen"
