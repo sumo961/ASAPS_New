@@ -23,7 +23,23 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
+import type { SlotIntentResolution } from '@asaps/core';
 import { SlotFlowView, isSlotModeBeatType, getSlotSpec } from '@asaps/renderer';
+
+// VE viewport presets for the slot-mode preview. `width: null` = "Fit"
+// (fill the editor canvas, real responsive behavior, no simulation).
+const SLOT_PREVIEW_VIEWPORTS: ReadonlyArray<{
+  id: string;
+  label: string;
+  width: number | null;
+  coarse: boolean;
+}> = [
+  { id: 'phone', label: 'Phone', width: 375, coarse: true },
+  { id: 'tablet', label: 'Tablet', width: 768, coarse: true },
+  { id: 'authored', label: 'Authored', width: 1024, coarse: false },
+  { id: 'desktop', label: 'Desktop', width: 1440, coarse: false },
+  { id: 'fit', label: 'Fit', width: null, coarse: false },
+];
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { getTranslationsForBeat } from '../../export/StoryTranslator';
 
@@ -807,6 +823,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [backgroundSound, setBackgroundSound] = useState<string>('');
   const [showProperties, setShowProperties] = useState(true);
   const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  // Slot-mode preview: which simulated viewport, and the latest per-slot
+  // intent-resolution report from SlotFlowView (override-visibility / 3c).
+  const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
+  const [slotResolutions, setSlotResolutions] = useState<SlotIntentResolution[]>([]);
   // Compatibility helper for single-select consumers
   const selectedElementId = selectedElementIds.length > 0 ? selectedElementIds[0] : null;
   const [hasChanges, setHasChanges] = useState(false);
@@ -4752,27 +4772,91 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             handlePreviewResizeDown={handlePreviewResizeDown}
           />
         ) : isSlotPreview && slotSpec && slotPreviewContent ? (
-          /* Responsive slot-mode: faithful read-only SlotFlowView preview.
-             This branch never wires onElementsChange/syncElementsToBeat-
-             Locations, so the beat cannot bake locations[] and silently
-             leave slot mode (the no-bake guard). Draggable intent handles +
-             viewport selector + override badges land in the next
-             increments. */
-          <div className="absolute inset-0">
-            <SlotFlowView
-              beatType={beat!.type}
-              slots={slotSpec}
-              content={slotPreviewContent}
-              theme={renderTheme ?? undefined}
-              backgroundUrl={backgroundUrl || null}
-              backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
-              slotIntent={slotPreviewParams?.slotIntent}
-              onAction={() => { /* read-only preview — clicks inert in the editor */ }}
-            />
-            <div className="absolute top-2 left-2 px-2 py-1 rounded bg-black/55 text-white text-[11px] pointer-events-none">
-              Responsive layout (slot mode) — positions managed automatically; edit text &amp; buttons in the Inspector
-            </div>
-          </div>
+          /* Responsive slot-mode: faithful read-only SlotFlowView preview at
+             a selectable simulated viewport, with override-visibility badges.
+             Still never wires onElementsChange/syncElementsToBeatLocations,
+             so the beat cannot bake locations[] and silently leave slot mode
+             (the no-bake guard). Draggable intent handles = next increment. */
+          (() => {
+            const selVp =
+              SLOT_PREVIEW_VIEWPORTS.find(v => v.id === slotPreviewViewportId) ??
+              SLOT_PREVIEW_VIEWPORTS[2];
+            const overridden = slotResolutions.filter(r => !r.applied);
+            const allApplied =
+              slotResolutions.length > 0 && overridden.length === 0;
+            return (
+              <div className="absolute inset-0 flex flex-col bg-neutral-900">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0">
+                  <span className="opacity-70 mr-1">Responsive (slot mode)</span>
+                  <div className="flex rounded overflow-hidden border border-white/20">
+                    {SLOT_PREVIEW_VIEWPORTS.map(vp => (
+                      <button
+                        key={vp.id}
+                        type="button"
+                        onClick={() => setSlotPreviewViewportId(vp.id)}
+                        title={vp.width ? `${vp.width}px${vp.coarse ? ' · touch' : ''}` : 'Fit editor canvas'}
+                        className={`px-2 py-0.5 transition-colors ${
+                          vp.id === selVp.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white/5 hover:bg-white/10 text-white/80'
+                        }`}
+                      >
+                        {vp.label}
+                        {vp.width ? <span className="opacity-60"> · {vp.width}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                  {overridden.map(r => (
+                    <span
+                      key={r.slot}
+                      title={r.overrideReason || ''}
+                      className="px-1.5 py-0.5 rounded bg-amber-500/90 text-black font-medium"
+                    >
+                      ⚠ {r.slot}: preference overridden here
+                    </span>
+                  ))}
+                  {allApplied && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-600/80 text-white">
+                      ✓ layout intent applied
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 min-h-0 flex justify-center p-3 overflow-auto">
+                  <div
+                    className="relative h-full bg-black shadow-xl ring-1 ring-white/15 shrink-0"
+                    style={{ width: selVp.width ? `${selVp.width}px` : '100%' }}
+                  >
+                    <SlotFlowView
+                      key={`slotprev-${beat!.id}-${selVp.id}`}
+                      beatType={beat!.type}
+                      slots={slotSpec}
+                      content={slotPreviewContent}
+                      theme={renderTheme ?? undefined}
+                      backgroundUrl={backgroundUrl || null}
+                      backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                      slotIntent={slotPreviewParams?.slotIntent}
+                      previewWidth={selVp.width ?? undefined}
+                      previewCoarse={selVp.coarse}
+                      onResolve={(res) =>
+                        setSlotResolutions(prev =>
+                          prev.length === res.length &&
+                          prev.every(
+                            (p, i) =>
+                              p.slot === res[i].slot &&
+                              p.applied === res[i].applied &&
+                              p.overrideReason === res[i].overrideReason
+                          )
+                            ? prev
+                            : res
+                        )
+                      }
+                      onAction={() => { /* read-only preview — clicks inert in the editor */ }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })()
         ) : (
           /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor

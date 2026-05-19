@@ -54,6 +54,19 @@ interface SlotFlowViewProps {
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
   /** Resolve a button click to the action id the beat expects. */
   onAction: (id: string) => void;
+  /**
+   * Visual-Editor viewport simulation. When set, the fluid font term uses
+   * this width instead of the live `100vw`, so a fixed-width preview box
+   * reflows exactly as that device would at runtime (the editor renders the
+   * REAL component, just told a different viewport). Unset at runtime.
+   */
+  previewWidth?: number;
+  /**
+   * VE viewport simulation for touch presets (phone/tablet): forces the
+   * coarse-pointer narrative floor that `@media (pointer: coarse)` would
+   * apply on the device, since the editor itself runs on a fine pointer.
+   */
+  previewCoarse?: boolean;
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -80,6 +93,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   slotIntent,
   onResolve,
   onAction,
+  previewWidth,
+  previewCoarse,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -105,7 +120,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // text at a readable size, not shrink it. (Aggressive downward scaling was
   // the "AI Info Text too small / unbounded" bug.) clamp()'s floor var is
   // the comfortable narrative minimum; the ceiling caps the giant case.
-  const grow = (k: number) => `max(0px, (100vw - ${DESIGN_WIDTH}px)) * ${k}`;
+  // `100vw` at runtime; a fixed simulated width in the VE viewport preview
+  // so a narrow preview box reflows like the real device.
+  const vwTerm = previewWidth ? `${previewWidth}px` : '100vw';
+  const grow = (k: number) => `max(0px, (${vwTerm} - ${DESIGN_WIDTH}px)) * ${k}`;
   const bodyFluid = `calc(${authoredBody}px + ${grow(0.012)})`;
   const titleFluid = `calc(${authoredTitle}px + ${grow(0.016)})`;
   const buttonFluid = `calc(${authoredButton}px + ${grow(0.008)})`;
@@ -214,7 +232,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         /* Comfortable NARRATIVE minimum — not the 16px absolute-legibility
            floor. Long-form story prose below ~18px reads as cramped/lost
            even though it's technically legible. */
-        .${scope} { --slotflow-body-floor: 18px; --slotflow-btn-floor: 16px; }
+        .${scope} { --slotflow-body-floor: ${previewCoarse ? 20 : 18}px; --slotflow-btn-floor: ${previewCoarse ? 18 : 16}px; }
         @media (pointer: coarse) {
           .${scope} { --slotflow-body-floor: 20px; --slotflow-btn-floor: 18px; }
         }
