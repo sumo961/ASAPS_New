@@ -95,6 +95,7 @@ export class OnlineContentBeat extends Beat {
       maxWords: this.maxWords,
       errorMessage: this.errorMessage,
       errorTarget: this.errorTarget,
+      slotIntent: this.slotIntent,
     };
   }
 
@@ -111,6 +112,7 @@ export class OnlineContentBeat extends Beat {
     if (params.maxWords !== undefined) this.maxWords = params.maxWords;
     if (params.errorMessage !== undefined) this.errorMessage = params.errorMessage;
     if (params.errorTarget !== undefined) this.errorTarget = params.errorTarget;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
   }
 
   // Cache for prefetched AI content

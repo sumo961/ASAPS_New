@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -638,6 +638,12 @@
       "description": "Story conclusion screen",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
         "message": {
           "type": "string",
           "required": false,
@@ -1826,6 +1832,12 @@
       "description": "Fetch and display real-time data from web APIs or AI queries",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
         "sourceType": {
           "type": "string",
           "required": true,
@@ -2157,6 +2169,12 @@
       "description": "Generate a narrative summary of the player's journey",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
         "prompt": {
           "type": "string",
           "required": false,
@@ -2394,6 +2412,12 @@
       "description": "Generate contextual 1-2 sentence info text using AI at runtime",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
         "prompt": {
           "type": "string",
           "required": true,

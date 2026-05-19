@@ -96,6 +96,7 @@ export class AIInfoTextBeat extends Beat {
       maxSentences: this.maxSentences,
       fallbackText: this.fallbackText,
       buttonText: this.buttonText,
+      slotIntent: this.slotIntent,
     };
   }
 
@@ -110,6 +111,7 @@ export class AIInfoTextBeat extends Beat {
     if (params.maxSentences !== undefined) this.maxSentences = params.maxSentences;
     if (params.fallbackText !== undefined) this.fallbackText = params.fallbackText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
   }
 
   protected async performAction(

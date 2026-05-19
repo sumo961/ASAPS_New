@@ -26,6 +26,15 @@ export abstract class Beat {
   public x?: number;
   public y?: number;
   public node?: string; // Background image/node reference
+  /**
+   * Soft responsive layout intent for slot-mode beats (per-slot
+   * preferredLines / anchor / gap). Visual-Editor managed. THE invariant:
+   * this is a PARAM, never the legacy baked `locations[]` — a beat carrying
+   * slotIntent and no locations[] stays responsive. Subclasses that are
+   * slot-mode surface this in get/updateParameters; declared on the base so
+   * the field + constructor read live in one place.
+   */
+  public slotIntent?: Record<string, any>;
   public animations?: AnimationPath[]; // Path animations for elements
   public notes?: string; // Author notes (not shown to player)
   public speaker: string; // Who speaks this beat's text (for TTS voice routing and optional display)
@@ -61,6 +70,7 @@ export abstract class Beat {
     this.defaultTargetDelay = (config as any).defaultTargetDelay || (config.parameters as any)?.defaultTargetDelay;
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
+    this.slotIntent = (config.parameters as any)?.slotIntent ?? (config as any).slotIntent;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.speaker = (config as any).speaker || (config.parameters as any)?.speaker || '';

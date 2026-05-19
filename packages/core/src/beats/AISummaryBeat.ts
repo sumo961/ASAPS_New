@@ -171,6 +171,7 @@ export class AISummaryBeat extends Beat {
       creditsPageTitle: this.creditsPageTitle,
       creditsPageBody: this.creditsPageBody,
       creditsCloseText: this.creditsCloseText,
+      slotIntent: this.slotIntent,
     };
   }
 
@@ -200,6 +201,7 @@ export class AISummaryBeat extends Beat {
     if (params.creditsPageTitle !== undefined) this.creditsPageTitle = params.creditsPageTitle;
     if (params.creditsPageBody !== undefined) this.creditsPageBody = params.creditsPageBody;
     if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
   }
 
   /**

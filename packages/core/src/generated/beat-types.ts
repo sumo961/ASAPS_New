@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.6.0
- * Generated: 2026-05-19T11:06:20.811Z
+ * Schema Version: 2.7.0
+ * Generated: 2026-05-19T13:21:26.863Z
  */
 
 // ============================================
@@ -235,6 +235,8 @@ export interface VideoBeatParameters {
  * Connection Type: single
  */
 export interface EndScreenParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
   /** Ending message */
   message?: string | undefined;
   /** Show restart button */
@@ -613,6 +615,8 @@ export interface HyperTextParameters {
  * Connection Type: single
  */
 export interface OnlineContentParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
   /** Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search */
   sourceType: string;
   /** API URL to fetch (supports ${variable} interpolation) */
@@ -697,6 +701,8 @@ export interface AiDialogTreeParameters {
  * Connection Type: single
  */
 export interface AiSummaryParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
   /** Custom instructions for summary style */
   prompt?: string | undefined;
   /** Include player variables in summary */
@@ -757,6 +763,8 @@ export interface AiSummaryParameters {
  * Connection Type: single
  */
 export interface AiInfoTextParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
   /** Context/instruction for AI (e.g., "A merchant's reply when the player can't afford the item") */
   prompt: string;
   /** Specific variables to include in AI context (leave empty for all) */

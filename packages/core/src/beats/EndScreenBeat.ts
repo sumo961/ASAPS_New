@@ -80,7 +80,8 @@ export class EndScreenBeat extends Beat {
       creditsPageBody: this.creditsPageBody,
       creditsCloseText: this.creditsCloseText,
       phaseOverrides: this.phaseOverrides,
-      node: this.node
+      node: this.node,
+      slotIntent: this.slotIntent
     };
   }
 
@@ -104,6 +105,7 @@ export class EndScreenBeat extends Beat {
     if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
     if (params.node !== undefined) this.node = params.node;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     this._version++;
   }
 
