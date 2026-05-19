@@ -20,6 +20,7 @@ import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { XRLocationsEditor, type XRLocationEntry } from '../editors/XRLocationsEditor';
 import { RequirementsEditor } from '../editors/RequirementsEditor';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
+import { CounterOwnerPicker } from './CounterOwnerPicker';
 import {
   groupConditionTemplates,
   findConditionTemplate,
@@ -1169,6 +1170,26 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   /**
+   * Atomically update several parameters in one state write. Calling
+   * handleParameterChange twice in the same tick is unsafe — each call
+   * closes over the same stale `localBeat`, so the second clobbers the
+   * first. The CounterOwnerPicker sets name + owner together; it must use
+   * this.
+   */
+  const handleParametersChange = (patch: Record<string, any>) => {
+    const updatedBeat = {
+      ...localBeat,
+      parameters: { ...localBeat.parameters, ...patch },
+    };
+    setLocalBeat(updatedBeat);
+    setHasChanges(true);
+    rebuildConnectionsAndUpdate(updatedBeat);
+    if (translationState.translations.length > 0 && beat) {
+      translationActions.syncBeatTranslations(beat.id, updatedBeat);
+    }
+  };
+
+  /**
    * durScreen-aware parameter change. As the author types the text, the
    * duration auto-recalculates from word count (via the shared
    * suggestDurationSeconds model) so a timed screen is never accidentally
@@ -1598,6 +1619,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     beatDefinition={getBeatDefinition(beat.type)}
                     parameters={localBeat.parameters}
                     onParameterChange={beat.type === 'durScreen' ? handleDurScreenParameterChange : handleParameterChange}
+                    onParametersChange={handleParametersChange}
                     availableTargets={availableTargets}
                     characters={getAvailableCharacters()}
                     playerCharacterName={playerCharacterName}
@@ -1629,6 +1651,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       beatDefinition={{ ...def, parameters: speakerParams }}
                       parameters={localBeat.parameters}
                       onParameterChange={handleParameterChange}
+                      onParametersChange={handleParametersChange}
                       characters={getAvailableCharacters()}
                       playerCharacterName={playerCharacterName}
                       beatProperties={localBeat}
@@ -1719,24 +1742,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                     {/* Counter Condition */}
                     {localBeat.parameters?.conditionType === 'counter' && (
                       <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Counter Name
-                          </label>
-                          <SmartNameDropdown
-                            value={localBeat.parameters?.variableName || localBeat.parameters?.left || ''}
-                            onChange={(val) => handleParameterChange('variableName', val || '')}
-                            options={availableCounters.map(c => ({
-                              name: c.name,
-                              displayName: c.displayName,
-                              characterName: c.characterName,
-                            }))}
-                            placeholder="e.g., courage"
-                            newItemLabel="+ New counter..."
-                            noSelectionLabel="Select counter..."
-                            className="w-full"
-                          />
-                        </div>
+                        <CounterOwnerPicker
+                          label="Counter"
+                          counters={availableCounters}
+                          characters={(characters || []).map(c => ({ id: c.id, name: c.name, displayName: c.displayName }))}
+                          name={localBeat.parameters?.variableName || localBeat.parameters?.left || ''}
+                          character={localBeat.parameters?.character || ''}
+                          onChange={(name, character) =>
+                            handleParametersChange({ variableName: name, character })
+                          }
+                        />
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Operator
@@ -1765,46 +1780,22 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
-                          <select
-                            value={localBeat.parameters?.character || ''}
-                            onChange={(e) => handleParameterChange('character', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Story-global (no character)</option>
-                            {(characters || []).map((c) => (
-                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Must match the owner the counter is written with (a character-scoped <code>setVariable</code> with the same Owner). Story-global reads the world counter.
-                          </p>
-                        </div>
                       </>
                     )}
 
                     {/* Counter Compare Condition */}
                     {localBeat.parameters?.conditionType === 'counterCompare' && (
                       <>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            First Counter
-                          </label>
-                          <SmartNameDropdown
-                            value={localBeat.parameters?.counter1 || ''}
-                            onChange={(val) => handleParameterChange('counter1', val || '')}
-                            options={availableCounters.map(c => ({
-                              name: c.name,
-                              displayName: c.displayName,
-                              characterName: c.characterName,
-                            }))}
-                            placeholder="e.g., courage"
-                            newItemLabel="+ New counter..."
-                            noSelectionLabel="Select counter..."
-                            className="w-full"
-                          />
-                        </div>
+                        <CounterOwnerPicker
+                          label="First Counter"
+                          counters={availableCounters}
+                          characters={(characters || []).map(c => ({ id: c.id, name: c.name, displayName: c.displayName }))}
+                          name={localBeat.parameters?.counter1 || ''}
+                          character={localBeat.parameters?.character || ''}
+                          onChange={(name, character) =>
+                            handleParametersChange({ counter1: name, character })
+                          }
+                        />
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Operator
@@ -1822,40 +1813,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             <option value="!=">Not Equal (≠)</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Second Counter
-                          </label>
-                          <SmartNameDropdown
-                            value={localBeat.parameters?.counter2 || ''}
-                            onChange={(val) => handleParameterChange('counter2', val || '')}
-                            options={availableCounters.map(c => ({
-                              name: c.name,
-                              displayName: c.displayName,
-                              characterName: c.characterName,
-                            }))}
-                            placeholder="e.g., wisdom"
-                            newItemLabel="+ New counter..."
-                            noSelectionLabel="Select counter..."
-                            className="w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
-                          <select
-                            value={localBeat.parameters?.character || ''}
-                            onChange={(e) => handleParameterChange('character', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Story-global (no character)</option>
-                            {(characters || []).map((c) => (
-                              <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
-                            ))}
-                          </select>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Both counters are read from this owner. Story-global reads the world counters.
-                          </p>
-                        </div>
+                        <CounterOwnerPicker
+                          label="Second Counter"
+                          counters={availableCounters}
+                          characters={(characters || []).map(c => ({ id: c.id, name: c.name, displayName: c.displayName }))}
+                          name={localBeat.parameters?.counter2 || ''}
+                          character={localBeat.parameters?.character || ''}
+                          lockedCharacter={localBeat.parameters?.character || ''}
+                          onChange={(name) =>
+                            handleParameterChange('counter2', name)
+                          }
+                        />
                       </>
                     )}
                     

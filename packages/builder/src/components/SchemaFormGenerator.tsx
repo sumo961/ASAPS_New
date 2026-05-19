@@ -4,6 +4,7 @@ import type { Beat } from '@asaps/core';
 import { describeMoodAxis } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import { CharacterRefField, type UsedName } from './characters/CharacterRefField';
+import { CounterOwnerPicker } from './CounterOwnerPicker';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -17,7 +18,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner';
     /** For 'affect-slider' control: end-cap labels — [low, high]. */
     axisLabels?: [string, string];
     /** For 'affect-slider' control: optional axis hint passed through to the
@@ -64,6 +65,9 @@ interface SchemaFormGeneratorProps {
   beatDefinition: BeatDefinition;
   parameters: Record<string, any>;
   onParameterChange: (param: string, value: any) => void;
+  /** Atomic multi-param update (used by CounterOwnerPicker which sets name +
+   * owner together). Falls back to sequential onParameterChange if absent. */
+  onParametersChange?: (patch: Record<string, any>) => void;
   availableTargets?: Beat[];
   characters?: any[];
   playerCharacterName?: string;
@@ -219,6 +223,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   beatDefinition,
   parameters,
   onParameterChange,
+  onParametersChange,
   availableTargets = [],
   characters = [],
   playerCharacterName,
@@ -459,6 +464,35 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
         // name. The "Player" pinned option preserves the special routing
         // semantics of the AddRemoveInventory runtime ('player' / empty
         // routes to the global single inventory).
+        if (paramDef.ui?.control === 'counter-owner') {
+          // Schema-driven: a counter is the (name, owner) pair. This control
+          // owns both `parameters.name` and `parameters.character` and writes
+          // them atomically. Visibility (type='counter' only) is the schema's
+          // dependsOn, not a hardcoded branch here.
+          const charList = (characterObjects && characterObjects.length > 0
+            ? characterObjects
+            : (characters || []).map((c: any) => (typeof c === 'string' ? { id: c, name: c } : c))
+          ).map((c: any) => ({ id: c.id, name: c.name, displayName: c.displayName }));
+          const setNameAndOwner = (n: string, ch: string) => {
+            if (onParametersChange) onParametersChange({ name: n, character: ch });
+            else {
+              onParameterChange('name', n);
+              onParameterChange('character', ch);
+            }
+          };
+          return (
+            <CounterOwnerPicker
+              key={paramName}
+              label={paramDef.ui.label || 'Counter'}
+              counters={availableCounters}
+              characters={charList}
+              name={typeof parameters.name === 'string' ? parameters.name : (parameters.name || '')}
+              character={parameters.character || ''}
+              onChange={setNameAndOwner}
+            />
+          );
+        }
+
         if (paramDef.ui?.control === 'character-ref') {
           const definedCharacters = (characters || [])
             .map((c: any) => {
@@ -852,19 +886,17 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           }
         }
 
-        // Handle variable/counter name field with dropdowns for setVariable beat
+        // Variable-name field for setVariable. Only reached for type='variable'
+        // — the schema's dependsOn gates this param (counter uses the
+        // 'counter-owner' control on `character`; fictionalTime has no name).
         if (paramName === 'name' && beatType === 'setVariable') {
-          // Fictional time doesn't use a variable name
-          if (parameters.type === 'fictionalTime') return null;
-          const isCounter = parameters.type === 'counter';
-          const options = isCounter ? availableCounters : availableVariables;
-          const hasOptions = options.length > 0;
+          const hasOptions = availableVariables.length > 0;
 
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Variable className="w-4 h-4 inline mr-1" />
-                {isCounter ? 'Counter' : 'Variable'} Name {isRequired && <span className="text-red-500">*</span>}
+                Variable Name {isRequired && <span className="text-red-500">*</span>}
               </label>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -873,40 +905,26 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                     value={value || paramDef.default || ''}
                     onChange={(e) => onParameterChange(paramName, e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm pr-8"
-                    placeholder={hasOptions ? `Type or select ${isCounter ? 'counter' : 'variable'}...` : `Enter ${isCounter ? 'counter' : 'variable'} name`}
+                    placeholder={hasOptions ? 'Type or select variable...' : 'Enter variable name'}
                     required={isRequired}
                     list={`${paramName}-datalist`}
                   />
                   {hasOptions && (
                     <datalist id={`${paramName}-datalist`}>
-                      {isCounter
-                        ? availableCounters.map((c) => (
-                            <option key={`${c.characterId}-${c.name}`} value={c.name}>
-                              {c.fullName}
-                            </option>
-                          ))
-                        : availableVariables.map((v) => (
-                            <option key={v.name} value={v.name}>
-                              {v.description || v.name}
-                            </option>
-                          ))}
+                      {availableVariables.map((v) => (
+                        <option key={v.name} value={v.name}>
+                          {v.description || v.name}
+                        </option>
+                      ))}
                     </datalist>
                   )}
                 </div>
               </div>
-              {hasOptions ? (
-                <p className="text-xs text-gray-500 mt-1">
-                  {isCounter
-                    ? `${availableCounters.length} counter(s) available from characters`
-                    : `${availableVariables.length} variable(s) defined in Global Settings`}
-                </p>
-              ) : (
-                <p className="text-xs text-gray-500 mt-1">
-                  {isCounter
-                    ? 'No counters defined. Add counters to characters first.'
-                    : 'No variables defined. Add variables in Global Settings.'}
-                </p>
-              )}
+              <p className="text-xs text-gray-500 mt-1">
+                {hasOptions
+                  ? `${availableVariables.length} variable(s) defined in Global Settings`
+                  : 'No variables defined. Add variables in Global Settings.'}
+              </p>
             </div>
           );
         }
@@ -1191,33 +1209,6 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                     onChange={(e) => onParameterChange(paramName, parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Owner
-                  </label>
-                  <select
-                    value={parameters.character || ''}
-                    onChange={(e) => onParameterChange('character', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Story-global (no character)</option>
-                    {(characters || [])
-                      .map((c: any) =>
-                        typeof c === 'string'
-                          ? { id: c, label: c }
-                          : { id: c?.id, label: c?.displayName || c?.name || c?.id }
-                      )
-                      .filter((c: any) => c.id)
-                      .map((c: any) => (
-                        <option key={c.id} value={c.id}>
-                          {c.label}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Story-global for world/plot tallies; pick a character to scope this counter to that character (e.g. per-character health). Two characters can safely share a counter name when scoped.
-                  </p>
                 </div>
               </React.Fragment>
             );

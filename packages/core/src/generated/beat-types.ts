@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.6.0
- * Generated: 2026-05-18T19:25:14.321Z
+ * Generated: 2026-05-19T00:22:00.209Z
  */
 
 // ============================================
@@ -321,6 +321,8 @@ export interface SetVariableParameters {
   type: string;
   /** Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead) */
   name: string;
+  /** type='counter' only. Counter owner. OMIT for a story-global counter (default — world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (per-character stats like health/trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'. */
+  character?: string | undefined;
   /** New value (string for variables, number for counters). For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value. */
   value: any;
   /** Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'. */
@@ -339,8 +341,6 @@ export interface SetVariableParameters {
   timeMinute?: number | undefined;
   /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'. */
   timeUnit?: string | undefined;
-  /** type='counter' only. Counter owner. OMIT for a story-global counter (default, unchanged behavior — use for world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (use for per-character stats like health, trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'. */
-  character?: string | undefined;
 }
 
 /**

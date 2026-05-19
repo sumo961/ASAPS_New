@@ -964,7 +964,14 @@
         "name": {
           "type": "string",
           "required": true,
-          "description": "Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead)"
+          "description": "Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead)",
+          "ui": { "dependsOn": { "field": "type", "value": "variable" } }
+        },
+        "character": {
+          "type": "string",
+          "required": false,
+          "description": "type='counter' only. Counter owner. OMIT for a story-global counter (default — world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (per-character stats like health/trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'.",
+          "ui": { "control": "counter-owner", "label": "Counter", "dependsOn": { "field": "type", "value": "counter" } }
         },
         "value": {
           "type": "any",
@@ -1016,12 +1023,6 @@
           "type": "string",
           "required": false,
           "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'.",
-          "ui": { "hidden": true }
-        },
-        "character": {
-          "type": "string",
-          "required": false,
-          "description": "type='counter' only. Counter owner. OMIT for a story-global counter (default, unchanged behavior — use for world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (use for per-character stats like health, trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'.",
           "ui": { "hidden": true }
         }
       },
