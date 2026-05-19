@@ -27,19 +27,23 @@ import type { SlotIntentResolution, SlotIntentEntry } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { SlotFlowView, isSlotModeBeatType, getSlotSpec } from '@asaps/renderer';
 
-// VE viewport presets for the slot-mode preview. `width: null` = "Fit"
-// (fill the editor canvas, real responsive behavior, no simulation).
+// VE viewport presets for the slot-mode preview. Fixed presets are a real
+// W×H device rectangle so the WHOLE composition (side/top/bottom margins,
+// bottom-anchored buttons) is faithful — not just the font. width/height
+// null = "Editor": fill the editor canvas (truly responsive to it, no
+// simulation). Larger-than-editor rects can be shown scaled-to-fit or 1:1.
 const SLOT_PREVIEW_VIEWPORTS: ReadonlyArray<{
   id: string;
   label: string;
   width: number | null;
+  height: number | null;
   coarse: boolean;
 }> = [
-  { id: 'phone', label: 'Phone', width: 375, coarse: true },
-  { id: 'tablet', label: 'Tablet', width: 768, coarse: true },
-  { id: 'authored', label: 'Authored', width: 1024, coarse: false },
-  { id: 'desktop', label: 'Desktop', width: 1440, coarse: false },
-  { id: 'fit', label: 'Fit', width: null, coarse: false },
+  { id: 'phone', label: 'Phone', width: 390, height: 844, coarse: true }, // modern standard (iPhone 14/15/16-class, ~19.5:9)
+  { id: 'tablet', label: 'Tablet', width: 768, height: 1024, coarse: true },
+  { id: 'authored', label: 'Authored', width: 1024, height: 768, coarse: false },
+  { id: 'desktop', label: 'Desktop', width: 1440, height: 810, coarse: false }, // 16:9
+  { id: 'editor', label: 'Editor', width: null, height: null, coarse: false },
 ];
 
 // Preview-only filler for slot beats whose body is produced at runtime
@@ -844,6 +848,31 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // so the preview reflows per-frame WITHOUT spamming the undo stack; a
   // single setAnchor commit fires on pointer-up.
   const [slotGapDrag, setSlotGapDrag] = useState<{ startY: number; startGap: number; gap: number } | null>(null);
+  // Viewport scale: 'fit' shrinks a larger-than-editor device rect to show
+  // the whole composition; 'one' = 1:1 actual pixels (scroll); 'auto' picks
+  // fit only when the rect exceeds the editor area. Measured editor area
+  // drives the fit factor.
+  const [slotScaleMode, setSlotScaleMode] = useState<'auto' | 'fit' | 'one'>('auto');
+  const [slotStageSize, setSlotStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const slotStageRoRef = useRef<ResizeObserver | null>(null);
+  // Callback ref: (dis)connects a ResizeObserver as the preview container
+  // mounts/unmounts — no dependency on later-declared state (TDZ-safe) and
+  // correct when the slot preview appears/disappears between beats.
+  const slotStageRef = useCallback((el: HTMLDivElement | null) => {
+    slotStageRoRef.current?.disconnect();
+    slotStageRoRef.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setSlotStageSize(prev => {
+        const w = el.clientWidth;
+        const h = el.clientHeight;
+        return prev.w === w && prev.h === h ? prev : { w, h };
+      });
+    });
+    ro.observe(el);
+    slotStageRoRef.current = ro;
+    setSlotStageSize({ w: el.clientWidth, h: el.clientHeight });
+  }, []);
 
   // 3d-1 — shared slotIntent write-back. The control panel (3d-2) and drag
   // handles (3d-4) both call this. It commits through the normal beat-param
@@ -4837,6 +4866,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             const selVp =
               SLOT_PREVIEW_VIEWPORTS.find(v => v.id === slotPreviewViewportId) ??
               SLOT_PREVIEW_VIEWPORTS[2];
+            // Fixed device rect vs the "Editor" preset (fills the area).
+            const isFixed = selVp.width != null && selVp.height != null;
+            const devW = selVp.width ?? 0;
+            const devH = selVp.height ?? 0;
+            // Available editor area (container minus its p-3 padding).
+            const availW = Math.max(0, slotStageSize.w - 24);
+            const availH = Math.max(0, slotStageSize.h - 24);
+            const fitScale =
+              isFixed && availW > 0 && availH > 0
+                ? Math.min(availW / devW, availH / devH, 1)
+                : 1;
+            const exceeds = isFixed && (devW > availW || devH > availH);
+            const effScale = !isFixed
+              ? 1
+              : slotScaleMode === 'one'
+                ? 1
+                : slotScaleMode === 'fit'
+                  ? fitScale
+                  : exceeds
+                    ? fitScale
+                    : 1; // auto
+            const scalePct = Math.round(effScale * 100);
             const overridden = slotResolutions.filter(r => !r.applied);
             const allApplied =
               slotResolutions.length > 0 && overridden.length === 0;
@@ -4890,6 +4941,95 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     },
                   }
                 : slotPreviewParams?.slotIntent;
+            // The faithful preview contents — defined once, hosted by either
+            // the scaled fixed-device rect or the editor-fill wrapper.
+            const previewInner = (
+              <>
+                {slotPreviewUsesSample && (
+                  <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-medium pointer-events-none">
+                    Sample body — replaced by generated content at runtime
+                  </div>
+                )}
+                <SlotFlowView
+                  key={`slotprev-${beat!.id}-${selVp.id}`}
+                  beatType={beat!.type}
+                  slots={slotSpec}
+                  content={slotPreviewContent}
+                  theme={renderTheme ?? undefined}
+                  backgroundUrl={backgroundUrl || null}
+                  backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                  slotIntent={previewSlotIntent}
+                  previewWidth={isFixed ? devW : undefined}
+                  previewCoarse={selVp.coarse}
+                  onResolve={(res) =>
+                    setSlotResolutions(prev =>
+                      prev.length === res.length &&
+                      prev.every(
+                        (p, i) =>
+                          p.slot === res[i].slot &&
+                          p.applied === res[i].applied &&
+                          p.overrideReason === res[i].overrideReason
+                      )
+                        ? prev
+                        : res
+                    )
+                  }
+                  onAction={() => { /* read-only preview — clicks inert in the editor */ }}
+                />
+                {/* 3d-4 — direct-manipulation gap grip. Delta is divided by
+                    the viewport scale so a screen-pixel drag maps to the
+                    right number of LOGICAL px even when the rect is
+                    fit-scaled. Transient during drag; one commit on release. */}
+                {actionSlotName && (
+                  <div
+                    role="slider"
+                    aria-label="Button gap"
+                    aria-valuenow={liveGap}
+                    title={`Drag to set button gap — ${liveGap}px`}
+                    onPointerDown={(e) => {
+                      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                      setSlotGapDrag({ startY: e.clientY, startGap: anchorGap, gap: anchorGap });
+                    }}
+                    onPointerMove={(e) => {
+                      setSlotGapDrag(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              gap: Math.max(
+                                0,
+                                Math.min(
+                                  64,
+                                  Math.round(
+                                    prev.startGap +
+                                      (prev.startY - e.clientY) / Math.max(effScale, 0.01)
+                                  )
+                                )
+                              ),
+                            }
+                          : prev
+                      );
+                    }}
+                    onPointerUp={() => {
+                      setSlotGapDrag(prev => {
+                        if (prev) {
+                          const quantized = Math.max(0, Math.min(64, Math.round(prev.gap / 4) * 4));
+                          setAnchor({ gap: quantized });
+                        }
+                        return null;
+                      });
+                    }}
+                    className={`absolute left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-1 px-3 h-5 rounded-full select-none touch-none cursor-ns-resize ${
+                      slotGapDrag ? 'bg-blue-500 text-white' : 'bg-white/70 text-black/70 hover:bg-white/90'
+                    }`}
+                    style={{ bottom: 6 }}
+                  >
+                    <span className="text-[10px] leading-none font-medium tracking-wide">
+                      ⇕ gap {liveGap}px
+                    </span>
+                  </div>
+                )}
+              </>
+            );
             return (
               <div className="absolute inset-0 flex flex-col bg-neutral-900">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0">
@@ -4912,6 +5052,43 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       </button>
                     ))}
                   </div>
+                  {isFixed && (
+                    <>
+                      <div className="flex rounded overflow-hidden border border-white/20">
+                        {([
+                          ['fit', 'Fit'],
+                          ['one', '1:1'],
+                        ] as const).map(([m, label]) => {
+                          const active =
+                            slotScaleMode === m ||
+                            (slotScaleMode === 'auto' &&
+                              ((m === 'fit' && effScale < 1) || (m === 'one' && effScale === 1)));
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setSlotScaleMode(m)}
+                              title={
+                                m === 'fit'
+                                  ? 'Shrink the whole device screen to fit — see the full composition + margins'
+                                  : 'Actual pixels (scroll if larger than the editor)'
+                              }
+                              className={`px-2 py-0.5 transition-colors ${
+                                active
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/5 hover:bg-white/10 text-white/80'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <span className="opacity-60 tabular-nums">
+                        {devW}×{devH} · {scalePct}%
+                      </span>
+                    </>
+                  )}
                   {overridden.map(r => (
                     <span
                       key={r.slot}
@@ -5020,90 +5197,39 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     </>
                   )}
                 </div>
-                <div className="flex-1 min-h-0 flex justify-center p-3 overflow-auto">
-                  <div
-                    className="relative h-full bg-black shadow-xl ring-1 ring-white/15 shrink-0"
-                    style={{ width: selVp.width ? `${selVp.width}px` : '100%' }}
-                  >
-                    {slotPreviewUsesSample && (
-                      <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-medium pointer-events-none">
-                        Sample body — replaced by generated content at runtime
-                      </div>
-                    )}
-                    <SlotFlowView
-                      key={`slotprev-${beat!.id}-${selVp.id}`}
-                      beatType={beat!.type}
-                      slots={slotSpec}
-                      content={slotPreviewContent}
-                      theme={renderTheme ?? undefined}
-                      backgroundUrl={backgroundUrl || null}
-                      backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
-                      slotIntent={previewSlotIntent}
-                      previewWidth={selVp.width ?? undefined}
-                      previewCoarse={selVp.coarse}
-                      onResolve={(res) =>
-                        setSlotResolutions(prev =>
-                          prev.length === res.length &&
-                          prev.every(
-                            (p, i) =>
-                              p.slot === res[i].slot &&
-                              p.applied === res[i].applied &&
-                              p.overrideReason === res[i].overrideReason
-                          )
-                            ? prev
-                            : res
-                        )
-                      }
-                      onAction={() => { /* read-only preview — clicks inert in the editor */ }}
-                    />
-                    {/* 3d-4 — direct-manipulation gap grip: drag the action
-                        row up/down to set the gap (the spatial twin of the
-                        panel slider). Transient during drag (live reflow, no
-                        undo spam); one setAnchor commit on release. Mode/h
-                        stay panel-only — drag only the continuous axis. */}
-                    {actionSlotName && (
+                <div
+                  ref={slotStageRef}
+                  className={`flex-1 min-h-0 flex p-3 overflow-auto ${
+                    isFixed ? 'items-center justify-center' : ''
+                  }`}
+                >
+                  {isFixed ? (
+                    // Fixed device rect, transform-scaled. The footprint
+                    // wrapper carries the SCALED size so flex-centering and
+                    // overflow-scroll account for the visual size while the
+                    // inner rect renders at true device px (faithful layout).
+                    <div
+                      className="shrink-0"
+                      style={{ width: devW * effScale, height: devH * effScale }}
+                    >
                       <div
-                        role="slider"
-                        aria-label="Button gap"
-                        aria-valuenow={liveGap}
-                        title={`Drag to set button gap — ${liveGap}px`}
-                        onPointerDown={(e) => {
-                          (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                          setSlotGapDrag({ startY: e.clientY, startGap: anchorGap, gap: anchorGap });
+                        className="relative bg-black shadow-xl ring-2 ring-amber-400/80"
+                        style={{
+                          width: devW,
+                          height: devH,
+                          transform: `scale(${effScale})`,
+                          transformOrigin: 'top left',
                         }}
-                        onPointerMove={(e) => {
-                          setSlotGapDrag(prev =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  gap: Math.max(
-                                    0,
-                                    Math.min(64, Math.round(prev.startGap + (prev.startY - e.clientY)))
-                                  ),
-                                }
-                              : prev
-                          );
-                        }}
-                        onPointerUp={() => {
-                          setSlotGapDrag(prev => {
-                            if (prev) {
-                              const quantized = Math.max(0, Math.min(64, Math.round(prev.gap / 4) * 4));
-                              setAnchor({ gap: quantized });
-                            }
-                            return null;
-                          });
-                        }}
-                        className={`absolute left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-1 px-3 h-5 rounded-full select-none touch-none cursor-ns-resize ${
-                          slotGapDrag ? 'bg-blue-500 text-white' : 'bg-white/70 text-black/70 hover:bg-white/90'
-                        }`}
-                        style={{ bottom: 6 }}
                       >
-                        <span className="text-[10px] leading-none font-medium tracking-wide">
-                          ⇕ gap {liveGap}px
-                        </span>
+                        {previewInner}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    // "Editor" preset — fill the area, truly responsive to it.
+                    <div className="relative w-full h-full bg-black shadow-xl ring-2 ring-amber-400/80">
+                      {previewInner}
+                    </div>
+                  )}
                 </div>
               </div>
             );
