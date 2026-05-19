@@ -10,7 +10,8 @@ import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
-import { shouldUseSlotMode, getSlotSpec } from '../utils/slotLayout';
+import { SpatialFlowView } from '../components/SpatialFlowView';
+import { shouldUseSlotMode, getSlotSpec, shouldUseSpatialMode, getSpatialSpec } from '../utils/slotLayout';
 import { PanoramaView } from '../components/PanoramaView';
 // MapBeatLeaflet replaces the v0.9.48 MapBeatPlaceholder. Same props,
 // real interactive OpenStreetMap tiles + target/player markers + radius
@@ -1892,6 +1893,35 @@ export class ReactRenderer extends BaseRenderer {
         };
       } else {
         resolve('');
+      }
+
+      // ── Phase-3 spatial-composite branch (Option A) ──
+      // A uniformly-scaled image layer + the responsive flow layer over it.
+      // Same per-instance zero-regression guard as slot mode (baked
+      // locations → absolute path). Checked BEFORE slot mode since it is the
+      // more specific layoutMode. No beat declares layoutMode:"spatial" yet
+      // (3a is a pure-addition primitive) so this is inert until 3b.
+      const spatialSpec = shouldUseSpatialMode(beatType, authorPositioned)
+        ? getSpatialSpec(beatType)
+        : null;
+      if (spatialSpec) {
+        const spBg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        console.log(`[ReactRenderer ${this.instanceId}] Rendering SPATIAL-MODE ${beatType} (no author locations)`);
+        const spIntent = (this.getState('slotIntent') as SlotIntent | undefined)
+          ?? (content.slotIntent as SlotIntent | undefined);
+        this.renderComponent(
+          <SpatialFlowView
+            beatType={beatType}
+            spatial={spatialSpec}
+            content={content}
+            theme={this.theme}
+            imageUrl={this.backgroundImageUrl}
+            backgroundColor={spBg}
+            slotIntent={spIntent}
+            onAction={this.handleAction}
+          />
+        );
+        return;
       }
 
       // ── Responsive slot-mode branch (Phase 1, endScreen test bed) ──
