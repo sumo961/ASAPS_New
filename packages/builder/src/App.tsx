@@ -54,6 +54,7 @@ import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal'
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
 import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
+import { mergeGeneratedVariables } from './utils/generatedVariables';
 import { BUILT_IN_THEMES } from '@asaps/core';
 import { useVCSStatus } from './vcs/VCSStatusProvider';
 import { VCSPanel } from './components/vcs/VCSPanel';
@@ -1438,6 +1439,30 @@ function App() {
       // write those stale chars into the new project (the v0.9.50 bug).
       if (story.characters && Array.isArray(story.characters)) {
         setCharacters(story.characters);
+      }
+
+      // Wire the generated story's top-level variables[] into
+      // globalSettings.variables so the Variables panel / Inspector /
+      // state-preset editor can see them. Previously these were silently
+      // dropped on import — the story still played (StoryContext creates a
+      // var on first write) but the authoring surfaces were blind to them.
+      // Character counters need no equivalent step: story.characters carry
+      // counters[], which flow through loadStoryData / setCharacters and are
+      // seeded at runtime. The ref is updated alongside state because the
+      // imminent injection save reads globalSettingsRef.current before the
+      // state→ref effect runs.
+      {
+        const mergedVars = mergeGeneratedVariables(
+          globalSettingsRef.current ?? globalSettings,
+          story.variables
+        );
+        if (mergedVars) {
+          globalSettingsRef.current = mergedVars;
+          setGlobalSettings(mergedVars);
+          console.log(
+            `[App] Wired ${mergedVars.variables?.length ?? 0} variable(s) into globalSettings.variables`
+          );
+        }
       }
 
       // NOTE: Don't call markChanged() here - we'll save the project immediately
@@ -4752,6 +4777,27 @@ function App() {
     } else {
       console.log('[App] No characters in AI response; clearing character state');
       setCharacters([]);
+    }
+
+    // Wire the generated story's top-level variables[] into
+    // globalSettings.variables so the authoring surfaces (Variables panel,
+    // Inspector, state-preset editor) see them. Without this they were
+    // silently dropped on import — the story still played (vars are created
+    // on first write) but were invisible to the editor. Character counters
+    // need no equivalent step (they ride on story.characters and are seeded
+    // at runtime). Mirrors the WebSocket/injected handler.
+    {
+      const mergedVars = mergeGeneratedVariables(
+        globalSettingsRef.current ?? globalSettings,
+        story.variables
+      );
+      if (mergedVars) {
+        globalSettingsRef.current = mergedVars;
+        setGlobalSettings(mergedVars);
+        console.log(
+          `[App] Wired ${mergedVars.variables?.length ?? 0} variable(s) into globalSettings.variables`
+        );
+      }
     }
 
     // Add metadata
