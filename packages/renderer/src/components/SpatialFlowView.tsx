@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type {
   SlotIntent,
   SlotIntentResolution,
@@ -126,6 +126,16 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   // animate in parallel because they share the same flip moment.
   const [imagePhase, setImagePhase] = useState<'enter' | 'exit'>('enter');
   const handleExitStart = useCallback(() => setImagePhase('exit'), []);
+
+  // P3-anim-9 — editor Test Exit. SlotAnimationsEditor dispatches this
+  // CustomEvent so authors can preview the exit without clicking through
+  // the beat. SlotFlowView listens to the same event in parallel; both
+  // layers flip together, just like the click path.
+  useEffect(() => {
+    const handler = () => setImagePhase('exit');
+    window.addEventListener('asaps:slotAnimTestExit', handler);
+    return () => window.removeEventListener('asaps:slotAnimTestExit', handler);
+  }, []);
 
   // Compute spatial exit duration to forward into SlotFlowView so its
   // wait factors in both layers (max of slot exits vs. spatial exit).

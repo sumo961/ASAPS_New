@@ -459,6 +459,15 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoExitMs, slotAnimations, slots]);
 
+  // P3-anim-9 — editor Test Exit. SlotAnimationsEditor dispatches this
+  // CustomEvent so authors can preview the exit without clicking through
+  // the beat (which advances and unmounts). Never fired at runtime.
+  useEffect(() => {
+    const handler = () => setPhase('exit');
+    window.addEventListener('asaps:slotAnimTestExit', handler);
+    return () => window.removeEventListener('asaps:slotAnimTestExit', handler);
+  }, []);
+
   return (
     <div className={`${scope} slotflow-root`} style={rootStyle}>
       <style>{`
