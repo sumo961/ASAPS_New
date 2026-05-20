@@ -25,7 +25,7 @@ import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-r
 import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
-import { SlotFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 
 // VE viewport presets for the slot-mode preview. Fixed presets are a real
 // W×H device rectangle so the WHOLE composition (side/top/bottom margins,
@@ -1202,9 +1202,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // can't accidentally bake locations[] and silently flip out of slot mode
   // (the no-bake guard; this is the Phase-1.5 correctness fix).
   const beatHasAuthorLocations = (beat?.locations?.size ?? 0) > 0;
+  // P3-anim-6.5 — spatial-mode beats (titleScreen, today the only one)
+  // also get the responsive preview: SlotFlowView covers the flow layer,
+  // SpatialFlowView wraps it with the image-layer animation. Both branches
+  // resolve to the same `slotSpec` shape from getSlotSpec / getSpatialSpec.
+  const isSpatialPreview =
+    !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations;
   const isSlotPreview =
-    !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations;
-  const slotSpec = isSlotPreview ? getSlotSpec(beat!.type) : null;
+    (!!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations)
+    || isSpatialPreview;
+  const slotSpec = isSpatialPreview
+    ? (getSpatialSpec(beat!.type)?.slots ?? null)
+    : (isSlotPreview ? getSlotSpec(beat!.type) : null);
   // Plain (non-memoized) derivation: the switch is trivial, and param edits
   // from the Inspector mutate the same Beat instance without changing its
   // identity — a useMemo keyed on `beat` would go stale on text edits.
@@ -1215,7 +1224,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const slotPreviewContent: Record<string, any> | null =
     !isSlotPreview || !beat || !slotPreviewParams
       ? null
-      : beat.type === 'endScreen'
+      : beat.type === 'titleScreen'
+        ? {
+            // P3-anim-6.5 — titleScreen (spatial mode). The flow slots are
+            // 'title' (heading) + 'actions' (start button); the spatial
+            // image rides on the beat background asset, threaded as
+            // imageUrl on SpatialFlowView.
+            title: slotPreviewParams.title || 'Untitled Story',
+            buttonText: slotPreviewParams.buttonText || 'Start',
+          }
+        : beat.type === 'endScreen'
         ? {
             message: slotPreviewParams.message ?? '',
             showRestart: slotPreviewParams.showRestart,
@@ -5042,35 +5060,74 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     Sample body — replaced by generated content at runtime
                   </div>
                 )}
-                <SlotFlowView
-                  key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
-                  beatType={beat!.type}
-                  slots={slotSpec}
-                  content={slotPreviewContent}
-                  theme={renderTheme ?? undefined}
-                  backgroundUrl={backgroundUrl || null}
-                  backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
-                  slotIntent={previewSlotIntent}
-                  slotAnimations={
-                    (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
-                  }
-                  previewWidth={isFixed ? devW : undefined}
-                  previewCoarse={selVp.coarse}
-                  onResolve={(res) =>
-                    setSlotResolutions(prev =>
-                      prev.length === res.length &&
-                      prev.every(
-                        (p, i) =>
-                          p.slot === res[i].slot &&
-                          p.applied === res[i].applied &&
-                          p.overrideReason === res[i].overrideReason
+                {isSpatialPreview ? (
+                  <SpatialFlowView
+                    key={`spatprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
+                    beatType={beat!.type}
+                    spatial={{
+                      source: 'background',
+                      fit: getSpatialSpec(beat!.type)?.fit ?? 'contain',
+                      slots: slotSpec!,
+                    }}
+                    content={slotPreviewContent}
+                    theme={renderTheme ?? undefined}
+                    imageUrl={backgroundUrl || null}
+                    backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                    slotIntent={previewSlotIntent}
+                    slotAnimations={
+                      (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
+                    }
+                    spatialAnimations={
+                      (slotPreviewParams?.spatialAnimations as SpatialAnimations | undefined) ?? undefined
+                    }
+                    previewWidth={isFixed ? devW : undefined}
+                    previewCoarse={selVp.coarse}
+                    onResolve={(res) =>
+                      setSlotResolutions(prev =>
+                        prev.length === res.length &&
+                        prev.every(
+                          (p, i) =>
+                            p.slot === res[i].slot &&
+                            p.applied === res[i].applied &&
+                            p.overrideReason === res[i].overrideReason
+                        )
+                          ? prev
+                          : res
                       )
-                        ? prev
-                        : res
-                    )
-                  }
-                  onAction={() => { /* read-only preview — clicks inert in the editor */ }}
-                />
+                    }
+                    onAction={() => { /* read-only preview */ }}
+                  />
+                ) : (
+                  <SlotFlowView
+                    key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
+                    beatType={beat!.type}
+                    slots={slotSpec}
+                    content={slotPreviewContent}
+                    theme={renderTheme ?? undefined}
+                    backgroundUrl={backgroundUrl || null}
+                    backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                    slotIntent={previewSlotIntent}
+                    slotAnimations={
+                      (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
+                    }
+                    previewWidth={isFixed ? devW : undefined}
+                    previewCoarse={selVp.coarse}
+                    onResolve={(res) =>
+                      setSlotResolutions(prev =>
+                        prev.length === res.length &&
+                        prev.every(
+                          (p, i) =>
+                            p.slot === res[i].slot &&
+                            p.applied === res[i].applied &&
+                            p.overrideReason === res[i].overrideReason
+                        )
+                          ? prev
+                          : res
+                      )
+                    }
+                    onAction={() => { /* read-only preview — clicks inert in the editor */ }}
+                  />
+                )}
                 {/* 3d-4 — direct-manipulation gap grip. Delta is divided by
                     the viewport scale so a screen-pixel drag maps to the
                     right number of LOGICAL px even when the rect is
