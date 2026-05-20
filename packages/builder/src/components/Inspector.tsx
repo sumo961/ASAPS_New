@@ -564,6 +564,55 @@ export const Inspector: React.FC<InspectorProps> = ({
     rebuildConnectionsAndUpdate(updatedBeat);
   };
 
+  // P3-3c-4 — spatial-hotspot controls (NEW path, distinct from the
+  // legacy beat.locations pixel-hotspot). Lives on `choice.hotspot` as
+  // normalized 0–1 against the spatial image rect. When every choice
+  // has one (and the beat has no baked locations), MovementChoiceBeat
+  // composes through SpatialFlowView automatically (P3-3c-2 routing).
+  const handleAddSpatialHotspot = (choiceIndex: number) => {
+    if (!beat || !onUpdate) return;
+    const choices = [...(localBeat.parameters?.choices || [])];
+    if (!choices[choiceIndex]) return;
+    // Stagger defaults so multiple new hotspots don't stack invisibly.
+    const stagger = (choiceIndex % 4) * 0.18;
+    choices[choiceIndex] = {
+      ...choices[choiceIndex],
+      hotspot: {
+        x: 0.1 + stagger,
+        y: 0.4,
+        width: 0.18,
+        height: 0.18,
+        shape: 'rect',
+      },
+    };
+    const updated = { ...localBeat, parameters: { ...localBeat.parameters, choices } };
+    setLocalBeat(updated);
+    onUpdate(beat.id, updated as any);
+  };
+
+  const handleRemoveSpatialHotspot = (choiceIndex: number) => {
+    if (!beat || !onUpdate) return;
+    const choices = [...(localBeat.parameters?.choices || [])];
+    if (!choices[choiceIndex]) return;
+    const { hotspot, ...rest } = choices[choiceIndex] as any;
+    void hotspot;
+    choices[choiceIndex] = rest;
+    const updated = { ...localBeat, parameters: { ...localBeat.parameters, choices } };
+    setLocalBeat(updated);
+    onUpdate(beat.id, updated as any);
+  };
+
+  const handleSetSpatialHotspotShape = (choiceIndex: number, shape: 'rect' | 'ellipse') => {
+    if (!beat || !onUpdate) return;
+    const choices = [...(localBeat.parameters?.choices || [])];
+    const cur = choices[choiceIndex] as any;
+    if (!cur?.hotspot) return;
+    choices[choiceIndex] = { ...cur, hotspot: { ...cur.hotspot, shape } };
+    const updated = { ...localBeat, parameters: { ...localBeat.parameters, choices } };
+    setLocalBeat(updated);
+    onUpdate(beat.id, updated as any);
+  };
+
   // Helper functions for Pick Prop
   const handleAddProp = () => {
     // Generate a unique prop name (New Prop 1, New Prop 2, etc.)
@@ -3816,6 +3865,59 @@ export const Inspector: React.FC<InspectorProps> = ({
                               New
                             </button>
                           </div>
+
+                          {/* P3-3c-4 — spatial hotspot (normalized 0–1 on the
+                              image rect). Independent from the locationName /
+                              legacy pixel-hotspot path above. When every
+                              choice has one (and the beat has no baked
+                              locations), the beat composes through
+                              SpatialFlowView and the canvas editor lets the
+                              author drag-place them visually. */}
+                          {(() => {
+                            const sp = (choice as any).hotspot;
+                            return (
+                              <div className="flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
+                                <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
+                                {sp ? (
+                                  <>
+                                    <select
+                                      value={sp.shape || 'rect'}
+                                      onChange={(e) =>
+                                        handleSetSpatialHotspotShape(index, e.target.value as 'rect' | 'ellipse')
+                                      }
+                                      className="text-xs px-1 py-0.5 border rounded bg-white"
+                                      title="Shape — rectangle or oval"
+                                    >
+                                      <option value="rect">Rectangle</option>
+                                      <option value="ellipse">Ellipse</option>
+                                    </select>
+                                    <span className="text-[10px] text-gray-500 ml-auto">
+                                      {Math.round(sp.x * 100)}%, {Math.round(sp.y * 100)}% · {Math.round(sp.width * 100)}×{Math.round(sp.height * 100)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveSpatialHotspot(index)}
+                                      className="text-xs px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 text-red-600"
+                                      title="Remove the spatial hotspot — keeps the choice"
+                                    >
+                                      Remove
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddSpatialHotspot(index)}
+                                      className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 ml-auto"
+                                      title="Add a normalized clickable region on the spatial image — drag in the Visual Editor to place it"
+                                    >
+                                      Add hotspot
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <select
                             value={choice.target || ''}
