@@ -4304,7 +4304,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </div>
                       
                       {localBeat.parameters?.props?.map((prop: PropWithEffect, index: number) => (
-                        <div key={prop.id} className="p-3 bg-gray-50 rounded-lg space-y-2 mb-2">
+                        <div
+                          key={prop.id}
+                          onPointerEnter={() => dispatchChoiceHover(prop.id)}
+                          onPointerLeave={() => dispatchChoiceHover(null)}
+                          className={`p-3 rounded-lg space-y-2 mb-2 transition-colors ${
+                            hoveredHotspotId === prop.id
+                              ? 'bg-green-50 ring-2 ring-green-400'
+                              : 'bg-gray-50'
+                          }`}
+                        >
                           <div className="flex justify-between">
                             <span className="text-xs font-medium">Prop {index + 1}</span>
                             <button
@@ -4495,6 +4504,58 @@ export const Inspector: React.FC<InspectorProps> = ({
                               Name added to inventory when picked. Leave empty to use "{prop.name || 'prop name'}"
                             </span>
                           </div>
+
+                          {/* P3-3c-8 — spatial hotspot (parallel to the movementChoice
+                              flow). Same data shape on `prop.hotspot`. */}
+                          {(() => {
+                            const sp = (prop as any).hotspot;
+                            return (
+                              <div className="flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
+                                <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
+                                {sp ? (
+                                  <>
+                                    <select
+                                      value={sp.shape || 'rect'}
+                                      onChange={(e) =>
+                                        handleUpdateProp(index, 'hotspot', { ...sp, shape: e.target.value })
+                                      }
+                                      className="text-xs px-1 py-0.5 border rounded bg-white"
+                                    >
+                                      <option value="rect">Rectangle</option>
+                                      <option value="ellipse">Ellipse</option>
+                                    </select>
+                                    <span className="text-[10px] text-gray-500 ml-auto">
+                                      {Math.round(sp.x * 100)}%, {Math.round(sp.y * 100)}% · {Math.round(sp.width * 100)}×{Math.round(sp.height * 100)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateProp(index, 'hotspot', undefined)}
+                                      className="text-xs px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 text-red-600"
+                                    >
+                                      Remove
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const stagger = (index % 4) * 0.18;
+                                      handleUpdateProp(index, 'hotspot', {
+                                        x: 0.1 + stagger,
+                                        y: 0.4,
+                                        width: 0.18,
+                                        height: 0.18,
+                                        shape: 'rect',
+                                      });
+                                    }}
+                                    className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 ml-auto"
+                                  >
+                                    Add hotspot
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <select
                             value={prop.target || ''}

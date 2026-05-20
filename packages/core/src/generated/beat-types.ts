@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.14.0
- * Generated: 2026-05-20T14:41:57.138Z
+ * Schema Version: 2.15.0
+ * Generated: 2026-05-20T17:15:27.684Z
  */
 
 // ============================================
@@ -80,6 +80,7 @@ export interface PropOption {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
+  hotspot?: '{ x: number, y: number, width: number, height: number, shape: rect' | 'ellipse }?';
 }
 
 /**

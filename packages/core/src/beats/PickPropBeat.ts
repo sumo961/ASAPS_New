@@ -134,7 +134,10 @@ export class PickPropBeat extends Beat {
         name: this.processText(p.name, context),
         displayName: p.displayName ? this.processText(p.displayName, context) : undefined,
         description: this.processText(p.description, context),
-        locationName: p.locationName  // For visual element association (like movementChoice)
+        locationName: p.locationName,  // For visual element association (like movementChoice)
+        // P3-3c-8 — normalized spatial hotspot. Routes through SpatialFlowView
+        // when any prop has it AND there are no baked locations.
+        hotspot: (p as any).hotspot,
       })),
       locations
     );

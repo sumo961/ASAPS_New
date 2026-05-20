@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -80,7 +80,8 @@
         "counter": "string?",
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
-        "soundEffect": "string?"
+        "soundEffect": "string?",
+        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
       },
       "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key."
     },
@@ -607,6 +608,14 @@
       "locationMapping": {
         "question": "question"
       },
+      "layoutModeNote": "P3-3c-8 — pickProp flips into spatial mode (SpatialFlowView composite) when ANY prop carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each prop becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderPropSelection path (zero regression).",
+      "spatialLayer": {
+        "source": "background",
+        "fit": "contain"
+      },
+      "slots": [
+        { "name": "question", "role": "title", "source": "question" }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "propSelection"

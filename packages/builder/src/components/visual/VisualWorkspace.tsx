@@ -935,59 +935,68 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // visual feedback) and commit:true on pointer-up (creates an undoable
   // command via onBeatUpdate). The on-disk shape stays normalized 0–1.
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
+
+  // P3-3c-8 — shared callbacks across movementChoice (choices[]) and
+  // pickProp (props[]). Each callback derives the items-key from
+  // beat.type at call time to avoid forward references; the spatial
+  // preview detection (isHotspotChoicePreview) is computed later.
+  const hotspotItemsKeyFor = (b: any): 'choices' | 'props' | null =>
+    b?.type === 'movementChoice' ? 'choices'
+    : b?.type === 'pickProp' ? 'props'
+    : null;
   const onHotspotChange = useCallback(
     (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => {
-      if (!beat) return;
+      const hotspotItemsKey = hotspotItemsKeyFor(beat);
+      if (!beat || !hotspotItemsKey) return;
       const params = beat.getParameters?.() ?? {};
-      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
-      const idx = choices.findIndex((c: any) => c?.id === id);
+      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
+      const idx = items.findIndex((c: any) => c?.id === id);
       if (idx < 0) return;
-      const cur = choices[idx];
+      const cur = items[idx];
       const curHotspot = (cur as any).hotspot ?? {};
-      choices[idx] = {
+      items[idx] = {
         ...cur,
         hotspot: { ...curHotspot, x: next.x, y: next.y, width: next.width, height: next.height },
       };
-      // In-memory update so the live preview reflects the drag instantly.
-      beat.updateParameters?.({ choices });
+      beat.updateParameters?.({ [hotspotItemsKey]: items });
       if (commit && onBeatUpdate) {
         onBeatUpdate(beat.id, {
-          parameters: { ...beat.getParameters(), choices },
+          parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
         } as any);
       }
     },
     [beat, onBeatUpdate]
   );
 
-  // P3-3c-6 — strip choice.hotspot but keep the choice. Triggered by
-  // Backspace/Delete on a selected hotspot in the canvas.
+  // P3-3c-6 — strip the item's hotspot but keep the item itself.
   const onHotspotDelete = useCallback(
     (id: string) => {
-      if (!beat || !onBeatUpdate) return;
+      const hotspotItemsKey = hotspotItemsKeyFor(beat);
+      if (!beat || !onBeatUpdate || !hotspotItemsKey) return;
       const params = beat.getParameters?.() ?? {};
-      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
-      const idx = choices.findIndex((c: any) => c?.id === id);
+      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
+      const idx = items.findIndex((c: any) => c?.id === id);
       if (idx < 0) return;
-      const { hotspot, ...rest } = choices[idx] as any;
+      const { hotspot, ...rest } = items[idx] as any;
       void hotspot;
-      choices[idx] = rest;
-      beat.updateParameters?.({ choices });
+      items[idx] = rest;
+      beat.updateParameters?.({ [hotspotItemsKey]: items });
       onBeatUpdate(beat.id, {
-        parameters: { ...beat.getParameters(), choices },
+        parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
       } as any);
     },
     [beat, onBeatUpdate]
   );
 
-  // P3-3c-5 — canvas draw-to-create new hotspot. Attach to the first
-  // choice without a hotspot; if every choice already has one, create
-  // a fresh choice with a placeholder id+text and attach there. Returns
-  // the receiving choice's id so the overlay can auto-select it.
+  // P3-3c-5 — canvas draw-to-create. For movementChoice the placeholder
+  // is a new choice {id, text, target}; for pickProp it's a new prop
+  // {id, name, description, target}.
   const onHotspotCreate = useCallback(
     (rect: { x: number; y: number; width: number; height: number }): string | null => {
-      if (!beat || !onBeatUpdate) return null;
+      const hotspotItemsKey = hotspotItemsKeyFor(beat);
+      if (!beat || !onBeatUpdate || !hotspotItemsKey) return null;
       const params = beat.getParameters?.() ?? {};
-      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
+      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
       const nextHotspot = {
         x: rect.x,
         y: rect.y,
@@ -995,20 +1004,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         height: rect.height,
         shape: 'rect' as const,
       };
-      let targetIdx = choices.findIndex((c: any) => !c?.hotspot);
+      let targetIdx = items.findIndex((c: any) => !c?.hotspot);
       if (targetIdx < 0) {
-        // All have hotspots — append a new placeholder choice.
-        const newId = `choice-${Date.now().toString(36).slice(-6)}`;
-        choices.push({ id: newId, text: 'New choice', target: '', hotspot: nextHotspot });
-        targetIdx = choices.length - 1;
+        const newId = `${hotspotItemsKey === 'props' ? 'prop' : 'choice'}-${Date.now().toString(36).slice(-6)}`;
+        const placeholder = hotspotItemsKey === 'props'
+          ? { id: newId, name: 'New prop', description: '', target: '', hotspot: nextHotspot }
+          : { id: newId, text: 'New choice', target: '', hotspot: nextHotspot };
+        items.push(placeholder);
+        targetIdx = items.length - 1;
       } else {
-        choices[targetIdx] = { ...choices[targetIdx], hotspot: nextHotspot };
+        items[targetIdx] = { ...items[targetIdx], hotspot: nextHotspot };
       }
-      beat.updateParameters?.({ choices });
+      beat.updateParameters?.({ [hotspotItemsKey]: items });
       onBeatUpdate(beat.id, {
-        parameters: { ...beat.getParameters(), choices },
+        parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
       } as any);
-      return (choices[targetIdx] as any).id ?? null;
+      return (items[targetIdx] as any).id ?? null;
     },
     [beat, onBeatUpdate]
   );
@@ -1293,15 +1304,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // even though its schema isn't layoutMode:spatial (the routing is
   // data-driven there).
   // P3-3c-5 — relaxed: the editor flips into spatial mode as soon as ANY
-  // choice has a hotspot OR there are no choices yet. This lets the author
-  // draw the FIRST hotspot via drag (which auto-creates a choice). The
-  // runtime detection (in renderMovement) keeps the same shape — choices
-  // without a hotspot just don't render as clickable regions.
+  // choice/prop has a hotspot OR there are none yet. This lets the author
+  // draw the FIRST hotspot via drag (which auto-creates a choice/prop).
+  // The runtime detection (in renderMovement / renderPropSelection) keeps
+  // the same shape — items without a hotspot just don't render as
+  // clickable regions.
+  // P3-3c-8 — pickProp shares the same overlay/canvas-editor path; the
+  // underlying data field happens to be `props` instead of `choices` so
+  // we read whichever is present on the beat. (The hotspot callbacks
+  // hoisted earlier in this component derive the key independently via
+  // hotspotItemsKeyFor.)
+  const hotspotItemsKey: 'choices' | 'props' | null =
+    !!beat && !isPanoramaBeat && !beatHasAuthorLocations
+      ? beat.type === 'movementChoice' ? 'choices'
+        : beat.type === 'pickProp' ? 'props'
+        : null
+      : null;
+  const hotspotItems: any[] = hotspotItemsKey
+    ? (Array.isArray((beat as any)[hotspotItemsKey]) ? (beat as any)[hotspotItemsKey] : [])
+    : [];
   const isHotspotChoicePreview =
-    !!beat && !isPanoramaBeat && beat.type === 'movementChoice' && !beatHasAuthorLocations
-    && Array.isArray((beat as any).choices)
-    && ((beat as any).choices.some((c: any) => c && c.hotspot)
-        || (beat as any).choices.length === 0);
+    hotspotItemsKey !== null
+    && (hotspotItems.some((c: any) => c && c.hotspot) || hotspotItems.length === 0);
   const isSpatialPreview =
     (!!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations)
     || isHotspotChoicePreview;
@@ -1336,6 +1360,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // text becomes a flow slot; the choices appear as hotspots
               // on the spatial layer (rendered by the editor overlay).
               question: slotPreviewParams.question || 'Where do you want to go?',
+            }
+        : beat.type === 'pickProp'
+          ? {
+              // P3-3c-8 — pickProp spatial mode. Mirrors movementChoice;
+              // props appear as hotspots on the image.
+              question: slotPreviewParams.question || 'What do you want to interact with?',
             }
         : beat.type === 'endScreen'
         ? {
@@ -5214,7 +5244,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       <HotspotEditOverlay
                         imageUrl={backgroundUrl || null}
                         fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
-                        hotspots={((slotPreviewParams?.choices as any[]) ?? [])
+                        hotspots={((hotspotItemsKey
+                          ? (slotPreviewParams?.[hotspotItemsKey] as any[])
+                          : []) ?? [])
                           .filter((c) => c && c.hotspot)
                           .map((c) => ({
                             id: c.id,
@@ -5223,7 +5255,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             width: c.hotspot.width,
                             height: c.hotspot.height,
                             shape: c.hotspot.shape,
-                            label: c.displayText || c.text,
+                            label: c.displayText || c.text || c.displayName || c.name,
                           }))}
                         selectedId={selectedHotspotId}
                         onSelect={setSelectedHotspotId}
