@@ -188,6 +188,24 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
 
+  // P3-3c-7 — bidirectional hotspot hover link. Canvas dispatches
+  // `asaps:hotspotHover` with the hovered choice id (or null on leave);
+  // we mirror it into local state so the matching choice card lights
+  // up. The choice card below dispatches `asaps:choiceHover` so the
+  // canvas hotspot highlights in reverse.
+  const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string | null } | undefined;
+      setHoveredHotspotId(detail?.id ?? null);
+    };
+    window.addEventListener('asaps:hotspotHover', handler);
+    return () => window.removeEventListener('asaps:hotspotHover', handler);
+  }, []);
+  const dispatchChoiceHover = (id: string | null) => {
+    window.dispatchEvent(new CustomEvent('asaps:choiceHover', { detail: { id } }));
+  };
+
   // Translation state
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
@@ -3781,7 +3799,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </div>
                       
                       {localBeat.parameters?.choices?.map((choice: ChoiceWithCounter, index: number) => (
-                        <div key={choice.id} className="p-3 bg-gray-50 rounded-lg space-y-2 mb-2">
+                        <div
+                          key={choice.id}
+                          onPointerEnter={() => dispatchChoiceHover(choice.id)}
+                          onPointerLeave={() => dispatchChoiceHover(null)}
+                          className={`p-3 rounded-lg space-y-2 mb-2 transition-colors ${
+                            hoveredHotspotId === choice.id
+                              ? 'bg-green-50 ring-2 ring-green-400'
+                              : 'bg-gray-50'
+                          }`}
+                        >
                           <div className="flex justify-between">
                             <span className="text-xs font-medium">Choice {index + 1}</span>
                             <button

@@ -959,6 +959,60 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     [beat, onBeatUpdate]
   );
 
+  // P3-3c-6 — strip choice.hotspot but keep the choice. Triggered by
+  // Backspace/Delete on a selected hotspot in the canvas.
+  const onHotspotDelete = useCallback(
+    (id: string) => {
+      if (!beat || !onBeatUpdate) return;
+      const params = beat.getParameters?.() ?? {};
+      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
+      const idx = choices.findIndex((c: any) => c?.id === id);
+      if (idx < 0) return;
+      const { hotspot, ...rest } = choices[idx] as any;
+      void hotspot;
+      choices[idx] = rest;
+      beat.updateParameters?.({ choices });
+      onBeatUpdate(beat.id, {
+        parameters: { ...beat.getParameters(), choices },
+      } as any);
+    },
+    [beat, onBeatUpdate]
+  );
+
+  // P3-3c-5 — canvas draw-to-create new hotspot. Attach to the first
+  // choice without a hotspot; if every choice already has one, create
+  // a fresh choice with a placeholder id+text and attach there. Returns
+  // the receiving choice's id so the overlay can auto-select it.
+  const onHotspotCreate = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }): string | null => {
+      if (!beat || !onBeatUpdate) return null;
+      const params = beat.getParameters?.() ?? {};
+      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
+      const nextHotspot = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        shape: 'rect' as const,
+      };
+      let targetIdx = choices.findIndex((c: any) => !c?.hotspot);
+      if (targetIdx < 0) {
+        // All have hotspots — append a new placeholder choice.
+        const newId = `choice-${Date.now().toString(36).slice(-6)}`;
+        choices.push({ id: newId, text: 'New choice', target: '', hotspot: nextHotspot });
+        targetIdx = choices.length - 1;
+      } else {
+        choices[targetIdx] = { ...choices[targetIdx], hotspot: nextHotspot };
+      }
+      beat.updateParameters?.({ choices });
+      onBeatUpdate(beat.id, {
+        parameters: { ...beat.getParameters(), choices },
+      } as any);
+      return (choices[targetIdx] as any).id ?? null;
+    },
+    [beat, onBeatUpdate]
+  );
+
   // P3-anim-5 — replay tick. SlotAnimationsEditor's "Replay" button
   // dispatches `asaps:slotAnimReplay`; we key the preview SlotFlowView
   // with this tick so it remounts and all enter animations play from
@@ -1238,10 +1292,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // whose every choice carries a hotspot composes through SpatialFlowView
   // even though its schema isn't layoutMode:spatial (the routing is
   // data-driven there).
+  // P3-3c-5 — relaxed: the editor flips into spatial mode as soon as ANY
+  // choice has a hotspot OR there are no choices yet. This lets the author
+  // draw the FIRST hotspot via drag (which auto-creates a choice). The
+  // runtime detection (in renderMovement) keeps the same shape — choices
+  // without a hotspot just don't render as clickable regions.
   const isHotspotChoicePreview =
     !!beat && !isPanoramaBeat && beat.type === 'movementChoice' && !beatHasAuthorLocations
-    && Array.isArray((beat as any).choices) && (beat as any).choices.length > 0
-    && (beat as any).choices.every((c: any) => c && c.hotspot);
+    && Array.isArray((beat as any).choices)
+    && ((beat as any).choices.some((c: any) => c && c.hotspot)
+        || (beat as any).choices.length === 0);
   const isSpatialPreview =
     (!!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations)
     || isHotspotChoicePreview;
@@ -5154,18 +5214,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       <HotspotEditOverlay
                         imageUrl={backgroundUrl || null}
                         fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
-                        hotspots={(slotPreviewParams?.choices as any[]).map((c) => ({
-                          id: c.id,
-                          x: c.hotspot.x,
-                          y: c.hotspot.y,
-                          width: c.hotspot.width,
-                          height: c.hotspot.height,
-                          shape: c.hotspot.shape,
-                          label: c.displayText || c.text,
-                        }))}
+                        hotspots={((slotPreviewParams?.choices as any[]) ?? [])
+                          .filter((c) => c && c.hotspot)
+                          .map((c) => ({
+                            id: c.id,
+                            x: c.hotspot.x,
+                            y: c.hotspot.y,
+                            width: c.hotspot.width,
+                            height: c.hotspot.height,
+                            shape: c.hotspot.shape,
+                            label: c.displayText || c.text,
+                          }))}
                         selectedId={selectedHotspotId}
                         onSelect={setSelectedHotspotId}
                         onChange={onHotspotChange}
+                        onCreate={onHotspotCreate}
+                        onDelete={onHotspotDelete}
                       />
                     )}
                   </>

@@ -22,11 +22,25 @@ interface Props {
   onSelect: (id: string | null) => void;
   /** Fires on every move (live) and on commit (final). */
   onChange: (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => void;
+  /**
+   * P3-3c-5 — fires when the author finishes drawing a new rectangle on
+   * empty image area. The caller decides which choice gets it (typically:
+   * first choice without a hotspot, else a freshly-added choice). Returns
+   * the new hotspot id so the overlay can auto-select it.
+   */
+  onCreate?: (rect: { x: number; y: number; width: number; height: number }) => string | null;
+  /**
+   * P3-3c-6 — fires when the author presses Backspace/Delete on a
+   * selected hotspot. The caller strips choice.hotspot but keeps the
+   * choice itself.
+   */
+  onDelete?: (id: string) => void;
 }
 
 type DragKind =
   | { kind: 'move'; id: string; startX: number; startY: number; origX: number; origY: number }
-  | { kind: 'resize'; id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } };
+  | { kind: 'resize'; id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } }
+  | { kind: 'create'; startX: number; startY: number; cur: { x: number; y: number; w: number; h: number } };
 
 const MIN_NORMALIZED = 0.02; // hotspots smaller than 2% are practically un-clickable
 
@@ -37,13 +51,20 @@ export const HotspotEditOverlay: React.FC<Props> = ({
   selectedId,
   onSelect,
   onChange,
+  onCreate,
+  onDelete,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const [imgAspect, setImgAspect] = useState<number>(0);
   const [drag, setDrag] = useState<DragKind | null>(null);
 
-  // Container size from ResizeObserver
+  // Container size from ResizeObserver. P3-3e — orientationchange also
+  // listened explicitly so the editor's image rect stays in sync when
+  // the author switches the VE viewport orientation (the ResizeObserver
+  // fires on the W↔H swap too, but on some devices the layout settles
+  // a frame after the resize event lands; rAF on orientationchange
+  // makes the re-resolve deterministic).
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -51,7 +72,17 @@ export const HotspotEditOverlay: React.FC<Props> = ({
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    const onOrient = () => requestAnimationFrame(() => {
+      if (containerRef.current) update();
+    });
+    window.addEventListener('orientationchange', onOrient);
+    const mq = window.matchMedia?.('(orientation: portrait)');
+    mq?.addEventListener?.('change', onOrient);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('orientationchange', onOrient);
+      mq?.removeEventListener?.('change', onOrient);
+    };
   }, []);
 
   // Pre-load the image to capture natural aspect (lets the rect math
@@ -72,6 +103,42 @@ export const HotspotEditOverlay: React.FC<Props> = ({
 
   const rect = imageRectPx(imgAspect, box.w, box.h, fit);
 
+  // P3-3c-6 — Backspace / Delete removes the selected hotspot. Skip when
+  // focus is in a form input so the inspector text fields stay editable.
+  useEffect(() => {
+    if (!selectedId || !onDelete) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = (t?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || t?.isContentEditable) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        onDelete(selectedId);
+        onSelect(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedId, onDelete, onSelect]);
+
+  // P3-3c-7 — inspector ⇄ canvas hover link. Inspector dispatches
+  // asaps:choiceHover with detail.id (or null) when a choice card is
+  // hovered; we mirror that into local state to brighten the matching
+  // hotspot. The canvas hover (below, on each hotspot rect) dispatches
+  // the same event so the inspector can highlight in reverse.
+  const [externalHoverId, setExternalHoverId] = useState<string | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { id?: string | null } | undefined;
+      setExternalHoverId(detail?.id ?? null);
+    };
+    window.addEventListener('asaps:choiceHover', handler);
+    return () => window.removeEventListener('asaps:choiceHover', handler);
+  }, []);
+  const dispatchHover = (id: string | null) => {
+    window.dispatchEvent(new CustomEvent('asaps:hotspotHover', { detail: { id } }));
+  };
+
   // Pointer-move: drag handler (live). Commit happens on pointer-up.
   useEffect(() => {
     if (!drag) return;
@@ -85,7 +152,7 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         const nx = Math.max(0, Math.min(1 - h.width, drag.origX + dx));
         const ny = Math.max(0, Math.min(1 - h.height, drag.origY + dy));
         onChange(drag.id, { x: nx, y: ny, width: h.width, height: h.height }, false);
-      } else {
+      } else if (drag.kind === 'resize') {
         const { x, y, w, h } = drag.orig;
         let nx = x, ny = y, nw = w, nh = h;
         if (drag.corner === 'tl') {
@@ -105,17 +172,39 @@ export const HotspotEditOverlay: React.FC<Props> = ({
           nw = Math.max(MIN_NORMALIZED, w + dx);
           nh = Math.max(MIN_NORMALIZED, h + dy);
         }
-        // Clamp inside [0,1]
         nx = Math.max(0, Math.min(1 - MIN_NORMALIZED, nx));
         ny = Math.max(0, Math.min(1 - MIN_NORMALIZED, ny));
         nw = Math.min(1 - nx, nw);
         nh = Math.min(1 - ny, nh);
         onChange(drag.id, { x: nx, y: ny, width: nw, height: nh }, false);
+      } else {
+        // create — track the live rectangle from start point to current.
+        const newW = Math.abs(dx);
+        const newH = Math.abs(dy);
+        const newX = Math.max(0, Math.min(1, drag.cur.x + Math.min(dx, 0)));
+        const newY = Math.max(0, Math.min(1, drag.cur.y + Math.min(dy, 0)));
+        setDrag({ ...drag, cur: { x: newX, y: newY, w: newW, h: newH } });
       }
     };
     const onUp = () => {
-      // Final commit: read the LATEST hotspot value (set during drag) and
-      // re-fire with commit:true so the consumer can promote to a command.
+      if (drag.kind === 'create') {
+        const { w, h } = drag.cur;
+        // Require a real drag (≥ MIN_NORMALIZED in each axis) — bare clicks
+        // already deselect via the empty-area click handler.
+        if (w >= MIN_NORMALIZED && h >= MIN_NORMALIZED && onCreate) {
+          const clampedW = Math.min(1 - drag.cur.x, w);
+          const clampedH = Math.min(1 - drag.cur.y, h);
+          const id = onCreate({
+            x: drag.cur.x,
+            y: drag.cur.y,
+            width: clampedW,
+            height: clampedH,
+          });
+          if (id) onSelect(id);
+        }
+        setDrag(null);
+        return;
+      }
       const h = hotspots.find(s => s.id === drag.id);
       if (h) onChange(drag.id, { x: h.x, y: h.y, width: h.width, height: h.height }, true);
       setDrag(null);
@@ -126,7 +215,7 @@ export const HotspotEditOverlay: React.FC<Props> = ({
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [drag, hotspots, onChange, rect.width, rect.height]);
+  }, [drag, hotspots, onChange, onCreate, onSelect, rect.width, rect.height]);
 
   const startMove = useCallback((e: React.PointerEvent, hotspot: Hotspot) => {
     e.preventDefault();
@@ -158,32 +247,73 @@ export const HotspotEditOverlay: React.FC<Props> = ({
     [],
   );
 
+  // P3-3c-5 — pointerdown on the image rect (but NOT on an existing
+  // hotspot) starts drawing a new rectangle. Bare clicks deselect; a
+  // real drag commits to onCreate at pointer-up.
+  const handleEmptyPointerDown = (e: React.PointerEvent) => {
+    if (e.target !== e.currentTarget) return; // only the image-rect surface
+    if (rect.width <= 0 || rect.height <= 0) return;
+    onSelect(null);
+    if (!onCreate) return; // creation disabled — just deselect
+    const bcr = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - bcr.left) / bcr.width;
+    const y = (e.clientY - bcr.top) / bcr.height;
+    setDrag({
+      kind: 'create',
+      startX: e.clientX,
+      startY: e.clientY,
+      cur: { x, y, w: 0, h: 0 },
+    });
+  };
+
   return (
     <div
       ref={containerRef}
       style={{ position: 'absolute', inset: 0, zIndex: 5 }}
       onPointerDown={(e) => {
-        // Clicks on the empty area deselect.
+        // Clicks on the OUTER (letterbox bar) area deselect. Empty image
+        // area starts a draw — handled by the inner div below.
         if (e.target === e.currentTarget) onSelect(null);
       }}
     >
       <div
         // Image-rect anchor — hotspots position relative to this.
+        onPointerDown={handleEmptyPointerDown}
         style={{
           position: 'absolute',
           left: rect.x,
           top: rect.y,
           width: rect.width,
           height: rect.height,
+          cursor: onCreate ? 'crosshair' : 'default',
         }}
       >
+        {/* Live draw preview — only visible during a create drag. */}
+        {drag?.kind === 'create' && drag.cur.w > 0.001 && drag.cur.h > 0.001 && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${drag.cur.x * 100}%`,
+              top: `${drag.cur.y * 100}%`,
+              width: `${drag.cur.w * 100}%`,
+              height: `${drag.cur.h * 100}%`,
+              border: '2px dashed rgba(59, 130, 246, 0.95)',
+              background: 'rgba(96, 165, 250, 0.16)',
+              pointerEvents: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        )}
         {hotspots.map((h) => {
           const isSelected = h.id === selectedId;
+          const isExternalHover = h.id === externalHoverId;
           const isEllipse = h.shape === 'ellipse';
           return (
             <div
               key={h.id}
               onPointerDown={(e) => startMove(e, h)}
+              onPointerEnter={() => dispatchHover(h.id)}
+              onPointerLeave={() => dispatchHover(null)}
               style={{
                 position: 'absolute',
                 left: `${h.x * 100}%`,
@@ -192,10 +322,14 @@ export const HotspotEditOverlay: React.FC<Props> = ({
                 height: `${h.height * 100}%`,
                 background: isSelected
                   ? 'rgba(96, 165, 250, 0.22)'
-                  : 'rgba(255, 200, 0, 0.16)',
+                  : isExternalHover
+                    ? 'rgba(34, 197, 94, 0.22)' // hover-link tint
+                    : 'rgba(255, 200, 0, 0.16)',
                 border: isSelected
                   ? '2px solid rgba(59, 130, 246, 0.95)'
-                  : '2px dashed rgba(255, 200, 0, 0.85)',
+                  : isExternalHover
+                    ? '2px solid rgba(34, 197, 94, 0.95)'
+                    : '2px dashed rgba(255, 200, 0, 0.85)',
                 borderRadius: isEllipse ? '50%' : undefined,
                 cursor: drag?.kind === 'move' && drag.id === h.id ? 'grabbing' : 'grab',
                 touchAction: 'none',

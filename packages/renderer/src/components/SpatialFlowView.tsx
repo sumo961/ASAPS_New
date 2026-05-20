@@ -221,7 +221,27 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    return () => ro.disconnect();
+    // P3-3e — orientation changes typically also fire ResizeObserver
+    // (W↔H swap), but on some devices the resize event lands a frame
+    // before the layout actually flips. Explicitly handling
+    // orientationchange + matchMedia('(orientation: portrait)') makes
+    // the re-resolve deterministic and lets normalized hotspots track
+    // the new letterboxed rect immediately.
+    const onOrient = () => {
+      // Defer one frame so clientWidth/Height reflect the post-rotation
+      // layout, not the pre-rotation transient.
+      requestAnimationFrame(() => {
+        if (containerRef.current) update();
+      });
+    };
+    window.addEventListener('orientationchange', onOrient);
+    const mq = window.matchMedia?.('(orientation: portrait)');
+    mq?.addEventListener?.('change', onOrient);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('orientationchange', onOrient);
+      mq?.removeEventListener?.('change', onOrient);
+    };
   }, []);
   const imgInsets = imageRectInsets(imgAspect, containerSize.w, containerSize.h, objectFit);
 
