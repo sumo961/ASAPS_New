@@ -23,7 +23,7 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
-import type { SlotIntentResolution, SlotIntentEntry } from '@asaps/core';
+import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { SlotFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec } from '@asaps/renderer';
 
@@ -895,6 +895,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       beat.updateParameters?.({ slotIntent: nextIntent });
       onBeatUpdate(beat.id, {
         parameters: { ...beat.getParameters(), slotIntent: nextIntent },
+      } as any);
+    },
+    [beat, onBeatUpdate]
+  );
+
+  // P3-anim-3 — slotAnimations write-back, mirroring onSlotIntentChange.
+  // The Animations tab editor receives the whole next SlotAnimations object
+  // (the merge is in the editor) and we just commit it; undo/redo lives in
+  // the same beat-param command path.
+  const onSlotAnimationsChange = useCallback(
+    (next: SlotAnimations | undefined) => {
+      if (!beat || !onBeatUpdate) return;
+      beat.updateParameters?.({ slotAnimations: next });
+      onBeatUpdate(beat.id, {
+        parameters: { ...beat.getParameters(), slotAnimations: next },
       } as any);
     },
     [beat, onBeatUpdate]
@@ -4838,6 +4853,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     console.log(`[VisualWorkspace] Animations immediately synced to beat:`, newAnimations.length, newAnimations);
                   }
                 }}
+                beatType={beat?.type}
+                slotAnimations={
+                  (beat?.getParameters?.()?.slotAnimations as SlotAnimations | undefined) ?? undefined
+                }
+                onSlotAnimationsChange={onSlotAnimationsChange}
               />
             )}
           </div>
