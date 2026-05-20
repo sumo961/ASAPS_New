@@ -25,7 +25,7 @@
  * See project_responsive_layout_system memory for the full rationale.
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
@@ -286,17 +286,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     fontFamily: theme.fonts.textFont || 'serif',
   };
 
-  const handleRestart = () => onAction('restart');
-  const handleCredits = () => onAction('credits');
-  const handleContinue = () => onAction('continue');
+  // P3-anim-4 — local exit phase. Defaults to 'enter' so the existing
+  // enter-on-mount path is unchanged. The wrapped action handler flips
+  // to 'exit', the exit animation plays, then the parent's onAction
+  // fires after the longest configured exit duration — so the next
+  // beat doesn't take over while the current one is still leaving.
+  const [phase, setPhase] = useState<'enter' | 'exit'>('enter');
 
-  // P3-anim-1 — per-slot enter animation. Returns the className + style
+  // P3-anim — per-slot enter animation. Returns the className + style
   // patch to merge into a slot wrapper. Absent / unsupported preset → no-op.
-  // P3-anim-1.5 / P3-anim-2 — enter preset palette: fade, slide-in-{L,R,T,B},
-  // scale-in. Slide `distance` is a PERCENT OF SLOT BOX (default 100 = one
-  // slot-box) — never absolute px — so it survives reflow / viewport.
-  // Threaded through a `--slotflow-anim-distance` CSS variable on the
-  // wrapper so the keyframes interpolate from the resolved value.
+  // Slide `distance` is PERCENT OF SLOT BOX (default 100 = one slot-box) —
+  // never absolute px — so it survives reflow / viewport. Threaded through
+  // a `--slotflow-anim-distance` CSS variable on the wrapper.
   const enterAnim = (slotName?: string): { className?: string; style?: React.CSSProperties } => {
     if (!slotName) return {};
     const enter: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.enter;
@@ -324,6 +325,82 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     return { className, style };
   };
 
+  // P3-anim-4 — per-slot exit animation. Mirrors enterAnim — same preset
+  // vocabulary, just the reverse direction. The slide-out keyframes start
+  // from the post-enter resting state (translate:0, opacity:1) and move
+  // OUT to the configured distance.
+  const exitAnim = (slotName?: string): { className?: string; style?: React.CSSProperties } => {
+    if (!slotName) return {};
+    const exit: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.exit;
+    if (!exit) return {};
+    const presetToClass: Record<string, string | undefined> = {
+      'fade': 'slotflow-anim-fade-out',
+      'slide-in-left': 'slotflow-anim-slide-out-left',
+      'slide-in-right': 'slotflow-anim-slide-out-right',
+      'slide-in-top': 'slotflow-anim-slide-out-top',
+      'slide-in-bottom': 'slotflow-anim-slide-out-bottom',
+      'scale-in': 'slotflow-anim-scale-out',
+    };
+    const className = presetToClass[exit.preset];
+    if (!className) return {};
+    const isSlide = exit.preset.startsWith('slide-in-');
+    const style: React.CSSProperties & Record<string, string | undefined> = {
+      animationDuration: `${exit.duration ?? 300}ms`,
+      animationDelay: exit.delay ? `${exit.delay}ms` : undefined,
+      animationTimingFunction: exit.easing ?? 'ease-in',
+    };
+    if (isSlide) {
+      const d = typeof exit.distance === 'number' ? exit.distance : 100;
+      (style as any)['--slotflow-anim-distance'] = `${d}%`;
+    }
+    return { className, style };
+  };
+
+  // P3-anim-4 — pick the phase's animation. Phase swap happens AFTER the
+  // user click, so on mount this is always enter; flipping to 'exit'
+  // re-evaluates and the exit keyframes start from the resting state.
+  const phaseAnim = (slotName?: string) =>
+    phase === 'exit' ? exitAnim(slotName) : enterAnim(slotName);
+
+  // Longest exit duration (+delay) across all slots — how long the parent
+  // onAction must be deferred so the leaving animation actually completes.
+  const computeMaxExitMs = (): number => {
+    if (!slotAnimations) return 0;
+    let max = 0;
+    for (const s of slots) {
+      const ex = slotAnimationsFor(slotAnimations, s.name)?.exit;
+      if (!ex) continue;
+      const dur = (ex.duration ?? 300) + (ex.delay ?? 0);
+      if (dur > max) max = dur;
+    }
+    return max;
+  };
+
+  // Wrapped action: if any slot has an exit animation, flip phase, wait
+  // for the longest exit to complete, then resolve the parent action.
+  // No exits configured → behaves exactly like raw onAction (no delay).
+  const dispatchAction = useCallback(
+    (id: string) => {
+      const wait = computeMaxExitMs();
+      if (wait <= 0) {
+        onAction(id);
+        return;
+      }
+      setPhase('exit');
+      // setTimeout with the longest configured wait. Using animationend on
+      // a specific slot would be more precise but would force us to pick
+      // one slot as the source of truth; the configured duration is
+      // already the author's intent, so use it directly.
+      window.setTimeout(() => onAction(id), wait);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onAction, slotAnimations, slots]
+  );
+
+  const handleRestart = () => dispatchAction('restart');
+  const handleCredits = () => dispatchAction('credits');
+  const handleContinue = () => dispatchAction('continue');
+
   return (
     <div className={`${scope} slotflow-root`} style={rootStyle}>
       <style>{`
@@ -350,7 +427,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         .${scope} .slotflow-anim-slide-in-right,
         .${scope} .slotflow-anim-slide-in-top,
         .${scope} .slotflow-anim-slide-in-bottom,
-        .${scope} .slotflow-anim-scale-in {
+        .${scope} .slotflow-anim-scale-in,
+        .${scope} .slotflow-anim-fade-out,
+        .${scope} .slotflow-anim-slide-out-left,
+        .${scope} .slotflow-anim-slide-out-right,
+        .${scope} .slotflow-anim-slide-out-top,
+        .${scope} .slotflow-anim-slide-out-bottom,
+        .${scope} .slotflow-anim-scale-out {
           animation-fill-mode: both;
         }
         .${scope} .slotflow-anim-fade-in { animation-name: slotflow-fade-in; }
@@ -359,6 +442,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         .${scope} .slotflow-anim-slide-in-top { animation-name: slotflow-slide-in-top; }
         .${scope} .slotflow-anim-slide-in-bottom { animation-name: slotflow-slide-in-bottom; }
         .${scope} .slotflow-anim-scale-in { animation-name: slotflow-scale-in; }
+        .${scope} .slotflow-anim-fade-out { animation-name: slotflow-fade-out; }
+        .${scope} .slotflow-anim-slide-out-left { animation-name: slotflow-slide-out-left; }
+        .${scope} .slotflow-anim-slide-out-right { animation-name: slotflow-slide-out-right; }
+        .${scope} .slotflow-anim-slide-out-top { animation-name: slotflow-slide-out-top; }
+        .${scope} .slotflow-anim-slide-out-bottom { animation-name: slotflow-slide-out-bottom; }
+        .${scope} .slotflow-anim-scale-out { animation-name: slotflow-scale-out; }
         @keyframes slotflow-fade-in {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -382,6 +471,30 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         @keyframes slotflow-scale-in {
           from { opacity: 0; transform: scale(0.7); }
           to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slotflow-fade-out {
+          from { opacity: 1; }
+          to   { opacity: 0; }
+        }
+        @keyframes slotflow-slide-out-left {
+          from { opacity: 1; transform: translateX(0); }
+          to   { opacity: 0; transform: translateX(calc(-1 * var(--slotflow-anim-distance, 100%))); }
+        }
+        @keyframes slotflow-slide-out-right {
+          from { opacity: 1; transform: translateX(0); }
+          to   { opacity: 0; transform: translateX(var(--slotflow-anim-distance, 100%)); }
+        }
+        @keyframes slotflow-slide-out-top {
+          from { opacity: 1; transform: translateY(0); }
+          to   { opacity: 0; transform: translateY(calc(-1 * var(--slotflow-anim-distance, 100%))); }
+        }
+        @keyframes slotflow-slide-out-bottom {
+          from { opacity: 1; transform: translateY(0); }
+          to   { opacity: 0; transform: translateY(var(--slotflow-anim-distance, 100%)); }
+        }
+        @keyframes slotflow-scale-out {
+          from { opacity: 1; transform: scale(1); }
+          to   { opacity: 0; transform: scale(0.7); }
         }
       `}</style>
 
@@ -414,7 +527,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           }}
         >
           {titleSlot && titleText && (() => {
-            const a = enterAnim(titleSlotName);
+            const a = phaseAnim(titleSlotName);
             return (
               <div
                 ref={titleRef}
@@ -440,7 +553,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             );
           })()}
           {(() => {
-            const a = enterAnim(bodySlot?.name);
+            const a = phaseAnim(bodySlot?.name);
             return (
               <div
                 className={a.className}
@@ -463,7 +576,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           Single continue (aiInfoText/onlineContent) vs restart/credits
           (endScreen/aiSummary). */}
       {actionSlot && (() => {
-        const a = enterAnim(actionSlot.name);
+        const a = phaseAnim(actionSlot.name);
         return (
         <div
           className={a.className}
