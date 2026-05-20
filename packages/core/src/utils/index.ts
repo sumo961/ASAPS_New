@@ -27,6 +27,10 @@ export {
   type SpatialAnimation,
   type SpatialAnimations,
 } from './spatialAnimation';
+export {
+  isHotspot,
+  type Hotspot,
+} from './hotspot';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';

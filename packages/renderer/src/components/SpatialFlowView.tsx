@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type {
   SlotIntent,
   SlotIntentResolution,
   SlotAnimations,
   SpatialAnimations,
   SpatialAnimation,
+  Hotspot,
 } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
@@ -31,10 +32,64 @@ interface SpatialFlowViewProps {
    * must not be uniformly scaled with the picture).
    */
   spatialAnimations?: SpatialAnimations;
+  /**
+   * P3-3c — normalized 0–1 clickable regions on the spatial IMAGE rect
+   * (NOT the container). Tracks the image's actual letterboxed box, so
+   * a hotspot drawn at (0.4, 0.3, 0.2, 0.1) lands on the same picture
+   * pixels at any viewport. Click fires onAction(hotspot.id) — same
+   * channel as button clicks in the flow layer.
+   */
+  hotspots?: Hotspot[];
+  /**
+   * Whether to render visible hotspot outlines (editor / debug). At
+   * runtime the default is false — hotspots are invisible click regions.
+   */
+  showHotspotOutlines?: boolean;
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
   onAction: (id: string) => void;
   previewWidth?: number;
   previewCoarse?: boolean;
+}
+
+/**
+ * Resolve the letterboxed image rect within a container for objectFit:contain.
+ * Returns inset percentages so we can position hotspots via CSS without
+ * needing to know the container's pixel size at hotspot-render time.
+ *
+ * - imgAspect    = naturalWidth / naturalHeight
+ * - boxAspect    = containerWidth / containerHeight
+ * - if imgAspect > boxAspect: image is letterboxed top/bottom (vertical bars)
+ *     scaledH = boxW / imgAspect, vertical bar = (boxH - scaledH) / 2
+ *   else: image is letterboxed left/right (horizontal bars)
+ *     scaledW = boxH * imgAspect, horizontal bar = (boxW - scaledW) / 2
+ *
+ * For objectFit:cover, the image fills the container and is clipped —
+ * hotspots map to (x*containerW, y*containerH) directly. Returned inset
+ * is then 0% on all sides.
+ */
+function imageRectInsets(
+  imgAspect: number,
+  boxW: number,
+  boxH: number,
+  fit: 'contain' | 'cover',
+): { top: string; left: string; right: string; bottom: string } {
+  if (fit === 'cover' || !imgAspect || !boxW || !boxH) {
+    return { top: '0%', left: '0%', right: '0%', bottom: '0%' };
+  }
+  const boxAspect = boxW / boxH;
+  if (imgAspect > boxAspect) {
+    // Letterboxed top/bottom — bars are vertical, image is full width.
+    const scaledH = boxW / imgAspect;
+    const bar = (boxH - scaledH) / 2;
+    const pct = (bar / boxH) * 100;
+    return { top: `${pct}%`, bottom: `${pct}%`, left: '0%', right: '0%' };
+  } else {
+    // Letterboxed left/right — bars are horizontal, image is full height.
+    const scaledW = boxH * imgAspect;
+    const bar = (boxW - scaledW) / 2;
+    const pct = (bar / boxW) * 100;
+    return { left: `${pct}%`, right: `${pct}%`, top: '0%', bottom: '0%' };
+  }
 }
 
 let spatialUidCounter = 0;
@@ -106,6 +161,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   slotIntent,
   slotAnimations,
   spatialAnimations,
+  hotspots,
+  showHotspotOutlines = false,
   onResolve,
   onAction,
   previewWidth,
@@ -126,6 +183,24 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   // animate in parallel because they share the same flip moment.
   const [imagePhase, setImagePhase] = useState<'enter' | 'exit'>('enter');
   const handleExitStart = useCallback(() => setImagePhase('exit'), []);
+
+  // P3-3c — track the container + image natural aspect so hotspots can be
+  // positioned relative to the LETTERBOXED image rect (not the container).
+  // The image's natural dimensions land on the load event; the container
+  // box updates via ResizeObserver.
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [imgAspect, setImgAspect] = useState<number>(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setContainerSize({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const imgInsets = imageRectInsets(imgAspect, containerSize.w, containerSize.h, objectFit);
 
   // P3-anim-9 — editor Test Exit. SlotAnimationsEditor dispatches this
   // CustomEvent so authors can preview the exit without clicking through
@@ -151,6 +226,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
 
   return (
     <div
+      ref={containerRef}
       data-layer="spatial-composite"
       className={scope}
       style={{
@@ -280,6 +356,12 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
             src={src}
             alt=""
             draggable={false}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              if (img.naturalWidth && img.naturalHeight) {
+                setImgAspect(img.naturalWidth / img.naturalHeight);
+              }
+            }}
             style={{
               position: 'absolute',
               inset: 0,
@@ -291,6 +373,61 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               pointerEvents: 'none',
             }}
           />
+        </div>
+      )}
+
+      {/* P3-3c — hotspot overlay. Positioned inside the LETTERBOXED image
+          rect (computed from imgInsets), so a hotspot at (0.5, 0.5) lands
+          on the center of the picture, not the container. The wrapper
+          has pointer-events:none so clicks pass to whatever's below
+          (typically the flow layer's buttons); each individual hotspot
+          opts in to receiving clicks. */}
+      {hotspots && hotspots.length > 0 && (
+        <div
+          data-layer="hotspots"
+          style={{
+            position: 'absolute',
+            top: imgInsets.top,
+            left: imgInsets.left,
+            right: imgInsets.right,
+            bottom: imgInsets.bottom,
+            zIndex: 2,
+            pointerEvents: 'none',
+          }}
+        >
+          {hotspots.map((h) => {
+            const isEllipse = h.shape === 'ellipse';
+            return (
+              <button
+                key={h.id}
+                type="button"
+                aria-label={h.label || h.id}
+                onClick={() => onAction(h.id)}
+                style={{
+                  position: 'absolute',
+                  left: `${h.x * 100}%`,
+                  top: `${h.y * 100}%`,
+                  width: `${h.width * 100}%`,
+                  height: `${h.height * 100}%`,
+                  pointerEvents: 'auto',
+                  background: showHotspotOutlines
+                    ? 'rgba(255, 200, 0, 0.18)'
+                    : 'transparent',
+                  border: showHotspotOutlines
+                    ? '2px dashed rgba(255, 200, 0, 0.8)'
+                    : 'none',
+                  borderRadius: isEllipse ? '50%' : undefined,
+                  clipPath: isEllipse ? 'ellipse(50% 50% at 50% 50%)' : undefined,
+                  cursor: 'pointer',
+                  padding: 0,
+                  // Author-controlled label visibility for hover lands later;
+                  // for now the aria-label provides a11y / screen-reader text.
+                  font: 'inherit',
+                  color: 'inherit',
+                }}
+              />
+            );
+          })}
         </div>
       )}
 
