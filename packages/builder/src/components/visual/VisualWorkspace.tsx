@@ -5022,6 +5022,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   backgroundUrl={backgroundUrl || null}
                   backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                   slotIntent={previewSlotIntent}
+                  slotAnimations={
+                    (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
+                  }
                   previewWidth={isFixed ? devW : undefined}
                   previewCoarse={selVp.coarse}
                   onResolve={(res) =>
