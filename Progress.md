@@ -1,5 +1,84 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-20: Responsive layout + animations + hotspot map navigation (work in progress), plus durScreen/fictionalTime/dialogTree/counter fixes (v0.9.58)
+
+### Overview
+
+A substantial release split across two streams. The headline is the first ship of a **responsive layout + animation system** — slot-mode rendering for text-driven beats (no more giant-endScreen bug class), spatial-mode composition for image-backed beats (titleScreen + map-style movementChoice), a full enter/exit animation vocabulary on both layers (fade, slide, scale, ken-burns, pan), an inspector + visual hotspot editor for placing clickable regions on spatial images, and a11y compliance via prefers-reduced-motion. **This is a work in progress** — every responsive feature is opt-in per beat instance and ships behind zero-regression guards (any beat with author-baked `locations[]` keeps the absolute-positioning path untouched), so existing projects continue to render exactly as before. Authors who want to try the new system can opt in beat-by-beat.
+
+The second stream is a batch of independent bug fixes and small features that landed alongside the responsive work — `durScreen` units-of-time bug, `fictionalTime` weeks unit silent no-op, `dialogTree` narrator-text-hijack, `endScreen` button overlap, character-scoped counters, and AI-generated story-variable import.
+
+### Responsive layout system — Phase 1, 2, 2.5, 3 (work in progress)
+
+The responsive layer is the first systematic answer to ASAPS's long-running giant-text and overflow bug class. The previous rendering path was uniformly-scaled absolute positioning: every authored beat's locations were translated through one `transform: scale()` that fit the 1024×768 design canvas into the actual viewport. This made title screens unreadably large on small phones, text overflow on landscape tablets, and impossible-to-place buttons on devices the author never tested. The responsive layer replaces that approach for visible beats that opt in.
+
+- **Slot mode (`SlotFlowView`)**: renders OUTSIDE `ScaledStage`. Text is sized with `clamp(FLOOR, fluid, CEILING)` so it scales gently across viewports but can never cross a readability floor or comfortable-reading ceiling. Body region scrolls when content overflows at the floor; the action row stays pinned. Coarse-pointer floor raised for touch devices. Body has a readable-column max-width so lines don't run edge-to-edge on wide displays.
+- **Spatial mode (`SpatialFlowView`)**: deliberately separates the image layer (uniformly scaled, hotspots map correctly via `objectFit:contain` math) and the flow layer (responsive text/buttons composited transparently over it). The split exists so text/buttons NEVER get uniformly scaled with the picture — the load-bearing reason slot mode exists.
+- **Slot intent** (`slotIntent`): soft layout preferences per slot (preferredLines, anchor — horizontal/vertical alignment, edge-relative, gap). Visual-Editor managed; never serialized as baked `locations[]` (the no-bake guard preserves responsive mode). Override-visibility badges show when an authored preference can't be satisfied at the resolved viewport.
+- **Orientation policy** (`flexible | portrait | landscape`): project-level setting; runtime overlay locks orientation on misalignment; VE viewport selector simulates phone/tablet portrait+landscape; explicit `orientationchange` re-resolve so hotspots track the new letterboxed rect immediately.
+
+### Animation vocabulary on both layers
+
+A complete intent-based motion vocabulary that survives reflow and orientation changes. NOT pixel-keyframed (that's the legacy `AnimationPath[]` system, which only works in absolute mode) — these animations are resolved against the slot's current box and the image's current rect, so a slide-in-from-left with distance 100 always slides from one slot-box away, on any viewport.
+
+**Slot animations** (per-slot enter + exit on every slot/spatial beat):
+- fade, slide-in-{left,right,top,bottom}, scale-in
+- Distance as percent of slot box, threaded via `--slotflow-anim-distance` CSS var
+- Exit on click for action beats (deferred parent advance), exit on timer for `durScreen`
+- Replay + Test-exit buttons in the editor
+
+**Spatial animations** (image-layer only, runs in parallel with slot exits):
+- ken-burns, zoom-{in,out}, pan-{left,right,up,down}
+- Intensity as % drift / scale delta
+- 6000ms cinematic default for enters; 1200ms for crisper exits
+- Cross-layer coordination: SlotFlowView's `onExitStart` callback fires the spatial exit at the same instant slot exits start; parent advance waits `max(slotMax, spatialMax)`
+
+**Reduced motion**: `@media (prefers-reduced-motion: reduce)` collapses all animations to 1ms in CSS; `matchMedia` check in JS also skips the setTimeout exit wait so motion-sensitive users don't sit through invisible exits.
+
+### Hotspot map navigation (Phase 3-3c)
+
+Normalized 0–1 clickable regions on the spatial image, the 2D analog of `panoramaHotspot`. The picture-pixel-accurate math: hotspots position relative to the LETTERBOXED image rect, not the container — a hotspot drawn at (0.4, 0.3, 0.2, 0.1) lands on the same picture pixels at any viewport / orientation / device aspect ratio.
+
+- **`movementChoice` spatial mode**: each choice can carry an optional `hotspot: { x, y, width, height, shape? }`. When ANY choice has one and there are no baked locations, the beat composes through `SpatialFlowView`; the rest of the choices stay clickable as well via standard fallback. Click → `onAction(choice.id)` → standard MovementChoice navigation.
+- **Inspector controls** per choice: Add hotspot button (places a default-positioned rectangle), shape selector (Rectangle / Ellipse), coordinate readout, Remove. The choice itself is unaffected by hotspot operations.
+- **Canvas editor** (`HotspotEditOverlay`): drag any hotspot to move; corner handles to resize on the selected one; click-drag on empty image area to draw a new rectangle (auto-attaches to the next hotspot-less choice, or creates a new placeholder choice); Backspace/Delete strips the selected hotspot; bidirectional hover link between canvas and inspector (hover a hotspot → its choice card lights up green, vice versa).
+- **Two coordinate systems coexist**: the new normalized `choice.hotspot` (spatial) and the legacy `beat.locations` pixel-hotspot (absolute). Authors pick one per beat.
+
+### Bug fixes (independent of responsive work)
+
+- **`durScreen` standardized on SECONDS** (`f4521177`). The unit was implicit and inconsistent — schema documented seconds, runtime read milliseconds, AI emitted bare seconds the runtime then interpreted as ms. Timed screens flashed by in 3ms. Canonical unit is now seconds, legacy values > 60 auto-migrate (÷1000), new beats default to a word-count-derived suggested duration (min ~3s).
+- **`fictionalTime` weeks unit** (`a8ffcfdc`). `advanceFictionalTime` had cases for hours/days/months but no `case 'weeks'` — weeks-unit advances were silent no-ops. Authors saw "time advances once then stuck." Fixed by adding the case + Inspector Weeks dropdown option + AI prompt rules.
+- **`dialogTree` narrator-text hijack** (`aefa26e8`). A choice whose label contained "text", "dialog", or "npc" rendered the dialog narrative instead of the choice label — the text-element fallback branch was matching by substring without kind discrimination. Gated on `loc.kind !== 'button'`.
+- **`endScreen` / `aiSummary` button overlap** (`41a47142`). Generic location-stacking placed restart and credits at the same x in the absolute renderer when both were present. Now side-by-side at `stageHeight - 100`.
+- **Character-scoped counters** (`a58ce688`, `f356a00b`, `648916e8`). Counters previously had ambient global scope; the inspector and effects editor now expose owner selection (character or player), the schema-driven picker is unified, and the editor↔setVariable disconnect that prevented per-character counter seeding is fixed.
+- **AI-generated story-variable import** (`22f250ec`). `mergeGeneratedVariables` was dropping the generated `variables[]` array when wiring an AI-generation result into `globalSettings`. Counters then "lost" their initial values on re-import. Now propagates correctly in both AI-injection handlers.
+
+### Files modified
+
+- **Core types/utils**: `packages/core/src/utils/slotIntent.ts`, `slotAnimation.ts`, `spatialAnimation.ts`, `hotspot.ts` (all new); `Beat.ts` (slotIntent / slotAnimations / spatialAnimations fields); `MovementChoiceBeat.ts`, `InfoTextBeat.ts`, `DurScreenBeat.ts`, `TitleScreenBeat.ts`, `EndScreenBeat.ts`, `AISummaryBeat.ts`, `OnlineContentBeat.ts`, `AIInfoTextBeat.ts` (persistence + render-state push); `duration.ts` (seconds canon)
+- **Renderer**: `SlotFlowView.tsx`, `SpatialFlowView.tsx` (new flow / composite); `slotLayout.ts` (slot spec resolution); `ReactRenderer.tsx` (slot + spatial branches in renderPositionedBeat, spatial-routed `renderMovement`); `OrientationGate.tsx` (rotate-lock overlay)
+- **Schema**: `beat-definitions/core-beats.json` (slot/spatial layoutMode + slots + spatialLayer descriptors, slotIntent + slotAnimations + spatialAnimations + hotspot params, schema versions 2.6 → 2.14)
+- **Builder UI**: `VisualWorkspace.tsx` (slot/spatial preview branches, viewport selector, intent control panel, hotspot editor wiring); `SlotAnimationsEditor.tsx`, `HotspotEditOverlay.tsx` (new); `Inspector.tsx` (mode-awareness — hide Position/Z + path animations in slot/spatial, spatial-hotspot controls per choice, hover-link listener); `AnimationPanel.tsx` (mode-aware editor surface)
+- **Bug-fix files**: `packages/core/src/engine/StoryContext.ts` (fictionalTime weeks), `packages/renderer/src/components/PositionedBeatView.tsx` + `DefaultLocationGenerator.ts` (button overlap), `packages/core/src/migration/effectsMigration.ts` (character-scoped counters), `packages/builder/src/services/aiInjection*.ts` (variable-import)
+- **Generated**: `packages/core/src/generated/beat-types.ts` (regenerated multiple times to match schema versions)
+
+### Status: responsive system is work in progress
+
+The responsive layer is fully usable end-to-end for the beat types that have been converted, but:
+
+- **Not all visible beat types are slot/spatial-mode yet.** Slot mode: endScreen, infoText, durScreen, aiSummary, aiInfoText, onlineContent. Spatial mode: titleScreen + movementChoice (the latter only when hotspots are configured). dialogTree, pickProp, hyperText, inputText, videoBeat continue in absolute mode for now.
+- **No pulse/shake emphasis presets yet** — the trigger API design needs a real use case to drive it.
+- **The Animations tab editor only surfaces enter/exit presets** — no per-slot keyframe authoring, no shared library, no project-level defaults.
+- **Inspector mode-awareness is per-beat** — there's no global UI affordance that says "this project uses responsive layout"; authors learn the mode-awareness pattern from the inspector itself.
+
+Everything that's shipped works correctly under viewport changes, orientation flips, and the prefers-reduced-motion preference. Existing absolute-mode projects are unaffected.
+
+### Files modified
+
+(See per-section file lists above.)
+
+---
+
 ## 2026-05-13: Ideator sessions UI, AI runtime hardening, endScreen layout, craft rules (v0.9.57)
 
 ### Overview

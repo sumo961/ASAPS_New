@@ -22,8 +22,12 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.57** — this is a **beta**. Core functionality works
-and new features arrive frequently. For what shipped when, see:
+Current release: **v0.9.58** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.58 introduces a responsive
+layout + animation system that is a work in progress** — every responsive
+feature is opt-in per beat instance behind zero-regression guards, so
+existing projects keep rendering exactly as before. Authors who want to
+try the new system can opt in beat-by-beat. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
