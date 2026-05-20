@@ -1952,6 +1952,11 @@ export class ReactRenderer extends BaseRenderer {
         // slotIntent. Absent → SlotFlowView renders unchanged.
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined)
           ?? (content.slotAnimations as Record<string, any> | undefined);
+        // P3-anim-4.5 — durScreen sets this so SlotFlowView can self-
+        // schedule the exit phase to finish exactly as the renderer's
+        // own setTimeout-driven advance fires. Click beats leave it
+        // undefined and use the click-driven exit path inside SlotFlowView.
+        const slotAutoExitMs = this.getState('slotAutoExitMs') as number | undefined;
         this.renderComponent(
           <SlotFlowView
             beatType={beatType}
@@ -1962,6 +1967,7 @@ export class ReactRenderer extends BaseRenderer {
             backgroundColor={slotBg}
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
+            autoExitMs={slotAutoExitMs}
             onAction={this.handleAction}
           />
         );
@@ -2639,8 +2645,15 @@ export class ReactRenderer extends BaseRenderer {
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('durScreen', content);
 
     this.ttsSpeakCallback?.(text, this.currentSpeaker);
+    // P3-anim-4.5 — let SlotFlowView (slot branch) self-schedule the exit
+    // phase flip so the leaving animation finishes exactly as our own
+    // setTimeout below advances the story. Cleared after the wait so the
+    // state doesn't leak into a subsequent non-durScreen beat that re-uses
+    // the slot branch.
+    this.setState('slotAutoExitMs', duration);
     await this.renderPositionedBeat('durScreen', content, effectiveLocations, false, undefined, authorPositioned);
     await new Promise(resolve => setTimeout(resolve, duration));
+    this.setState('slotAutoExitMs', undefined);
   }
 
   async renderInputText(

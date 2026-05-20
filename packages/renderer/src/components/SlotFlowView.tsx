@@ -25,7 +25,7 @@
  * See project_responsive_layout_system memory for the full rationale.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
@@ -62,6 +62,16 @@ interface SlotFlowViewProps {
   slotAnimations?: SlotAnimations;
   /** Resolve a button click to the action id the beat expects. */
   onAction: (id: string) => void;
+  /**
+   * P3-anim-4.5 — timer-driven exit for beats without a click (durScreen).
+   * When set, SlotFlowView schedules its OWN phase flip at
+   * `autoExitMs - maxExitMs` so the exit animation finishes precisely as
+   * the renderer's own setTimeout-driven advance fires. The component
+   * doesn't drive the advance — only the visual exit; the renderer still
+   * resolves the render-method promise at `autoExitMs`. Unset → no
+   * timer-driven exit (action beats use the click-driven path).
+   */
+  autoExitMs?: number;
   /**
    * Visual-Editor viewport simulation. When set, the fluid font term uses
    * this width instead of the live `100vw`, so a fixed-width preview box
@@ -104,6 +114,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   onAction,
   previewWidth,
   previewCoarse,
+  autoExitMs,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -400,6 +411,22 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const handleRestart = () => dispatchAction('restart');
   const handleCredits = () => dispatchAction('credits');
   const handleContinue = () => dispatchAction('continue');
+
+  // P3-anim-4.5 — timer-driven exit for click-less beats (durScreen). Wait
+  // (autoExitMs - maxExitMs) ms, then flip to 'exit' so the leaving
+  // animation finishes precisely as the renderer's own setTimeout-driven
+  // advance fires. If maxExitMs >= autoExitMs (or no exits configured),
+  // skip — the beat will simply unmount on advance with no exit.
+  useEffect(() => {
+    if (!autoExitMs || autoExitMs <= 0) return;
+    const wait = computeMaxExitMs();
+    if (wait <= 0) return; // no exit configured
+    const triggerAfter = autoExitMs - wait;
+    if (triggerAfter <= 0) return; // not enough time to play exit
+    const id = window.setTimeout(() => setPhase('exit'), triggerAfter);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoExitMs, slotAnimations, slots]);
 
   return (
     <div className={`${scope} slotflow-root`} style={rootStyle}>
