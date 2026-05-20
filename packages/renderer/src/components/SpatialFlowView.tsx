@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import type {
   SlotIntent,
   SlotIntentResolution,
@@ -25,10 +25,10 @@ interface SpatialFlowViewProps {
   /** Responsive motion intent (P3-anim). Forwarded into the flow layer. */
   slotAnimations?: SlotAnimations;
   /**
-   * P3-anim-6 — spatial-layer motion intent. Drives a CSS transform
-   * animation on the image-layer subtree only; the flow layer is
-   * unaffected (deliberate decoupling — text/buttons must not be
-   * uniformly scaled with the picture).
+   * P3-anim-6 / P3-anim-7 — spatial-layer motion intent (enter + exit).
+   * Drives a CSS transform animation on the image-layer subtree only;
+   * the flow layer is unaffected (deliberate decoupling — text/buttons
+   * must not be uniformly scaled with the picture).
    */
   spatialAnimations?: SpatialAnimations;
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
@@ -37,38 +37,41 @@ interface SpatialFlowViewProps {
   previewCoarse?: boolean;
 }
 
-// Stable, low-collision id for the scoped <style> tag below.
 let spatialUidCounter = 0;
 
 /**
- * Resolve a spatial enter preset to its CSS class + per-animation style
- * (duration / delay / easing / intensity via custom property). Mirrors
- * SlotFlowView's enterAnim but operates on the IMAGE layer.
+ * Resolve a spatial preset to its CSS class + per-animation style
+ * (duration / delay / easing / intensity via custom property). Used for
+ * BOTH enter and exit — the preset names are the same, the keyframes
+ * differ in start/end states so the same preset reads as a coherent
+ * arrival vs. departure.
  */
-function spatialEnterStyles(
-  enter: SpatialAnimation | undefined,
+function spatialPhaseStyles(
+  anim: SpatialAnimation | undefined,
+  phase: 'enter' | 'exit',
 ): { className?: string; style?: React.CSSProperties } {
-  if (!enter) return {};
+  if (!anim) return {};
+  const suffix = phase === 'exit' ? 'out' : 'in';
+  // Pan/ken-burns names don't suffix with -in/-out; we share keyframes
+  // for those across phases since the motion is naturally continuous.
   const presetToClass: Record<string, string | undefined> = {
-    'ken-burns': 'spatialflow-anim-ken-burns',
-    'zoom-in': 'spatialflow-anim-zoom-in',
-    'zoom-out': 'spatialflow-anim-zoom-out',
-    'pan-left': 'spatialflow-anim-pan-left',
-    'pan-right': 'spatialflow-anim-pan-right',
-    'pan-up': 'spatialflow-anim-pan-up',
-    'pan-down': 'spatialflow-anim-pan-down',
+    'ken-burns': `spatialflow-anim-ken-burns-${suffix}`,
+    'zoom-in': `spatialflow-anim-zoom-${suffix === 'in' ? 'in-in' : 'in-out'}`,
+    'zoom-out': `spatialflow-anim-zoom-${suffix === 'in' ? 'out-in' : 'out-out'}`,
+    'pan-left': `spatialflow-anim-pan-left-${suffix}`,
+    'pan-right': `spatialflow-anim-pan-right-${suffix}`,
+    'pan-up': `spatialflow-anim-pan-up-${suffix}`,
+    'pan-down': `spatialflow-anim-pan-down-${suffix}`,
   };
-  const className = presetToClass[enter.preset];
+  const className = presetToClass[anim.preset];
   if (!className) return {};
-  const isZoom = enter.preset === 'zoom-in' || enter.preset === 'zoom-out' || enter.preset === 'ken-burns';
+  const isZoom = anim.preset === 'zoom-in' || anim.preset === 'zoom-out' || anim.preset === 'ken-burns';
   const defaultEasing = isZoom ? 'ease-out' : 'linear';
-  const intensity = typeof enter.intensity === 'number' ? enter.intensity : 10; // % drift / scale delta
+  const intensity = typeof anim.intensity === 'number' ? anim.intensity : 10;
   const style: React.CSSProperties & Record<string, string | undefined> = {
-    animationDuration: `${enter.duration ?? 6000}ms`,
-    animationDelay: enter.delay ? `${enter.delay}ms` : undefined,
-    animationTimingFunction: enter.easing ?? defaultEasing,
-    // CSS vars consumed by keyframes — survive reflow because they're
-    // percent / scale, never pixel-keyed.
+    animationDuration: `${anim.duration ?? (phase === 'exit' ? 1200 : 6000)}ms`,
+    animationDelay: anim.delay ? `${anim.delay}ms` : undefined,
+    animationTimingFunction: anim.easing ?? defaultEasing,
     '--spatial-anim-intensity': `${intensity}%`,
     '--spatial-anim-scale': `${1 + intensity / 100}`,
   };
@@ -80,19 +83,18 @@ function spatialEnterStyles(
  *
  * Two DECOUPLED, independently-wrappable layers:
  *
- *  1. **spatial layer** — a uniformly-scaled image (background / map). With
- *     `fit:'contain'` the whole image shows, letterboxed, so normalized 0–1
- *     hotspot coords (Phase 3c) map onto its rendered rect exactly. This is
- *     the "uniform scale is correct for pictorial content" half. P3-anim-6
- *     wraps THIS subtree with CSS transform animations (ken-burns / zoom /
- *     pan) — text/buttons in the flow layer are not affected.
- *  2. **flow layer** — the real `SlotFlowView` composited over it with a
- *     transparent background, so text/buttons flow + clamp responsively and
- *     are NEVER uniformly scaled with the picture (the load-bearing reason
- *     slot mode exists). Slot-level animations (P3-anim-1..4) live here.
+ *  1. **spatial layer** — uniformly-scaled image; P3-anim-6/7 wraps this
+ *     subtree with enter/exit CSS transform animations (ken-burns / zoom /
+ *     pan) — text/buttons are not affected.
+ *  2. **flow layer** — the responsive SlotFlowView; slot-level
+ *     enter/exit live here, with their own coordination (P3-anim-4).
  *
- * The two layers are separate DOM subtrees on purpose — the animation
- * model can wrap each independently without architectural rework.
+ * P3-anim-7: spatial EXIT plays in PARALLEL with the slot exits. We
+ * pass `extraExitMs` (the spatial exit duration) AND an `onExitStart`
+ * callback into SlotFlowView; when the user clicks, SlotFlowView
+ * dispatchAction flips its own phase, calls onExitStart (we flip our
+ * local image phase, image-layer exit starts), and the final advance
+ * fires after max(slotMax, spatialMax).
  */
 export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   beatType,
@@ -113,14 +115,29 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     imageUrl ?? (typeof content[spatial.source] === 'string' ? content[spatial.source] : null);
   const objectFit = spatial.fit === 'cover' ? 'cover' : 'contain';
 
-  // Scoped style — one per mount so concurrent SpatialFlowViews don't
-  // collide on keyframe names that share global scope.
   const scopeRef = React.useRef<string>('');
   if (!scopeRef.current) {
     scopeRef.current = `spatialflow-${++spatialUidCounter}`;
   }
   const scope = scopeRef.current;
-  const spatialAnim = spatialEnterStyles(spatialAnimations?.enter);
+
+  // P3-anim-7 — local image-layer phase. Flips to 'exit' when SlotFlowView
+  // reports its own exit start (onExitStart callback). The two layers
+  // animate in parallel because they share the same flip moment.
+  const [imagePhase, setImagePhase] = useState<'enter' | 'exit'>('enter');
+  const handleExitStart = useCallback(() => setImagePhase('exit'), []);
+
+  // Compute spatial exit duration to forward into SlotFlowView so its
+  // wait factors in both layers (max of slot exits vs. spatial exit).
+  const spatialExit = spatialAnimations?.exit;
+  const spatialExitMs = spatialExit
+    ? (spatialExit.duration ?? 1200) + (spatialExit.delay ?? 0)
+    : 0;
+
+  const spatialAnim =
+    imagePhase === 'exit'
+      ? spatialPhaseStyles(spatialAnimations?.exit, 'exit')
+      : spatialPhaseStyles(spatialAnimations?.enter, 'enter');
 
   return (
     <div
@@ -134,57 +151,100 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
       }}
     >
       <style>{`
-        /* P3-anim-6 — spatial-layer motion. The image-layer subtree is the
-           animation target; the flow layer above is deliberately untouched. */
-        .${scope} .spatialflow-anim-ken-burns,
-        .${scope} .spatialflow-anim-zoom-in,
-        .${scope} .spatialflow-anim-zoom-out,
-        .${scope} .spatialflow-anim-pan-left,
-        .${scope} .spatialflow-anim-pan-right,
-        .${scope} .spatialflow-anim-pan-up,
-        .${scope} .spatialflow-anim-pan-down {
+        /* P3-anim-6 / 7 — spatial-layer motion. Enter and exit share a
+           class-suffix convention: -in, -out, plus pan/ken-burns variants. */
+        .${scope} [class*="spatialflow-anim-"] {
           animation-fill-mode: both;
         }
-        .${scope} .spatialflow-anim-ken-burns { animation-name: spatialflow-ken-burns; }
-        .${scope} .spatialflow-anim-zoom-in   { animation-name: spatialflow-zoom-in; }
-        .${scope} .spatialflow-anim-zoom-out  { animation-name: spatialflow-zoom-out; }
-        .${scope} .spatialflow-anim-pan-left  { animation-name: spatialflow-pan-left; }
-        .${scope} .spatialflow-anim-pan-right { animation-name: spatialflow-pan-right; }
-        .${scope} .spatialflow-anim-pan-up    { animation-name: spatialflow-pan-up; }
-        .${scope} .spatialflow-anim-pan-down  { animation-name: spatialflow-pan-down; }
-        @keyframes spatialflow-ken-burns {
-          from { transform: scale(1) translate(0, 0); }
+        /* Enter */
+        .${scope} .spatialflow-anim-ken-burns-in { animation-name: spatialflow-ken-burns-in; }
+        .${scope} .spatialflow-anim-zoom-in-in   { animation-name: spatialflow-zoom-in-in; }
+        .${scope} .spatialflow-anim-zoom-out-in  { animation-name: spatialflow-zoom-out-in; }
+        .${scope} .spatialflow-anim-pan-left-in  { animation-name: spatialflow-pan-left-in; }
+        .${scope} .spatialflow-anim-pan-right-in { animation-name: spatialflow-pan-right-in; }
+        .${scope} .spatialflow-anim-pan-up-in    { animation-name: spatialflow-pan-up-in; }
+        .${scope} .spatialflow-anim-pan-down-in  { animation-name: spatialflow-pan-down-in; }
+        /* Exit */
+        .${scope} .spatialflow-anim-ken-burns-out { animation-name: spatialflow-ken-burns-out; }
+        .${scope} .spatialflow-anim-zoom-in-out   { animation-name: spatialflow-zoom-in-out; }
+        .${scope} .spatialflow-anim-zoom-out-out  { animation-name: spatialflow-zoom-out-out; }
+        .${scope} .spatialflow-anim-pan-left-out  { animation-name: spatialflow-pan-left-out; }
+        .${scope} .spatialflow-anim-pan-right-out { animation-name: spatialflow-pan-right-out; }
+        .${scope} .spatialflow-anim-pan-up-out    { animation-name: spatialflow-pan-up-out; }
+        .${scope} .spatialflow-anim-pan-down-out  { animation-name: spatialflow-pan-down-out; }
+
+        /* === Enter keyframes (image arrives + settles) === */
+        @keyframes spatialflow-ken-burns-in {
+          from { transform: scale(1) translate(0, 0); opacity: 0; }
           to   { transform: scale(var(--spatial-anim-scale, 1.1))
                             translate(calc(var(--spatial-anim-intensity, 10%) * -0.5),
-                                      calc(var(--spatial-anim-intensity, 10%) * -0.5)); }
+                                      calc(var(--spatial-anim-intensity, 10%) * -0.5));
+                 opacity: 1; }
         }
-        @keyframes spatialflow-zoom-in {
-          from { transform: scale(var(--spatial-anim-scale, 1.1)); }
-          to   { transform: scale(1); }
+        @keyframes spatialflow-zoom-in-in {
+          from { transform: scale(var(--spatial-anim-scale, 1.1)); opacity: 0; }
+          to   { transform: scale(1); opacity: 1; }
         }
-        @keyframes spatialflow-zoom-out {
-          from { transform: scale(1); }
-          to   { transform: scale(var(--spatial-anim-scale, 1.1)); }
+        @keyframes spatialflow-zoom-out-in {
+          from { transform: scale(1); opacity: 0; }
+          to   { transform: scale(var(--spatial-anim-scale, 1.1)); opacity: 1; }
         }
-        @keyframes spatialflow-pan-left {
+        @keyframes spatialflow-pan-left-in {
           from { transform: translateX(var(--spatial-anim-intensity, 10%)); }
           to   { transform: translateX(calc(-1 * var(--spatial-anim-intensity, 10%))); }
         }
-        @keyframes spatialflow-pan-right {
+        @keyframes spatialflow-pan-right-in {
           from { transform: translateX(calc(-1 * var(--spatial-anim-intensity, 10%))); }
           to   { transform: translateX(var(--spatial-anim-intensity, 10%)); }
         }
-        @keyframes spatialflow-pan-up {
+        @keyframes spatialflow-pan-up-in {
           from { transform: translateY(var(--spatial-anim-intensity, 10%)); }
           to   { transform: translateY(calc(-1 * var(--spatial-anim-intensity, 10%))); }
         }
-        @keyframes spatialflow-pan-down {
+        @keyframes spatialflow-pan-down-in {
           from { transform: translateY(calc(-1 * var(--spatial-anim-intensity, 10%))); }
           to   { transform: translateY(var(--spatial-anim-intensity, 10%)); }
         }
+
+        /* === Exit keyframes (image departs) ===
+           Pans continue the drift direction; zoom-in pushes further in,
+           zoom-out pulls back; ken-burns continues the slow drift + fades. */
+        @keyframes spatialflow-ken-burns-out {
+          from { transform: scale(var(--spatial-anim-scale, 1.1))
+                            translate(calc(var(--spatial-anim-intensity, 10%) * -0.5),
+                                      calc(var(--spatial-anim-intensity, 10%) * -0.5));
+                 opacity: 1; }
+          to   { transform: scale(calc(var(--spatial-anim-scale, 1.1) * 1.05))
+                            translate(calc(var(--spatial-anim-intensity, 10%) * -1),
+                                      calc(var(--spatial-anim-intensity, 10%) * -1));
+                 opacity: 0; }
+        }
+        @keyframes spatialflow-zoom-in-out {
+          from { transform: scale(1); opacity: 1; }
+          to   { transform: scale(var(--spatial-anim-scale, 1.1)); opacity: 0; }
+        }
+        @keyframes spatialflow-zoom-out-out {
+          from { transform: scale(1); opacity: 1; }
+          to   { transform: scale(calc(2 - var(--spatial-anim-scale, 1.1))); opacity: 0; }
+        }
+        @keyframes spatialflow-pan-left-out {
+          from { transform: translateX(0); opacity: 1; }
+          to   { transform: translateX(calc(-1 * var(--spatial-anim-intensity, 10%))); opacity: 0; }
+        }
+        @keyframes spatialflow-pan-right-out {
+          from { transform: translateX(0); opacity: 1; }
+          to   { transform: translateX(var(--spatial-anim-intensity, 10%)); opacity: 0; }
+        }
+        @keyframes spatialflow-pan-up-out {
+          from { transform: translateY(0); opacity: 1; }
+          to   { transform: translateY(calc(-1 * var(--spatial-anim-intensity, 10%))); opacity: 0; }
+        }
+        @keyframes spatialflow-pan-down-out {
+          from { transform: translateY(0); opacity: 1; }
+          to   { transform: translateY(var(--spatial-anim-intensity, 10%)); opacity: 0; }
+        }
       `}</style>
 
-      {/* Layer 1 — uniformly-scaled image (wrappable later for pan/zoom). */}
       {src && (
         <div
           data-layer="spatial"
@@ -211,12 +271,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               pointerEvents: 'none',
             }}
           />
-          {/* Normalized 0–1 hotspot overlay lands in Phase 3c. */}
         </div>
       )}
 
-      {/* Layer 2 — responsive flow, transparent so the image shows through
-          (wrappable later for per-slot enter/exit). */}
       <div
         data-layer="flow"
         style={{ position: 'absolute', inset: 0, zIndex: 1 }}
@@ -234,6 +291,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           onAction={onAction}
           previewWidth={previewWidth}
           previewCoarse={previewCoarse}
+          extraExitMs={spatialExitMs}
+          onExitStart={handleExitStart}
         />
       </div>
     </div>

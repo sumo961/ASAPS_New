@@ -43,9 +43,16 @@ export interface SpatialAnimation {
   intensity?: number;
 }
 
-/** Top-level shape stored on a beat. Reserved for future {enter,exit,emphasis}. */
+/** Top-level shape stored on a beat. */
 export interface SpatialAnimations {
   enter?: SpatialAnimation;
+  /**
+   * P3-anim-7 — exit applied to the spatial layer BEFORE the next beat
+   * takes over. Plays in PARALLEL with the flow-layer slot exits
+   * (independent DOM subtrees) — total wait before advance is the max
+   * of the two so neither layer is cut off mid-animation.
+   */
+  exit?: SpatialAnimation;
 }
 
 /** Defensive type guard. */

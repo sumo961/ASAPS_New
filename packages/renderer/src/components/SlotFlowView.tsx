@@ -73,6 +73,19 @@ interface SlotFlowViewProps {
    */
   autoExitMs?: number;
   /**
+   * P3-anim-7 — extra exit wait (ms) contributed by a wrapping layer
+   * (e.g., SpatialFlowView's image-layer exit). Folded into dispatchAction's
+   * wait so the longest exit across all layers finishes before the parent
+   * `onAction` is fired. Absent → only slot exits dictate timing.
+   */
+  extraExitMs?: number;
+  /**
+   * P3-anim-7 — fires when dispatchAction starts an exit phase. A wrapping
+   * layer (SpatialFlowView) listens to start its OWN exit in parallel
+   * (image layer ⇄ flow layer). Absent → no-op.
+   */
+  onExitStart?: () => void;
+  /**
    * Visual-Editor viewport simulation. When set, the fluid font term uses
    * this width instead of the live `100vw`, so a fixed-width preview box
    * reflows exactly as that device would at runtime (the editor renders the
@@ -115,6 +128,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   previewWidth,
   previewCoarse,
   autoExitMs,
+  extraExitMs,
+  onExitStart,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -392,20 +407,22 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // No exits configured → behaves exactly like raw onAction (no delay).
   const dispatchAction = useCallback(
     (id: string) => {
-      const wait = computeMaxExitMs();
+      // P3-anim-7 — wait = max(slot exits, spatial exit forwarded by an
+      // outer SpatialFlowView). Both layers play in parallel; neither
+      // gets cut off mid-animation.
+      const wait = Math.max(computeMaxExitMs(), extraExitMs ?? 0);
       if (wait <= 0) {
         onAction(id);
         return;
       }
       setPhase('exit');
-      // setTimeout with the longest configured wait. Using animationend on
-      // a specific slot would be more precise but would force us to pick
-      // one slot as the source of truth; the configured duration is
-      // already the author's intent, so use it directly.
+      // Notify any wrapper (SpatialFlowView) so its image-layer exit
+      // starts at the same instant the slot exits do.
+      onExitStart?.();
       window.setTimeout(() => onAction(id), wait);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onAction, slotAnimations, slots]
+    [onAction, slotAnimations, slots, extraExitMs, onExitStart]
   );
 
   const handleRestart = () => dispatchAction('restart');

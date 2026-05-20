@@ -163,15 +163,22 @@ const SlotPhaseControls: React.FC<SlotPhaseControlsProps> = ({
 };
 
 interface SpatialControlsProps {
+  label: string;
+  defaultDuration: number;
   value: SpatialAnimation | undefined;
   onChange: (next: Partial<SpatialAnimation> | null) => void;
 }
 
-const SpatialControls: React.FC<SpatialControlsProps> = ({ value, onChange }) => {
+const SpatialControls: React.FC<SpatialControlsProps> = ({
+  label,
+  defaultDuration,
+  value,
+  onChange,
+}) => {
   const preset = (value?.preset ?? '') as SpatialAnimationPreset | '';
   return (
     <div>
-      <label className="block text-[11px] text-gray-600 mb-1">Enter</label>
+      <label className="block text-[11px] text-gray-600 mb-1">{label}</label>
       <select
         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         value={preset}
@@ -194,7 +201,7 @@ const SpatialControls: React.FC<SpatialControlsProps> = ({ value, onChange }) =>
               type="number"
               min={0}
               step={500}
-              placeholder="6000"
+              placeholder={String(defaultDuration)}
               value={value.duration ?? ''}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -269,14 +276,21 @@ export const SlotAnimationsEditor: React.FC<Props> = ({
     onChange(mergeSlotAnimations(value, slotName, { [phaseKey]: merged } as Partial<SlotAnimationEntry>));
   };
 
-  const updateSpatial = (patch: Partial<SpatialAnimation> | null) => {
+  const updateSpatial = (
+    phaseKey: 'enter' | 'exit',
+    patch: Partial<SpatialAnimation> | null,
+  ) => {
     if (!onSpatialChange) return;
+    const cur: SpatialAnimations = spatialValue ?? {};
     if (patch === null) {
-      onSpatialChange(undefined);
+      const next: SpatialAnimations = { ...cur };
+      delete next[phaseKey];
+      onSpatialChange(Object.keys(next).length > 0 ? next : undefined);
       return;
     }
-    const merged: SpatialAnimation = { ...(spatialValue?.enter ?? { preset: 'ken-burns' }), ...patch } as SpatialAnimation;
-    onSpatialChange({ enter: merged });
+    const prevPhase = cur[phaseKey];
+    const merged: SpatialAnimation = { ...(prevPhase ?? { preset: 'ken-burns' }), ...patch } as SpatialAnimation;
+    onSpatialChange({ ...cur, [phaseKey]: merged });
   };
 
   const handleReplay = () => {
@@ -327,10 +341,20 @@ export const SlotAnimationsEditor: React.FC<Props> = ({
                 Image
               </span>
             </div>
-            <SpatialControls
-              value={spatialValue?.enter}
-              onChange={updateSpatial}
-            />
+            <div className="space-y-3">
+              <SpatialControls
+                label="Enter"
+                defaultDuration={6000}
+                value={spatialValue?.enter}
+                onChange={(patch) => updateSpatial('enter', patch)}
+              />
+              <SpatialControls
+                label="Exit"
+                defaultDuration={1200}
+                value={spatialValue?.exit}
+                onChange={(patch) => updateSpatial('exit', patch)}
+              />
+            </div>
           </div>
         )}
 
