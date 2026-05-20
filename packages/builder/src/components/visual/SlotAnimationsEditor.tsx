@@ -179,10 +179,27 @@ export const SlotAnimationsEditor: React.FC<Props> = ({
     );
   }
 
+  const handleReplay = () => {
+    // Force the live preview's SlotFlowView to remount so all enter
+    // animations play from scratch. The listener (VisualWorkspace) keys
+    // the preview with a tick that increments on every event.
+    window.dispatchEvent(new CustomEvent('asaps:slotAnimReplay'));
+  };
+
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col h-full">
       <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800">Animations</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">Animations</h2>
+          <button
+            type="button"
+            onClick={handleReplay}
+            className="text-xs px-2 py-1 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+            title="Replay enter animations in the live preview"
+          >
+            Replay
+          </button>
+        </div>
         <p className="mt-1 text-xs text-gray-500 leading-relaxed">
           Responsive enter / exit animations — resolved against each slot's
           box at runtime, so they survive reflow and orientation changes.

@@ -914,6 +914,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     },
     [beat, onBeatUpdate]
   );
+
+  // P3-anim-5 — replay tick. SlotAnimationsEditor's "Replay" button
+  // dispatches `asaps:slotAnimReplay`; we key the preview SlotFlowView
+  // with this tick so it remounts and all enter animations play from
+  // scratch. Authors can iterate on a preset without clicking through
+  // the beat to retrigger it.
+  const [animReplayTick, setAnimReplayTick] = useState(0);
+  useEffect(() => {
+    const handler = () => setAnimReplayTick((t) => t + 1);
+    window.addEventListener('asaps:slotAnimReplay', handler);
+    return () => window.removeEventListener('asaps:slotAnimReplay', handler);
+  }, []);
   // Compatibility helper for single-select consumers
   const selectedElementId = selectedElementIds.length > 0 ? selectedElementIds[0] : null;
   const [hasChanges, setHasChanges] = useState(false);
@@ -5014,7 +5026,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   </div>
                 )}
                 <SlotFlowView
-                  key={`slotprev-${beat!.id}-${selVp.id}`}
+                  key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
                   beatType={beat!.type}
                   slots={slotSpec}
                   content={slotPreviewContent}
