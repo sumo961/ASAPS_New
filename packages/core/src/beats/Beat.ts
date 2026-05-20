@@ -44,6 +44,15 @@ export abstract class Beat {
    * memory ("Responsive animation model — DESIGN SPEC").
    */
   public slotAnimations?: Record<string, any>;
+  /**
+   * P3-anim-6 — responsive motion intent for the SPATIAL layer (the
+   * Phase-3 composite image). Sibling of `slotAnimations` which targets
+   * the flow slots; the split mirrors SpatialFlowView's deliberate
+   * data-layer separation (image vs. text+buttons) so they animate
+   * independently. Only meaningful for spatial-mode beats; the field
+   * exists on the base class so the persistence path is uniform.
+   */
+  public spatialAnimations?: Record<string, any>;
   public animations?: AnimationPath[]; // Path animations for elements (absolute mode)
   public notes?: string; // Author notes (not shown to player)
   public speaker: string; // Who speaks this beat's text (for TTS voice routing and optional display)
@@ -81,6 +90,7 @@ export abstract class Beat {
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.slotIntent = (config.parameters as any)?.slotIntent ?? (config as any).slotIntent;
     this.slotAnimations = (config.parameters as any)?.slotAnimations ?? (config as any).slotAnimations;
+    this.spatialAnimations = (config.parameters as any)?.spatialAnimations ?? (config as any).spatialAnimations;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.speaker = (config as any).speaker || (config.parameters as any)?.speaker || '';

@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import type { AnimationPath, SlotAnimations } from '@asaps/core';
+import type { AnimationPath, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { AnimationPathEditor } from '../animation/AnimationPathEditor';
 import { SlotAnimationsEditor } from './SlotAnimationsEditor';
 import { Play, Edit, Trash2, Plus } from 'lucide-react';
@@ -55,6 +55,14 @@ interface AnimationPanelProps {
   beatType?: string;
   slotAnimations?: SlotAnimations;
   onSlotAnimationsChange?: (next: SlotAnimations | undefined) => void;
+
+  /**
+   * P3-anim-6 — spatial-layer (image) animation for spatial-mode beats.
+   * Sibling channel to slotAnimations; the editor renders a "Background"
+   * card at the top when both this and the change handle are wired.
+   */
+  spatialAnimations?: SpatialAnimations;
+  onSpatialAnimationsChange?: (next: SpatialAnimations | undefined) => void;
 }
 
 export const AnimationPanel: React.FC<AnimationPanelProps> = ({
@@ -69,6 +77,8 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   beatType,
   slotAnimations,
   onSlotAnimationsChange,
+  spatialAnimations,
+  onSpatialAnimationsChange,
 }) => {
   const [editingAnimation, setEditingAnimation] = useState<AnimationPath | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -132,6 +142,8 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
           layoutMode={layoutMode}
           value={slotAnimations}
           onChange={onSlotAnimationsChange}
+          spatialValue={spatialAnimations}
+          onSpatialChange={onSpatialAnimationsChange}
         />
       );
     }

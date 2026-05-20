@@ -27,7 +27,8 @@ export class TitleScreenBeat extends Beat {
       buttonText: this.buttonText,
       node: this.node,
       slotIntent: this.slotIntent,
-      slotAnimations: this.slotAnimations
+      slotAnimations: this.slotAnimations,
+      spatialAnimations: this.spatialAnimations
     };
   }
 
@@ -38,6 +39,7 @@ export class TitleScreenBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
+    if (params.spatialAnimations !== undefined) this.spatialAnimations = params.spatialAnimations;
   }
 
   protected async performAction(
@@ -50,6 +52,9 @@ export class TitleScreenBeat extends Beat {
     // channel so renderPositionedBeat's slot branch forwards it to
     // SlotFlowView. Absent → no animation (unchanged).
     renderer.setState('slotAnimations', this.slotAnimations);
+    // P3-anim-6 — spatial-layer motion. Sibling channel; SpatialFlowView
+    // reads it and applies a CSS transform animation to data-layer="spatial".
+    renderer.setState('spatialAnimations', this.spatialAnimations);
 
     const locations = Array.from(this.locations.values());
 

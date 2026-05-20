@@ -23,7 +23,7 @@ import '@photo-sphere-viewer/core/index.css';
 import '@photo-sphere-viewer/markers-plugin/index.css';
 import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 import type { DialogNode, DialogChoice } from '@asaps/core';
-import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations } from '@asaps/core';
+import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { SlotFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec } from '@asaps/renderer';
 
@@ -910,6 +910,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       beat.updateParameters?.({ slotAnimations: next });
       onBeatUpdate(beat.id, {
         parameters: { ...beat.getParameters(), slotAnimations: next },
+      } as any);
+    },
+    [beat, onBeatUpdate]
+  );
+
+  // P3-anim-6 — spatial-layer animation write-back. Mirrors slotAnimations
+  // — sibling channel persisted on beat.spatialAnimations.
+  const onSpatialAnimationsChange = useCallback(
+    (next: SpatialAnimations | undefined) => {
+      if (!beat || !onBeatUpdate) return;
+      beat.updateParameters?.({ spatialAnimations: next });
+      onBeatUpdate(beat.id, {
+        parameters: { ...beat.getParameters(), spatialAnimations: next },
       } as any);
     },
     [beat, onBeatUpdate]
@@ -4870,6 +4883,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   (beat?.getParameters?.()?.slotAnimations as SlotAnimations | undefined) ?? undefined
                 }
                 onSlotAnimationsChange={onSlotAnimationsChange}
+                spatialAnimations={
+                  (beat?.getParameters?.()?.spatialAnimations as SpatialAnimations | undefined) ?? undefined
+                }
+                onSpatialAnimationsChange={onSpatialAnimationsChange}
               />
             )}
           </div>

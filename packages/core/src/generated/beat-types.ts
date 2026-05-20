@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.12.0
- * Generated: 2026-05-20T10:37:19.468Z
+ * Schema Version: 2.13.0
+ * Generated: 2026-05-20T11:02:28.966Z
  */
 
 // ============================================
@@ -111,6 +111,8 @@ export interface TitleScreenParameters {
   slotIntent?: object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
   slotAnimations?: object | undefined;
+  /** Responsive motion intent for the SPATIAL layer (Phase-3 composite image). Cinematic enter presets — ken-burns, zoom-in, zoom-out, pan-{left,right,up,down}. Resolved against the image's currently-rendered rect, so motion survives reflow / viewport. Distinct from slotAnimations (flow layer). Absent → no animation. Only meaningful for spatial-mode beats. */
+  spatialAnimations?: object | undefined;
   /** Story title text */
   title: string;
   /** Author name */

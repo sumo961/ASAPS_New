@@ -21,6 +21,12 @@ export {
   type SlotAnimationEntry,
   type SlotAnimations,
 } from './slotAnimation';
+export {
+  isSpatialAnimations,
+  type SpatialAnimationPreset,
+  type SpatialAnimation,
+  type SpatialAnimations,
+} from './spatialAnimation';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';

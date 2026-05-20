@@ -1913,6 +1913,10 @@ export class ReactRenderer extends BaseRenderer {
         // slotIntent and is forwarded into the composite's flow layer.
         const spAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined)
           ?? (content.slotAnimations as Record<string, any> | undefined);
+        // P3-anim-6 — spatial-layer motion (image only). Sibling channel
+        // to slotAnimations; the two layers animate independently.
+        const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined)
+          ?? (content.spatialAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SpatialFlowView
             beatType={beatType}
@@ -1923,6 +1927,7 @@ export class ReactRenderer extends BaseRenderer {
             backgroundColor={spBg}
             slotIntent={spIntent}
             slotAnimations={spAnimations}
+            spatialAnimations={spatialAnimations}
             onAction={this.handleAction}
           />
         );

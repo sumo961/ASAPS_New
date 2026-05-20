@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -260,6 +260,12 @@
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
+        },
+        "spatialAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for the SPATIAL layer (Phase-3 composite image). Cinematic enter presets — ken-burns, zoom-in, zoom-out, pan-{left,right,up,down}. Resolved against the image's currently-rendered rect, so motion survives reflow / viewport. Distinct from slotAnimations (flow layer). Absent → no animation. Only meaningful for spatial-mode beats.",
           "ui": { "hidden": true }
         },
         "title": {
