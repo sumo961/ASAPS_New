@@ -67,7 +67,7 @@ interface SpatialFlowViewProps {
  * hotspots map to (x*containerW, y*containerH) directly. Returned inset
  * is then 0% on all sides.
  */
-function imageRectInsets(
+export function imageRectInsets(
   imgAspect: number,
   boxW: number,
   boxH: number,
@@ -78,17 +78,40 @@ function imageRectInsets(
   }
   const boxAspect = boxW / boxH;
   if (imgAspect > boxAspect) {
-    // Letterboxed top/bottom — bars are vertical, image is full width.
     const scaledH = boxW / imgAspect;
     const bar = (boxH - scaledH) / 2;
     const pct = (bar / boxH) * 100;
     return { top: `${pct}%`, bottom: `${pct}%`, left: '0%', right: '0%' };
   } else {
-    // Letterboxed left/right — bars are horizontal, image is full height.
     const scaledW = boxH * imgAspect;
     const bar = (boxW - scaledW) / 2;
     const pct = (bar / boxW) * 100;
     return { left: `${pct}%`, right: `${pct}%`, top: '0%', bottom: '0%' };
+  }
+}
+
+/**
+ * Same letterbox math but as absolute pixel rect (for hit-testing / drag
+ * coordinate translation). Returns { x, y, width, height } in container
+ * pixels. With objectFit:'cover' or unresolved aspect, returns the full
+ * container rect.
+ */
+export function imageRectPx(
+  imgAspect: number,
+  boxW: number,
+  boxH: number,
+  fit: 'contain' | 'cover',
+): { x: number; y: number; width: number; height: number } {
+  if (fit === 'cover' || !imgAspect || !boxW || !boxH) {
+    return { x: 0, y: 0, width: boxW, height: boxH };
+  }
+  const boxAspect = boxW / boxH;
+  if (imgAspect > boxAspect) {
+    const scaledH = boxW / imgAspect;
+    return { x: 0, y: (boxH - scaledH) / 2, width: boxW, height: scaledH };
+  } else {
+    const scaledW = boxH * imgAspect;
+    return { x: (boxW - scaledW) / 2, y: 0, width: scaledW, height: boxH };
   }
 }
 

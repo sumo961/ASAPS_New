@@ -26,6 +26,8 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec } from '@asaps/renderer';
+import { HotspotEditOverlay } from './HotspotEditOverlay';
+import type { Hotspot } from '@asaps/core';
 
 // VE viewport presets for the slot-mode preview. Fixed presets are a real
 // W×H device rectangle so the WHOLE composition (side/top/bottom margins,
@@ -928,6 +930,35 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     [beat, onBeatUpdate]
   );
 
+  // P3-3c-3 — hotspot editing state + write-back. The overlay calls
+  // onChange with commit:false on every move (in-memory only, for live
+  // visual feedback) and commit:true on pointer-up (creates an undoable
+  // command via onBeatUpdate). The on-disk shape stays normalized 0–1.
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
+  const onHotspotChange = useCallback(
+    (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => {
+      if (!beat) return;
+      const params = beat.getParameters?.() ?? {};
+      const choices = Array.isArray(params.choices) ? [...params.choices] : [];
+      const idx = choices.findIndex((c: any) => c?.id === id);
+      if (idx < 0) return;
+      const cur = choices[idx];
+      const curHotspot = (cur as any).hotspot ?? {};
+      choices[idx] = {
+        ...cur,
+        hotspot: { ...curHotspot, x: next.x, y: next.y, width: next.width, height: next.height },
+      };
+      // In-memory update so the live preview reflects the drag instantly.
+      beat.updateParameters?.({ choices });
+      if (commit && onBeatUpdate) {
+        onBeatUpdate(beat.id, {
+          parameters: { ...beat.getParameters(), choices },
+        } as any);
+      }
+    },
+    [beat, onBeatUpdate]
+  );
+
   // P3-anim-5 — replay tick. SlotAnimationsEditor's "Replay" button
   // dispatches `asaps:slotAnimReplay`; we key the preview SlotFlowView
   // with this tick so it remounts and all enter animations play from
@@ -1202,12 +1233,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // can't accidentally bake locations[] and silently flip out of slot mode
   // (the no-bake guard; this is the Phase-1.5 correctness fix).
   const beatHasAuthorLocations = (beat?.locations?.size ?? 0) > 0;
-  // P3-anim-6.5 — spatial-mode beats (titleScreen, today the only one)
-  // also get the responsive preview: SlotFlowView covers the flow layer,
-  // SpatialFlowView wraps it with the image-layer animation. Both branches
-  // resolve to the same `slotSpec` shape from getSlotSpec / getSpatialSpec.
+  // P3-anim-6.5 — spatial-mode beats (titleScreen) also get the responsive
+  // preview. P3-3c-3 extends this to per-INSTANCE spatial: a movementChoice
+  // whose every choice carries a hotspot composes through SpatialFlowView
+  // even though its schema isn't layoutMode:spatial (the routing is
+  // data-driven there).
+  const isHotspotChoicePreview =
+    !!beat && !isPanoramaBeat && beat.type === 'movementChoice' && !beatHasAuthorLocations
+    && Array.isArray((beat as any).choices) && (beat as any).choices.length > 0
+    && (beat as any).choices.every((c: any) => c && c.hotspot);
   const isSpatialPreview =
-    !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations;
+    (!!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations)
+    || isHotspotChoicePreview;
   const isSlotPreview =
     (!!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations)
     || isSpatialPreview;
@@ -1233,6 +1270,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             title: slotPreviewParams.title || 'Untitled Story',
             buttonText: slotPreviewParams.buttonText || 'Start',
           }
+        : beat.type === 'movementChoice'
+          ? {
+              // P3-3c-3 — movementChoice spatial mode. Only the question
+              // text becomes a flow slot; the choices appear as hotspots
+              // on the spatial layer (rendered by the editor overlay).
+              question: slotPreviewParams.question || 'Where do you want to go?',
+            }
         : beat.type === 'endScreen'
         ? {
             message: slotPreviewParams.message ?? '',
@@ -5061,42 +5105,70 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   </div>
                 )}
                 {isSpatialPreview ? (
-                  <SpatialFlowView
-                    key={`spatprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
-                    beatType={beat!.type}
-                    spatial={{
-                      source: 'background',
-                      fit: getSpatialSpec(beat!.type)?.fit ?? 'contain',
-                      slots: slotSpec!,
-                    }}
-                    content={slotPreviewContent}
-                    theme={renderTheme ?? undefined}
-                    imageUrl={backgroundUrl || null}
-                    backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
-                    slotIntent={previewSlotIntent}
-                    slotAnimations={
-                      (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
-                    }
-                    spatialAnimations={
-                      (slotPreviewParams?.spatialAnimations as SpatialAnimations | undefined) ?? undefined
-                    }
-                    previewWidth={isFixed ? devW : undefined}
-                    previewCoarse={selVp.coarse}
-                    onResolve={(res) =>
-                      setSlotResolutions(prev =>
-                        prev.length === res.length &&
-                        prev.every(
-                          (p, i) =>
-                            p.slot === res[i].slot &&
-                            p.applied === res[i].applied &&
-                            p.overrideReason === res[i].overrideReason
+                  <>
+                    <SpatialFlowView
+                      key={`spatprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
+                      beatType={beat!.type}
+                      spatial={{
+                        source: 'background',
+                        fit: getSpatialSpec(beat!.type)?.fit ?? 'contain',
+                        slots: slotSpec!,
+                      }}
+                      content={slotPreviewContent}
+                      theme={renderTheme ?? undefined}
+                      imageUrl={backgroundUrl || null}
+                      backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                      slotIntent={previewSlotIntent}
+                      slotAnimations={
+                        (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
+                      }
+                      spatialAnimations={
+                        (slotPreviewParams?.spatialAnimations as SpatialAnimations | undefined) ?? undefined
+                      }
+                      hotspots={undefined /* P3-3c-3: HotspotEditOverlay below
+                        renders the interactive hotspots in the editor;
+                        SpatialFlowView would otherwise double-render the
+                        runtime button layer and intercept clicks. */}
+                      previewWidth={isFixed ? devW : undefined}
+                      previewCoarse={selVp.coarse}
+                      onResolve={(res) =>
+                        setSlotResolutions(prev =>
+                          prev.length === res.length &&
+                          prev.every(
+                            (p, i) =>
+                              p.slot === res[i].slot &&
+                              p.applied === res[i].applied &&
+                              p.overrideReason === res[i].overrideReason
+                          )
+                            ? prev
+                            : res
                         )
-                          ? prev
-                          : res
-                      )
-                    }
-                    onAction={() => { /* read-only preview */ }}
-                  />
+                      }
+                      onAction={() => { /* read-only preview */ }}
+                    />
+                    {/* P3-3c-3 — interactive hotspot editor overlay. Only for
+                        movementChoice in spatial mode; sits above the read-only
+                        SpatialFlowView, intercepts pointer events to drag-move
+                        and corner-resize each hotspot. */}
+                    {isHotspotChoicePreview && (
+                      <HotspotEditOverlay
+                        imageUrl={backgroundUrl || null}
+                        fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
+                        hotspots={(slotPreviewParams?.choices as any[]).map((c) => ({
+                          id: c.id,
+                          x: c.hotspot.x,
+                          y: c.hotspot.y,
+                          width: c.hotspot.width,
+                          height: c.hotspot.height,
+                          shape: c.hotspot.shape,
+                          label: c.displayText || c.text,
+                        }))}
+                        selectedId={selectedHotspotId}
+                        onSelect={setSelectedHotspotId}
+                        onChange={onHotspotChange}
+                      />
+                    )}
+                  </>
                 ) : (
                   <SlotFlowView
                     key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
