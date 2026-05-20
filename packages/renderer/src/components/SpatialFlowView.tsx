@@ -156,6 +156,16 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         .${scope} [class*="spatialflow-anim-"] {
           animation-fill-mode: both;
         }
+        /* P3-anim-8 — respect prefers-reduced-motion. Spatial animations
+           are LONG by design (6000ms ken-burns dwell) so leaving them at
+           full duration would be especially hostile to motion-sensitive
+           users. Collapse to ~1ms; fill-mode:both holds the end-state. */
+        @media (prefers-reduced-motion: reduce) {
+          .${scope} [class*="spatialflow-anim-"] {
+            animation-duration: 1ms !important;
+            animation-delay: 0ms !important;
+          }
+        }
         /* Enter */
         .${scope} .spatialflow-anim-ken-burns-in { animation-name: spatialflow-ken-burns-in; }
         .${scope} .spatialflow-anim-zoom-in-in   { animation-name: spatialflow-zoom-in-in; }

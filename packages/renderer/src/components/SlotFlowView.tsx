@@ -409,15 +409,29 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     (id: string) => {
       // P3-anim-7 — wait = max(slot exits, spatial exit forwarded by an
       // outer SpatialFlowView). Both layers play in parallel; neither
-      // gets cut off mid-animation.
-      const wait = Math.max(computeMaxExitMs(), extraExitMs ?? 0);
+      // gets cut off mid-animation. P3-anim-8 — when the OS reports
+      // prefers-reduced-motion:reduce, advance ~immediately so the
+      // user doesn't wait through an invisible exit. We still call
+      // onExitStart and fill-mode:both leaves the slots in the
+      // exit-end state for the brief moment before unmount.
+      const reduced =
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const wait = reduced
+        ? 0
+        : Math.max(computeMaxExitMs(), extraExitMs ?? 0);
       if (wait <= 0) {
+        if (reduced && (computeMaxExitMs() > 0 || (extraExitMs ?? 0) > 0)) {
+          // Still phase-flip so the CSS keyframes' end-state applies
+          // (fill-mode:both) — visually a snap rather than a hang.
+          setPhase('exit');
+          onExitStart?.();
+        }
         onAction(id);
         return;
       }
       setPhase('exit');
-      // Notify any wrapper (SpatialFlowView) so its image-layer exit
-      // starts at the same instant the slot exits do.
       onExitStart?.();
       window.setTimeout(() => onAction(id), wait);
     },
@@ -479,6 +493,30 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         .${scope} .slotflow-anim-slide-out-bottom,
         .${scope} .slotflow-anim-scale-out {
           animation-fill-mode: both;
+        }
+        /* P3-anim-8 — respect prefers-reduced-motion. We collapse the
+           animation to ~1ms rather than disabling it entirely so the
+           exit timing in dispatchAction (which uses configured duration)
+           still resolves and the slot visibly snaps to its target state
+           via fill-mode:both. Authors who configured motion still get
+           the layout result; users opted-out of motion just don't see
+           the in-between frames. */
+        @media (prefers-reduced-motion: reduce) {
+          .${scope} .slotflow-anim-fade-in,
+          .${scope} .slotflow-anim-slide-in-left,
+          .${scope} .slotflow-anim-slide-in-right,
+          .${scope} .slotflow-anim-slide-in-top,
+          .${scope} .slotflow-anim-slide-in-bottom,
+          .${scope} .slotflow-anim-scale-in,
+          .${scope} .slotflow-anim-fade-out,
+          .${scope} .slotflow-anim-slide-out-left,
+          .${scope} .slotflow-anim-slide-out-right,
+          .${scope} .slotflow-anim-slide-out-top,
+          .${scope} .slotflow-anim-slide-out-bottom,
+          .${scope} .slotflow-anim-scale-out {
+            animation-duration: 1ms !important;
+            animation-delay: 0ms !important;
+          }
         }
         .${scope} .slotflow-anim-fade-in { animation-name: slotflow-fade-in; }
         .${scope} .slotflow-anim-slide-in-left { animation-name: slotflow-slide-in-left; }
