@@ -35,7 +35,16 @@ export abstract class Beat {
    * the field + constructor read live in one place.
    */
   public slotIntent?: Record<string, any>;
-  public animations?: AnimationPath[]; // Path animations for elements
+  /**
+   * Responsive motion intent (P3-anim). Per-slot enter/exit/emphasis (and
+   * later spatial pan/zoom + hotspot reveal). DELIBERATELY a separate
+   * field from `animations` (the legacy AnimationPath[] of pixel-keyframe
+   * paths): the new model is INTENT against the slot's resolved box, not
+   * coordinates over baked x/y. See project_responsive_layout_system
+   * memory ("Responsive animation model — DESIGN SPEC").
+   */
+  public slotAnimations?: Record<string, any>;
+  public animations?: AnimationPath[]; // Path animations for elements (absolute mode)
   public notes?: string; // Author notes (not shown to player)
   public speaker: string; // Who speaks this beat's text (for TTS voice routing and optional display)
   /**
@@ -71,6 +80,7 @@ export abstract class Beat {
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.slotIntent = (config.parameters as any)?.slotIntent ?? (config as any).slotIntent;
+    this.slotAnimations = (config.parameters as any)?.slotAnimations ?? (config as any).slotAnimations;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
     this.notes = config.notes || (config.parameters as any)?.notes;
     this.speaker = (config as any).speaker || (config.parameters as any)?.speaker || '';

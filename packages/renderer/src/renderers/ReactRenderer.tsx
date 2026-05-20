@@ -1943,6 +1943,10 @@ export class ReactRenderer extends BaseRenderer {
         // pure-flow behavior unchanged.
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined)
           ?? (content.slotIntent as SlotIntent | undefined);
+        // P3-anim-1 — responsive motion intent travels the same channel as
+        // slotIntent. Absent → SlotFlowView renders unchanged.
+        const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined)
+          ?? (content.slotAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SlotFlowView
             beatType={beatType}
@@ -1952,6 +1956,7 @@ export class ReactRenderer extends BaseRenderer {
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
             slotIntent={slotIntent}
+            slotAnimations={slotAnimations}
             onAction={this.handleAction}
           />
         );

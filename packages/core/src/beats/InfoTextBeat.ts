@@ -33,7 +33,8 @@ export class InfoTextBeat extends Beat {
       text: this.text,
       buttonText: this.buttonText,
       node: this.node,
-      backgroundSound: this.backgroundSound
+      backgroundSound: this.backgroundSound,
+      slotAnimations: this.slotAnimations,
     };
     if (this.textVariations && this.textVariations.length > 0) {
       params.textVariations = this.textVariations;
@@ -51,6 +52,7 @@ export class InfoTextBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.locs !== undefined) this.locs = params.locs;
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   /**
@@ -81,11 +83,16 @@ export class InfoTextBeat extends Beat {
     const processedButtonText = this.processText(this.buttonText || 'Continue', context);
 
     // Declare our own beat type so renderText() resolves schema-driven
-    // behavior for THIS beat, not a stale value left by a prior
-    // aiInfoText/onlineContent beat (which would wrongly route a plain
-    // infoText through responsive slot mode). infoText is not slot-mode in
-    // the schema, so this keeps it on the unchanged absolute path.
+    // behavior for THIS beat, not a stale value left by a prior beat.
+    // (Phase 2: infoText IS slot-mode in the schema — non-baked instances
+    // route through SlotFlowView; baked ones stay absolute via the
+    // authorPositioned guard.)
     renderer.setState('currentBeatType', 'infoText');
+    // P3-anim-1 — push the beat's responsive motion intent through the same
+    // renderer-state channel as currentBeatType; renderPositionedBeat's
+    // slot branch reads it and forwards to SlotFlowView. Absent on every
+    // existing beat → no-op (zero regression).
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     const locations = Array.from(this.locations.values());
     await renderer.renderText(processedText, processedButtonText, locations);

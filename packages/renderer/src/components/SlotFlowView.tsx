@@ -26,8 +26,8 @@
  */
 
 import React from 'react';
-import type { SlotIntent, SlotIntentResolution } from '@asaps/core';
-import { slotIntentFor } from '@asaps/core';
+import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation } from '@asaps/core';
+import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 
@@ -52,6 +52,14 @@ interface SlotFlowViewProps {
    * Visual Editor consumes it to badge degraded preferences.
    */
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
+  /**
+   * Responsive motion intent (P3-anim). Per-slot enter/exit/emphasis
+   * presets resolved against the slot's responsive box. Absent → no
+   * animation (unchanged rendering). P3-anim-1 supports the `fade` enter
+   * preset; further presets land per the P3-anim phasing in
+   * project_responsive_layout_system memory.
+   */
+  slotAnimations?: SlotAnimations;
   /** Resolve a button click to the action id the beat expects. */
   onAction: (id: string) => void;
   /**
@@ -91,6 +99,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   backgroundUrl,
   backgroundColor,
   slotIntent,
+  slotAnimations,
   onResolve,
   onAction,
   previewWidth,
@@ -281,6 +290,25 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const handleCredits = () => onAction('credits');
   const handleContinue = () => onAction('continue');
 
+  // P3-anim-1 — per-slot enter animation. Returns the className + style
+  // patch to merge into a slot wrapper. Absent / unsupported preset → no-op.
+  // P3-anim-1 ships only the `fade` preset (slide / scale / etc. land in
+  // subsequent P3-anim increments per the design note).
+  const enterAnim = (slotName?: string): { className?: string; style?: React.CSSProperties } => {
+    if (!slotName) return {};
+    const enter: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.enter;
+    if (!enter) return {};
+    if (enter.preset !== 'fade') return {}; // graceful no-op for unsupported presets
+    return {
+      className: 'slotflow-anim-fade-in',
+      style: {
+        animationDuration: `${enter.duration ?? 400}ms`,
+        animationDelay: enter.delay ? `${enter.delay}ms` : undefined,
+        animationTimingFunction: enter.easing ?? 'ease-out',
+      },
+    };
+  };
+
   return (
     <div className={`${scope} slotflow-root`} style={rootStyle}>
       <style>{`
@@ -297,6 +325,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         }
         .${scope} .slotflow-btn { transition: background-color 0.15s ease; }
         .${scope} .slotflow-btn:hover { background: ${theme.button?.hoverBackgroundColor || theme.button?.backgroundColor || '#333'}; }
+        /* P3-anim-1 — fade slot enter. animationDuration / delay / easing
+           come from the per-slot style merged at the wrapper. */
+        .${scope} .slotflow-anim-fade-in {
+          animation-name: slotflow-fade-in;
+          animation-fill-mode: both;
+        }
+        @keyframes slotflow-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
       `}</style>
 
       {/* Body slot — grows & scrolls (stage-bottom action), or sizes to
@@ -327,45 +365,60 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             justifyContent: 'center',
           }}
         >
-          {titleSlot && titleText && (
-            <div
-              ref={titleRef}
-              style={{
-                fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
-                fontWeight: 700,
-                lineHeight: 1.25,
-                textAlign: 'center',
-                marginBottom: 'clamp(16px, 3vh, 32px)',
-                fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
-                // preferredLines bias: a measured max-width that coaxes the
-                // title toward the author's target line count. Stays
-                // centered; never exceeds the readable column.
-                ...(titleMaxWidth
-                  ? { maxWidth: titleMaxWidth, marginLeft: 'auto', marginRight: 'auto' }
-                  : {}),
-              }}
-            >
-              {titleText}
-            </div>
-          )}
-          <div
-            style={{
-              whiteSpace: 'pre-wrap',
-              lineHeight: 1.6,
-              textAlign: 'center',
-              fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
-            }}
-          >
-            {bodyText}
-          </div>
+          {titleSlot && titleText && (() => {
+            const a = enterAnim(titleSlotName);
+            return (
+              <div
+                ref={titleRef}
+                className={a.className}
+                style={{
+                  fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
+                  fontWeight: 700,
+                  lineHeight: 1.25,
+                  textAlign: 'center',
+                  marginBottom: 'clamp(16px, 3vh, 32px)',
+                  fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
+                  // preferredLines bias: a measured max-width that coaxes the
+                  // title toward the author's target line count. Stays
+                  // centered; never exceeds the readable column.
+                  ...(titleMaxWidth
+                    ? { maxWidth: titleMaxWidth, marginLeft: 'auto', marginRight: 'auto' }
+                    : {}),
+                  ...a.style,
+                }}
+              >
+                {titleText}
+              </div>
+            );
+          })()}
+          {(() => {
+            const a = enterAnim(bodySlot?.name);
+            return (
+              <div
+                className={a.className}
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.6,
+                  textAlign: 'center',
+                  fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
+                  ...a.style,
+                }}
+              >
+                {bodyText}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
       {/* Action slot — pinned, always visible, overlap-proof.
           Single continue (aiInfoText/onlineContent) vs restart/credits
           (endScreen/aiSummary). */}
-      {actionSlot && (
+      {actionSlot && (() => {
+        const a = enterAnim(actionSlot.name);
+        return (
         <div
+          className={a.className}
           style={{
             flexShrink: 0,
             display: 'flex',
@@ -377,6 +430,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             paddingBottom: 'clamp(16px, 3vh, 28px)',
             paddingLeft: 16,
             paddingRight: 16,
+            ...a.style,
           }}
         >
           {isContinueAction ? (
@@ -410,7 +464,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             </>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

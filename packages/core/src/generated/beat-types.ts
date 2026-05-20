@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.10.0
- * Generated: 2026-05-19T22:18:52.966Z
+ * Schema Version: 2.11.0
+ * Generated: 2026-05-19T23:41:20.209Z
  */
 
 // ============================================
@@ -139,6 +139,8 @@ export interface InfoTextParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat when button is clicked */
   connection: Connection;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
 }
 
 /**

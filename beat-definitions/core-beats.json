@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -353,6 +353,12 @@
           "type": "connection",
           "required": true,
           "description": "Target beat when button is clicked"
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
         }
       },
       "locations": ["text", "continueButton"],
