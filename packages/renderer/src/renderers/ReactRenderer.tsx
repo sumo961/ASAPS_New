@@ -2467,17 +2467,13 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat(beatType, content, defaultLocations, true);
   }
 
-  async renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string }[], locations?: Location[]): Promise<string> {
+  async renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
-
-    // Use provided locations or generate default locations from schema
-    const content = { question, choices, markVisited };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('movementChoice', content);
 
     // Store choice text for interactor TTS on click
     this.choiceTextMap.clear();
@@ -2486,6 +2482,59 @@ export class ReactRenderer extends BaseRenderer {
     }
 
     this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
+
+    // P3-3c — spatial path: every choice carries a normalized hotspot AND
+    // there are no baked absolute locations. Compose through SpatialFlowView
+    // with the image as background and the choice hotspots as clickable
+    // regions anchored to the image's letterboxed rect. Beats without
+    // hotspots fall through to the existing absolute-positioned path
+    // (zero regression).
+    const authorPositioned = !!(locations && locations.length > 0);
+    const allHaveHotspots = choices.length > 0 && choices.every(c => !!c.hotspot);
+    if (allHaveHotspots && !authorPositioned) {
+      const spatialSpec = getSpatialSpec('movementChoice');
+      if (spatialSpec) {
+        const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
+        const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
+        const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
+        const hotspots = choices.map(c => ({
+          id: c.id,
+          x: c.hotspot!.x,
+          y: c.hotspot!.y,
+          width: c.hotspot!.width,
+          height: c.hotspot!.height,
+          shape: c.hotspot!.shape,
+          label: c.displayText || c.text,
+        }));
+        return new Promise<string>(resolve => {
+          this.resolveAction = (id: string) => {
+            this.resolveAction = null;
+            resolve(id);
+          };
+          this.renderComponent(
+            <SpatialFlowView
+              beatType="movementChoice"
+              spatial={spatialSpec}
+              content={{ question }}
+              theme={this.theme}
+              imageUrl={this.backgroundImageUrl}
+              backgroundColor={bg}
+              slotIntent={slotIntent}
+              slotAnimations={slotAnimations}
+              spatialAnimations={spatialAnimations}
+              hotspots={hotspots}
+              onAction={this.handleAction}
+            />
+          );
+        });
+      }
+    }
+
+    // Absolute-positioned fallback (existing path) — locations baked or
+    // not all choices have hotspots.
+    const content = { question, choices, markVisited };
+    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('movementChoice', content);
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 

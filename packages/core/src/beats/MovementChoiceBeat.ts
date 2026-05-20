@@ -170,7 +170,10 @@ export class MovementChoiceBeat extends Beat {
           text: this.processText(c.text, context),
           displayText: c.displayText ? this.processText(c.displayText, context) : undefined,
           location: c.location || '',
-          locationName: c.locationName  // Pass locationName for hotspot/prop association
+          locationName: c.locationName,  // Pass locationName for hotspot/prop association
+          // P3-3c — normalized spatial hotspot; routes through SpatialFlowView
+          // when ALL choices have it AND there are no baked locations.
+          hotspot: (c as any).hotspot,
         })),
         locations
       );

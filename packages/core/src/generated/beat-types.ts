@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.13.0
- * Generated: 2026-05-20T14:06:18.447Z
+ * Schema Version: 2.14.0
+ * Generated: 2026-05-20T14:09:58.288Z
  */
 
 // ============================================
@@ -59,6 +59,7 @@ export interface MovementOption {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
+  hotspot?: '{ x: number, y: number, width: number, height: number, shape: rect' | 'ellipse }?';
 }
 
 /**

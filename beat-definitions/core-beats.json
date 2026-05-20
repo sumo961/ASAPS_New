@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -59,9 +59,10 @@
         "counter": "string?",
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
-        "soundEffect": "string?"
+        "soundEffect": "string?",
+        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
       },
-      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching."
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching. P3-3c — optional `hotspot` carries a normalized 0–1 rectangle on the spatial layer; when ALL choices have hotspots AND the beat has no baked locations, the renderer composes movementChoice through SpatialFlowView with the image as background and the hotspots as clickable regions."
     },
     "propOption": {
       "description": "A prop interaction choice",
@@ -539,6 +540,14 @@
       "locationMapping": {
         "question": "question"
       },
+      "layoutModeNote": "P3-3c — movementChoice flips into spatial mode (SpatialFlowView composite) when EVERY choice carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each choice becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderMovement path (zero regression).",
+      "spatialLayer": {
+        "source": "background",
+        "fit": "contain"
+      },
+      "slots": [
+        { "name": "question", "role": "title", "source": "question" }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "movementChoice"
