@@ -292,21 +292,36 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
   // P3-anim-1 — per-slot enter animation. Returns the className + style
   // patch to merge into a slot wrapper. Absent / unsupported preset → no-op.
-  // P3-anim-1 ships only the `fade` preset (slide / scale / etc. land in
-  // subsequent P3-anim increments per the design note).
+  // P3-anim-1.5 / P3-anim-2 — enter preset palette: fade, slide-in-{L,R,T,B},
+  // scale-in. Slide `distance` is a PERCENT OF SLOT BOX (default 100 = one
+  // slot-box) — never absolute px — so it survives reflow / viewport.
+  // Threaded through a `--slotflow-anim-distance` CSS variable on the
+  // wrapper so the keyframes interpolate from the resolved value.
   const enterAnim = (slotName?: string): { className?: string; style?: React.CSSProperties } => {
     if (!slotName) return {};
     const enter: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.enter;
     if (!enter) return {};
-    if (enter.preset !== 'fade') return {}; // graceful no-op for unsupported presets
-    return {
-      className: 'slotflow-anim-fade-in',
-      style: {
-        animationDuration: `${enter.duration ?? 400}ms`,
-        animationDelay: enter.delay ? `${enter.delay}ms` : undefined,
-        animationTimingFunction: enter.easing ?? 'ease-out',
-      },
+    const presetToClass: Record<string, string | undefined> = {
+      'fade': 'slotflow-anim-fade-in',
+      'slide-in-left': 'slotflow-anim-slide-in-left',
+      'slide-in-right': 'slotflow-anim-slide-in-right',
+      'slide-in-top': 'slotflow-anim-slide-in-top',
+      'slide-in-bottom': 'slotflow-anim-slide-in-bottom',
+      'scale-in': 'slotflow-anim-scale-in',
     };
+    const className = presetToClass[enter.preset];
+    if (!className) return {}; // graceful no-op for unsupported presets (pulse/shake later)
+    const isSlide = enter.preset.startsWith('slide-in-');
+    const style: React.CSSProperties & Record<string, string | undefined> = {
+      animationDuration: `${enter.duration ?? 400}ms`,
+      animationDelay: enter.delay ? `${enter.delay}ms` : undefined,
+      animationTimingFunction: enter.easing ?? 'ease-out',
+    };
+    if (isSlide) {
+      const d = typeof enter.distance === 'number' ? enter.distance : 100;
+      (style as any)['--slotflow-anim-distance'] = `${d}%`;
+    }
+    return { className, style };
   };
 
   return (
@@ -325,15 +340,48 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         }
         .${scope} .slotflow-btn { transition: background-color 0.15s ease; }
         .${scope} .slotflow-btn:hover { background: ${theme.button?.hoverBackgroundColor || theme.button?.backgroundColor || '#333'}; }
-        /* P3-anim-1 — fade slot enter. animationDuration / delay / easing
-           come from the per-slot style merged at the wrapper. */
-        .${scope} .slotflow-anim-fade-in {
-          animation-name: slotflow-fade-in;
+        /* P3-anim — enter preset palette. animationDuration / delay /
+           easing come from the per-slot inline style merged at the
+           wrapper; slide distance comes from --slotflow-anim-distance
+           (percent of slot box). All survive reflow because the keyframe
+           targets are relative (% / scale), not pixel-keyed. */
+        .${scope} .slotflow-anim-fade-in,
+        .${scope} .slotflow-anim-slide-in-left,
+        .${scope} .slotflow-anim-slide-in-right,
+        .${scope} .slotflow-anim-slide-in-top,
+        .${scope} .slotflow-anim-slide-in-bottom,
+        .${scope} .slotflow-anim-scale-in {
           animation-fill-mode: both;
         }
+        .${scope} .slotflow-anim-fade-in { animation-name: slotflow-fade-in; }
+        .${scope} .slotflow-anim-slide-in-left { animation-name: slotflow-slide-in-left; }
+        .${scope} .slotflow-anim-slide-in-right { animation-name: slotflow-slide-in-right; }
+        .${scope} .slotflow-anim-slide-in-top { animation-name: slotflow-slide-in-top; }
+        .${scope} .slotflow-anim-slide-in-bottom { animation-name: slotflow-slide-in-bottom; }
+        .${scope} .slotflow-anim-scale-in { animation-name: slotflow-scale-in; }
         @keyframes slotflow-fade-in {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes slotflow-slide-in-left {
+          from { opacity: 0; transform: translateX(calc(-1 * var(--slotflow-anim-distance, 100%))); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slotflow-slide-in-right {
+          from { opacity: 0; transform: translateX(var(--slotflow-anim-distance, 100%)); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slotflow-slide-in-top {
+          from { opacity: 0; transform: translateY(calc(-1 * var(--slotflow-anim-distance, 100%))); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slotflow-slide-in-bottom {
+          from { opacity: 0; transform: translateY(var(--slotflow-anim-distance, 100%)); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slotflow-scale-in {
+          from { opacity: 0; transform: scale(0.7); }
+          to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
