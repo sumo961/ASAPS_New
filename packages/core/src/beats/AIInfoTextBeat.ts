@@ -97,6 +97,7 @@ export class AIInfoTextBeat extends Beat {
       fallbackText: this.fallbackText,
       buttonText: this.buttonText,
       slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
   }
 
@@ -112,6 +113,7 @@ export class AIInfoTextBeat extends Beat {
     if (params.fallbackText !== undefined) this.fallbackText = params.fallbackText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   protected async performAction(
@@ -125,6 +127,7 @@ export class AIInfoTextBeat extends Beat {
     // this, renderText defaults beatType to 'infoText' and aiInfoText never
     // takes the SlotFlowView path. Mirrors OnlineContentBeat.
     renderer.setState('currentBeatType', 'aiInfoText');
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     // Check if AI service is available
     const aiService = renderer.getState('aiService');

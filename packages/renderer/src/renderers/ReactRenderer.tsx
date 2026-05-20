@@ -1909,6 +1909,10 @@ export class ReactRenderer extends BaseRenderer {
         console.log(`[ReactRenderer ${this.instanceId}] Rendering SPATIAL-MODE ${beatType} (no author locations)`);
         const spIntent = (this.getState('slotIntent') as SlotIntent | undefined)
           ?? (content.slotIntent as SlotIntent | undefined);
+        // P3-anim — responsive motion intent travels the same channel as
+        // slotIntent and is forwarded into the composite's flow layer.
+        const spAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined)
+          ?? (content.slotAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SpatialFlowView
             beatType={beatType}
@@ -1918,6 +1922,7 @@ export class ReactRenderer extends BaseRenderer {
             imageUrl={this.backgroundImageUrl}
             backgroundColor={spBg}
             slotIntent={spIntent}
+            slotAnimations={spAnimations}
             onAction={this.handleAction}
           />
         );

@@ -81,7 +81,8 @@ export class EndScreenBeat extends Beat {
       creditsCloseText: this.creditsCloseText,
       phaseOverrides: this.phaseOverrides,
       node: this.node,
-      slotIntent: this.slotIntent
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations
     };
   }
 
@@ -106,6 +107,7 @@ export class EndScreenBeat extends Beat {
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
     if (params.node !== undefined) this.node = params.node;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
     this._version++;
   }
 
@@ -114,6 +116,11 @@ export class EndScreenBeat extends Beat {
     renderer: IRenderer
   ): Promise<string | null> {
     // Background is now handled centrally in Beat.execute()
+
+    // P3-anim — push responsive motion intent through the renderer-state
+    // channel so renderPositionedBeat's slot branch forwards it to
+    // SlotFlowView. Absent → no animation (unchanged).
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     // Set button text in renderer state so it can be used by schema mapping
     // buttonText is legacy - treat it as restartText if restartText not set

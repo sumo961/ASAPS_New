@@ -172,6 +172,7 @@ export class AISummaryBeat extends Beat {
       creditsPageBody: this.creditsPageBody,
       creditsCloseText: this.creditsCloseText,
       slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
   }
 
@@ -202,6 +203,7 @@ export class AISummaryBeat extends Beat {
     if (params.creditsPageBody !== undefined) this.creditsPageBody = params.creditsPageBody;
     if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   /**
@@ -228,6 +230,11 @@ export class AISummaryBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer
   ): Promise<string | null> {
+    // P3-anim — push responsive motion intent through the renderer-state
+    // channel so renderPositionedBeat's slot branch forwards it to
+    // SlotFlowView. Absent → no animation (unchanged).
+    renderer.setState('slotAnimations', this.slotAnimations);
+
     let summaryText: string;
 
     // Check if AI service is available

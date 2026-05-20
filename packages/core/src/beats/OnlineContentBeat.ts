@@ -96,6 +96,7 @@ export class OnlineContentBeat extends Beat {
       errorMessage: this.errorMessage,
       errorTarget: this.errorTarget,
       slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
   }
 
@@ -113,6 +114,7 @@ export class OnlineContentBeat extends Beat {
     if (params.errorMessage !== undefined) this.errorMessage = params.errorMessage;
     if (params.errorTarget !== undefined) this.errorTarget = params.errorTarget;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   // Cache for prefetched AI content
@@ -146,6 +148,7 @@ export class OnlineContentBeat extends Beat {
   ): Promise<string | null> {
     // Mark this as an online content beat for centering in PositionedBeatView
     renderer.setState('currentBeatType', 'onlineContent');
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     try {
       let content: string;

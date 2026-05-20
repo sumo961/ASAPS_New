@@ -1,5 +1,5 @@
 import React from 'react';
-import type { SlotIntent, SlotIntentResolution } from '@asaps/core';
+import type { SlotIntent, SlotIntentResolution, SlotAnimations } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView } from './SlotFlowView';
@@ -16,6 +16,8 @@ interface SpatialFlowViewProps {
   /** Painted only when there is no image (true letterbox backdrop). */
   backgroundColor: string;
   slotIntent?: SlotIntent;
+  /** Responsive motion intent (P3-anim). Forwarded into the flow layer. */
+  slotAnimations?: SlotAnimations;
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
   onAction: (id: string) => void;
   previewWidth?: number;
@@ -49,6 +51,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   imageUrl,
   backgroundColor,
   slotIntent,
+  slotAnimations,
   onResolve,
   onAction,
   previewWidth,
@@ -107,6 +110,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           backgroundUrl={null}
           backgroundColor="transparent"
           slotIntent={slotIntent}
+          slotAnimations={slotAnimations}
           onResolve={onResolve}
           onAction={onAction}
           previewWidth={previewWidth}

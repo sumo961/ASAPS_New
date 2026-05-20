@@ -46,6 +46,8 @@ export class DurScreenBeat extends Beat {
     if (this.textVariations && this.textVariations.length > 0) {
       params.textVariations = this.textVariations;
     }
+    params.slotIntent = this.slotIntent;
+    params.slotAnimations = this.slotAnimations;
     return params;
   }
 
@@ -56,6 +58,8 @@ export class DurScreenBeat extends Beat {
       this.duration = normalizeDurationToSeconds(params.duration);
     }
     if (params.node !== undefined) this.node = params.node;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   /**
@@ -77,6 +81,11 @@ export class DurScreenBeat extends Beat {
     renderer: IRenderer
   ): Promise<string | null> {
     // Background is now handled centrally in Beat.execute()
+
+    // P3-anim — push responsive motion intent through the renderer-state
+    // channel so renderPositionedBeat's slot branch forwards it to
+    // SlotFlowView. Absent → no animation (unchanged).
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     // Select text (handles random variation selection)
     const selectedText = this.selectText();

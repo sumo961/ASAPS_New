@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -250,6 +250,18 @@
       "description": "Opening title screen with start button",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
+        },
         "title": {
           "type": "string",
           "required": true,
@@ -664,6 +676,12 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
           "ui": { "hidden": true }
         },
         "message": {
@@ -1107,6 +1125,18 @@
       "description": "Timed display screen",
       "connectionType": "single",
       "parameters": {
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
+        },
         "text": {
           "type": "string",
           "required": true,
@@ -1865,6 +1895,12 @@
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
           "ui": { "hidden": true }
         },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
+        },
         "sourceType": {
           "type": "string",
           "required": true,
@@ -2202,6 +2238,12 @@
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
           "ui": { "hidden": true }
         },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
+          "ui": { "hidden": true }
+        },
         "prompt": {
           "type": "string",
           "required": false,
@@ -2443,6 +2485,12 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
+          "ui": { "hidden": true }
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
           "ui": { "hidden": true }
         },
         "prompt": {

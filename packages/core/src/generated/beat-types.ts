@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.11.0
- * Generated: 2026-05-19T23:41:20.209Z
+ * Schema Version: 2.12.0
+ * Generated: 2026-05-20T00:32:54.400Z
  */
 
 // ============================================
@@ -107,6 +107,10 @@ export interface PanoramaHotspot {
  * Connection Type: single
  */
 export interface TitleScreenParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Story title text */
   title: string;
   /** Author name */
@@ -239,6 +243,8 @@ export interface VideoBeatParameters {
 export interface EndScreenParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
   slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Ending message */
   message?: string | undefined;
   /** Show restart button */
@@ -367,6 +373,10 @@ export interface ConditionBeatParameters {
  * Connection Type: single
  */
 export interface DurScreenParameters {
+  /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
+  slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Text to display */
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
@@ -619,6 +629,8 @@ export interface HyperTextParameters {
 export interface OnlineContentParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
   slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search */
   sourceType: string;
   /** API URL to fetch (supports ${variable} interpolation) */
@@ -705,6 +717,8 @@ export interface AiDialogTreeParameters {
 export interface AiSummaryParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
   slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Custom instructions for summary style */
   prompt?: string | undefined;
   /** Include player variables in summary */
@@ -767,6 +781,8 @@ export interface AiSummaryParameters {
 export interface AiInfoTextParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
   slotIntent?: object | undefined;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
+  slotAnimations?: object | undefined;
   /** Context/instruction for AI (e.g., "A merchant's reply when the player can't afford the item") */
   prompt: string;
   /** Specific variables to include in AI context (leave empty for all) */

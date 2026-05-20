@@ -25,7 +25,9 @@ export class TitleScreenBeat extends Beat {
       title: this.title,
       author: this.author,
       buttonText: this.buttonText,
-      node: this.node
+      node: this.node,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations
     };
   }
 
@@ -34,6 +36,8 @@ export class TitleScreenBeat extends Beat {
     if (params.author !== undefined) this.author = params.author;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
     if (params.node !== undefined) this.node = params.node;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   protected async performAction(
@@ -41,6 +45,11 @@ export class TitleScreenBeat extends Beat {
     renderer: IRenderer
   ): Promise<string | null> {
     // Background is now handled centrally in Beat.execute()
+
+    // P3-anim — push responsive motion intent through the renderer-state
+    // channel so renderPositionedBeat's slot branch forwards it to
+    // SlotFlowView. Absent → no animation (unchanged).
+    renderer.setState('slotAnimations', this.slotAnimations);
 
     const locations = Array.from(this.locations.values());
 
