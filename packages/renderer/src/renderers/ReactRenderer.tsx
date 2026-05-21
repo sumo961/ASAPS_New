@@ -2562,15 +2562,20 @@ export class ReactRenderer extends BaseRenderer {
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
-        const hotspots = choices.map(c => ({
-          id: c.id,
-          x: c.hotspot!.x,
-          y: c.hotspot!.y,
-          width: c.hotspot!.width,
-          height: c.hotspot!.height,
-          shape: c.hotspot!.shape,
-          label: c.displayText || c.text,
-        }));
+        // Filter to choices that actually have a hotspot — relaxed
+        // any-hotspot detection means some choices may lack one, and
+        // mapping unconditionally would crash on undefined access.
+        const hotspots = choices
+          .filter(c => !!c.hotspot)
+          .map(c => ({
+            id: c.id,
+            x: c.hotspot!.x,
+            y: c.hotspot!.y,
+            width: c.hotspot!.width,
+            height: c.hotspot!.height,
+            shape: c.hotspot!.shape,
+            label: c.displayText || c.text,
+          }));
         return new Promise<string>(resolve => {
           this.resolveAction = (id: string) => {
             this.resolveAction = null;
