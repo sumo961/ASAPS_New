@@ -936,11 +936,45 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // command via onBeatUpdate). The on-disk shape stays normalized 0–1.
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
 
-  // P3-3c-8 / P3-3c-11 — shared callbacks across movementChoice,
-  // pickProp, and dialogTree (root). DialogTree's items live nested
-  // at `dialogTree.choices`, so a read/write accessor pair beats a
-  // flat key. itemKind drives placeholder creation when drawing a
-  // new hotspot on empty image area.
+  // P3-3c-12 — dialogTree click-to-traverse. The path is a sequence of
+  // choice ids from root → current node; each segment names the choice
+  // whose `dialogNode` we descended into. Empty array means root node.
+  // Reset to root when the selected beat changes.
+  const [dialogTreeNodePath, setDialogTreeNodePath] = useState<string[]>([]);
+  useEffect(() => {
+    setDialogTreeNodePath([]);
+  }, [beat?.id]);
+
+  // P3-3c-12 — walk the tree to the node at the given path, or null if
+  // any segment refers to a choice without a nested dialogNode.
+  function dialogNodeAt(tree: any, path: string[]): any | null {
+    if (!tree) return null;
+    let cur = tree;
+    for (const choiceId of path) {
+      const choice = (cur?.choices ?? []).find((c: any) => c?.id === choiceId);
+      if (!choice?.dialogNode) return null;
+      cur = choice.dialogNode;
+    }
+    return cur;
+  }
+
+  // P3-3c-12 — return a new tree with `newChoices` substituted into the
+  // node at `path`. Never mutates the input.
+  function dialogTreeWithChoicesAt(tree: any, path: string[], newChoices: any[]): any {
+    if (path.length === 0) return { ...(tree ?? {}), choices: newChoices };
+    const [head, ...rest] = path;
+    const choices = (tree?.choices ?? []).map((c: any) =>
+      c?.id !== head || !c?.dialogNode
+        ? c
+        : { ...c, dialogNode: dialogTreeWithChoicesAt(c.dialogNode, rest, newChoices) }
+    );
+    return { ...(tree ?? {}), choices };
+  }
+
+  // P3-3c-8 / P3-3c-11 / P3-3c-12 — shared callbacks across
+  // movementChoice, pickProp, and dialogTree (any depth). DialogTree's
+  // items live nested at `dialogTree.{choices}.{dialogNode}.choices...`
+  // so the accessor closes over the current dialogTreeNodePath.
   type HotspotItemsAccessor = {
     read: (params: any) => any[];
     write: (params: any, items: any[]) => any;
@@ -958,10 +992,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       itemKind: 'prop',
     };
     if (b?.type === 'dialogTree') return {
-      read: (p) => Array.isArray(p?.dialogTree?.choices) ? p.dialogTree.choices : [],
+      read: (p) => {
+        const node = dialogNodeAt(p?.dialogTree, dialogTreeNodePath);
+        return Array.isArray(node?.choices) ? node.choices : [];
+      },
       write: (p, items) => ({
         ...p,
-        dialogTree: { ...(p?.dialogTree ?? {}), choices: items },
+        dialogTree: dialogTreeWithChoicesAt(p?.dialogTree, dialogTreeNodePath, items),
       }),
       itemKind: 'dialogChoice',
     };
@@ -1390,14 +1427,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               question: slotPreviewParams.question || 'What do you want to interact with?',
             }
         : beat.type === 'dialogTree'
-          ? {
-              // P3-3c-11 — dialogTree spatial preview shows the ROOT node
-              // only (nested-node hotspots are still inspector-only). The
-              // speaker + text feed the dialogTree slots; the root
-              // choices become the hotspots on the spatial layer.
-              speaker: slotPreviewParams.dialogTree?.speaker || 'Speaker',
-              text: slotPreviewParams.dialogTree?.text || 'Dialogue text...',
-            }
+          ? (() => {
+              // P3-3c-12 — current node lookup along dialogTreeNodePath.
+              // Falls back to root if the path is empty (or stale, e.g.
+              // a choice was renamed and the path no longer resolves).
+              const cur = dialogNodeAt(slotPreviewParams.dialogTree, dialogTreeNodePath)
+                ?? slotPreviewParams.dialogTree;
+              return {
+                speaker: cur?.speaker || 'Speaker',
+                text: cur?.text || 'Dialogue text...',
+              };
+            })()
         : beat.type === 'endScreen'
         ? {
             message: slotPreviewParams.message ?? '',
@@ -5218,11 +5258,56 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 : slotPreviewParams?.slotIntent;
             // The faithful preview contents — defined once, hosted by either
             // the scaled fixed-device rect or the editor-fill wrapper.
+            // P3-3c-12 — breadcrumb of the current dialogTree node path.
+            // Each segment is the choice id whose dialogNode we descended
+            // into; resolve labels by re-walking the tree so a rename
+            // updates them automatically. Click a segment to step back
+            // up to that depth (root = path index -1).
+            const dialogBreadcrumb = beat?.type === 'dialogTree' && dialogTreeNodePath.length > 0
+              ? (() => {
+                  const tree = slotPreviewParams?.dialogTree;
+                  const labels: Array<{ idx: number; label: string }> = [];
+                  let cur = tree;
+                  for (let i = 0; i < dialogTreeNodePath.length; i++) {
+                    const id = dialogTreeNodePath[i];
+                    const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
+                    if (!choice) break;
+                    labels.push({ idx: i, label: choice.text || choice.id });
+                    cur = choice.dialogNode;
+                  }
+                  return labels;
+                })()
+              : null;
             const previewInner = (
               <>
                 {slotPreviewUsesSample && (
                   <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 px-2 py-0.5 rounded bg-amber-400/90 text-black text-[10px] font-medium pointer-events-none">
                     Sample body — replaced by generated content at runtime
+                  </div>
+                )}
+                {dialogBreadcrumb && dialogBreadcrumb.length > 0 && (
+                  <div className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-white text-[11px] font-medium">
+                    <button
+                      type="button"
+                      onClick={() => setDialogTreeNodePath([])}
+                      className="hover:underline"
+                      title="Back to root node"
+                    >
+                      Root
+                    </button>
+                    {dialogBreadcrumb.map((seg, i) => (
+                      <React.Fragment key={seg.idx}>
+                        <span className="text-white/50">›</span>
+                        <button
+                          type="button"
+                          onClick={() => setDialogTreeNodePath(prev => prev.slice(0, seg.idx + 1))}
+                          className={`hover:underline truncate max-w-[120px] ${i === dialogBreadcrumb.length - 1 ? 'text-amber-300' : ''}`}
+                          title={seg.label}
+                        >
+                          {seg.label}
+                        </button>
+                      </React.Fragment>
+                    ))}
                   </div>
                 )}
                 {isSpatialPreview ? (
@@ -5271,30 +5356,49 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         movementChoice in spatial mode; sits above the read-only
                         SpatialFlowView, intercepts pointer events to drag-move
                         and corner-resize each hotspot. */}
-                    {isHotspotChoicePreview && (
-                      <HotspotEditOverlay
-                        imageUrl={backgroundUrl || null}
-                        fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
-                        hotspots={(hotspotAccessor && slotPreviewParams
-                          ? hotspotAccessor.read(slotPreviewParams)
-                          : [])
-                          .filter((c: any) => c && c.hotspot)
-                          .map((c: any) => ({
-                            id: c.id,
-                            x: c.hotspot.x,
-                            y: c.hotspot.y,
-                            width: c.hotspot.width,
-                            height: c.hotspot.height,
-                            shape: c.hotspot.shape,
-                            label: c.displayText || c.text || c.displayName || c.name,
-                          }))}
-                        selectedId={selectedHotspotId}
-                        onSelect={setSelectedHotspotId}
-                        onChange={onHotspotChange}
-                        onCreate={onHotspotCreate}
-                        onDelete={onHotspotDelete}
-                      />
-                    )}
+                    {isHotspotChoicePreview && (() => {
+                      const items = hotspotAccessor && slotPreviewParams
+                        ? hotspotAccessor.read(slotPreviewParams)
+                        : [];
+                      // P3-3c-12 — dialogTree: which choices can step in?
+                      // Any whose `dialogNode` exists. Pass as a Set so the
+                      // overlay can render the "Step in →" badge per
+                      // hotspot. movementChoice/pickProp omit the prop.
+                      const stepIntoIds = beat?.type === 'dialogTree'
+                        ? new Set<string>(
+                            items
+                              .filter((c: any) => c?.hotspot && c?.dialogNode)
+                              .map((c: any) => c.id)
+                          )
+                        : undefined;
+                      return (
+                        <HotspotEditOverlay
+                          imageUrl={backgroundUrl || null}
+                          fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
+                          hotspots={items
+                            .filter((c: any) => c && c.hotspot)
+                            .map((c: any) => ({
+                              id: c.id,
+                              x: c.hotspot.x,
+                              y: c.hotspot.y,
+                              width: c.hotspot.width,
+                              height: c.hotspot.height,
+                              shape: c.hotspot.shape,
+                              label: c.displayText || c.text || c.displayName || c.name,
+                            }))}
+                          selectedId={selectedHotspotId}
+                          onSelect={setSelectedHotspotId}
+                          onChange={onHotspotChange}
+                          onCreate={onHotspotCreate}
+                          onDelete={onHotspotDelete}
+                          stepIntoIds={stepIntoIds}
+                          onStepInto={beat?.type === 'dialogTree' ? (id) => {
+                            setDialogTreeNodePath(prev => [...prev, id]);
+                            setSelectedHotspotId(null);
+                          } : undefined}
+                        />
+                      );
+                    })()}
                   </>
                 ) : (
                   <SlotFlowView

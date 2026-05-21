@@ -35,6 +35,14 @@ interface Props {
    * choice itself.
    */
   onDelete?: (id: string) => void;
+  /**
+   * P3-3c-12 — set of hotspot ids whose choice has a nested dialogNode
+   * (dialogTree only). Each such hotspot gets a small "Step in" badge;
+   * clicking it fires onStepInto. Other beat types omit this prop and
+   * the badges don't render.
+   */
+  stepIntoIds?: Set<string>;
+  onStepInto?: (id: string) => void;
 }
 
 type DragKind =
@@ -53,6 +61,8 @@ export const HotspotEditOverlay: React.FC<Props> = ({
   onChange,
   onCreate,
   onDelete,
+  stepIntoIds,
+  onStepInto,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -353,6 +363,38 @@ export const HotspotEditOverlay: React.FC<Props> = ({
               >
                 {h.label || h.id}
               </div>
+              {/* P3-3c-12 — Step-in badge for hotspots whose choice has a
+                  nested dialogNode (dialogTree only). Clicking it descends
+                  into the nested node so the canvas + breadcrumb update.
+                  pointerDown stopPropagation prevents the click from
+                  starting a hotspot move-drag. */}
+              {stepIntoIds?.has(h.id) && onStepInto && (
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStepInto(h.id);
+                  }}
+                  title="Step into this choice's nested dialog"
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 4,
+                    fontSize: 10,
+                    background: 'rgba(59, 130, 246, 0.95)',
+                    color: '#fff',
+                    padding: '1px 6px',
+                    borderRadius: 3,
+                    border: 'none',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    userSelect: 'none',
+                  }}
+                >
+                  Step in →
+                </button>
+              )}
               {/* Corner handles — only for the selected hotspot. */}
               {isSelected && (['tl', 'tr', 'bl', 'br'] as const).map((corner) => {
                 const pos: React.CSSProperties = {
