@@ -2544,15 +2544,18 @@ export class ReactRenderer extends BaseRenderer {
 
     this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
 
-    // P3-3c — spatial path: every choice carries a normalized hotspot AND
+    // P3-3c — spatial path: ANY choice carries a normalized hotspot AND
     // there are no baked absolute locations. Compose through SpatialFlowView
     // with the image as background and the choice hotspots as clickable
-    // regions anchored to the image's letterboxed rect. Beats without
-    // hotspots fall through to the existing absolute-positioned path
-    // (zero regression).
+    // regions anchored to the image's letterboxed rect. QA caught: was
+    // `every` (strict) — that didn't match the editor preview which
+    // flipped on `some`, so a partial-config beat showed spatial in VE
+    // and absolute in PreviewWindow. Choices WITHOUT a hotspot simply
+    // don't render as clickable regions in spatial mode (the inspector
+    // should warn the author about that gap; that warning lands separately).
     const authorPositioned = !!(locations && locations.length > 0);
-    const allHaveHotspots = choices.length > 0 && choices.every(c => !!c.hotspot);
-    if (allHaveHotspots && !authorPositioned) {
+    const anyHasHotspot = choices.length > 0 && choices.some(c => !!c.hotspot);
+    if (anyHasHotspot && !authorPositioned) {
       const spatialSpec = getSpatialSpec('movementChoice');
       if (spatialSpec) {
         const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';

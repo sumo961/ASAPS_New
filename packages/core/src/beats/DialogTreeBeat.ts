@@ -536,11 +536,16 @@ export class DialogTreeBeat extends Beat {
         // a single combined SpatialFlowView render (image + speaker/text
         // slots + hotspot choices). Per-node so a dialogTree can mix
         // spatial scenes with positioned close-up monologues.
+        // QA-flagged: was `every` (all choices need a hotspot) — that
+        // didn't match the editor preview (which fires on `some`), so a
+        // partial-config node showed spatial in VE and absolute in
+        // PreviewWindow. Relaxed to `some`; choices without a hotspot
+        // simply won't render as clickable regions in spatial mode.
         const nodeIsSpatial =
           (this.presentationMode || 'positioned') === 'positioned'
           && locations.length === 0
           && visibleChoices.length > 0
-          && visibleChoices.every(c => !!(c as any).hotspot);
+          && visibleChoices.some(c => !!(c as any).hotspot);
         renderer.setState('dialogNodeIsSpatial', nodeIsSpatial);
 
         // Process choice text with variable interpolation and render choices
