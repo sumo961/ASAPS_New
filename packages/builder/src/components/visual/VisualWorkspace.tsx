@@ -5098,13 +5098,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             {activeTab === 'animations' && (
               <AnimationPanel
                 layoutMode={
-                  beat && !beatHasAuthorLocations
-                    ? isSpatialModeBeatType(beat.type)
-                      ? 'spatial'
-                      : isSlotModeBeatType(beat.type)
-                        ? 'slot'
-                        : 'absolute'
-                    : 'absolute'
+                  // QA-flagged: schema-type-only detection missed the
+                  // data-driven spatial mode used by movementChoice /
+                  // pickProp / dialogTree (they opt in per-instance via
+                  // hotspot, without setting layoutMode:'spatial' at the
+                  // type level). Reuse the same isSpatialPreview /
+                  // isSlotPreview flags that the canvas preview branch
+                  // uses, so the SlotAnimationsEditor shows up for
+                  // hotspot-mode beats too instead of the legacy
+                  // path-keyframe editor.
+                  isSpatialPreview
+                    ? 'spatial'
+                    : isSlotPreview
+                      ? 'slot'
+                      : 'absolute'
                 }
                 animations={animations}
                 elements={visualElements}
