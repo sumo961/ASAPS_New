@@ -44,9 +44,40 @@ interface BeatDefinitions {
 }
 
 /**
+ * P3-3c-13 — flag schema type strings that would parse into garbage TS.
+ *
+ * Background: in P3-3c-2 the schema temporarily carried inline-object type
+ * strings like `"hotspot": "{ x: number, y: number, ... }?"`. The codegen
+ * accepted these silently — the `' | '` literal-union split path produced
+ * nonsensical unions like `'{ x:... shape: rect' | 'ellipse }?'` that
+ * TypeScript happily validated as string literal unions, just garbage.
+ * Type-check stayed green and the bug was invisible until consumers tried
+ * to use the field as a real interface.
+ *
+ * Now: any type string containing `{` is rejected. Inline objects MUST be
+ * promoted to a fragment in customTypes (the registered mapCustomType map
+ * picks them up cleanly). Returns an array of issues; caller decides
+ * whether to fail.
+ */
+const schemaTypeIssues: string[] = [];
+function validateSchemaTypeString(typeStr: string, context: string): void {
+  if (typeof typeStr !== 'string') return;
+  if (typeStr.includes('{') || typeStr.includes('}')) {
+    schemaTypeIssues.push(
+      `${context}: type string "${typeStr}" contains '{' or '}'. Inline objects ` +
+      `are not supported — promote it to a customTypes fragment (e.g. add a ` +
+      `"spatialHotspot" entry and reference it as "spatialHotspot?"). ` +
+      `Past breakage: shipped silent literal-union garbage that type-check ` +
+      `couldn't catch.`
+    );
+  }
+}
+
+/**
  * Map JSON schema types to TypeScript types
  */
 function mapTypeToTS(paramType: string, isRequired: boolean): string {
+  validateSchemaTypeString(paramType, 'mapTypeToTS');
   // Handle array types
   if (paramType.startsWith('array<')) {
     const innerType = paramType.match(/array<(.+)>/)?.[1] || 'any';
@@ -223,6 +254,7 @@ function generateCustomTypes(customTypes: Record<string, any>): string {
     lines.push(`export interface ${interfaceName} {`);
 
     for (const [propName, propType] of Object.entries(typeDef.schema)) {
+      validateSchemaTypeString(String(propType), `customTypes.${typeName}.${propName}`);
       const isOptional = String(propType).endsWith('?');
       const cleanType = String(propType).replace('?', '');
       const optional = isOptional ? '?' : '';
@@ -320,6 +352,20 @@ function generateTypes() {
 
   console.log(`✅ Generated ${beatNames.length} beat type interfaces`);
   console.log(`📝 Output: ${path.relative(process.cwd(), outputPath)}`);
+
+  // P3-3c-13 — fail loud on schema-type-string issues. The output was
+  // still written so the diff is inspectable, but exit code is non-zero
+  // so CI / pre-commit / "npm run build" stops before the garbage types
+  // ship to downstream callers.
+  if (schemaTypeIssues.length > 0) {
+    console.error(`\n❌ ${schemaTypeIssues.length} schema-type-string issue(s) detected:`);
+    for (const issue of schemaTypeIssues) {
+      console.error(`   • ${issue}`);
+    }
+    console.error('');
+    process.exit(1);
+  }
+
   console.log(`\n✨ Type generation complete!`);
 }
 
