@@ -5338,7 +5338,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 {isSpatialPreview ? (
                   <>
                     <SpatialFlowView
-                      key={`spatprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
+                      key={`spatprev-${beat!.id}-${selVp.id}-${animReplayTick}-${dialogTreeNodePath.join('.')}`}
                       beatType={beat!.type}
                       spatial={{
                         source: 'background',
