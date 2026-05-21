@@ -1,6 +1,6 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.15.0",
+  "version": "2.16.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
   
   "connectionModel": {
@@ -41,9 +41,10 @@
         "counter": "string?",
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
-        "soundEffect": "string?"
+        "soundEffect": "string?",
+        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
       },
-      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected."
+      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. P3-3c-9 — optional `hotspot` (normalized 0–1 against the spatial image) flips the CURRENT dialog node into spatial mode: the renderer composes speaker/text into flow slots over the beat background and turns the choices into clickable regions on the image. Per-node, so a dialogTree can mix spatial nodes (a scene) with positioned nodes (a close-up monologue)."
     },
     "movementOption": {
       "description": "A movement choice",
@@ -468,6 +469,15 @@
       "locationMapping": {
         "dialog": "text"
       },
+      "layoutModeNote": "P3-3c-9 — dialogTree flips into spatial mode PER NODE: a node whose choices each carry a `hotspot` composes through SpatialFlowView (image as background, speaker/text in flow slots, choices as clickable regions on the image). Positioned-presentation only — chat-scroll / chat-bubble keep their own renderers. Authors can mix spatial nodes (scenes) with positioned nodes (close-up monologues) within a single dialogTree.",
+      "spatialLayer": {
+        "source": "background",
+        "fit": "contain"
+      },
+      "slots": [
+        { "name": "speaker", "role": "title", "source": "speaker" },
+        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "dialogTree",

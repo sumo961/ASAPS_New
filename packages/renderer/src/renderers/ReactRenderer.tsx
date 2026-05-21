@@ -2192,6 +2192,15 @@ export class ReactRenderer extends BaseRenderer {
       return;
     }
 
+    // P3-3c-9 — when the current dialogTree node will compose spatially
+    // (any choice has a hotspot), skip the absolute-mode dialog render.
+    // dialogContext is already set above; renderChoices will do a single
+    // combined SpatialFlowView render with speaker/text + hotspots.
+    // Avoids a one-frame absolute-then-spatial flicker.
+    if (this.getState('dialogNodeIsSpatial')) {
+      return;
+    }
+
     // Positioned mode - render as before
     // Render dialog immediately WITHOUT choices (don't wait for action)
     // This ensures the dialog text, background, and characters are visible
@@ -2315,7 +2324,7 @@ export class ReactRenderer extends BaseRenderer {
     );
   }
 
-  async renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string> {
+  async renderChoices(choices: { id: string; text: string; isExit?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -2331,6 +2340,58 @@ export class ReactRenderer extends BaseRenderer {
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
+
+    // P3-3c-9 — spatial path for dialogTree nodes whose choices all
+    // carry hotspots. DialogTreeBeat set `dialogNodeIsSpatial` after
+    // detecting per-node; renderDialog skipped its absolute render
+    // already. We compose the full turn (image + speaker/text slots
+    // + hotspot choices) in a single SpatialFlowView render.
+    const dialogNodeIsSpatial = !!this.getState('dialogNodeIsSpatial');
+    const authorPositioned = !!(locations && locations.length > 0);
+    if (dialogNodeIsSpatial && !authorPositioned) {
+      const spatialSpec = getSpatialSpec('dialogTree');
+      if (spatialSpec) {
+        const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
+        const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
+        const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
+        const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
+        const hotspots = choices
+          .filter(c => !!c.hotspot)
+          .map(c => ({
+            id: c.id,
+            x: c.hotspot!.x,
+            y: c.hotspot!.y,
+            width: c.hotspot!.width,
+            height: c.hotspot!.height,
+            shape: c.hotspot!.shape,
+            label: c.text,
+          }));
+        return new Promise<string>(resolve => {
+          this.resolveAction = (id: string) => {
+            this.resolveAction = null;
+            resolve(id);
+          };
+          this.renderComponent(
+            <SpatialFlowView
+              beatType="dialogTree"
+              spatial={spatialSpec}
+              content={{
+                speaker: dialogContext.speaker || '',
+                text: dialogContext.text || '',
+              }}
+              theme={this.theme}
+              imageUrl={this.backgroundImageUrl}
+              backgroundColor={bg}
+              slotIntent={slotIntent}
+              slotAnimations={slotAnimations}
+              spatialAnimations={spatialAnimations}
+              hotspots={hotspots}
+              onAction={this.handleAction}
+            />
+          );
+        });
+      }
+    }
 
     // Log choice rendering info
     console.log(`[renderChoices] Rendering ${choices.length} choices:`, choices.map(c => c.text).join(', '));

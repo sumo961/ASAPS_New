@@ -567,7 +567,7 @@ export interface IRenderer {
   renderTitleScreen(title: string, author: string, buttonText: string, locations?: Location[]): Promise<void>;
   renderText(text: string, buttonText: string, locations?: Location[]): Promise<void>;
   renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void>;
-  renderChoices(choices: { id: string; text: string }[], locations?: Location[]): Promise<string>;
+  renderChoices(choices: { id: string; text: string; isExit?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void>;

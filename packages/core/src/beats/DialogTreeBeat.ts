@@ -523,6 +523,20 @@ export class DialogTreeBeat extends Beat {
           await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
         }
 
+        // P3-3c-9 — per-node spatial detection. If every visible choice on
+        // THIS node carries a hotspot AND no baked locations exist for the
+        // beat AND we're in positioned presentation, set a state flag so
+        // renderDialog skips its absolute render and renderChoices does
+        // a single combined SpatialFlowView render (image + speaker/text
+        // slots + hotspot choices). Per-node so a dialogTree can mix
+        // spatial scenes with positioned close-up monologues.
+        const nodeIsSpatial =
+          (this.presentationMode || 'positioned') === 'positioned'
+          && locations.length === 0
+          && visibleChoices.length > 0
+          && visibleChoices.every(c => !!(c as any).hotspot);
+        renderer.setState('dialogNodeIsSpatial', nodeIsSpatial);
+
         // Process choice text with variable interpolation and render choices
         // Include isExit flag to indicate if choice exits to another beat (skip typing animation)
         // Prefix choice IDs with nodePath so different dialog nodes don't share IDs
@@ -531,9 +545,17 @@ export class DialogTreeBeat extends Beat {
             id: `${nodePath}_${c.id}`,
             text: this.processText(c.text, context),
             isExit: !!c.target && !c.dialogNode, // Exit if has target but no nested dialog
+            // P3-3c-9 — pass through; ReactRenderer.renderChoices routes
+            // through SpatialFlowView when dialogNodeIsSpatial is set.
+            hotspot: (c as any).hotspot,
           })),
           locations
         );
+
+        // Clear the spatial flag after this node's render — the NEXT node
+        // re-detects from its own choices, and non-spatial intervening
+        // beats (renderText, etc.) shouldn't see a stale value.
+        renderer.setState('dialogNodeIsSpatial', false);
 
         // First try to match by exact ID (strip nodePath prefix if present)
         const rawChoiceId = choiceId?.startsWith(`${nodePath}_`) ? choiceId.substring(nodePath.length + 1) : choiceId;
