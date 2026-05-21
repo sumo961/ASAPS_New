@@ -676,6 +676,66 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         />
                       </div>
 
+                      {/* P3-3c-10 — spatial hotspot per choice. When EVERY
+                          visible choice on a dialog node has a hotspot, that
+                          node composes through SpatialFlowView at runtime
+                          (image + speaker/text slots + hotspot regions). */}
+                      {(() => {
+                        const sp = (choice as any).hotspot;
+                        const stagger = (index % 4) * 0.18;
+                        return (
+                          <div className="mt-2 flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
+                            <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
+                            {sp ? (
+                              <>
+                                <select
+                                  value={sp.shape || 'rect'}
+                                  onChange={(e) =>
+                                    updateChoiceAtPath(path, index, {
+                                      hotspot: { ...sp, shape: e.target.value as 'rect' | 'ellipse' },
+                                    } as any)
+                                  }
+                                  className="text-xs px-1 py-0.5 border rounded bg-white"
+                                >
+                                  <option value="rect">Rectangle</option>
+                                  <option value="ellipse">Ellipse</option>
+                                </select>
+                                <span className="text-[10px] text-gray-500 ml-auto">
+                                  {Math.round(sp.x * 100)}%, {Math.round(sp.y * 100)}% · {Math.round(sp.width * 100)}×{Math.round(sp.height * 100)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateChoiceAtPath(path, index, { hotspot: undefined } as any)
+                                  }
+                                  className="text-xs px-2 py-0.5 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 text-red-600"
+                                >
+                                  Remove
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateChoiceAtPath(path, index, {
+                                    hotspot: {
+                                      x: 0.1 + stagger,
+                                      y: 0.4,
+                                      width: 0.18,
+                                      height: 0.18,
+                                      shape: 'rect',
+                                    },
+                                  } as any)
+                                }
+                                className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded hover:bg-blue-600 ml-auto"
+                              >
+                                Add hotspot
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
+
                       {/* Target selection - show for choices without nested dialog OR collapsible patterns */}
                       {(!hasNestedDialog || isCollapsible) && (
                         <div className="mt-2 flex gap-1.5 items-center">

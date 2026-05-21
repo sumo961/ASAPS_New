@@ -77,6 +77,7 @@ function mapCustomType(typeName: string): string {
     'movementOption': 'MovementOption',
     'propOption': 'PropOption',
     'panoramaHotspot': 'PanoramaHotspot',
+    'spatialHotspot': 'SpatialHotspot',
     'condition': 'Condition',
     'effect': 'Effect',
     'connection': 'Connection',

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-05-21T00:48:27.473Z
+ * Generated: 2026-05-21T08:45:44.743Z
  */
 
 // ============================================
@@ -41,7 +41,7 @@ export interface DialogChoice {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
-  hotspot?: '{ x: number, y: number, width: number, height: number, shape: rect' | 'ellipse }?';
+  hotspot?: SpatialHotspot;
 }
 
 /**
@@ -60,7 +60,7 @@ export interface MovementOption {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
-  hotspot?: '{ x: number, y: number, width: number, height: number, shape: rect' | 'ellipse }?';
+  hotspot?: SpatialHotspot;
 }
 
 /**
@@ -81,7 +81,18 @@ export interface PropOption {
   counterOperation?: 'set' | 'change';
   counterValue?: number;
   soundEffect?: string;
-  hotspot?: '{ x: number, y: number, width: number, height: number, shape: rect' | 'ellipse }?';
+  hotspot?: SpatialHotspot;
+}
+
+/**
+ * Normalized 0–1 clickable region on the spatial image (P3-3c). Coordinates are RELATIVE to the LETTERBOXED image rect (objectFit:'contain'), so the hotspot tracks the picture pixels across viewports / orientations.
+ */
+export interface SpatialHotspot {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  shape?: 'rect' | 'ellipse';
 }
 
 /**

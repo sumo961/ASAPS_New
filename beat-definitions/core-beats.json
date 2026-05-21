@@ -42,7 +42,7 @@
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
         "soundEffect": "string?",
-        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
+        "hotspot": "spatialHotspot?"
       },
       "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. P3-3c-9 — optional `hotspot` (normalized 0–1 against the spatial image) flips the CURRENT dialog node into spatial mode: the renderer composes speaker/text into flow slots over the beat background and turns the choices into clickable regions on the image. Per-node, so a dialogTree can mix spatial nodes (a scene) with positioned nodes (a close-up monologue)."
     },
@@ -61,7 +61,7 @@
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
         "soundEffect": "string?",
-        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
+        "hotspot": "spatialHotspot?"
       },
       "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching. P3-3c — optional `hotspot` carries a normalized 0–1 rectangle on the spatial layer; when ALL choices have hotspots AND the beat has no baked locations, the renderer composes movementChoice through SpatialFlowView with the image as background and the hotspots as clickable regions."
     },
@@ -82,7 +82,7 @@
         "counterOperation": "'set' | 'change'?",
         "counterValue": "number?",
         "soundEffect": "string?",
-        "hotspot": "{ x: number, y: number, width: number, height: number, shape?: 'rect' | 'ellipse' }?"
+        "hotspot": "spatialHotspot?"
       },
       "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key."
     },
@@ -114,6 +114,16 @@
         "label": "string?",
         "condition": "condition?",
         "effects": "effect[]?"
+      }
+    },
+    "spatialHotspot": {
+      "description": "Normalized 0–1 clickable region on the spatial image (P3-3c). Coordinates are RELATIVE to the LETTERBOXED image rect (objectFit:'contain'), so the hotspot tracks the picture pixels across viewports / orientations.",
+      "schema": {
+        "x": "number",
+        "y": "number",
+        "width": "number",
+        "height": "number",
+        "shape": "'rect' | 'ellipse'?"
       }
     },
     "panoramaHotspot": {
