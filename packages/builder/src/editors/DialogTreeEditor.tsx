@@ -90,6 +90,11 @@ interface DialogTreeEditorProps {
   /** Project emotion palette — passed to ChoiceEffectsEditor so the
    *  fireEmotion / addSentiment emotion fields offer combobox auto-complete. */
   emotionPalette?: ReadonlyArray<import('@asaps/core').EmotionDefinition>;
+  /** P3-3c-15 — true when the parent beat has baked locations[]. Spatial
+   * hotspots only fire when the beat composes through SpatialFlowView,
+   * which requires no baked locations; when this is true the per-choice
+   * spatial-hotspot row shows an inactive advisory. */
+  beatHasAuthorLocations?: boolean;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -131,6 +136,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   speakerNameResolver,
   onDefineAsCharacter,
   emotionPalette,
+  beatHasAuthorLocations = false,
 }) => {
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
@@ -772,7 +778,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         const sp = (choice as any).hotspot;
                         const stagger = (index % 4) * 0.18;
                         return (
-                          <div className="mt-2 flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
+                          <div className="mt-2">
+                          <div className="flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
                             <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
                             {sp ? (
                               <>
@@ -820,6 +827,12 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                                 Add hotspot
                               </button>
                             )}
+                          </div>
+                          {sp && beatHasAuthorLocations && (
+                            <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
+                              ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                            </p>
+                          )}
                           </div>
                         );
                       })()}

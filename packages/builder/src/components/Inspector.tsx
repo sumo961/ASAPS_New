@@ -188,6 +188,14 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
 
+  // P3-3c-15 — spatial hotspots only fire at runtime when the beat
+  // composes through SpatialFlowView, which requires no baked
+  // locations[]. If the author has baked layout, the absolute path
+  // wins and any choice.hotspot is inert. Surface that as an inline
+  // advisory in the Spatial-hotspot row so saving a hotspot that
+  // won't do anything isn't silently mysterious.
+  const beatHasAuthorLocations = !!beat && (beat.locations?.size ?? 0) > 0;
+
   // P3-3c-7 — bidirectional hotspot hover link. Canvas dispatches
   // `asaps:hotspotHover` with the hovered choice id (or null on leave);
   // we mirror it into local state so the matching choice card lights
@@ -3458,6 +3466,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       characters={getAvailableCharacters()}
                       characterObjects={characters}
                       allBeats={availableTargets}
+                      beatHasAuthorLocations={beatHasAuthorLocations}
                       counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
                       variables={availableVariables.map(v => v.name)}
                       availableCounters={availableCounters}
@@ -3903,6 +3912,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           {(() => {
                             const sp = (choice as any).hotspot;
                             return (
+                              <div>
                               <div className="flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
                                 <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
                                 {sp ? (
@@ -3942,6 +3952,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     </button>
                                   </>
                                 )}
+                              </div>
+                              {sp && beatHasAuthorLocations && (
+                                <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
+                                  ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                                </p>
+                              )}
                               </div>
                             );
                           })()}
@@ -4510,6 +4526,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           {(() => {
                             const sp = (prop as any).hotspot;
                             return (
+                              <div>
                               <div className="flex items-center gap-2 px-2 py-1 bg-blue-50/60 border border-blue-200 rounded">
                                 <span className="text-[11px] text-gray-700">Spatial hotspot:</span>
                                 {sp ? (
@@ -4553,6 +4570,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     Add hotspot
                                   </button>
                                 )}
+                              </div>
+                              {sp && beatHasAuthorLocations && (
+                                <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
+                                  ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                                </p>
+                              )}
                               </div>
                             );
                           })()}
