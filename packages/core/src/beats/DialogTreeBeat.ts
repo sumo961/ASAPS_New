@@ -113,6 +113,12 @@ export class DialogTreeBeat extends Beat {
         // Preserve sound effect
         if (choice.soundEffect) (migratedChoice as any).soundEffect = choice.soundEffect;
 
+        // P3-3c — preserve spatial hotspot (normalized 0–1 region on the
+        // image rect). Without this, every updateParameters call strips
+        // choice.hotspot back to undefined and the inspector / canvas
+        // edits silently revert.
+        if (choice.hotspot) (migratedChoice as any).hotspot = choice.hotspot;
+
         // Old format: target was either string (beat ID) or object (nested DialogNode)
         // New format: target is string only, dialogNode is nested node
         if (typeof choice.target === 'string') {
