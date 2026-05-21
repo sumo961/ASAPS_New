@@ -794,6 +794,27 @@ export function initializeBeatLocations(
     // Get beat parameters
     const params = beat.getParameters ? beat.getParameters() : {};
 
+    // P3-3c — author has signaled "I want spatial mode" by configuring at
+    // least one hotspot on a choice/prop/dialog-choice. Auto-baking schema
+    // locations here would set authorPositioned=true at runtime and force
+    // the absolute path, contradicting the author's intent. QA caught
+    // this: a hotspot-bearing movementChoice rendered spatially in the
+    // editor (where the check is data-driven) but FELL BACK TO ABSOLUTE
+    // in PreviewWindow because PW startup ran this initializer and
+    // baked 7 default locations into the empty beat. Skip auto-baking
+    // for any beat whose choices/props/dialogTree-choices carry a hotspot.
+    const choices = Array.isArray(params?.choices) ? params.choices : [];
+    const props = Array.isArray(params?.props) ? params.props : [];
+    const dialogChoices = Array.isArray(params?.dialogTree?.choices) ? params.dialogTree.choices : [];
+    const anyHotspot =
+      choices.some((c: any) => c?.hotspot) ||
+      props.some((p: any) => p?.hotspot) ||
+      dialogChoices.some((c: any) => c?.hotspot);
+    if (anyHotspot) {
+      console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — author configured spatial hotspot(s); auto-baked locations would override spatial-mode runtime.`);
+      return;
+    }
+
     // Generate visual elements from schema
     const elements = initializeLocationsFromSchema(
       beat,
