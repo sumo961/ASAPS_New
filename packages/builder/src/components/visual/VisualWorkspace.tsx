@@ -936,20 +936,43 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // command via onBeatUpdate). The on-disk shape stays normalized 0–1.
   const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
 
-  // P3-3c-8 — shared callbacks across movementChoice (choices[]) and
-  // pickProp (props[]). Each callback derives the items-key from
-  // beat.type at call time to avoid forward references; the spatial
-  // preview detection (isHotspotChoicePreview) is computed later.
-  const hotspotItemsKeyFor = (b: any): 'choices' | 'props' | null =>
-    b?.type === 'movementChoice' ? 'choices'
-    : b?.type === 'pickProp' ? 'props'
-    : null;
+  // P3-3c-8 / P3-3c-11 — shared callbacks across movementChoice,
+  // pickProp, and dialogTree (root). DialogTree's items live nested
+  // at `dialogTree.choices`, so a read/write accessor pair beats a
+  // flat key. itemKind drives placeholder creation when drawing a
+  // new hotspot on empty image area.
+  type HotspotItemsAccessor = {
+    read: (params: any) => any[];
+    write: (params: any, items: any[]) => any;
+    itemKind: 'choice' | 'prop' | 'dialogChoice';
+  };
+  const hotspotItemsAccessorFor = (b: any): HotspotItemsAccessor | null => {
+    if (b?.type === 'movementChoice') return {
+      read: (p) => Array.isArray(p?.choices) ? p.choices : [],
+      write: (p, items) => ({ ...p, choices: items }),
+      itemKind: 'choice',
+    };
+    if (b?.type === 'pickProp') return {
+      read: (p) => Array.isArray(p?.props) ? p.props : [],
+      write: (p, items) => ({ ...p, props: items }),
+      itemKind: 'prop',
+    };
+    if (b?.type === 'dialogTree') return {
+      read: (p) => Array.isArray(p?.dialogTree?.choices) ? p.dialogTree.choices : [],
+      write: (p, items) => ({
+        ...p,
+        dialogTree: { ...(p?.dialogTree ?? {}), choices: items },
+      }),
+      itemKind: 'dialogChoice',
+    };
+    return null;
+  };
   const onHotspotChange = useCallback(
     (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => {
-      const hotspotItemsKey = hotspotItemsKeyFor(beat);
-      if (!beat || !hotspotItemsKey) return;
+      const accessor = hotspotItemsAccessorFor(beat);
+      if (!beat || !accessor) return;
       const params = beat.getParameters?.() ?? {};
-      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
+      const items = [...accessor.read(params)];
       const idx = items.findIndex((c: any) => c?.id === id);
       if (idx < 0) return;
       const cur = items[idx];
@@ -958,11 +981,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         ...cur,
         hotspot: { ...curHotspot, x: next.x, y: next.y, width: next.width, height: next.height },
       };
-      beat.updateParameters?.({ [hotspotItemsKey]: items });
+      const nextParams = accessor.write(params, items);
+      beat.updateParameters?.(nextParams);
       if (commit && onBeatUpdate) {
-        onBeatUpdate(beat.id, {
-          parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
-        } as any);
+        onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...nextParams } } as any);
       }
     },
     [beat, onBeatUpdate]
@@ -971,32 +993,30 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // P3-3c-6 — strip the item's hotspot but keep the item itself.
   const onHotspotDelete = useCallback(
     (id: string) => {
-      const hotspotItemsKey = hotspotItemsKeyFor(beat);
-      if (!beat || !onBeatUpdate || !hotspotItemsKey) return;
+      const accessor = hotspotItemsAccessorFor(beat);
+      if (!beat || !onBeatUpdate || !accessor) return;
       const params = beat.getParameters?.() ?? {};
-      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
+      const items = [...accessor.read(params)];
       const idx = items.findIndex((c: any) => c?.id === id);
       if (idx < 0) return;
       const { hotspot, ...rest } = items[idx] as any;
       void hotspot;
       items[idx] = rest;
-      beat.updateParameters?.({ [hotspotItemsKey]: items });
-      onBeatUpdate(beat.id, {
-        parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
-      } as any);
+      const nextParams = accessor.write(params, items);
+      beat.updateParameters?.(nextParams);
+      onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...nextParams } } as any);
     },
     [beat, onBeatUpdate]
   );
 
-  // P3-3c-5 — canvas draw-to-create. For movementChoice the placeholder
-  // is a new choice {id, text, target}; for pickProp it's a new prop
-  // {id, name, description, target}.
+  // P3-3c-5 / 8 / 11 — canvas draw-to-create. Placeholder shape depends
+  // on the beat type's itemKind.
   const onHotspotCreate = useCallback(
     (rect: { x: number; y: number; width: number; height: number }): string | null => {
-      const hotspotItemsKey = hotspotItemsKeyFor(beat);
-      if (!beat || !onBeatUpdate || !hotspotItemsKey) return null;
+      const accessor = hotspotItemsAccessorFor(beat);
+      if (!beat || !onBeatUpdate || !accessor) return null;
       const params = beat.getParameters?.() ?? {};
-      const items = Array.isArray(params[hotspotItemsKey]) ? [...params[hotspotItemsKey]] : [];
+      const items = [...accessor.read(params)];
       const nextHotspot = {
         x: rect.x,
         y: rect.y,
@@ -1006,19 +1026,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       };
       let targetIdx = items.findIndex((c: any) => !c?.hotspot);
       if (targetIdx < 0) {
-        const newId = `${hotspotItemsKey === 'props' ? 'prop' : 'choice'}-${Date.now().toString(36).slice(-6)}`;
-        const placeholder = hotspotItemsKey === 'props'
+        const newId = `${accessor.itemKind === 'prop' ? 'prop' : 'choice'}-${Date.now().toString(36).slice(-6)}`;
+        const placeholder = accessor.itemKind === 'prop'
           ? { id: newId, name: 'New prop', description: '', target: '', hotspot: nextHotspot }
-          : { id: newId, text: 'New choice', target: '', hotspot: nextHotspot };
+          : accessor.itemKind === 'dialogChoice'
+            ? { id: newId, text: 'New choice', hotspot: nextHotspot }
+            : { id: newId, text: 'New choice', target: '', hotspot: nextHotspot };
         items.push(placeholder);
         targetIdx = items.length - 1;
       } else {
         items[targetIdx] = { ...items[targetIdx], hotspot: nextHotspot };
       }
-      beat.updateParameters?.({ [hotspotItemsKey]: items });
-      onBeatUpdate(beat.id, {
-        parameters: { ...beat.getParameters(), [hotspotItemsKey]: items },
-      } as any);
+      const nextParams = accessor.write(params, items);
+      beat.updateParameters?.(nextParams);
+      onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), ...nextParams } } as any);
       return (items[targetIdx] as any).id ?? null;
     },
     [beat, onBeatUpdate]
@@ -1309,19 +1330,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // The runtime detection (in renderMovement / renderPropSelection) keeps
   // the same shape — items without a hotspot just don't render as
   // clickable regions.
-  // P3-3c-8 — pickProp shares the same overlay/canvas-editor path; the
-  // underlying data field happens to be `props` instead of `choices` so
-  // we read whichever is present on the beat. (The hotspot callbacks
-  // hoisted earlier in this component derive the key independently via
-  // hotspotItemsKeyFor.)
-  const hotspotItemsKey: 'choices' | 'props' | null =
-    !!beat && !isPanoramaBeat && !beatHasAuthorLocations
-      ? beat.type === 'movementChoice' ? 'choices'
+  // P3-3c-8 / P3-3c-11 — generalized hotspot-bearing detection via the
+  // accessor pair. Reads from the accessor's read(params) so dialogTree's
+  // nested `dialogTree.choices` path works the same as movementChoice's
+  // top-level `choices`.
+  const hotspotAccessor = hotspotItemsAccessorFor(beat);
+  const hotspotItemsKey: 'choices' | 'props' | 'dialogChoices' | null =
+    !!beat && !isPanoramaBeat && !beatHasAuthorLocations && !!hotspotAccessor
+      ? (beat.type === 'movementChoice' ? 'choices'
         : beat.type === 'pickProp' ? 'props'
-        : null
+        : beat.type === 'dialogTree' ? 'dialogChoices'
+        : null)
       : null;
-  const hotspotItems: any[] = hotspotItemsKey
-    ? (Array.isArray((beat as any)[hotspotItemsKey]) ? (beat as any)[hotspotItemsKey] : [])
+  const hotspotItems: any[] = hotspotAccessor && beat
+    ? hotspotAccessor.read(beat.getParameters?.() ?? {})
     : [];
   const isHotspotChoicePreview =
     hotspotItemsKey !== null
@@ -1366,6 +1388,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // P3-3c-8 — pickProp spatial mode. Mirrors movementChoice;
               // props appear as hotspots on the image.
               question: slotPreviewParams.question || 'What do you want to interact with?',
+            }
+        : beat.type === 'dialogTree'
+          ? {
+              // P3-3c-11 — dialogTree spatial preview shows the ROOT node
+              // only (nested-node hotspots are still inspector-only). The
+              // speaker + text feed the dialogTree slots; the root
+              // choices become the hotspots on the spatial layer.
+              speaker: slotPreviewParams.dialogTree?.speaker || 'Speaker',
+              text: slotPreviewParams.dialogTree?.text || 'Dialogue text...',
             }
         : beat.type === 'endScreen'
         ? {
@@ -5244,11 +5275,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       <HotspotEditOverlay
                         imageUrl={backgroundUrl || null}
                         fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
-                        hotspots={((hotspotItemsKey
-                          ? (slotPreviewParams?.[hotspotItemsKey] as any[])
-                          : []) ?? [])
-                          .filter((c) => c && c.hotspot)
-                          .map((c) => ({
+                        hotspots={(hotspotAccessor && slotPreviewParams
+                          ? hotspotAccessor.read(slotPreviewParams)
+                          : [])
+                          .filter((c: any) => c && c.hotspot)
+                          .map((c: any) => ({
                             id: c.id,
                             x: c.hotspot.x,
                             y: c.hotspot.y,
