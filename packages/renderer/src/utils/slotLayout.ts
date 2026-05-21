@@ -95,16 +95,23 @@ export function isSpatialModeBeatType(beatType: string): boolean {
 }
 
 /**
- * The spatial spec (image layer + flow slots) for a spatial-mode beat type,
- * or null. Requires layoutMode:"spatial", a spatialLayer.source, and slots.
+ * The spatial spec (image layer + flow slots) for any beat type that
+ * declares one, or null. Returns the spec as long as `spatialLayer.source`
+ * + `slots` are set — regardless of whether the schema's `layoutMode` is
+ * `'spatial'`. P3-3c-2 / -8 / -9 introduced beats that opt INTO spatial
+ * mode per instance (movementChoice, pickProp, dialogTree — they flip
+ * spatial when a hotspot is configured on a choice/prop), so the schema
+ * declares the spec WITHOUT setting layoutMode at the type level. The
+ * old "layoutMode === 'spatial'" gate here silently rejected those —
+ * `getSpatialSpec('movementChoice')` returned null, the editor's spatial
+ * preview never mounted, and the renderer's spatial routing in
+ * renderMovement / renderPropSelection / renderChoices fell through to
+ * absolute. The per-instance opt-in lives in the caller (any choice
+ * has a hotspot + no baked locations[]) — not here.
  */
 export function getSpatialSpec(beatType: string): SpatialSpec | null {
   const def = beatDef(beatType);
-  if (
-    def?.layoutMode !== 'spatial' ||
-    !def.spatialLayer?.source ||
-    !Array.isArray(def.slots)
-  ) {
+  if (!def?.spatialLayer?.source || !Array.isArray(def.slots)) {
     return null;
   }
   return {
