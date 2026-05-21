@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   MessageSquare,
   Plus,
@@ -143,6 +143,13 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     return new Set(['root']);
   });
   const [expandedChoices, setExpandedChoices] = useState<Set<string>>(new Set());
+
+  // P3-3c-14 — the dialog node currently focused on the canvas (via
+  // walker). Set by an `asaps:dialogTreeWalkChanged` event dispatched
+  // from VisualWorkspace whenever the canvas's dialogTreeNodePath
+  // changes. Used to highlight the matching node header so the author
+  // can see where the canvas is at a glance.
+  const [canvasFocusedNodeId, setCanvasFocusedNodeId] = useState<string>('root');
   const [editingNode, setEditingNode] = useState<{node: DialogNode, path: string[]} | null>(null);
   const [showConditions, setShowConditions] = useState(false);
   const [showEffects, setShowEffects] = useState(false);
@@ -180,6 +187,67 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const cloneNode = (node: DialogNode): DialogNode => {
     return JSON.parse(JSON.stringify(node));
   };
+
+  // P3-3c-14 — translate between the canvas walker's path (sequence of
+  // choice.id values) and the inspector's path (sequence of
+  // `choice_${index}` segments rooted at 'root'). The two coordinate
+  // systems differ because the canvas writes ids while the inspector
+  // expansion is keyed by index.
+  const inspectorPathToCanvasPath = (insp: string[]): string[] => {
+    const out: string[] = [];
+    let cur: any = dialogTree;
+    for (let i = 1; i < insp.length; i++) {
+      const m = insp[i].match(/^choice_(\d+)$/);
+      if (!m || !cur) break;
+      const idx = parseInt(m[1], 10);
+      const choice = cur.choices?.[idx];
+      if (!choice) break;
+      out.push(choice.id);
+      cur = choice.dialogNode ?? null;
+    }
+    return out;
+  };
+  const canvasPathToInspectorPath = (canv: string[]): string[] => {
+    const out: string[] = ['root'];
+    let cur: any = dialogTree;
+    for (const choiceId of canv) {
+      const idx = (cur?.choices ?? []).findIndex((c: any) => c?.id === choiceId);
+      if (idx < 0 || !cur) break;
+      out.push(`choice_${idx}`);
+      cur = cur.choices[idx].dialogNode ?? null;
+    }
+    return out;
+  };
+
+  // P3-3c-14 — listen for canvas walker changes. Expand every node /
+  // choice along the path so the matching node header is visible, and
+  // remember which one is canvas-focused for header highlighting.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { path?: string[] } | undefined;
+      if (!detail || !Array.isArray(detail.path)) return;
+      const insp = canvasPathToInspectorPath(detail.path);
+      // All partial node ids: 'root', 'root.choice_0', etc. — used as
+      // both node-expansion keys AND choice-expansion keys.
+      const partials: string[] = [];
+      for (let i = 1; i <= insp.length; i++) partials.push(insp.slice(0, i).join('.'));
+      setExpandedNodes(prev => {
+        const next = new Set(prev);
+        partials.forEach(id => next.add(id));
+        return next;
+      });
+      setExpandedChoices(prev => {
+        const next = new Set(prev);
+        // Skip the root partial (no choice expansion for root itself).
+        partials.slice(1).forEach(id => next.add(id));
+        return next;
+      });
+      setCanvasFocusedNodeId(partials[partials.length - 1] ?? 'root');
+    };
+    window.addEventListener('asaps:dialogTreeWalkChanged', handler);
+    return () => window.removeEventListener('asaps:dialogTreeWalkChanged', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogTree]);
 
   // Navigate to node at path
   const getNodeAtPath = (tree: DialogNode, path: string[]): DialogNode | null => {
@@ -440,6 +508,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     // Get speaker color for visual distinction
     const speakerColor = isNPC ? getSpeakerColor(node.speaker) : null;
 
+    const isCanvasFocused = nodeId === canvasFocusedNodeId;
     return (
       <div key={nodeId} className={`${depth > 0 ? 'ml-4' : ''}`}>
         {/* Node Header */}
@@ -447,7 +516,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           isNPC && speakerColor
             ? `${speakerColor.bg} ${speakerColor.border}`
             : 'bg-gray-50 border-gray-200'
-        }`}>
+        } ${isCanvasFocused ? 'ring-2 ring-blue-500' : ''}`}>
           {/* Expand/Collapse for nodes with choices - only for root level (depth 0) */}
           {hasChoices && depth === 0 ? (
             <button
@@ -490,6 +559,25 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{node.text}</p>
           </div>
           
+          {/* P3-3c-14 — walk the canvas preview to this node. NPC nodes
+              only (player-choice rows have their own "Step in" badge on
+              the canvas hotspot). Dispatches `asaps:dialogTreeWalkRequest`;
+              VisualWorkspace's listener sets dialogTreeNodePath. */}
+          {isNPC && (
+            <button
+              onClick={() => {
+                const canvasPath = inspectorPathToCanvasPath(path);
+                window.dispatchEvent(new CustomEvent('asaps:dialogTreeWalkRequest', {
+                  detail: { path: canvasPath },
+                }));
+              }}
+              className="p-1 hover:bg-blue-100 rounded text-blue-600"
+              title="Walk the canvas preview to this node"
+            >
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
+
           {/* Edit button for NPC nodes */}
           {isNPC && (
             <button

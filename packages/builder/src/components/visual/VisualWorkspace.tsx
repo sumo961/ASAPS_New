@@ -945,6 +945,31 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     setDialogTreeNodePath([]);
   }, [beat?.id]);
 
+  // P3-3c-14 — bidirectional walker sync with DialogTreeEditor:
+  //   - Canvas walks (Step in / breadcrumb / beat switch) → dispatch
+  //     `asaps:dialogTreeWalkChanged` so the inspector can auto-expand
+  //     the matching parent chain and highlight the focused node.
+  //   - Inspector "Walk here" button → fires `asaps:dialogTreeWalkRequest`
+  //     which we listen for and apply to our local path state.
+  useEffect(() => {
+    if (beat?.type !== 'dialogTree') return;
+    window.dispatchEvent(new CustomEvent('asaps:dialogTreeWalkChanged', {
+      detail: { beatId: beat?.id, path: dialogTreeNodePath },
+    }));
+  }, [beat?.id, beat?.type, dialogTreeNodePath]);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { beatId?: string; path?: string[] } | undefined;
+      if (!detail || !Array.isArray(detail.path)) return;
+      if (!beat || beat.type !== 'dialogTree') return;
+      if (detail.beatId && detail.beatId !== beat.id) return;
+      setDialogTreeNodePath(detail.path);
+      setSelectedHotspotId(null);
+    };
+    window.addEventListener('asaps:dialogTreeWalkRequest', handler);
+    return () => window.removeEventListener('asaps:dialogTreeWalkRequest', handler);
+  }, [beat]);
+
   // P3-3c-12 — walk the tree to the node at the given path, or null if
   // any segment refers to a choice without a nested dialogNode.
   function dialogNodeAt(tree: any, path: string[]): any | null {
