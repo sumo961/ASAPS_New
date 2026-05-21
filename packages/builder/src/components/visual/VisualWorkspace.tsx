@@ -5347,7 +5347,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       }}
                       content={slotPreviewContent}
                       theme={renderTheme ?? undefined}
-                      imageUrl={backgroundUrl || null}
+                      imageUrl={
+                        // Prioritize asset lookup (fresh URL) over the
+                        // backgroundUrl state, which can lag or hold an
+                        // ASML-import-only direct URL. Matches the
+                        // AnimationPanel resolution.
+                        ((backgroundAssetId && assets
+                          ? assets.find(a => a.id === backgroundAssetId)?.url
+                          : undefined) || backgroundUrl) || null
+                      }
                       backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                       slotIntent={previewSlotIntent}
                       slotAnimations={
@@ -5398,7 +5406,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         : undefined;
                       return (
                         <HotspotEditOverlay
-                          imageUrl={backgroundUrl || null}
+                          imageUrl={
+                        // Prioritize asset lookup (fresh URL) over the
+                        // backgroundUrl state, which can lag or hold an
+                        // ASML-import-only direct URL. Matches the
+                        // AnimationPanel resolution.
+                        ((backgroundAssetId && assets
+                          ? assets.find(a => a.id === backgroundAssetId)?.url
+                          : undefined) || backgroundUrl) || null
+                      }
                           fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
                           hotspots={items
                             .filter((c: any) => c && c.hotspot)

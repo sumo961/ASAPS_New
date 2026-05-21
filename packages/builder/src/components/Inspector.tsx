@@ -480,13 +480,26 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Helper functions for Movement Choice
   const handleAddChoice = () => {
+    // QA-flagged: every new choice used to be named "New Choice" — they
+    // collided when more than one was added, and SchemaLocationInitializer
+    // (which mints the auto-generated location/hotspot from choice.text)
+    // would assign overlapping names. Iterate uniquely, mirroring
+    // handleAddProp's "New Prop N" pattern.
+    const existingChoices = localBeat.parameters?.choices || [];
+    const existingTexts = new Set(existingChoices.map((c: any) => c.text));
+    let choiceNumber = existingChoices.length + 1;
+    let choiceText = `New Choice ${choiceNumber}`;
+    while (existingTexts.has(choiceText)) {
+      choiceNumber++;
+      choiceText = `New Choice ${choiceNumber}`;
+    }
     const newChoice: ChoiceWithCounter = {
       id: `choice_${Date.now()}`,
-      text: 'New Choice',
+      text: choiceText,
       location: '',
       target: ''
     };
-    handleParameterChange('choices', [...(localBeat.parameters?.choices || []), newChoice]);
+    handleParameterChange('choices', [...existingChoices, newChoice]);
   };
 
   const handleRemoveChoice = (index: number) => {
@@ -1280,10 +1293,19 @@ export const Inspector: React.FC<InspectorProps> = ({
       return;
     }
     if (param === 'text') {
-      handleParameterChange('text', value);
-      if (!durationManualRef.current) {
-        // Programmatic resync — does NOT flip durationManualRef.
-        handleParameterChange('duration', suggestDurationSeconds(String(value ?? '')));
+      // QA-flagged: calling handleParameterChange twice in the same tick
+      // each closes over the same stale localBeat — the second update
+      // clobbers the first, so typing into the text field appeared dead.
+      // Use the atomic handleParametersChange to commit both fields in
+      // one state write. durationManualRef gates whether the duration
+      // resync runs (manual edit → don't auto-resync).
+      if (durationManualRef.current) {
+        handleParameterChange('text', value);
+      } else {
+        handleParametersChange({
+          text: value,
+          duration: suggestDurationSeconds(String(value ?? '')),
+        });
       }
       return;
     }
