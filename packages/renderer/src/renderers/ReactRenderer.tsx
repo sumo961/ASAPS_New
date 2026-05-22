@@ -2280,46 +2280,51 @@ export class ReactRenderer extends BaseRenderer {
     choices: Array<{ id: string; text: string }>,
     showTypingIndicator: boolean
   ): void {
-    // Determine background
+    // Determine background — used by both the bg layer below and the
+    // chat view's transparent fallback.
     const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
     const backgroundColor = this.backgroundImageUrl
       ? 'transparent'
       : (this.theme?.backgroundColor || defaultGradient);
 
-    const stageWidth = this.context.width;
-    const stageHeight = this.context.height;
-    const disableScaling = this.getState('disableScaling') as boolean | undefined;
-
-    // Determine scaling mode for mobile
-    const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
-    const useMobileBg = this.mobileMode && scalingMode === 'cover';
-
+    // Bug 20 — chat presentation modes render responsively. ChatDialogView
+    // is already flex-internally; the legacy ScaledStage wrapper was
+    // forcing a 1024×768 canvas + transform:scale which (a) broke text
+    // crispness at non-1× scales and (b) prevented natural reflow on
+    // mobile. We let the view fill the parent at 100% × 100% and use
+    // clamp()/vw-based padding inside. Bubbles still pick up theme.fonts
+    // and (in a follow-on) theme.textBox.
     this.renderComponent(
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <ScaledStage
-          width={stageWidth}
-          height={stageHeight}
-          disableScaling={disableScaling}
-          scalingMode={scalingMode}
-          backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
-          backgroundColor={useMobileBg ? backgroundColor : undefined}
-        >
-          <ChatDialogView
-            messages={[...this.chatMessages]}
-            choices={choices}
-            mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
-            showAvatars={this.currentShowAvatars}
-            theme={this.theme}
-            backgroundUrl={this.backgroundImageUrl}
-            backgroundColor={backgroundColor}
-            onChoiceSelect={this.handleAction}
-            stageWidth={stageWidth}
-            stageHeight={stageHeight}
-            characterAvatarResolver={this.characterAvatarResolver || undefined}
-            showTypingIndicator={showTypingIndicator}
-            fontScale={this.mobileFontScale}
-          />
-        </ScaledStage>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          overflow: 'hidden',
+          // Background lives on the outer wrapper so the message area
+          // can scroll over it without the bg scrolling too.
+          backgroundImage: this.backgroundImageUrl ? `url(${this.backgroundImageUrl})` : undefined,
+          backgroundColor: this.backgroundImageUrl ? undefined : backgroundColor,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <ChatDialogView
+          messages={[...this.chatMessages]}
+          choices={choices}
+          mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
+          showAvatars={this.currentShowAvatars}
+          theme={this.theme}
+          // Background already painted on the outer wrapper; the inner
+          // view stays transparent so the scroll area lets the bg show.
+          backgroundUrl={null}
+          backgroundColor="transparent"
+          onChoiceSelect={this.handleAction}
+          characterAvatarResolver={this.characterAvatarResolver || undefined}
+          showTypingIndicator={showTypingIndicator}
+          fontScale={this.mobileFontScale}
+          responsive
+        />
       </div>
     );
   }

@@ -33,9 +33,10 @@ export interface ChatDialogViewProps {
   backgroundColor?: string;
   /** Callback when a choice is selected */
   onChoiceSelect?: (choiceId: string) => void;
-  /** Stage width for layout */
+  /** Stage width for layout. Ignored when `responsive` is true (the
+   *  view fills its parent at 100% × 100%). */
   stageWidth?: number;
-  /** Stage height for layout */
+  /** Stage height for layout. Ignored when `responsive` is true. */
   stageHeight?: number;
   /** Character avatar resolver */
   characterAvatarResolver?: (characterId: string) => string | undefined;
@@ -43,6 +44,14 @@ export interface ChatDialogViewProps {
   showTypingIndicator?: boolean;
   /** Font scale multiplier (default 1.0) */
   fontScale?: number;
+  /**
+   * When true, render at 100% × 100% of the parent without the
+   * ScaledStage uniform-scale wrapper. Bubble/typography sizes use
+   * clamp() and viewport units so layout reflows naturally instead
+   * of being scale-transformed. Bubbles also pick up theme.textBox
+   * styling for consistency with slot mode.
+   */
+  responsive?: boolean;
 }
 
 /**
@@ -65,6 +74,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
   stageHeight = 600,
   showTypingIndicator = false,
   fontScale = 1.0,
+  responsive = false,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [animatedMessages, setAnimatedMessages] = useState<Set<string>>(new Set());
@@ -346,12 +356,19 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
     <div
       className="flex flex-col"
       style={{
-        width: stageWidth,
-        height: stageHeight,
+        width: responsive ? '100%' : stageWidth,
+        height: responsive ? '100%' : stageHeight,
         backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
         backgroundColor: backgroundUrl ? undefined : backgroundColor,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
+        // Responsive mode: pick up theme typography at the root so
+        // bubbles/labels inherit the project font instead of the
+        // browser default. Slot mode already does this in SlotFlowView.
+        ...(responsive ? {
+          fontFamily: theme?.fonts.textFont || 'sans-serif',
+          color: theme?.colors?.textColor || '#fff',
+        } : {}),
       }}
     >
       {/* Message area */}
@@ -359,7 +376,10 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto"
         style={{
-          padding: '20px 16px',
+          // Responsive: use viewport-relative padding so it scales on
+          // mobile. Legacy: fixed 20px/16px for ScaledStage-compatible
+          // pixels.
+          padding: responsive ? 'clamp(12px, 2vh, 24px) clamp(12px, 3vw, 24px)' : '20px 16px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: mode === 'chat-bubble' ? 'center' : 'flex-end',
@@ -367,7 +387,10 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
       >
         <div
           style={{
-            maxWidth: 600,
+            // Readable max-width column. clamp keeps narrow screens
+            // wide-enough for legibility and caps the line length on
+            // ultra-wide displays.
+            maxWidth: responsive ? 'min(680px, 92vw)' : 600,
             width: '100%',
             margin: '0 auto',
           }}

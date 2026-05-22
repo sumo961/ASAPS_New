@@ -3501,6 +3501,60 @@ export const Inspector: React.FC<InspectorProps> = ({
 
                     {showAdvanced && (
                       <div className="border-t pt-3 space-y-3">
+                        {/* Bug 20 — presentation mode picker. Schema-declared
+                            but the dialogTree section bypasses the full
+                            SchemaFormGenerator, so we hand-render it here. */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Presentation Mode
+                            <span className="text-xs text-gray-500 block font-normal">
+                              How the dialog is laid out at runtime
+                            </span>
+                          </label>
+                          <select
+                            value={localBeat.parameters?.presentationMode || 'positioned'}
+                            onChange={(e) => handleParameterChange('presentationMode', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          >
+                            <option value="positioned">Positioned (traditional elements / spatial)</option>
+                            <option value="chat-scroll">Chat — scrolling history</option>
+                            <option value="chat-bubble">Chat — single bubble</option>
+                          </select>
+                        </div>
+                        {(localBeat.parameters?.presentationMode === 'chat-scroll' ||
+                          localBeat.parameters?.presentationMode === 'chat-bubble') && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="showAvatars-dialog"
+                                checked={localBeat.parameters?.showAvatars ?? true}
+                                onChange={(e) => handleParameterChange('showAvatars', e.target.checked)}
+                                className="rounded border-gray-300"
+                              />
+                              <label htmlFor="showAvatars-dialog" className="text-sm text-gray-700">
+                                Show character avatars
+                              </label>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                NPC Response Delay (seconds)
+                                <span className="text-xs text-gray-500 block font-normal">
+                                  Typing-indicator delay before NPC replies
+                                </span>
+                              </label>
+                              <input
+                                type="number"
+                                value={localBeat.parameters?.responseDelay || 0}
+                                onChange={(e) => handleParameterChange('responseDelay', parseFloat(e.target.value))}
+                                min="0"
+                                max="10"
+                                step="0.5"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              />
+                            </div>
+                          </>
+                        )}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Choice Delay (seconds)
