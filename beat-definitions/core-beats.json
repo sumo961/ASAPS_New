@@ -562,13 +562,13 @@
       "locationMapping": {
         "question": "question"
       },
-      "layoutModeNote": "P3-3c — movementChoice flips into spatial mode (SpatialFlowView composite) when EVERY choice carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each choice becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderMovement path (zero regression).",
+      "layoutModeNote": "P3-3c — movementChoice flips into spatial mode (SpatialFlowView composite) when EVERY choice carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each choice becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderMovement path (zero regression). Question slot is role:'body' (NPC-style prompt), not role:'title' — the prompt is the NPC's question to the player, not a story title.",
       "spatialLayer": {
         "source": "background",
         "fit": "contain"
       },
       "slots": [
-        { "name": "question", "role": "title", "source": "question" }
+        { "name": "question", "role": "body", "source": "question" }
       ],
       "transitions": true,
       "sound": true,
@@ -629,13 +629,13 @@
       "locationMapping": {
         "question": "question"
       },
-      "layoutModeNote": "P3-3c-8 — pickProp flips into spatial mode (SpatialFlowView composite) when ANY prop carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each prop becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderPropSelection path (zero regression).",
+      "layoutModeNote": "P3-3c-8 — pickProp flips into spatial mode (SpatialFlowView composite) when ANY prop carries a `hotspot` AND the beat has no baked locations[]. The image rides on the beat background; each prop becomes a clickable normalized region anchored to the image's letterboxed rect. Beats WITHOUT hotspots stay on the absolute-positioned renderPropSelection path (zero regression). Question slot is role:'body' (NPC-style prompt), not role:'title' — the prompt is the NPC's question to the player, not a story title.",
       "spatialLayer": {
         "source": "background",
         "fit": "contain"
       },
       "slots": [
-        { "name": "question", "role": "title", "source": "question" }
+        { "name": "question", "role": "body", "source": "question" }
       ],
       "transitions": true,
       "sound": true,

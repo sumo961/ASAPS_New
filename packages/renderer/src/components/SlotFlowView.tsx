@@ -308,7 +308,15 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     paddingRight: 'env(safe-area-inset-right, 0px)',
     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     paddingLeft: 'env(safe-area-inset-left, 0px)',
-    color: theme.colors?.textColor || '#fff',
+    // Bug 16 — apply theme.colors.textAlpha (0-100) to the inherited
+    // text color using the same #RRGGBB+AA hex pattern used elsewhere.
+    // This colors only TEXT (buttons override `color` via buttonStyle),
+    // matching the absolute path which applies textAlpha at the text
+    // element level, not the container.
+    color: applyAlphaToHex(
+      theme.colors?.textColor || '#fff',
+      Math.max(0, Math.min(1, (theme.colors?.textAlpha ?? 100) / 100))
+    ),
     fontFamily: theme.fonts.textFont || 'serif',
   };
 
@@ -768,6 +776,11 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProper
  * just floated. This helper produces the same card styling so slot
  * mode matches the absolute mode's visual contract.
  *
+ * Bug 16 — when the theme provides a `textboxFrameUrl` (typically a
+ * 9-slice-style frame image imported from a Ren'Py theme), the absolute
+ * path uses it as a stretched background-image with no border or radius.
+ * Match that here so themed projects don't suddenly lose their frame.
+ *
  * Returns `{ background:'transparent', border:'none', padding:0 }` when
  * the card is hidden (titles with `hideTitleTextBox:true`, or no
  * effective theme.textBox). Callers should spread the result into the
@@ -783,6 +796,21 @@ function textBoxCardStyle(
   const hideForTitle = opts.isTitle && tb?.hideTitleTextBox === true;
   if (!tb || hideForTitle) {
     return { background: 'transparent', border: 'none', padding: 0 };
+  }
+  // Frame-image branch: the image carries its own border/radius/shadow,
+  // so we suppress the CSS border + radius and let the bitmap own the
+  // look. Padding still applies — the frame is sized 100% × 100% of
+  // the card so its safe area must match the inner padding.
+  if (theme.textboxFrameUrl) {
+    return {
+      backgroundImage: `url(${theme.textboxFrameUrl})`,
+      backgroundSize: '100% 100%',
+      backgroundRepeat: 'no-repeat',
+      backgroundColor: 'transparent',
+      border: 'none',
+      borderRadius: 0,
+      padding: `${tb.padding ?? 16}px`,
+    };
   }
   const opacityFrac = Math.max(0, Math.min(1, (tb.opacity ?? 100) / 100));
   // Same #RRGGBB + AA hex append the absolute path uses, so colors
