@@ -144,6 +144,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const titleSlot = slots.find(s => s.role === 'title');
   const bodySlot = slots.find(s => s.role === 'body');
   const actionSlot = slots.find(s => s.role === 'action');
+  // Bug 19a — speaker role (small label above the body). Used by
+  // dialogTree spatial so "Character" isn't styled as a giant title.
+  const speakerSlot = slots.find(s => s.role === 'speaker');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -165,6 +168,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
   const titleText: string = titleSlot?.source ? (content[titleSlot.source] ?? '') : '';
   const bodyText: string = bodySlot?.source ? (content[bodySlot.source] ?? '') : '';
+  const speakerText: string = speakerSlot?.source ? (content[speakerSlot.source] ?? '') : '';
 
   // Bug 17 — honour theme.textEffects in slot mode. Three modes match
   // the absolute path:
@@ -652,6 +656,31 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             justifyContent: 'center',
           }}
         >
+          {speakerSlot && speakerText && (() => {
+            // Bug 19a — small label above the body. No card behind it
+            // (it's an attribution, not a content card). Centered, slight
+            // opacity to recede next to the body. dialogTree spatial
+            // uses this for the NPC name.
+            const a = phaseAnim(speakerSlot.name);
+            return (
+              <div
+                className={a.className}
+                style={{
+                  fontFamily: theme.fonts.textFont || 'sans-serif',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textAlign: 'center',
+                  opacity: 0.78,
+                  marginBottom: 'clamp(6px, 1vh, 12px)',
+                  // ~70% of body font size — sits as a label, not a heading.
+                  fontSize: `clamp(calc(var(--slotflow-body-floor) - 2px), calc(${bodyFluid} * 0.78), 22px)`,
+                  ...a.style,
+                }}
+              >
+                {speakerText}
+              </div>
+            );
+          })()}
           {titleSlot && titleText && (() => {
             const a = phaseAnim(titleSlotName);
             return (

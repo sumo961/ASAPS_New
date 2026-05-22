@@ -486,7 +486,7 @@
         "fit": "contain"
       },
       "slots": [
-        { "name": "speaker", "role": "title", "source": "speaker" },
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
         { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
       ],
       "transitions": true,

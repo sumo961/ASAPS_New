@@ -45,6 +45,14 @@ interface SpatialFlowViewProps {
    * runtime the default is false — hotspots are invisible click regions.
    */
   showHotspotOutlines?: boolean;
+  /**
+   * Bug 19b — choices that ARE part of this turn but DON'T have a hotspot
+   * (mixed dialogTree nodes). The schema's flow has no action slot for
+   * dynamic per-turn choices, so SpatialFlowView renders them as a
+   * themed button row at the bottom of the stage. Click fires onAction
+   * with the supplied id — same channel as hotspots.
+   */
+  dynamicActions?: { id: string; text: string }[];
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
   onAction: (id: string) => void;
   previewWidth?: number;
@@ -186,6 +194,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   spatialAnimations,
   hotspots,
   showHotspotOutlines = false,
+  dynamicActions,
   onResolve,
   onAction,
   previewWidth,
@@ -552,6 +561,53 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           onExitStart={handleExitStart}
         />
       </div>
+
+      {/* Bug 19b — dynamic per-turn choices that don't have a hotspot.
+          Rendered as a themed button row pinned below the flow layer
+          (z=3, above hotspots and flow) so a mixed dialogTree node can
+          combine "click thing in scene" hotspots with "say something
+          generic" buttons. */}
+      {dynamicActions && dynamicActions.length > 0 && (
+        <div
+          data-layer="dynamic-actions"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 3,
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 'clamp(8px, 1.5vw, 16px)',
+            padding: 'clamp(12px, 2.5vh, 20px) clamp(16px, 3vw, 28px)',
+            pointerEvents: 'none',
+          }}
+        >
+          {dynamicActions.map(a => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => onAction(a.id)}
+              style={{
+                pointerEvents: 'auto',
+                fontFamily: theme?.fonts.buttonFont || theme?.fonts.textFont || 'sans-serif',
+                fontSize: 'clamp(13px, 1.4vw, 18px)',
+                fontWeight: 600,
+                color: theme?.button?.textColor || '#fff',
+                background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
+                border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
+                borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
+                padding: '8px clamp(14px, 2.5vw, 24px)',
+                minHeight: 44,
+                cursor: 'pointer',
+              }}
+            >
+              {a.text}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

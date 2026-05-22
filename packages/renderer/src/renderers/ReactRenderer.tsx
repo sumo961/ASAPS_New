@@ -2355,6 +2355,11 @@ export class ReactRenderer extends BaseRenderer {
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
+        // Bug 19b — split choices into hotspots (on the image) and
+        // dynamic actions (rendered as a button row at the bottom).
+        // Authors can mix "click the candle" hotspots with "Goodbye"
+        // buttons in a single dialog node; the spatial path used to
+        // silently drop the non-hotspot choices.
         const hotspots = choices
           .filter(c => !!c.hotspot)
           .map(c => ({
@@ -2366,6 +2371,19 @@ export class ReactRenderer extends BaseRenderer {
             shape: c.hotspot!.shape,
             label: c.text,
           }));
+        const dynamicActions = choices
+          .filter(c => !c.hotspot)
+          .map(c => ({ id: c.id, text: c.text }));
+        // Bug 19c — honour showSpeaker the same way the absolute path
+        // does (beat override wins, else global theme.speakerDisplay.
+        // showNames). Hidden speaker → pass empty speaker so the slot
+        // doesn't render the label above the body text.
+        const beatShowSpeaker = this.getState('showSpeaker') as boolean | undefined;
+        const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
+        const speakerVisible =
+          beatShowSpeaker === true ? true :
+          beatShowSpeaker === false ? false :
+          globalShowNames;
         return new Promise<string>(resolve => {
           this.resolveAction = (id: string) => {
             this.resolveAction = null;
@@ -2376,7 +2394,7 @@ export class ReactRenderer extends BaseRenderer {
               beatType="dialogTree"
               spatial={spatialSpec}
               content={{
-                speaker: dialogContext.speaker || '',
+                speaker: speakerVisible ? (dialogContext.speaker || '') : '',
                 text: dialogContext.text || '',
               }}
               theme={this.theme}
@@ -2386,6 +2404,7 @@ export class ReactRenderer extends BaseRenderer {
               slotAnimations={slotAnimations}
               spatialAnimations={spatialAnimations}
               hotspots={hotspots}
+              dynamicActions={dynamicActions}
               onAction={this.handleAction}
             />
           );

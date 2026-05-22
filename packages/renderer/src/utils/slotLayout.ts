@@ -18,8 +18,14 @@ import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 export interface SlotSpec {
   /** Slot id (also the schema location name it draws from for body slots). */
   name: string;
-  /** Layout role. 'body' = growing/scrolling text region; 'action' = button row. */
-  role: 'body' | 'action' | 'title';
+  /** Layout role.
+   *   'title'   = primary heading; large bold font, card sized to text.
+   *   'body'    = the main growing/scrolling text region.
+   *   'action'  = button row.
+   *   'speaker' = small label above the body (NPC name in dialog mode).
+   *               Bug 19a — separates "who speaks" from "what they say"
+   *               so the speaker isn't styled as a title in spatial dialog. */
+  role: 'body' | 'action' | 'title' | 'speaker';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */
