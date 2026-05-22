@@ -198,15 +198,21 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
             minWidth: 100,
           }}
         >
-          {/* Speaker name (only for NPC in chat mode).
+          {/* Speaker name (NPC only, and only when the avatar isn't
+              already showing it).
               Bug 21 — dropped the emotion emoji that used to follow
               the name. dialogNode.emotion has no author UI in the
               DialogTreeEditor, so the emoji was shown to players but
               authors could never set or change it. The character's
               live affect (which DOES have authoring) is already
               visible via the debug panel and through any character-
-              affect-driven beats. */}
-          {!isPlayer && (
+              affect-driven beats.
+              Bug 22 — suppress the label when showAvatars is on: the
+              circular avatar (image or initial) already identifies
+              the speaker, and a duplicate name above the bubble is
+              visual noise. With showAvatars OFF, the text label is
+              still essential so the player knows who's talking. */}
+          {!isPlayer && !showAvatars && (
             <div
               className="text-xs mb-1 px-2"
               style={{
