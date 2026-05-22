@@ -198,7 +198,14 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
             minWidth: 100,
           }}
         >
-          {/* Speaker name (only for NPC in chat mode) */}
+          {/* Speaker name (only for NPC in chat mode).
+              Bug 21 — dropped the emotion emoji that used to follow
+              the name. dialogNode.emotion has no author UI in the
+              DialogTreeEditor, so the emoji was shown to players but
+              authors could never set or change it. The character's
+              live affect (which DOES have authoring) is already
+              visible via the debug panel and through any character-
+              affect-driven beats. */}
           {!isPlayer && (
             <div
               className="text-xs mb-1 px-2"
@@ -209,11 +216,6 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               }}
             >
               {message.speaker}
-              {message.emotion && (
-                <span className="ml-2">
-                  {getEmotionEmoji(message.emotion)}
-                </span>
-              )}
             </div>
           )}
 
@@ -405,26 +407,5 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
     </div>
   );
 };
-
-/**
- * Get an emoji for a given emotion
- */
-function getEmotionEmoji(emotion: string): string {
-  const emotionMap: Record<string, string> = {
-    happy: '😊',
-    sad: '😢',
-    angry: '😠',
-    surprised: '😮',
-    neutral: '😐',
-    excited: '🤩',
-    confused: '😕',
-    worried: '😟',
-    thinking: '🤔',
-    laughing: '😂',
-    scared: '😨',
-    love: '😍',
-  };
-  return emotionMap[emotion.toLowerCase()] || '';
-}
 
 export default ChatDialogView;
