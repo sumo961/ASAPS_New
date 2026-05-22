@@ -166,6 +166,26 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const titleText: string = titleSlot?.source ? (content[titleSlot.source] ?? '') : '';
   const bodyText: string = bodySlot?.source ? (content[bodySlot.source] ?? '') : '';
 
+  // Bug 17 — honour theme.textEffects in slot mode. Three modes match
+  // the absolute path:
+  //   none       → text shows immediately
+  //   typewriter → reveal one character per (1000/speed) ms
+  //   fade       → render full text immediately under a CSS fade-in
+  // The slot's enter animation (slotAnimations) still runs in parallel
+  // around the card; this controls how the TEXT inside reveals.
+  // prefers-reduced-motion suppresses both (the user already opted out
+  // of motion globally; the typewriter is just slower motion).
+  const textAnim = (theme.textEffects?.animation as 'none' | 'typewriter' | 'fade' | undefined) ?? 'none';
+  const typewriterSpeed = theme.textEffects?.typewriterSpeed ?? 30; // chars/sec
+  const fadeInMs = theme.textEffects?.fadeInDuration ?? 500;
+  const reducedMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const effectiveTextAnim = reducedMotion ? 'none' : textAnim;
+  const titleReveal = useTextReveal(titleText, effectiveTextAnim, typewriterSpeed, fadeInMs);
+  const bodyReveal = useTextReveal(bodyText, effectiveTextAnim, typewriterSpeed, fadeInMs);
+
   // ── preferredLines honoring for the title (soft) ──────────────────────
   // The author can ask a title to be N lines. We bias toward it with a
   // measured max-width, then check the ACTUAL rendered line count and
@@ -551,6 +571,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        /* Bug 17 — text-level fade-in for theme.textEffects.animation='fade'.
+           Global keyframes (not scoped) because each text element references
+           it by name through inline animation; matches the absolute path. */
+        @keyframes slotflow-text-fade-in {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
         @keyframes slotflow-slide-in-left {
           from { opacity: 0; transform: translateX(calc(-1 * var(--slotflow-anim-distance, 100%))); }
           to   { opacity: 1; transform: translateX(0); }
@@ -653,10 +680,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                     : { marginLeft: 'auto', marginRight: 'auto' }),
                   display: 'inline-block',
                   alignSelf: 'center',
+                  ...titleReveal.fadeStyle,
                   ...a.style,
                 }}
               >
-                {titleText}
+                {titleReveal.rendered}
               </div>
             );
           })()}
@@ -680,10 +708,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   maxWidth: '100%',
                   alignSelf: 'center',
                   ...textBoxCardStyle(theme, { isTitle: false }),
+                  ...bodyReveal.fadeStyle,
                   ...a.style,
                 }}
               >
-                {bodyText}
+                {bodyReveal.rendered}
               </div>
             );
           })()}
@@ -827,8 +856,53 @@ function textBoxCardStyle(
   };
 }
 
+/**
+ * Bug 17 — text reveal hook for theme.textEffects in slot mode.
+ *
+ * Returns the reveal state for a piece of text: which characters to
+ * show, whether a fade-in should be active, and the CSS animation
+ * description for the wrapper.
+ *
+ * Mirrors the absolute path (PositionedBeatView.tsx:2855) but lighter:
+ * we don't need skip-on-click here because slot mode never blocks on
+ * the reveal — the action row stays clickable, and a click on a choice
+ * naturally advances past the reveal.
+ */
+function useTextReveal(
+  text: string,
+  animation: 'none' | 'typewriter' | 'fade',
+  speed: number,
+  fadeInMs: number
+): { rendered: string; fadeStyle: React.CSSProperties } {
+  const [shown, setShown] = React.useState<string>(
+    animation === 'typewriter' ? '' : text
+  );
+  // Re-run when text or mode changes. Intervals are cleared in cleanup
+  // so a beat change mid-reveal doesn't leak.
+  React.useEffect(() => {
+    if (animation !== 'typewriter') {
+      setShown(text);
+      return;
+    }
+    setShown('');
+    let i = 0;
+    const msPerChar = 1000 / Math.max(1, speed);
+    const handle = window.setInterval(() => {
+      i += 1;
+      setShown(text.slice(0, i));
+      if (i >= text.length) window.clearInterval(handle);
+    }, msPerChar);
+    return () => window.clearInterval(handle);
+  }, [text, animation, speed]);
+  const fadeStyle: React.CSSProperties =
+    animation === 'fade' && text
+      ? { animation: `slotflow-text-fade-in ${fadeInMs}ms ease-in both` }
+      : {};
+  return { rendered: shown, fadeStyle };
+}
+
 /** #RRGGBB → #RRGGBBAA blended at `alpha` (0..1). Non-hex inputs pass through. */
-function applyAlphaToHex(color: string | undefined, alpha: number): string {
+export function applyAlphaToHex(color: string | undefined, alpha: number): string {
   if (!color) return 'transparent';
   if (!color.startsWith('#') || (color.length !== 7 && color.length !== 4)) {
     return color;

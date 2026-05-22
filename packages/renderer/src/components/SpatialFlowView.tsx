@@ -9,7 +9,7 @@ import type {
 } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
-import { SlotFlowView } from './SlotFlowView';
+import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
 
 interface SpatialFlowViewProps {
   beatType: string;
@@ -424,55 +424,112 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           on the center of the picture, not the container. The wrapper
           has pointer-events:none so clicks pass to whatever's below
           (typically the flow layer's buttons); each individual hotspot
-          opts in to receiving clicks. */}
-      {hotspots && hotspots.length > 0 && (
-        <div
-          data-layer="hotspots"
-          style={{
-            position: 'absolute',
-            top: imgInsets.top,
-            left: imgInsets.left,
-            right: imgInsets.right,
-            bottom: imgInsets.bottom,
-            zIndex: 2,
-            pointerEvents: 'none',
-          }}
-        >
-          {hotspots.map((h) => {
-            const isEllipse = h.shape === 'ellipse';
-            return (
-              <button
-                key={h.id}
-                type="button"
-                aria-label={h.label || h.id}
-                onClick={() => onAction(h.id)}
-                style={{
-                  position: 'absolute',
-                  left: `${h.x * 100}%`,
-                  top: `${h.y * 100}%`,
-                  width: `${h.width * 100}%`,
-                  height: `${h.height * 100}%`,
-                  pointerEvents: 'auto',
-                  background: showHotspotOutlines
-                    ? 'rgba(255, 200, 0, 0.18)'
-                    : 'transparent',
-                  border: showHotspotOutlines
-                    ? '2px dashed rgba(255, 200, 0, 0.8)'
-                    : 'none',
-                  borderRadius: isEllipse ? '50%' : undefined,
-                  clipPath: isEllipse ? 'ellipse(50% 50% at 50% 50%)' : undefined,
-                  cursor: 'pointer',
-                  padding: 0,
-                  // Author-controlled label visibility for hover lands later;
-                  // for now the aria-label provides a11y / screen-reader text.
-                  font: 'inherit',
-                  color: 'inherit',
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
+          opts in to receiving clicks.
+
+          Bug 18 — respect theme.hotspot settings (highlightColor,
+          opacity, showInPreview, labelDisplay). The editor's
+          `showHotspotOutlines` prop still wins for VE overlay tooling
+          (so authors always see hotspots while editing) — at runtime
+          we defer to the theme. */}
+      {hotspots && hotspots.length > 0 && (() => {
+        const hs = theme?.hotspot;
+        const hsColor = hs?.highlightColor || '#ffff00';
+        const hsAlpha = hs?.opacity ?? 0.3;
+        const hsVisible = hs?.visible ?? true;
+        const hsShow = hs?.showInPreview ?? 'visible';
+        const hsLabel = hs?.labelDisplay ?? 'hover';
+        // showHotspotOutlines (editor) ALWAYS shows fills + dashed
+        // outlines for authoring. Runtime visibility is:
+        //   hsVisible=false              → invisible
+        //   hsShow='invisible'           → invisible
+        //   hsShow='onHover'             → fills only appear on hover
+        //   hsShow='visible' (default)   → fills always shown at hsAlpha
+        const baseVisible = showHotspotOutlines
+          ? true
+          : hsVisible && hsShow !== 'invisible';
+        const fillsOnHover = !showHotspotOutlines && hsShow === 'onHover';
+        // Same hex+AA pattern used elsewhere for opacity blends.
+        const fillHex = applyAlphaToHex(hsColor, baseVisible && !fillsOnHover ? hsAlpha : 0);
+        const hoverHex = applyAlphaToHex(hsColor, Math.min(1, hsAlpha * 1.5));
+        const borderColor = showHotspotOutlines
+          ? applyAlphaToHex(hsColor, 0.8)
+          : 'transparent';
+        return (
+          <div
+            data-layer="hotspots"
+            style={{
+              position: 'absolute',
+              top: imgInsets.top,
+              left: imgInsets.left,
+              right: imgInsets.right,
+              bottom: imgInsets.bottom,
+              zIndex: 2,
+              pointerEvents: 'none',
+            }}
+          >
+            {hotspots.map((h) => {
+              const isEllipse = h.shape === 'ellipse';
+              const labelText = h.label || h.id;
+              const showLabelAlways = hsLabel === 'always' && !!labelText;
+              const showLabelOnHover = hsLabel === 'hover' && !!labelText;
+              return (
+                <button
+                  key={h.id}
+                  type="button"
+                  aria-label={labelText}
+                  title={showLabelOnHover ? labelText : undefined}
+                  onClick={() => onAction(h.id)}
+                  className="spatialflow-hotspot"
+                  style={{
+                    position: 'absolute',
+                    left: `${h.x * 100}%`,
+                    top: `${h.y * 100}%`,
+                    width: `${h.width * 100}%`,
+                    height: `${h.height * 100}%`,
+                    pointerEvents: 'auto',
+                    background: fillHex,
+                    border: showHotspotOutlines
+                      ? `2px dashed ${borderColor}`
+                      : 'none',
+                    borderRadius: isEllipse ? '50%' : undefined,
+                    clipPath: isEllipse ? 'ellipse(50% 50% at 50% 50%)' : undefined,
+                    cursor: 'pointer',
+                    padding: 0,
+                    font: 'inherit',
+                    color: 'inherit',
+                    // CSS vars consumed by the :hover rule below so we
+                    // can swap fills on hover without re-rendering.
+                    ['--spatialflow-hotspot-hover-bg' as any]: hoverHex,
+                    ['--spatialflow-hotspot-onhover-bg' as any]: fillsOnHover ? hoverHex : fillHex,
+                    transition: 'background 120ms ease-out',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {showLabelAlways && (
+                    <span style={{
+                      pointerEvents: 'none',
+                      fontFamily: theme?.fonts.textFont || 'sans-serif',
+                      fontWeight: 600,
+                      fontSize: 'clamp(12px, 1.6vw, 18px)',
+                      color: theme?.colors?.textColor || '#fff',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                      padding: '4px 8px',
+                    }}>
+                      {labelText}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            <style>{`
+              .spatialflow-hotspot:hover { background: var(--spatialflow-hotspot-hover-bg) !important; }
+              .spatialflow-hotspot:focus-visible { outline: 2px solid var(--spatialflow-hotspot-hover-bg); outline-offset: 2px; }
+            `}</style>
+          </div>
+        );
+      })()}
 
       <div
         data-layer="flow"
