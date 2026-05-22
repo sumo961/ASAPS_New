@@ -2355,11 +2355,16 @@ export class ReactRenderer extends BaseRenderer {
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
         const spatialAnimations = (this.getState('spatialAnimations') as Record<string, any> | undefined);
-        // Bug 19b — split choices into hotspots (on the image) and
-        // dynamic actions (rendered as a button row at the bottom).
-        // Authors can mix "click the candle" hotspots with "Goodbye"
-        // buttons in a single dialog node; the spatial path used to
-        // silently drop the non-hotspot choices.
+        // Bug 19b/d — every dialog choice MUST be reachable. Hotspots
+        // are a spatial-discovery enhancement (click the thing in the
+        // scene) — but when the theme hides hotspot fills at rest
+        // (showInPreview:'onHover'/'invisible', labelDisplay:'hover'/
+        // 'none') the player has no way to discover the choice. So we
+        // render EVERY choice as a button in the dynamicActions row;
+        // choices that also carry a hotspot get the hotspot region as
+        // a bonus interaction surface. Click either → same action id,
+        // so the same Promise resolves regardless of which surface the
+        // player picked.
         const hotspots = choices
           .filter(c => !!c.hotspot)
           .map(c => ({
@@ -2371,9 +2376,7 @@ export class ReactRenderer extends BaseRenderer {
             shape: c.hotspot!.shape,
             label: c.text,
           }));
-        const dynamicActions = choices
-          .filter(c => !c.hotspot)
-          .map(c => ({ id: c.id, text: c.text }));
+        const dynamicActions = choices.map(c => ({ id: c.id, text: c.text }));
         // Bug 19c — honour showSpeaker the same way the absolute path
         // does (beat override wins, else global theme.speakerDisplay.
         // showNames). Hidden speaker → pass empty speaker so the slot
