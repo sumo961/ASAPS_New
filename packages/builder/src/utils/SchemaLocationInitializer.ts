@@ -815,6 +815,25 @@ export function initializeBeatLocations(
       return;
     }
 
+    // Same problem at the schema-type level: titleScreen / infoText /
+    // durScreen / endScreen declare `layoutMode: "spatial" | "slot"` —
+    // their responsive rendering only kicks in when the beat has NO baked
+    // pixel locations (authorPositioned=false). If we auto-bake here, the
+    // runtime always sees authorPositioned=true and falls through to the
+    // absolute path, which is exactly the OLD non-responsive layout users
+    // are trying to leave behind. QA caught this: titleScreen in PW
+    // showed the dark boxes + fixed positions instead of the
+    // SpatialFlowView composite. Per-instance opt-out: if the author HAS
+    // manually placed elements in VE, the earlier `locations.size > 0`
+    // guard above keeps those — so this skip only fires for empty beats
+    // of slot/spatial schema types.
+    const beatDef = (beatDefinitions as any).beatTypes?.[beat.type];
+    const layoutMode = beatDef?.layoutMode;
+    if (layoutMode === 'spatial' || layoutMode === 'slot') {
+      console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — schema layoutMode="${layoutMode}"; auto-baked locations would force the absolute path and defeat responsive rendering.`);
+      return;
+    }
+
     // Generate visual elements from schema
     const elements = initializeLocationsFromSchema(
       beat,

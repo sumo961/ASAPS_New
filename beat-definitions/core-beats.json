@@ -324,13 +324,14 @@
         "startButton": "buttonText"
       },
       "layoutMode": "spatial",
-      "layoutModeNote": "Phase-3 spatial composite (first consumer). The spatial image is the beat's background (passed by renderTitleScreen as imageUrl); the flow layer composites title + start button responsively over it. renderTitleScreen threads authorPositioned; baked-location instances stay absolute (zero regression). 'author'/subtitle is omitted from the slot decomposition for the first cut — authored projects that used it keep the absolute path. See project_responsive_layout_system memory.",
+      "layoutModeNote": "Phase-3 spatial composite (first consumer). The spatial image is the beat's background (passed by renderTitleScreen as imageUrl); the flow layer composites title + author (subtitle) + start button responsively over it. renderTitleScreen threads authorPositioned; baked-location instances stay absolute (zero regression). See project_responsive_layout_system memory.",
       "spatialLayer": {
         "source": "background",
         "fit": "contain"
       },
       "slots": [
         { "name": "title", "role": "title", "source": "title" },
+        { "name": "author", "role": "body", "source": "author" },
         { "name": "actions", "role": "action", "buttons": ["continueButton"] }
       ],
       "transitions": true,
