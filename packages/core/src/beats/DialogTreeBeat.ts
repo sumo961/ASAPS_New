@@ -473,6 +473,22 @@ export class DialogTreeBeat extends Beat {
       const processedSpeaker = this.processText(this.currentNode.speaker, context);
       const processedText = this.processText(this.currentNode.text, context);
 
+      // P3-3c-9 — per-node spatial detection (computed BEFORE renderDialog
+      // so the absolute speaker/text render can be skipped on spatial
+      // nodes; renderDialog reads `dialogNodeIsSpatial` and early-returns
+      // after stashing dialogContext for the combined spatial render in
+      // renderChoices). See the matching block below the visibleChoices
+      // filter for the full rationale — both checks must agree.
+      const earlyVisibleChoices = this.currentNode.choices
+        ? this.filterVisibleChoices(this.currentNode.choices, context)
+        : [];
+      const nodeWillBeSpatial =
+        (this.presentationMode || 'positioned') === 'positioned'
+        && this.locations.size === 0
+        && earlyVisibleChoices.length > 0
+        && earlyVisibleChoices.some(c => !!(c as any).hotspot);
+      renderer.setState('dialogNodeIsSpatial', nodeWillBeSpatial);
+
       // Render the NPC/system dialog
       await renderer.renderDialog(
         processedSpeaker,
@@ -529,28 +545,21 @@ export class DialogTreeBeat extends Beat {
           await new Promise(resolve => setTimeout(resolve, this.choiceDelay! * 1000));
         }
 
-        // P3-3c-9 — per-node spatial detection. If every visible choice on
-        // THIS node carries a hotspot AND no baked locations exist for the
-        // beat AND we're in positioned presentation, set a state flag so
-        // renderDialog skips its absolute render and renderChoices does
-        // a single combined SpatialFlowView render (image + speaker/text
-        // slots + hotspot choices). Per-node so a dialogTree can mix
-        // spatial scenes with positioned close-up monologues.
-        // QA-flagged: was `every` (all choices need a hotspot) — that
-        // didn't match the editor preview (which fires on `some`), so a
-        // partial-config node showed spatial in VE and absolute in
-        // PreviewWindow. Relaxed to `some`; choices without a hotspot
-        // simply won't render as clickable regions in spatial mode.
-        const nodeIsSpatial =
-          (this.presentationMode || 'positioned') === 'positioned'
-          && locations.length === 0
-          && visibleChoices.length > 0
-          && visibleChoices.some(c => !!(c as any).hotspot);
-        renderer.setState('dialogNodeIsSpatial', nodeIsSpatial);
+        // `dialogNodeIsSpatial` was already computed and set above
+        // (before renderDialog) so renderDialog could skip its absolute
+        // speaker/text render on spatial nodes. renderChoices reads the
+        // same flag below.
 
         // Process choice text with variable interpolation and render choices
         // Include isExit flag to indicate if choice exits to another beat (skip typing animation)
         // Prefix choice IDs with nodePath so different dialog nodes don't share IDs
+        // P3-3c-9 — on spatial nodes, suppress the layout-calculated locations
+        // (renderChoices treats any non-empty locations[] as `authorPositioned`
+        // and falls back to the absolute path). The author baked nothing
+        // (this.locations.size === 0); `locations` only contains positions
+        // that `computeDialogTreeLayout` derived above for the absolute path.
+        // The spatial branch composes choices via SpatialFlowView from
+        // normalized hotspots — it doesn't need pixel locations.
         const choiceId = await renderer.renderChoices(
           visibleChoices.map(c => ({
             id: `${nodePath}_${c.id}`,
@@ -560,7 +569,7 @@ export class DialogTreeBeat extends Beat {
             // through SpatialFlowView when dialogNodeIsSpatial is set.
             hotspot: (c as any).hotspot,
           })),
-          locations
+          nodeWillBeSpatial ? undefined : locations
         );
 
         // Clear the spatial flag after this node's render — the NEXT node
