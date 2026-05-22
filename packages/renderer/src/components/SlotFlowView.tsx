@@ -630,12 +630,21 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   textAlign: 'center',
                   marginBottom: 'clamp(16px, 3vh, 32px)',
                   fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
+                  // Bug 14 — apply theme.textBox so titles match the absolute
+                  // path's card styling (background, border, radius, padding,
+                  // opacity). Skipped when hideTitleTextBox is true (VN-style
+                  // splash titles float on the spatial image).
+                  ...textBoxCardStyle(theme, { isTitle: true }),
                   // preferredLines bias: a measured max-width that coaxes the
                   // title toward the author's target line count. Stays
-                  // centered; never exceeds the readable column.
+                  // centered; never exceeds the readable column. Sized
+                  // around the text — `inline-block` so the card hugs the
+                  // text instead of stretching to the column width.
                   ...(titleMaxWidth
                     ? { maxWidth: titleMaxWidth, marginLeft: 'auto', marginRight: 'auto' }
-                    : {}),
+                    : { marginLeft: 'auto', marginRight: 'auto' }),
+                  display: 'inline-block',
+                  alignSelf: 'center',
                   ...a.style,
                 }}
               >
@@ -643,7 +652,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               </div>
             );
           })()}
-          {(() => {
+          {bodyText && (() => {
             const a = phaseAnim(bodySlot?.name);
             return (
               <div
@@ -653,6 +662,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   lineHeight: 1.6,
                   textAlign: 'center',
                   fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
+                  // Bug 14 — wrap body text in the theme's card. Card
+                  // hugs short text but wraps long paragraphs at the
+                  // readable column width (max-width on a fit-content
+                  // box). Without this, a one-word subtitle (e.g. the
+                  // titleScreen author) gets stretched to the full
+                  // readable column and looks oversized.
+                  width: 'fit-content',
+                  maxWidth: '100%',
+                  alignSelf: 'center',
+                  ...textBoxCardStyle(theme, { isTitle: false }),
                   ...a.style,
                 }}
               >
@@ -736,4 +755,61 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProper
     cursor: 'pointer',
     fontWeight: 600,
   };
+}
+
+/**
+ * Bug 14 — wire theme.textBox into the responsive flow.
+ *
+ * The absolute path wraps every dialog/text element in a "card" with
+ * background, border, padding, border-radius, and opacity from
+ * `theme.textBox`. The responsive flow used to bare-render text on
+ * the stage background, so a project theme like ASAPS's default
+ * (dark blue surface + blue border + 90% opacity) was invisible — text
+ * just floated. This helper produces the same card styling so slot
+ * mode matches the absolute mode's visual contract.
+ *
+ * Returns `{ background:'transparent', border:'none', padding:0 }` when
+ * the card is hidden (titles with `hideTitleTextBox:true`, or no
+ * effective theme.textBox). Callers should spread the result into the
+ * text element's inline style.
+ */
+function textBoxCardStyle(
+  theme: RenderThemeSettings,
+  opts: { isTitle: boolean }
+): React.CSSProperties {
+  const tb = theme.textBox;
+  // Title slot honours `hideTitleTextBox` (VN splash style — title text
+  // floats on the spatial image without a card).
+  const hideForTitle = opts.isTitle && tb?.hideTitleTextBox === true;
+  if (!tb || hideForTitle) {
+    return { background: 'transparent', border: 'none', padding: 0 };
+  }
+  const opacityFrac = Math.max(0, Math.min(1, (tb.opacity ?? 100) / 100));
+  // Same #RRGGBB + AA hex append the absolute path uses, so colors
+  // resolve identically. Non-hex (rgb()/named) values pass through.
+  const bg = applyAlphaToHex(tb.backgroundColor, opacityFrac);
+  return {
+    background: bg,
+    border: `${tb.borderWidth ?? 0}px solid ${tb.borderColor || 'transparent'}`,
+    borderRadius: `${tb.borderRadius ?? 0}px`,
+    // theme.textBox.padding is the AUTHORED inner padding. Apply on all
+    // sides so the card breathes. The outer flow container already
+    // provides margin between title and body via marginBottom.
+    padding: `${tb.padding ?? 16}px`,
+  };
+}
+
+/** #RRGGBB → #RRGGBBAA blended at `alpha` (0..1). Non-hex inputs pass through. */
+function applyAlphaToHex(color: string | undefined, alpha: number): string {
+  if (!color) return 'transparent';
+  if (!color.startsWith('#') || (color.length !== 7 && color.length !== 4)) {
+    return color;
+  }
+  const hex = color.length === 4
+    ? `#${color[1]}${color[1]}${color[2]}${color[2]}${color[3]}${color[3]}`
+    : color;
+  const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `${hex}${a}`;
 }
