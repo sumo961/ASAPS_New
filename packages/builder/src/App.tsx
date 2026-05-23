@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Header } from './components/Header';
 import { resolveLayoutMode } from './utils/projectLayoutMode';
+import { migrateFixedToResponsive, migrateResponsiveToFixed } from './utils/projectLayoutMigrator';
+import { initializeLocationsFromSchema } from './utils/SchemaLocationInitializer';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
@@ -4421,6 +4423,82 @@ function App() {
   }, []);
 
   /**
+   * Phase 1 — handle a layout-mode change request from Settings.
+   * Runs the appropriate migrator on a copy of the beats, shows a
+   * confirmation with the per-beat summary, then commits both the
+   * setting and the migrated beats in one user-visible step.
+   */
+  const handleRequestLayoutModeChange = useCallback((target: 'fixed' | 'responsive') => {
+    const current = resolveLayoutMode(globalSettings, state.beats);
+    if (current === target) return;
+    const projectWidth = globalSettings?.project?.width || 1024;
+    const projectHeight = globalSettings?.project?.height || 768;
+
+    const result = target === 'responsive'
+      ? migrateFixedToResponsive(state.beats, projectWidth, projectHeight)
+      : migrateResponsiveToFixed(
+          state.beats,
+          (beat, params, stage) => {
+            try {
+              const created = initializeLocationsFromSchema(beat as any, params, stage);
+              return Array.isArray(created) ? created : [];
+            } catch (err) {
+              console.warn('[layoutMigrator] initializeLocationsFromSchema failed', err);
+              return [];
+            }
+          },
+          projectWidth,
+          projectHeight
+        );
+
+    const targetLabel = target === 'responsive' ? 'Responsive layout' : 'Fixed canvas';
+    const changeCount = result.summary.length;
+    const preview = result.summary.slice(0, 8)
+      .map(s => `  • ${s.beatName || s.beatType} (${s.beatId}): ${s.detail}`)
+      .join('\n');
+    const overflow = result.summary.length > 8
+      ? `\n  …and ${result.summary.length - 8} more`
+      : '';
+    const message =
+      `Switch to ${targetLabel}?\n\n` +
+      (changeCount > 0
+        ? `${changeCount} beat${changeCount === 1 ? '' : 's'} will be migrated:\n${preview}${overflow}\n\n`
+        : 'No beats need changes — only the project flag will be updated.\n\n') +
+      'This is undoable but destructive — make sure you have a save.';
+    if (!window.confirm(message)) return;
+
+    const oldSettings = globalSettings;
+    const newSettings: any = {
+      ...oldSettings,
+      project: { ...oldSettings?.project, layoutMode: target },
+    };
+    applyGlobalSettingsChange(newSettings);
+    const cmd = new UpdateGlobalSettingsCommand(
+      oldSettings,
+      newSettings,
+      globalSettingsMutationsRef.current,
+      `Switch to ${targetLabel}`
+    );
+    getCommandManager().pushWithoutExecute(cmd);
+    if (changeCount > 0) {
+      // Per-beat update — the store has no setBeats wholesale setter,
+      // and per-beat updates undo-tag individually anyway. Beats with
+      // no entry in summary were unchanged, so we only touch the ones
+      // the migrator marked.
+      const touched = new Set(result.summary.map(s => s.beatId));
+      for (const beat of result.applied) {
+        const id = (beat as any).id;
+        if (!touched.has(id)) continue;
+        actions.updateBeat(id, {
+          locations: (beat as any).locations,
+          slotIntent: (beat as any).slotIntent,
+        } as any);
+      }
+      markChanged();
+    }
+  }, [globalSettings, state.beats, applyGlobalSettingsChange, actions, markChanged]);
+
+  /**
    * Handle manual save - for untitled projects, this shows the Save Project dialog
    */
   const handleSave = useCallback(async () => {
@@ -5935,6 +6013,8 @@ function App() {
           }}
           directoryPath={(currentProject as any)?.directoryPath}
           characters={characters}
+          resolvedLayoutMode={resolveLayoutMode(globalSettings, state.beats)}
+          onRequestLayoutModeChange={(target) => handleRequestLayoutModeChange(target)}
         />
       )}
 

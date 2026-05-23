@@ -184,6 +184,15 @@ interface GlobalSettingsInspectorProps {
   directoryPath?: string | null;
   /** Characters for portrait display in speaker settings */
   characters?: Array<{ displayName: string; name: string; portrait?: { image?: string; assetId?: string } }>;
+  /**
+   * Phase 1 — request a layout-mode switch. The setting itself can't
+   * be changed inline (it requires a migration step with confirm), so
+   * the inspector emits the desired target and the parent (App.tsx)
+   * runs the migrator + commits.
+   */
+  onRequestLayoutModeChange?: (target: 'fixed' | 'responsive') => void;
+  /** Currently-resolved mode for display (handles undefined-on-load). */
+  resolvedLayoutMode?: 'fixed' | 'responsive';
 }
 
 export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = ({
@@ -199,6 +208,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onAssetsPathChange,
   directoryPath,
   characters = [],
+  onRequestLayoutModeChange,
+  resolvedLayoutMode,
 }) => {
   const [settings, setSettings] = useState<GlobalSettings>(() => {
     // Normalize speakerDisplay on load to migrate old format to new
@@ -1052,6 +1063,54 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
                         Auto uses fit mode with enlarged text on mobile for readability. Cover fills the mobile screen but may crop stage edges. Fit keeps identical behavior on all devices. Native is for projects already designed at mobile dimensions — disables all mobile detection.
+                      </p>
+                    </div>
+
+                    {/* Phase 1 — project layout mode picker. Triggers
+                        the migrator via the parent (App.tsx) rather than
+                        mutating the field directly, because switching is
+                        a destructive op (strips pixel positions or bakes
+                        them) and needs author confirmation. */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Layout Mode
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (resolvedLayoutMode === 'responsive') return;
+                            onRequestLayoutModeChange?.('responsive');
+                          }}
+                          className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                            resolvedLayoutMode === 'responsive'
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-medium'
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          Responsive layout
+                          {resolvedLayoutMode === 'responsive' && <span className="ml-2 text-xs">✓ current</span>}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (resolvedLayoutMode === 'fixed') return;
+                            onRequestLayoutModeChange?.('fixed');
+                          }}
+                          className={`flex-1 px-3 py-2 text-sm rounded border transition-colors ${
+                            resolvedLayoutMode === 'fixed'
+                              ? 'bg-amber-50 border-amber-300 text-amber-800 font-medium'
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          Fixed canvas
+                          {resolvedLayoutMode === 'fixed' && <span className="ml-2 text-xs">✓ current</span>}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Responsive: slot/spatial flow, reflows on any viewport.
+                        Fixed canvas: pixel-positioned at the project's design size.
+                        Switching runs a one-shot migrator with preview.
                       </p>
                     </div>
 
