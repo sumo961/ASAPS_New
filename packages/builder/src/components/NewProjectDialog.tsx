@@ -1,7 +1,13 @@
 /**
  * NewProjectDialog - Dialog for creating a new project
  *
- * Simple form with project name and optional description
+ * Phase 2.5 — also prompts up front for the two project-level choices
+ * that are awkward to change later: layout mode (fixed vs responsive)
+ * and the responsive orientation policy. Both have safe defaults so a
+ * user who just hits "Create Project" gets a sensible responsive
+ * landscape project. Authors who explicitly want the legacy
+ * pixel-precise canvas can pick "Fixed canvas" up front and avoid a
+ * later migration.
  */
 
 import React, { useState } from 'react';
@@ -19,6 +25,9 @@ export interface NewProjectDialogProps {
   isModal?: boolean;
 }
 
+type LayoutMode = 'responsive' | 'fixed';
+type OrientationPolicy = 'flexible' | 'landscape' | 'portrait';
+
 /**
  * New project dialog component
  */
@@ -27,9 +36,11 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
   onProjectCreated,
   isModal = true,
 }) => {
-  const { create } = useProject();
+  const { create, updateGlobalSettings, project: currentProject } = useProject();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('responsive');
+  const [orientation, setOrientation] = useState<OrientationPolicy>('flexible');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +60,31 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
 
     try {
       const projectId = await create(name.trim(), description.trim() || undefined);
+
+      // Phase 2.5 — apply the wizard's layout choices to the freshly
+      // created project. updateGlobalSettings reads the current project
+      // from the persistence ref, which create() has just swapped to
+      // the new project, so this hits the right record.
+      const existing = (currentProject?.globalSettings ?? {}) as Record<string, any>;
+      const nextSettings = {
+        ...existing,
+        project: {
+          ...(existing.project ?? {}),
+          // Width/height/aspectRatio default in the create path; we only
+          // override the two wizard fields. Keep `scalingMode` undefined
+          // here so the existing default applies.
+          width: existing.project?.width ?? 1024,
+          height: existing.project?.height ?? 768,
+          aspectRatio: existing.project?.aspectRatio ?? '4:3',
+          scalingMode: existing.project?.scalingMode ?? 'fit',
+          layoutMode,
+          // Orientation is only meaningful when layoutMode is responsive;
+          // fixed projects ignore it but we still persist the value so
+          // toggling back is non-destructive.
+          orientation,
+        },
+      };
+      await updateGlobalSettings(nextSettings as any);
 
       if (onProjectCreated) {
         onProjectCreated(projectId);
@@ -124,12 +160,87 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of your project..."
-              rows={3}
+              rows={2}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
               disabled={creating}
               maxLength={500}
             />
           </div>
+
+          {/* Phase 2.5 — Layout mode picker */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Layout Mode
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setLayoutMode('responsive')}
+                disabled={creating}
+                className={`text-left p-3 rounded-lg border transition ${
+                  layoutMode === 'responsive'
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <div className="text-sm font-semibold text-gray-900">Responsive</div>
+                <div className="text-[11px] text-gray-600 leading-snug mt-0.5">
+                  Adapts to any viewport. Slot + spatial layout.
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLayoutMode('fixed')}
+                disabled={creating}
+                className={`text-left p-3 rounded-lg border transition ${
+                  layoutMode === 'fixed'
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                    : 'border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <div className="text-sm font-semibold text-gray-900">Fixed canvas</div>
+                <div className="text-[11px] text-gray-600 leading-snug mt-0.5">
+                  Pixel-precise authoring on a 1024×768 stage.
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Phase 2.5 — Orientation policy (only meaningful in responsive) */}
+          {layoutMode === 'responsive' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Orientation
+              </label>
+              <div className="flex rounded-lg overflow-hidden border border-gray-300">
+                {([
+                  ['flexible',  'Flexible',  'Adapts to device rotation'],
+                  ['landscape', 'Landscape', 'Locks to landscape'],
+                  ['portrait',  'Portrait',  'Locks to portrait'],
+                ] as const).map(([value, label, hint]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setOrientation(value)}
+                    disabled={creating}
+                    title={hint}
+                    className={`flex-1 px-2 py-1.5 text-xs font-medium transition ${
+                      orientation === value
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1 leading-snug">
+                Width-responsiveness is always on; locking only restricts
+                the orientation axis (the player shows a "rotate your
+                device" overlay when held the other way).
+              </p>
+            </div>
+          )}
 
           {/* Error message */}
           {error && (
