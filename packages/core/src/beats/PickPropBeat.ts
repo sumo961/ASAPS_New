@@ -10,6 +10,7 @@ export class PickPropBeat extends Beat {
   public props: PropOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
+  public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
 
   constructor(config: BeatConfig & {
     parameters?: Partial<PickPropParameters>;
@@ -19,6 +20,8 @@ export class PickPropBeat extends Beat {
     this.props = config.props || config.parameters?.props || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
+    this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
 
     // Migrate flat counter fields → canonical effects on all props
     this.props.forEach(p => migrateChoiceEffects(p as any));
@@ -30,7 +33,8 @@ export class PickPropBeat extends Beat {
       props: this.props,
       node: this.node,
       choiceDelay: this.choiceDelay,
-      markVisited: this.markVisited
+      markVisited: this.markVisited,
+      spatialFit: this.spatialFit,
     };
   }
 
@@ -53,6 +57,10 @@ export class PickPropBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.spatialFit !== undefined) {
+      this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
+        ? params.spatialFit : undefined;
+    }
   }
 
   /**
@@ -95,6 +103,8 @@ export class PickPropBeat extends Beat {
 
     // Set markVisited state for renderer to use when rendering choices
     renderer.setState('markVisited', this.markVisited || false);
+    // Bug 26 — per-beat spatial-fit override for the spatial layer.
+    renderer.setState('spatialFit', this.spatialFit);
 
     // Reset visited choice IDs to this beat's choices (empty on first visit).
     // Prevents stale visitedChoiceIds from a previous beat causing false-positive dimming.

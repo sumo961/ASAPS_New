@@ -8,6 +8,10 @@ export class TitleScreenBeat extends Beat {
   public title: string;
   public author?: string;
   public buttonText?: string;
+  /** Bug 26 — per-beat override for the spatial layer's fit. Schema
+   *  declares 'contain' as the type-level default; authors can pick
+   *  'cover' here for an immersive backdrop that fills the stage. */
+  public spatialFit?: 'contain' | 'cover';
 
   constructor(config: BeatConfig & {
     node?: string;
@@ -17,6 +21,8 @@ export class TitleScreenBeat extends Beat {
     this.title = config.title || config.parameters?.title || 'Untitled Story';
     this.author = config.author || config.parameters?.author;
     this.buttonText = config.buttonText || config.parameters?.buttonText;
+    const fit = (config.parameters as any)?.spatialFit;
+    this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
     // node is now handled by Beat base class
   }
 
@@ -28,7 +34,8 @@ export class TitleScreenBeat extends Beat {
       node: this.node,
       slotIntent: this.slotIntent,
       slotAnimations: this.slotAnimations,
-      spatialAnimations: this.spatialAnimations
+      spatialAnimations: this.spatialAnimations,
+      spatialFit: this.spatialFit,
     };
   }
 
@@ -40,6 +47,10 @@ export class TitleScreenBeat extends Beat {
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
     if (params.spatialAnimations !== undefined) this.spatialAnimations = params.spatialAnimations;
+    if (params.spatialFit !== undefined) {
+      this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
+        ? params.spatialFit : undefined;
+    }
   }
 
   protected async performAction(
@@ -55,6 +66,8 @@ export class TitleScreenBeat extends Beat {
     // P3-anim-6 — spatial-layer motion. Sibling channel; SpatialFlowView
     // reads it and applies a CSS transform animation to data-layer="spatial".
     renderer.setState('spatialAnimations', this.spatialAnimations);
+    // Bug 26 — per-beat spatial-fit override (contain | cover).
+    renderer.setState('spatialFit', this.spatialFit);
 
     const locations = Array.from(this.locations.values());
 

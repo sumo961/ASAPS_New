@@ -11,6 +11,7 @@ export class MovementChoiceBeat extends Beat {
   public choiceDelay?: number; // Delay in seconds before showing choices
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
   public showTextOnHover?: boolean; // Only show choice text when hovering over the hotspot
+  public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
 
   constructor(config: BeatConfig & {
     parameters?: Partial<MovementChoiceParameters>;
@@ -21,6 +22,8 @@ export class MovementChoiceBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.showTextOnHover = config.showTextOnHover ?? config.parameters?.showTextOnHover ?? false;
+    const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
+    this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
 
     // Migrate flat counter fields → canonical effects on all choices
     this.choices.forEach(c => migrateChoiceEffects(c as any));
@@ -37,7 +40,8 @@ export class MovementChoiceBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
-      showTextOnHover: this.showTextOnHover
+      showTextOnHover: this.showTextOnHover,
+      spatialFit: this.spatialFit,
     };
     console.log('[MovementChoiceBeat.getParameters] Returning:', params);
     return params;
@@ -76,6 +80,10 @@ export class MovementChoiceBeat extends Beat {
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.showTextOnHover !== undefined) this.showTextOnHover = params.showTextOnHover;
+    if (params.spatialFit !== undefined) {
+      this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
+        ? params.spatialFit : undefined;
+    }
 
     console.log('[MovementChoiceBeat.updateParameters] AFTER:', {
       question: this.question,
@@ -136,6 +144,9 @@ export class MovementChoiceBeat extends Beat {
 
     // Set showTextOnHover state for renderer to use when rendering hotspots
     renderer.setState('showTextOnHover', this.showTextOnHover || false);
+
+    // Bug 26 — per-beat spatial-fit override for the spatial layer.
+    renderer.setState('spatialFit', this.spatialFit);
 
     // While loop supports __self__ target (return to choices)
     while (true) {

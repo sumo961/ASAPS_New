@@ -5349,7 +5349,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       beatType={beat!.type}
                       spatial={{
                         source: 'background',
-                        fit: getSpatialSpec(beat!.type)?.fit ?? 'contain',
+                        // Bug 26 — per-beat fit override. The beat
+                        // can opt 'cover' over the schema's default
+                        // 'contain' (and vice-versa). Falls back to
+                        // schema default when unset.
+                        fit: ((slotPreviewParams as any)?.spatialFit === 'contain'
+                          || (slotPreviewParams as any)?.spatialFit === 'cover'
+                          ? (slotPreviewParams as any).spatialFit
+                          : getSpatialSpec(beat!.type)?.fit) ?? 'contain',
                         slots: slotSpec!,
                       }}
                       content={slotPreviewContent}

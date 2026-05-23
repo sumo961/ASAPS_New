@@ -1905,6 +1905,12 @@ export class ReactRenderer extends BaseRenderer {
         ? getSpatialSpec(beatType)
         : null;
       if (spatialSpec) {
+        // Bug 26 — per-beat fit override from renderer state (the beat
+        // set it before calling the render method).
+        const fitOverride = this.getState('spatialFit');
+        if (fitOverride === 'contain' || fitOverride === 'cover') {
+          spatialSpec.fit = fitOverride;
+        }
         const spBg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         console.log(`[ReactRenderer ${this.instanceId}] Rendering SPATIAL-MODE ${beatType} (no author locations)`);
         const spIntent = (this.getState('slotIntent') as SlotIntent | undefined)
@@ -2356,6 +2362,11 @@ export class ReactRenderer extends BaseRenderer {
     if (dialogNodeIsSpatial && !authorPositioned) {
       const spatialSpec = getSpatialSpec('dialogTree');
       if (spatialSpec) {
+        // Bug 26 — per-beat fit override.
+        const fitOverride = this.getState('spatialFit');
+        if (fitOverride === 'contain' || fitOverride === 'cover') {
+          spatialSpec.fit = fitOverride;
+        }
         const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
@@ -2585,6 +2596,11 @@ export class ReactRenderer extends BaseRenderer {
     if (anyHasHotspot && !authorPositioned) {
       const spatialSpec = getSpatialSpec('movementChoice');
       if (spatialSpec) {
+        // Bug 26 — per-beat fit override.
+        const fitOverride = this.getState('spatialFit');
+        if (fitOverride === 'contain' || fitOverride === 'cover') {
+          spatialSpec.fit = fitOverride;
+        }
         const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
@@ -2660,6 +2676,11 @@ export class ReactRenderer extends BaseRenderer {
     if (anyHasHotspot && !authorPositioned) {
       const spatialSpec = getSpatialSpec('pickProp');
       if (spatialSpec) {
+        // Bug 26 — per-beat fit override.
+        const fitOverride = this.getState('spatialFit');
+        if (fitOverride === 'contain' || fitOverride === 'cover') {
+          spatialSpec.fit = fitOverride;
+        }
         const bg = this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
         const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
         const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);

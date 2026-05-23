@@ -31,6 +31,7 @@ export class DialogTreeBeat extends Beat {
   public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides
   public presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble'; // Dialog presentation style
   public showAvatars?: boolean; // Show character avatars in chat mode
+  public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
   private currentNode: DialogNode | null = null;
 
   constructor(config: BeatConfig & {
@@ -47,6 +48,8 @@ export class DialogTreeBeat extends Beat {
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
     this.presentationMode = (config.parameters?.presentationMode as 'positioned' | 'chat-scroll' | 'chat-bubble') || 'positioned';
     this.showAvatars = config.parameters?.showAvatars ?? true;
+    const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
+    this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
 
     if (dialogTreeParam) {
       // Migrate old format to new format if needed
@@ -272,7 +275,8 @@ export class DialogTreeBeat extends Beat {
       backgroundAssetId: this.backgroundAssetId,
       phaseOverrides: this.phaseOverrides,
       presentationMode: this.presentationMode,
-      showAvatars: this.showAvatars
+      showAvatars: this.showAvatars,
+      spatialFit: this.spatialFit,
     };
   }
 
@@ -307,6 +311,10 @@ export class DialogTreeBeat extends Beat {
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
     if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
+    if (params.spatialFit !== undefined) {
+      this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
+        ? params.spatialFit : undefined;
+    }
 
     // Sync instance properties back to dialogTree
     if (this.dialogTree && typeof this.dialogTree === 'object') {
@@ -360,6 +368,8 @@ export class DialogTreeBeat extends Beat {
 
     // Set presentation mode for chat-like dialogs
     renderer.setState('presentationMode', this.presentationMode || 'positioned');
+    // Bug 26 — per-beat spatial-fit override for the spatial layer.
+    renderer.setState('spatialFit', this.spatialFit);
     renderer.setState('showAvatars', this.showAvatars ?? true);
     // Default responseDelay to 1.5s for chat modes if not explicitly set
     const isChatMode = this.presentationMode && this.presentationMode !== 'positioned';

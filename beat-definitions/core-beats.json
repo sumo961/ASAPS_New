@@ -299,6 +299,17 @@
           "default": "Start",
           "description": "Start button text"
         },
+        "spatialFit": {
+          "type": "string",
+          "required": false,
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "ui": {
+            "control": "select",
+            "options": ["contain", "cover"],
+            "label": "Background fit",
+            "group": "Background"
+          }
+        },
         "speaker": {
           "type": "string",
           "default": "",
@@ -474,6 +485,17 @@
           "default": false,
           "description": "Displays per-node speaker names as labels during dialog",
           "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+        },
+        "spatialFit": {
+          "type": "string",
+          "required": false,
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "ui": {
+            "control": "select",
+            "options": ["contain", "cover"],
+            "label": "Background fit",
+            "group": "Background"
+          }
         }
       },
       "locations": ["dialog", "choices"],
@@ -545,6 +567,17 @@
           "default": false,
           "description": "Only show choice text when hovering over the hotspot"
         },
+        "spatialFit": {
+          "type": "string",
+          "required": false,
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "ui": {
+            "control": "select",
+            "options": ["contain", "cover"],
+            "label": "Background fit",
+            "group": "Background"
+          }
+        },
         "speaker": {
           "type": "string",
           "default": "",
@@ -611,6 +644,17 @@
           "required": false,
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
+        },
+        "spatialFit": {
+          "type": "string",
+          "required": false,
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "ui": {
+            "control": "select",
+            "options": ["contain", "cover"],
+            "label": "Background fit",
+            "group": "Background"
+          }
         },
         "speaker": {
           "type": "string",
