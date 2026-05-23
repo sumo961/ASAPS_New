@@ -1159,6 +1159,27 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </div>
                 )}
 
+                {/* Phase 1 — Lock position (designer feedback). When
+                    set, CollisionDetect skips this element's
+                    auto-shift; the renderer keeps the authored x/y
+                    even if it overlaps text or other buttons. Only
+                    meaningful in fixed/absolute mode; the responsive
+                    flow doesn't run collision detection. */}
+                {layoutMode === 'absolute' && (
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={!!(selected as any).lockPosition}
+                      onChange={(e) => onElementUpdate(selected.id, { lockPosition: e.target.checked } as any)}
+                      className="rounded border-gray-300"
+                    />
+                    Lock position
+                    <span className="text-gray-500 text-[10px]">
+                      (skip auto-shift on overlap)
+                    </span>
+                  </label>
+                )}
+
                 {/* Name */}
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-1 block">

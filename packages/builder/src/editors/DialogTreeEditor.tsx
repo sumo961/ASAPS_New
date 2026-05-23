@@ -539,7 +539,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             <div className="w-5" />  // Keep spacing consistent
           )}
 
-          {/* Node Content */}
+          {/* Node Content.
+              Bug 23 — NPC nodes used to display speaker + text as
+              read-only spans, requiring a click on a pencil to open a
+              modal for editing. Player choices were already inline-
+              editable; designer feedback flagged the asymmetry. Now
+              NPC speaker (CharacterRefField combobox) and text
+              (TextFieldWithVariables) edit inline directly in the
+              row. The modal still opens via the pencil but is now
+              reserved for the less-common NPC auto-exit target. */}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               {/* Speaker color indicator */}
@@ -547,7 +555,36 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 <div className={`w-1.5 h-4 rounded-full ${speakerColor.accent}`} />
               )}
               {isNPC ? <Users className={`w-4 h-4 ${speakerColor?.text || 'text-blue-600'}`} /> : <User className="w-4 h-4 text-orange-600" />}
-              <span className={`font-medium text-sm ${isNPC && speakerColor ? speakerColor.text : ''}`}>{speakerNameResolver ? speakerNameResolver(node.speaker) : node.speaker}</span>
+              {isNPC ? (
+                <div className="flex-1 max-w-xs">
+                  <CharacterRefField
+                    value={{ characterRef: node.characterRef, freeText: node.speaker }}
+                    onChange={(next) => {
+                      const updates: Partial<DialogNode> = {
+                        speaker: next.freeText ?? '',
+                        ...(next.characterRef
+                          ? { characterRef: next.characterRef }
+                          : { characterRef: undefined }),
+                      };
+                      onChange(updateNodeAtPath(dialogTree, path, updates));
+                    }}
+                    characters={(characterObjects && characterObjects.length > 0
+                      ? characterObjects
+                      : characters.map((s) => ({
+                          id: s, name: s, displayName: s, role: 'npc',
+                          visual: { type: 'static' }, states: [], defaultState: '',
+                          counters: [], inventory: [], createdAt: '', updatedAt: '',
+                        }))
+                    ) as any}
+                    onDefineAsCharacter={onDefineAsCharacter}
+                    placeholder="NPC speaker…"
+                  />
+                </div>
+              ) : (
+                <span className={`font-medium text-sm ${isNPC && speakerColor ? speakerColor.text : ''}`}>
+                  {speakerNameResolver ? speakerNameResolver(node.speaker) : node.speaker}
+                </span>
+              )}
               {/* Only show choice count for root node where collapse/expand is available */}
               {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">
@@ -562,7 +599,21 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{node.text}</p>
+            {isNPC ? (
+              <TextFieldWithVariables
+                value={node.text}
+                onChange={(val) => {
+                  onChange(updateNodeAtPath(dialogTree, path, { text: val }));
+                }}
+                availableVariables={effectVariables}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-sm bg-white/60 focus:bg-white focus:border-blue-400"
+                multiline
+                rows={2}
+                placeholder="What does the NPC say?"
+              />
+            ) : (
+              <p className="text-sm text-gray-700 break-words whitespace-pre-wrap">{node.text}</p>
+            )}
           </div>
           
           {/* P3-3c-14 — walk the canvas preview to this node. NPC nodes

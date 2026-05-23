@@ -32,6 +32,14 @@ export interface Location {
   autosize?: boolean;  // Auto-calculate font size based on box dimensions
   fontOverridden?: boolean;  // True if font/size explicitly set, false = use theme defaults
   visible?: boolean;   // Element visibility (false = hidden, true/undefined = visible)
+  /**
+   * Phase 1 — opt out of CollisionDetect auto-shifting in absolute mode.
+   * When true the renderer keeps the element at the authored x/y even
+   * if it overlaps another element. Designer feedback: forced
+   * collision avoidance fought authored layouts; this is the escape
+   * hatch. Default `false` (legacy behavior preserved).
+   */
+  lockPosition?: boolean;
   // Scroll behavior properties (for text/dialog elements)
   requireScrollToBottom?: boolean;  // If true, continue button disabled until user scrolls to bottom
   manuallyResized?: boolean;        // User has manually resized - skip auto-sizing on content change

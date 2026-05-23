@@ -38,6 +38,34 @@ import {
 const STAGE_WIDTH = 1024;
 const STAGE_HEIGHT = 768;
 
+/**
+ * Phase 1 — viewport presets for the PW viewport switcher.
+ * The dimensions are stage-canvas pixels (CSS px); the stage wrapper
+ * clamps to these so responsive layouts reflow as they would on the
+ * target device. Fixed-canvas projects render their design dims with
+ * a CSS transform-scale fit (current behavior, no change).
+ *
+ * Each preset is orientation-aware: the orientation field lets the
+ * project-level orientation lock filter the list. If the project
+ * locks 'portrait', landscape presets are disabled (and the rotate-
+ * device overlay would fire at runtime anyway — see P2.5-2). The
+ * 'auto' preset always passes the filter.
+ */
+export const VIEWPORT_PRESETS: ReadonlyArray<{
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+  orientation: 'auto' | 'portrait' | 'landscape';
+}> = [
+  { id: 'auto',        label: 'Fit window',        width: 0,    height: 0,    orientation: 'auto' },
+  { id: 'desktop',     label: 'Desktop · 1280×800', width: 1280, height: 800,  orientation: 'landscape' },
+  { id: 'tablet-l',    label: 'Tablet landscape · 1024×768', width: 1024, height: 768, orientation: 'landscape' },
+  { id: 'tablet-p',    label: 'Tablet portrait · 768×1024',  width: 768,  height: 1024, orientation: 'portrait' },
+  { id: 'phone-l',     label: 'Phone landscape · 740×360',   width: 740,  height: 360,  orientation: 'landscape' },
+  { id: 'phone-p',     label: 'Phone portrait · 390×740',    width: 390,  height: 740,  orientation: 'portrait' },
+];
+
 // Proxy endpoint for CORS-blocked requests (custom baseUrls)
 // Match OpenAIProvider's logic: prefer same-origin proxy (Vite dev plugin
 // at port 5173) over the legacy stand-alone api server on :3001 which
@@ -579,6 +607,16 @@ export const PreviewWindow: React.FC = () => {
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [fitScale, setFitScale] = useState(1);
+  // Phase 1 — viewport preset. `null` = no override; the stage takes
+  // the project's design dimensions and the existing fit-to-window
+  // logic handles sizing. When a preset is selected the stage wrapper
+  // is clamped to those pixel dimensions so responsive layouts
+  // reflow as they would on that device. Fixed-canvas projects still
+  // render at their design dims (CSS transform scales them down to
+  // fit the preset window, the legacy behavior).
+  const [previewViewport, setPreviewViewport] = useState<
+    null | { id: string; width: number; height: number; label: string }
+  >(null);
   const [isAutoFit, setIsAutoFit] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
@@ -2792,14 +2830,43 @@ export const PreviewWindow: React.FC = () => {
           ref={previewAreaRef}
           className="flex-1 flex items-center justify-center overflow-hidden p-5"
         >
-          {/* Stage wrapper - sized to scaled dimensions */}
-          <div
-            style={{
-              width: STAGE_WIDTH * scale,
-              height: STAGE_HEIGHT * scale,
-              flexShrink: 0,
-            }}
-          >
+          {/* Stage wrapper - sized to scaled dimensions.
+              Phase 1 — when a viewport preset is selected, the stage
+              snaps to the preset's pixel dimensions instead of the
+              design canvas. The renderer's responsive flow reflows
+              against these dims (via the existing P2.5-3 resize
+              listener); fixed-canvas projects scale-fit into the
+              preset window via transform:scale (their previous
+              behavior, just inside a smaller box). */}
+          {previewViewport ? (
+            <div
+              className={`relative bg-white shadow-lg transition-all duration-200 ${
+                (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
+              }`}
+              style={{
+                width: previewViewport.width,
+                height: previewViewport.height,
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}
+            >
+              {/* Renderer container fills the preset stage. */}
+              <div ref={containerRef} className="absolute inset-0" />
+              <div
+                className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-white pointer-events-none select-none"
+                title="Preview viewport (Phase 1)"
+              >
+                {previewViewport.width}×{previewViewport.height}
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                width: STAGE_WIDTH * scale,
+                height: STAGE_HEIGHT * scale,
+                flexShrink: 0,
+              }}
+            >
             {/* Inner stage - full size with CSS transform */}
             <div
               className={`relative bg-white shadow-lg transition-all duration-200 ${
@@ -2916,6 +2983,7 @@ export const PreviewWindow: React.FC = () => {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {/* Debug Panel */}
@@ -3128,6 +3196,43 @@ export const PreviewWindow: React.FC = () => {
           >
             <Maximize2 className="w-4 h-4" />
           </button>
+
+          {/* Phase 1 — viewport preset switcher. Auto = no override
+              (stage takes design dims, fits to window). Other presets
+              clamp the stage to those pixel dims so responsive layouts
+              reflow as on the target device. Filtered against the
+              project's orientation lock (no portrait presets in a
+              landscape-locked project, and vice versa). */}
+          <div className="w-px h-5 bg-gray-400 mx-2" />
+          <select
+            value={previewViewport?.id ?? 'auto'}
+            onChange={(e) => {
+              const id = e.target.value;
+              if (id === 'auto') {
+                setPreviewViewport(null);
+                return;
+              }
+              const preset = VIEWPORT_PRESETS.find(p => p.id === id);
+              if (preset) {
+                setPreviewViewport({
+                  id: preset.id,
+                  width: preset.width,
+                  height: preset.height,
+                  label: preset.label,
+                });
+              }
+            }}
+            className="text-xs bg-gray-100 border border-gray-300 rounded px-2 py-1"
+            title="Preview at a specific device size — responsive layouts reflow live"
+          >
+            {VIEWPORT_PRESETS.filter(p => {
+              const lock = (previewData?.settings as any)?.project?.orientation;
+              if (!lock || lock === 'flexible') return true;
+              return p.orientation === 'auto' || p.orientation === lock;
+            }).map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex items-center gap-2">

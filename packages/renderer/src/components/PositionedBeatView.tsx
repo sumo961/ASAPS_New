@@ -891,8 +891,16 @@ export function adjustElementsForCollisions(
     const estimatedHeight = estimateButtonHeight(buttonText, buttonWidth, fontSize);
     const buttonHeight = Math.max(el.location.height || 42, estimatedHeight);
 
+    // Phase 1 — author opt-out of collision auto-shift. Designer
+    // feedback flagged that the forced row-alignment + push-below-text
+    // behavior fought their authored layouts. With `lockPosition: true`
+    // the element stays exactly where the author placed it, even if it
+    // overlaps text or other buttons. Other buttons still shift around
+    // this one (it's an immovable obstacle).
+    const locked = (el.location as any).lockPosition === true;
+
     // Determine X position - only align if buttons are very scattered
-    const newX = shouldAlignButtons ? targetX : el.location.x;
+    const newX = locked ? el.location.x : (shouldAlignButtons ? targetX : el.location.x);
 
     // Determine Y position - prevent overlap with BOTH text AND other buttons
     let newY = el.location.y;
@@ -901,7 +909,10 @@ export function adjustElementsForCollisions(
     const buttonTop = el.location.y;
     const overlapsText = textBoxBounds.some(tb => buttonTop < tb.bottom + 10);
 
-    if (overlapsText && buttonTop < lowestTextBottom + 10) {
+    if (locked) {
+      // Author chose this position; respect it regardless of overlap.
+      newY = el.location.y;
+    } else if (overlapsText && buttonTop < lowestTextBottom + 10) {
       // Button overlaps text - push it down below all text
       newY = Math.max(nextY, lowestTextBottom + 35);
     } else if (buttonTop < nextY) {
@@ -909,7 +920,9 @@ export function adjustElementsForCollisions(
       newY = nextY;
     }
 
-    // Track cumulative stacking position for ALL subsequent buttons
+    // Track cumulative stacking position for ALL subsequent buttons.
+    // Locked buttons still contribute to nextY so unlocked buttons
+    // that follow don't overlap them.
     nextY = newY + buttonHeight + 15;
 
     console.log(`[CollisionDetect] Button "${el.location.name}": original(${el.location.x},${el.location.y}) → adjusted(${newX},${newY}), overlapsText=${overlapsText}`);
