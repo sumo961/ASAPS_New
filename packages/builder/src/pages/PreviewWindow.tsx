@@ -2837,42 +2837,31 @@ export const PreviewWindow: React.FC = () => {
               against these dims (via the existing P2.5-3 resize
               listener); fixed-canvas projects scale-fit into the
               preset window via transform:scale (their previous
-              behavior, just inside a smaller box). */}
-          {previewViewport ? (
+              behavior, just inside a smaller box).
+              IMPORTANT — keep the containerRef-bearing div stable
+              across preset changes. Earlier I had two parallel
+              branches each with its own `<div ref={containerRef}>`,
+              and swapping presets mid-preview unmounted the React
+              renderer's mount node ("No root available" warning,
+              blank stage). Now there's exactly ONE mount node; only
+              its wrapping changes. */}
+          <div
+            style={{
+              width: previewViewport ? previewViewport.width : STAGE_WIDTH * scale,
+              height: previewViewport ? previewViewport.height : STAGE_HEIGHT * scale,
+              flexShrink: 0,
+              position: 'relative',
+            }}
+          >
             <div
               className={`relative bg-white shadow-lg transition-all duration-200 ${
                 (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
               }`}
-              style={{
+              style={previewViewport ? {
                 width: previewViewport.width,
                 height: previewViewport.height,
                 overflow: 'hidden',
-                flexShrink: 0,
-              }}
-            >
-              {/* Renderer container fills the preset stage. */}
-              <div ref={containerRef} className="absolute inset-0" />
-              <div
-                className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-white pointer-events-none select-none"
-                title="Preview viewport (Phase 1)"
-              >
-                {previewViewport.width}×{previewViewport.height}
-              </div>
-            </div>
-          ) : (
-            <div
-              style={{
-                width: STAGE_WIDTH * scale,
-                height: STAGE_HEIGHT * scale,
-                flexShrink: 0,
-              }}
-            >
-            {/* Inner stage - full size with CSS transform */}
-            <div
-              className={`relative bg-white shadow-lg transition-all duration-200 ${
-                (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
-              }`}
-              style={{
+              } : {
                 width: STAGE_WIDTH,
                 height: STAGE_HEIGHT,
                 transform: `scale(${scale})`,
@@ -2880,8 +2869,18 @@ export const PreviewWindow: React.FC = () => {
                 overflow: 'hidden',
               }}
             >
-              {/* Renderer container */}
+              {/* Renderer container - SINGLE mount point, lives in
+                  one place regardless of preset to keep the React
+                  renderer's root attached across viewport changes. */}
               <div ref={containerRef} className="absolute inset-0" />
+              {previewViewport && (
+                <div
+                  className="absolute top-1 left-1 text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-white pointer-events-none select-none z-10"
+                  title="Preview viewport (Phase 1)"
+                >
+                  {previewViewport.width}×{previewViewport.height}
+                </div>
+              )}
 
               {/* Mood-pad HUD overlay — top-level layer for screen-docked
                   HUDs that don't depend on the character being placed on
@@ -2983,7 +2982,6 @@ export const PreviewWindow: React.FC = () => {
               )}
             </div>
           </div>
-          )}
         </div>
 
         {/* Debug Panel */}
