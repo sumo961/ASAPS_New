@@ -26,7 +26,7 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, type TimerHudConfig } from '@asaps/renderer';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
 
@@ -193,6 +193,43 @@ function findPhaseById(dialogTree: DialogNode | undefined, phaseId: string | nul
   }
 
   return currentNode || null;
+}
+
+/**
+ * Phase 3.1 — fictional-time HUD preview formatter.
+ *
+ * Mirrors StoryContext.formatFictionalTime but reads its time from the
+ * passed `initialTime` argument instead of `this.state.fictionalTime`,
+ * because the Visual Editor preview has no live StoryContext. Used by
+ * the editor HUD overlay to show the project's initial fictional time
+ * under the author's chosen displayFormat — the format the chip will
+ * carry on the very first beat at runtime.
+ */
+function formatEditorFictionalTime(
+  initialTime: { year: number; month: number; day: number; hour: number; minute: number },
+  format: 'time-12h' | 'time-24h' | 'date' | 'datetime-12h' | 'datetime-24h' | 'day-number' | 'year'
+): string {
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  const t12 = (h: number, m: number) => {
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
+  };
+  const t24 = (h: number, m: number) =>
+    `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  const date = () =>
+    `${initialTime.day} ${monthNames[initialTime.month - 1]} ${initialTime.year}`;
+  switch (format) {
+    case 'time-12h': return t12(initialTime.hour, initialTime.minute);
+    case 'time-24h': return t24(initialTime.hour, initialTime.minute);
+    case 'date': return date();
+    case 'datetime-12h': return `${date()}, ${t12(initialTime.hour, initialTime.minute)}`;
+    case 'datetime-24h': return `${date()}, ${t24(initialTime.hour, initialTime.minute)}`;
+    case 'day-number': return 'Day 1'; // editor preview is always at the initial time, so Day 1
+    case 'year': return String(initialTime.year);
+    default: return `${date()}, ${t12(initialTime.hour, initialTime.minute)}`;
+  }
 }
 
 const _DEG_TO_RAD = Math.PI / 180;
@@ -5621,6 +5658,41 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     </span>
                   </div>
                 )}
+                {/* Phase 3.1 — fictional-time HUD preview. The runtime
+                    renders the same TimerHudDisplay over the stage
+                    (driven by globalSettings.hudOverlays); the editor
+                    surfaces it now so authors see WHERE the chip will
+                    sit and HOW the initial time renders under the
+                    chosen displayFormat. Only mounted when the project
+                    has fictional-time enabled + opted-in to the HUD;
+                    otherwise the stage stays clean. */}
+                {(() => {
+                  const overlays = (globalSettings as any)?.hudOverlays ?? {};
+                  const ft = overlays.fictionalTime as
+                    | {
+                        enabled?: boolean;
+                        initialTime?: { year: number; month: number; day: number; hour: number; minute: number };
+                        displayFormat?: 'time-12h' | 'time-24h' | 'date' | 'datetime-12h' | 'datetime-24h' | 'day-number' | 'year';
+                        showInTimerHud?: boolean;
+                      }
+                    | undefined;
+                  if (!ft?.enabled || !ft.showInTimerHud || !ft.initialTime) return null;
+                  // Persisted key is `timerHud` (matching the storage shape
+                  // in GlobalSettings.hudOverlays). The component prop
+                  // type is the same — just the key differs from the
+                  // older `timer` shorthand.
+                  const timerCfg = overlays.timerHud as TimerHudConfig | undefined;
+                  if (!timerCfg?.enabled) return null;
+                  const fmt = ft.displayFormat ?? 'datetime-12h';
+                  const text = formatEditorFictionalTime(ft.initialTime, fmt);
+                  return (
+                    <TimerHudDisplay
+                      visible
+                      config={timerCfg}
+                      fictionalTimeText={text}
+                    />
+                  );
+                })()}
               </>
             );
             return (

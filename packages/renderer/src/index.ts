@@ -64,5 +64,10 @@ export {
 // Export mobile detection utilities
 export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './utils/mobileDetection';
 
+// Timer / fictional-time HUD — exported so the Visual Editor can show
+// the same chip the runtime renders (faithful preview of the
+// project's HUD overlay), driven by globalSettings.hudOverlays.
+export { TimerHudDisplay, type TimerHudConfig } from './components/TimerHudDisplay';
+
 // Export markdown-lite renderer
 export { renderMarkdownLite } from './utils/markdownLite';
