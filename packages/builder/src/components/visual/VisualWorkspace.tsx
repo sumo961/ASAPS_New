@@ -4967,6 +4967,26 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
                   setHasChanges(true);
                 } : undefined}
+                spatialFit={
+                  beat.type === 'titleScreen' ||
+                  beat.type === 'movementChoice' ||
+                  beat.type === 'pickProp' ||
+                  beat.type === 'dialogTree'
+                    ? ((beat as any).spatialFit as 'contain' | 'cover' | undefined)
+                    : undefined
+                }
+                onSpatialFitChange={
+                  (beat.type === 'titleScreen' ||
+                    beat.type === 'movementChoice' ||
+                    beat.type === 'pickProp' ||
+                    beat.type === 'dialogTree') && onBeatUpdate
+                    ? (fit) => {
+                        (beat as any).spatialFit = fit;
+                        onBeatUpdate(beat.id, { spatialFit: fit } as any);
+                        setHasChanges(true);
+                      }
+                    : undefined
+                }
                 allBeats={beat.type === 'panorama' ? beats.map(b => ({ id: b.id, name: b.name, type: b.type })) : undefined}
                 panoramaHotspots={beat.type === 'panorama' ? (() => {
                   const params = beat.getParameters ? beat.getParameters() : {};

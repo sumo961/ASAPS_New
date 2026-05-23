@@ -95,6 +95,12 @@ interface VisualPropertiesPanelProps {
   videoSettings?: { autoplay: boolean; controls: boolean; skipButton: boolean };
   onSelectVideo?: () => void;
   onVideoSettingsChange?: (settings: { autoplay?: boolean; controls?: boolean; skipButton?: boolean }) => void;
+  // Bug 26 follow-up — per-beat background fit (contain | cover).
+  // Lives under the Background section in the VE properties panel,
+  // not the inspector — feedback was that fit is a background-asset
+  // concern and belongs next to the "Change Background" button.
+  spatialFit?: 'contain' | 'cover';
+  onSpatialFitChange?: (fit: 'contain' | 'cover' | undefined) => void;
 }
 
 // Helper to format beat type for display (camelCase -> Title Case)
@@ -144,6 +150,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   videoSettings,
   onSelectVideo,
   onVideoSettingsChange,
+  spatialFit,
+  onSpatialFitChange,
 }) => {
   // Get available fonts (built-in + custom from assets)
   const { fonts } = useFonts(assets);
@@ -273,6 +281,38 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
               {backgroundAsset && (
                 <div className="mt-2 text-xs text-gray-600">
                   {backgroundAsset.name}
+                </div>
+              )}
+
+              {/* Bug 26 follow-up — Background fit (spatial beats only).
+                  Moved here from the Inspector at author request: fit is
+                  a background-asset concern, so it belongs next to the
+                  "Change Background" button. Only shown for beat types
+                  that compose through SpatialFlowView (the schema has
+                  a spatialLayer). */}
+              {onSpatialFitChange &&
+                (beatType === 'titleScreen' ||
+                  beatType === 'movementChoice' ||
+                  beatType === 'pickProp' ||
+                  beatType === 'dialogTree') && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Background fit
+                  </label>
+                  <select
+                    value={spatialFit || ''}
+                    onChange={(e) => onSpatialFitChange((e.target.value || undefined) as 'contain' | 'cover' | undefined)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="">Default (contain)</option>
+                    <option value="contain">Contain — show whole image</option>
+                    <option value="cover">Cover — fill stage, crop edges</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {spatialFit === 'cover'
+                      ? 'Image fills the stage; edges may be cropped on narrow viewports.'
+                      : 'Image is shown whole with letterboxed bars when aspect ratios differ.'}
+                  </p>
                 </div>
               )}
 

@@ -304,10 +304,7 @@
           "required": false,
           "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
           "ui": {
-            "control": "select",
-            "options": ["contain", "cover"],
-            "label": "Background fit",
-            "group": "Background"
+            "hidden": true
           }
         },
         "speaker": {
@@ -489,12 +486,9 @@
         "spatialFit": {
           "type": "string",
           "required": false,
-          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector.",
           "ui": {
-            "control": "select",
-            "options": ["contain", "cover"],
-            "label": "Background fit",
-            "group": "Background"
+            "hidden": true
           }
         }
       },
@@ -570,12 +564,9 @@
         "spatialFit": {
           "type": "string",
           "required": false,
-          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector.",
           "ui": {
-            "control": "select",
-            "options": ["contain", "cover"],
-            "label": "Background fit",
-            "group": "Background"
+            "hidden": true
           }
         },
         "speaker": {
@@ -648,12 +639,9 @@
         "spatialFit": {
           "type": "string",
           "required": false,
-          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat.",
+          "description": "How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector.",
           "ui": {
-            "control": "select",
-            "options": ["contain", "cover"],
-            "label": "Background fit",
-            "group": "Background"
+            "hidden": true
           }
         },
         "speaker": {

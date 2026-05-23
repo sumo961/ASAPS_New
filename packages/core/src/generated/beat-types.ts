@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-05-23T13:38:19.107Z
+ * Generated: 2026-05-23T13:50:01.633Z
  */
 
 // ============================================
@@ -185,7 +185,7 @@ export interface DialogTreeParameters {
   responseDelay?: number | undefined;
   /** Displays per-node speaker names as labels during dialog */
   showSpeaker?: boolean | undefined;
-  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat. */
+  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
 }
 
@@ -205,7 +205,7 @@ export interface MovementChoiceParameters {
   markVisited?: boolean | undefined;
   /** Only show choice text when hovering over the hotspot */
   showTextOnHover?: boolean | undefined;
-  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat. */
+  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
   /** Who speaks this beat's text (for TTS voice and optional display) */
   speaker?: string | undefined;
@@ -227,7 +227,7 @@ export interface PickPropParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
-  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Override the schema-level default per beat. */
+  /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
   /** Who speaks this beat's text (for TTS voice and optional display) */
   speaker?: string | undefined;

@@ -3586,24 +3586,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </span>
                           </label>
                         </div>
-                        {/* Bug 26 — per-beat background fit override. */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Background fit
-                            <span className="text-xs text-gray-500 block font-normal">
-                              Contain preserves the full image (letterboxed); cover fills the stage (may crop)
-                            </span>
-                          </label>
-                          <select
-                            value={localBeat.parameters?.spatialFit || ''}
-                            onChange={(e) => handleParameterChange('spatialFit', e.target.value || undefined)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Default (contain)</option>
-                            <option value="contain">Contain — show whole image</option>
-                            <option value="cover">Cover — fill stage, crop edges</option>
-                          </select>
-                        </div>
                       </div>
                     )}
 
@@ -3871,24 +3853,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                               Block and dim choices leading to previously visited beats
                             </span>
                           </label>
-                        </div>
-                        {/* Bug 26 — per-beat background fit override. */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Background fit
-                            <span className="text-xs text-gray-500 block font-normal">
-                              Contain preserves the full image (letterboxed); cover fills the stage (may crop)
-                            </span>
-                          </label>
-                          <select
-                            value={localBeat.parameters?.spatialFit || ''}
-                            onChange={(e) => handleParameterChange('spatialFit', e.target.value || undefined)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Default (contain)</option>
-                            <option value="contain">Contain — show whole image</option>
-                            <option value="cover">Cover — fill stage, crop edges</option>
-                          </select>
                         </div>
                         <div className="flex items-center gap-2">
                           <input
@@ -4416,24 +4380,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                               Block and dim choices leading to previously visited beats
                             </span>
                           </label>
-                        </div>
-                        {/* Bug 26 — per-beat background fit override. */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Background fit
-                            <span className="text-xs text-gray-500 block font-normal">
-                              Contain preserves the full image (letterboxed); cover fills the stage (may crop)
-                            </span>
-                          </label>
-                          <select
-                            value={localBeat.parameters?.spatialFit || ''}
-                            onChange={(e) => handleParameterChange('spatialFit', e.target.value || undefined)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Default (contain)</option>
-                            <option value="contain">Contain — show whole image</option>
-                            <option value="cover">Cover — fill stage, crop edges</option>
-                          </select>
                         </div>
                       </div>
                     )}
