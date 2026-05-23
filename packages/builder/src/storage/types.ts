@@ -30,6 +30,30 @@ export interface GlobalSettings {
     // player shows a "rotate your device" overlay when held the other way so
     // the layout is never rendered in the unsupported orientation.
     orientation?: 'flexible' | 'portrait' | 'landscape';
+    /**
+     * Phase 1 — project-level layout mode. Authors pick ONE mode per
+     * project; the editor and the runtime adapt accordingly.
+     *
+     *  'fixed'      = legacy absolute-positioned layout. Authors place
+     *                 elements pixel-precise on a fixed design canvas
+     *                 (`width` × `height`). Slot/spatial paths are
+     *                 disabled. The Visual Editor exposes x/y handles,
+     *                 the AnimationPath system, and all legacy controls.
+     *
+     *  'responsive' = slot + spatial layout. The engine resolves
+     *                 positions from anchors / slot specs at runtime,
+     *                 reflowing on any viewport. No pixel positions are
+     *                 authored or persisted. SlotFlowView /
+     *                 SpatialFlowView own the visual contract.
+     *
+     * Existing projects load as 'fixed' (zero regression). New projects
+     * default to 'responsive'. Switching is a one-shot migration with
+     * preview; mixed-mode projects are NOT supported (deliberate — the
+     * previous per-beat auto-detection produced UX nobody could reason
+     * about). Inverse migration (responsive → fixed) bakes
+     * schema-resolved positions at the project's design width.
+     */
+    layoutMode?: 'fixed' | 'responsive';
   };
   colors: {
     pcolor: string;         // Button/choice background color (player actions)

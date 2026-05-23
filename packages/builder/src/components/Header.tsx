@@ -71,6 +71,10 @@ interface HeaderProps {
   speakerVoices?: Record<string, string>;
   onSpeakerVoiceChange?: (speaker: string, voiceId: string) => void;
   onTTSProviderChanged?: (provider: string, model?: string, baseUrl?: string) => void;
+  /** Phase 1 — resolved project layout mode for the badge. */
+  layoutMode?: 'fixed' | 'responsive';
+  /** Phase 1 — opens project settings (badge click target). */
+  onOpenLayoutSettings?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -116,6 +120,8 @@ export const Header: React.FC<HeaderProps> = ({
   speakerVoices = {},
   onSpeakerVoiceChange,
   onTTSProviderChanged,
+  layoutMode,
+  onOpenLayoutSettings,
 }) => {
   const { status, lastSaved, error: saveError, markChanged } = useSave();
   const { load } = useProject();
@@ -221,6 +227,27 @@ export const Header: React.FC<HeaderProps> = ({
             size={Math.max(15, (title || '').length + 2)}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           />
+
+          {/* Phase 1 — project layout mode badge. Always visible so the
+              author knows which authoring contract is active; click
+              opens Settings → Layout to switch (with migration prompt). */}
+          {layoutMode && (
+            <button
+              type="button"
+              onClick={onOpenLayoutSettings}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                layoutMode === 'responsive'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+              }`}
+              title={layoutMode === 'responsive'
+                ? 'Responsive layout — slot/spatial flow. Click to change.'
+                : 'Fixed canvas — pixel-positioned. Click to change.'}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              {layoutMode === 'responsive' ? 'Responsive layout' : 'Fixed canvas'}
+            </button>
+          )}
         </div>
       </div>
 

@@ -20,6 +20,10 @@ interface GlobalSettings {
     orientation?: 'flexible' | 'portrait' | 'landscape';  // Device orientation policy (P2.5)
     mobileFontScale?: number;   // Font scale multiplier for mobile (1.0-2.0)
     showMobileSafeZone?: boolean;  // Show mobile crop safe zone overlay in editor
+    // Phase 1 — project-level layout mode. See packages/builder/src/
+    // storage/types.ts for the full doc. Mirrored here because App and
+    // GlobalSettingsInspector import this inline type; keep in sync.
+    layoutMode?: 'fixed' | 'responsive';
   };
   colors: {
     pcolor: string;         // Button/choice background color (player actions)

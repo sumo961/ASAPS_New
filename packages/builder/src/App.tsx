@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Header } from './components/Header';
+import { resolveLayoutMode } from './utils/projectLayoutMode';
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
@@ -574,7 +575,12 @@ function App() {
       width: 1024,
       height: 768,
       aspectRatio: '4:3',
-      scalingMode: 'fit'
+      scalingMode: 'fit',
+      // Phase 1 — new projects default to 'responsive'. Existing
+      // projects load with undefined here and are treated as 'fixed'
+      // by the load-time normalization (see resolveLayoutMode below
+      // / GlobalSettingsAdapter). The author then picks via migrator.
+      layoutMode: 'responsive',
     },
     colors: {
       pcolor: '#ffffff',       // Button/choice background color
@@ -5552,6 +5558,8 @@ function App() {
           }));
           markChanged();
         }}
+        layoutMode={resolveLayoutMode(globalSettings, state.beats)}
+        onOpenLayoutSettings={handleOpenSettings}
       />
 
       <div className="flex flex-1 overflow-hidden">
