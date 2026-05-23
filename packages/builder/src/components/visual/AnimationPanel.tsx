@@ -63,6 +63,16 @@ interface AnimationPanelProps {
    */
   spatialAnimations?: SpatialAnimations;
   onSpatialAnimationsChange?: (next: SpatialAnimations | undefined) => void;
+
+  /**
+   * Project-level layoutMode. When 'responsive' AND this panel is
+   * showing the absolute-mode (path-keyframe) editor, we surface a
+   * "Legacy path animation" hint at the top: the beat is still
+   * absolute (has baked locations) inside an otherwise-responsive
+   * project, so AnimationPath still works but slotAnimations would
+   * be more portable. No behavior change — author can keep going.
+   */
+  projectLayoutMode?: 'fixed' | 'responsive';
 }
 
 export const AnimationPanel: React.FC<AnimationPanelProps> = ({
@@ -79,6 +89,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
   onSlotAnimationsChange,
   spatialAnimations,
   onSpatialAnimationsChange,
+  projectLayoutMode,
 }) => {
   const [editingAnimation, setEditingAnimation] = useState<AnimationPath | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -176,6 +187,20 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Animations</h2>
+
+        {/* Phase 2.4 — legacy hint. The path-keyframe (AnimationPath)
+            editor is the absolute-mode tool; it stays available for
+            beats with baked pixel positions, but in a responsive
+            project it is the secondary path. Nudge the author that
+            this beat is still absolute and could be migrated. */}
+        {projectLayoutMode === 'responsive' && (
+          <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-900 leading-snug">
+            <span className="font-semibold">Legacy path animation.</span>{' '}
+            This beat has baked pixel positions, so it animates with
+            keyframed x/y. Slot-anchored elements use the responsive
+            animation editor automatically.
+          </div>
+        )}
 
         {/* Element selector */}
         <div className="mb-3">

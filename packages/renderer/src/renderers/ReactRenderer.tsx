@@ -1888,10 +1888,14 @@ export class ReactRenderer extends BaseRenderer {
     animations?: AnimationPath[],
     /**
      * Whether this beat instance has author-persisted pixel locations.
-     * Defaults to `true` so EVERY existing caller and beat type keeps the
-     * unchanged absolute path — slot mode is strictly opt-in per-instance
-     * and only renderEndScreen passes `false` (when there are no baked
-     * locations). This is the zero-regression guard.
+     * Defaults to `true` so a forgotten override falls THROUGH the safe
+     * absolute path — the zero-regression guard. Slot/spatial mode is
+     * opt-in per call site: every render* method passes
+     * `!!(locations && locations.length > 0)` so an instance with no
+     * baked locations resolves to slot mode when its schema supports it.
+     * Never flip the default to `false` — that would silently flip
+     * existing absolute-path beats into responsive flow on any caller
+     * that hasn't yet been audited.
      */
     authorPositioned: boolean = true
   ): Promise<string> {

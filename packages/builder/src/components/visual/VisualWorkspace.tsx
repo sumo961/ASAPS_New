@@ -25,6 +25,7 @@ import { Info, Share2, ChevronDown, ChevronRight, MessageSquare } from 'lucide-r
 import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
+import { resolveLayoutMode } from '../../utils/projectLayoutMode';
 import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
@@ -5188,6 +5189,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   (beat?.getParameters?.()?.spatialAnimations as SpatialAnimations | undefined) ?? undefined
                 }
                 onSpatialAnimationsChange={onSpatialAnimationsChange}
+                projectLayoutMode={resolveLayoutMode(
+                  globalSettings as any,
+                  beats as any
+                )}
               />
             )}
           </div>
