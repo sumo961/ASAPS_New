@@ -26,7 +26,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation } from '@asaps/core';
+import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
@@ -750,62 +750,135 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
       {/* Action slot — pinned, always visible, overlap-proof.
           Single continue (aiInfoText/onlineContent) vs restart/credits
-          (endScreen/aiSummary). */}
+          (endScreen/aiSummary).
+          Per-button anchors (slotIntent[action].buttonAnchors[buttonId])
+          lift a button OUT of the flex row and position it absolutely
+          against the stage; un-anchored buttons stay in the row. */}
       {actionSlot && (() => {
         const a = phaseAnim(actionSlot.name);
+        // Catalogue every button the beat exposes here, paired with the
+        // identifier the schema uses in `actionSlot.buttons` so the
+        // anchor map keys line up with what the VE writes.
+        const buttonCatalog: Array<{
+          id: string;
+          text: string;
+          onClick: () => void;
+          show: boolean;
+        }> = isContinueAction
+          ? [{ id: 'continueButton', text: continueText, onClick: handleContinue, show: true }]
+          : [
+              { id: 'creditsButton', text: creditsText, onClick: handleCredits, show: showCredits },
+              { id: 'restartButton', text: restartText, onClick: handleRestart, show: showRestart },
+            ];
+        const buttonAnchors = (actionSlot
+          ? slotIntentFor(slotIntent, actionSlot.name)?.buttonAnchors
+          : undefined) as Record<string, SlotAnchor> | undefined;
+        const flowButtons = buttonCatalog.filter(
+          b => b.show && !buttonAnchors?.[b.id]
+        );
+        const anchoredButtons = buttonCatalog.filter(
+          b => b.show && buttonAnchors?.[b.id]
+        );
         return (
-        <div
-          className={a.className}
-          style={{
-            flexShrink: 0,
-            display: 'flex',
-            justifyContent: actionJustify,
-            gap: 'clamp(12px, 2vw, 24px)',
-            // gap intent controls the space above the row (under the body in
-            // below-body mode; bottom inset stays comfortable either way).
-            paddingTop: actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)',
-            paddingBottom: 'clamp(16px, 3vh, 28px)',
-            paddingLeft: 16,
-            paddingRight: 16,
-            ...a.style,
-          }}
-        >
-          {isContinueAction ? (
-            <button
-              className="slotflow-btn"
-              onClick={handleContinue}
-              style={buttonStyle(theme, buttonFluid)}
+          <>
+            <div
+              className={a.className}
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                justifyContent: actionJustify,
+                gap: 'clamp(12px, 2vw, 24px)',
+                // gap intent controls the space above the row (under the body in
+                // below-body mode; bottom inset stays comfortable either way).
+                paddingTop: actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)',
+                paddingBottom: 'clamp(16px, 3vh, 28px)',
+                paddingLeft: 16,
+                paddingRight: 16,
+                // When every button is individually anchored the row is
+                // empty; collapse its vertical inset so it doesn't leave
+                // a phantom stripe at the bottom.
+                ...(flowButtons.length === 0
+                  ? { paddingTop: 0, paddingBottom: 0 }
+                  : {}),
+                ...a.style,
+              }}
             >
-              {continueText}
-            </button>
-          ) : (
-            <>
-              {showCredits && (
+              {flowButtons.map(b => (
                 <button
+                  key={b.id}
                   className="slotflow-btn"
-                  onClick={handleCredits}
+                  onClick={b.onClick}
                   style={buttonStyle(theme, buttonFluid)}
                 >
-                  {creditsText}
+                  {b.text}
                 </button>
-              )}
-              {showRestart && (
+              ))}
+            </div>
+            {anchoredButtons.map(b => {
+              const anchor = buttonAnchors![b.id];
+              return (
                 <button
-                  className="slotflow-btn"
-                  onClick={handleRestart}
-                  style={buttonStyle(theme, buttonFluid)}
+                  key={`anchored-${b.id}`}
+                  className={`slotflow-btn ${a.className ?? ''}`}
+                  onClick={b.onClick}
+                  style={{
+                    ...buttonStyle(theme, buttonFluid),
+                    position: 'absolute',
+                    ...anchoredButtonPlacement(anchor),
+                    zIndex: 4,
+                    ...a.style,
+                  }}
                 >
-                  {restartText}
+                  {b.text}
                 </button>
-              )}
-            </>
-          )}
-        </div>
+              );
+            })}
+          </>
         );
       })()}
     </div>
   );
 };
+
+/**
+ * Resolve a SlotAnchor into the `position: absolute` placement for a
+ * per-button anchor. Stage-relative (the slot/element forms are not
+ * supported here — per-button anchors always pin against the root). Gap
+ * is the inset from the chosen edges; offset.x / offset.y nudge from the
+ * resolved point. Falls back to bottom-center when ambiguous so a
+ * partially-configured anchor still renders somewhere visible.
+ */
+function anchoredButtonPlacement(anchor: SlotAnchor): React.CSSProperties {
+  const inset = typeof anchor.gap === 'number' ? anchor.gap : 16;
+  const ox = anchor.offset?.x ?? 0;
+  const oy = anchor.offset?.y ?? 0;
+  const out: React.CSSProperties = {};
+  // Horizontal.
+  if (anchor.h === 'left') {
+    out.left = `calc(${inset + ox}px + env(safe-area-inset-left, 0px))`;
+  } else if (anchor.h === 'right') {
+    out.right = `calc(${inset - ox}px + env(safe-area-inset-right, 0px))`;
+  } else {
+    // center (or unset) — center on the stage with optional offset
+    out.left = `calc(50% + ${ox}px)`;
+    out.transform = (out.transform ?? '') + ' translateX(-50%)';
+  }
+  // Vertical.
+  if (anchor.v === 'top') {
+    out.top = `calc(${inset + oy}px + env(safe-area-inset-top, 0px))`;
+  } else if (anchor.v === 'middle') {
+    out.top = `calc(50% + ${oy}px)`;
+    out.transform = (out.transform ?? '') + ' translateY(-50%)';
+  } else {
+    // bottom (default)
+    out.bottom = `calc(${inset - oy}px + env(safe-area-inset-bottom, 0px))`;
+  }
+  if (typeof out.transform === 'string') {
+    out.transform = out.transform.trim();
+    if (out.transform === '') delete out.transform;
+  }
+  return out;
+}
 
 function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProperties {
   return {

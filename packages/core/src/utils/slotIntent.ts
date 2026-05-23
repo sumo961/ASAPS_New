@@ -54,6 +54,17 @@ export interface SlotIntentEntry {
   preferredLines?: number;
   /** Anchor for buttons / hotspots / movable slots. */
   anchor?: SlotAnchor;
+  /**
+   * Per-button anchor overrides for action slots that host multiple named
+   * buttons (e.g. endScreen: 'restartButton' + 'creditsButton'). Keys are
+   * the button identifiers the beat emits via `actionSlot.buttons`. A
+   * button with an entry here is lifted OUT of the default flex row and
+   * positioned independently inside the action region; buttons without an
+   * entry stay in the row using the slot's `anchor` (the shared
+   * align/gap/below-body policy). Use this for designs like "Credits in
+   * the corner, Restart centered" without splitting beats.
+   */
+  buttonAnchors?: Record<string, SlotAnchor>;
 }
 
 /** Per-beat map: slot name → author intent for that slot. */

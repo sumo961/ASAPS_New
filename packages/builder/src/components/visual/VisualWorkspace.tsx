@@ -894,7 +894,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // In-memory update first so the faithful preview reflects it instantly
       // (bumps _version → beatVersion → re-render); the command path then
       // persists + makes it undoable like any Inspector param edit.
-      beat.updateParameters?.({ slotIntent: nextIntent });
+      // updateParameters skips `undefined` values across all beat
+      // subclasses (the standard partial-update guard), so a full clear
+      // (nextIntent === undefined when the last slot entry is removed)
+      // is written directly to the public field. The command path below
+      // still records the change for undo.
+      if (nextIntent === undefined) {
+        (beat as any).slotIntent = undefined;
+      } else {
+        beat.updateParameters?.({ slotIntent: nextIntent });
+      }
       onBeatUpdate(beat.id, {
         parameters: { ...beat.getParameters(), slotIntent: nextIntent },
       } as any);
@@ -5279,7 +5288,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             // action slot's anchor. Slot names come from the schema spec so
             // we target the right keys in slotIntent.
             const titleSlotName = slotSpec!.find(s => s.role === 'title')?.name;
-            const actionSlotName = slotSpec!.find(s => s.role === 'action')?.name;
+            const actionSlotSpec = slotSpec!.find(s => s.role === 'action');
+            const actionSlotName = actionSlotSpec?.name;
             const curIntent = (slotPreviewParams?.slotIntent ?? {}) as Record<string, any>;
             const titleLines: number | undefined =
               titleSlotName ? curIntent[titleSlotName]?.preferredLines : undefined;
@@ -5306,6 +5316,37 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         ...patch,
                       };
               onSlotIntentChange(actionSlotName!, { anchor: nextAnchor });
+            };
+            // Per-button anchor authoring. The action schema lists the
+            // catalogue of button ids (continueButton / restartButton /
+            // creditsButton); each beat instance only shows those its
+            // content opts in. Without overrides, all visible buttons live
+            // in the shared flex row above; pinning one lifts JUST that
+            // button onto an absolute anchor against the stage so designs
+            // like "Credits in the corner, Restart centered" work without
+            // splitting beats.
+            const actionButtonIds: string[] = actionSlotSpec?.buttons ?? [];
+            const buttonAnchors = (actionSlotName
+              ? (curIntent[actionSlotName]?.buttonAnchors as Record<string, any> | undefined)
+              : undefined) ?? {};
+            const visibleActionButtonIds = actionButtonIds.filter(id => {
+              if (id === 'continueButton') return true;
+              if (id === 'restartButton') return (slotPreviewParams as any)?.showRestart !== false;
+              if (id === 'creditsButton') return (slotPreviewParams as any)?.showCredits === true;
+              return true;
+            });
+            const setButtonAnchor = (buttonId: string, patch: Record<string, any> | null) => {
+              if (!actionSlotName) return;
+              const nextAnchors = { ...buttonAnchors };
+              if (patch === null) {
+                delete nextAnchors[buttonId];
+              } else {
+                const cur = nextAnchors[buttonId] ?? { h: 'center', v: 'bottom', relativeTo: 'stage', gap: 16 };
+                nextAnchors[buttonId] = { ...cur, ...patch };
+              }
+              onSlotIntentChange(actionSlotName, {
+                buttonAnchors: Object.keys(nextAnchors).length > 0 ? nextAnchors : undefined,
+              });
             };
             // 3d-4 — live gap while dragging the action grip (uncommitted).
             const liveGap = slotGapDrag ? slotGapDrag.gap : anchorGap;
@@ -5784,6 +5825,90 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         />
                         <span className="w-7 tabular-nums opacity-70">{anchorGap}px</span>
                       </div>
+                      {/* Phase 2.2 — per-button anchor pins. One control
+                          per visible button in the action slot. Default
+                          ("In row") keeps the button in the shared flex
+                          row above; the other presets lift it out and
+                          anchor it absolutely against the stage. */}
+                      {visibleActionButtonIds.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="opacity-50">|</span>
+                          <span className="opacity-70">Pin</span>
+                          {visibleActionButtonIds.map(bid => {
+                            const cur = buttonAnchors[bid];
+                            const labelMap: Record<string, string> = {
+                              continueButton: 'Continue',
+                              restartButton: 'Restart',
+                              creditsButton: 'Credits',
+                            };
+                            const label = labelMap[bid] || bid;
+                            type PinPreset = 'row' | 'bl' | 'bc' | 'br' | 'tl' | 'tr';
+                            const presets: Array<{ key: PinPreset; title: string; glyph: string }> = [
+                              { key: 'row', title: 'In shared row', glyph: '—' },
+                              { key: 'tl', title: 'Top-left',      glyph: '⌜' },
+                              { key: 'tr', title: 'Top-right',     glyph: '⌝' },
+                              { key: 'bl', title: 'Bottom-left',   glyph: '⌞' },
+                              { key: 'bc', title: 'Bottom-center', glyph: '⎵' },
+                              { key: 'br', title: 'Bottom-right',  glyph: '⌟' },
+                            ];
+                            const currentKey: PinPreset = !cur
+                              ? 'row'
+                              : cur.v === 'top' && cur.h === 'left' ? 'tl'
+                              : cur.v === 'top' && cur.h === 'right' ? 'tr'
+                              : cur.h === 'left' ? 'bl'
+                              : cur.h === 'right' ? 'br'
+                              : 'bc';
+                            const applyPreset = (k: PinPreset) => {
+                              if (k === 'row') return setButtonAnchor(bid, null);
+                              const map: Record<Exclude<PinPreset, 'row'>, Record<string, any>> = {
+                                tl: { h: 'left',   v: 'top',    relativeTo: 'stage' },
+                                tr: { h: 'right',  v: 'top',    relativeTo: 'stage' },
+                                bl: { h: 'left',   v: 'bottom', relativeTo: 'stage' },
+                                bc: { h: 'center', v: 'bottom', relativeTo: 'stage' },
+                                br: { h: 'right',  v: 'bottom', relativeTo: 'stage' },
+                              };
+                              setButtonAnchor(bid, { ...map[k], gap: cur?.gap ?? 16 });
+                            };
+                            return (
+                              <div key={bid} className="flex items-center gap-1 rounded bg-white/[0.04] px-1.5 py-0.5">
+                                <span className="opacity-80">{label}</span>
+                                <div className="flex rounded overflow-hidden border border-white/15">
+                                  {presets.map(p => (
+                                    <button
+                                      key={p.key}
+                                      type="button"
+                                      onClick={() => applyPreset(p.key)}
+                                      title={p.title}
+                                      className={`px-1.5 py-0.5 ${
+                                        currentKey === p.key
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-white/5 hover:bg-white/15 text-white/80'
+                                      }`}
+                                    >
+                                      {p.glyph}
+                                    </button>
+                                  ))}
+                                </div>
+                                {cur && (
+                                  <>
+                                    <span className="opacity-50 ml-0.5">gap</span>
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={64}
+                                      step={4}
+                                      value={typeof cur.gap === 'number' ? cur.gap : 16}
+                                      onChange={e => setButtonAnchor(bid, { gap: parseInt(e.target.value, 10) || 0 })}
+                                      className="w-14 align-middle"
+                                      title={`${cur.gap ?? 16}px`}
+                                    />
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
