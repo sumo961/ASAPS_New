@@ -1077,7 +1077,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     return null;
   };
   const onHotspotChange = useCallback(
-    (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => {
+    (
+      id: string,
+      next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>,
+      commit: boolean,
+      isPortrait: boolean
+    ) => {
       const accessor = hotspotItemsAccessorFor(beat);
       if (!beat || !accessor) return;
       const params = beat.getParameters?.() ?? {};
@@ -1086,10 +1091,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (idx < 0) return;
       const cur = items[idx];
       const curHotspot = (cur as any).hotspot ?? {};
-      items[idx] = {
-        ...cur,
-        hotspot: { ...curHotspot, x: next.x, y: next.y, width: next.width, height: next.height },
-      };
+      // P3-3e — route the edit to the variant the author was looking
+      // at. Portrait edits write into hotspot.portrait (creating it on
+      // first edit, with the canonical rect as its template so an
+      // accidental tap doesn't blank the override). Landscape edits
+      // write the canonical x/y/width/height as before.
+      const nextHotspot = isPortrait
+        ? {
+            ...curHotspot,
+            portrait: {
+              x: next.x,
+              y: next.y,
+              width: next.width,
+              height: next.height,
+            },
+          }
+        : { ...curHotspot, x: next.x, y: next.y, width: next.width, height: next.height };
+      items[idx] = { ...cur, hotspot: nextHotspot };
       const nextParams = accessor.write(params, items);
       beat.updateParameters?.(nextParams);
       if (commit && onBeatUpdate) {
@@ -5559,6 +5577,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               width: c.hotspot.width,
                               height: c.hotspot.height,
                               shape: c.hotspot.shape,
+                              // P3-3e — pass the portrait override
+                              // through so the overlay can render the
+                              // portrait variant when in portrait
+                              // preview, and so drag-start reads the
+                              // correct origin rect.
+                              portrait: c.hotspot.portrait,
                               label: c.displayText || c.text || c.displayName || c.name,
                             }))}
                           selectedId={selectedHotspotId}
@@ -5571,6 +5595,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             setDialogTreeNodePath(prev => [...prev, id]);
                             setSelectedHotspotId(null);
                           } : undefined}
+                          // P3-3e — orientation for hotspot routing. For
+                          // fixed device presets (Phone/Tablet/Authored/
+                          // Desktop) use the ACTUAL stage dimensions —
+                          // that's what the runtime sees and what
+                          // SpatialFlowView's container measurement
+                          // will report. For the editor-fill preset
+                          // (no fixed dims) fall back to the
+                          // orientation-policy toggle.
+                          isPortrait={isFixed ? devH > devW : effOrient === 'portrait'}
                         />
                       );
                     })()}

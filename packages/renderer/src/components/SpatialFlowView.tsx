@@ -7,6 +7,7 @@ import type {
   SpatialAnimation,
   Hotspot,
 } from '@asaps/core';
+import { resolveHotspotRect } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
@@ -496,6 +497,13 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               const labelText = h.label || h.id;
               const showLabelAlways = hsLabel === 'always' && !!labelText;
               const showLabelOnHover = hsLabel === 'hover' && !!labelText;
+              // P3-3e — pick the orientation-appropriate rect. The
+              // container's current aspect ratio decides portrait vs
+              // landscape (the LETTERBOXED image follows the container
+              // here, and orientationchange + ResizeObserver above
+              // refresh containerSize so this re-resolves immediately).
+              const isPortrait = containerSize.h > containerSize.w;
+              const rect = resolveHotspotRect(h, isPortrait);
               return (
                 <button
                   key={h.id}
@@ -506,10 +514,10 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                   className="spatialflow-hotspot"
                   style={{
                     position: 'absolute',
-                    left: `${h.x * 100}%`,
-                    top: `${h.y * 100}%`,
-                    width: `${h.width * 100}%`,
-                    height: `${h.height * 100}%`,
+                    left: `${rect.x * 100}%`,
+                    top: `${rect.y * 100}%`,
+                    width: `${rect.width * 100}%`,
+                    height: `${rect.height * 100}%`,
                     pointerEvents: 'auto',
                     background: fillHex,
                     border: showHotspotOutlines

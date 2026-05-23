@@ -37,6 +37,25 @@ export interface Hotspot {
    * elements without needing a separate coordinate system.
    */
   shape?: 'rect' | 'ellipse';
+  /**
+   * P3-3e — orientation-aware portrait override.
+   *
+   * The canonical x/y/width/height above is the LANDSCAPE rect. When the
+   * runtime detects a portrait-oriented stage (container taller than
+   * wide) AND this override is present, the renderer uses these values
+   * instead. This lets a door that sits in the upper-right of a wide
+   * shot move to the lower-right of the same scene's portrait crop
+   * without the author needing two separate beats.
+   *
+   * Absent → the landscape values are used in both orientations
+   * (existing behavior, zero regression).
+   */
+  portrait?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 /** Defensive type guard. */
@@ -50,4 +69,27 @@ export function isHotspot(v: unknown): v is Hotspot {
     typeof o.width === 'number' &&
     typeof o.height === 'number'
   );
+}
+
+/**
+ * P3-3e — resolve a hotspot's effective rect for the current orientation.
+ *
+ * Returns the portrait override when isPortrait is true AND the hotspot
+ * carries one; otherwise returns the canonical landscape rect. Pure: the
+ * input is never mutated, the return is a fresh shallow object that's
+ * safe to spread into CSS-percent styles.
+ */
+export function resolveHotspotRect(
+  h: Hotspot,
+  isPortrait: boolean
+): { x: number; y: number; width: number; height: number } {
+  if (isPortrait && h.portrait) {
+    return {
+      x: h.portrait.x,
+      y: h.portrait.y,
+      width: h.portrait.width,
+      height: h.portrait.height,
+    };
+  }
+  return { x: h.x, y: h.y, width: h.width, height: h.height };
 }

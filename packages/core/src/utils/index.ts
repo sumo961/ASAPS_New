@@ -29,6 +29,7 @@ export {
 } from './spatialAnimation';
 export {
   isHotspot,
+  resolveHotspotRect,
   type Hotspot,
 } from './hotspot';
 export { waitForTTS, waitForReadingTime } from './ttsWait';

@@ -12,6 +12,7 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { Hotspot } from '@asaps/core';
+import { resolveHotspotRect } from '@asaps/core';
 import { imageRectPx } from '@asaps/renderer';
 
 interface Props {
@@ -20,8 +21,25 @@ interface Props {
   hotspots: Hotspot[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  /** Fires on every move (live) and on commit (final). */
-  onChange: (id: string, next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>, commit: boolean) => void;
+  /**
+   * Fires on every move (live) and on commit (final). `isPortrait`
+   * tells the parent which variant to write: the canonical landscape
+   * x/y/width/height, or the `hotspot.portrait` override. The parent
+   * is the single source of truth for that mapping — the overlay just
+   * forwards the orientation it was rendered for. */
+  onChange: (
+    id: string,
+    next: Pick<Hotspot, 'x' | 'y' | 'width' | 'height'>,
+    commit: boolean,
+    isPortrait: boolean
+  ) => void;
+  /**
+   * P3-3e — current preview orientation. When true, the overlay
+   * renders hotspots at their portrait-override rect (falling back to
+   * landscape when no override exists) and routes edits back as the
+   * portrait variant. The parent decides whether the override is
+   * created on first edit. */
+  isPortrait?: boolean;
   /**
    * P3-3c-5 — fires when the author finishes drawing a new rectangle on
    * empty image area. The caller decides which choice gets it (typically:
@@ -63,6 +81,7 @@ export const HotspotEditOverlay: React.FC<Props> = ({
   onDelete,
   stepIntoIds,
   onStepInto,
+  isPortrait = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -159,9 +178,17 @@ export const HotspotEditOverlay: React.FC<Props> = ({
       if (drag.kind === 'move') {
         const h = hotspots.find(s => s.id === drag.id);
         if (!h) return;
-        const nx = Math.max(0, Math.min(1 - h.width, drag.origX + dx));
-        const ny = Math.max(0, Math.min(1 - h.height, drag.origY + dy));
-        onChange(drag.id, { x: nx, y: ny, width: h.width, height: h.height }, false);
+        // Read the variant's own width/height when constraining, so a
+        // portrait override with different dimensions clamps correctly.
+        const cur = resolveHotspotRect(h, isPortrait);
+        const nx = Math.max(0, Math.min(1 - cur.width, drag.origX + dx));
+        const ny = Math.max(0, Math.min(1 - cur.height, drag.origY + dy));
+        onChange(
+          drag.id,
+          { x: nx, y: ny, width: cur.width, height: cur.height },
+          false,
+          isPortrait
+        );
       } else if (drag.kind === 'resize') {
         const { x, y, w, h } = drag.orig;
         let nx = x, ny = y, nw = w, nh = h;
@@ -186,7 +213,7 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         ny = Math.max(0, Math.min(1 - MIN_NORMALIZED, ny));
         nw = Math.min(1 - nx, nw);
         nh = Math.min(1 - ny, nh);
-        onChange(drag.id, { x: nx, y: ny, width: nw, height: nh }, false);
+        onChange(drag.id, { x: nx, y: ny, width: nw, height: nh }, false, isPortrait);
       } else {
         // create — track the live rectangle from start point to current.
         const newW = Math.abs(dx);
@@ -216,7 +243,15 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         return;
       }
       const h = hotspots.find(s => s.id === drag.id);
-      if (h) onChange(drag.id, { x: h.x, y: h.y, width: h.width, height: h.height }, true);
+      if (h) {
+        const cur = resolveHotspotRect(h, isPortrait);
+        onChange(
+          drag.id,
+          { x: cur.x, y: cur.y, width: cur.width, height: cur.height },
+          true,
+          isPortrait
+        );
+      }
       setDrag(null);
     };
     window.addEventListener('pointermove', onMove);
@@ -231,30 +266,32 @@ export const HotspotEditOverlay: React.FC<Props> = ({
     e.preventDefault();
     e.stopPropagation();
     onSelect(hotspot.id);
+    const cur = resolveHotspotRect(hotspot, isPortrait);
     setDrag({
       kind: 'move',
       id: hotspot.id,
       startX: e.clientX,
       startY: e.clientY,
-      origX: hotspot.x,
-      origY: hotspot.y,
+      origX: cur.x,
+      origY: cur.y,
     });
-  }, [onSelect]);
+  }, [onSelect, isPortrait]);
 
   const startResize = useCallback(
     (e: React.PointerEvent, hotspot: Hotspot, corner: 'tl' | 'tr' | 'bl' | 'br') => {
       e.preventDefault();
       e.stopPropagation();
+      const cur = resolveHotspotRect(hotspot, isPortrait);
       setDrag({
         kind: 'resize',
         id: hotspot.id,
         corner,
         startX: e.clientX,
         startY: e.clientY,
-        orig: { x: hotspot.x, y: hotspot.y, w: hotspot.width, h: hotspot.height },
+        orig: { x: cur.x, y: cur.y, w: cur.width, h: cur.height },
       });
     },
-    [],
+    [isPortrait],
   );
 
   // P3-3c-5 — pointerdown on the image rect (but NOT on an existing
@@ -318,6 +355,10 @@ export const HotspotEditOverlay: React.FC<Props> = ({
           const isSelected = h.id === selectedId;
           const isExternalHover = h.id === externalHoverId;
           const isEllipse = h.shape === 'ellipse';
+          // Render against the resolved variant for this orientation.
+          // No portrait override yet → falls back to the canonical rect
+          // (matches the runtime's behavior exactly).
+          const cur = resolveHotspotRect(h, isPortrait);
           return (
             <div
               key={h.id}
@@ -326,10 +367,10 @@ export const HotspotEditOverlay: React.FC<Props> = ({
               onPointerLeave={() => dispatchHover(null)}
               style={{
                 position: 'absolute',
-                left: `${h.x * 100}%`,
-                top: `${h.y * 100}%`,
-                width: `${h.width * 100}%`,
-                height: `${h.height * 100}%`,
+                left: `${cur.x * 100}%`,
+                top: `${cur.y * 100}%`,
+                width: `${cur.width * 100}%`,
+                height: `${cur.height * 100}%`,
                 background: isSelected
                   ? 'rgba(96, 165, 250, 0.22)'
                   : isExternalHover
