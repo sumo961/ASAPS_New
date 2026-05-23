@@ -321,37 +321,52 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         .${scope} .spatialflow-anim-pan-up-out    { animation-name: spatialflow-pan-up-out; }
         .${scope} .spatialflow-anim-pan-down-out  { animation-name: spatialflow-pan-down-out; }
 
-        /* === Enter keyframes (image arrives + settles) === */
+        /* === Enter keyframes (image arrives + settles) ===
+            Bug 25 — keyframes that LEFT the image in a transformed rest
+            state at animation-end (with fill-mode:both holding it there
+            forever) produced an "off-center, zoomed" stage. ken-burns
+            and zoom-out used to end at scale(1.1) + translate, so the
+            image was permanently shifted and clipped by the stage
+            frame. Both now SETTLE at scale(1) + translate(0,0) so the
+            rest state is exactly the contain-fit rect the author
+            expects. ken-burns starts drifted and resolves to centered;
+            zoom-out starts wide and pulls in. */
         @keyframes spatialflow-ken-burns-in {
-          from { transform: scale(1) translate(0, 0); opacity: 0; }
-          to   { transform: scale(var(--spatial-anim-scale, 1.1))
+          from { transform: scale(var(--spatial-anim-scale, 1.1))
                             translate(calc(var(--spatial-anim-intensity, 10%) * -0.5),
                                       calc(var(--spatial-anim-intensity, 10%) * -0.5));
-                 opacity: 1; }
+                 opacity: 0; }
+          to   { transform: scale(1) translate(0, 0); opacity: 1; }
         }
         @keyframes spatialflow-zoom-in-in {
           from { transform: scale(var(--spatial-anim-scale, 1.1)); opacity: 0; }
           to   { transform: scale(1); opacity: 1; }
         }
         @keyframes spatialflow-zoom-out-in {
-          from { transform: scale(1); opacity: 0; }
-          to   { transform: scale(var(--spatial-anim-scale, 1.1)); opacity: 1; }
+          from { transform: scale(calc(2 - var(--spatial-anim-scale, 1.1))); opacity: 0; }
+          to   { transform: scale(1); opacity: 1; }
         }
+        /* Bug 25 — pan-* enter keyframes used to end at translateX/Y(±10%)
+            so the image stayed permanently shifted (with fill-mode:both
+            holding the end state). Now they enter from the directional
+            offset and settle to translate(0), so the rest state is
+            centered. Pan-left = image comes IN from the right and
+            settles; pan-right = comes in from the left; etc. */
         @keyframes spatialflow-pan-left-in {
           from { transform: translateX(var(--spatial-anim-intensity, 10%)); }
-          to   { transform: translateX(calc(-1 * var(--spatial-anim-intensity, 10%))); }
+          to   { transform: translateX(0); }
         }
         @keyframes spatialflow-pan-right-in {
           from { transform: translateX(calc(-1 * var(--spatial-anim-intensity, 10%))); }
-          to   { transform: translateX(var(--spatial-anim-intensity, 10%)); }
+          to   { transform: translateX(0); }
         }
         @keyframes spatialflow-pan-up-in {
           from { transform: translateY(var(--spatial-anim-intensity, 10%)); }
-          to   { transform: translateY(calc(-1 * var(--spatial-anim-intensity, 10%))); }
+          to   { transform: translateY(0); }
         }
         @keyframes spatialflow-pan-down-in {
           from { transform: translateY(calc(-1 * var(--spatial-anim-intensity, 10%))); }
-          to   { transform: translateY(var(--spatial-anim-intensity, 10%)); }
+          to   { transform: translateY(0); }
         }
 
         /* === Exit keyframes (image departs) ===
