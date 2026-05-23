@@ -883,6 +883,29 @@ export class ReactRenderer extends BaseRenderer {
     return (this.getState('beatSpeaker') as string) || 'Narrator';
   }
 
+  /**
+   * Task #225 — resolve the speaker name for the 'speaker' slot in
+   * slot-mode rendering. Mirrors the absolute path's logic
+   * (renderPositionedBeat speakerName): beat-level showSpeaker override
+   * wins; otherwise the global theme.speakerDisplay.showNames flag
+   * decides. Returns '' when speaker should be hidden — the speaker
+   * slot reads content[source], and SlotFlowView guards on falsy text.
+   * Beat type 'titleScreen' has no speaker concept; skip.
+   */
+  private resolveSpeakerForSlot(): string {
+    const beatType = (this.getState('currentBeatType') as string) || '';
+    if (beatType === 'titleScreen') return '';
+    const beatOverride = this.getState('showSpeaker') as boolean | undefined;
+    const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;
+    const show =
+      beatOverride === true ? true :
+      beatOverride === false ? false :
+      globalShowNames;
+    if (!show) return '';
+    const raw = (this.getState('beatSpeaker') as string) || '';
+    return raw && this.speakerNameResolver ? this.speakerNameResolver(raw) : raw;
+  }
+
   private get root(): ReactDOM.Root | null {
     return this._root;
   }
@@ -2133,7 +2156,11 @@ export class ReactRenderer extends BaseRenderer {
     // authorPositioned gates slot mode (only effective for slot-declared
     // beat types — onlineContent/aiInfoText; infoText/durScreen have no
     // layoutMode in the schema so they always stay on the absolute path).
-    const content = { text, buttonText };
+    // Task #225 — surface the speaker label in slot mode if the
+    // beat/theme says it should show. SlotFlowView's speaker role
+    // reads content.speaker; we resolve here so the same logic
+    // (beat override > global theme) governs both modes.
+    const content: Record<string, any> = { text, buttonText, speaker: this.resolveSpeakerForSlot() };
     const authorPositioned = !!(locations && locations.length > 0);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
 
@@ -2799,7 +2826,11 @@ export class ReactRenderer extends BaseRenderer {
     // (no author layout — e.g. AI-generated or never opened in the Visual
     // Editor) and the schema marks endScreen as slot-mode, renderPositionedBeat
     // routes to the responsive SlotFlowView instead of absolute positioning.
-    const content = { message, showRestart, showCredits, restartText, creditsText };
+    // Task #225 — surface speaker label in slot mode if visible.
+    const content: Record<string, any> = {
+      message, showRestart, showCredits, restartText, creditsText,
+      speaker: this.resolveSpeakerForSlot(),
+    };
     const authorPositioned = !!(locations && locations.length > 0);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('endScreen', content);
 
@@ -2860,7 +2891,8 @@ export class ReactRenderer extends BaseRenderer {
     // layoutMode:slot → SlotFlowView (body-only timed text, no action row;
     // it still auto-advances after `duration`). Baked instances stay
     // absolute (zero regression). Mirrors renderText/renderEndScreen.
-    const content = { text };
+    // Task #225 — surface speaker label in slot mode if visible.
+    const content: Record<string, any> = { text, speaker: this.resolveSpeakerForSlot() };
     const authorPositioned = !!(locations && locations.length > 0);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('durScreen', content);
 

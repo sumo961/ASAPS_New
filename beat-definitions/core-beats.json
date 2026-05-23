@@ -407,8 +407,9 @@
         "continueButton": "buttonText"
       },
       "layoutMode": "slot",
-      "layoutModeNote": "Phase-2 responsive-slot (stack beats). infoText instances with NO author-persisted locations render via SlotFlowView (body from 'text', single continue button) — same renderText path / authorPositioned guard as aiInfoText. Baked-location instances stay absolute (zero regression). See project_responsive_layout_system memory.",
+      "layoutModeNote": "Phase-2 responsive-slot (stack beats). infoText instances with NO author-persisted locations render via SlotFlowView (body from 'text', single continue button) — same renderText path / authorPositioned guard as aiInfoText. Baked-location instances stay absolute (zero regression). Speaker slot (Task #225) renders above the body when the beat's showSpeaker (or global theme.speakerDisplay.showNames) is true; content.speaker is '' otherwise so the slot collapses. See project_responsive_layout_system memory.",
       "slots": [
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
         { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
         { "name": "actions", "role": "action", "buttons": ["continueButton"] }
       ],
@@ -899,8 +900,9 @@
         "creditsButton": "creditsText"
       },
       "layoutMode": "slot",
-      "layoutModeNote": "Phase-1 responsive-slot test bed. When a beat instance has NO author-persisted locations, the runtime renders it via SlotFlowView (vertical flow, clamped-fluid font outside the stage-fit transform) instead of absolute positioning. Instances with baked locations stay on the absolute path unchanged. See project_responsive_layout_system memory.",
+      "layoutModeNote": "Phase-1 responsive-slot test bed. When a beat instance has NO author-persisted locations, the runtime renders it via SlotFlowView (vertical flow, clamped-fluid font outside the stage-fit transform) instead of absolute positioning. Instances with baked locations stay on the absolute path unchanged. Speaker slot (Task #225) renders above the body when showSpeaker/global is true. See project_responsive_layout_system memory.",
       "slots": [
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
         { "name": "message", "role": "body", "source": "message", "grow": true, "scroll": true },
         { "name": "actions", "role": "action", "buttons": ["restartButton", "creditsButton"] }
       ],
@@ -1261,8 +1263,9 @@
         "text": "text"
       },
       "layoutMode": "slot",
-      "layoutModeNote": "Phase-2 responsive-slot (stack beats). Body-only: timed text with NO action row — the beat auto-advances after its duration, the slot path is purely the responsive visual. renderDurScreen threads authorPositioned; baked-location instances stay absolute (zero regression). See project_responsive_layout_system memory.",
+      "layoutModeNote": "Phase-2 responsive-slot (stack beats). Body-only: timed text with NO action row — the beat auto-advances after its duration, the slot path is purely the responsive visual. renderDurScreen threads authorPositioned; baked-location instances stay absolute (zero regression). Speaker slot (Task #225) renders above the body when showSpeaker/global is true. See project_responsive_layout_system memory.",
       "slots": [
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
         { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
       ],
       "transitions": true,
