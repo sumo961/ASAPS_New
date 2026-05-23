@@ -32,6 +32,15 @@ export {
   resolveHotspotRect,
   type Hotspot,
 } from './hotspot';
+export {
+  resolveAssetVariant,
+  detectDeviceClass,
+  detectOrientation,
+  type AssetVariant,
+  type AssetVariantContext,
+  type AssetOrientation,
+  type AssetDeviceClass,
+} from './assetVariant';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';

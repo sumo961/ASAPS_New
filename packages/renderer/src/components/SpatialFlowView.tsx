@@ -7,7 +7,8 @@ import type {
   SpatialAnimation,
   Hotspot,
 } from '@asaps/core';
-import { resolveHotspotRect } from '@asaps/core';
+import { resolveHotspotRect, resolveAssetVariant, detectDeviceClass, detectOrientation } from '@asaps/core';
+import type { AssetVariant } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
@@ -21,6 +22,17 @@ interface SpatialFlowViewProps {
   /** Resolved spatial image URL (beat background / map asset). Falls back to
    *  content[spatial.source] when the renderer didn't resolve one. */
   imageUrl?: string | null;
+  /**
+   * Phase 3.3 — orientation / device-class variants for the spatial
+   * image. The component picks the best match against its container's
+   * current dimensions at render time (the SAME measurements that
+   * drive hotspot orientation resolution, so the picture and its
+   * clickable regions stay in sync). Each variant must carry a
+   * resolved `url` because SpatialFlowView lives below the
+   * asset-resolution layer and has no view onto the project's asset
+   * list. Absent / empty → renders `imageUrl` (unchanged).
+   */
+  imageVariants?: ReadonlyArray<AssetVariant & { url: string }>;
   /** Painted only when there is no image (true letterbox backdrop). */
   backgroundColor: string;
   slotIntent?: SlotIntent;
@@ -189,6 +201,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   content,
   theme,
   imageUrl,
+  imageVariants,
   backgroundColor,
   slotIntent,
   slotAnimations,
@@ -201,8 +214,6 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   previewWidth,
   previewCoarse,
 }) => {
-  const src: string | null =
-    imageUrl ?? (typeof content[spatial.source] === 'string' ? content[spatial.source] : null);
   const objectFit = spatial.fit === 'cover' ? 'cover' : 'contain';
 
   const scopeRef = React.useRef<string>('');
@@ -254,6 +265,37 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     };
   }, []);
   const imgInsets = imageRectInsets(imgAspect, containerSize.w, containerSize.h, objectFit);
+
+  /**
+   * Phase 3.3 — pick the best image source for this container.
+   *
+   * Base URL is `imageUrl` (already resolved by the caller from the
+   * beat's background asset, falling back to `content[spatial.source]`).
+   * When `imageVariants` are supplied, resolveAssetVariant scores each
+   * candidate against the container's current orientation + the
+   * width-derived device class and returns the most-specific match.
+   * Constraint-violating variants are filtered out; if none qualify
+   * the base URL stays in use (the documented fallback).
+   *
+   * Container dimensions must be measured before this resolves; until
+   * the first ResizeObserver tick lands, containerSize.w is 0 and
+   * deviceClass would mis-classify as 'phone'. We hold off on variant
+   * lookup in that initial frame so the first paint uses the base
+   * image; a re-render lands within a frame with the right context.
+   */
+  const baseSrc: string | null =
+    imageUrl ?? (typeof content[spatial.source] === 'string' ? content[spatial.source] : null);
+  const variantUrl: string | null = (() => {
+    if (!imageVariants || imageVariants.length === 0) return null;
+    if (containerSize.w === 0 || containerSize.h === 0) return null;
+    const orientation = detectOrientation(containerSize.w, containerSize.h);
+    const deviceClass = detectDeviceClass(containerSize.w);
+    const picked = resolveAssetVariant(imageVariants, { orientation, deviceClass });
+    if (!picked) return null;
+    const found = imageVariants.find(v => v.assetId === picked.assetId);
+    return found?.url ?? null;
+  })();
+  const src: string | null = variantUrl ?? baseSrc;
 
   // P3-anim-9 — editor Test Exit. SlotAnimationsEditor dispatches this
   // CustomEvent so authors can preview the exit without clicking through

@@ -839,7 +839,34 @@ export class ReactRenderer extends BaseRenderer {
   private _originalHandleAction: ((id: string) => void) | null = null;  // Saved for cancellation
   private instanceId: string;
   protected backgroundImageUrl: string | null = null;  // Changed to protected
+  /**
+   * Phase 3.3 — orientation / device-class variants of the active
+   * background image, paired with their resolved URLs. Computed
+   * alongside `backgroundImageUrl` whenever a beat resolves its
+   * background asset; passed to SpatialFlowView so the component can
+   * pick the best match for the current container at render time.
+   * Null / empty when the base asset has no variants.
+   */
+  protected backgroundImageVariants: ReadonlyArray<{
+    assetId: string;
+    orientation?: 'portrait' | 'landscape';
+    deviceClass?: 'phone' | 'tablet' | 'desktop';
+    url: string;
+  }> | null = null;
   private assetResolver: ((assetId: string) => string | undefined) | null = null;  // NEW: Asset resolver function
+  /**
+   * Phase 3.3 — variant resolver. Host wires this up to look up an
+   * asset's `variants[]` field and pair each with the target asset's
+   * URL, so ReactRenderer can hand SpatialFlowView a self-contained
+   * list (no upstream asset table reads at render time). Unset → the
+   * background renders with no variants, exactly like before.
+   */
+  private assetVariantsResolver: ((assetId: string) => ReadonlyArray<{
+    assetId: string;
+    orientation?: 'portrait' | 'landscape';
+    deviceClass?: 'phone' | 'tablet' | 'desktop';
+    url: string;
+  }> | undefined) | null = null;
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
   private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
   private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
@@ -1141,6 +1168,24 @@ export class ReactRenderer extends BaseRenderer {
    */
   setAssetResolver(resolver: (assetId: string) => string | undefined): void {
     this.assetResolver = resolver;
+  }
+
+  /**
+   * Phase 3.3 — wire up the asset variants resolver. Host should
+   * return the variants for the given base asset id with each
+   * variant's URL pre-resolved. Returning undefined / empty means
+   * "this asset has no variants" and SpatialFlowView renders the
+   * base image as before.
+   */
+  setAssetVariantsResolver(
+    resolver: (assetId: string) => ReadonlyArray<{
+      assetId: string;
+      orientation?: 'portrait' | 'landscape';
+      deviceClass?: 'phone' | 'tablet' | 'desktop';
+      url: string;
+    }> | undefined
+  ): void {
+    this.assetVariantsResolver = resolver;
   }
 
   /**
@@ -1710,6 +1755,25 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Phase 3.3 — pair an asset id with its variants array (each URL
+   * pre-resolved). Null when no resolver is wired or the base has no
+   * variants. Call sites use this to compute backgroundImageVariants
+   * before passing to SpatialFlowView.
+   */
+  protected resolveAssetVariants(
+    assetId: string | undefined | null
+  ): ReadonlyArray<{
+    assetId: string;
+    orientation?: 'portrait' | 'landscape';
+    deviceClass?: 'phone' | 'tablet' | 'desktop';
+    url: string;
+  }> | null {
+    if (!assetId || !this.assetVariantsResolver) return null;
+    const v = this.assetVariantsResolver(assetId);
+    return v && v.length > 0 ? v : null;
+  }
+
+  /**
    * Set whether to hide text box backgrounds
    * When true, only the text content is visible (no background, border, shadow)
    */
@@ -1957,6 +2021,7 @@ export class ReactRenderer extends BaseRenderer {
             content={content}
             theme={this.theme}
             imageUrl={this.backgroundImageUrl}
+            imageVariants={this.backgroundImageVariants ?? undefined}
             backgroundColor={spBg}
             slotIntent={spIntent}
             slotAnimations={spAnimations}
@@ -2130,6 +2195,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background - try state first (asset URL), then try to resolve from state (asset ID)
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundAssetId:`, backgroundAssetId);
     console.log(`[ReactRenderer ${this.instanceId}]   - backgroundImageUrl:`, this.backgroundImageUrl);
 
@@ -2150,6 +2216,7 @@ export class ReactRenderer extends BaseRenderer {
   async renderText(text: string, buttonText: string, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Use currentBeatType from state if set (for AI beats), otherwise default to infoText
     const beatType = (this.getState('currentBeatType') as string) || 'infoText';
@@ -2181,6 +2248,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Get presentation mode from renderer state (set by DialogTreeBeat)
     const presentationMode = this.getState('presentationMode') as 'positioned' | 'chat-scroll' | 'chat-bubble' | undefined;
@@ -2370,6 +2438,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Store choice text for interactor TTS on click
     this.choiceTextMap.clear();
@@ -2449,6 +2518,7 @@ export class ReactRenderer extends BaseRenderer {
               }}
               theme={this.theme}
               imageUrl={this.backgroundImageUrl}
+            imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
               slotIntent={slotIntent}
               slotAnimations={slotAnimations}
@@ -2601,6 +2671,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
@@ -2662,6 +2733,7 @@ export class ReactRenderer extends BaseRenderer {
               content={{ question }}
               theme={this.theme}
               imageUrl={this.backgroundImageUrl}
+            imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
               slotIntent={slotIntent}
               slotAnimations={slotAnimations}
@@ -2685,6 +2757,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Get markVisited from renderer state (set by the beat)
     const markVisited = this.getState('markVisited') || false;
@@ -2739,6 +2812,7 @@ export class ReactRenderer extends BaseRenderer {
               content={{ question }}
               theme={this.theme}
               imageUrl={this.backgroundImageUrl}
+            imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
               slotIntent={slotIntent}
               slotAnimations={slotAnimations}
@@ -2760,6 +2834,7 @@ export class ReactRenderer extends BaseRenderer {
   async renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Resolve video URL: try asset resolver for fresh URL (blob URLs expire), fall back to provided URL
     const videoAssetId = this.getState('videoAssetId') as string | null;
@@ -2820,6 +2895,7 @@ export class ReactRenderer extends BaseRenderer {
   async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Get button text from renderer state (set by beat)
     const restartText = this.getState('restartText') || 'Play Again';
@@ -2853,6 +2929,7 @@ export class ReactRenderer extends BaseRenderer {
   }, locations?: Location[]): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Build content with separate title and summary
     const content = {
@@ -2879,6 +2956,7 @@ export class ReactRenderer extends BaseRenderer {
     // Keep same background as current beat
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Use provided locations or generate default locations for credits
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('endScreenCredits', content);
@@ -2889,6 +2967,7 @@ export class ReactRenderer extends BaseRenderer {
   async renderDurScreen(text: string, duration: number, locations?: Location[]): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Use provided locations or generate default locations from schema.
     // authorPositioned=false (no baked layout) + durScreen's schema
@@ -2926,6 +3005,7 @@ export class ReactRenderer extends BaseRenderer {
   ): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Use provided locations or generate default locations from schema
     const content = {
@@ -2979,6 +3059,7 @@ export class ReactRenderer extends BaseRenderer {
   ): Promise<string> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
 
@@ -3039,6 +3120,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     // Use provided locations or generate default locations from schema
     const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('hyperText', data);
@@ -3342,6 +3424,7 @@ export class ReactRenderer extends BaseRenderer {
     // Get background
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
     this.renderComponent(
       <LoadingDisplay

@@ -5508,6 +5508,26 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           ? assets.find(a => a.id === backgroundAssetId)?.url
                           : undefined) || backgroundUrl) || null
                       }
+                      imageVariants={(() => {
+                        // Phase 3.3 — pair the background asset's
+                        // variants (assetId + orientation/deviceClass
+                        // constraints) with each target asset's URL
+                        // so SpatialFlowView can pick the best match
+                        // at render time without needing the full
+                        // asset list.
+                        if (!backgroundAssetId || !assets) return undefined;
+                        const base = assets.find(a => a.id === backgroundAssetId);
+                        const vs = (base as any)?.variants as
+                          | ReadonlyArray<{ assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop' }>
+                          | undefined;
+                        if (!vs || vs.length === 0) return undefined;
+                        return vs
+                          .map(v => {
+                            const target = assets.find(a => a.id === v.assetId);
+                            return target ? { ...v, url: target.url } : null;
+                          })
+                          .filter((v): v is { assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop'; url: string } => !!v);
+                      })()}
                       backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                       slotIntent={previewSlotIntent}
                       slotAnimations={

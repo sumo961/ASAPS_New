@@ -19,6 +19,20 @@ import {
   Mountain,
 } from 'lucide-react';
 
+/**
+ * Phase 3.3 — iOS-style multi-resource asset variant. Points to
+ * another asset in the same project, optionally constrained to an
+ * orientation and/or device class. Stored on the BASE asset's
+ * `variants[]` array. The runtime calls `resolveAssetVariant` to
+ * pick the best match for the current viewport; if no variant
+ * matches, the base asset renders unchanged.
+ */
+export interface AssetVariant {
+  assetId: string;
+  orientation?: 'portrait' | 'landscape';
+  deviceClass?: 'phone' | 'tablet' | 'desktop';
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -31,6 +45,14 @@ export interface Asset {
   duration?: number;
   metadata?: Record<string, any>;
   uploadedAt: Date;
+  /**
+   * Phase 3.3 — optional orientation / device-class variants. Each
+   * entry points to ANOTHER asset in the project that should be used
+   * in place of THIS one when the runtime context matches. See
+   * `resolveAssetVariant` in @asaps/core/utils for the lookup rules.
+   * Absent → only this asset is used (unchanged behavior).
+   */
+  variants?: AssetVariant[];
 }
 
 interface AssetManagerProps {
@@ -661,6 +683,115 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
               Download
             </a>
           </div>
+
+          {/* Phase 3.3 — variants UI. Only meaningful for image
+              assets. Authors pair another image in the project with
+              an orientation and/or device-class constraint; the
+              runtime picks the most-specific match for the current
+              container. A variant cannot point at itself. */}
+          {selectedAsset.type === 'image' && (() => {
+            const otherImages = assets.filter(
+              a => a.type === 'image' && a.id !== selectedAsset.id
+            );
+            const variants = selectedAsset.variants ?? [];
+            const setVariants = (next: AssetVariant[]) => {
+              onAssetUpdate(selectedAsset.id, { variants: next });
+              setSelectedAsset({ ...selectedAsset, variants: next });
+            };
+            return (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-gray-700">
+                    Variants
+                    <span className="ml-2 text-[10px] font-normal text-gray-500">
+                      ({variants.length})
+                    </span>
+                  </h4>
+                  {otherImages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVariants([...variants, { assetId: otherImages[0].id }])}
+                      className="text-[11px] px-2 py-0.5 rounded bg-blue-500 text-white hover:bg-blue-600"
+                    >
+                      + Add
+                    </button>
+                  )}
+                </div>
+                {otherImages.length === 0 && (
+                  <p className="text-[11px] text-gray-500 italic">
+                    Upload another image first to use as a variant.
+                  </p>
+                )}
+                {variants.map((v, i) => {
+                  const update = (patch: Partial<AssetVariant>) => {
+                    const next = variants.slice();
+                    next[i] = { ...v, ...patch };
+                    // Drop explicitly-cleared keys (undefined) so the
+                    // serialized shape stays tidy.
+                    if (next[i].orientation === undefined) delete (next[i] as any).orientation;
+                    if (next[i].deviceClass === undefined) delete (next[i] as any).deviceClass;
+                    setVariants(next);
+                  };
+                  return (
+                    <div
+                      key={`${v.assetId}-${i}`}
+                      className="flex items-center gap-1.5 mb-1.5 p-1.5 rounded bg-white border border-gray-200 text-[11px]"
+                    >
+                      <select
+                        value={v.assetId}
+                        onChange={(e) => update({ assetId: e.target.value })}
+                        className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded"
+                      >
+                        {otherImages.map(a => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={v.orientation ?? ''}
+                        onChange={(e) =>
+                          update({ orientation: (e.target.value || undefined) as any })
+                        }
+                        title="Orientation constraint"
+                        className="px-1.5 py-0.5 border border-gray-300 rounded"
+                      >
+                        <option value="">Any orient.</option>
+                        <option value="portrait">Portrait</option>
+                        <option value="landscape">Landscape</option>
+                      </select>
+                      <select
+                        value={v.deviceClass ?? ''}
+                        onChange={(e) =>
+                          update({ deviceClass: (e.target.value || undefined) as any })
+                        }
+                        title="Device-class constraint"
+                        className="px-1.5 py-0.5 border border-gray-300 rounded"
+                      >
+                        <option value="">Any device</option>
+                        <option value="phone">Phone</option>
+                        <option value="tablet">Tablet</option>
+                        <option value="desktop">Desktop</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setVariants(variants.filter((_, j) => j !== i))}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded"
+                        title="Remove variant"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {variants.length > 0 && (
+                  <p className="text-[10px] text-gray-500 mt-1 leading-snug">
+                    The runtime picks the most-specific variant whose
+                    constraints all match the current viewport. No
+                    matching variant → falls back to this base image.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

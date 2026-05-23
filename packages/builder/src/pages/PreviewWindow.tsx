@@ -1040,6 +1040,27 @@ export const PreviewWindow: React.FC = () => {
         return asset ? asset.url : undefined;
       });
 
+      // Phase 3.3 — variants resolver. Pair each variant entry with
+      // the target asset's URL so the renderer can hand SpatialFlowView
+      // a self-contained list (no further asset-table reads at render
+      // time). Returns undefined when the base has no variants — the
+      // renderer treats that as "no variant override".
+      (reactRenderer as any).setAssetVariantsResolver?.((assetId: string) => {
+        const all = previewDataRef.current?.assets;
+        if (!all) return undefined;
+        const base = all.find(a => a.id === assetId) as any;
+        const vs = base?.variants as
+          | ReadonlyArray<{ assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop' }>
+          | undefined;
+        if (!vs || vs.length === 0) return undefined;
+        const out: Array<{ assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop'; url: string }> = [];
+        for (const v of vs) {
+          const tgt = all.find(a => a.id === v.assetId);
+          if (tgt) out.push({ ...v, url: tgt.url });
+        }
+        return out;
+      });
+
       // Set up portrait resolver for speaker portraits in dialog
       reactRenderer.setCharacterPortraitResolver((speakerName: string) => {
         const pd = previewDataRef.current;
