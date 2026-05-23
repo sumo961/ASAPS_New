@@ -1426,6 +1426,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // correct and cheap.
   const slotPreviewParams =
     isSlotPreview && beat ? beat.getParameters() : undefined;
+  // Bug 27 — speaker visibility for the VE slot preview, mirroring the
+  // runtime's resolveSpeakerForSlot. Beat-level showSpeaker wins;
+  // otherwise the global theme.speakerDisplay.showNames flag decides.
+  // titleScreen has no speaker concept and stays blank.
+  const slotPreviewSpeaker: string = (() => {
+    if (!beat || beat.type === 'titleScreen') return '';
+    const override = (beat as any).showSpeaker as boolean | undefined;
+    const globalOn = !!(globalSettings as any)?.speakerDisplay?.showNames;
+    const show = override === true ? true : override === false ? false : globalOn;
+    if (!show) return '';
+    return ((beat as any).speaker as string) || '';
+  })();
   const slotPreviewContent: Record<string, any> | null =
     !isSlotPreview || !beat || !slotPreviewParams
       ? null
@@ -1444,12 +1456,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // text becomes a flow slot; the choices appear as hotspots
               // on the spatial layer (rendered by the editor overlay).
               question: slotPreviewParams.question || 'Where do you want to go?',
+              speaker: slotPreviewSpeaker,
             }
         : beat.type === 'pickProp'
           ? {
               // P3-3c-8 — pickProp spatial mode. Mirrors movementChoice;
               // props appear as hotspots on the image.
               question: slotPreviewParams.question || 'What do you want to interact with?',
+              speaker: slotPreviewSpeaker,
             }
         : beat.type === 'dialogTree'
           ? (() => {
@@ -1470,6 +1484,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             showCredits: slotPreviewParams.showCredits,
             restartText: slotPreviewParams.restartText,
             creditsText: slotPreviewParams.creditsText,
+            speaker: slotPreviewSpeaker,
           }
         : beat.type === 'aiSummary'
           ? {
@@ -1483,16 +1498,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               creditsText: slotPreviewParams.creditsText,
             }
           : {
-              // onlineContent / aiInfoText — runtime fetches/generates the
-              // body; preview with the authored placeholder, or realistic
-              // sample filler when there is none so the author can judge
-              // the real composition.
+              // onlineContent / aiInfoText / infoText / durScreen —
+              // runtime fetches/generates the body for AI beats; preview
+              // with the authored placeholder, or realistic sample filler
+              // when there is none so the author can judge the real
+              // composition.
               text:
                 (slotPreviewParams.text ??
                   slotPreviewParams.displayTemplate ??
                   slotPreviewParams.fallbackText) ||
                 SLOT_PREVIEW_SAMPLE_BODY,
               buttonText: slotPreviewParams.buttonText ?? 'Continue',
+              speaker: slotPreviewSpeaker,
             };
 
   // True when the preview body above fell back to the editor-only sample

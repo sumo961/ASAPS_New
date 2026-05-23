@@ -810,29 +810,41 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
 
           {expandedSections.elements && (
             <div className="px-4 pb-4 space-y-2">
-              {/* Add Element Buttons */}
+              {/* Add Element Buttons.
+                  Phase 2 gating — Character/Prop/Text are pixel-positioned
+                  authoring affordances; they only make sense in absolute
+                  (fixed-canvas) mode. In slot/spatial mode the slot
+                  schema decides the structure and adding free-form
+                  elements would create dead pixel positions the
+                  responsive renderer ignores. Hotspot stays because
+                  it's a normalized 0–1 overlay on the spatial image
+                  rect, fundamentally responsive. */}
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => onElementAdd('character')}
-                  className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
-                >
-                  <User className="w-3 h-3" />
-                  Character
-                </button>
-                <button
-                  onClick={() => onElementAdd('prop')}
-                  className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
-                >
-                  <Box className="w-3 h-3" />
-                  Prop
-                </button>
-                <button
-                  onClick={() => onElementAdd('text')}
-                  className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
-                >
-                  <Type className="w-3 h-3" />
-                  Text
-                </button>
+                {layoutMode === 'absolute' && (
+                  <>
+                    <button
+                      onClick={() => onElementAdd('character')}
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
+                    >
+                      <User className="w-3 h-3" />
+                      Character
+                    </button>
+                    <button
+                      onClick={() => onElementAdd('prop')}
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
+                    >
+                      <Box className="w-3 h-3" />
+                      Prop
+                    </button>
+                    <button
+                      onClick={() => onElementAdd('text')}
+                      className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
+                    >
+                      <Type className="w-3 h-3" />
+                      Text
+                    </button>
+                  </>
+                )}
                 {/* Show Hotspot button for movementChoice, pickProp, and panorama beats */}
                 {(beatType === 'movementChoice' || beatType === 'pickProp' || beatType === 'panorama') && (
                   <button
