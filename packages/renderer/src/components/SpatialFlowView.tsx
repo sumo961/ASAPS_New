@@ -216,6 +216,22 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
 }) => {
   const objectFit = spatial.fit === 'cover' ? 'cover' : 'contain';
 
+  // Read-gate coordination for multi-choice spatial beats (dialogTree
+  // with hotspots / dynamicActions, movementChoice, pickProp).
+  // Counts every visible choice across the two surfaces; ≥ 2 → the
+  // inner SlotFlowView runs phase-1 (body grows, outer scrolls,
+  // sentinel earns the gate). While the gate is unearned, the
+  // hotspots and the dynamicActions row are visually present but
+  // pointer-events:none + dimmed so the player can SEE what awaits
+  // without being able to commit. ≤ 1 → no gating (a beat with no
+  // choices or one trivial Continue doesn't need it).
+  const totalChoices = (dynamicActions?.length ?? 0) + (hotspots?.length ?? 0);
+  const gatedBeat = totalChoices >= 2;
+  const [gateEarned, setGateEarned] = useState(!gatedBeat);
+  const handleGateChange = React.useCallback((earned: boolean) => {
+    if (earned) setGateEarned(true);
+  }, []);
+
   const scopeRef = React.useRef<string>('');
   if (!scopeRef.current) {
     scopeRef.current = `spatialflow-${++spatialUidCounter}`;
@@ -532,6 +548,13 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               bottom: imgInsets.bottom,
               zIndex: 2,
               pointerEvents: 'none',
+              // Read-gate — fade and de-activate the hotspot layer
+              // until the player has scrolled past the body text.
+              // Hotspots still draw their outlines (when the theme
+              // shows them) so the player sees what's available;
+              // they just can't be clicked yet.
+              opacity: gateEarned ? 1 : 0.35,
+              transition: 'opacity 200ms ease',
             }}
           >
             {hotspots.map((h) => {
@@ -551,8 +574,10 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                   key={h.id}
                   type="button"
                   aria-label={labelText}
-                  title={showLabelOnHover ? labelText : undefined}
+                  title={showLabelOnHover ? labelText : (!gateEarned ? 'Scroll to the bottom of the text to choose' : undefined)}
                   onClick={() => onAction(h.id)}
+                  disabled={!gateEarned}
+                  aria-disabled={!gateEarned}
                   className="spatialflow-hotspot"
                   style={{
                     position: 'absolute',
@@ -560,7 +585,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                     top: `${rect.y * 100}%`,
                     width: `${rect.width * 100}%`,
                     height: `${rect.height * 100}%`,
-                    pointerEvents: 'auto',
+                    pointerEvents: gateEarned ? 'auto' : 'none',
                     background: fillHex,
                     border: showHotspotOutlines
                       ? `2px dashed ${borderColor}`
@@ -624,6 +649,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           previewCoarse={previewCoarse}
           extraExitMs={spatialExitMs}
           onExitStart={handleExitStart}
+          forceMultiActionGate={gatedBeat}
+          onGateChange={handleGateChange}
         />
       </div>
 
@@ -632,7 +659,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           (z=3, above hotspots and flow) so a mixed dialogTree node can
           combine "click thing in scene" hotspots with "say something
           generic" buttons. */}
-      {dynamicActions && dynamicActions.length > 0 && (
+      {dynamicActions && dynamicActions.length > 0 && gateEarned && (
         <div
           data-layer="dynamic-actions"
           style={{

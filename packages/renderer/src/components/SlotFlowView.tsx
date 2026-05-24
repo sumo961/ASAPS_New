@@ -98,6 +98,50 @@ interface SlotFlowViewProps {
    * apply on the device, since the editor itself runs on a fine pointer.
    */
   previewCoarse?: boolean;
+  /**
+   * Read-gate model — two-phase layout for multi-action beats and
+   * dimmed-Continue for single-action beats. When `requireFullRead`
+   * is true (default for slot/spatial beats), the action area is
+   * unreachable until the player has seen the bottom of the body.
+   *
+   *  - Single-action beats (Continue / Start / Restart-only): the
+   *    body grows naturally, the outer container scrolls when
+   *    needed, the action button is rendered in-flow at the end of
+   *    the body. While the button is off-screen it's dimmed and
+   *    pointer-events:none; it becomes active as soon as it enters
+   *    the viewport (IntersectionObserver on the button itself).
+   *
+   *  - Multi-action beats (restart+credits, dialogTree choices via
+   *    dynamicActions, etc.): PHASE 1 has the body growing naturally
+   *    with outer-scroll and the action area hidden. When the body's
+   *    end-sentinel enters the viewport, the gate is "earned":
+   *    PHASE 2 flips the body to a fixed flex:1 region with internal
+   *    scroll and pins the action area at the bottom of the stage,
+   *    where it activates. Once earned, the gate is sticky — going
+   *    back into PHASE 1 doesn't happen.
+   *
+   *  - `requireFullRead: false` opts out: gate starts earned, layout
+   *    is PHASE 2 from the first frame, classic always-visible
+   *    action area. For authors who don't want to gate reading.
+   */
+  requireFullRead?: boolean;
+  /**
+   * Fires when the read-gate transitions. Parent layers (SpatialFlowView
+   * for dialogTree dynamicActions and hotspots) listen so they can
+   * dim/disable their own interactive elements while phase 1 holds.
+   * Single-shot per mount (sticky once earned).
+   */
+  onGateChange?: (earned: boolean) => void;
+  /**
+   * Forces the multi-action two-phase model even when the slot spec
+   * has no action buttons. Used by SpatialFlowView to gate the OUTER
+   * choice layer (dynamicActions / hotspots) when the beat has
+   * multiple choices — the inner slot spec only carries body /
+   * speaker, so SlotFlowView can't detect "multi-action" on its own
+   * for those beats. Parent passes true when its own action shape is
+   * multi-choice.
+   */
+  forceMultiActionGate?: boolean;
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -130,6 +174,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   autoExitMs,
   extraExitMs,
   onExitStart,
+  requireFullRead = true,
+  onGateChange,
+  forceMultiActionGate = false,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -316,6 +363,85 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const restartText = content.restartText || 'Play Again';
   const creditsText = content.creditsText || 'Credits';
 
+  // Read-gate model — count VISIBLE action items to decide the layout
+  // shape. Single (1 forward path) uses Option A — body grows, outer
+  // scrolls, action in-flow at the end, dimmed until visible in
+  // viewport. Multi (2+ choices) uses two-phase Option B — phase 1
+  // is identical to single-action with action area hidden; phase 2
+  // activates once the body's end-sentinel has been seen, flipping
+  // the body to fixed flex:1 with internal scroll and revealing the
+  // action area pinned at the bottom.
+  const visibleActionCount = isContinueAction
+    ? 1
+    : (showCredits ? 1 : 0) + (showRestart ? 1 : 0);
+  const isMultiAction = visibleActionCount > 1 || forceMultiActionGate;
+
+  // Sticky once true — earned by either the content fitting on its
+  // own or by the player scrolling to the end-sentinel.
+  const [gateEarned, setGateEarned] = useState(!requireFullRead);
+
+  // Stage-root + end-of-body sentinel for the gate.
+  // Detection uses the ACTUAL scrolling element's scrollTop /
+  // scrollHeight / clientHeight (whichever element is currently
+  // scrolling — phase-1's slot-root or phase-2's inner body card).
+  // This is more robust than rect-comparing the sentinel: the
+  // sentinel-rect approach fires its first check on a layout that
+  // doesn't yet include the (still-loading) body content, false-
+  // earning the gate. The scroll-metrics approach naturally reflects
+  // overflow because both scrollHeight and clientHeight come from
+  // the live box; if scrollHeight grows when content arrives, the
+  // gate stays unearned until the player actually scrolls to the end.
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (gateEarned) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    // Pick the scrolling element: phase 1 multi-action uses the
+    // slot-root itself (overflow-y: auto); otherwise the inner
+    // .slotflow-scroll node owns its own internal scroll.
+    const scrollEl: HTMLElement = (isMultiAction && !gateEarned)
+      ? root
+      : (root.querySelector('.slotflow-scroll') as HTMLElement) || root;
+
+    const check = () => {
+      if (gateEarned) return;
+      const sh = scrollEl.scrollHeight;
+      const ch = scrollEl.clientHeight;
+      const st = scrollEl.scrollTop;
+      // No overflow → content fits → gate earned immediately.
+      if (sh <= ch + 1) {
+        setGateEarned(true);
+        return;
+      }
+      // Overflow + scrolled to (or near) the end → gate earned.
+      // Allow a 4px tolerance for fractional rounding on Retina.
+      if (st + ch >= sh - 4) {
+        setGateEarned(true);
+      }
+    };
+
+    const raf = requestAnimationFrame(check);
+    const ro = new ResizeObserver(check);
+    ro.observe(scrollEl);
+    // Observe the inner content too so the check re-runs when the
+    // body grows (typewriter reveal, font load, theme swap).
+    const child = scrollEl.firstElementChild as HTMLElement | null;
+    if (child) ro.observe(child);
+    const onScroll = () => check();
+    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      scrollEl.removeEventListener('scroll', onScroll);
+    };
+  }, [gateEarned, isMultiAction]);
+
+  React.useEffect(() => {
+    onGateChange?.(gateEarned);
+  }, [gateEarned, onGateChange]);
+
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
@@ -501,7 +627,21 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   }, []);
 
   return (
-    <div className={`${scope} slotflow-root`} style={rootStyle}>
+    <div
+      ref={rootRef}
+      className={`${scope} slotflow-root`}
+      style={{
+        ...rootStyle,
+        // Phase 1 (multi-action, gate not earned) — outer container
+        // scrolls. Body grows naturally; the player must scroll past
+        // the body to earn the gate and reveal the action area.
+        // Otherwise (single-action, OR multi-action phase 2) — outer
+        // is locked, the body has its own internal scroll (existing
+        // behavior, no regression).
+        overflowY: (isMultiAction && !gateEarned) ? 'auto' : 'hidden',
+        overflowX: 'hidden',
+      }}
+    >
       <style>{`
         /* Comfortable NARRATIVE minimum — not the 16px absolute-legibility
            floor. Long-form story prose below ~18px reads as cramped/lost
@@ -628,12 +768,25 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         }
       `}</style>
 
-      {/* Body slot — grows & scrolls (stage-bottom action), or sizes to
-          content so the action row hugs it (below-body anchor). Either way
-          it scrolls internally when content exceeds the column. */}
+      {/* Body slot — two layouts share the same JSX:
+          - Phase 1 (multi-action, gate not earned): body grows
+            naturally and the outer slot-root scrolls. flex:none +
+            overflowY:visible so the body's height = its content. The
+            sentinel at the bottom (rendered after the body text) is
+            what the read-gate watches.
+          - Phase 2 (multi-action gate earned) / single-action: body
+            is flex:1 with internal scroll (the original behavior).
+            The action row stays pinned at the bottom of the stage. */}
       <div
         className="slotflow-scroll"
-        style={{
+        style={(isMultiAction && !gateEarned) ? {
+          flex: 'none',
+          minHeight: 0,
+          overflowY: 'visible',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+        } : {
           flex: belowBody ? '0 1 auto' : 1,
           maxHeight: belowBody ? '100%' : undefined,
           minHeight: 0,
@@ -745,6 +898,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               </div>
             );
           })()}
+          {/* Read-gate sentinel — rendered AFTER the body text inside
+              the same scroll/flow container so it sits at the bottom
+              of the readable content. The rect-based observer above
+              earns the gate when this element's bottom enters the
+              visible area of the stage root. */}
+          <div ref={sentinelRef} aria-hidden style={{ height: 1, width: '100%' }} />
         </div>
       </div>
 
@@ -779,6 +938,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const anchoredButtons = buttonCatalog.filter(
           b => b.show && buttonAnchors?.[b.id]
         );
+        // Read-gate effect on the action row. Hidden entirely while
+        // phase-1 multi-action is in force (player must scroll past
+        // the body to earn the gate). Dimmed + disabled for the
+        // single-action case while the gate isn't earned yet (the
+        // Continue button visually exists at the bottom of the
+        // stage but won't accept clicks until the player has at
+        // least seen the body's bottom).
+        const phase1Hidden = isMultiAction && !gateEarned;
+        const gatedDim = !isMultiAction && !gateEarned;
+        if (phase1Hidden) return null;
         return (
           <>
             <div
@@ -800,8 +969,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 ...(flowButtons.length === 0
                   ? { paddingTop: 0, paddingBottom: 0 }
                   : {}),
+                opacity: gatedDim ? 0.4 : 1,
+                pointerEvents: gatedDim ? 'none' : undefined,
+                transition: 'opacity 200ms ease',
                 ...a.style,
               }}
+              title={gatedDim ? 'Scroll to the bottom of the text to continue' : undefined}
             >
               {flowButtons.map(b => (
                 <button
@@ -809,6 +982,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   className="slotflow-btn"
                   onClick={b.onClick}
                   style={buttonStyle(theme, buttonFluid)}
+                  disabled={gatedDim}
+                  aria-disabled={gatedDim}
                 >
                   {b.text}
                 </button>

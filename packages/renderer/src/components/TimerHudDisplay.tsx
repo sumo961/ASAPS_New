@@ -151,6 +151,11 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
         padding: config.padding,
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
+        // Cap to stage width minus 24px gutters so a long
+        // "datetime-12h" display ("8 January 2024, 9:04 PM") never
+        // overruns the right edge. The whiteSpace below switches
+        // to normal wrapping when the chip would otherwise overflow.
+        maxWidth: 'calc(100% - 24px)',
       }}
     >
       {/* Optional label */}
@@ -181,7 +186,12 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
           lineHeight: 1.2,
           textShadow: '0 1px 3px rgba(0, 0, 0, 0.4)',
           transition: 'color 0.5s ease',
-          whiteSpace: 'nowrap',
+          // Wrap when the chip would overflow its capped maxWidth
+          // (parent caps at calc(100% - 24px) of the stage). Center
+          // the wrapped lines.
+          whiteSpace: 'normal',
+          textAlign: 'center',
+          wordBreak: 'normal',
         }}
       >
         {content}
