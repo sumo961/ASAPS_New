@@ -6,11 +6,19 @@
  */
 
 /**
- * Control point for bezier curve interpolation
+ * Control point for bezier curve interpolation.
+ *
+ * `x` / `y` are pixel positions on the authored stage; `xPercent` /
+ * `yPercent` are layout-agnostic equivalents (percent of stage size,
+ * 0–100) used by the responsive renderer so the curve survives a
+ * viewport / orientation change. Both can be populated — the
+ * migrator fills percent from pixel when going Fixed → Responsive.
  */
 export interface ControlPoint {
   x: number;
   y: number;
+  xPercent?: number;
+  yPercent?: number;
 }
 
 /**
@@ -18,13 +26,29 @@ export interface ControlPoint {
  *
  * Represents a point in space and time that an element moves through.
  * Supports bezier curves via control points.
+ *
+ * Coordinate fields:
+ * - `x` / `y` — pixel position on the authored stage. Canonical in
+ *   fixed-canvas mode; the legacy editor still writes these.
+ * - `xPercent` / `yPercent` — percent of stage width/height (0–100),
+ *   used by the responsive renderer so the path tracks the live
+ *   stage box at any viewport. Populated by the Fixed → Responsive
+ *   migrator and by the responsive editor.
+ * Both forms can coexist on the same waypoint; renderers should
+ * prefer percent when set and fall back to pixel x/y.
  */
 export interface AnimationWaypoint {
-  /** X position of waypoint */
+  /** X position of waypoint (pixels on the authored stage). */
   x: number;
 
-  /** Y position of waypoint */
+  /** Y position of waypoint (pixels on the authored stage). */
   y: number;
+
+  /** Percent of stage width (0–100). Optional. */
+  xPercent?: number;
+
+  /** Percent of stage height (0–100). Optional. */
+  yPercent?: number;
 
   /** First bezier control point (for curve before this waypoint) */
   controlPoint1?: ControlPoint;
@@ -174,4 +198,16 @@ export interface AnimationPlayOptions {
 
   /** Callback for each frame with current state */
   onUpdate?: (state: AnimationState) => void;
+
+  /**
+   * Stage size for responsive resolution. When supplied AND a
+   * waypoint carries `xPercent` / `yPercent`, the engine scales those
+   * percent values against this width/height each frame so the path
+   * tracks the responsive layout. A function form re-reads the size
+   * on every tick (so resize / orientation flips track live);
+   * passing an object snapshots the size at play-time.
+   */
+  stage?:
+    | { width: number; height: number }
+    | (() => { width: number; height: number } | null);
 }

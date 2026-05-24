@@ -114,8 +114,22 @@ export function migrateFixedToResponsive(
     // Capture each baked location with its rect (we need the rect later
     // for hotspot translation, not just the (x, y) used for slotIntent
     // anchor inference). `kind` distinguishes hotspots / buttons from
-    // plain text elements so we know what to translate.
-    const baked: Array<{ name: string; x: number; y: number; width: number; height: number; kind?: string }> = [];
+    // plain text elements so we know what to translate. We keep the
+    // raw `record` for kinds we DON'T clear (characters, props) so we
+    // can put them back on the next locations map with added percent
+    // fields — they're free-positioned avatars, not slot content, and
+    // wiping them would leave responsive beats without any character
+    // sprites at all.
+    type BakedLoc = {
+      name: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      kind?: string;
+      record: any;
+    };
+    const baked: BakedLoc[] = [];
     const existingLocs = beat.locations;
     if (existingLocs instanceof Map) {
       existingLocs.forEach((v: any, k: any) => {
@@ -127,6 +141,7 @@ export function migrateFixedToResponsive(
             width: typeof v.width === 'number' ? v.width : 0,
             height: typeof v.height === 'number' ? v.height : 0,
             kind: v.kind,
+            record: v,
           });
         }
       });
@@ -158,46 +173,99 @@ export function migrateFixedToResponsive(
       }
     }
 
-    // Legacy AnimationPath → SlotPath translation. Each waypoint's
-    // absolute pixel position becomes a percent of the stage anchored
-    // at top-left, so the slot's center lands at the same proportional
-    // point on any viewport. The destination slot is found by mapping
-    // the animation's elementId back to its baked location's name and
-    // then to a slot via the slot.name / slot.source match used above.
+    // Animation translation. Two cases need handling:
+    //
+    //  (a) elementId matches a slot: write a SlotPath into
+    //      beat.slotAnimations[slot].enter so the responsive
+    //      SlotFlowView drives the slot wrapper through the waypoints.
+    //  (b) elementId DOESN'T match a slot — it's a free-positioned
+    //      element (a character sprite, a prop). For those we just
+    //      enrich the existing AnimationPath waypoints with
+    //      xPercent / yPercent so the engine can scale them against
+    //      the current stage at runtime. The path itself stays under
+    //      parameters.animations where the editor + engine already
+    //      look for it; the percent fields make it layout-agnostic.
+    //
+    // Authored animations live under `beat.parameters.animations` in
+    // the legacy editor; the previous migrator looked at the
+    // (always-empty) `beat.animations` top-level field and silently
+    // dropped every author-edited path.
     const slotAnimations: Record<string, any> = { ...((beat as any).slotAnimations ?? {}) };
-    const legacyAnimations: any[] = Array.isArray((beat as any).animations) ? (beat as any).animations : [];
+    const legacyAnimations: any[] = Array.isArray(params?.animations)
+      ? params.animations
+      : Array.isArray((beat as any).animations) ? (beat as any).animations : [];
     let translatedAnims = 0;
+    let enrichedPathAnims = 0;
+    const enrichedParamAnimations: any[] = [];
     for (const anim of legacyAnimations) {
       const elementId = anim?.elementId;
       const waypoints = Array.isArray(anim?.waypoints) ? anim.waypoints : [];
-      if (!elementId || waypoints.length === 0) continue;
-      // Find the slot whose name (or source) matches the elementId
+      if (!elementId || waypoints.length === 0) {
+        enrichedParamAnimations.push(anim);
+        continue;
+      }
+      // Try to map elementId → slot. If found, translate to slotAnimations.
       const slot = slots.find(s => s.name === elementId)
         ?? slots.find(s => s.source === elementId);
-      if (!slot) continue;
-      const slotWaypoints = waypoints.map((wp: any) => {
+      if (slot) {
+        const slotWaypoints = waypoints.map((wp: any) => {
+          const x = typeof wp?.x === 'number' ? wp.x : 0;
+          const y = typeof wp?.y === 'number' ? wp.y : 0;
+          return {
+            anchor: { h: 'left', v: 'top' },
+            dxPercent: (x / stage.w) * 100,
+            dyPercent: (y / stage.h) * 100,
+            easing: typeof wp?.easing === 'string' ? wp.easing : undefined,
+          };
+        });
+        const entry = { ...(slotAnimations[slot.name] ?? {}) };
+        entry.enter = {
+          preset: 'path',
+          duration: typeof anim?.duration === 'number' ? anim.duration : 1000,
+          easing: typeof anim?.easing === 'string' ? anim.easing : undefined,
+          path: {
+            type: anim?.type === 'bezier' ? 'bezier' : 'linear',
+            loop: !!anim?.loop,
+            waypoints: slotWaypoints,
+          },
+        };
+        slotAnimations[slot.name] = entry;
+        translatedAnims++;
+        // Slot-translated animations are also kept on parameters.animations
+        // (enriched with percent) so a future round-trip through the
+        // editor can still find them in their canonical form.
+      }
+
+      // Always enrich the waypoint pixel coords with percent so the
+      // responsive AnimationEngine can scale them against any stage.
+      const enrichedWaypoints = waypoints.map((wp: any) => {
         const x = typeof wp?.x === 'number' ? wp.x : 0;
         const y = typeof wp?.y === 'number' ? wp.y : 0;
-        return {
-          anchor: { h: 'left', v: 'top' },
-          dxPercent: (x / stage.w) * 100,
-          dyPercent: (y / stage.h) * 100,
-          easing: typeof wp?.easing === 'string' ? wp.easing : undefined,
+        const next: any = {
+          ...wp,
+          xPercent: (x / stage.w) * 100,
+          yPercent: (y / stage.h) * 100,
         };
+        // Bezier control points also get percent siblings so curves
+        // bend the same way at any viewport.
+        if (wp.controlPoint1 && typeof wp.controlPoint1.x === 'number') {
+          next.controlPoint1 = {
+            ...wp.controlPoint1,
+            xPercent: (wp.controlPoint1.x / stage.w) * 100,
+            yPercent: (wp.controlPoint1.y / stage.h) * 100,
+          };
+        }
+        if (wp.controlPoint2 && typeof wp.controlPoint2.x === 'number') {
+          next.controlPoint2 = {
+            ...wp.controlPoint2,
+            xPercent: (wp.controlPoint2.x / stage.w) * 100,
+            yPercent: (wp.controlPoint2.y / stage.h) * 100,
+          };
+        }
+        return next;
       });
-      const entry = { ...(slotAnimations[slot.name] ?? {}) };
-      entry.enter = {
-        preset: 'path',
-        duration: typeof anim?.duration === 'number' ? anim.duration : 1000,
-        easing: typeof anim?.easing === 'string' ? anim.easing : undefined,
-        path: {
-          type: anim?.type === 'bezier' ? 'bezier' : 'linear',
-          loop: !!anim?.loop,
-          waypoints: slotWaypoints,
-        },
-      };
-      slotAnimations[slot.name] = entry;
-      translatedAnims++;
+      enrichedParamAnimations.push({ ...anim, waypoints: enrichedWaypoints });
+      enrichedPathAnims++;
     }
 
     // Pixel-rect hotspots on baked locations → normalized 0..1 on the
@@ -254,8 +322,38 @@ export function migrateFixedToResponsive(
       nextParams.dialogTree = { ...params.dialogTree, choices: nextDialogChoices };
     }
 
+    // Write the enriched animations back to parameters so the
+    // responsive AnimationEngine + a future editor can find them in
+    // the canonical place (with percent siblings).
+    if (enrichedParamAnimations.length > 0) {
+      nextParams.animations = enrichedParamAnimations;
+    }
+
+    // Preserve free-positioned avatar / prop locations across the
+    // migration — they have no slot equivalent, so wiping them would
+    // delete every character sprite on the beat. We DO add xPercent /
+    // yPercent fields so their position scales with the stage in
+    // responsive mode. Slot-equivalent kinds (text, button, dialog,
+    // hotspot used purely as click target, etc.) are still cleared so
+    // the responsive layout owns positioning for them.
+    const PRESERVED_KINDS = new Set(['character', 'prop']);
+    const preservedLocs = new Map<string, any>();
+    let preservedCount = 0;
+    for (const loc of baked) {
+      if (!PRESERVED_KINDS.has(loc.kind ?? '')) continue;
+      const enriched = {
+        ...loc.record,
+        xPercent: (loc.x / stage.w) * 100,
+        yPercent: (loc.y / stage.h) * 100,
+        widthPercent: loc.width ? (loc.width / stage.w) * 100 : undefined,
+        heightPercent: loc.height ? (loc.height / stage.h) * 100 : undefined,
+      };
+      preservedLocs.set(loc.name, enriched);
+      preservedCount++;
+    }
+
     const next: any = { ...beat, parameters: nextParams };
-    next.locations = new Map();
+    next.locations = preservedLocs;
     if (Object.keys(slotIntent).length > 0) {
       next.slotIntent = slotIntent;
     }
@@ -263,14 +361,23 @@ export function migrateFixedToResponsive(
       next.slotAnimations = slotAnimations;
     }
 
+    const clearedCount = baked.length - preservedCount;
     const parts: string[] = [];
-    if (baked.length > 0) {
-      parts.push(`cleared ${baked.length} baked position${baked.length === 1 ? '' : 's'}, inferred slotIntent`);
-    } else {
+    if (clearedCount > 0) {
+      parts.push(`cleared ${clearedCount} baked position${clearedCount === 1 ? '' : 's'}, inferred slotIntent`);
+    } else if (baked.length === 0) {
       parts.push('already empty — flag now consistent');
+    } else {
+      parts.push('flag now consistent');
+    }
+    if (preservedCount > 0) {
+      parts.push(`kept ${preservedCount} character/prop location${preservedCount === 1 ? '' : 's'} with percent fields`);
     }
     if (translatedAnims > 0) {
-      parts.push(`translated ${translatedAnims} path animation${translatedAnims === 1 ? '' : 's'}`);
+      parts.push(`translated ${translatedAnims} slot path animation${translatedAnims === 1 ? '' : 's'}`);
+    }
+    if (enrichedPathAnims > 0) {
+      parts.push(`enriched ${enrichedPathAnims} character path animation${enrichedPathAnims === 1 ? '' : 's'}`);
     }
     if (translatedHotspots > 0) {
       parts.push(`normalized ${translatedHotspots} hotspot${translatedHotspots === 1 ? '' : 's'}`);

@@ -257,17 +257,67 @@ export function interpolateSegment(
 }
 
 /**
+ * Resolve a waypoint's effective pixel coords for the current stage.
+ *
+ * When `xPercent` / `yPercent` are present on a waypoint (or its bezier
+ * control points), they take precedence over the pixel `x` / `y` —
+ * those percent values are scaled against the live stage so the same
+ * animation tracks the layout across viewport / orientation changes.
+ * Pixel coords are kept as the fallback so fixed-mode beats and
+ * pre-percent legacy data continue to work unchanged.
+ *
+ * Returns a SHALLOW copy of the waypoint with resolved x/y (and
+ * resolved control points if present). The original is never mutated.
+ */
+export function resolveWaypoint(
+  wp: AnimationWaypoint,
+  stage?: { width: number; height: number } | null,
+): AnimationWaypoint {
+  if (!stage || !stage.width || !stage.height) return wp;
+  const resolveCoord = (p?: number, fallback?: number, axis?: 'x' | 'y') =>
+    typeof p === 'number'
+      ? (p / 100) * (axis === 'x' ? stage.width : stage.height)
+      : (fallback ?? 0);
+  const x = resolveCoord(wp.xPercent, wp.x, 'x');
+  const y = resolveCoord(wp.yPercent, wp.y, 'y');
+  let cp1 = wp.controlPoint1;
+  let cp2 = wp.controlPoint2;
+  if (cp1 && (cp1.xPercent != null || cp1.yPercent != null)) {
+    cp1 = {
+      ...cp1,
+      x: resolveCoord(cp1.xPercent, cp1.x, 'x'),
+      y: resolveCoord(cp1.yPercent, cp1.y, 'y'),
+    };
+  }
+  if (cp2 && (cp2.xPercent != null || cp2.yPercent != null)) {
+    cp2 = {
+      ...cp2,
+      x: resolveCoord(cp2.xPercent, cp2.x, 'x'),
+      y: resolveCoord(cp2.yPercent, cp2.y, 'y'),
+    };
+  }
+  return { ...wp, x, y, controlPoint1: cp1, controlPoint2: cp2 };
+}
+
+/**
  * Calculate position at a specific time along an animation path
  *
  * @param waypoints Array of waypoints defining the path
  * @param currentTime Current time in milliseconds
  * @param interpolationType Type of interpolation
+ * @param stage Optional stage dimensions; when supplied, waypoints
+ *   with xPercent/yPercent are scaled against it (responsive mode).
+ *   Without it, pixel x/y are used unchanged (fixed mode).
  */
 export function calculatePositionAtTime(
   waypoints: AnimationWaypoint[],
   currentTime: number,
-  interpolationType: 'linear' | 'bezier'
+  interpolationType: 'linear' | 'bezier',
+  stage?: { width: number; height: number } | null,
 ): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number } | null {
+  if (stage && stage.width && stage.height) {
+    waypoints = waypoints.map(wp => resolveWaypoint(wp, stage));
+  }
   if (waypoints.length === 0) {
     return null;
   }

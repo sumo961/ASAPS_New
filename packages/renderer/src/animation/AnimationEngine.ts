@@ -198,10 +198,16 @@ export class AnimationEngine {
       return;
     }
 
+    // Resolve responsive stage size each frame (function form) so a
+    // mid-animation resize / orientation change updates pixel coords
+    // without restarting. Object form snapshots once at play-time.
+    const stageOpt = this.options.stage;
+    const stage = typeof stageOpt === 'function' ? stageOpt() : (stageOpt ?? null);
     const position = calculatePositionAtTime(
       this.animationState.animation.waypoints,
       this.animationState.currentTime,
-      this.animationState.animation.type
+      this.animationState.animation.type,
+      stage,
     );
 
     if (position) {
