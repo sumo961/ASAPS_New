@@ -127,6 +127,13 @@ export async function exportProjectAsZip(
 
     // Add asset metadata
     const metadataFileName = `${folderName}/${asset.id}.json`;
+    // Phase 3.3 — fold asset.variants (top-level on the in-memory
+    // Asset for AssetManager use) into the nested metadata bag the
+    // player loader reads. Belt-and-suspenders: also accept variants
+    // already nested under asset.metadata.variants from the storage
+    // round-trip so we don't lose them either way.
+    const variants = (asset as any).variants
+      ?? (asset.metadata as any)?.variants;
     const assetMetadata = {
       id: asset.id,
       filename: asset.filename,
@@ -134,7 +141,10 @@ export async function exportProjectAsZip(
       mimeType: asset.mimeType,
       size: asset.size,
       uploadedAt: asset.uploadedAt,
-      metadata: asset.metadata
+      metadata: {
+        ...(asset.metadata ?? {}),
+        ...(Array.isArray(variants) && variants.length > 0 ? { variants } : {}),
+      },
     };
     zip.file(metadataFileName, JSON.stringify(assetMetadata, null, 2));
   }

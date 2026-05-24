@@ -263,6 +263,16 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   private globalSettings: GlobalSettings | null = null;
   private backgroundMusicAudio: HTMLAudioElement | null = null;
   private assetMap: Map<string, string> = new Map();
+  /**
+   * Phase 3.3 — per-asset orientation/device-class variants, loaded
+   * from each asset's metadata JSON in the ZIP. Key is the BASE
+   * asset id; value is the variants[] array (each entry points to
+   * another asset id with optional orientation/deviceClass
+   * constraints). Consumed by the variants resolver wired into the
+   * renderer in setupResolvers(), which pairs each entry with its
+   * target asset's URL from assetMap at lookup time.
+   */
+  private assetVariants: Map<string, Array<{ assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop' }>> = new Map();
   private currentMuted: boolean = false;
   private currentVolume: number = 100;
 
@@ -571,6 +581,29 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         const jsonFilename = assetInfo.path.split('/').pop() || '';
         const potentialId = jsonFilename.replace(/\.json$/, '');
         if (potentialId) knownAssetIds.add(potentialId);
+
+        // Phase 3.3 — parse the per-asset metadata JSON to extract
+        // orientation/device-class variants. They live nested at
+        // metadata.metadata.variants (the projectZipManager writes
+        // them there). Cached on this.assetVariants keyed by base
+        // asset id; the resolver wired in setupResolvers() pairs
+        // each entry's assetId with its URL from assetMap at lookup
+        // time. Best-effort: a parse failure on one file doesn't
+        // break the rest of asset loading.
+        try {
+          const loaded = await this.assetResolver.getAsset(assetInfo.path);
+          if (loaded?.blob) {
+            const text = await loaded.blob.text();
+            const meta = JSON.parse(text);
+            const variants = meta?.metadata?.variants;
+            if (Array.isArray(variants) && variants.length > 0 && potentialId) {
+              this.assetVariants.set(potentialId, variants);
+              console.log(`[PlayerEngine] Loaded ${variants.length} variant(s) for asset ${potentialId}`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[PlayerEngine] Failed to parse asset metadata ${assetInfo.path}:`, err);
+        }
       }
     }
 
@@ -740,6 +773,25 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           return assetId;
         }
         return undefined;
+      });
+    }
+
+    // Phase 3.3 — asset variants resolver. Pairs each variant entry
+    // from buildStoryAssets' JSON-metadata pass with the target
+    // asset's URL from assetMap so SpatialFlowView can pick the best
+    // orientation/device-class match at render time without further
+    // ZIP I/O. Undefined when the base asset has no variants → the
+    // renderer falls back to the base image (the documented default).
+    if ('setAssetVariantsResolver' in renderer) {
+      (renderer as any).setAssetVariantsResolver((assetId: string) => {
+        const variants = this.assetVariants.get(assetId);
+        if (!variants || variants.length === 0) return undefined;
+        const out: Array<{ assetId: string; orientation?: 'portrait' | 'landscape'; deviceClass?: 'phone' | 'tablet' | 'desktop'; url: string }> = [];
+        for (const v of variants) {
+          const url = this.assetMap.get(v.assetId);
+          if (url) out.push({ ...v, url });
+        }
+        return out.length > 0 ? out : undefined;
       });
     }
 
