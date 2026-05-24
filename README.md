@@ -22,12 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.58** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.58 introduces a responsive
-layout + animation system that is a work in progress** — every responsive
-feature is opt-in per beat instance behind zero-regression guards, so
-existing projects keep rendering exactly as before. Authors who want to
-try the new system can opt in beat-by-beat. For what shipped when, see:
+Current release: **v0.9.59** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.59 completes the responsive
+layout system end-to-end** — `project.layoutMode: 'fixed' | 'responsive'`
+flag with bidirectional migrator, full Phase 2/3 authoring polish
+(per-button anchor, new-project wizard, fictional-time HUD in VE preview,
+orientation-aware spatial hotspots with portrait override, and iOS-style
+asset variants with orientation + device-class constraints). The system
+is still **WORK IN PROGRESS** in the not-yet-battle-tested-on-real-
+production-projects sense, but it is now functionally complete: authoring
++ runtime + variant resolution + migration all compose together. Existing
+projects keep rendering exactly as before via the legacy absolute path.
+For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

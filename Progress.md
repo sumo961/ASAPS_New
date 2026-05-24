@@ -1,5 +1,54 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-24: Responsive layout — project-level mode, full Phase 2/3 polish, asset variants (v0.9.59)
+
+### Overview
+
+A focused follow-up to v0.9.58 that completes the responsive layout system end-to-end. The headline is the **project-level `layoutMode` flag** (`fixed` vs `responsive`), which replaces v0.9.58's per-beat auto-detection with one explicit project setting + a bidirectional migrator. On top of that, Phase 2 closed the authoring loop (per-button anchor, AnimationPath legacy banner, new-project wizard) and Phase 3 added the three deferred items (fictional-time HUD in the VE preview, orientation-aware spatial hotspots with portrait override, iOS-style asset variants with orientation + device-class constraints). Responsive layout is still **WORK IN PROGRESS** in the "not yet battle-tested on real production projects" sense, but it is now functionally complete — authoring + runtime + variant resolution + migration all compose together.
+
+The release also lands a batch of v0.9.58 follow-up fixes (chat-bubble responsive mode, dialogTree spatial speaker rendering, theme.textBox wiring in the responsive flow, spatial animation rest-state) plus the player-web 30s fetch timeout + ZIP magic-byte validation that resolves the endless-loading-on-bad-export class of bug.
+
+### Phase 1 — project-level layoutMode (the spine)
+
+Replaces the per-beat auto-detect heuristic with one project setting authors actually choose. `globalSettings.project.layoutMode: 'fixed' | 'responsive'` with `resolveLayoutMode()` inference for legacy projects (any baked locations → fixed; otherwise responsive). The Header surfaces a coloured badge so the active mode is always visible. A bidirectional migrator (`migrateFixedToResponsive` / `migrateResponsiveToFixed`) handles one-shot conversion — fixed → responsive clears baked positions and infers slot anchors; responsive → fixed bakes schema-resolved positions at the design width. PreviewWindow gained a viewport switcher (Fit / Desktop / Tablet / Phone) with a stable container across preset swaps so the SlotFlowView doesn't remount on every change.
+
+**Files modified**: `packages/builder/src/utils/projectLayoutMode.ts` (new), `projectLayoutMigrator.ts` (new), `Header.tsx` (badge), `GlobalSettingsInspector.tsx` (picker + migrator UI), `PreviewWindow.tsx` (viewport switcher with stable container ref), `storage/types.ts` (`layoutMode` field).
+
+### Phase 2 — editor gating + authoring polish
+
+- **2.1 — VE speaker preview + element-add gating**: VE preview matches the runtime's `resolveSpeakerForSlot` so slot-mode dialog NPCs show their label there too; element-add buttons (Character / Prop / Text) are hidden when the beat is in slot/spatial mode (where adding pixel-positioned elements is meaningless).
+- **2.2 — per-button anchor in slot-mode action row**: `SlotIntentEntry.buttonAnchors` lets authors pin individual buttons (Continue / Restart / Credits) to any stage corner while others stay in the shared flex row. Six preset glyphs (In row, TL, TR, BL, BC, BR) plus per-button gap slider in the slot-intent toolbar. Verified end-to-end via chrome-devtools.
+- **2.3 — runtime collapse audit**: confirmed no silent-fallback paths exist; clarified the load-bearing comment on `renderPositionedBeat`'s `authorPositioned: true` default. Zero behaviour changes.
+- **2.4 — AnimationPath legacy banner**: `AnimationPanel` now receives `projectLayoutMode` and surfaces an amber "Legacy path animation" hint when a responsive project still has an absolute-mode beat using the path-keyframe editor.
+- **2.5 — new-project wizard**: `NewProjectDialog` collects Layout Mode + Orientation up front and applies them via `updateGlobalSettings` immediately after create. Verified by inspecting persisted `globalSettings.project` in IndexedDB.
+
+**Files modified**: `VisualWorkspace.tsx` (speaker resolver + element gating + per-button anchor toolbar), `slotIntent.ts` (buttonAnchors field), `SlotFlowView.tsx` (anchored-button rendering with safe-area insets), `AnimationPanel.tsx` (projectLayoutMode prop + banner), `ReactRenderer.tsx` (comment clarification), `NewProjectDialog.tsx` (wizard fields + persistence).
+
+### Phase 3 — deferred items, all three shipped
+
+- **3.1 — fictional-time HUD in VE slot/spatial preview**: TimerHudDisplay now mounts as a sibling of SlotFlowView / SpatialFlowView in the VE preview when `hudOverlays.timerHud.enabled && hudOverlays.fictionalTime.enabled && fictionalTime.showInTimerHud`. Authors see WHERE the chip sits and HOW the initial fictional time renders under their chosen displayFormat. Verified: green "1 January 2024, 9:00 AM" chip at top-right of the TitleScreen preview matched the configured `datetime-12h` format over `initialTime: 2024-01-01T09:00`.
+- **3.2 — orientation-aware spatial hotspot positions**: `Hotspot.portrait?` optional override + `resolveHotspotRect(h, isPortrait)` helper. SpatialFlowView detects orientation from container aspect (the same dimensions ResizeObserver / orientationchange already track) and resolves each hotspot rect before rendering. HotspotEditOverlay accepts `isPortrait` prop, renders + drags against the active variant, and forwards the orientation along onChange so the parent (VisualWorkspace) creates the portrait override on first edit. Verified: a hotspot with `portrait: {0.6, 0.6, 0.25, 0.25}` and canonical `{0.1, 0.1, 0.2, 0.2}` renders at 10/10/20/20 in Authored landscape and at 60/60/25/25 in Phone portrait.
+- **3.3 — iOS-style asset variants (orientation + device class)**: `Asset.variants[]` declares other project assets as variants, each optionally constrained to an orientation and/or device class. `resolveAssetVariant` scores candidates iOS-catalog style (2 points for exact orientation match, 1 for deviceClass; contradicting constraints disqualify; ties go to first declared). SpatialFlowView picks at render time using container dimensions, so picture + Phase 3.2's hotspot variants stay in sync. AssetManager UI exposes per-image variants section. ReactRenderer + PreviewWindow + VisualWorkspace all wired with the variants resolver. Verified end-to-end: a portrait-variant.png paired against the TitleScreen tree image swapped automatically between Authored landscape (800×600 tree) and Phone portrait (600×1024 orange variant).
+- **3.3 storage roundtrip fix**: end-to-end verification surfaced that `assetToStored` was dropping `Asset.variants` on save and `storedToAsset` + `App.tsx`'s inline asset construction weren't lifting `metadata.variants` back to the top level. All three sites now thread variants correctly so they survive the storage→load roundtrip.
+
+**Files modified**: `core/utils/hotspot.ts` (portrait override + helper), `core/utils/assetVariant.ts` (new — type + resolver + detectors), `core/utils/index.ts` (exports), `renderer/components/SpatialFlowView.tsx` (orientation-aware hotspot resolution + imageVariants prop), `renderer/components/TimerHudDisplay.tsx` + `renderer/index.ts` (exported for VE use), `renderer/renderers/ReactRenderer.tsx` (backgroundImageVariants + setAssetVariantsResolver), `builder/components/visual/HotspotEditOverlay.tsx` (isPortrait routing), `builder/components/visual/VisualWorkspace.tsx` (HUD overlay + variants resolver inline + portrait routing), `builder/components/assets/AssetManager.tsx` (Asset.variants type + UI), `builder/pages/PreviewWindow.tsx` (variants resolver wiring), `builder/storage/AssetStorageAdapter.ts` (variants roundtrip), `builder/App.tsx` (assets-list variant lift).
+
+### Bug fixes that landed alongside
+
+- **Spatial enter animations now settle to centered rest state**: ken-burns / pan keyframes were ending at scale(1.1) translate offsets, leaving the image permanently shifted+zoomed. Inverted keyframes so they start drifted and settle at neutral.
+- **PW stable container across viewport-preset switches**: the previous viewport switcher had two containerRef divs in conditional branches; switching presets unmounted the renderer's React root, blanking the stage. Unified into a single mount point with conditional styling.
+- **Chat-bubble + chat-scroll responsive mode**: ChatDialogView gained a `responsive` prop (100%/100% layout, no ScaledStage wrapper) so dialog chat composes in responsive projects without the absolute-canvas math.
+- **dialogTree spatial polish**: speaker renders as a label (not title), non-hotspot dialog choices surface as button-row dynamicActions, `showSpeaker` is honoured per-beat, choice.hotspot survives `migrateDialogTree`.
+- **Theme wiring in responsive flow**: SlotFlowView honours `theme.textBox`, `theme.textboxFrameUrl`, `theme.colors.textAlpha`, and `theme.textEffects` (typewriter/fade) so themed projects don't lose their card backgrounds, frames, or text animations in slot mode.
+- **Per-beat spatialFit toggle**: each spatial beat can override schema's default `contain` with `cover` (or vice-versa); control lives in the VE left sidebar under the background image picker.
+- **Background fit moved from Inspector to VE left sidebar**: closer to where authors are looking when they pick the background.
+
+### Player-web hardening (already on this branch from earlier)
+
+- **30s fetch timeout** + **ZIP magic-byte validation** in player-web: a corrupt or HTML-served `.zip` (e.g. Vercel returning the SPA shell instead of the file) used to leave the player on an endless loading screen. Now times out cleanly after 30s and rejects non-ZIP responses with a clear error.
+
+---
+
 ## 2026-05-20: Responsive layout + animations + hotspot map navigation (work in progress), plus durScreen/fictionalTime/dialogTree/counter fixes (v0.9.58)
 
 ### Overview
