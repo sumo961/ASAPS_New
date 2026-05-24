@@ -492,11 +492,22 @@ export class DialogTreeBeat extends Beat {
       const earlyVisibleChoices = this.currentNode.choices
         ? this.filterVisibleChoices(this.currentNode.choices, context)
         : [];
+      // A dialogTree node renders through SpatialFlowView (responsive)
+      // whenever the beat instance has NO baked pixel locations AND the
+      // presentationMode is the positioned default (chat modes have
+      // their own ChatDialogView path). Hotspots are an OPTIONAL
+      // enrichment — when present, choices appear both as picture
+      // hotspots and as a fallback button row; when absent, the
+      // button row stands alone over the spatial backdrop (which can
+      // also be blank). Earlier this check required at least one
+      // hotspot, which forced no-hotspot dialogTree in a responsive
+      // project into the absolute path and skipped slot-mode reflow
+      // entirely — the load-bearing bug behind "my responsive project's
+      // dialog still renders fixed-pixel".
       const nodeWillBeSpatial =
         (this.presentationMode || 'positioned') === 'positioned'
         && this.locations.size === 0
-        && earlyVisibleChoices.length > 0
-        && earlyVisibleChoices.some(c => !!(c as any).hotspot);
+        && earlyVisibleChoices.length > 0;
       renderer.setState('dialogNodeIsSpatial', nodeWillBeSpatial);
 
       // Render the NPC/system dialog

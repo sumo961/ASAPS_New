@@ -142,6 +142,17 @@ interface SlotFlowViewProps {
    * multi-choice.
    */
   forceMultiActionGate?: boolean;
+  /**
+   * Optional content rendered INSIDE the inner scroll surface, after
+   * the body card. Used by SpatialFlowView for dialogTree's
+   * dynamicActions: putting the choices in the same scroller as the
+   * body means the player's scroll gesture literally drags them into
+   * view from below — they're already in the DOM, just below the
+   * viewport at scrollTop=0. The body wrapper above is sized to
+   * `min-height: 100%` of the scroller so the body fills the stage on
+   * arrival, and scrolling reveals this content one row at a time.
+   */
+  extraInScrollAfterBody?: React.ReactNode;
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -177,6 +188,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   requireFullRead = true,
   onGateChange,
   forceMultiActionGate = false,
+  extraInScrollAfterBody,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -398,18 +410,26 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const root = rootRef.current;
     if (!root) return;
 
-    // Pick the scrolling element: phase 1 multi-action uses the
-    // slot-root itself (overflow-y: auto); otherwise the inner
-    // .slotflow-scroll node owns its own internal scroll.
-    const scrollEl: HTMLElement = (isMultiAction && !gateEarned)
-      ? root
-      : (root.querySelector('.slotflow-scroll') as HTMLElement) || root;
+    // Single inner scroller owns scroll in BOTH phases — phase 1
+    // (no action row) has the card at full stage height; phase 2 (action
+    // row visible) has the card at constrained height, but it's still
+    // the same scroll surface, so scrollTop carries naturally across.
+    const scrollEl: HTMLElement = (root.querySelector('.slotflow-scroll') as HTMLElement) || root;
 
     const check = () => {
       if (gateEarned) return;
       const sh = scrollEl.scrollHeight;
       const ch = scrollEl.clientHeight;
       const st = scrollEl.scrollTop;
+      let contentChild: HTMLElement | null = null;
+      for (const c of Array.from(scrollEl.children) as HTMLElement[]) {
+        if (c.tagName !== 'STYLE' && c.tagName !== 'SCRIPT') {
+          contentChild = c;
+          break;
+        }
+      }
+      const childH = contentChild?.offsetHeight ?? 0;
+      if (childH === 0) return;
       // No overflow → content fits → gate earned immediately.
       if (sh <= ch + 1) {
         setGateEarned(true);
@@ -425,10 +445,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const raf = requestAnimationFrame(check);
     const ro = new ResizeObserver(check);
     ro.observe(scrollEl);
-    // Observe the inner content too so the check re-runs when the
-    // body grows (typewriter reveal, font load, theme swap).
-    const child = scrollEl.firstElementChild as HTMLElement | null;
-    if (child) ro.observe(child);
+    // Observe each non-style/script child so the check re-runs when the
+    // body grows (typewriter reveal, font load, theme swap). Observing
+    // only firstElementChild misses content when a <style> tag sits at
+    // index 0 (a common scope-class setup in this view).
+    for (const c of Array.from(scrollEl.children) as HTMLElement[]) {
+      if (c.tagName !== 'STYLE' && c.tagName !== 'SCRIPT') ro.observe(c);
+    }
     const onScroll = () => check();
     scrollEl.addEventListener('scroll', onScroll, { passive: true });
     return () => {
@@ -441,6 +464,23 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   React.useEffect(() => {
     onGateChange?.(gateEarned);
   }, [gateEarned, onGateChange]);
+
+  // When the beat's body/title text changes, reset scroll back to the top
+  // and re-arm the gate. Otherwise the previous beat's scrollTop persists
+  // (player has read to the end → next beat starts mid-text instead of
+  // at the start of the new content).
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    root.scrollTo({ top: 0 });
+    const scroller = root.querySelector('.slotflow-scroll') as HTMLElement | null;
+    if (scroller) scroller.scrollTo({ top: 0 });
+    if (requireFullRead) {
+      // Re-arm: the new body might have its own overflow profile, and we
+      // want the player to see its start before the gate fires.
+      setGateEarned(false);
+    }
+  }, [titleText, bodyText, requireFullRead]);
 
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
@@ -632,13 +672,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       className={`${scope} slotflow-root`}
       style={{
         ...rootStyle,
-        // Phase 1 (multi-action, gate not earned) — outer container
-        // scrolls. Body grows naturally; the player must scroll past
-        // the body to earn the gate and reveal the action area.
-        // Otherwise (single-action, OR multi-action phase 2) — outer
-        // is locked, the body has its own internal scroll (existing
-        // behavior, no regression).
-        overflowY: (isMultiAction && !gateEarned) ? 'auto' : 'hidden',
+        // Single inner scrollable surface (.slotflow-scroll). The action
+        // area is in the same flex column but conditionally rendered: in
+        // phase 1 it's absent → the body card fills the full stage; in
+        // phase 2 it slides in from the bottom and the body card shrinks
+        // to share space. The body's scroll position is preserved across
+        // the swap, so the player doesn't see a "jump back to the top"
+        // when the gate fires.
+        overflowY: 'hidden',
         overflowX: 'hidden',
       }}
     >
@@ -766,34 +807,42 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           from { opacity: 1; transform: scale(1); }
           to   { opacity: 0; transform: scale(0.7); }
         }
+        /* Gate-earned reveal for the action row. Used on every action
+           area that becomes visible when phase 2 fires — single Continue
+           on infoText AND the dynamicActions row on dialogTree (same
+           class is applied at the SpatialFlowView level). Short enough
+           that the player still feels the click responsiveness, long
+           enough to read as a deliberate transition. */
+        @keyframes slotflow-action-slide-in {
+          from { opacity: 0; transform: translateY(40%); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .${scope} .slotflow-action-slide-in {
+          animation-name: slotflow-action-slide-in;
+          animation-duration: 280ms;
+          animation-timing-function: ease-out;
+          animation-fill-mode: both;
+        }
       `}</style>
 
-      {/* Body slot — two layouts share the same JSX:
-          - Phase 1 (multi-action, gate not earned): body grows
-            naturally and the outer slot-root scrolls. flex:none +
-            overflowY:visible so the body's height = its content. The
-            sentinel at the bottom (rendered after the body text) is
-            what the read-gate watches.
-          - Phase 2 (multi-action gate earned) / single-action: body
-            is flex:1 with internal scroll (the original behavior).
-            The action row stays pinned at the bottom of the stage. */}
+      {/* Body slot — one scrollable surface in BOTH phases. In phase 1
+          the action row isn't rendered, so this card has the full stage
+          height (body either fits → centered, or overflows → internal
+          scroll). In phase 2 the action row joins the flex column and
+          this card flexes down to share space; its scrollTop carries
+          across the swap so the player keeps their reading position.
+          The read-gate watches THIS element's overflow state. */}
       <div
         className="slotflow-scroll"
-        style={(isMultiAction && !gateEarned) ? {
-          flex: 'none',
-          minHeight: 0,
-          overflowY: 'visible',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-        } : {
+        style={{
           flex: belowBody ? '0 1 auto' : 1,
           maxHeight: belowBody ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
         }}
       >
         <div
@@ -802,11 +851,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             width: '100%',
             padding: 'clamp(24px, 5vh, 64px) clamp(20px, 5vw, 48px)',
             margin: '0 auto',
-            // Vertically center short endings; long ones top-align + scroll.
-            minHeight: '100%',
+            // Body wrapper always uses its natural content height. With
+            // extraInScrollAfterBody (dialogTree choices) rendered
+            // below it inside the same scroller during pre-earn, this
+            // means the gate-fit check sees a TRUE measurement: if the
+            // body + choices fit the viewport, scrollHeight equals
+            // clientHeight and the gate fires immediately — no
+            // synthetic "drag the choices in" requirement on a stage
+            // with plenty of room. Only when the combined content
+            // genuinely overflows do we get the drag-in behavior.
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
           }}
         >
           {speakerSlot && speakerText && (() => {
@@ -905,7 +961,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               visible area of the stage root. */}
           <div ref={sentinelRef} aria-hidden style={{ height: 1, width: '100%' }} />
         </div>
+        {/* Pre-earn: extra content lives INSIDE the scroller so the
+            player's scroll naturally drags it into view from below.
+            Post-earn: it moves OUT of this scroller (rendered below
+            in the flex column) so the body card gets its own internal
+            scroll like an infoText body. */}
+        {extraInScrollAfterBody && !gateEarned ? extraInScrollAfterBody : null}
       </div>
+      {/* Post-earn placement of the extra content: outside the
+          scroller, in the slot-root flex column. The body above now
+          has natural height and its own internal scroll, while these
+          choices sit in their own row at the bottom of the stage. */}
+      {extraInScrollAfterBody && gateEarned ? extraInScrollAfterBody : null}
 
       {/* Action slot — pinned, always visible, overlap-proof.
           Single continue (aiInfoText/onlineContent) vs restart/credits
@@ -938,20 +1005,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const anchoredButtons = buttonCatalog.filter(
           b => b.show && buttonAnchors?.[b.id]
         );
-        // Read-gate effect on the action row. Hidden entirely while
-        // phase-1 multi-action is in force (player must scroll past
-        // the body to earn the gate). Dimmed + disabled for the
-        // single-action case while the gate isn't earned yet (the
-        // Continue button visually exists at the bottom of the
-        // stage but won't accept clicks until the player has at
-        // least seen the body's bottom).
-        const phase1Hidden = isMultiAction && !gateEarned;
-        const gatedDim = !isMultiAction && !gateEarned;
-        if (phase1Hidden) return null;
+        // The action row is hidden in phase 1 (single AND multi-action):
+        // the body card occupies the full stage and the player reads
+        // first. Once the gate fires (content scrolled to its end, or
+        // fit-in-viewport from the start), the row joins the flex column
+        // and slides up from the bottom. No "dimmed but visible" state —
+        // per the design diagram, choices/Continue simply aren't there
+        // until they're earned.
+        if (!gateEarned) return null;
         return (
           <>
             <div
-              className={a.className}
+              className={`${a.className ?? ''} slotflow-action-slide-in`}
               style={{
                 flexShrink: 0,
                 display: 'flex',
@@ -969,12 +1034,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 ...(flowButtons.length === 0
                   ? { paddingTop: 0, paddingBottom: 0 }
                   : {}),
-                opacity: gatedDim ? 0.4 : 1,
-                pointerEvents: gatedDim ? 'none' : undefined,
-                transition: 'opacity 200ms ease',
                 ...a.style,
               }}
-              title={gatedDim ? 'Scroll to the bottom of the text to continue' : undefined}
             >
               {flowButtons.map(b => (
                 <button
@@ -982,8 +1043,6 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   className="slotflow-btn"
                   onClick={b.onClick}
                   style={buttonStyle(theme, buttonFluid)}
-                  disabled={gatedDim}
-                  aria-disabled={gatedDim}
                 >
                   {b.text}
                 </button>

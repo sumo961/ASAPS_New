@@ -225,12 +225,27 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   // pointer-events:none + dimmed so the player can SEE what awaits
   // without being able to commit. ≤ 1 → no gating (a beat with no
   // choices or one trivial Continue doesn't need it).
-  const totalChoices = (dynamicActions?.length ?? 0) + (hotspots?.length ?? 0);
-  const gatedBeat = totalChoices >= 2;
-  const [gateEarned, setGateEarned] = useState(!gatedBeat);
+  // Whether this beat presents any per-turn choices that the spatial
+  // composite owns. Hotspot-only beats (no dynamic action buttons)
+  // skip the gate entirely — there's nothing to slide in. Otherwise
+  // the action row is gated regardless of choice count: even a single
+  // "Continue" should let the player read the body first.
+  const hasDynamicActions = (dynamicActions?.length ?? 0) > 0;
+  const [gateEarned, setGateEarned] = useState(!hasDynamicActions);
   const handleGateChange = React.useCallback((earned: boolean) => {
     if (earned) setGateEarned(true);
   }, []);
+
+  // Reset the gate when the dialog content advances within the same
+  // beat (dialogTree node transitions don't remount this component).
+  // Inner SlotFlowView already re-arms its own gate on bodyText
+  // change; we mirror that here so phase 1 (hidden choices) is
+  // restored for the new node instead of inheriting the previous
+  // node's "earned" state.
+  const dialogBody = (content?.text ?? '') as string;
+  React.useEffect(() => {
+    if (hasDynamicActions) setGateEarned(false);
+  }, [dialogBody, hasDynamicActions]);
 
   const scopeRef = React.useRef<string>('');
   if (!scopeRef.current) {
@@ -630,6 +645,14 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         );
       })()}
 
+      {/* Flow layer: SlotFlowView owns the single scrollable surface
+          and we hand it the dynamicActions via extraInScrollAfterBody,
+          so the choices live INSIDE the same scroller, below the body
+          card. That makes the player's scroll gesture literally drag
+          the choice list into view from below — no triggered slide-in.
+          A choice is only clickable after the read-gate fires (= user
+          has scrolled past the end-of-body sentinel). Before that the
+          buttons are visible (scrolling reveals them) but disabled. */}
       <div
         data-layer="flow"
         style={{ position: 'absolute', inset: 0, zIndex: 1 }}
@@ -649,57 +672,55 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           previewCoarse={previewCoarse}
           extraExitMs={spatialExitMs}
           onExitStart={handleExitStart}
-          forceMultiActionGate={gatedBeat}
+          forceMultiActionGate={hasDynamicActions}
           onGateChange={handleGateChange}
+          extraInScrollAfterBody={
+            dynamicActions && dynamicActions.length > 0 ? (
+              <div
+                data-layer="dynamic-actions"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 'clamp(10px, 1.8vw, 18px)',
+                  padding: 'clamp(12px, 2.5vh, 20px) clamp(16px, 3vw, 28px) clamp(20px, 4vh, 32px)',
+                  width: '100%',
+                  maxWidth: 760,
+                  margin: '0 auto',
+                }}
+              >
+                {dynamicActions.map(a => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => onAction(a.id)}
+                    disabled={!gateEarned}
+                    aria-disabled={!gateEarned}
+                    style={{
+                      width: '100%',
+                      pointerEvents: gateEarned ? 'auto' : 'none',
+                      fontFamily: theme?.fonts.buttonFont || theme?.fonts.textFont || 'sans-serif',
+                      fontSize: 'clamp(13px, 1.4vw, 18px)',
+                      fontWeight: 600,
+                      color: theme?.button?.textColor || '#fff',
+                      background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
+                      border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
+                      borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
+                      padding: '10px clamp(14px, 2.5vw, 24px)',
+                      minHeight: 44,
+                      cursor: gateEarned ? 'pointer' : 'default',
+                      opacity: gateEarned ? 1 : 0.55,
+                      transition: 'opacity 200ms ease',
+                    }}
+                  >
+                    {a.text}
+                  </button>
+                ))}
+              </div>
+            ) : null
+          }
         />
       </div>
-
-      {/* Bug 19b — dynamic per-turn choices that don't have a hotspot.
-          Rendered as a themed button row pinned below the flow layer
-          (z=3, above hotspots and flow) so a mixed dialogTree node can
-          combine "click thing in scene" hotspots with "say something
-          generic" buttons. */}
-      {dynamicActions && dynamicActions.length > 0 && gateEarned && (
-        <div
-          data-layer="dynamic-actions"
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 3,
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            gap: 'clamp(8px, 1.5vw, 16px)',
-            padding: 'clamp(12px, 2.5vh, 20px) clamp(16px, 3vw, 28px)',
-            pointerEvents: 'none',
-          }}
-        >
-          {dynamicActions.map(a => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onAction(a.id)}
-              style={{
-                pointerEvents: 'auto',
-                fontFamily: theme?.fonts.buttonFont || theme?.fonts.textFont || 'sans-serif',
-                fontSize: 'clamp(13px, 1.4vw, 18px)',
-                fontWeight: 600,
-                color: theme?.button?.textColor || '#fff',
-                background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
-                border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
-                borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
-                padding: '8px clamp(14px, 2.5vw, 24px)',
-                minHeight: 44,
-                cursor: 'pointer',
-              }}
-            >
-              {a.text}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 };

@@ -833,6 +833,17 @@ export function initializeBeatLocations(
       console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — schema layoutMode="${layoutMode}"; auto-baked locations would force the absolute path and defeat responsive rendering.`);
       return;
     }
+    // Same rationale, schema-shape variant: beats like dialogTree declare a
+    // spatialLayer + slots (so getSpatialSpec returns a valid responsive
+    // spec) but don't set a top-level layoutMode. Without this check the
+    // initializer bakes 4 locations into every empty dialogTree, the runtime
+    // sees this.locations.size > 0, nodeWillBeSpatial becomes false, and the
+    // render falls through to the absolute path — defeating the responsive
+    // dialogTree composite (image + flow + gated choices).
+    if (beatDef?.spatialLayer?.source && Array.isArray(beatDef?.slots) && beatDef.slots.length > 0) {
+      console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — schema has spatialLayer + slots; auto-baked locations would force the absolute path and defeat responsive rendering.`);
+      return;
+    }
 
     // Generate visual elements from schema
     const elements = initializeLocationsFromSchema(
