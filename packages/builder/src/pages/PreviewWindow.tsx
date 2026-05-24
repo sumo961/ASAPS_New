@@ -23,6 +23,7 @@ import { getSavedTTSConfig } from '../hooks/useTTS';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
+import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import { CharacterAffectPanel } from '../components/characters/CharacterAffectPanel';
 import { MockSensorPanel } from '../components/preview/MockSensorPanel';
 import Anthropic from '@anthropic-ai/sdk';
@@ -2866,10 +2867,38 @@ export const PreviewWindow: React.FC = () => {
               renderer's mount node ("No root available" warning,
               blank stage). Now there's exactly ONE mount node; only
               its wrapping changes. */}
+          {(() => {
+            // Phase 1 follow-up — responsive projects with "Fit window"
+            // (no preset) must NOT be wrapped in transform:scale(). Slot
+            // mode renders OUTSIDE any uniform scale on purpose; its
+            // clamp(FLOOR, fluid, CEILING) font sizing already handles
+            // any container size. Applying the transform here was the
+            // root of "dialogTree text is tiny": SlotFlowView would
+            // compute fonts against 100vw (e.g. 22px), then the parent's
+            // 0.836 scale would shrink it to ~18px on screen. For
+            // responsive + Fit window we let the stage fill the
+            // available area at native scale; fixed-canvas + Fit window
+            // keeps the legacy transform-scale path (correct for
+            // absolute layouts).
+            // Use the same resolver the Header badge / Visual Editor
+            // use, so a legacy project without an explicit layoutMode
+            // field is correctly inferred from its beats (any baked
+            // locations → 'fixed', otherwise → 'responsive'). The
+            // explicit setting always wins; this is the fallback.
+            const isResponsive = resolveLayoutMode(
+              previewData?.settings as any,
+              previewData?.storyData?.beats as any
+            ) === 'responsive';
+            const useNativeScale = !previewViewport && isResponsive;
+            return (
           <div
             style={{
-              width: previewViewport ? previewViewport.width : STAGE_WIDTH * scale,
-              height: previewViewport ? previewViewport.height : STAGE_HEIGHT * scale,
+              width: previewViewport ? previewViewport.width
+                : useNativeScale ? '100%'
+                : STAGE_WIDTH * scale,
+              height: previewViewport ? previewViewport.height
+                : useNativeScale ? '100%'
+                : STAGE_HEIGHT * scale,
               flexShrink: 0,
               position: 'relative',
             }}
@@ -2881,6 +2910,10 @@ export const PreviewWindow: React.FC = () => {
               style={previewViewport ? {
                 width: previewViewport.width,
                 height: previewViewport.height,
+                overflow: 'hidden',
+              } : useNativeScale ? {
+                width: '100%',
+                height: '100%',
                 overflow: 'hidden',
               } : {
                 width: STAGE_WIDTH,
@@ -3003,6 +3036,8 @@ export const PreviewWindow: React.FC = () => {
               )}
             </div>
           </div>
+            );
+          })()}
         </div>
 
         {/* Debug Panel */}
@@ -3223,7 +3258,21 @@ export const PreviewWindow: React.FC = () => {
               project's orientation lock (no portrait presets in a
               landscape-locked project, and vice versa). */}
           <div className="w-px h-5 bg-gray-400 mx-2" />
+          {/* Phase 1+ — viewport preset switcher.
+              Discoverability: prefix with a "Device:" label so authors
+              know the dropdown picks the simulated device, not some
+              generic window setting. The dropdown stays a <select>
+              (compact, plays well with long preset names) but the
+              label changes the read from "Fit window" → "what's that
+              for?" to "Device: Fit window" → clear. */}
+          <label
+            className="text-xs text-gray-600 font-medium select-none"
+            htmlFor="pw-viewport-preset"
+          >
+            Device:
+          </label>
           <select
+            id="pw-viewport-preset"
             value={previewViewport?.id ?? 'auto'}
             onChange={(e) => {
               const id = e.target.value;
@@ -3241,8 +3290,12 @@ export const PreviewWindow: React.FC = () => {
                 });
               }
             }}
-            className="text-xs bg-gray-100 border border-gray-300 rounded px-2 py-1"
-            title="Preview at a specific device size — responsive layouts reflow live"
+            className={`text-xs border rounded px-2 py-1 transition-colors ${
+              previewViewport
+                ? 'bg-blue-100 border-blue-300 text-blue-800 font-medium'
+                : 'bg-gray-100 border-gray-300'
+            }`}
+            title="Preview at a specific device size — responsive layouts reflow live to match"
           >
             {VIEWPORT_PRESETS.filter(p => {
               const lock = (previewData?.settings as any)?.project?.orientation;

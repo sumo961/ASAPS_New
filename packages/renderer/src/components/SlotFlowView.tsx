@@ -630,19 +630,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
       {/* Body slot — grows & scrolls (stage-bottom action), or sizes to
           content so the action row hugs it (below-body anchor). Either way
-          it scrolls internally when content exceeds the column. */}
-      <div
-        className="slotflow-scroll"
-        style={{
-          flex: belowBody ? '0 1 auto' : 1,
-          maxHeight: belowBody ? '100%' : undefined,
-          minHeight: 0,
-          overflowY: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-        }}
-      >
+          it scrolls internally when content exceeds the column.
+
+          A scroll-affordance pair (top fade + chevron at the bottom edge)
+          appears whenever the inner content is taller than the visible
+          box, so authors / players can see "more below" instead of
+          assuming the screen ends at the fold. Driven by a small ref +
+          state that listens to scroll + resize. */}
+      <ScrollableBody belowBody={belowBody}>
         <div
           style={{
             maxWidth: READABLE_MAX_WIDTH,
@@ -746,7 +741,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             );
           })()}
         </div>
-      </div>
+      </ScrollableBody>
 
       {/* Action slot — pinned, always visible, overlap-proof.
           Single continue (aiInfoText/onlineContent) vs restart/credits
@@ -879,6 +874,174 @@ function anchoredButtonPlacement(anchor: SlotAnchor): React.CSSProperties {
   }
   return out;
 }
+
+/**
+ * Body scroll container with affordances for overflow.
+ *
+ * The plain scroll container had no visual cue when content extended
+ * past the visible area — readers (and authors in the editor)
+ * assumed the screen ended at the fold. ScrollableBody adds two
+ * indicators rendered ABOVE the scroll surface (z-index inside the
+ * relative wrapper):
+ *
+ *   - top fade   — appears when scroll is not at the very top, so the
+ *                  reader knows they have already scrolled past
+ *                  something
+ *   - bottom fade + chevron — appears when more content lies below
+ *                  the fold; clicking the chevron pages down a screen
+ *
+ * Indicators are pure presentation — clicking-through the chevron is
+ * the only interactive bit. They're hidden whenever the inner content
+ * fits within the visible box. The fade uses a CSS linear-gradient
+ * from transparent to a near-stage-bg color so it blends in across
+ * themes.
+ *
+ * Listens to scroll on the container and ResizeObserver on both the
+ * container and its inner content — both axes can change without a
+ * window resize (a long beat with a typewriter reveal grows; an
+ * orientation change shrinks the container).
+ */
+const ScrollableBody: React.FC<{
+  belowBody: boolean;
+  children: React.ReactNode;
+}> = ({ belowBody, children }) => {
+  const scrollRef = React.useRef<HTMLDivElement | null>(null);
+  const [overflow, setOverflow] = React.useState<{
+    canScrollUp: boolean;
+    canScrollDown: boolean;
+  }>({ canScrollUp: false, canScrollDown: false });
+
+  const update = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const canScrollUp = el.scrollTop > 1;
+    const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setOverflow(prev =>
+      prev.canScrollUp === canScrollUp && prev.canScrollDown === canScrollDown
+        ? prev
+        : { canScrollUp, canScrollDown }
+    );
+  }, []);
+
+  React.useEffect(() => {
+    update();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    // Also observe the immediate child so content-height changes
+    // (typewriter reveal, font load, theme swap) trigger a refresh.
+    const child = el.firstElementChild as HTMLElement | null;
+    if (child) ro.observe(child);
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [update]);
+
+  const pageDown = React.useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ top: el.clientHeight * 0.85, behavior: 'smooth' });
+  }, []);
+
+  // Match the ORIGINAL scroll container's CSS exactly so the body's
+  // existing `min-height: 100%` + `justify-content: center` continue
+  // to vertically center short content. Indicators are absolute
+  // siblings within the same flex item — no wrapping div, no
+  // structural change to the body layout (which was the source of
+  // the "text jumped to the top" regression on the previous attempt).
+  return (
+    <div
+      ref={scrollRef}
+      className="slotflow-scroll"
+      style={{
+        position: 'relative',
+        flex: belowBody ? '0 1 auto' : 1,
+        maxHeight: belowBody ? '100%' : undefined,
+        minHeight: 0,
+        overflowY: 'auto',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+      }}
+    >
+      {children}
+      {/* Top fade — visible once you've scrolled past the very top.
+          position:sticky keeps it pinned inside the scroll container's
+          visible area as the content scrolls underneath. */}
+      {overflow.canScrollUp && (
+        <div
+          aria-hidden
+          style={{
+            position: 'sticky',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 24,
+            marginBottom: -24,
+            alignSelf: 'flex-start',
+            width: '100%',
+            pointerEvents: 'none',
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.35), transparent)',
+            zIndex: 2,
+          }}
+        />
+      )}
+      {/* Bottom fade + chevron — visible when more content lies below. */}
+      {overflow.canScrollDown && (
+        <div
+          aria-hidden
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 32,
+            marginTop: -32,
+            alignSelf: 'flex-end',
+            width: '100%',
+            pointerEvents: 'none',
+            background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)',
+            zIndex: 2,
+          }}
+        >
+          <button
+            type="button"
+            onClick={pageDown}
+            aria-label="Scroll down"
+            title="Scroll down"
+            style={{
+              position: 'absolute',
+              bottom: 4,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 28,
+              height: 18,
+              border: 'none',
+              background: 'rgba(255,255,255,0.18)',
+              color: 'currentColor',
+              borderRadius: 9,
+              cursor: 'pointer',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              lineHeight: 1,
+              opacity: 0.78,
+              zIndex: 3,
+              pointerEvents: 'auto',
+            }}
+          >
+            ▾
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProperties {
   return {
