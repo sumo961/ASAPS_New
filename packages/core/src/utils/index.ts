@@ -20,12 +20,16 @@ export {
   type SlotAnimation,
   type SlotAnimationEntry,
   type SlotAnimations,
+  type SlotWaypoint,
+  type SlotPath,
 } from './slotAnimation';
 export {
   isSpatialAnimations,
   type SpatialAnimationPreset,
   type SpatialAnimation,
   type SpatialAnimations,
+  type SpatialWaypoint,
+  type SpatialPath,
 } from './spatialAnimation';
 export {
   isHotspot,

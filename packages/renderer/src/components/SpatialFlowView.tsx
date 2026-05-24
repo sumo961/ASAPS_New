@@ -12,6 +12,7 @@ import type { AssetVariant } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
+import { runSpatialPath } from '../utils/pathAnimation';
 
 interface SpatialFlowViewProps {
   beatType: string;
@@ -150,6 +151,10 @@ function spatialPhaseStyles(
   phase: 'enter' | 'exit',
 ): { className?: string; style?: React.CSSProperties } {
   if (!anim) return {};
+  // Path preset is rAF-driven (see useEffect below). Returning an empty
+  // patch leaves the spatial layer in its natural transform; runSpatialPath
+  // then animates pan + zoom each frame.
+  if (anim.preset === 'path') return {};
   const suffix = phase === 'exit' ? 'out' : 'in';
   // Pan/ken-burns names don't suffix with -in/-out; we share keyframes
   // for those across phases since the motion is naturally continuous.
@@ -350,6 +355,37 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
       ? spatialPhaseStyles(spatialAnimations?.exit, 'exit')
       : spatialPhaseStyles(spatialAnimations?.enter, 'enter');
 
+  // Path-preset spatial animation. Drives a JS-controlled pan + zoom
+  // on the spatial-layer div via rAF, reading the current letterboxed
+  // image rect each frame so the path tracks viewport / variant swaps.
+  // Skipped when the active phase's preset is not 'path'.
+  const spatialLayerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const event =
+      imagePhase === 'exit' ? spatialAnimations?.exit : spatialAnimations?.enter;
+    if (!event || event.preset !== 'path' || !event.path?.waypoints?.length) return;
+    const el = spatialLayerRef.current;
+    if (!el) return;
+    const cleanup = runSpatialPath({
+      el,
+      getImageRect: () =>
+        imageRectPx(imgAspect, containerSize.w, containerSize.h, objectFit),
+      waypoints: event.path.waypoints,
+      duration: event.duration ?? (imagePhase === 'exit' ? 1200 : 6000),
+      delay: event.delay ?? 0,
+      easing: event.easing,
+      loop: !!event.path.loop,
+    });
+    return cleanup;
+  }, [
+    imagePhase,
+    spatialAnimations,
+    imgAspect,
+    containerSize.w,
+    containerSize.h,
+    objectFit,
+  ]);
+
   return (
     <div
       ref={containerRef}
@@ -484,6 +520,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
 
       {src && (
         <div
+          ref={spatialLayerRef}
           data-layer="spatial"
           className={spatialAnim.className}
           style={{

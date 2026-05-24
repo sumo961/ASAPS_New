@@ -30,6 +30,7 @@ import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, S
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
+import { runSlotPath } from '../utils/pathAnimation';
 
 interface SlotFlowViewProps {
   beatType: string;
@@ -517,6 +518,41 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // beat doesn't take over while the current one is still leaving.
   const [phase, setPhase] = useState<'enter' | 'exit'>('enter');
 
+  // Path-preset slot animations. Scans slotAnimations for entries whose
+  // enter/exit preset === 'path' and runs the rAF translator for each
+  // matching slot wrapper. The wrappers are tagged with
+  // `data-slotflow-slot="{name}"` so we can find them inside the root
+  // without threading a refs map through every slot render. Re-runs
+  // when the slotAnimations object identity changes (new beat / new
+  // values from the editor) and when the phase flips so exits replace
+  // enters cleanly.
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !slotAnimations) return;
+    const cleanups: Array<() => void> = [];
+    const entries = Object.entries(slotAnimations as Record<string, any>);
+    for (const [slotName, entry] of entries) {
+      const event = phase === 'exit' ? entry?.exit : entry?.enter;
+      if (!event || event.preset !== 'path' || !event.path?.waypoints?.length) continue;
+      const el = root.querySelector<HTMLElement>(
+        `[data-slotflow-slot="${CSS.escape(slotName)}"]`
+      );
+      if (!el) continue;
+      cleanups.push(
+        runSlotPath({
+          el,
+          stage: root,
+          waypoints: event.path.waypoints,
+          duration: event.duration ?? (phase === 'exit' ? 300 : 400),
+          delay: event.delay ?? 0,
+          easing: event.easing,
+          loop: !!event.path.loop,
+        }),
+      );
+    }
+    return () => cleanups.forEach(fn => fn());
+  }, [slotAnimations, phase]);
+
   // P3-anim — per-slot enter animation. Returns the className + style
   // patch to merge into a slot wrapper. Absent / unsupported preset → no-op.
   // Slide `distance` is PERCENT OF SLOT BOX (default 100 = one slot-box) —
@@ -526,6 +562,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     if (!slotName) return {};
     const enter: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.enter;
     if (!enter) return {};
+    // Path preset is handled by a per-slot rAF driver below — no CSS
+    // animation, no class. Returning an empty patch leaves the slot
+    // in its natural layout position; runSlotPath then translates it
+    // through the waypoints once the wrapper is in the DOM.
+    if (enter.preset === 'path') return {};
     const presetToClass: Record<string, string | undefined> = {
       'fade': 'slotflow-anim-fade-in',
       'slide-in-left': 'slotflow-anim-slide-in-left',
@@ -557,6 +598,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     if (!slotName) return {};
     const exit: SlotAnimation | undefined = slotAnimationsFor(slotAnimations, slotName)?.exit;
     if (!exit) return {};
+    if (exit.preset === 'path') return {}; // driven by rAF below
     const presetToClass: Record<string, string | undefined> = {
       'fade': 'slotflow-anim-fade-out',
       'slide-in-left': 'slotflow-anim-slide-out-left',
@@ -874,6 +916,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             return (
               <div
                 className={a.className}
+                data-slotflow-slot={speakerSlot.name}
                 style={{
                   fontFamily: theme.fonts.textFont || 'sans-serif',
                   fontWeight: 600,
@@ -896,6 +939,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               <div
                 ref={titleRef}
                 className={a.className}
+                data-slotflow-slot={titleSlotName}
                 style={{
                   fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
                   fontWeight: 700,
@@ -931,6 +975,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             return (
               <div
                 className={a.className}
+                data-slotflow-slot={bodySlot?.name}
                 style={{
                   whiteSpace: 'pre-wrap',
                   lineHeight: 1.6,
@@ -1017,6 +1062,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           <>
             <div
               className={`${a.className ?? ''} slotflow-action-slide-in`}
+              data-slotflow-slot={actionSlot.name}
               style={{
                 flexShrink: 0,
                 display: 'flex',

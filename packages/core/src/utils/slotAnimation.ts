@@ -16,7 +16,13 @@
  * P3-anim-1 ships with a single supported preset: `fade` slot enter.
  */
 
-/** Supported animation presets. New presets land per P3-anim phasing. */
+/** Supported animation presets. New presets land per P3-anim phasing.
+ *
+ * `'path'` is the keyframe-driven escape hatch: the renderer drives a
+ * transform along the SlotPath waypoints (anchor + percent offsets)
+ * rather than picking a built-in CSS animation. Use this when the
+ * presets don't express the motion an author needs — the migrator
+ * targets this for legacy AnimationPath[] beats. */
 export type SlotAnimationPreset =
   | 'fade'
   | 'slide-in-left'
@@ -25,12 +31,17 @@ export type SlotAnimationPreset =
   | 'slide-in-bottom'
   | 'scale-in'
   | 'pulse'
-  | 'shake';
+  | 'shake'
+  | 'path';
 
 /**
  * A single animation event on a slot. `preset` is the kind; timing is
  * optional with sensible defaults. `distance` is RELATIVE (percent of the
  * slot's resolved box) — never pixels — so it survives any viewport.
+ *
+ * When `preset === 'path'`, the renderer reads `path.waypoints` and
+ * drives a frame-by-frame transform instead of one of the CSS preset
+ * animations. The `path` field is ignored for any other preset.
  */
 export interface SlotAnimation {
   preset: SlotAnimationPreset;
@@ -42,6 +53,51 @@ export interface SlotAnimation {
   easing?: string;
   /** % of slot box for slide presets. Default 100 (= one slot-box). */
   distance?: number;
+  /** Required when preset === 'path'. Ignored otherwise. */
+  path?: SlotPath;
+}
+
+/**
+ * A waypoint along a slot path. Encoded layout-agnostic so it survives
+ * reflow / viewport / orientation:
+ *
+ *  - `anchor` picks a point on the slot's RESOLVED box (e.g. center,
+ *    top-left). Default { h: 'center', v: 'center' }.
+ *  - `dxPercent` / `dyPercent` are signed percentages of the STAGE
+ *    width / height, applied from the anchor point. The renderer
+ *    recomputes them every frame against the current stage box, so a
+ *    waypoint at `{ h:'center', v:'center', dxPercent: -20 }` always
+ *    lands 20% of the stage to the LEFT of the slot's center, on any
+ *    viewport.
+ *  - `t` (0..1) is the normalized time along the total animation
+ *    duration this waypoint should be hit. Defaults to evenly-spaced
+ *    distribution across the waypoint array when omitted.
+ *  - `easing` overrides the leg's easing for the segment ENDING at
+ *    this waypoint. Falls back to the animation's `easing` then to
+ *    'linear'.
+ */
+export interface SlotWaypoint {
+  anchor?: {
+    h?: 'left' | 'center' | 'right';
+    v?: 'top' | 'center' | 'bottom';
+  };
+  dxPercent?: number;
+  dyPercent?: number;
+  t?: number;
+  easing?: string;
+}
+
+/**
+ * A keyframe path. Two or more waypoints required for motion; a single
+ * waypoint is treated as an end-state hold. `type` controls the
+ * inter-waypoint interpolation: `'linear'` (default) is straight
+ * segments; `'bezier'` is a Catmull-Rom-derived smooth curve through
+ * the waypoints. `loop` repeats from waypoint 0 after reaching the end.
+ */
+export interface SlotPath {
+  type?: 'linear' | 'bezier';
+  loop?: boolean;
+  waypoints: SlotWaypoint[];
 }
 
 /**

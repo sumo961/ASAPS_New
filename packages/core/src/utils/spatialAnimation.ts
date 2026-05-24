@@ -11,7 +11,13 @@
  * rect, so motion survives reflow / viewport / orientation.
  */
 
-/** Supported spatial-layer presets. */
+/** Supported spatial-layer presets.
+ *
+ * `'path'` is the keyframe-driven escape hatch — waypoints over the
+ * LETTERBOXED image rect (normalized 0..1, same coordinate system as
+ * hotspots), with optional per-waypoint zoom. The renderer interpolates
+ * pan + scale frame-by-frame, recomputing pixel offsets against the
+ * current image rect so the motion survives reflow / orientation. */
 export type SpatialAnimationPreset =
   | 'ken-burns'   // slow zoom + drift; classic cinematic
   | 'zoom-in'     // start scaled-up, settle to fit
@@ -19,7 +25,8 @@ export type SpatialAnimationPreset =
   | 'pan-left'    // drift left across the image
   | 'pan-right'   // drift right across the image
   | 'pan-up'      // drift up
-  | 'pan-down';   // drift down
+  | 'pan-down'    // drift down
+  | 'path';       // keyframe waypoints over the letterboxed image
 
 /**
  * A single spatial-layer animation event. Unlike slot animations,
@@ -41,6 +48,35 @@ export interface SpatialAnimation {
    * motion but not draw attention away from the foreground.
    */
   intensity?: number;
+  /** Required when preset === 'path'. Ignored otherwise. */
+  path?: SpatialPath;
+}
+
+/**
+ * A waypoint along a spatial path. Coordinates are normalized 0..1
+ * against the LETTERBOXED image rect — the same coordinate system
+ * hotspots use, so a waypoint at `(0.5, 0.5)` always centers on the
+ * image regardless of viewport. `zoom` is a scale factor where 1 means
+ * the image fills its container at fit-scale (objectFit: contain) and
+ * >1 zooms in (the renderer translates so the waypoint stays centered
+ * during the zoom).
+ */
+export interface SpatialWaypoint {
+  x: number;
+  y: number;
+  zoom?: number;
+  t?: number;
+  easing?: string;
+}
+
+/**
+ * Keyframe path for the spatial layer (image). Same shape as SlotPath
+ * but with image-relative waypoints.
+ */
+export interface SpatialPath {
+  type?: 'linear' | 'bezier';
+  loop?: boolean;
+  waypoints: SpatialWaypoint[];
 }
 
 /** Top-level shape stored on a beat. */

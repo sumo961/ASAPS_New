@@ -19,9 +19,13 @@ import type {
   SlotAnimationEntry,
   SlotAnimation,
   SlotAnimationPreset,
+  SlotPath,
+  SlotWaypoint,
   SpatialAnimations,
   SpatialAnimation,
   SpatialAnimationPreset,
+  SpatialPath,
+  SpatialWaypoint,
 } from '@asaps/core';
 import {
   getSlotSpec,
@@ -48,6 +52,7 @@ const SLOT_PRESETS: Array<{ value: SlotAnimationPreset | ''; label: string }> = 
   { value: 'slide-in-top', label: 'Slide from top' },
   { value: 'slide-in-bottom', label: 'Slide from bottom' },
   { value: 'scale-in', label: 'Scale' },
+  { value: 'path', label: 'Path (custom waypoints)' },
 ];
 
 const SPATIAL_PRESETS: Array<{ value: SpatialAnimationPreset | ''; label: string }> = [
@@ -59,7 +64,261 @@ const SPATIAL_PRESETS: Array<{ value: SpatialAnimationPreset | ''; label: string
   { value: 'pan-right', label: 'Pan right' },
   { value: 'pan-up', label: 'Pan up' },
   { value: 'pan-down', label: 'Pan down' },
+  { value: 'path', label: 'Path (custom waypoints)' },
 ];
+
+/**
+ * Default starter paths so the author can see motion immediately after
+ * picking the Path preset. The renderer happily handles 1-waypoint
+ * paths as static end-states, but 2 waypoints actually move.
+ */
+const DEFAULT_SLOT_PATH: SlotPath = {
+  type: 'linear',
+  waypoints: [
+    { anchor: { h: 'left', v: 'center' }, dxPercent: 0, dyPercent: 0, t: 0 },
+    { anchor: { h: 'center', v: 'center' }, dxPercent: 0, dyPercent: 0, t: 1 },
+  ],
+};
+
+const DEFAULT_SPATIAL_PATH: SpatialPath = {
+  type: 'linear',
+  waypoints: [
+    { x: 0.2, y: 0.5, zoom: 1.1, t: 0 },
+    { x: 0.8, y: 0.5, zoom: 1.1, t: 1 },
+  ],
+};
+
+const ANCHOR_H: Array<'left' | 'center' | 'right'> = ['left', 'center', 'right'];
+const ANCHOR_V: Array<'top' | 'center' | 'bottom'> = ['top', 'center', 'bottom'];
+
+/* ─────────────────── Path waypoint editors ─────────────────── */
+
+interface SlotPathEditorProps {
+  value: SlotPath | undefined;
+  onChange: (next: SlotPath) => void;
+}
+
+const SlotPathEditor: React.FC<SlotPathEditorProps> = ({ value, onChange }) => {
+  const waypoints: SlotWaypoint[] = value?.waypoints ?? [];
+
+  const update = (i: number, patch: Partial<SlotWaypoint>) => {
+    const next = waypoints.map((w, idx) => (idx === i ? { ...w, ...patch } : w));
+    onChange({ type: value?.type ?? 'linear', loop: value?.loop, waypoints: next });
+  };
+  const remove = (i: number) => {
+    onChange({
+      type: value?.type ?? 'linear',
+      loop: value?.loop,
+      waypoints: waypoints.filter((_, idx) => idx !== i),
+    });
+  };
+  const add = () => {
+    const last = waypoints[waypoints.length - 1] ?? { anchor: { h: 'center', v: 'center' }, dxPercent: 0, dyPercent: 0 };
+    onChange({
+      type: value?.type ?? 'linear',
+      loop: value?.loop,
+      waypoints: [...waypoints, { ...last, t: undefined }],
+    });
+  };
+
+  return (
+    <div className="col-span-2 mt-1 rounded border border-gray-200 bg-white p-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-medium text-gray-700">Waypoints</span>
+        <label className="text-[11px] text-gray-600 flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={!!value?.loop}
+            onChange={(e) => onChange({ ...(value ?? { type: 'linear', waypoints: [] }), loop: e.target.checked })}
+          />
+          Loop
+        </label>
+      </div>
+      <div className="space-y-1.5">
+        {waypoints.map((wp, i) => (
+          <div key={i} className="grid grid-cols-12 gap-1 items-center text-[11px]">
+            <span className="col-span-1 text-gray-500 text-center">{i + 1}</span>
+            <select
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              value={wp.anchor?.h ?? 'center'}
+              onChange={(e) =>
+                update(i, { anchor: { h: e.target.value as 'left' | 'center' | 'right', v: wp.anchor?.v } })
+              }
+            >
+              {ANCHOR_H.map((h) => <option key={h} value={h}>{h[0]}</option>)}
+            </select>
+            <select
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              value={wp.anchor?.v ?? 'center'}
+              onChange={(e) =>
+                update(i, { anchor: { h: wp.anchor?.h, v: e.target.value as 'top' | 'center' | 'bottom' } })
+              }
+            >
+              {ANCHOR_V.map((v) => <option key={v} value={v}>{v[0]}</option>)}
+            </select>
+            <input
+              type="number"
+              step={1}
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="dx%"
+              value={wp.dxPercent ?? 0}
+              onChange={(e) => update(i, { dxPercent: Number(e.target.value) })}
+            />
+            <input
+              type="number"
+              step={1}
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="dy%"
+              value={wp.dyPercent ?? 0}
+              onChange={(e) => update(i, { dyPercent: Number(e.target.value) })}
+            />
+            <input
+              type="number"
+              step={0.05}
+              min={0}
+              max={1}
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="t"
+              value={wp.t ?? ''}
+              onChange={(e) => update(i, { t: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
+            <button
+              type="button"
+              className="col-span-1 text-red-600 hover:bg-red-50 rounded"
+              onClick={() => remove(i)}
+              title="Remove waypoint"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="mt-2 text-[11px] px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+        onClick={add}
+      >
+        + Add waypoint
+      </button>
+      <p className="mt-1 text-[10px] text-gray-500 leading-tight">
+        Each waypoint picks an anchor on the stage (h, v) and a percent offset.
+        The slot's center is moved to that target. `t` is the normalized time
+        (0–1) the waypoint is reached; leave blank for even spacing.
+      </p>
+    </div>
+  );
+};
+
+interface SpatialPathEditorProps {
+  value: SpatialPath | undefined;
+  onChange: (next: SpatialPath) => void;
+}
+
+const SpatialPathEditor: React.FC<SpatialPathEditorProps> = ({ value, onChange }) => {
+  const waypoints: SpatialWaypoint[] = value?.waypoints ?? [];
+
+  const update = (i: number, patch: Partial<SpatialWaypoint>) => {
+    const next = waypoints.map((w, idx) => (idx === i ? { ...w, ...patch } : w));
+    onChange({ type: value?.type ?? 'linear', loop: value?.loop, waypoints: next });
+  };
+  const remove = (i: number) => {
+    onChange({
+      type: value?.type ?? 'linear',
+      loop: value?.loop,
+      waypoints: waypoints.filter((_, idx) => idx !== i),
+    });
+  };
+  const add = () => {
+    const last = waypoints[waypoints.length - 1] ?? { x: 0.5, y: 0.5, zoom: 1 };
+    onChange({
+      type: value?.type ?? 'linear',
+      loop: value?.loop,
+      waypoints: [...waypoints, { ...last, t: undefined }],
+    });
+  };
+
+  return (
+    <div className="col-span-2 mt-1 rounded border border-gray-200 bg-white p-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-medium text-gray-700">Waypoints (0–1 on image)</span>
+        <label className="text-[11px] text-gray-600 flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={!!value?.loop}
+            onChange={(e) => onChange({ ...(value ?? { type: 'linear', waypoints: [] }), loop: e.target.checked })}
+          />
+          Loop
+        </label>
+      </div>
+      <div className="space-y-1.5">
+        {waypoints.map((wp, i) => (
+          <div key={i} className="grid grid-cols-12 gap-1 items-center text-[11px]">
+            <span className="col-span-1 text-gray-500 text-center">{i + 1}</span>
+            <input
+              type="number"
+              step={0.05}
+              min={0}
+              max={1}
+              className="col-span-3 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="x"
+              value={wp.x ?? 0}
+              onChange={(e) => update(i, { x: Number(e.target.value) })}
+            />
+            <input
+              type="number"
+              step={0.05}
+              min={0}
+              max={1}
+              className="col-span-3 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="y"
+              value={wp.y ?? 0}
+              onChange={(e) => update(i, { y: Number(e.target.value) })}
+            />
+            <input
+              type="number"
+              step={0.1}
+              min={0.1}
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="zoom"
+              value={wp.zoom ?? 1}
+              onChange={(e) => update(i, { zoom: Number(e.target.value) })}
+            />
+            <input
+              type="number"
+              step={0.05}
+              min={0}
+              max={1}
+              className="col-span-2 px-1 py-0.5 border border-gray-300 rounded text-[11px]"
+              placeholder="t"
+              value={wp.t ?? ''}
+              onChange={(e) => update(i, { t: e.target.value === '' ? undefined : Number(e.target.value) })}
+            />
+            <button
+              type="button"
+              className="col-span-1 text-red-600 hover:bg-red-50 rounded"
+              onClick={() => remove(i)}
+              title="Remove waypoint"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="mt-2 text-[11px] px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-700"
+        onClick={add}
+      >
+        + Add waypoint
+      </button>
+      <p className="mt-1 text-[10px] text-gray-500 leading-tight">
+        Coordinates are 0–1 on the letterboxed image (same as hotspots).
+        `zoom` is the scale factor at the waypoint (1 = fit, &gt;1 zooms in).
+        Leave `t` blank for even spacing.
+      </p>
+    </div>
+  );
+};
 
 function slotsForBeat(beatType: string, mode: 'slot' | 'spatial'): SlotSpec[] {
   if (mode === 'spatial') return getSpatialSpec(beatType)?.slots ?? [];
@@ -85,6 +344,7 @@ const SlotPhaseControls: React.FC<SlotPhaseControlsProps> = ({
 }) => {
   const preset = (value?.preset ?? '') as SlotAnimationPreset | '';
   const isSlide = preset.startsWith('slide-in-');
+  const isPath = preset === 'path';
   return (
     <div>
       <label className="block text-[11px] text-gray-600 mb-1">{label}</label>
@@ -94,6 +354,10 @@ const SlotPhaseControls: React.FC<SlotPhaseControlsProps> = ({
         onChange={(e) => {
           const v = e.target.value as SlotAnimationPreset | '';
           if (!v) onChange(null);
+          // Seed a starter path when the author picks Path — the renderer
+          // expects at least one waypoint, and an empty list reads as
+          // "no animation" which would silently swallow the selection.
+          else if (v === 'path') onChange({ preset: v, path: DEFAULT_SLOT_PATH });
           else onChange({ preset: v });
         }}
       >
@@ -156,6 +420,12 @@ const SlotPhaseControls: React.FC<SlotPhaseControlsProps> = ({
               />
             </div>
           )}
+          {isPath && (
+            <SlotPathEditor
+              value={value.path}
+              onChange={(nextPath) => onChange({ path: nextPath })}
+            />
+          )}
         </div>
       )}
     </div>
@@ -176,6 +446,7 @@ const SpatialControls: React.FC<SpatialControlsProps> = ({
   onChange,
 }) => {
   const preset = (value?.preset ?? '') as SpatialAnimationPreset | '';
+  const isPath = preset === 'path';
   return (
     <div>
       <label className="block text-[11px] text-gray-600 mb-1">{label}</label>
@@ -185,6 +456,7 @@ const SpatialControls: React.FC<SpatialControlsProps> = ({
         onChange={(e) => {
           const v = e.target.value as SpatialAnimationPreset | '';
           if (!v) onChange(null);
+          else if (v === 'path') onChange({ preset: v, path: DEFAULT_SPATIAL_PATH });
           else onChange({ preset: v });
         }}
       >
@@ -227,24 +499,32 @@ const SpatialControls: React.FC<SpatialControlsProps> = ({
               className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md bg-white"
             />
           </div>
-          <div className="col-span-2">
-            <label className="block text-[11px] text-gray-600 mb-1">
-              Intensity (% pan / scale delta)
-            </label>
-            <input
-              type="number"
-              min={0}
-              step={5}
-              placeholder="10"
-              value={value.intensity ?? ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                const num = raw === '' ? undefined : Math.max(0, Number(raw));
-                onChange({ intensity: num });
-              }}
-              className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md bg-white"
+          {!isPath && (
+            <div className="col-span-2">
+              <label className="block text-[11px] text-gray-600 mb-1">
+                Intensity (% pan / scale delta)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={5}
+                placeholder="10"
+                value={value.intensity ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const num = raw === '' ? undefined : Math.max(0, Number(raw));
+                  onChange({ intensity: num });
+                }}
+                className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md bg-white"
+              />
+            </div>
+          )}
+          {isPath && (
+            <SpatialPathEditor
+              value={value.path}
+              onChange={(nextPath) => onChange({ path: nextPath })}
             />
-          </div>
+          )}
         </div>
       )}
     </div>

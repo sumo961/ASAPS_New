@@ -111,12 +111,23 @@ export function migrateFixedToResponsive(
       def?.layoutMode === 'slot' || def?.layoutMode === 'spatial' || !!def?.spatialLayer;
     if (!hasResponsiveContract) return beat;
 
-    const baked: Array<{ name: string; x: number; y: number; width?: number; height?: number }> = [];
+    // Capture each baked location with its rect (we need the rect later
+    // for hotspot translation, not just the (x, y) used for slotIntent
+    // anchor inference). `kind` distinguishes hotspots / buttons from
+    // plain text elements so we know what to translate.
+    const baked: Array<{ name: string; x: number; y: number; width: number; height: number; kind?: string }> = [];
     const existingLocs = beat.locations;
     if (existingLocs instanceof Map) {
       existingLocs.forEach((v: any, k: any) => {
         if (v && typeof v === 'object' && typeof v.x === 'number' && typeof v.y === 'number') {
-          baked.push({ name: String(k ?? v.name ?? ''), x: v.x, y: v.y, width: v.width, height: v.height });
+          baked.push({
+            name: String(k ?? v.name ?? ''),
+            x: v.x,
+            y: v.y,
+            width: typeof v.width === 'number' ? v.width : 0,
+            height: typeof v.height === 'number' ? v.height : 0,
+            kind: v.kind,
+          });
         }
       });
     }
@@ -147,19 +158,128 @@ export function migrateFixedToResponsive(
       }
     }
 
-    const next: any = { ...beat };
+    // Legacy AnimationPath → SlotPath translation. Each waypoint's
+    // absolute pixel position becomes a percent of the stage anchored
+    // at top-left, so the slot's center lands at the same proportional
+    // point on any viewport. The destination slot is found by mapping
+    // the animation's elementId back to its baked location's name and
+    // then to a slot via the slot.name / slot.source match used above.
+    const slotAnimations: Record<string, any> = { ...((beat as any).slotAnimations ?? {}) };
+    const legacyAnimations: any[] = Array.isArray((beat as any).animations) ? (beat as any).animations : [];
+    let translatedAnims = 0;
+    for (const anim of legacyAnimations) {
+      const elementId = anim?.elementId;
+      const waypoints = Array.isArray(anim?.waypoints) ? anim.waypoints : [];
+      if (!elementId || waypoints.length === 0) continue;
+      // Find the slot whose name (or source) matches the elementId
+      const slot = slots.find(s => s.name === elementId)
+        ?? slots.find(s => s.source === elementId);
+      if (!slot) continue;
+      const slotWaypoints = waypoints.map((wp: any) => {
+        const x = typeof wp?.x === 'number' ? wp.x : 0;
+        const y = typeof wp?.y === 'number' ? wp.y : 0;
+        return {
+          anchor: { h: 'left', v: 'top' },
+          dxPercent: (x / stage.w) * 100,
+          dyPercent: (y / stage.h) * 100,
+          easing: typeof wp?.easing === 'string' ? wp.easing : undefined,
+        };
+      });
+      const entry = { ...(slotAnimations[slot.name] ?? {}) };
+      entry.enter = {
+        preset: 'path',
+        duration: typeof anim?.duration === 'number' ? anim.duration : 1000,
+        easing: typeof anim?.easing === 'string' ? anim.easing : undefined,
+        path: {
+          type: anim?.type === 'bezier' ? 'bezier' : 'linear',
+          loop: !!anim?.loop,
+          waypoints: slotWaypoints,
+        },
+      };
+      slotAnimations[slot.name] = entry;
+      translatedAnims++;
+    }
+
+    // Pixel-rect hotspots on baked locations → normalized 0..1 on the
+    // spatial image rect (approximated as the stage rect; close enough
+    // when the spatial image is aspect-matched to the project canvas).
+    // For each choice (movementChoice / dialogTree / pickProp) that
+    // references a hotspot location by `locationName`, copy the rect
+    // onto `choice.hotspot` as { x, y, width, height } in 0..1.
+    let translatedHotspots = 0;
+    const nextParams: any = { ...params };
+    const transferHotspots = (key: 'choices' | 'props') => {
+      const arr = Array.isArray(params?.[key]) ? params[key] : null;
+      if (!arr) return;
+      const nextArr = arr.map((c: any) => {
+        if (c?.hotspot) return c; // already responsive — preserve
+        const locName = c?.locationName ?? c?.location;
+        if (!locName) return c;
+        const loc = baked.find(b => b.name === locName);
+        if (!loc || !loc.width || !loc.height) return c;
+        translatedHotspots++;
+        return {
+          ...c,
+          hotspot: {
+            x: loc.x / stage.w,
+            y: loc.y / stage.h,
+            width: loc.width / stage.w,
+            height: loc.height / stage.h,
+          },
+        };
+      });
+      nextParams[key] = nextArr;
+    };
+    transferHotspots('choices');
+    transferHotspots('props');
+    // dialogTree choices live one level deeper, under parameters.dialogTree.choices
+    if (params?.dialogTree?.choices && Array.isArray(params.dialogTree.choices)) {
+      const nextDialogChoices = params.dialogTree.choices.map((c: any) => {
+        if (c?.hotspot) return c;
+        const locName = c?.locationName ?? c?.location;
+        if (!locName) return c;
+        const loc = baked.find(b => b.name === locName);
+        if (!loc || !loc.width || !loc.height) return c;
+        translatedHotspots++;
+        return {
+          ...c,
+          hotspot: {
+            x: loc.x / stage.w,
+            y: loc.y / stage.h,
+            width: loc.width / stage.w,
+            height: loc.height / stage.h,
+          },
+        };
+      });
+      nextParams.dialogTree = { ...params.dialogTree, choices: nextDialogChoices };
+    }
+
+    const next: any = { ...beat, parameters: nextParams };
     next.locations = new Map();
     if (Object.keys(slotIntent).length > 0) {
       next.slotIntent = slotIntent;
     }
+    if (Object.keys(slotAnimations).length > 0) {
+      next.slotAnimations = slotAnimations;
+    }
 
+    const parts: string[] = [];
+    if (baked.length > 0) {
+      parts.push(`cleared ${baked.length} baked position${baked.length === 1 ? '' : 's'}, inferred slotIntent`);
+    } else {
+      parts.push('already empty — flag now consistent');
+    }
+    if (translatedAnims > 0) {
+      parts.push(`translated ${translatedAnims} path animation${translatedAnims === 1 ? '' : 's'}`);
+    }
+    if (translatedHotspots > 0) {
+      parts.push(`normalized ${translatedHotspots} hotspot${translatedHotspots === 1 ? '' : 's'}`);
+    }
     summary.push({
       beatId: (beat as any).id,
       beatType: beat.type,
       beatName: (beat as any).name,
-      detail: baked.length > 0
-        ? `cleared ${baked.length} baked position${baked.length === 1 ? '' : 's'}, inferred slotIntent`
-        : 'already empty — flag now consistent',
+      detail: parts.join(', '),
     });
     return next as Beat;
   });
