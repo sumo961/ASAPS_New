@@ -36,6 +36,11 @@ export const generateStoryTool = {
                 type: 'string',
                 description: 'Additional context or requirements',
             },
+            affectDepth: {
+                type: 'string',
+                description: 'How much rich-character / affect (mood, traits, goals, etc.) to deploy. "auto" lets the AI pick based on the prompt; "sparse" produces lean output with no affect annotations; "standard" deploys mood seeds + affect Effects on key choices; "rich" uses the full affect system including traits, goals, variants, and bookmark-relative conditions. Default: "auto".',
+                enum: ['auto', 'sparse', 'standard', 'rich'],
+            },
         },
         required: ['prompt'],
     },
@@ -44,7 +49,7 @@ export const generateStoryTool = {
  * Tool handler
  */
 export async function handleGenerateStory(args) {
-    const { prompt, genre, length, complexity, context } = args;
+    const { prompt, genre, length, complexity, context, affectDepth } = args;
     // Validate prompt
     if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
         return {
@@ -54,7 +59,7 @@ export async function handleGenerateStory(args) {
         };
     }
     console.error(`[generateStory] Generating story: "${prompt}"`);
-    console.error(`[generateStory] Parameters: genre=${genre}, length=${length}, complexity=${complexity}`);
+    console.error(`[generateStory] Parameters: genre=${genre}, length=${length}, complexity=${complexity}, affectDepth=${affectDepth ?? 'auto'}`);
     try {
         const story = await generateStory({
             prompt,
@@ -62,6 +67,7 @@ export async function handleGenerateStory(args) {
             length,
             complexity,
             context,
+            affectDepth,
         });
         console.error(`[generateStory] Generated ${story.beats.length} beats, ${story.connections.length} connections`);
         return {

@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.56.107*
+*Last revised against build 0.9.59.110*
 
 ---
 
@@ -151,7 +151,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.43.94), and a large text field where you can type or edit your project's title directly.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.59.110), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
 
 **Row 2 -- Main Controls:**
 
@@ -1205,6 +1205,31 @@ Assets are your media files—the images, sounds, and videos that bring your exp
 - Delete unused assets to keep projects lean
 - Keep source files backed up outside ASAPS
 
+<a id="asset-variants"></a>
+### Image Asset Variants — Orientation and Device Class (v0.9.59)
+
+Image assets can carry **variants** — alternate images the runtime swaps in when the player's viewport matches certain constraints. This is the iOS-style asset-catalog mechanic: you ship one "base" image and pair it with portrait-only, phone-only, or "phone + portrait" overrides for situations where the base composition doesn't read well.
+
+To author variants:
+
+1. Open the **Asset Manager** (header) and select an image asset. The details panel on the right opens.
+2. Scroll down to the **Variants** section.
+3. Click **+ Add** to pair another image as a variant. The dropdown lists every other image in your project; the variant cannot point at itself.
+4. For each variant row, optionally set:
+   - **Orientation** — *Any orient.* (default), *Portrait*, or *Landscape*.
+   - **Device class** — *Any device* (default), *Phone*, *Tablet*, or *Desktop*.
+5. Add as many variants as you need; remove one with the trash icon.
+
+At render time the runtime picks the **most-specific variant whose constraints all match** the current container (iOS asset-catalog scoring — exact orientation +2 points, exact device class +1 point; contradictions disqualify). If no variant matches, the runtime falls back to the base image. This is currently used by `SpatialFlowView` for spatial backgrounds, which read container dimensions at render time and resolve the best-matching variant URL.
+
+Typical use cases:
+
+- A landscape composition that needs to crop differently in portrait: ship the landscape base, add a portrait-specific variant that recomposes the framing.
+- A high-detail background that's wasteful on phone: ship the high-res base, add a phone variant pointing at a lighter image.
+- Device-class tone shifts (a denser composition for desktop's bigger canvas vs. a simpler one for phone).
+
+> **Variant ≠ thumbnail.** ASAPS doesn't resize variants for you — each variant points at a separate, fully-authored image asset. If the variant images don't exist yet, upload them first; the dropdown only lists images already in the project.
+
 ---
 
 # Part 5: Visual Design
@@ -1217,6 +1242,62 @@ Your story shouldn't just read well—it should look amazing. The Visual Editor 
 2. Click the **Visual Editor** tab
 
 You'll see a stage representing what interactors see—default size is 1024×768 pixels (customizable in Settings).
+
+<a id="responsive-vs-fixed-layout"></a>
+## Responsive vs Fixed Layout (v0.9.59)
+
+Every project carries a **layout mode** — either *Responsive* or *Fixed canvas* — that decides how the Visual Editor and the runtime treat element positions. The mode is project-level (not per-beat), and the choice colours how the editor looks and what controls show up.
+
+> **Heads-up:** Responsive layout is shipped but still **work-in-progress**. The contracts (slot intents, spatial fits, anchor pins) are stable enough to author against, and existing projects keep rendering through the legacy absolute path with no silent breaking changes — but expect the responsive surface to keep evolving over the next few releases. If you're writing a story that *must* ship soon and pixel-perfect, picking Fixed canvas is a safe choice.
+
+### What the two modes mean
+
+| Mode | What it does | When to pick it |
+|------|--------------|-----------------|
+| **Responsive layout** (green pill in header) | Beats reflow through ASAPS's slot / spatial system. The runtime adapts to any viewport — desktop, tablet, phone, portrait or landscape — by re-resolving positions at render time. Authoring is *intent-annotated*: you say "this text wants to sit in the bottom-center action slot", not "this text is at x=512, y=720". | New projects, anything you plan to ship to phones, anything you want to preview across devices. The default for new projects since v0.9.59. |
+| **Fixed canvas** (amber pill in header) | Every element carries explicit pixel positions on a 1024×768 (or your custom) stage. What you place is what the runtime renders, scaled to fit the player's viewport. The historical ASAPS behaviour. | Pixel-precise visual-novel layouts, projects authored before v0.9.58 that you don't want to migrate, anything where you need full control over compositional placement. |
+
+### Picking the mode at project creation
+
+The **New Project** dialog (Project Selector → *New Project*) now has two extra rows under the description field:
+
+- **Layout Mode** — *Responsive* (default) or *Fixed canvas*. Two side-by-side cards.
+- **Orientation** — appears only when Layout Mode is *Responsive*. Three options: *Flexible* (adapts to device rotation, default), *Landscape* (locks to landscape — player shows a "rotate your device" overlay otherwise), *Portrait* (locks to portrait the same way). When Layout Mode is *Fixed canvas* the Orientation row collapses, because fixed-canvas projects always render at their authored aspect ratio.
+
+You can change either setting later from **Settings → Project**.
+
+### Switching mode on an existing project
+
+Click the **layout-mode pill** in the header (green *Responsive layout* or amber *Fixed canvas*) — or open **Settings → Project → Layout Mode** — and pick the other mode. ASAPS runs a one-shot **migrator** with a preview:
+
+- **Fixed → Responsive** strips baked pixel positions so beats fall back to schema-driven slot/spatial layout. Best for projects that have only ever used the default layouts.
+- **Responsive → Fixed** bakes the current schema-driven positions into explicit `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
+
+The migrator preview lists the per-beat changes so you can see what will happen before committing. Either direction is destructive in the sense that the previous shape isn't preserved — back up (or commit to git) before switching if you might want to revert.
+
+### Authoring affordances that change with the mode
+
+The Visual Editor adapts to the active mode:
+
+- **Add Character / Add Prop / Add Text** buttons (in the Elements panel on the right) are **only available in Fixed canvas mode**. In Responsive mode these would create dead pixel positions the responsive renderer ignores, so they're hidden. **Add Hotspot** stays available everywhere because hotspots are normalized 0–1 overlays on the spatial image rect — fundamentally responsive.
+- **Background fit** (Visual Editor left sidebar, just under the background-image picker) lets you toggle *Contain* (show the whole image) vs *Cover* (fill the stage, crop edges) per beat in spatial mode. Defaults to *Contain*. This moved out of the Inspector in v0.9.59 to sit closer to where authors are looking.
+- **Path-keyframe animations** (the absolute-mode animation editor) keep working on beats with baked pixel positions even in responsive projects, but the Animations panel shows a small amber **"Legacy path animation"** banner reminding you that slot-anchored elements use a different animation editor.
+- **Speaker label preview** — when a slot-mode dialog beat has a speaker assigned, the VE preview now shows the speaker label exactly where the runtime would render it, matching `resolveSpeakerForSlot`.
+
+### Per-button pins (action slot)
+
+In responsive mode, the slot-intent toolbar (top of the Visual Editor preview area) has a **Pin** row that lets you lift individual stage buttons out of the shared action row and pin them to any stage corner. One control per visible button — *Continue*, *Restart*, *Credits*. The six preset glyphs are:
+
+| Glyph | Position |
+|-------|----------|
+| `—` | In shared row (default) |
+| `⌜` | Top-left |
+| `⌝` | Top-right |
+| `⌞` | Bottom-left |
+| `⎵` | Bottom-center |
+| `⌟` | Bottom-right |
+
+Once a button is pinned (anything other than *In row*), a per-button **gap** slider appears next to its preset row so you can tune the offset from the stage edge.
 
 ## Setting the Scene
 
@@ -1263,6 +1344,8 @@ Create clickable areas that don't have visible content:
 3. Connect to choices or actions
 
 Useful for "click on the suspicious painting" interactions.
+
+**Orientation-aware spatial hotspots (v0.9.59).** Spatial hotspots (on Movement Choice, Pick Prop, and similar beats in responsive mode) can carry an optional **portrait variant** — a second rect (`portrait: { x, y, width, height }`) that the runtime uses when the player is on a portrait-oriented stage. The landscape rect is the canonical position; the portrait override is *additive*. To author both variants from the Visual Editor, switch the preview viewport (top of the slot/spatial preview) between landscape and portrait presets — Phone portrait, Tablet portrait, and similar presets put the editor in portrait mode and drag-edits write into `hotspot.portrait` (creating it on first edit, with the canonical rect as its template so an accidental tap doesn't blank the override). Landscape edits write the canonical `x/y/width/height` as before. If a beat has only landscape coordinates, the runtime falls back to them in portrait orientation too — overrides are opt-in per-hotspot.
 
 ## Layering & Z-Order
 
@@ -1626,10 +1709,24 @@ The top toolbar provides essential controls:
 | **Step** | Advance one beat at a time |
 | **Zoom** | Adjust display size |
 | **Fit** | Auto-fit to window |
+| **Viewport** | Switch the preview container to a device preset (Fit window, Desktop 1280×800, Tablet landscape/portrait, Phone landscape/portrait) — see below |
 | **Text Animation** | Toggle typewriter effect on/off |
 | **Mute** | Silence all audio |
 | **Inventory** | Show/hide inventory panel (Ctrl/Cmd+I) |
 | **Debug Panel** | Toggle debug information sidebar |
+
+### Viewport Switcher (v0.9.59)
+
+The **Viewport** dropdown next to the Fit button lets you preview your story at a fixed device preset without resizing the actual browser window. Six options ship out of the box:
+
+- **Fit window** — no override; the stage scales to whatever window size you've given the preview pop-out (the default).
+- **Desktop · 1280×800** — landscape desktop reference.
+- **Tablet landscape · 1024×768** and **Tablet portrait · 768×1024**.
+- **Phone landscape · 740×360** and **Phone portrait · 390×740**.
+
+Picking a preset locks the preview container to that exact pixel size and orientation. The container stays stable across preset swaps so you can A/B between, say, Phone portrait and Tablet portrait without the renderer fully remounting. The active size is also shown as a small chip on the preview frame.
+
+This is particularly useful for **responsive-mode projects**, where the same story renders differently depending on viewport width and orientation — flipping between presets is how you sanity-check that your slot intents land the way you want on a phone, a tablet, and a desktop. Fixed-canvas projects also respect the preset, but since their layout is pixel-baked, the viewport switcher just changes how much of the stage you see at once.
 
 ### Path-Based State Presets
 
@@ -2135,6 +2232,8 @@ Use sprite sheets for frame-by-frame animation:
 - Stage dimensions and aspect ratio (4:3, 16:9, etc.)
 - Scaling mode
 - Mobile display settings (font scaling, safe zone preview)
+- **Layout Mode** — *Responsive layout* (green) or *Fixed canvas* (amber). Switching runs the one-shot migrator with a preview; see [Responsive vs Fixed Layout](#responsive-vs-fixed-layout).
+- **Orientation** — *Flexible*, *Portrait only*, or *Landscape only*. Affects how the player handles device rotation (a locked project shows a "rotate your device" prompt when held the wrong way).
 
 **Settings → Colors:**
 - Button colors
@@ -2272,6 +2371,8 @@ Fictional time tracks an in-story date and time that's independent of real-world
 - Branch your story based on what "time" it is in the narrative
 
 **Displaying Fictional Time:** When the Timer HUD is enabled and fictional time is set, the HUD automatically displays the formatted time (e.g., "9:00 AM" or "Jan 31, 2025 9:00"). This appears even when no real-time countdown is active.
+
+**Fictional-time HUD in the Visual Editor (v0.9.59).** When all three switches line up — **Settings → HUD → Timer / Time Display** *Enabled*, **Settings → HUD → Fictional Time** *Enabled*, and that section's **Show in Timer HUD** option turned on — the Visual Editor's slot/spatial preview now renders the chip too, in the configured corner and at the configured `displayFormat` (e.g., a green *"1 January 2024, 9:00 AM"* chip at top-right). So you can see WHERE the chip will sit and HOW the initial time renders without leaving the editor. The chip stays hidden in the VE when any of those switches is off.
 
 **Example: Day/Night Cycle**
 ```
@@ -2728,6 +2829,16 @@ Quick reference for all beat types.
 
 **Markdown-Lite** - Lightweight text formatting supported in text boxes: `**bold**`, `*italic*`, `~~strikethrough~~`, and line breaks.
 
+**Layout Mode** - Project-level setting (v0.9.59+) that decides whether the project uses *Responsive layout* (slot/spatial flow, reflows to any viewport, default for new projects) or *Fixed canvas* (pixel positions on a 1024×768-ish stage, the historical ASAPS behaviour). Set in the New Project wizard or **Settings → Project → Layout Mode**; the colored pill in the header reflects the active mode. Switching modes on an existing project runs a one-shot migrator with a preview.
+
+**Orientation Policy** - Project-level setting (v0.9.59+) that constrains responsive projects to *Flexible*, *Landscape only*, or *Portrait only*. Locking shows a "rotate your device" overlay when the player holds the device the wrong way; layout stays width-responsive either way. Only meaningful for Responsive-layout projects; collapses to a non-choice when Layout Mode is Fixed canvas.
+
+**Asset Variant** - Optional override on an image asset (v0.9.59+) that swaps in an alternate image when the viewport matches given orientation and/or device-class constraints (iOS asset-catalog style scoring). Authored in the Asset Manager's image-details panel; resolved at render time by `SpatialFlowView`. Falls back to the base asset when no variant matches.
+
+**Hotspot Portrait Override** - Optional second rect on a spatial hotspot (v0.9.59+) that the runtime uses when the stage is portrait-oriented. Authored by switching the Visual Editor preview to a portrait viewport preset and dragging the hotspot — drags in portrait mode write to `hotspot.portrait`, drags in landscape write the canonical rect. Falls back to landscape values when no portrait override exists.
+
+**Action Slot Button Pin** - Per-button override (v0.9.59+) that lifts one of the action-slot buttons (*Continue*, *Restart*, *Credits*) out of the shared flex row and pins it to one of five stage corners (or back into the row). Authored from the **Pin** row in the slot-intent toolbar; each pinned button gets its own gap slider.
+
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
 **STT (Speech-to-Text)** - Voice input that converts spoken words to text. Used in AI Conversation beats and other input scenarios. Supports Web Speech, Whisper (OpenAI), local Whisper servers, Vosk, and whisper.cpp.
@@ -2784,6 +2895,9 @@ Yes! Use the language selector (top right) to add target languages. You can tran
 
 ### What browsers are supported?
 Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects.
+
+### Should I pick Responsive or Fixed canvas for my new project?
+**Responsive layout** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. The runtime adapts to any viewport using ASAPS's slot/spatial system, and the Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. The trade-off is that Responsive is still work-in-progress (shipping, but evolving), and you give up some pixel-precise compositional control. **Fixed canvas** gives you full pixel control on a 1024×768-ish stage — pick it if you're authoring a visual-novel-style project with hand-placed compositions, or if you're porting a pre-v0.9.58 project and don't want to migrate. You can switch later via the header pill or **Settings → Project → Layout Mode** (with a migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
 
 ---
 

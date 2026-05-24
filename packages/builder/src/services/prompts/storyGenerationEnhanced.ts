@@ -1865,6 +1865,71 @@ These are internal editor fields - NEVER include them:
 - ❌ \`locs\`
 - ❌ \`locations\`
 
+### 5b. Layout — responsive is the default
+
+ASAPS Modern v0.9.59 ships responsive layout as the **default for new
+projects**. Visible text-driven beats (titleScreen, infoText, durScreen,
+endScreen, aiInfoText, aiSummary, onlineContent) render via slot mode —
+the engine resolves position from the beat's schema slots at runtime
+instead of pixel coordinates. Spatial-mode beats (titleScreen with a
+background image; movementChoice / pickProp / dialogTree once they
+carry hotspots) compose a uniformly-scaled image layer under a
+responsive text/button flow. Either path means: **never emit pixel
+positions** for these beats. The forbidden \`locations\` field above
+already covers this; the rest of this section explains the responsive
+mechanics so you can use them when they help the story.
+
+**Hotspots — the responsive way to author "click somewhere on the
+picture"**. \`movementChoice\` / \`pickProp\` / \`dialogTree\` can attach
+an optional \`hotspot: { x, y, width, height, shape? }\` to any
+choice, prop, or dialog node. Coordinates are normalized 0–1 of the
+IMAGE rect (not the container), so they land on the same picture
+pixels at any viewport. Use hotspots when the choices correspond to
+visible things in the background image — a door, an object, a person.
+Don't fabricate a hotspot for an abstract choice ("be brave" has no
+hotspot); leave \`hotspot\` absent and the choice surfaces as a
+themed button below the scene.
+
+\`\`\`json
+{
+  "id": "c1",
+  "text": "Open the cellar door",
+  "target": "beat_5",
+  "hotspot": { "x": 0.32, "y": 0.58, "width": 0.18, "height": 0.24, "shape": "rect" }
+}
+\`\`\`
+
+**Slot intent — soft layout hints (optional)**. For slot-mode beats,
+\`parameters.slotIntent\` is a per-slot map of soft preferences the
+renderer honours when it can. Today: \`preferredLines\` (target line
+count for the title slot) and \`anchor\` (alignment / edge-relative
+position for the action slot). NEVER serialize this as
+\`locations[]\` — the no-bake guard is what keeps the beat responsive.
+
+\`\`\`json
+"slotIntent": {
+  "title":   { "preferredLines": 2 },
+  "actions": { "anchor": { "h": "right", "v": "bottom", "relativeTo": "stage", "gap": 16 } }
+}
+\`\`\`
+
+**Per-button anchor (optional, action slot only)**. For endScreen and
+aiSummary, \`slotIntent.actions.buttonAnchors\` lifts a single named
+button out of the shared row to its own stage corner — useful for
+designs like "Credits in the corner, Restart centered". Keys:
+\`continueButton\`, \`restartButton\`, \`creditsButton\`.
+
+**Hotspot portrait override (optional)**. A hotspot can carry
+\`portrait: { x, y, width, height }\` when the scene's portrait crop
+puts the clickable element in a different place than the landscape
+crop. Absent → landscape values used in both orientations.
+
+**Asset variants (optional)**. An image asset's \`variants\` array
+declares other project images as orientation- and/or device-class-
+specific variants. Authors typically pair a landscape master image
+with a portrait re-crop. Don't author variants in story generation
+unless the user explicitly asks for orientation-aware backgrounds.
+
 ### 6. Avoid infinite loops without exit
 ❌ WRONG (trap loop with no progression):
 \`\`\`

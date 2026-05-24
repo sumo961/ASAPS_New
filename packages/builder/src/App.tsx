@@ -1531,6 +1531,29 @@ function App() {
             appCharIds: charactersRef.current.map((c: any) => c.id),
           });
 
+          // Phase 3 — AI-generated projects default to responsive layout.
+          // The inference in resolveLayoutMode would already classify a
+          // beats-without-baked-locations project as 'responsive', but
+          // setting the flag explicitly makes the Header badge land
+          // green from the first frame and makes the choice durable
+          // through any future migration. Write only the layoutMode
+          // field; leave other globalSettings (variables wired
+          // earlier, AI provider, theme) untouched.
+          try {
+            const cur = globalSettingsRef.current ?? globalSettings ?? {};
+            const next = {
+              ...cur,
+              project: {
+                ...(cur as any).project,
+                layoutMode: 'responsive' as const,
+              },
+            };
+            globalSettingsRef.current = next as any;
+            setGlobalSettings(next as any);
+          } catch (err) {
+            console.warn('[App] Failed to stamp layoutMode=responsive on AI-generated project', err);
+          }
+
           // NOW sync beats to the new project (createProject updated currentProjectRef)
           syncProjectData();
           console.log('[AI-CHAR-DIAG] AFTER syncProjectData:', {

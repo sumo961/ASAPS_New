@@ -937,6 +937,17 @@ CRITICAL CONNECTION RULES:
   ❌ WRONG: "trueConnection": { "targetId": "beat_5", "label": "Yes" }
   ✓ CORRECT: "trueConnection": { "target": "beat_5", "label": "Yes" }
 
+LAYOUT — RESPONSIVE IS THE DEFAULT (v0.9.59+):
+ASAPS Modern projects default to responsive layout — visible text-driven beats render through schema-driven slot mode (no pixel positions), spatial-mode beats (titleScreen with a background image; movementChoice / pickProp / dialogTree carrying hotspots) compose a uniformly-scaled image under responsive flow. The runtime decides position from slot specs and viewport; you do not.
+- 🚫 NEVER emit a "locations" field on any beat — baking pixel x/y/w/h forces the beat into legacy absolute mode and defeats responsive rendering.
+- ✓ For "click somewhere on the picture" choices: attach an optional hotspot on the choice/prop/dialog node:
+  { "id": "c1", "text": "Open the cellar door", "target": "beat_5",
+    "hotspot": { "x": 0.32, "y": 0.58, "width": 0.18, "height": 0.24, "shape": "rect" } }
+  Coordinates are normalized 0–1 of the IMAGE rect (not the container) so they survive any viewport / orientation. Use hotspots when choices map to visible elements in the background image; omit when choices are abstract (those surface as themed buttons below the scene automatically).
+- ✓ Optional slotIntent on slot-mode beats: parameters.slotIntent is a per-slot map of soft preferences (e.g. { "title": { "preferredLines": 2 }, "actions": { "anchor": { "h": "right", "v": "bottom", "relativeTo": "stage", "gap": 16 } } }). Honored when the renderer can; never serialized as locations[].
+- ✓ Optional hotspot.portrait override: a hotspot can carry { x, y, width, height } under a "portrait" key when the portrait crop puts the clickable element in a different place than the landscape crop. Absent → landscape values used in both orientations.
+- Do not author Asset.variants[] (the per-image orientation/device-class swap) unless the user explicitly asks for orientation-aware backgrounds — those belong to the asset, not the story.
+
 CRITICAL setVariable LIMITATION:
 - setVariable beats can ONLY modify ONE variable/counter per beat!
 - If you need to set multiple variables (e.g., "Creative +1, Temper -1"), you MUST create SEPARATE setVariable beats chained together.

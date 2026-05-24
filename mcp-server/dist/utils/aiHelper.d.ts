@@ -99,7 +99,7 @@
  * - Set via setVariable with type "fictionalTime": operations "set", "advance", "subtract"
  * - Check via conditionBeat with type "fictionalTime": compare current time against a date/time
  * - Display: Shows automatically in Timer HUD when enabled in global settings
- * - Supports units: minutes, hours, days, months, years
+ * - Supports units: minutes, hours, days, weeks, months, years
  * - Display formats: time-12h, time-24h, date, datetime-12h, datetime-24h, day-number, year
  * - Per-beat timeDisplayMode: "fictionalTime" (default), "manual" (custom text), "none" (hide HUD)
  *
@@ -160,8 +160,8 @@ export declare const BEAT_TYPES: {
     readonly keypad: "Numeric keypad input (PIN entry, safe locks, phone dialers). Parameters: prompt, layout (\"numeric\"|\"phone\"|\"pin\"), maxDigits, minDigits, correctCode (optional auto-validation), failTarget (beat on wrong code), maxAttempts (0=unlimited), maskInput (boolean), saveToType (\"variable\"|\"counter\"), variable, buttonText, clearButtonText, showDisplay. SINGLE CONNECTION: correct code or submit → next beat. If correctCode is set, validates automatically and routes to failTarget on wrong entry.";
     readonly durScreen: "Timed screen that auto-advances after duration. SINGLE CONNECTION: only one target via connections array at beat level. ❌ WRONG: connection inside parameters. ✓ CORRECT: \"connections\": [{ \"targetId\": \"beat_5\" }] at beat level. Optional: textVariations (array) for random text selection at runtime.";
     readonly videoBeat: "Video playback. SINGLE CONNECTION: only one target after video ends. Supports optional defaultTarget for timed auto-advance.";
-    readonly conditionBeat: "Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime (compare in-story date/time).";
-    readonly setVariable: "Set ONE variable/counter/fictionalTime per beat. Types: \"variable\" (text/boolean), \"counter\" (numeric ops), \"fictionalTime\" (set/advance/subtract in-story date/time). Operations: set, add, subtract, multiply, divide. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.";
+    readonly conditionBeat: "Conditional branching. NESTED FORMAT ONLY: uses condition object + trueConnection/falseConnection objects. ❌ Do NOT use flat params like trueTarget, falseTarget, variableName, operator, value. Condition types: variable, inventory, counter, counterCompare, timer, visitedBeat, fictionalTime (compare in-story date/time). A counter/counterCompare condition may include \"character\" to read a per-character counter; it MUST match the scope the counter was written with (omit for a global counter).";
+    readonly setVariable: "Set ONE variable/counter/fictionalTime per beat. Types: \"variable\" (text/boolean), \"counter\" (numeric ops), \"fictionalTime\" (set/advance/subtract in-story date/time). Operations: set, add, subtract, multiply, divide. For type=\"counter\" only, an optional \"character\" field scopes the counter to one character (per-character stat like health/trust); OMIT it for a global world/plot tally (the default). Two characters can share a counter name when scoped. Read it back with the same scope. IMPORTANT: Can only modify ONE variable at a time! To set multiple variables, chain multiple setVariable beats. SINGLE CONNECTION: executes then continues to one target.";
     readonly addRemoveInventory: "Modify inventory. Actions: add, remove, or transfer (move between characters). Use \"character\" parameter to specify which character's inventory (defaults to player). Examples: { \"action\": \"add\", \"item\": \"key\", \"character\": \"merchant\" }, { \"action\": \"transfer\", \"item\": \"sword\", \"fromCharacter\": \"player\", \"toCharacter\": \"companion\" }. SINGLE CONNECTION: executes then continues to one target.";
     readonly randomTarget: "Random branching. MULTIPLE TARGETS: define targets in choices[].target parameter.";
     readonly setTimer: "Set/check timers. Beat continues immediately to SINGLE CONNECTION target while timer runs in background. Optional timerTarget parameter: where story jumps when timer expires.";
@@ -182,7 +182,20 @@ export interface StoryConfig {
     length?: 'short' | 'medium' | 'long';
     complexity?: 'linear' | 'moderate' | 'complex';
     context?: string;
+    /**
+     * Affect deployment depth for the generated story (v0.9.46+).
+     * 'auto' (default) lets the AI pick based on prompt content;
+     * 'sparse' / 'standard' / 'rich' force a tier. See
+     * `buildAffectPromptSection` (mirrored from packages/core/src/prompts/
+     * affectPrompt.ts) for tier definitions.
+     */
+    affectDepth?: 'auto' | 'sparse' | 'standard' | 'rich';
 }
+/**
+ * Compose the affect-aware section of an AI generation system prompt.
+ * Mirror of `buildAffectPromptSection` in @asaps/core. Keep this in sync.
+ */
+export declare function buildAffectPromptSection(depth?: 'auto' | 'sparse' | 'standard' | 'rich'): string;
 /**
  * Generated beat structure
  */
