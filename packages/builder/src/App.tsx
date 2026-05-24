@@ -2152,6 +2152,14 @@ function App() {
                   url,
                   size: assetInfo.size,
                   uploadedAt: new Date(assetInfo.uploadedAt),
+                  // Phase 3.3 — carry variants from the metadata bag
+                  // into the top-level Asset.variants field the UI and
+                  // resolver consume. Absent → no override (unchanged
+                  // behavior).
+                  ...(Array.isArray((assetInfo as any).metadata?.variants) &&
+                  (assetInfo as any).metadata.variants.length > 0
+                    ? { variants: (assetInfo as any).metadata.variants }
+                    : {}),
                 });
                 console.log('[App] >>> Asset loaded:', assetInfo.filename, '(location:', assetInfo.location, ')');
               } else {
@@ -2386,6 +2394,14 @@ function App() {
                   url,
                   size: assetInfo.size,
                   uploadedAt: new Date(assetInfo.uploadedAt),
+                  // Phase 3.3 — carry variants from the metadata bag
+                  // into the top-level Asset.variants field the UI and
+                  // resolver consume. Absent → no override (unchanged
+                  // behavior).
+                  ...(Array.isArray((assetInfo as any).metadata?.variants) &&
+                  (assetInfo as any).metadata.variants.length > 0
+                    ? { variants: (assetInfo as any).metadata.variants }
+                    : {}),
                 });
                 console.log('[App] >>> Asset loaded:', assetInfo.filename, '(location:', assetInfo.location, ')');
               } else {

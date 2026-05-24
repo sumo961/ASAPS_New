@@ -79,6 +79,10 @@ export async function assetToStored(
       subType: asset.subType,
       dimensions: asset.dimensions,
       duration: asset.duration,
+      // Phase 3.3 — persist asset variants under metadata so the
+      // round-trip through StoredAsset preserves them. storedToAsset
+      // lifts them back to the top-level Asset.variants the UI uses.
+      ...(asset.variants ? { variants: asset.variants } : {}),
     },
   };
 
@@ -118,6 +122,14 @@ export function storedToAsset(storedAsset: StoredAsset): Asset {
     duration: storedAsset.metadata?.duration,
     metadata: storedAsset.metadata,
     uploadedAt: storedAsset.uploadedAt,
+    // Phase 3.3 — lift variants from the nested metadata bag back to
+    // the top-level Asset.variants the AssetManager UI reads and writes.
+    // Defensive: only when the array is non-empty so an authored-but-
+    // emptied list serializes as absent.
+    ...(Array.isArray((storedAsset.metadata as any)?.variants) &&
+    (storedAsset.metadata as any).variants.length > 0
+      ? { variants: (storedAsset.metadata as any).variants }
+      : {}),
   };
 
   return asset;
