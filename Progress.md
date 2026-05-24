@@ -1,5 +1,45 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-24: Responsive layout follow-through — generation paths, web export parity (v0.9.60)
+
+### Overview
+
+A focused follow-up to v0.9.59 that closes the last two gaps in the responsive layout system: **AI generation paths now default to responsive** (prompts updated, AI-injection explicitly stamps `layoutMode: 'responsive'`, MCP server prompt mirrors the same guidance), and the **HTML/web export now ships asset variants end-to-end** (the v0.9.59 Phase 3.3 feature was silently broken in exports because the player's variant resolver was never wired). No new authoring surface; this release just makes the existing v0.9.59 features actually reach the runtime via every path.
+
+### Generation paths default to responsive
+
+The v0.9.59 wizard makes Responsive the default for human-authored new projects, but AI-generated stories and MCP-driven generation needed the same treatment:
+
+- **AI story-generation prompt** (`storyGenerationEnhanced.ts`): added a new "5b. Layout — responsive is the default" section right after the existing forbid on `locations`. Names the responsive mechanics positively so the model knows what TO emit: hotspot on choice/prop/dialog node (normalized 0–1 of the IMAGE rect), optional slotIntent for soft layout hints, optional per-button anchor for endScreen/aiSummary, optional hotspot.portrait override, optional Asset.variants (gated on explicit user ask).
+- **MCP server prompt** (`mcp-server/src/utils/aiHelper.ts`): the same layout section in its terser format. Built `dist` regenerated.
+- **AI-injection path** (`App.tsx`): stamps `globalSettings.project.layoutMode = 'responsive'` right after `createProject` runs. The `resolveLayoutMode` inference would already classify an AI-generated project as responsive (no beats carry baked locations), but the explicit write makes the Header badge land green from frame one and survives any future migration.
+
+**Audited and confirmed no changes needed**: Twine + Ren'Py importers don't bake `locations`. `SchemaLocationInitializer` already has the schema-type-level skip-guard for slot/spatial beats. Blank-project `createProject` leaves `globalSettings` unset; the resolver infers `'responsive'` when no baked locations exist — correct.
+
+**Files modified**: `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `mcp-server/src/utils/aiHelper.ts`, `packages/builder/src/App.tsx`.
+
+### Web export parity — asset variants ship through HTML export
+
+A devTools-style audit of the HTML export path turned up that the asset-variants metadata (orientation + device-class) was being written to exported ZIPs but never wired on the player side. Stories shipped the variant entries, but `setAssetVariantsResolver` was never called, so SpatialFlowView silently fell back to the base image. Three coordinated fixes close the loop:
+
+- **Export side** (`projectZipManager.ts`): per-asset metadata JSON now folds `asset.variants` (lifted to the top-level Asset by the v0.9.59 Phase 3.3 loader fix) into the nested metadata bag the player reads. Belt-and-suspenders fallback to `asset.metadata.variants` so the storage round-trip's other shape is also captured.
+- **Player load side** (`PlayerEngine.buildStoryAssets`): the JSON-metadata pass now parses each asset's `.json` file via the existing `assetResolver.getAsset` path, extracts `metadata.variants`, and caches it on the new `this.assetVariants: Map<baseId, variants[]>` field. Best-effort: a parse failure on one asset doesn't break the rest of asset loading.
+- **Player resolver side** (`PlayerEngine.setupResolvers`): wires `renderer.setAssetVariantsResolver(...)` — mirror of the existing PreviewWindow / VisualWorkspace inline implementations. Pairs each cached variant's `assetId` with its URL from `assetMap` at lookup time. Undefined for assets without variants → SpatialFlowView falls back to the base image (the documented default).
+
+All packages rebuilt; `packages/builder/public/player-web.js` now contains the variant wiring (verified via grep). Every future HTML export will embed the corrected player.
+
+**Other features the audit confirmed already-wired and required no changes**: `OrientationGate` (orientation policy), `TimerHudDisplay` (fictional-time HUD), `theme.textBox` wiring, slot/spatial mode auto-selection per beat. The project-level `layoutMode` flag is editor UI metadata, not a runtime input — the renderer's per-beat `shouldUseSlotMode` / `shouldUseSpatialMode` checks are the load-bearing decision and they already work correctly across the export.
+
+**Files modified**: `packages/builder/src/utils/projectZipManager.ts`, `packages/player/src/PlayerEngine.ts`, `packages/builder/public/player-web.js` (regenerated).
+
+### User Guide updated
+
+The `user-guide-qa` agent ran against `/docs/USER_GUIDE.md` for v0.9.59 and added coverage for: the Header layout-mode badge, the New Project wizard's Layout Mode + Orientation row, the per-button anchor pin row, the fictional-time HUD in the VE preview, orientation-aware spatial hotspot portrait overrides, the Asset Manager variants section, and the PreviewWindow viewport switcher. Five entries added to the Glossary, one to the FAQ. Five screenshots flagged for refresh.
+
+**Files modified**: `docs/USER_GUIDE.md`.
+
+---
+
 ## 2026-05-24: Responsive layout — project-level mode, full Phase 2/3 polish, asset variants (v0.9.59)
 
 ### Overview

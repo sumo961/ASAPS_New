@@ -22,16 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.59** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.59 completes the responsive
-layout system end-to-end** — `project.layoutMode: 'fixed' | 'responsive'`
-flag with bidirectional migrator, full Phase 2/3 authoring polish
-(per-button anchor, new-project wizard, fictional-time HUD in VE preview,
-orientation-aware spatial hotspots with portrait override, and iOS-style
-asset variants with orientation + device-class constraints). The system
-is still **WORK IN PROGRESS** in the not-yet-battle-tested-on-real-
-production-projects sense, but it is now functionally complete: authoring
-+ runtime + variant resolution + migration all compose together. Existing
+Current release: **v0.9.60** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.60 closes the last two
+gaps in the responsive layout system**: AI generation paths now default
+to responsive (story-generation + MCP prompts updated, AI-injection
+stamps `layoutMode: 'responsive'`), and the HTML/web export now
+ships asset variants end-to-end (the v0.9.59 Phase 3.3 feature was
+silently broken in exports because the player's variant resolver was
+never wired). The system is still **WORK IN PROGRESS** in the
+not-yet-battle-tested-on-real-production-projects sense, but it is now
+functionally complete: authoring + runtime + variant resolution +
+migration + generation + export all compose together. Existing
 projects keep rendering exactly as before via the legacy absolute path.
 For what shipped when, see:
 
