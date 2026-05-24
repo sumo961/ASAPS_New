@@ -12,6 +12,7 @@ import type { StatePreset, IAIService } from '@asaps/core';
 import { ReactRenderer, getAudioManager, CharacterMoodFrame } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
+import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import type { PreviewMessage, SerializedStoryData } from '../services/PreviewWindowManager';
 import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
@@ -1684,9 +1685,12 @@ export const PreviewWindow: React.FC = () => {
       rendererRef.current.clear();
       setIsRunning(true);
 
-      // Initialize beat locations
+      // Initialize beat locations. Pass the project's resolved layout
+      // mode so dual-mode beats (dialogTree) get a fixed bake in fixed
+      // projects and stay empty (→ spatial path) in responsive ones.
       const allBeats = story.getAllBeats();
-      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT);
+      const projectLayoutMode = resolveLayoutMode(previewData?.settings, allBeats);
+      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT, projectLayoutMode);
 
       // Merge assets into story environment
       const existingEnvironment = story.getEnvironment() || {};

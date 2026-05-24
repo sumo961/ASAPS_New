@@ -10,6 +10,7 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { StatePresetManager } from '../debug/StatePresetManager';
 import { StatePresetEditor } from '../debug/StatePresetEditor';
 import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
+import { resolveLayoutMode } from '../../utils/projectLayoutMode';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
@@ -1040,10 +1041,14 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       }
 
       // CRITICAL: Initialize beat locations from schema for beats that don't have them
-      // This ensures proper positioned rendering instead of fallback centered components
+      // This ensures proper positioned rendering instead of fallback centered components.
+      // Pass the resolved layout mode so dual-mode beats (dialogTree) get
+      // their fixed bake in fixed projects and stay empty (→ spatial path)
+      // in responsive ones.
       const allBeats = story.getAllBeats();
-      console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats');
-      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT);
+      const projectLayoutMode = resolveLayoutMode(settings, allBeats);
+      console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats; projectLayoutMode=', projectLayoutMode);
+      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT, projectLayoutMode);
 
       // CRITICAL: Merge environment.nodes from both imported ASML and builder assets
       // This makes the Story object self-contained with all asset URLs, enabling:

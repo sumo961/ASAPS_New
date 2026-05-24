@@ -761,7 +761,8 @@ export function supportsVisualElements(beatType: string): boolean {
 export function initializeBeatLocations(
   beats: Beat[],
   projectWidth: number = 1024,
-  projectHeight: number = 768
+  projectHeight: number = 768,
+  projectLayoutMode?: 'fixed' | 'responsive'
 ): void {
   console.log(`[SchemaLocationInitializer] Initializing locations for ${beats.length} beats`);
 
@@ -835,13 +836,21 @@ export function initializeBeatLocations(
     }
     // Same rationale, schema-shape variant: beats like dialogTree declare a
     // spatialLayer + slots (so getSpatialSpec returns a valid responsive
-    // spec) but don't set a top-level layoutMode. Without this check the
-    // initializer bakes 4 locations into every empty dialogTree, the runtime
-    // sees this.locations.size > 0, nodeWillBeSpatial becomes false, and the
-    // render falls through to the absolute path — defeating the responsive
-    // dialogTree composite (image + flow + gated choices).
-    if (beatDef?.spatialLayer?.source && Array.isArray(beatDef?.slots) && beatDef.slots.length > 0) {
-      console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — schema has spatialLayer + slots; auto-baked locations would force the absolute path and defeat responsive rendering.`);
+    // spec) but don't set a top-level layoutMode. Unlike titleScreen /
+    // infoText (which are responsive-only by schema declaration),
+    // dialogTree is DUAL-MODE: it has a legitimate fixed-canvas variant
+    // where the choice buttons need baked pixel locations. So the skip
+    // here is conditional on the project's resolved layoutMode — only
+    // responsive projects strip the auto-bake; fixed projects still get
+    // their default locations baked and render through the absolute path.
+    // Without this gate, a fixed-mode dialogTree would silently lose its
+    // positioning the moment the initializer ran.
+    const isDualModeSpatial =
+      beatDef?.spatialLayer?.source &&
+      Array.isArray(beatDef?.slots) &&
+      beatDef.slots.length > 0;
+    if (isDualModeSpatial && projectLayoutMode === 'responsive') {
+      console.log(`[SchemaLocationInitializer] Skipping ${beat.type} (${beat.id}) — responsive project + schema has spatialLayer + slots; auto-baked locations would force the absolute path.`);
       return;
     }
 
