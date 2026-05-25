@@ -13,7 +13,7 @@ import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
 import { runSpatialPath } from '../utils/pathAnimation';
-import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
+import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
 import type { Location, AnimationPath } from '@asaps/core';
 import type { SpriteSheetData } from './PositionedBeatView';
@@ -292,6 +292,26 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     scopeRef.current = `spatialflow-${++spatialUidCounter}`;
   }
   const scope = scopeRef.current;
+
+  // onClick AnimationPath bridge — clicking a hotspot tells the
+  // character layer to play any matching onClick path, awaits its
+  // completion, then resolves the choice. While the path plays:
+  //   - committedActionId !== null → all hotspots disable (gate)
+  //   - the rest of the UI (question, timer) stays visible (per design)
+  const rclRef = useRef<ResponsiveCharacterLayerHandle | null>(null);
+  const [committedActionId, setCommittedActionId] = useState<string | null>(null);
+  const handleHotspotClick = useCallback(async (hotspotId: string) => {
+    if (committedActionId !== null) return; // already committed; ignore re-click
+    setCommittedActionId(hotspotId);
+    try {
+      if (rclRef.current) {
+        await rclRef.current.triggerClickAnimation(hotspotId);
+      }
+    } catch (err) {
+      console.warn('[SpatialFlowView] triggerClickAnimation failed; resolving anyway', err);
+    }
+    onAction(hotspotId);
+  }, [committedActionId, onAction]);
 
   // P3-anim-7 — local image-layer phase. Flips to 'exit' when SlotFlowView
   // reports its own exit start (onExitStart callback). The two layers
@@ -700,9 +720,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                   type="button"
                   aria-label={labelText}
                   title={showLabelOnHover ? labelText : (!gateEarned ? 'Scroll to the bottom of the text to choose' : undefined)}
-                  onClick={() => onAction(h.id)}
-                  disabled={!gateEarned}
-                  aria-disabled={!gateEarned}
+                  onClick={() => handleHotspotClick(h.id)}
+                  disabled={!gateEarned || committedActionId !== null}
+                  aria-disabled={!gateEarned || committedActionId !== null}
                   className="spatialflow-hotspot"
                   style={{
                     position: 'absolute',
@@ -855,6 +875,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           }}
         >
           <ResponsiveCharacterLayer
+            ref={rclRef}
             locations={characterLocations}
             animations={animations}
             characterResolver={characterResolver}

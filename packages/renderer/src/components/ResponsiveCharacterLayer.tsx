@@ -25,10 +25,22 @@
  *    sprite-sheet metadata is supplied). Frame cycling along the path
  *    is the next iteration.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { AnimationPath, Location } from '@asaps/core';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import type { SpriteSheetData } from './PositionedBeatView';
+
+/**
+ * Imperative handle exposed to the parent (SpatialFlowView) so a
+ * hotspot click can drive the onClick AnimationPath through the same
+ * engine + onUpdate plumbing the auto-played onLoad paths use. The
+ * returned Promise resolves when the engine reports onComplete; the
+ * caller (SpatialFlowView) awaits this before resolving the choice so
+ * the player visibly walks out the animation before the beat advances.
+ */
+export interface ResponsiveCharacterLayerHandle {
+  triggerClickAnimation: (clickedElementId: string) => Promise<void>;
+}
 
 export interface ResponsiveCharacterLayerProps {
   /** Subset of beat.locations with kind 'character' or 'prop'. */
@@ -70,13 +82,13 @@ interface AnimatedPosition {
   spriteFrameDuration?: number;
 }
 
-export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> = ({
+export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandle, ResponsiveCharacterLayerProps>(({
   locations,
   animations,
   characterResolver,
   assetResolver,
   spriteDataResolver,
-}) => {
+}, ref) => {
   // Animated-position map, keyed by location.name (which legacy
   // AnimationPath.elementId matches against).
   const [animatedPositions, setAnimatedPositions] = useState<Record<string, AnimatedPosition>>({});
@@ -180,6 +192,50 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
       for (const id of ids) manager.stop(id);
     };
   }, [relevantAnimations]);
+
+  // Imperative trigger: play the matching onClick AnimationPath now,
+  // pushing position updates through the same setAnimatedPositions
+  // channel as the auto-played ones so the cycler and render loop pick
+  // them up. The Promise resolves when the engine fires onComplete,
+  // letting the caller await the visible walk-out before resolving the
+  // choice. If no matching anim exists, resolves immediately.
+  useImperativeHandle(ref, (): ResponsiveCharacterLayerHandle => ({
+    triggerClickAnimation: (clickedElementId: string) => {
+      const all = animations ?? [];
+      const anim = all.find(a =>
+        a.trigger === 'onClick' &&
+        ((a as any).triggerElementId === clickedElementId || a.elementId === clickedElementId)
+      );
+      console.log(`[RCL triggerClickAnim] clicked=${clickedElementId} matched=${anim?.id ?? 'NONE'}`);
+      if (!anim) return Promise.resolve();
+      const manager = getAnimationManager();
+      return new Promise<void>(resolve => {
+        manager.play(anim.id, anim, {
+          stage: () => stageSizeRef.current,
+          onUpdate: (state) => {
+            setAnimatedPositions(prev => ({
+              ...prev,
+              [anim.elementId]: {
+                x: state.currentPosition.x,
+                y: state.currentPosition.y,
+                scale: state.currentTransform?.scale,
+                rotation: state.currentTransform?.rotation,
+                opacity: state.currentTransform?.opacity,
+                flipX: state.currentTransform?.flipX,
+                spriteAnimation: state.currentTransform?.spriteAnimation,
+                spriteFrames: state.currentTransform?.spriteFrames,
+                spriteFrameDuration: state.currentTransform?.spriteFrameDuration,
+              },
+            }));
+          },
+          onComplete: () => {
+            console.log(`[RCL triggerClickAnim] ${anim.id} complete`);
+            resolve();
+          },
+        });
+      });
+    },
+  }), [animations]);
 
   // Sprite-frame cycler. One rAF loop walks every character with an
   // ACTIVE frame sequence and advances its index at the configured
@@ -435,4 +491,6 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
       })}
     </div>
   );
-};
+});
+
+ResponsiveCharacterLayer.displayName = 'ResponsiveCharacterLayer';
