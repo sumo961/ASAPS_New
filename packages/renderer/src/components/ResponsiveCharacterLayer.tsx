@@ -470,10 +470,20 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         if (animPos?.flipX) transformParts.push('scaleX(-1)');
         const transform = transformParts.length ? transformParts.join(' ') : undefined;
 
+        // Center-anchored position. The author places the waypoint /
+        // location coords assuming the FULL-SIZE bounding box anchors
+        // there, but the visible sprite is scaled around its center.
+        // Shifting the rendered top-left by (-visualW/2, -visualH/2)
+        // puts the visible center at the authored coord — so the
+        // engine's reported path position is where the sprite is SEEN,
+        // not where its top-left mathematically sits. Applies uniformly
+        // to characters and props.
+        const renderLeft = x - visualW / 2;
+        const renderTop = y - visualH / 2;
         const commonStyle: React.CSSProperties = {
           position: 'absolute',
-          left: x,
-          top: y,
+          left: renderLeft,
+          top: renderTop,
           width: visualW,
           height: visualH,
           opacity: animPos?.opacity,
