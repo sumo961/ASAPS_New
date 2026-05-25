@@ -4557,7 +4557,14 @@ function App() {
           spatialAnimations: next.spatialAnimations,
           // Direct fields on Beat — Object.assign sets them in place
           // (per-beat updateParameters() doesn't surface these).
-          animations: next.animations ?? next.parameters?.animations,
+          //
+          // CRITICAL: the migrator stores the enriched waypoints (with
+          // xPercent/yPercent) in `nextParams.animations`. `next.animations`
+          // comes from `{...beat}` and is the ORIGINAL un-enriched array.
+          // Read parameters.animations FIRST so the engine sees the
+          // percent-aware waypoints; falling back to next.animations only
+          // when params didn't have any.
+          animations: next.parameters?.animations ?? next.animations,
           parameters: next.parameters,
         } as any);
       }

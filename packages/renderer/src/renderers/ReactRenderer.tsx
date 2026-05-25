@@ -2075,6 +2075,7 @@ export class ReactRenderer extends BaseRenderer {
           ?? (content.spatialAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SpatialFlowView
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-default'}
             beatType={beatType}
             spatial={spatialSpec}
             content={content}
@@ -2128,6 +2129,7 @@ export class ReactRenderer extends BaseRenderer {
         const slotAutoExitMs = this.getState('slotAutoExitMs') as number | undefined;
         this.renderComponent(
           <SlotFlowView
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-default'}
             beatType={beatType}
             slots={slotSpec}
             content={content}
@@ -2583,6 +2585,7 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+              key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-dialogTree'}
               beatType="dialogTree"
               spatial={spatialSpec}
               content={{
@@ -2821,6 +2824,7 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+              key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-movementChoice'}
               beatType="movementChoice"
               spatial={spatialSpec}
               content={{ question }}
@@ -2907,6 +2911,7 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+              key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-pickProp'}
               beatType="pickProp"
               spatial={spatialSpec}
               content={{ question }}
