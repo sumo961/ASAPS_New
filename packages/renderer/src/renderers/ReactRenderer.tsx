@@ -847,6 +847,24 @@ function layoutAuthorPositioned(locations?: Location[]): boolean {
   return false;
 }
 
+/**
+ * Merge a schema-default layout-location list with any free-positioned
+ * (character / prop) locations from the original `locations` array.
+ * Callers that fall back to generateDefaultLocations when there's no
+ * author-placed LAYOUT content would otherwise drop preserved character
+ * sprites on the floor — this keeps them around so the responsive
+ * character layer still has something to render.
+ */
+function mergeWithFreePositioned(
+  defaults: Location[],
+  original?: Location[],
+): Location[] {
+  if (!original || original.length === 0) return defaults;
+  const free = original.filter(l => FREE_POSITIONED_KINDS.has(l.kind ?? ''));
+  if (free.length === 0) return defaults;
+  return [...defaults, ...free];
+}
+
 // ============= REACT RENDERER CLASS =============
 
 export class ReactRenderer extends BaseRenderer {
@@ -2261,7 +2279,7 @@ export class ReactRenderer extends BaseRenderer {
     // (zero regression). Mirrors renderText/renderEndScreen/renderDurScreen.
     const content = { title, author, buttonText };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('titleScreen', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('titleScreen', content), locations);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
     this.ttsSpeakCallback?.(title, this.currentSpeaker);
@@ -2288,7 +2306,7 @@ export class ReactRenderer extends BaseRenderer {
     // (beat override > global theme) governs both modes.
     const content: Record<string, any> = { text, buttonText, speaker: this.resolveSpeakerForSlot() };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content), locations);
 
     // Log each location's position and dimensions
     effectiveLocations.forEach((loc, i) => {
@@ -2818,7 +2836,7 @@ export class ReactRenderer extends BaseRenderer {
     // Absolute-positioned fallback (existing path) — locations baked or
     // not all choices have hotspots.
     const content = { question, choices, markVisited };
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('movementChoice', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('movementChoice', content), locations);
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 
@@ -2903,7 +2921,7 @@ export class ReactRenderer extends BaseRenderer {
 
     // Absolute-positioned fallback (existing path).
     const content = { question, props, markVisited };
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('pickProp', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('pickProp', content), locations);
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
@@ -2988,7 +3006,7 @@ export class ReactRenderer extends BaseRenderer {
       speaker: this.resolveSpeakerForSlot(),
     };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('endScreen', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('endScreen', content), locations);
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
     this.ttsSpeakCallback?.(message, this.currentSpeaker);
@@ -3021,7 +3039,7 @@ export class ReactRenderer extends BaseRenderer {
     // authorPositioned=false (no baked layout) + aiSummary's schema
     // layoutMode:slot → SlotFlowView (title + summary body + restart/credits).
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('aiSummary', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('aiSummary', content), locations);
 
     // Return the user's action (e.g., 'restart', 'credits')
     this.ttsSpeakCallback?.(data.summary, this.currentSpeaker);
@@ -3053,7 +3071,7 @@ export class ReactRenderer extends BaseRenderer {
     // Task #225 — surface speaker label in slot mode if visible.
     const content: Record<string, any> = { text, speaker: this.resolveSpeakerForSlot() };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('durScreen', content);
+    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('durScreen', content), locations);
 
     this.ttsSpeakCallback?.(text, this.currentSpeaker);
     // P3-anim-4.5 — let SlotFlowView (slot branch) self-schedule the exit
