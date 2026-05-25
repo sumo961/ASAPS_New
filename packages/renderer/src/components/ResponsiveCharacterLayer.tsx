@@ -495,6 +495,17 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         };
 
         if (useSprite) {
+          // When the sprite sheet is smaller/larger than the visual
+          // frame size (responsive stageScale ≠ 1), background-image
+          // defaults to its natural pixel size — which means the div
+          // becomes a viewport that CROPS the sheet instead of scaling
+          // it. Match the sheet's render size and the per-frame offset
+          // to the same stageScale so the chosen frame scales to fit
+          // the visualW × visualH box exactly.
+          const sheetW = (sprite?.imageWidth ?? 0) * stageScale;
+          const sheetH = ((sprite as any)?.imageHeight ?? sprite?.imageWidth ?? 0) * stageScale;
+          const bgPosX = bgX * stageScale;
+          const bgPosY = bgY * stageScale;
           return (
             <div
               key={loc.id ?? `${loc.name}-${idx}`}
@@ -502,7 +513,8 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
               style={{
                 ...commonStyle,
                 backgroundImage: `url(${url})`,
-                backgroundPosition: `${bgX}px ${bgY}px`,
+                backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+                backgroundSize: sheetW && sheetH ? `${sheetW}px ${sheetH}px` : undefined,
                 backgroundRepeat: 'no-repeat',
               }}
             />
