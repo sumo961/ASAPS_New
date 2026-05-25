@@ -193,6 +193,22 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
     };
   }, [relevantAnimations]);
 
+  // Track every animation id we kicked off via the imperative handle so
+  // we can stop them on unmount. The auto-played onLoad set is already
+  // tracked by its own useEffect cleanup; this ref covers the click
+  // triggers, which the engine would otherwise leave registered (and
+  // potentially still ticking against a dead state setter) when the
+  // beat advances mid-walk.
+  const triggeredAnimIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    return () => {
+      const manager = getAnimationManager();
+      for (const id of triggeredAnimIdsRef.current) {
+        manager.stop(id);
+      }
+      triggeredAnimIdsRef.current.clear();
+    };
+  }, []);
   // Imperative trigger: play the matching onClick AnimationPath now,
   // pushing position updates through the same setAnimatedPositions
   // channel as the auto-played ones so the cycler and render loop pick
@@ -206,9 +222,10 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         a.trigger === 'onClick' &&
         ((a as any).triggerElementId === clickedElementId || a.elementId === clickedElementId)
       );
-      console.log(`[RCL triggerClickAnim] clicked=${clickedElementId} matched=${anim?.id ?? 'NONE'}`);
+      console.log(`[RCL triggerClickAnim] clicked=${clickedElementId} matched=${anim?.id ?? 'NONE'} (animations.total=${all.length}, candidates=${all.filter(a => a.trigger === 'onClick').map(a => `id=${a.id} trig=${(a as any).triggerElementId} el=${a.elementId}`).join('; ') || 'none'})`);
       if (!anim) return Promise.resolve();
       const manager = getAnimationManager();
+      triggeredAnimIdsRef.current.add(anim.id);
       return new Promise<void>(resolve => {
         manager.play(anim.id, anim, {
           stage: () => stageSizeRef.current,
@@ -230,6 +247,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           },
           onComplete: () => {
             console.log(`[RCL triggerClickAnim] ${anim.id} complete`);
+            triggeredAnimIdsRef.current.delete(anim.id);
             resolve();
           },
         });
