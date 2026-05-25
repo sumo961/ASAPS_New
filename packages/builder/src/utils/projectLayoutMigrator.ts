@@ -276,14 +276,29 @@ export function migrateFixedToResponsive(
     // onto `choice.hotspot` as { x, y, width, height } in 0..1.
     let translatedHotspots = 0;
     const nextParams: any = { ...params };
+    // Find the hotspot location for a choice, mirroring the fallback
+    // chain fixed-mode renders use: explicit `locationName` first, then
+    // `location` (legacy), then by matching `choice.text` against
+    // `location.name` (the implicit convention an author falls into
+    // when they don't wire locationName explicitly). Returns the
+    // baked location, or undefined when none match.
+    const findChoiceHotspotLoc = (c: any): BakedLoc | undefined => {
+      const explicit = c?.locationName ?? c?.location;
+      if (explicit) {
+        const found = baked.find(b => b.name === explicit);
+        if (found) return found;
+      }
+      if (typeof c?.text === 'string') {
+        return baked.find(b => b.name === c.text && b.kind === 'hotspot');
+      }
+      return undefined;
+    };
     const transferHotspots = (key: 'choices' | 'props') => {
       const arr = Array.isArray(params?.[key]) ? params[key] : null;
       if (!arr) return;
       const nextArr = arr.map((c: any) => {
         if (c?.hotspot) return c; // already responsive — preserve
-        const locName = c?.locationName ?? c?.location;
-        if (!locName) return c;
-        const loc = baked.find(b => b.name === locName);
+        const loc = findChoiceHotspotLoc(c);
         if (!loc || !loc.width || !loc.height) return c;
         translatedHotspots++;
         return {
@@ -293,6 +308,9 @@ export function migrateFixedToResponsive(
             y: loc.y / stage.h,
             width: loc.width / stage.w,
             height: loc.height / stage.h,
+            // Preserve the authored shape (rect / ellipse) when set on
+            // the location; defaults to rect when omitted.
+            ...(loc.record?.shape ? { shape: loc.record.shape } : {}),
           },
         };
       });
@@ -304,9 +322,7 @@ export function migrateFixedToResponsive(
     if (params?.dialogTree?.choices && Array.isArray(params.dialogTree.choices)) {
       const nextDialogChoices = params.dialogTree.choices.map((c: any) => {
         if (c?.hotspot) return c;
-        const locName = c?.locationName ?? c?.location;
-        if (!locName) return c;
-        const loc = baked.find(b => b.name === locName);
+        const loc = findChoiceHotspotLoc(c);
         if (!loc || !loc.width || !loc.height) return c;
         translatedHotspots++;
         return {
@@ -316,6 +332,7 @@ export function migrateFixedToResponsive(
             y: loc.y / stage.h,
             width: loc.width / stage.w,
             height: loc.height / stage.h,
+            ...(loc.record?.shape ? { shape: loc.record.shape } : {}),
           },
         };
       });

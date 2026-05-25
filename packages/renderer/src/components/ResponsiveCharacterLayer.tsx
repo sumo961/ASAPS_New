@@ -25,7 +25,7 @@
  *    sprite-sheet metadata is supplied). Frame cycling along the path
  *    is the next iteration.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AnimationPath, Location } from '@asaps/core';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import type { SpriteSheetData } from './PositionedBeatView';
@@ -107,13 +107,20 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     return () => ro.disconnect();
   }, []);
 
-  // Subset of animations that actually target one of our locations.
-  // We key by id + elementId + waypoint count so a content change
-  // (new beat) tears down old engines but a same-content re-render
-  // doesn't restart playing animations.
+  // Subset of animations that actually target one of our locations
+  // AND should auto-start on beat enter. Animations with explicit
+  // triggers ('onClick', 'onVariable') wait for their trigger; only
+  // 'onLoad' (or omitted, which defaults to onLoad) plays on mount.
+  // Mirrors the gating PositionedBeatView does in fixed mode so a
+  // beat with a click-triggered character path doesn't silently play
+  // the moment it appears.
   const relevantAnimations = useMemo(() => {
     const names = new Set(locations.map(l => l.name));
-    return (animations ?? []).filter(a => names.has(a.elementId));
+    return (animations ?? []).filter(a => {
+      if (!names.has(a.elementId)) return false;
+      const trigger = a.trigger;
+      return trigger === undefined || trigger === 'onLoad';
+    });
   }, [animations, locations]);
 
   // Run path animations through the shared AnimationEngine. Each
@@ -155,32 +162,54 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     };
   }, [relevantAnimations]);
 
-  // Sprite-frame cycler. One rAF loop walks every character whose
-  // AnimationEngine state reports an active spriteFrames array,
-  // advances its frame index at `spriteFrameDuration` ms cadence, and
-  // wraps within the array. Per-character timing is independent so a
-  // segment switch (e.g. 'walk' → 'idle') restarts cleanly. The loop
-  // self-stops when no character has an active sequence to avoid
-  // burning frames on a static scene.
+  // Sprite-frame cycler. One rAF loop walks every character with an
+  // ACTIVE frame sequence and advances its index at the configured
+  // ms cadence. The sequence comes from either:
+  //   - `animPos.spriteFrames` (inline list per legacy AnimationPath
+  //     waypoint), or
+  //   - the named animation on the character's sprite-sheet metadata
+  //     when `animPos.spriteAnimation` is set (e.g. 'walk' → look up
+  //     spriteData.animations[name].frames).
+  // Per-character timing is independent so a segment switch restarts
+  // cleanly. Self-stops when no character has an active sequence.
   const lastTickRef = useRef<Record<string, number>>({});
+  // Resolve a character's active frames + frame duration. Returns
+  // null when there's nothing to cycle. Shared by the cycler effect
+  // and the render-loop above so both stay in sync.
+  const resolveActive = useCallback(
+    (loc: Location, pos: AnimatedPosition | undefined): { frames: number[]; dur: number } | null => {
+      if (!pos) return null;
+      if (Array.isArray(pos.spriteFrames) && pos.spriteFrames.length > 1) {
+        return { frames: pos.spriteFrames, dur: Math.max(1, pos.spriteFrameDuration ?? 100) };
+      }
+      if (pos.spriteAnimation && loc.kind === 'character' && loc.characterId && spriteDataResolver) {
+        const sd = spriteDataResolver(loc.characterId);
+        const named = sd?.animations?.find((a: { name: string }) => a.name === pos.spriteAnimation);
+        if (named && Array.isArray(named.frames) && named.frames.length > 1) {
+          return { frames: named.frames, dur: Math.max(1, pos.spriteFrameDuration ?? named.frameDuration ?? 100) };
+        }
+      }
+      return null;
+    },
+    [spriteDataResolver],
+  );
   useEffect(() => {
-    // Any character currently in a non-trivial sprite sequence?
-    const active = Object.entries(animatedPositions).filter(
-      ([, p]) => Array.isArray(p.spriteFrames) && p.spriteFrames.length > 1
-    );
+    const active: Array<{ name: string; frames: number[]; dur: number }> = [];
+    for (const loc of locations) {
+      const r = resolveActive(loc, animatedPositions[loc.name]);
+      if (r) active.push({ name: loc.name, frames: r.frames, dur: r.dur });
+    }
     if (active.length === 0) return;
     let raf = 0;
     const step = (now: number) => {
       let didChange = false;
       const next: Record<string, number> = { ...spriteFrameIdx };
-      for (const [name, pos] of active) {
-        const frames = pos.spriteFrames!;
-        const dur = Math.max(1, pos.spriteFrameDuration ?? 100);
-        const last = lastTickRef.current[name] ?? now;
-        if (now - last >= dur) {
-          const idx = ((spriteFrameIdx[name] ?? 0) + 1) % frames.length;
-          next[name] = idx;
-          lastTickRef.current[name] = now;
+      for (const entry of active) {
+        const last = lastTickRef.current[entry.name] ?? now;
+        if (now - last >= entry.dur) {
+          const idx = ((spriteFrameIdx[entry.name] ?? 0) + 1) % entry.frames.length;
+          next[entry.name] = idx;
+          lastTickRef.current[entry.name] = now;
           didChange = true;
         }
       }
@@ -189,7 +218,7 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [animatedPositions, spriteFrameIdx]);
+  }, [animatedPositions, spriteFrameIdx, locations, resolveActive]);
 
   // Helper: resolve a location's image URL via the same priority chain
   // PositionedBeatView uses — character (via characterId), then
@@ -260,17 +289,27 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
         }
 
         // Sprite-sheet frame crop. Frame index priority:
-        // (1) active spriteFrames sequence from the path's current
-        //     segment (cycled by the rAF loop above) →
-        //     `animPos.spriteFrames[spriteFrameIdx[name]]`.
-        // (2) the sheet's defaultFrame.
+        // (1) inline spriteFrames sequence forwarded per-segment by
+        //     the engine (legacy AnimationPath form).
+        // (2) NAMED sprite-sheet animation — the engine reports
+        //     `spriteAnimation: 'walk'` per waypoint and the actual
+        //     frame array lives on the character's sprite-sheet
+        //     metadata; we look it up here. Mirrors PositionedBeatView's
+        //     AnimatedSprite resolution path.
+        // (3) the sheet's defaultFrame as a static fallback.
         // No sprite sheet at all → render the image natively (covers
         // the prop / static-image case).
         const useSprite = !!sprite && sprite.frameWidth && sprite.frameHeight;
         const frameW = sprite?.frameWidth ?? 0;
         const frameH = sprite?.frameHeight ?? 0;
         const defaultFrame = sprite?.defaultFrame ?? 0;
-        const activeFrames = animPos?.spriteFrames;
+        let activeFrames: number[] | undefined = animPos?.spriteFrames;
+        if ((!activeFrames || activeFrames.length === 0) && animPos?.spriteAnimation && sprite?.animations) {
+          const named = sprite.animations.find((a: { name: string }) => a.name === animPos.spriteAnimation);
+          if (named && Array.isArray(named.frames) && named.frames.length > 0) {
+            activeFrames = named.frames;
+          }
+        }
         const activeFrameIdx = activeFrames && activeFrames.length > 0
           ? activeFrames[Math.min(spriteFrameIdx[loc.name] ?? 0, activeFrames.length - 1)]
           : defaultFrame;
