@@ -357,6 +357,10 @@ export function migrateFixedToResponsive(
             // Preserve the authored shape (rect / ellipse) when set on
             // the location; defaults to rect when omitted.
             ...(loc.record?.shape ? { shape: loc.record.shape } : {}),
+            // Preserve any authored rotation (degrees, around hotspot
+            // center) so a tilted bed / sofa / sign hotspot retains its
+            // angle in responsive mode.
+            ...(typeof loc.record?.rotation === 'number' ? { rotation: loc.record.rotation } : {}),
           },
         };
       });

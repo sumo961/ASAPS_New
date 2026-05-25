@@ -99,6 +99,7 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     const update = () => {
       const r = el.getBoundingClientRect();
       stageSizeRef.current = { width: r.width, height: r.height };
+      console.log(`[RCL container] size=${r.width.toFixed(0)}x${r.height.toFixed(0)} (this is the container — NOT necessarily the spatial image rect)`);
       setResizeTick(t => t + 1);
     };
     update();
@@ -106,6 +107,14 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // DIAG-RCL — mount log: which animations are gated in vs out
+  useEffect(() => {
+    const namedLocs = locations.map(l => `${l.kind}:${l.name}(xPct=${l.xPercent},yPct=${l.yPercent},w=${l.width},h=${l.height})`);
+    const animSummary = (animations ?? []).map(a => `${a.id}(target=${a.elementId},trigger=${a.trigger ?? 'onLoad'},wps=${a.waypoints?.length})`);
+    console.log(`[RCL mount] locations=${locations.length} [${namedLocs.join('; ')}]`);
+    console.log(`[RCL mount] animations.total=${animations?.length ?? 0} [${animSummary.join('; ')}]`);
+  }, [locations, animations]);
 
   // Subset of animations that actually target one of our locations
   // AND should auto-start on beat enter. Animations with explicit
@@ -130,10 +139,20 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
   useEffect(() => {
     const manager = getAnimationManager();
     const ids = relevantAnimations.map(a => a.id);
+    console.log(`[RCL play] relevantAnimations.filter-pass=${relevantAnimations.length} ids=[${ids.join(',')}]`);
+    // Per-animation last-seen spriteAnimation, so we only log when the
+    // segment's sprite identity actually changes (one line per switch,
+    // not per frame).
+    const lastSpriteByAnim: Record<string, string | undefined> = {};
     for (const anim of relevantAnimations) {
       manager.play(anim.id, anim, {
         stage: () => stageSizeRef.current,
         onUpdate: (state) => {
+          const sp = state.currentTransform?.spriteAnimation;
+          if (lastSpriteByAnim[anim.id] !== sp) {
+            console.log(`[RCL anim ${anim.id}] segment-switch spriteAnimation=${sp ?? 'none'} at (${state.currentPosition.x.toFixed(0)},${state.currentPosition.y.toFixed(0)}) frames=${state.currentTransform?.spriteFrames?.length ?? '-'} flipX=${state.currentTransform?.flipX} scale=${state.currentTransform?.scale}`);
+            lastSpriteByAnim[anim.id] = sp;
+          }
           setAnimatedPositions(prev => ({
             ...prev,
             [anim.elementId]: {
@@ -193,6 +212,22 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     },
     [spriteDataResolver],
   );
+  // DIAG-cycler — log a single line per location whenever the resolved
+  // frame set CHANGES (no spam at 60Hz). Tells us when a segment switch
+  // produces 0 frames (= no cycling) vs N frames.
+  const lastResolvedKeyRef = useRef<Record<string, string>>({});
+  // DIAG-RCL pos dedupe — see render block
+  const lastPosKeyRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    for (const loc of locations) {
+      const r = resolveActive(loc, animatedPositions[loc.name]);
+      const key = r ? `frames=${r.frames.length} dur=${r.dur} via=${animatedPositions[loc.name]?.spriteFrames ? 'inline' : 'named:' + animatedPositions[loc.name]?.spriteAnimation}` : 'IDLE';
+      if (lastResolvedKeyRef.current[loc.name] !== key) {
+        console.log(`[RCL cycler ${loc.name}] ${key}`);
+        lastResolvedKeyRef.current[loc.name] = key;
+      }
+    }
+  }, [animatedPositions, locations, resolveActive]);
   // The cycler runs continuously while the layer is mounted. Reading
   // animatedPositions / spriteFrameIdx from refs (rather than depending
   // on them) keeps the rAF loop alive across the constant stream of
@@ -281,15 +316,26 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
         const animPos = animatedPositions[loc.name];
         let x: number;
         let y: number;
+        let posMode: string;
         if (animPos) {
           x = animPos.x;
           y = animPos.y;
+          posMode = 'engine';
         } else if (typeof loc.xPercent === 'number' && typeof loc.yPercent === 'number' && stage.width && stage.height) {
           x = (loc.xPercent / 100) * stage.width;
           y = (loc.yPercent / 100) * stage.height;
+          posMode = `pct(${loc.xPercent.toFixed(1)},${loc.yPercent.toFixed(1)})*container(${stage.width.toFixed(0)}x${stage.height.toFixed(0)})`;
         } else {
           x = loc.x;
           y = loc.y;
+          posMode = 'pixel-fallback';
+        }
+        // DIAG-RCL pos — one line per location when the FINAL pixel
+        // position changes by ≥1 px. Captures static + animated alike.
+        const posKey = `${loc.name}:${x.toFixed(0)},${y.toFixed(0)}|${posMode}`;
+        if (lastPosKeyRef.current[loc.name] !== posKey) {
+          console.log(`[RCL pos ${loc.name}] → (${x.toFixed(0)},${y.toFixed(0)}) via ${posMode}`);
+          lastPosKeyRef.current[loc.name] = posKey;
         }
 
         // Resolve size. widthPercent > pixel width.

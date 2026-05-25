@@ -2799,10 +2799,15 @@ export class ReactRenderer extends BaseRenderer {
             width: c.hotspot!.width,
             height: c.hotspot!.height,
             shape: c.hotspot!.shape,
+            rotation: (c.hotspot as any)!.rotation,
             label: c.displayText || c.text,
           }));
+        console.log(`[RR movementChoice→spatial] choices=${choices.length} withHotspot=${hotspots.length} hotspots=`, hotspots.map((h: any) => `${h.id}|${h.label}|(${h.x.toFixed(3)},${h.y.toFixed(3)},${h.width.toFixed(3)}x${h.height.toFixed(3)})|shape=${h.shape ?? 'rect'}|rot=${h.rotation ?? 0}`));
+        const _charLocs = this.pickFreePositioned(locations) ?? [];
+        console.log(`[RR movementChoice→spatial] characterLocations=${_charLocs.length} [${_charLocs.map((l: any) => `${l.kind}:${l.name}`).join(', ')}] animations=`, this.getState('animations'));
         return new Promise<string>(resolve => {
           this.resolveAction = (id: string) => {
+            console.log(`[RR movementChoice→spatial onAction] id=${id} — resolving choice; NOTE: spatial path does NOT run onClick AnimationPaths before resolving (fixed-mode PositionedBeatView does).`);
             this.resolveAction = null;
             resolve(id);
           };
