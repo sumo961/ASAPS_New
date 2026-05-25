@@ -457,11 +457,23 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         const bgX = -(frameCol * frameW);
         const bgY = -(frameRow * frameH);
 
-        // Visual width/height: a sprite-sheet sprite uses the FRAME
-        // dimensions; a non-sprite image uses the location's resolved
-        // w/h (so prop placement matches authored size).
-        const visualW = useSprite ? frameW : w;
-        const visualH = useSprite ? frameH : h;
+        // Visual width/height. For a sprite-sheet sprite the frame
+        // dimensions are in AUTHORED-STAGE pixels (the sheet was drawn
+        // for the project's stage size, typically 1024×768), so they
+        // need to scale by container:stage just like positions do.
+        // Hotspots already scale this way; without this, the sprite
+        // renders ~20% oversized in a smaller container, which shifts
+        // its visible center and breaks alignment with hotspots /
+        // animation path endpoints.
+        //
+        // The authored stage width is recoverable from any location:
+        // loc.width / (loc.widthPercent / 100). Fall back to 1.0 when
+        // the math isn't possible (no percent fields available).
+        const stageScale = (typeof loc.widthPercent === 'number' && loc.widthPercent > 0 && loc.width > 0 && stage.width)
+          ? (loc.widthPercent / 100 * stage.width) / loc.width
+          : 1;
+        const visualW = useSprite ? frameW * stageScale : w;
+        const visualH = useSprite ? frameH * stageScale : h;
 
         // Common transform — scale / rotate / flip per animation state.
         const transformParts: string[] = [];
