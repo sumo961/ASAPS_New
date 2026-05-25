@@ -4528,9 +4528,22 @@ function App() {
       for (const beat of result.applied) {
         const id = (beat as any).id;
         if (!touched.has(id)) continue;
+        // The migrator may rewrite parameters (choice.hotspot
+        // normalization, waypoint percent enrichment), set
+        // slotAnimations (translated slot paths), and update the
+        // per-element AnimationPath list. We must forward ALL of these
+        // — passing only locations/slotIntent silently dropped the
+        // hotspot conversion and animation enrichments.
+        const next = beat as any;
         actions.updateBeat(id, {
-          locations: (beat as any).locations,
-          slotIntent: (beat as any).slotIntent,
+          locations: next.locations,
+          slotIntent: next.slotIntent,
+          slotAnimations: next.slotAnimations,
+          spatialAnimations: next.spatialAnimations,
+          // Direct fields on Beat — Object.assign sets them in place
+          // (per-beat updateParameters() doesn't surface these).
+          animations: next.animations ?? next.parameters?.animations,
+          parameters: next.parameters,
         } as any);
       }
       markChanged();
