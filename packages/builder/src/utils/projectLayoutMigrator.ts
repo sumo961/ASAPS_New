@@ -183,7 +183,17 @@ export function migrateFixedToResponsive(
     // anchor preset inferred from the matching baked element. Title
     // slots also get preferredLines from text length.
     const slotIntent: Record<string, any> = { ...(beat as any).slotIntent };
-    const params = (beat as any).parameters ?? {};
+    // Beat instances store their params as discrete fields (this.choices,
+    // this.question, this.animations, etc.); `beat.parameters` is not a
+    // backing field — it's surfaced via `getParameters()`. Reading the
+    // non-existent property silently returned `{}` and the entire
+    // choice.hotspot / animation-percent enrichment path no-op'd.
+    const baseParams: Record<string, any> =
+      typeof (beat as any).getParameters === 'function'
+        ? ((beat as any).getParameters() ?? {})
+        : ((beat as any).parameters ?? {});
+    const params: Record<string, any> = { ...baseParams };
+    console.log(`[migrator PRM ${(beat as any).id}] params keys=${Object.keys(params).join(',')} choices.len=${params.choices?.length ?? '-'} anims.len=${params.animations?.length ?? '-'}`);
     const slots: Array<{ name: string; role: string; source?: string }> = Array.isArray(def?.slots) ? def.slots : [];
     for (const slot of slots) {
       // Match by the slot's name first, else by slot.source which
