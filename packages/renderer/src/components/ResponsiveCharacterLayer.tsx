@@ -193,23 +193,41 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     },
     [spriteDataResolver],
   );
+  // The cycler runs continuously while the layer is mounted. Reading
+  // animatedPositions / spriteFrameIdx from refs (rather than depending
+  // on them) keeps the rAF loop alive across the constant stream of
+  // position updates the engine produces (~60Hz); otherwise the effect
+  // would cancel + re-schedule every tick before any frame could advance.
+  const animatedPositionsRef = useRef(animatedPositions);
+  const spriteFrameIdxRef = useRef(spriteFrameIdx);
+  useEffect(() => { animatedPositionsRef.current = animatedPositions; }, [animatedPositions]);
+  useEffect(() => { spriteFrameIdxRef.current = spriteFrameIdx; }, [spriteFrameIdx]);
   useEffect(() => {
-    const active: Array<{ name: string; frames: number[]; dur: number }> = [];
-    for (const loc of locations) {
-      const r = resolveActive(loc, animatedPositions[loc.name]);
-      if (r) active.push({ name: loc.name, frames: r.frames, dur: r.dur });
-    }
-    if (active.length === 0) return;
     let raf = 0;
     const step = (now: number) => {
+      const positions = animatedPositionsRef.current;
+      const indices = spriteFrameIdxRef.current;
       let didChange = false;
-      const next: Record<string, number> = { ...spriteFrameIdx };
-      for (const entry of active) {
-        const last = lastTickRef.current[entry.name] ?? now;
-        if (now - last >= entry.dur) {
-          const idx = ((spriteFrameIdx[entry.name] ?? 0) + 1) % entry.frames.length;
-          next[entry.name] = idx;
-          lastTickRef.current[entry.name] = now;
+      const next: Record<string, number> = { ...indices };
+      for (const loc of locations) {
+        const r = resolveActive(loc, positions[loc.name]);
+        if (!r) {
+          // Segment switched to one with no cycling — drop the tick
+          // record so the next ACTIVE segment starts a fresh cadence.
+          if (lastTickRef.current[loc.name] != null) {
+            delete lastTickRef.current[loc.name];
+          }
+          continue;
+        }
+        const last = lastTickRef.current[loc.name];
+        if (last == null) {
+          lastTickRef.current[loc.name] = now;
+          continue;
+        }
+        if (now - last >= r.dur) {
+          const idx = ((indices[loc.name] ?? 0) + 1) % r.frames.length;
+          next[loc.name] = idx;
+          lastTickRef.current[loc.name] = now;
           didChange = true;
         }
       }
@@ -218,7 +236,7 @@ export const ResponsiveCharacterLayer: React.FC<ResponsiveCharacterLayerProps> =
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [animatedPositions, spriteFrameIdx, locations, resolveActive]);
+  }, [locations, resolveActive]);
 
   // Helper: resolve a location's image URL via the same priority chain
   // PositionedBeatView uses — character (via characterId), then
