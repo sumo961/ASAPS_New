@@ -834,15 +834,34 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
 
       {/* Character / prop sprite layer — free-positioned avatars on
           top of the spatial image but below the flow text/buttons.
-          Picks up beat.parameters.animations for path-driven motion. */}
+          Picks up beat.parameters.animations for path-driven motion.
+          Anchored to the LETTERBOXED image rect (imgInsets) — the
+          authored character positions are relative to the spatial
+          image, NOT the surrounding container, so a sprite drawn at
+          (0.5, 0.95) of the original stage lands on the same picture
+          pixel at any viewport. Without these insets the sprite would
+          float above the actual scene whenever the container is wider
+          or shorter than the image. */}
       {characterLocations && characterLocations.length > 0 && (
-        <ResponsiveCharacterLayer
-          locations={characterLocations}
-          animations={animations}
-          characterResolver={characterResolver}
-          assetResolver={assetResolver}
-          spriteDataResolver={spriteDataResolver}
-        />
+        <div
+          style={{
+            position: 'absolute',
+            top: imgInsets.top,
+            left: imgInsets.left,
+            right: imgInsets.right,
+            bottom: imgInsets.bottom,
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          <ResponsiveCharacterLayer
+            locations={characterLocations}
+            animations={animations}
+            characterResolver={characterResolver}
+            assetResolver={assetResolver}
+            spriteDataResolver={spriteDataResolver}
+          />
+        </div>
       )}
     </div>
   );
