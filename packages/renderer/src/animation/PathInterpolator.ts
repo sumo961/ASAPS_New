@@ -239,18 +239,24 @@ export function interpolateSegment(
     result.flipY = start.flipY ?? false;
   }
 
-  // Sprite animation properties - use the START waypoint's value for the entire segment
-  // This allows different animations for different path segments (e.g., walk then run)
-  if (start.spriteAnimation !== undefined) {
-    result.spriteAnimation = start.spriteAnimation;
+  // Sprite animation properties — use the END waypoint's value for the
+  // entire segment. Author convention (mirrored in AnimationPathEditor):
+  // `spriteAnimation: 'walk'` placed on a waypoint means "play walk WHILE
+  // moving TO this waypoint", i.e. it describes the arrival, not the
+  // departure. The previous START-waypoint rule produced a 1-segment
+  // offset — the cycle would start one segment late and the last
+  // waypoint's animation would never play at all. END is the natural
+  // match for how authors write paths (idle → walk-target → run-target).
+  if (end.spriteAnimation !== undefined) {
+    result.spriteAnimation = end.spriteAnimation;
   }
 
-  if (start.spriteFrames !== undefined && start.spriteFrames.length > 0) {
-    result.spriteFrames = start.spriteFrames;
+  if (end.spriteFrames !== undefined && end.spriteFrames.length > 0) {
+    result.spriteFrames = end.spriteFrames;
   }
 
-  if (start.spriteFrameDuration !== undefined) {
-    result.spriteFrameDuration = start.spriteFrameDuration;
+  if (end.spriteFrameDuration !== undefined) {
+    result.spriteFrameDuration = end.spriteFrameDuration;
   }
 
   return result;

@@ -347,6 +347,13 @@ export function migrateFixedToResponsive(
         console.log(`[migrator HTSPT ${(beat as any).id} ${key}] choice "${c?.text}" locName="${c?.locationName ?? c?.location ?? '<none>'}" → loc=${loc ? `${loc.kind}:${loc.name}(${loc.x},${loc.y},${loc.width}x${loc.height})` : 'NO MATCH'}`);
         if (!loc || !loc.width || !loc.height) return c;
         translatedHotspots++;
+        // When the source location is a PROP (visible asset rather than
+        // an authored click region), the prop image itself is what the
+        // player should click — not an orange overlay rectangle. We
+        // still write the hotspot (same coords / size as the prop) so
+        // the spatial composite has a click target, but tag it so the
+        // renderer can skip the highlight fill / outline.
+        const fromProp = loc.kind === 'prop';
         return {
           ...c,
           hotspot: {
@@ -361,6 +368,8 @@ export function migrateFixedToResponsive(
             // center) so a tilted bed / sofa / sign hotspot retains its
             // angle in responsive mode.
             ...(typeof loc.record?.rotation === 'number' ? { rotation: loc.record.rotation } : {}),
+            // Prop-derived: invisible at runtime — the prop is the visual.
+            ...(fromProp ? { fromProp: true } : {}),
           },
         };
       });

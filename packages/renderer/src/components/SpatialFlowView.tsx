@@ -679,6 +679,21 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               // refresh containerSize so this re-resolves immediately).
               const isPortrait = containerSize.h > containerSize.w;
               const rect = resolveHotspotRect(h, isPortrait);
+              // Prop-derived hotspots are click targets only — no tint,
+              // no outline, no hover swap; the prop image underneath is
+              // the visual. Author-drawn hotspots keep the normal theme.
+              const fromProp = (h as any).fromProp === true;
+              const hSpotFill = fromProp ? 'transparent' : fillHex;
+              const hSpotHover = fromProp ? 'transparent' : hoverHex;
+              const hSpotBorder = fromProp ? 'none' : (showHotspotOutlines
+                ? `2px dashed ${borderColor}`
+                : 'none');
+              // Rotation (degrees around hotspot center) applied via
+              // CSS transform — purely visual, the click area itself
+              // remains the axis-aligned rect (good enough for the
+              // tilted-bed case; a true polygonal hit test would
+              // require a clipPath).
+              const rotation = typeof (h as any).rotation === 'number' ? (h as any).rotation : 0;
               return (
                 <button
                   key={h.id}
@@ -696,20 +711,20 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                     width: `${rect.width * 100}%`,
                     height: `${rect.height * 100}%`,
                     pointerEvents: gateEarned ? 'auto' : 'none',
-                    background: fillHex,
-                    border: showHotspotOutlines
-                      ? `2px dashed ${borderColor}`
-                      : 'none',
+                    background: hSpotFill,
+                    border: hSpotBorder,
                     borderRadius: isEllipse ? '50%' : undefined,
                     clipPath: isEllipse ? 'ellipse(50% 50% at 50% 50%)' : undefined,
                     cursor: 'pointer',
                     padding: 0,
                     font: 'inherit',
                     color: 'inherit',
+                    transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                    transformOrigin: 'center center',
                     // CSS vars consumed by the :hover rule below so we
                     // can swap fills on hover without re-rendering.
-                    ['--spatialflow-hotspot-hover-bg' as any]: hoverHex,
-                    ['--spatialflow-hotspot-onhover-bg' as any]: fillsOnHover ? hoverHex : fillHex,
+                    ['--spatialflow-hotspot-hover-bg' as any]: hSpotHover,
+                    ['--spatialflow-hotspot-onhover-bg' as any]: fromProp ? 'transparent' : (fillsOnHover ? hoverHex : fillHex),
                     transition: 'background 120ms ease-out',
                     display: 'flex',
                     alignItems: 'center',

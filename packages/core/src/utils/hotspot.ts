@@ -56,6 +56,15 @@ export interface Hotspot {
     width: number;
     height: number;
   };
+  /** Optional rotation in degrees, around the hotspot's center. */
+  rotation?: number;
+  /**
+   * True when this hotspot was synthesized from a `kind:'prop'` location
+   * during Fixed→Responsive migration. The rect overlays the prop image
+   * so clicks still resolve, but the renderer skips the highlight tint
+   * and outline — the prop IS the visual, no overlay needed.
+   */
+  fromProp?: boolean;
 }
 
 /** Defensive type guard. */
