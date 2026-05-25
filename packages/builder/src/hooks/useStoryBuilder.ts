@@ -207,6 +207,12 @@ export function useStoryBuilder() {
 
   // Update a beat
   const updateBeat = useCallback((beatId: string, updates: Partial<Beat>) => {
+    // DIAG-UB-1 — every updateBeat call. Helps confirm what reaches the
+    // store after migration vs. what the call site thinks it sent.
+    const u: any = updates;
+    const choicesH = (u?.parameters?.choices ?? []).filter((c: any) => !!c.hotspot).length;
+    const wp0Pct = typeof u?.parameters?.animations?.[0]?.waypoints?.[0]?.xPercent === 'number';
+    console.log(`[useStoryBuilder UB ${beatId}] keys=${Object.keys(u || {}).join(',')} choicesWithHotspot=${choicesH} animsWp0Pct=${wp0Pct} animations.len=${u?.animations?.length ?? '-'}`);
     setState(prev => ({
       ...prev,
       beats: prev.beats.map(beat => {

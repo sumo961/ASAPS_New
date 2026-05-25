@@ -130,7 +130,21 @@ export function migrateFixedToResponsive(
       record: any;
     };
     const baked: BakedLoc[] = [];
-    const existingLocs = beat.locations;
+    const existingLocs: any = beat.locations;
+    // DIAG-MIG-1 — input to migrator per beat. Helps confirm whether the
+    // locations Map arrives at migration with all kinds (hotspot/dialog
+    // etc) or already stripped, and whether the shape is Map vs Array.
+    const _diagInputKind = existingLocs instanceof Map ? 'Map' : Array.isArray(existingLocs) ? 'Array' : typeof existingLocs;
+    const _diagInputSize = existingLocs instanceof Map
+      ? existingLocs.size
+      : Array.isArray(existingLocs) ? existingLocs.length : 0;
+    const _diagInputKinds: string[] = [];
+    if (existingLocs instanceof Map) {
+      existingLocs.forEach((v: any) => _diagInputKinds.push(`${v?.kind}:${v?.name}`));
+    } else if (Array.isArray(existingLocs)) {
+      existingLocs.forEach((v: any) => _diagInputKinds.push(`${v?.kind}:${v?.name}`));
+    }
+    console.log(`[migrator IN  ${(beat as any).id} ${beat.type}] locations shape=${_diagInputKind} size=${_diagInputSize}`, _diagInputKinds);
     if (existingLocs instanceof Map) {
       existingLocs.forEach((v: any, k: any) => {
         if (v && typeof v === 'object' && typeof v.x === 'number' && typeof v.y === 'number') {
@@ -145,7 +159,25 @@ export function migrateFixedToResponsive(
           });
         }
       });
+    } else if (Array.isArray(existingLocs)) {
+      // DIAG-MIG-2 — Array fallback. The migrator was Map-only; if the
+      // load path leaves locations as an Array, baked stayed empty and
+      // every hotspot/animation-percent enrichment was silently skipped.
+      existingLocs.forEach((v: any) => {
+        if (v && typeof v === 'object' && typeof v.x === 'number' && typeof v.y === 'number') {
+          baked.push({
+            name: String(v.name ?? ''),
+            x: v.x,
+            y: v.y,
+            width: typeof v.width === 'number' ? v.width : 0,
+            height: typeof v.height === 'number' ? v.height : 0,
+            kind: v.kind,
+            record: v,
+          });
+        }
+      });
     }
+    console.log(`[migrator BAK ${(beat as any).id}] baked=${baked.length}`, baked.map(b => `${b.kind}:${b.name}(${b.x},${b.y},${b.width}x${b.height})`));
 
     // Build a slotIntent map keyed by slot name, with per-slot
     // anchor preset inferred from the matching baked element. Title
@@ -297,8 +329,12 @@ export function migrateFixedToResponsive(
       const arr = Array.isArray(params?.[key]) ? params[key] : null;
       if (!arr) return;
       const nextArr = arr.map((c: any) => {
-        if (c?.hotspot) return c; // already responsive — preserve
+        if (c?.hotspot) {
+          console.log(`[migrator HTSPT ${(beat as any).id} ${key}] choice "${c?.text}" already has hotspot → preserve`);
+          return c;
+        }
         const loc = findChoiceHotspotLoc(c);
+        console.log(`[migrator HTSPT ${(beat as any).id} ${key}] choice "${c?.text}" locName="${c?.locationName ?? c?.location ?? '<none>'}" → loc=${loc ? `${loc.kind}:${loc.name}(${loc.x},${loc.y},${loc.width}x${loc.height})` : 'NO MATCH'}`);
         if (!loc || !loc.width || !loc.height) return c;
         translatedHotspots++;
         return {
@@ -371,6 +407,7 @@ export function migrateFixedToResponsive(
 
     const next: any = { ...beat, parameters: nextParams };
     next.locations = preservedLocs;
+    console.log(`[migrator OUT ${(beat as any).id}] kept=${preservedCount} hotspots=${translatedHotspots} animsWp0Pct=${typeof nextParams?.animations?.[0]?.waypoints?.[0]?.xPercent === 'number'} choicesWithHotspot=${(nextParams?.choices ?? []).filter((c: any) => !!c.hotspot).length}`);
     if (Object.keys(slotIntent).length > 0) {
       next.slotIntent = slotIntent;
     }
