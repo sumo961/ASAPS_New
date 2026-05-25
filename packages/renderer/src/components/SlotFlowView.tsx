@@ -26,11 +26,13 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor } from '@asaps/core';
+import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
-import { DEFAULT_THEME, type RenderThemeSettings } from './PositionedBeatView';
+import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 import { runSlotPath } from '../utils/pathAnimation';
+import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
+import { TimerProgressBar } from './TimerProgressBar';
 
 interface SlotFlowViewProps {
   beatType: string;
@@ -154,6 +156,34 @@ interface SlotFlowViewProps {
    * arrival, and scrolling reveals this content one row at a time.
    */
   extraInScrollAfterBody?: React.ReactNode;
+  /**
+   * Free-positioned sprite layer (mirror of SpatialFlowView's). When
+   * a slot-mode beat carries character / prop locations (e.g. an
+   * infoText with a player avatar), we mount a ResponsiveCharacterLayer
+   * over the slot content so the sprites and their AnimationPath
+   * motion travel through the responsive renderer alongside the slot
+   * elements. Layer is absolutely positioned and pointer-events:none,
+   * so it never blocks the slot UI underneath.
+   */
+  characterLocations?: Location[];
+  animations?: AnimationPath[];
+  characterResolver?: (characterId: string, stateId?: string) => string | undefined;
+  assetResolver?: (assetId: string) => string | undefined;
+  spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
+  /**
+   * Default-target countdown — when present and visible, a green
+   * progress bar pinned to the top of the stage shows the remaining
+   * time before auto-advance. The wrapping renderer publishes this
+   * state (it owns the timer); we subscribe so the bar smoothly
+   * tracks each tick instead of re-mounting per re-render.
+   */
+  timerState?: {
+    totalTime: number;
+    remainingTime: number;
+    visible: boolean;
+    label?: string;
+  };
+  onSubscribeTimerState?: (listener: (state: SlotFlowViewProps['timerState']) => void) => () => void;
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -190,6 +220,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   onGateChange,
   forceMultiActionGate = false,
   extraInScrollAfterBody,
+  characterLocations,
+  animations,
+  characterResolver,
+  assetResolver,
+  spriteDataResolver,
+  timerState: initialTimerState,
+  onSubscribeTimerState,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -518,6 +555,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // beat doesn't take over while the current one is still leaving.
   const [phase, setPhase] = useState<'enter' | 'exit'>('enter');
 
+  // Default-target countdown — subscribed live so the progress bar
+  // tracks each tick of the renderer's timer without re-mounting.
+  // Initial value comes from the prop; updates flow through the
+  // subscription callback. Unsubscribes on unmount.
+  const [timerState, setTimerState] = useState(initialTimerState);
+  React.useEffect(() => {
+    setTimerState(initialTimerState);
+  }, [initialTimerState]);
+  React.useEffect(() => {
+    if (onSubscribeTimerState) return onSubscribeTimerState(setTimerState);
+  }, [onSubscribeTimerState]);
+
   // Path-preset slot animations. Scans slotAnimations for entries whose
   // enter/exit preset === 'path' and runs the rAF translator for each
   // matching slot wrapper. The wrappers are tagged with
@@ -725,6 +774,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         overflowX: 'hidden',
       }}
     >
+      {/* Default-target countdown bar — pinned to the top of the
+          stage. Mirrors the same TimerProgressBar PositionedBeatView
+          uses, so a beat that auto-advances after defaultTargetDelay
+          shows the same green→yellow→red ticker in responsive mode. */}
+      {timerState && timerState.visible && (
+        <TimerProgressBar
+          totalTime={timerState.totalTime}
+          remainingTime={timerState.remainingTime}
+          visible={timerState.visible}
+          label={timerState.label}
+        />
+      )}
       <style>{`
         /* Comfortable NARRATIVE minimum — not the 16px absolute-legibility
            floor. Long-form story prose below ~18px reads as cramped/lost
@@ -1116,6 +1177,20 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           </>
         );
       })()}
+
+      {/* Character / prop sprite layer — same component as
+          SpatialFlowView mounts. Renders absolute-positioned sprites
+          on top of the slot content; pointer-events:none so it never
+          intercepts clicks. */}
+      {characterLocations && characterLocations.length > 0 && (
+        <ResponsiveCharacterLayer
+          locations={characterLocations}
+          animations={animations}
+          characterResolver={characterResolver}
+          assetResolver={assetResolver}
+          spriteDataResolver={spriteDataResolver}
+        />
+      )}
     </div>
   );
 };

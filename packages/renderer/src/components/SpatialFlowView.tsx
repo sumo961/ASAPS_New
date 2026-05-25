@@ -13,6 +13,10 @@ import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
 import { runSpatialPath } from '../utils/pathAnimation';
+import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
+import { TimerProgressBar } from './TimerProgressBar';
+import type { Location, AnimationPath } from '@asaps/core';
+import type { SpriteSheetData } from './PositionedBeatView';
 
 interface SpatialFlowViewProps {
   beatType: string;
@@ -71,6 +75,30 @@ interface SpatialFlowViewProps {
   onAction: (id: string) => void;
   previewWidth?: number;
   previewCoarse?: boolean;
+  /**
+   * Free-positioned sprite layer — character / prop locations that
+   * the responsive slot/spatial routing has decided NOT to treat as
+   * "author placed layout content". Mirrors the kind:'character' /
+   * kind:'prop' rendering that PositionedBeatView does in fixed
+   * mode, but uses xPercent / yPercent so positions track the live
+   * stage at any viewport. The renderer also forwards
+   * beat.parameters.animations so AnimationPath[] entries whose
+   * elementId matches a character location drive the sprite's
+   * transform each frame (via the shared AnimationEngine).
+   */
+  characterLocations?: Location[];
+  animations?: AnimationPath[];
+  characterResolver?: (characterId: string, stateId?: string) => string | undefined;
+  assetResolver?: (assetId: string) => string | undefined;
+  spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
+  /** Same timer hookup as SlotFlowView — see notes there. */
+  timerState?: {
+    totalTime: number;
+    remainingTime: number;
+    visible: boolean;
+    label?: string;
+  };
+  onSubscribeTimerState?: (listener: (state: SpatialFlowViewProps['timerState']) => void) => () => void;
 }
 
 /**
@@ -218,6 +246,13 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   onAction,
   previewWidth,
   previewCoarse,
+  characterLocations,
+  animations,
+  characterResolver,
+  assetResolver,
+  spriteDataResolver,
+  timerState: initialTimerState,
+  onSubscribeTimerState,
 }) => {
   const objectFit = spatial.fit === 'cover' ? 'cover' : 'contain';
 
@@ -263,6 +298,18 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   // animate in parallel because they share the same flip moment.
   const [imagePhase, setImagePhase] = useState<'enter' | 'exit'>('enter');
   const handleExitStart = useCallback(() => setImagePhase('exit'), []);
+
+  // Default-target countdown — mirror of SlotFlowView's subscription
+  // wiring so a spatial beat (titleScreen, dialogTree spatial node,
+  // etc.) shows the same green→red bar at the top when the beat
+  // auto-advances.
+  const [timerState, setTimerState] = useState(initialTimerState);
+  useEffect(() => {
+    setTimerState(initialTimerState);
+  }, [initialTimerState]);
+  useEffect(() => {
+    if (onSubscribeTimerState) return onSubscribeTimerState(setTimerState);
+  }, [onSubscribeTimerState]);
 
   // P3-3c — track the container + image natural aspect so hotspots can be
   // positioned relative to the LETTERBOXED image rect (not the container).
@@ -398,6 +445,17 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         background: src ? '#000' : backgroundColor,
       }}
     >
+      {/* Default-target countdown bar — mirrors PositionedBeatView /
+          SlotFlowView placement so beats that auto-advance show the
+          same green→red ticker pinned at the top of the stage. */}
+      {timerState && timerState.visible && (
+        <TimerProgressBar
+          totalTime={timerState.totalTime}
+          remainingTime={timerState.remainingTime}
+          visible={timerState.visible}
+          label={timerState.label}
+        />
+      )}
       <style>{`
         /* P3-anim-6 / 7 — spatial-layer motion. Enter and exit share a
            class-suffix convention: -in, -out, plus pan/ken-burns variants. */
@@ -758,6 +816,19 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           }
         />
       </div>
+
+      {/* Character / prop sprite layer — free-positioned avatars on
+          top of the spatial image but below the flow text/buttons.
+          Picks up beat.parameters.animations for path-driven motion. */}
+      {characterLocations && characterLocations.length > 0 && (
+        <ResponsiveCharacterLayer
+          locations={characterLocations}
+          animations={animations}
+          characterResolver={characterResolver}
+          assetResolver={assetResolver}
+          spriteDataResolver={spriteDataResolver}
+        />
+      )}
     </div>
   );
 };

@@ -12,6 +12,18 @@ export interface Location {
   y: number;
   width: number;
   height: number;
+  /**
+   * Layout-agnostic position siblings to x/y (percent of stage,
+   * 0..100). Populated by the Fixed → Responsive migrator for
+   * free-positioned avatars (kind: 'character' | 'prop') so the
+   * responsive renderer can scale the location against the live
+   * stage at any viewport. Absent on fixed-mode locations; pixel
+   * x/y remains canonical for the absolute renderer.
+   */
+  xPercent?: number;
+  yPercent?: number;
+  widthPercent?: number;
+  heightPercent?: number;
   zIndex?: number;
   assetId?: string;  // Asset reference for character/prop elements
   assetType?: 'image' | 'audio' | 'video' | 'font';  // Asset type for rendering (video renders as <video> instead of <img>)

@@ -831,6 +831,22 @@ const LoadingDisplay: React.FC<{
   );
 };
 
+// Free-positioned avatar kinds — character / prop. These never block
+// the responsive routing (slot/spatial mode), because they don't
+// represent author-placed LAYOUT content; they ride along on a
+// separate sprite layer (ResponsiveCharacterLayer) inside
+// SlotFlowView / SpatialFlowView. authorPositioned must be computed
+// against layout content only.
+const FREE_POSITIONED_KINDS = new Set(['character', 'prop']);
+
+function layoutAuthorPositioned(locations?: Location[]): boolean {
+  if (!locations || locations.length === 0) return false;
+  for (const loc of locations) {
+    if (!FREE_POSITIONED_KINDS.has(loc.kind ?? '')) return true;
+  }
+  return false;
+}
+
 // ============= REACT RENDERER CLASS =============
 
 export class ReactRenderer extends BaseRenderer {
@@ -874,6 +890,17 @@ export class ReactRenderer extends BaseRenderer {
   private characterMoodFrameResolver: ((characterId: string) => { valence: number; arousal: number; config: import('../components/CharacterMoodFrame').MoodFrameConfig; palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>; characterName?: string; characterPortraitUrl?: string; characterColor?: string } | null) | null = null;
   protected inventoryVisible: boolean = false;  // NEW: Whether inventory is currently visible (controlled by Ctrl/Cmd+I)
   private spriteDataResolver: ((characterId: string) => { frameWidth: number; frameHeight: number; defaultFrame?: number; imageWidth?: number; animations?: Array<{ name: string; frames: number[]; frameDuration: number; loop: boolean }>; activeAnimation?: string } | null) | null = null;  // NEW: Sprite sheet data resolver
+
+  /**
+   * Pick character / prop locations out of a beat's locations array
+   * (or undefined when there are none). Used wherever the renderer
+   * forwards a character layer to a responsive component.
+   */
+  protected pickFreePositioned(locations?: Location[]): Location[] | undefined {
+    if (!locations || locations.length === 0) return undefined;
+    const out = locations.filter(l => FREE_POSITIONED_KINDS.has(l.kind ?? ''));
+    return out.length > 0 ? out : undefined;
+  }
   // soundBlobResolver is inherited from BaseRenderer
   protected hideTextBoxes: boolean = false;  // NEW: Whether to hide text box backgrounds
   protected hideButtonBoxes: boolean = false;  // NEW: Whether to hide button box backgrounds
@@ -1965,8 +1992,17 @@ export class ReactRenderer extends BaseRenderer {
   ): Promise<string> {
     console.log(`[ReactRenderer ${this.instanceId}] Rendering positioned ${beatType} with ${locations.length} elements`);
 
-    // Debug: Log all character/prop locations and their assetIds
+    // Split locations into LAYOUT-content (text / button / dialog /
+    // hotspot — anything the responsive slot/spatial renderer would
+    // own) and FREE-positioned avatars (character / prop). Only
+    // layout content drives the "author placed elements → use
+    // absolute path" decision. Character / prop locations are
+    // forwarded to the responsive renderer as a separate sprite
+    // layer, so a beat that has only a character location (e.g. a
+    // migrated responsive project) routes through the responsive
+    // path instead of being locked into the legacy absolute renderer.
     const charPropLocations = locations.filter(loc => loc.kind === 'character' || loc.kind === 'prop');
+    const layoutLocations = locations.filter(loc => loc.kind !== 'character' && loc.kind !== 'prop');
     if (charPropLocations.length > 0) {
       console.log(`[ReactRenderer ${this.instanceId}] Character/Prop locations:`, charPropLocations.map(loc => ({
         name: loc.name,
@@ -1975,6 +2011,11 @@ export class ReactRenderer extends BaseRenderer {
         hasAssetResolver: !!this.assetResolver
       })));
     }
+    // Recompute authorPositioned against ONLY layout content. If the
+    // caller said true based on a count that was all character/prop,
+    // we want the responsive renderer to still fire (with sprites on
+    // top via the character layer).
+    const effectiveAuthorPositioned = authorPositioned && layoutLocations.length > 0;
 
     return new Promise(resolve => {
       if (waitForAction) {
@@ -1992,7 +2033,7 @@ export class ReactRenderer extends BaseRenderer {
       // locations → absolute path). Checked BEFORE slot mode since it is the
       // more specific layoutMode. No beat declares layoutMode:"spatial" yet
       // (3a is a pure-addition primitive) so this is inert until 3b.
-      const spatialSpec = shouldUseSpatialMode(beatType, authorPositioned)
+      const spatialSpec = shouldUseSpatialMode(beatType, effectiveAuthorPositioned)
         ? getSpatialSpec(beatType)
         : null;
       if (spatialSpec) {
@@ -2027,6 +2068,13 @@ export class ReactRenderer extends BaseRenderer {
             slotAnimations={spAnimations}
             spatialAnimations={spatialAnimations}
             onAction={this.handleAction}
+            characterLocations={charPropLocations.length > 0 ? charPropLocations : undefined}
+            animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
+            characterResolver={this.characterResolver ?? undefined}
+            assetResolver={this.assetResolver ?? undefined}
+            spriteDataResolver={this.spriteDataResolver ?? undefined}
+            timerState={this.timerState}
+            onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
           />
         );
         return;
@@ -2037,7 +2085,7 @@ export class ReactRenderer extends BaseRenderer {
       // for slot-declared beat types whose instance has no author-persisted
       // pixel locations (authorPositioned=false). Every other beat / caller
       // falls straight through to the unchanged absolute path below.
-      const slotSpec = shouldUseSlotMode(beatType, authorPositioned)
+      const slotSpec = shouldUseSlotMode(beatType, effectiveAuthorPositioned)
         ? getSlotSpec(beatType)
         : null;
       if (slotSpec) {
@@ -2072,6 +2120,13 @@ export class ReactRenderer extends BaseRenderer {
             slotAnimations={slotAnimations}
             autoExitMs={slotAutoExitMs}
             onAction={this.handleAction}
+            characterLocations={charPropLocations.length > 0 ? charPropLocations : undefined}
+            animations={animations || (this.getState('animations') as AnimationPath[] | undefined)}
+            characterResolver={this.characterResolver ?? undefined}
+            assetResolver={this.assetResolver ?? undefined}
+            spriteDataResolver={this.spriteDataResolver ?? undefined}
+            timerState={this.timerState}
+            onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
           />
         );
         return;
@@ -2205,7 +2260,7 @@ export class ReactRenderer extends BaseRenderer {
     // responsive title + start-button flow). Baked instances stay absolute
     // (zero regression). Mirrors renderText/renderEndScreen/renderDurScreen.
     const content = { title, author, buttonText };
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('titleScreen', content);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
@@ -2232,7 +2287,7 @@ export class ReactRenderer extends BaseRenderer {
     // reads content.speaker; we resolve here so the same logic
     // (beat override > global theme) governs both modes.
     const content: Record<string, any> = { text, buttonText, speaker: this.resolveSpeakerForSlot() };
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
 
     // Log each location's position and dimensions
@@ -2458,7 +2513,7 @@ export class ReactRenderer extends BaseRenderer {
     // already. We compose the full turn (image + speaker/text slots
     // + hotspot choices) in a single SpatialFlowView render.
     const dialogNodeIsSpatial = !!this.getState('dialogNodeIsSpatial');
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     if (dialogNodeIsSpatial && !authorPositioned) {
       const spatialSpec = getSpatialSpec('dialogTree');
       if (spatialSpec) {
@@ -2526,6 +2581,13 @@ export class ReactRenderer extends BaseRenderer {
               hotspots={hotspots}
               dynamicActions={dynamicActions}
               onAction={this.handleAction}
+              characterLocations={this.pickFreePositioned(locations)}
+              animations={this.getState('animations') as AnimationPath[] | undefined}
+              characterResolver={this.characterResolver ?? undefined}
+              assetResolver={this.assetResolver ?? undefined}
+              spriteDataResolver={this.spriteDataResolver ?? undefined}
+              timerState={this.timerState}
+              onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
             />
           );
         });
@@ -2693,7 +2755,7 @@ export class ReactRenderer extends BaseRenderer {
     // and absolute in PreviewWindow. Choices WITHOUT a hotspot simply
     // don't render as clickable regions in spatial mode (the inspector
     // should warn the author about that gap; that warning lands separately).
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const anyHasHotspot = choices.length > 0 && choices.some(c => !!c.hotspot);
     if (anyHasHotspot && !authorPositioned) {
       const spatialSpec = getSpatialSpec('movementChoice');
@@ -2740,6 +2802,13 @@ export class ReactRenderer extends BaseRenderer {
               spatialAnimations={spatialAnimations}
               hotspots={hotspots}
               onAction={this.handleAction}
+              characterLocations={this.pickFreePositioned(locations)}
+              animations={this.getState('animations') as AnimationPath[] | undefined}
+              characterResolver={this.characterResolver ?? undefined}
+              assetResolver={this.assetResolver ?? undefined}
+              spriteDataResolver={this.spriteDataResolver ?? undefined}
+              timerState={this.timerState}
+              onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
             />
           );
         });
@@ -2775,7 +2844,7 @@ export class ReactRenderer extends BaseRenderer {
     // with the image as background and the prop hotspots as clickable
     // regions anchored to the image's letterboxed rect. Mirrors the
     // movementChoice spatial routing (P3-3c-2).
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const anyHasHotspot = props.length > 0 && props.some(p => !!p.hotspot);
     if (anyHasHotspot && !authorPositioned) {
       const spatialSpec = getSpatialSpec('pickProp');
@@ -2819,6 +2888,13 @@ export class ReactRenderer extends BaseRenderer {
               spatialAnimations={spatialAnimations}
               hotspots={hotspots}
               onAction={this.handleAction}
+              characterLocations={this.pickFreePositioned(locations)}
+              animations={this.getState('animations') as AnimationPath[] | undefined}
+              characterResolver={this.characterResolver ?? undefined}
+              assetResolver={this.assetResolver ?? undefined}
+              spriteDataResolver={this.spriteDataResolver ?? undefined}
+              timerState={this.timerState}
+              onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
             />
           );
         });
@@ -2911,7 +2987,7 @@ export class ReactRenderer extends BaseRenderer {
       message, showRestart, showCredits, restartText, creditsText,
       speaker: this.resolveSpeakerForSlot(),
     };
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('endScreen', content);
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
@@ -2944,7 +3020,7 @@ export class ReactRenderer extends BaseRenderer {
     // Use provided locations or generate default locations from schema.
     // authorPositioned=false (no baked layout) + aiSummary's schema
     // layoutMode:slot → SlotFlowView (title + summary body + restart/credits).
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('aiSummary', content);
 
     // Return the user's action (e.g., 'restart', 'credits')
@@ -2976,7 +3052,7 @@ export class ReactRenderer extends BaseRenderer {
     // absolute (zero regression). Mirrors renderText/renderEndScreen.
     // Task #225 — surface speaker label in slot mode if visible.
     const content: Record<string, any> = { text, speaker: this.resolveSpeakerForSlot() };
-    const authorPositioned = !!(locations && locations.length > 0);
+    const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : generateDefaultLocations('durScreen', content);
 
     this.ttsSpeakCallback?.(text, this.currentSpeaker);
