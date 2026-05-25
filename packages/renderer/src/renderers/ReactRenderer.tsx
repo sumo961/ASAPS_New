@@ -2802,8 +2802,15 @@ export class ReactRenderer extends BaseRenderer {
             rotation: (c.hotspot as any)!.rotation,
             fromProp: (c.hotspot as any)!.fromProp,
             label: c.displayText || c.text,
+            // triggerName — what the onClick AnimationPath matches
+            // against (anim.triggerElementId / elementId === this). The
+            // legacy ZIP convention is that the trigger refers to the
+            // LOCATION name, not the choice id. Fall back to text when
+            // locationName isn't set (e.g. beat_4 door, where the
+            // choice referenced the door hotspot purely by text).
+            triggerName: c.locationName || c.text,
           }));
-        console.log(`[RR movementChoice→spatial] choices=${choices.length} withHotspot=${hotspots.length} hotspots=`, hotspots.map((h: any) => `${h.id}|${h.label}|(${h.x.toFixed(3)},${h.y.toFixed(3)},${h.width.toFixed(3)}x${h.height.toFixed(3)})|shape=${h.shape ?? 'rect'}|rot=${h.rotation ?? 0}|fromProp=${h.fromProp ?? false}`));
+        console.log(`[RR movementChoice→spatial] choices=${choices.length} withHotspot=${hotspots.length} hotspots=`, hotspots.map((h: any) => `${h.id}|${h.label}|(${h.x.toFixed(3)},${h.y.toFixed(3)},${h.width.toFixed(3)}x${h.height.toFixed(3)})|shape=${h.shape ?? 'rect'}|rot=${h.rotation ?? 0}|fromProp=${h.fromProp ?? false}|trigger=${h.triggerName ?? '<none>'}`));
         const _charLocs = this.pickFreePositioned(locations) ?? [];
         console.log(`[RR movementChoice→spatial] characterLocations=${_charLocs.length} [${_charLocs.map((l: any) => `${l.kind}:${l.name}`).join(', ')}] animations=`, this.getState('animations'));
         return new Promise<string>(resolve => {

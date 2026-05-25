@@ -300,12 +300,16 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   //   - the rest of the UI (question, timer) stays visible (per design)
   const rclRef = useRef<ResponsiveCharacterLayerHandle | null>(null);
   const [committedActionId, setCommittedActionId] = useState<string | null>(null);
-  const handleHotspotClick = useCallback(async (hotspotId: string) => {
+  const handleHotspotClick = useCallback(async (hotspotId: string, triggerName?: string) => {
     if (committedActionId !== null) return; // already committed; ignore re-click
     setCommittedActionId(hotspotId);
     try {
+      // Match the onClick AnimationPath by the LOGICAL name (the
+      // source location's name — 'door' / 'bed' / …), not the choice
+      // id. Fall back to id only when triggerName is absent (legacy
+      // data with no location-name plumbing).
       if (rclRef.current) {
-        await rclRef.current.triggerClickAnimation(hotspotId);
+        await rclRef.current.triggerClickAnimation(triggerName || hotspotId);
       }
     } catch (err) {
       console.warn('[SpatialFlowView] triggerClickAnimation failed; resolving anyway', err);
@@ -687,7 +691,15 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
               transition: 'opacity 200ms ease',
             }}
           >
-            {hotspots.map((h) => {
+            {/* Render prop-derived hotspots FIRST so author-drawn
+                hotspots (door, bed, kitchen) land later in the DOM
+                and sit on top — siblings stack last-on-top, and a
+                prop-derived hotspot is often huge (whole image rect),
+                so without this it would block clicks on small
+                author-drawn hotspots that overlap it. */}
+            {[...hotspots]
+              .sort((a, b) => Number(!!(a as any).fromProp) - Number(!!(b as any).fromProp))
+              .map((h) => {
               const isEllipse = h.shape === 'ellipse';
               const labelText = h.label || h.id;
               const showLabelAlways = hsLabel === 'always' && !!labelText;
@@ -720,7 +732,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                   type="button"
                   aria-label={labelText}
                   title={showLabelOnHover ? labelText : (!gateEarned ? 'Scroll to the bottom of the text to choose' : undefined)}
-                  onClick={() => handleHotspotClick(h.id)}
+                  onClick={() => handleHotspotClick(h.id, (h as any).triggerName)}
                   disabled={!gateEarned || committedActionId !== null}
                   aria-disabled={!gateEarned || committedActionId !== null}
                   className="spatialflow-hotspot"

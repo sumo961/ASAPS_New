@@ -335,6 +335,23 @@ export function migrateFixedToResponsive(
       }
       return undefined;
     };
+    // Effective rect for a hotspot or prop. When the source location
+    // carries a `scale` transform (e.g. a Present-1.png prop drawn at
+    // scale 0.4 around its center), the VISIBLE rect is smaller than
+    // (loc.x, loc.y, loc.width, loc.height). We bake that scale into a
+    // single rect so the hotspot click region exactly overlays the
+    // prop's visible image, instead of a 600×300 box covering half the
+    // scene. Scale on a hotspot kind is unusual but handled the same
+    // way for consistency.
+    const effectiveRect = (loc: BakedLoc): { x: number; y: number; w: number; h: number } => {
+      const s = (typeof loc.record?.scale === 'number' && loc.record.scale > 0) ? loc.record.scale : 1;
+      if (s === 1) return { x: loc.x, y: loc.y, w: loc.width, h: loc.height };
+      const cx = loc.x + loc.width / 2;
+      const cy = loc.y + loc.height / 2;
+      const w = loc.width * s;
+      const h = loc.height * s;
+      return { x: cx - w / 2, y: cy - h / 2, w, h };
+    };
     const transferHotspots = (key: 'choices' | 'props') => {
       const arr = Array.isArray(params?.[key]) ? params[key] : null;
       if (!arr) return;
@@ -354,13 +371,14 @@ export function migrateFixedToResponsive(
         // the spatial composite has a click target, but tag it so the
         // renderer can skip the highlight fill / outline.
         const fromProp = loc.kind === 'prop';
+        const r = effectiveRect(loc);
         return {
           ...c,
           hotspot: {
-            x: loc.x / stage.w,
-            y: loc.y / stage.h,
-            width: loc.width / stage.w,
-            height: loc.height / stage.h,
+            x: r.x / stage.w,
+            y: r.y / stage.h,
+            width: r.w / stage.w,
+            height: r.h / stage.h,
             // Preserve the authored shape (rect / ellipse) when set on
             // the location; defaults to rect when omitted.
             ...(loc.record?.shape ? { shape: loc.record.shape } : {}),
@@ -417,12 +435,28 @@ export function migrateFixedToResponsive(
     let preservedCount = 0;
     for (const loc of baked) {
       if (!PRESERVED_KINDS.has(loc.kind ?? '')) continue;
+      // Bake `scale` into the percent rect so the responsive renderer
+      // (which doesn't apply a separate scale transform on static
+      // sprites) draws the prop at its authored visible size. The
+      // origin is the prop's center, matching fixed-mode's
+      // `transform: scale(s)` behavior. Then drop `scale` from the
+      // preserved record so it isn't double-applied if downstream
+      // code interprets it later.
+      const r = effectiveRect(loc);
+      const { scale: _droppedScale, ...recordWithoutScale } = loc.record;
       const enriched = {
-        ...loc.record,
-        xPercent: (loc.x / stage.w) * 100,
-        yPercent: (loc.y / stage.h) * 100,
-        widthPercent: loc.width ? (loc.width / stage.w) * 100 : undefined,
-        heightPercent: loc.height ? (loc.height / stage.h) * 100 : undefined,
+        ...recordWithoutScale,
+        // Keep pixel x/y/width/height for any code path that reads
+        // them; also write the post-scale effective values so the
+        // editor sees the visible rect, not the source rect.
+        x: r.x,
+        y: r.y,
+        width: r.w,
+        height: r.h,
+        xPercent: (r.x / stage.w) * 100,
+        yPercent: (r.y / stage.h) * 100,
+        widthPercent: r.w ? (r.w / stage.w) * 100 : undefined,
+        heightPercent: r.h ? (r.h / stage.h) * 100 : undefined,
       };
       preservedLocs.set(loc.name, enriched);
       preservedCount++;

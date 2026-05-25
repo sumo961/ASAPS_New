@@ -65,6 +65,15 @@ export interface Hotspot {
    * and outline — the prop IS the visual, no overlay needed.
    */
   fromProp?: boolean;
+  /**
+   * Logical name the onClick AnimationPath's `triggerElementId` (or
+   * `elementId`) matches against. Usually the source location name
+   * (`door`, `bed`, …) — distinct from `id` which is the choice id.
+   * The renderer (SpatialFlowView) passes this to
+   * ResponsiveCharacterLayer.triggerClickAnimation so a click on the
+   * 'door' hotspot can find the matching player path.
+   */
+  triggerName?: string;
 }
 
 /** Defensive type guard. */
