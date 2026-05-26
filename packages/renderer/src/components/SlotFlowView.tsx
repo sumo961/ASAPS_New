@@ -1125,6 +1125,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               className={`${a.className ?? ''} slotflow-action-slide-in`}
               data-slotflow-slot={actionSlot.name}
               style={{
+                // Position + zIndex so this row stacks ABOVE the
+                // ResponsiveCharacterLayer (which has position:absolute
+                // and zIndex:1, putting it in the positioned-stacking
+                // tier above static siblings regardless of DOM order).
+                // Without this, an animated player walks IN FRONT of
+                // the Continue button.
+                position: 'relative',
+                zIndex: 5,
                 flexShrink: 0,
                 display: 'flex',
                 justifyContent: actionJustify,
