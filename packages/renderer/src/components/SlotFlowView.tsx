@@ -194,6 +194,21 @@ interface SlotFlowViewProps {
    * when dynamicChoices is absent (e.g. infoText's Continue).
    */
   dynamicChoices?: { id: string; text: string }[];
+  /**
+   * Visual layout template for the slot composition. Drives the high-
+   * level flex direction at the root:
+   *   'stacked'      — speaker above body, body above action (default)
+   *   'conversation' — body scroller and action row sit SIDE-BY-SIDE,
+   *                    creating the back-and-forth "NPC says X / player
+   *                    picks" look. Read-gate is implicitly bypassed
+   *                    (the conversational layout is short and snappy;
+   *                    nothing to scroll past).
+   * Other templates ('chat-bubble' / 'chat-scroll' / 'custom') do NOT
+   * route through SlotFlowView yet — chat modes use ChatDialogView;
+   * 'custom' will read slotIntent anchors in a later commit. Unset →
+   * 'stacked'.
+   */
+  layoutTemplate?: 'stacked' | 'conversation';
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -238,7 +253,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
   dynamicChoices,
+  layoutTemplate = 'stacked',
 }) => {
+  const isConversation = layoutTemplate === 'conversation';
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
   // scrollbar) doesn't leak to other mounts.
@@ -445,8 +462,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const isMultiAction = visibleActionCount > 1 || forceMultiActionGate;
 
   // Sticky once true — earned by either the content fitting on its
-  // own or by the player scrolling to the end-sentinel.
-  const [gateEarned, setGateEarned] = useState(!requireFullRead);
+  // own or by the player scrolling to the end-sentinel. Conversation
+  // layout bypasses the gate entirely: it's a short snappy back-and-
+  // forth, the action row sits beside the body from the start.
+  const [gateEarned, setGateEarned] = useState(isConversation || !requireFullRead);
 
   // Stage-root + end-of-body sentinel for the gate.
   // Detection uses the ACTUAL scrolling element's scrollTop /
@@ -542,7 +561,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     position: 'absolute',
     inset: 0,
     display: 'flex',
-    flexDirection: 'column',
+    // Conversation template runs the body scroller + action row as
+    // side-by-side siblings (NPC text on one side, player choices on
+    // the other). Stacked keeps the legacy column layout. Other
+    // templates collapse to 'column' until they get a dedicated layout.
+    flexDirection: isConversation ? 'row' : 'column',
+    // In conversation layout, the inner panels fit naturally; align them
+    // vertically against the stage top so a short prompt doesn't get
+    // dragged to mid-height.
+    alignItems: isConversation ? 'stretch' : undefined,
+    gap: isConversation ? 'clamp(16px, 3vw, 32px)' : undefined,
     overflow: 'hidden',
     background: backgroundUrl ? undefined : backgroundColor,
     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
@@ -1152,7 +1180,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         return (
           <>
             <div
-              className={`${a.className ?? ''} slotflow-action-slide-in`}
+              className={`${a.className ?? ''} ${isConversation ? '' : 'slotflow-action-slide-in'}`}
               data-slotflow-slot={actionSlot.name}
               style={{
                 // Position + zIndex so this row stacks ABOVE the
@@ -1165,7 +1193,20 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 zIndex: 5,
                 flexShrink: 0,
                 display: 'flex',
-                justifyContent: actionJustify,
+                // Conversation layout: stack buttons VERTICALLY on the
+                // right-side panel so the back-and-forth reads as
+                // "NPC text ← → player choices" rather than "NPC text
+                // above a horizontal button row inside its own panel".
+                // The legacy row layout (stacked template) keeps the
+                // horizontal flex it always had.
+                flexDirection: isConversation ? 'column' : undefined,
+                // In conversation mode the action panel claims a fixed
+                // width fraction of the stage; body scroller flexes to
+                // fill the rest. Without flex-basis the empty-buttons
+                // row collapses to zero width.
+                flexBasis: isConversation ? 'clamp(180px, 38%, 360px)' : undefined,
+                alignSelf: isConversation ? 'center' : undefined,
+                justifyContent: isConversation ? 'center' : actionJustify,
                 gap: 'clamp(12px, 2vw, 24px)',
                 // gap intent controls the space above the row (under the body in
                 // below-body mode; bottom inset stays comfortable either way).

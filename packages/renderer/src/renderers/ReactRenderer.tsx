@@ -2658,6 +2658,12 @@ export class ReactRenderer extends BaseRenderer {
         : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
       const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
+      // Layout template forwarded from MultiChoiceBeat via state. Only
+      // 'stacked' and 'conversation' are routed through SlotFlowView;
+      // 'chat-bubble' / 'custom' fall through (chat-bubble uses the
+      // existing ChatDialogView path, custom is a later commit).
+      const rawTemplate = this.getState('layoutTemplate') as string | undefined;
+      const slotTemplate: 'stacked' | 'conversation' = rawTemplate === 'conversation' ? 'conversation' : 'stacked';
       return new Promise<string>(resolve => {
         this.resolveAction = (id: string) => {
           this.resolveAction = null;
@@ -2678,6 +2684,7 @@ export class ReactRenderer extends BaseRenderer {
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
             dynamicChoices={choices.map(c => ({ id: c.id, text: c.text }))}
+            layoutTemplate={slotTemplate}
             onAction={this.handleAction}
             characterLocations={this.pickFreePositioned(locations)}
             animations={this.getState('animations') as AnimationPath[] | undefined}
