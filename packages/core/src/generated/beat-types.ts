@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-05-26T14:21:01.418Z
+ * Generated: 2026-05-26T21:34:07.719Z
  */
 
 // ============================================
@@ -190,7 +190,9 @@ export interface DialogTreeParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
-  /** Dialog presentation style: 'positioned' (traditional positioned elements), 'chat-scroll' (scrollable chat history), or 'chat-bubble' (single message bubble) */
+  /** How the dialog renders in responsive mode. 'conversation' (default) lays text on one side and choices on the other — the natural back-and-forth feel. 'stacked' keeps text on top, choices below. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors for fine-grained author control. Lives in the LEFT-side VE settings panel (it's a layout property, not a content property). */
+  layoutTemplate?: string | undefined;
+  /** DEPRECATED in v0.9.62 — use layoutTemplate instead. Existing projects auto-migrate at load: 'positioned' → 'conversation', 'chat-scroll' → 'chat-scroll', 'chat-bubble' → 'chat-bubble'. The field is kept in the schema only so legacy ZIPs deserialize without warnings; new projects should never write to it. */
   presentationMode?: string | undefined;
   /** Show character avatars in chat mode */
   showAvatars?: boolean | undefined;
@@ -216,6 +218,8 @@ export interface MultiChoiceParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices that lead to previously visited beats */
   markVisited?: boolean | undefined;
+  /** How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel. */
+  layoutTemplate?: string | undefined;
   /** Who speaks the prompt (for TTS voice routing and optional display) */
   speaker?: string | undefined;
   /** Show speaker name to the interactor */

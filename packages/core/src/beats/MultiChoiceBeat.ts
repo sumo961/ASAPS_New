@@ -19,11 +19,24 @@ import { migrateChoiceEffects } from '../migration/effectsMigration';
  * No spatial layer; no hotspot variant — for spatial picks use
  * MovementChoice; for back-and-forth dialog use DialogTree.
  */
+/** Layout templates available on MultiChoice. chat-scroll is intentionally
+ *  excluded — MultiChoice is single-screen by design; chat-scroll's
+ *  scrollable history concept only makes sense on DialogTree. */
+export type MultiChoiceLayoutTemplate = 'stacked' | 'conversation' | 'chat-bubble' | 'custom';
+
+function normalizeLayoutTemplate(v: unknown): MultiChoiceLayoutTemplate {
+  if (v === 'stacked' || v === 'conversation' || v === 'chat-bubble' || v === 'custom') {
+    return v;
+  }
+  return 'stacked';
+}
+
 export class MultiChoiceBeat extends Beat {
   public question: string;
   public choices: MultiChoiceOption[];
   public choiceDelay?: number;
   public markVisited?: boolean;
+  public layoutTemplate: MultiChoiceLayoutTemplate;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<MultiChoiceParameters>;
@@ -33,6 +46,9 @@ export class MultiChoiceBeat extends Beat {
     this.choices = (config.choices || config.parameters?.choices || []) as MultiChoiceOption[];
     this.choiceDelay = config.choiceDelay ?? config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.layoutTemplate = normalizeLayoutTemplate(
+      (config as any).layoutTemplate ?? config.parameters?.layoutTemplate,
+    );
 
     // Migrate flat counter fields → canonical effects on all choices, same as
     // MovementChoice / DialogTree. No-op when choices already use effects[].
@@ -46,6 +62,7 @@ export class MultiChoiceBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
+      layoutTemplate: this.layoutTemplate,
       speaker: this.speaker,
       showSpeaker: this.showSpeaker,
     };
@@ -70,6 +87,7 @@ export class MultiChoiceBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.layoutTemplate !== undefined) this.layoutTemplate = normalizeLayoutTemplate(params.layoutTemplate);
     if (params.speaker !== undefined) this.speaker = params.speaker;
     if (params.showSpeaker !== undefined) this.showSpeaker = params.showSpeaker;
   }

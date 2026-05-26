@@ -18,6 +18,41 @@ export interface PhaseOverride {
   height?: number;
 }
 
+/**
+ * Layout templates available on DialogTree. Unified field as of v0.9.62
+ * (supersedes the legacy `presentationMode` enum). `chat-scroll` and
+ * `chat-bubble` keep their existing render paths via ChatDialogView;
+ * `conversation` is the new responsive back-and-forth (text on one side,
+ * choice buttons on the other); `stacked` is the simple top-bottom flow;
+ * `custom` defers to slotIntent anchors for fine-grained author control.
+ */
+export type DialogTreeLayoutTemplate =
+  | 'stacked'
+  | 'conversation'
+  | 'chat-scroll'
+  | 'chat-bubble'
+  | 'custom';
+
+function normalizeDialogTreeLayoutTemplate(v: unknown): DialogTreeLayoutTemplate {
+  if (
+    v === 'stacked' ||
+    v === 'conversation' ||
+    v === 'chat-scroll' ||
+    v === 'chat-bubble' ||
+    v === 'custom'
+  ) {
+    return v;
+  }
+  return 'conversation';
+}
+
+/** True when the layout template is one of the existing chat-style modes
+ *  (uses ChatDialogView). Replaces the old `presentationMode !== 'positioned'`
+ *  check in five places below. */
+export function isChatLayoutTemplate(template: DialogTreeLayoutTemplate): boolean {
+  return template === 'chat-scroll' || template === 'chat-bubble';
+}
+
 export class DialogTreeBeat extends Beat {
   public dialogTree: DialogNode;
   public speaker: string;
@@ -29,7 +64,15 @@ export class DialogTreeBeat extends Beat {
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
   public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides
-  public presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble'; // Dialog presentation style
+  /** Authoritative layout field as of v0.9.62. The legacy presentationMode
+   *  value lives below for one release cycle so legacy data deserializes
+   *  cleanly; the constructor and updateParameters() migrate it forward. */
+  public layoutTemplate: DialogTreeLayoutTemplate;
+  /** @deprecated v0.9.62 — read from layoutTemplate instead. Kept on the
+   *  instance only to surface the legacy value during getParameters() so
+   *  ASML / ZIP exports keep round-tripping on the old field name until
+   *  v0.9.63 strips it. New writes should target layoutTemplate. */
+  public presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
   public showAvatars?: boolean; // Show character avatars in chat mode
   public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
   private currentNode: DialogNode | null = null;
@@ -46,7 +89,27 @@ export class DialogTreeBeat extends Beat {
     this.responseDelay = config.parameters?.responseDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
-    this.presentationMode = (config.parameters?.presentationMode as 'positioned' | 'chat-scroll' | 'chat-bubble') || 'positioned';
+    // v0.9.62 — unified layoutTemplate. Migrate legacy presentationMode:
+    //   'positioned' → 'conversation' (back-and-forth is the new default)
+    //   'chat-scroll' / 'chat-bubble' → kept verbatim
+    // layoutTemplate wins when both are set on disk (new authoring path).
+    const legacyPM = (config.parameters as any)?.presentationMode as
+      | 'positioned' | 'chat-scroll' | 'chat-bubble' | undefined;
+    const legacyMigrated: DialogTreeLayoutTemplate | undefined = legacyPM === 'positioned'
+      ? 'conversation'
+      : legacyPM === 'chat-scroll'
+        ? 'chat-scroll'
+        : legacyPM === 'chat-bubble'
+          ? 'chat-bubble'
+          : undefined;
+    const rawTemplate = (config as any).layoutTemplate
+      ?? config.parameters?.layoutTemplate
+      ?? legacyMigrated;
+    this.layoutTemplate = normalizeDialogTreeLayoutTemplate(rawTemplate);
+    // Surface the legacy value on the instance so getParameters() can
+    // emit it alongside layoutTemplate for one release; new authoring
+    // never writes via this field.
+    this.presentationMode = legacyPM;
     this.showAvatars = config.parameters?.showAvatars ?? true;
     const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
     this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
@@ -274,6 +337,9 @@ export class DialogTreeBeat extends Beat {
       backgroundUrl: this.backgroundUrl,
       backgroundAssetId: this.backgroundAssetId,
       phaseOverrides: this.phaseOverrides,
+      layoutTemplate: this.layoutTemplate,
+      // Continue to emit the legacy presentationMode for one release so
+      // older ASML / ZIP readers don't blow up; v0.9.63 will drop it.
       presentationMode: this.presentationMode,
       showAvatars: this.showAvatars,
       spatialFit: this.spatialFit,
@@ -309,7 +375,19 @@ export class DialogTreeBeat extends Beat {
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
-    if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
+    // v0.9.62 — layoutTemplate is authoritative. A stale write of
+    // presentationMode (legacy editor surfaces) is still respected for
+    // back-compat, but layoutTemplate wins when both are present.
+    if (params.layoutTemplate !== undefined) {
+      this.layoutTemplate = normalizeDialogTreeLayoutTemplate(params.layoutTemplate);
+    } else if (params.presentationMode !== undefined) {
+      this.presentationMode = params.presentationMode;
+      this.layoutTemplate = params.presentationMode === 'chat-scroll'
+        ? 'chat-scroll'
+        : params.presentationMode === 'chat-bubble'
+          ? 'chat-bubble'
+          : 'conversation';
+    }
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
     if (params.spatialFit !== undefined) {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
@@ -366,13 +444,16 @@ export class DialogTreeBeat extends Beat {
       renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
     }
 
-    // Set presentation mode for chat-like dialogs
-    renderer.setState('presentationMode', this.presentationMode || 'positioned');
+    // Surface the layout template to the renderer. We keep emitting
+    // `presentationMode` alongside `layoutTemplate` for one release so any
+    // renderer code that still reads the old state key doesn't break.
+    renderer.setState('layoutTemplate', this.layoutTemplate);
+    renderer.setState('presentationMode', this.presentationMode || (this.layoutTemplate === 'chat-scroll' || this.layoutTemplate === 'chat-bubble' ? this.layoutTemplate : 'positioned'));
     // Bug 26 — per-beat spatial-fit override for the spatial layer.
     renderer.setState('spatialFit', this.spatialFit);
     renderer.setState('showAvatars', this.showAvatars ?? true);
     // Default responseDelay to 1.5s for chat modes if not explicitly set
-    const isChatMode = this.presentationMode && this.presentationMode !== 'positioned';
+    const isChatMode = isChatLayoutTemplate(this.layoutTemplate);
     const defaultDelay = isChatMode ? 1.5 : 0;
     renderer.setState('responseDelay', this.responseDelay ?? defaultDelay);
 
@@ -383,7 +464,7 @@ export class DialogTreeBeat extends Beat {
 
     // Clear chat history when starting a new dialog tree in chat mode
     // This ensures messages from previous dialog trees don't persist
-    if (this.presentationMode && this.presentationMode !== 'positioned') {
+    if (isChatMode) {
       if (renderer.clearChatHistory) {
         renderer.clearChatHistory();
       }
@@ -504,8 +585,11 @@ export class DialogTreeBeat extends Beat {
       // project into the absolute path and skipped slot-mode reflow
       // entirely — the load-bearing bug behind "my responsive project's
       // dialog still renders fixed-pixel".
+      // Chat-style templates (chat-bubble / chat-scroll) own their
+      // render path via ChatDialogView, so they never become spatial.
+      // Everything else (conversation / stacked / custom) is eligible.
       const nodeWillBeSpatial =
-        (this.presentationMode || 'positioned') === 'positioned'
+        !isChatLayoutTemplate(this.layoutTemplate)
         && this.locations.size === 0
         && earlyVisibleChoices.length > 0;
       renderer.setState('dialogNodeIsSpatial', nodeWillBeSpatial);

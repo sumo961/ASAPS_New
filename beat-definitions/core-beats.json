@@ -461,16 +461,23 @@
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
         },
+        "layoutTemplate": {
+          "type": "string",
+          "required": false,
+          "default": "conversation",
+          "description": "How the dialog renders in responsive mode. 'conversation' (default) lays text on one side and choices on the other — the natural back-and-forth feel. 'stacked' keeps text on top, choices below. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors for fine-grained author control. Lives in the LEFT-side VE settings panel (it's a layout property, not a content property).",
+          "ui": {
+            "control": "select",
+            "options": ["conversation", "stacked", "chat-scroll", "chat-bubble", "custom"],
+            "label": "Layout",
+            "scope": "ve-left"
+          }
+        },
         "presentationMode": {
           "type": "string",
           "required": false,
-          "default": "positioned",
-          "description": "Dialog presentation style: 'positioned' (traditional positioned elements), 'chat-scroll' (scrollable chat history), or 'chat-bubble' (single message bubble)",
-          "ui": {
-            "control": "select",
-            "options": ["positioned", "chat-scroll", "chat-bubble"],
-            "label": "Presentation Mode"
-          }
+          "description": "DEPRECATED in v0.9.62 — use layoutTemplate instead. Existing projects auto-migrate at load: 'positioned' → 'conversation', 'chat-scroll' → 'chat-scroll', 'chat-bubble' → 'chat-bubble'. The field is kept in the schema only so legacy ZIPs deserialize without warnings; new projects should never write to it.",
+          "ui": { "hidden": true }
         },
         "showAvatars": {
           "type": "boolean",
@@ -568,6 +575,18 @@
           "required": false,
           "default": false,
           "description": "Block and dim choices that lead to previously visited beats"
+        },
+        "layoutTemplate": {
+          "type": "string",
+          "required": false,
+          "default": "stacked",
+          "description": "How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel.",
+          "ui": {
+            "control": "select",
+            "options": ["stacked", "conversation", "chat-bubble", "custom"],
+            "label": "Layout",
+            "scope": "ve-left"
+          }
         },
         "speaker": {
           "type": "string",
