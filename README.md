@@ -22,18 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.60** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.60 closes the last two
-gaps in the responsive layout system**: AI generation paths now default
-to responsive (story-generation + MCP prompts updated, AI-injection
-stamps `layoutMode: 'responsive'`), and the HTML/web export now
-ships asset variants end-to-end (the v0.9.59 Phase 3.3 feature was
-silently broken in exports because the player's variant resolver was
-never wired). The system is still **WORK IN PROGRESS** in the
-not-yet-battle-tested-on-real-production-projects sense, but it is now
-functionally complete: authoring + runtime + variant resolution +
-migration + generation + export all compose together. Existing
-projects keep rendering exactly as before via the legacy absolute path.
+Current release: **v0.9.61** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.61 is a heavy bug-fix
+release for the Fixed→Responsive migration path** — an end-to-end test of
+a real fixed-mode project surfaced ~15 distinct issues across the
+migrator data flow, the responsive character / sprite layer, and the
+spatial onClick AnimationPath trigger. Each fix is in its own commit so
+the changelog reads like a debugging journal; cumulative effect: a
+fixed-mode project with character animations, multi-segment sprite
+cycling, click-triggered path animations, scaled props, and rotated
+hotspots now migrates AND renders correctly in responsive mode.
+Authors who already migrated projects on v0.9.59/0.9.60 may need to
+round-trip Fixed → Responsive once on this release to pick up the
+corrected migration output. Existing fixed-mode projects keep rendering
+exactly as before via the legacy absolute path.
 For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version

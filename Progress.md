@@ -1,5 +1,68 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-26: Responsive layout — Fixed→Responsive migration completed end-to-end (v0.9.61)
+
+### Overview
+
+A heavy round of bug-fix work on the Fixed→Responsive migration path, the responsive character / sprite layer, and the spatial click flow. The v0.9.59 system shipped the surfaces (project-level layoutMode, bidirectional migrator, slot/spatial composition) but a real end-to-end test of a project authored in fixed mode — "Animation, dialogs and auto-advance" — surfaced ~15 distinct issues across the migration data path and the runtime renderer. This release fixes each one with a targeted commit, the cumulative effect being that a fixed-mode project with character animations, multi-segment sprite cycling, onClick path animations on hotspot clicks, prop-with-scale overlays, and authored hotspot rotation now migrates AND renders correctly in responsive mode.
+
+Authors who already migrated projects on v0.9.59/0.9.60 may need to round-trip Fixed → Responsive once on this release to pick up the corrected migration output (most of the data fixes only take effect when the migrator runs).
+
+### Fixed→Responsive migrator data fixes
+
+The migrator was silently dropping its enrichment output in several places. Each line below was an independent bug:
+
+- **`beat.parameters` is a getter, not a field.** The migrator was reading `(beat as any).parameters` which silently resolved to `undefined` on every Beat instance — `params.choices` was always falsy, so `transferHotspots` no-op'd despite the source `kind: hotspot` locations sitting right there in `baked`. Switched to `beat.getParameters()`.
+- **App.tsx callsite only forwarded `locations` + `slotIntent`.** The migrator's enriched `parameters` (with `choice.hotspot` normalized 0–1 against the stage) and `animations` (with xPercent/yPercent siblings on waypoints) reached `updateBeat`'s caller, then got thrown away. Forwarded the full set including `slotAnimations`, `spatialAnimations`, and a top-level `animations` field (because per-beat `updateParameters()` implementations don't consume `animations`).
+- **Read order bug for enriched animations.** Callsite read `next.animations ?? next.parameters?.animations`. The `??` never fell through because `next.animations` came from `{...beat}` and was the un-enriched original — so the engine always got pixel coords instead of the percent-aware waypoints, and the sprite visibly jumped from its static spot to wp0 the moment a triggered animation started.
+- **Hotspot text-fallback.** Choices like `{text: 'door', locationName: '' }` lost their hotspot during migration because the matcher only checked `locationName` / `location`. Added a fallback chain mirroring fixed mode: explicit name first, then `baked.find(b.name === choice.text && b.kind === 'hotspot')`.
+- **Bed rotation preserved.** Tilted hotspots (e.g. rotated bed at 44°) now survive the migration via `choice.hotspot.rotation`, rendered via a CSS `rotate(deg)` on the spatial hotspot button.
+- **Prop scale baked into effectiveRect.** A prop authored with `scale: 0.4` was migrating to a `choice.hotspot` covering the FULL un-scaled rect (e.g. 600×300 instead of 240×120). Added `effectiveRect(loc)` that applies scale around the location's center; used for both the preserved character/prop location's percent fields AND the prop-derived choice.hotspot.
+- **`fromProp` flag for prop-derived hotspots.** When the source location is a `kind: 'prop'` (visible asset rather than authored click region), the hotspot stays as a click target but the renderer skips the highlight fill + outline — the prop image IS the visual. The Gift prop no longer has an overlay orange rect.
+- **`triggerName` on hotspot data.** The spatial click handler was passing the choice ID to `triggerClickAnimation`, but AnimationPath.triggerElementId references the LOCATION name (e.g. 'door'). Added `Hotspot.triggerName` (= `choice.locationName ?? choice.text`) so the matcher actually finds the path.
+- **Array-shape fallback in migrator.** The Map-only branch silently no-op'd whenever locations arrived as Array (which the deserializer can do depending on call path).
+
+**Files modified**: `packages/builder/src/utils/projectLayoutMigrator.ts`, `packages/builder/src/App.tsx`, `packages/core/src/utils/hotspot.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`.
+
+### Responsive character / sprite layer fixes
+
+- **Sprite frame size scales with container:stage ratio.** Fixed mode renders sprites at native frame size (e.g. 203×256) inside ScaledStage, which scales everything by `container.width / authored_stage_width`. Responsive was rendering the sprite at raw frame pixels — ~20% oversized in a typical viewport, which then shifted the visible-after-`scale(0.5)` center off the door/bed/kitchen. The fix derives `stageScale` from `loc.width / (loc.widthPercent / 100)` and multiplies `frameW × stageScale` for visualW.
+- **`background-size` scales the sheet, not just the window.** With the frame-size shrunk, the sheet's natural-size backgroundImage was clipping the chosen frame at the new smaller div bounds. Both `backgroundSize` and `backgroundPosition` now multiply by `stageScale`.
+- **`clientWidth` instead of `getBoundingClientRect`.** PreviewWindow wraps the stage in `transform: scale(fitScale)` for letterbox-fit. RCL was reading the bounding rect (post-transform), so its stageScale calc double-counted the outer transform — sprites ended up at ~70% of intended size. Switched to `clientWidth`/`clientHeight` (pre-transform layout box), matching what SpatialFlowView already does for `containerSize`.
+- **Character layer anchored to `imgInsets`.** When the spatial image is letterboxed (image aspect ≠ container aspect), the character was floating mid-container instead of landing on the picture. Wrapped RCL in a div positioned at `top/left/right/bottom: imgInsets.*` so character coords are relative to the image rect — matching the hotspot layer.
+- **Cycler cancel/restart bug.** The sprite-frame cycler useEffect depended on `animatedPositions`, which the engine mutates ~60Hz. Effect cleanup cancelled the rAF before any frame could advance — characters never cycled even when the engine was correctly reporting `spriteAnimation: 'walk'`. Read mutating state from refs, single rAF loop tied only to locations + resolver identity.
+- **END-waypoint rule for spriteAnimation.** Author convention places sprite-animation names on the END waypoint of a segment ("walk while moving TO this waypoint"). PathInterpolator was using the START — off-by-one, so the first segment never cycled and the last waypoint's animation never played. Switched to END.
+
+**Files modified**: `packages/renderer/src/components/ResponsiveCharacterLayer.tsx`, `packages/renderer/src/components/SpatialFlowView.tsx`, `packages/renderer/src/animation/PathInterpolator.ts`.
+
+### Spatial onClick AnimationPath + state leak fixes
+
+- **Spatial path now runs the onClick AnimationPath before resolving the choice.** Fixed-mode's PositionedBeatView awaits the click animation via `onTriggerClickAnimation`; the spatial path resolved immediately, so beat_4's door click never triggered the player walk-out. ResponsiveCharacterLayer now exposes a `triggerClickAnimation(triggerName)` imperative handle via forwardRef + useImperativeHandle; SpatialFlowView holds a `committedActionId` state that disables all hotspots while the animation runs, awaits the engine's onComplete, then calls onAction.
+- **Per-beat key on SpatialFlowView / SlotFlowView.** React was reconciling the same component instance across beat transitions, so `committedActionId` from clicking the door in beat_4 stayed set in beat_5 (hotspots unclickable), and `animatedPositions` similarly leaked beat_4's final walk-out position + scale into beat_5. Added `key={beatId}` to all spatial / slot mount sites; full unmount/remount per beat fixes both leaks.
+- **Triggered animation cleanup on unmount.** Triggers registered with the engine singleton are now stopped when RCL unmounts.
+
+**Files modified**: `packages/renderer/src/components/SpatialFlowView.tsx`, `packages/renderer/src/components/ResponsiveCharacterLayer.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`.
+
+### Z-order + small polish
+
+- **Beat_1 Continue button now stacks above the walking sprite.** The SlotFlowView flow action row was non-positioned; the character layer at `position: absolute; zIndex: 1` stacked above static siblings regardless of DOM order. Gave the action row `position: relative; zIndex: 5`.
+- **Prop-derived hotspots render below author-drawn hotspots.** Sort so `fromProp: true` is FIRST in the DOM (earlier sibling = below in z-stack). A large prop-derived hotspot no longer blocks clicks on small author-drawn hotspots that overlap it (e.g. Gift covering bed/kitchen).
+- **Hotspot `triggerName` matching.** ReactRenderer maps `choice.locationName || choice.text` onto the dispatched hotspot data.
+
+**Files modified**: `packages/renderer/src/components/SlotFlowView.tsx`, `packages/renderer/src/components/SpatialFlowView.tsx`, `packages/renderer/src/components/ResponsiveCharacterLayer.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`.
+
+### Path-based animations for responsive mode (initial scaffold)
+
+The first scaffold of path-keyframe animation support inside the responsive composite — `slotPath` / `spatialPath` types on the animation schema, percent-aware waypoint resolution, frame cycling for sprite-sheet characters. The bulk of the per-issue debugging above sits on top of this scaffold.
+
+**Files modified**: `packages/renderer/src/components/ResponsiveCharacterLayer.tsx` (new component), `packages/renderer/src/animation/*`, `packages/core/src/types/animation.ts`.
+
+### Debug instrumentation (added, then removed)
+
+Two diagnostic passes landed during the debugging — `[migrator …]` / `[callsite UB …]` / `[useStoryBuilder UB …]` on the data side, `[RCL …]` / `[RR movementChoice→spatial …]` on the runtime side. Each commit listed the diagnostic at the top and the substantive fix below; final cleanup commit (`fac3d819`) strips all of them now that the migrations + runtime are settled.
+
+---
+
 ## 2026-05-24: Responsive layout follow-through — generation paths, web export parity (v0.9.60)
 
 ### Overview
