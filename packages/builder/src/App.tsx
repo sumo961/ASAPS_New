@@ -4473,18 +4473,6 @@ function App() {
     const projectWidth = globalSettings?.project?.width || 1024;
     const projectHeight = globalSettings?.project?.height || 768;
 
-    // DIAG-MIG-CALL — dump pre-migration state.beats so we can correlate
-    // what the migrator INPUT looks like with what eventually persists.
-    console.log(`[migrate-call] target=${target} stateBeats=${state.beats.length}`);
-    for (const b of state.beats) {
-      const locs = (b as any).locations;
-      const locKind = locs instanceof Map ? 'Map' : Array.isArray(locs) ? 'Array' : typeof locs;
-      const kindList: string[] = [];
-      if (locs instanceof Map) locs.forEach((v: any) => kindList.push(`${v?.kind}:${v?.name}`));
-      else if (Array.isArray(locs)) locs.forEach((v: any) => kindList.push(`${v?.kind}:${v?.name}`));
-      const params: any = (b as any).parameters ?? {};
-      console.log(`[migrate-call ${(b as any).id} ${b.type}] locs=${locKind}(${locs?.size ?? locs?.length ?? 0}) [${kindList.join(', ')}] | choices.len=${params.choices?.length ?? '-'} anims.len=${params.animations?.length ?? '-'}`);
-    }
     const result = target === 'responsive'
       ? migrateFixedToResponsive(state.beats, projectWidth, projectHeight)
       : migrateResponsiveToFixed(
@@ -4547,9 +4535,6 @@ function App() {
         // — passing only locations/slotIntent silently dropped the
         // hotspot conversion and animation enrichments.
         const next = beat as any;
-        const choicesH = (next.parameters?.choices ?? []).filter((c: any) => !!c.hotspot).length;
-        const wp0Pct = typeof next.parameters?.animations?.[0]?.waypoints?.[0]?.xPercent === 'number';
-        console.log(`[callsite UB ${id}] sending: locKind=${next.locations?.constructor?.name} locSize=${next.locations?.size ?? '-'} choicesWithHotspot=${choicesH} animsWp0Pct=${wp0Pct} hasSlotAnims=${!!next.slotAnimations} hasAnims=${(next.animations ?? next.parameters?.animations)?.length ?? 0}`);
         actions.updateBeat(id, {
           locations: next.locations,
           slotIntent: next.slotIntent,
