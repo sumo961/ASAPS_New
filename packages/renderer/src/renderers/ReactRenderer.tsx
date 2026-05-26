@@ -2381,6 +2381,17 @@ export class ReactRenderer extends BaseRenderer {
       return;
     }
 
+    // v0.9.62 — MultiChoice composes its prompt + choices as a single
+    // SlotFlowView render in renderChoices. The renderDialog call from
+    // MultiChoiceBeat.performAction is purely a TTS / context-stashing
+    // hook; the absolute dialog render would just flash for one frame
+    // before SlotFlowView paints on top. Same pattern as
+    // dialogNodeIsSpatial above.
+    const currentBeatType = this.getState('currentBeatType') as string | undefined;
+    if (currentBeatType === 'multiChoice') {
+      return;
+    }
+
     // Positioned mode - render as before
     // Render dialog immediately WITHOUT choices (don't wait for action)
     // This ensures the dialog text, background, and characters are visible
@@ -2633,6 +2644,52 @@ export class ReactRenderer extends BaseRenderer {
 
     // Use currentBeatType from state if set (for AI beats), otherwise default to dialogTree
     const beatType = (this.getState('currentBeatType') as string) || 'dialogTree';
+
+    // Slot-mode dispatch — when the current beat is slot-mode and the
+    // author has NOT baked pixel locations, route through SlotFlowView
+    // with dynamicChoices instead of falling through to the absolute
+    // path. v0.9.62: MultiChoice is the first consumer. DialogTree
+    // positioned mode follows in a later commit (task #280).
+    const slotSpec = getSlotSpec(beatType);
+    const slotAuthorPositioned = layoutAuthorPositioned(locations);
+    if (slotSpec && !slotAuthorPositioned && beatType === 'multiChoice') {
+      const slotBg = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+      const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
+      const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
+      return new Promise<string>(resolve => {
+        this.resolveAction = (id: string) => {
+          this.resolveAction = null;
+          resolve(id);
+        };
+        this.renderComponent(
+          <SlotFlowView
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-multiChoice'}
+            beatType={beatType}
+            slots={slotSpec}
+            content={{
+              speaker: dialogContext.speaker || '',
+              question: dialogContext.text || '',
+            }}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={slotBg}
+            slotIntent={slotIntent}
+            slotAnimations={slotAnimations}
+            dynamicChoices={choices.map(c => ({ id: c.id, text: c.text }))}
+            onAction={this.handleAction}
+            characterLocations={this.pickFreePositioned(locations)}
+            animations={this.getState('animations') as AnimationPath[] | undefined}
+            characterResolver={this.characterResolver ?? undefined}
+            assetResolver={this.assetResolver ?? undefined}
+            spriteDataResolver={this.spriteDataResolver ?? undefined}
+            timerState={this.timerState}
+            onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
+          />
+        );
+      });
+    }
 
     // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {

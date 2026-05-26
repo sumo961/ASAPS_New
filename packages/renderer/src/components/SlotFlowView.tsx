@@ -184,6 +184,16 @@ interface SlotFlowViewProps {
     label?: string;
   };
   onSubscribeTimerState?: (listener: (state: SlotFlowViewProps['timerState']) => void) => () => void;
+  /**
+   * Dynamic action-row buttons. When set, the action slot uses these
+   * choices INSTEAD of the schema-defined fixed buttons (continueButton /
+   * restartButton / etc.). Each button's `id` is what gets passed to
+   * onAction when clicked. MultiChoice is the first consumer; DialogTree
+   * positioned-mode-in-responsive will follow once it migrates to
+   * layoutTemplate. The schema's `actionSlot.buttons` is still honoured
+   * when dynamicChoices is absent (e.g. infoText's Continue).
+   */
+  dynamicChoices?: { id: string; text: string }[];
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -227,6 +237,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   spriteDataResolver,
   timerState: initialTimerState,
   onSubscribeTimerState,
+  dynamicChoices,
 }) => {
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -406,7 +417,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const actionGap =
     typeof actionAnchor?.gap === 'number' ? actionAnchor.gap : undefined;
 
-  const isContinueAction = actionButtons.includes('continueButton');
+  // dynamicChoices (MultiChoice etc.) override the schema-fixed
+  // button catalog. When set, isContinueAction is false (a multi-
+  // choice beat with 1 dynamic choice is still gated like a multi-
+  // action beat — the choice is a fork, not a Continue).
+  const hasDynamicChoices = (dynamicChoices?.length ?? 0) > 0;
+  const isContinueAction = !hasDynamicChoices && actionButtons.includes('continueButton');
   const continueText = content.buttonText || 'Continue';
   const showRestart = content.showRestart !== false;
   const showCredits = content.showCredits === true;
@@ -421,9 +437,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // activates once the body's end-sentinel has been seen, flipping
   // the body to fixed flex:1 with internal scroll and revealing the
   // action area pinned at the bottom.
-  const visibleActionCount = isContinueAction
-    ? 1
-    : (showCredits ? 1 : 0) + (showRestart ? 1 : 0);
+  const visibleActionCount = hasDynamicChoices
+    ? dynamicChoices!.length
+    : isContinueAction
+      ? 1
+      : (showCredits ? 1 : 0) + (showRestart ? 1 : 0);
   const isMultiAction = visibleActionCount > 1 || forceMultiActionGate;
 
   // Sticky once true — earned by either the content fitting on its
@@ -1096,12 +1114,24 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           text: string;
           onClick: () => void;
           show: boolean;
-        }> = isContinueAction
-          ? [{ id: 'continueButton', text: continueText, onClick: handleContinue, show: true }]
-          : [
-              { id: 'creditsButton', text: creditsText, onClick: handleCredits, show: showCredits },
-              { id: 'restartButton', text: restartText, onClick: handleRestart, show: showRestart },
-            ];
+        }> = dynamicChoices && dynamicChoices.length > 0
+          // MultiChoice (and any future beat with dynamic choice buttons)
+          // uses runtime-supplied choices instead of the schema's fixed
+          // button names. Each choice id is what we pass to dispatchAction
+          // so the parent (ReactRenderer) can resolve the awaiting
+          // Promise with the player's pick.
+          ? dynamicChoices.map(c => ({
+              id: c.id,
+              text: c.text,
+              onClick: () => dispatchAction(c.id),
+              show: true,
+            }))
+          : isContinueAction
+            ? [{ id: 'continueButton', text: continueText, onClick: handleContinue, show: true }]
+            : [
+                { id: 'creditsButton', text: creditsText, onClick: handleCredits, show: showCredits },
+                { id: 'restartButton', text: restartText, onClick: handleRestart, show: showRestart },
+              ];
         const buttonAnchors = (actionSlot
           ? slotIntentFor(slotIntent, actionSlot.name)?.buttonAnchors
           : undefined) as Record<string, SlotAnchor> | undefined;

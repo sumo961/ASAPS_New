@@ -123,6 +123,14 @@ export class MultiChoiceBeat extends Beat {
     context: StoryContext,
     renderer: IRenderer,
   ): Promise<string | null> {
+    // Surface the beat type + chosen layout so the renderer can dispatch
+    // into slot-mode (SlotFlowView with dynamicChoices) when in
+    // responsive layout. ReactRenderer.renderChoices reads currentBeatType
+    // to look up the slot spec; layoutTemplate drives the within-SlotFlowView
+    // visual (stacked vs. conversation in a future commit).
+    renderer.setState('currentBeatType', 'multiChoice');
+    renderer.setState('layoutTemplate', this.layoutTemplate);
+
     // Mark-visited dimming state for the choice renderer.
     renderer.setState('markVisited', this.markVisited || false);
     if (renderer.setVisitedChoiceIds) {
