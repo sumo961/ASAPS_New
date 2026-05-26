@@ -1187,7 +1187,7 @@ function App() {
       const createdBeats: Beat[] = [];
       // Known beat types for validation (including AI variations that map to canonical types)
       const knownBeatTypes = new Set([
-        'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'movementChoice',
+        'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'multiChoice', 'movementChoice',
         'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'SWFBeat', 'inputText', 'hyperText',
         'setVariable', 'setGlobal', 'setCounter', 'counter', 'variable', 'conditionBeat', 'conditionCheck', 'condition',
         'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'

@@ -119,10 +119,10 @@ const BEAT_TYPE_GUIDE = `
   At runtime, randomly selects from: ["Hello!", "Hi there!", "Greetings!"]
 - Connections: Single → next beat (ONLY ONE connection allowed!)
 - ⚠️ CRITICAL: infoText can ONLY connect to ONE beat!
-- ❌ WRONG: infoText with 2+ connections (use dialogTree for branching!)
+- ❌ WRONG: infoText with 2+ connections (use multiChoice for branching!)
 - ✓ CORRECT: infoText → one target beat
-- For branching choices, use dialogTree (DEFAULT — shows visible buttons). Only use movementChoice if the choices are spatial hotspots on a background image.
-- Example: "You arrive at the mansion..." → dialogTree (shallow, empty speaker, text as scene, top-level choices as options)
+- For branching choices, use multiChoice (DEFAULT — shows visible buttons under a single-screen prompt). Use dialogTree only when you need multi-turn NPC dialogue (back-and-forth, nested follow-ups). Use movementChoice only when choices are spatial hotspots on a background image.
+- Example: "You arrive at the mansion..." → multiChoice (question = the scene description, choices = the options the player can take)
 
 **durScreen** - Timed auto-advance text
 - Use: Quick transitions, atmosphere, montages
@@ -137,16 +137,35 @@ const BEAT_TYPE_GUIDE = `
 - Connections: Single → auto-advances after duration
 - Example: "Three days later..." (3s) → dialogTree
 
-**dialogTree** - Branching choices (DEFAULT for presenting multiple options to the player!)
-- 🚨 PREFERRED CHOICE BEAT: Use dialogTree for ANY situation where you want to present 2+ options to the player — conversations, decisions, actions, reactions, story branches.
-- Why: dialogTree shows choices directly as visible buttons. movementChoice uses invisible hotspots by default and is confusing for most content.
-- Use: Character interactions, interrogations, negotiations, AND general "what do you do?" branching
-- Pattern for simple multi-choice (no NPC): set speaker to "" (empty), text to the scene description / question, and put the 2-4 options as top-level choices. This is a "shallow dialogTree" and is the DEFAULT way to present choices.
-- Example (shallow, for general branching):
-  { "dialogTree": { "id": "root", "speaker": "", "text": "You stand at a crossroads. Three paths lie before you.", "choices": [
-    { "id": "c1", "text": "Take the forest path", "target": "beat_forest" },
-    { "id": "c2", "text": "Follow the river", "target": "beat_river" },
-    { "id": "c3", "text": "Climb the mountain", "target": "beat_mountain" }
+**multiChoice** - Single-screen prompt + N response buttons (DEFAULT for branching choices!)
+- 🚨 PREFERRED CHOICE BEAT for non-nested branching: Use multiChoice for the common "ask a question, player picks one answer" pattern — scene-level decisions, simple NPC responses, action picks, story branches with no follow-up turn.
+- Why: this is what most authors actually want when they reach for a multi-button beat. Simpler than dialogTree (no nested follow-ups), more discoverable than movementChoice (no spatial layer).
+- Use: Standalone questions, single-screen decisions, "what do you do?" prompts, simple NPC one-liners that don't lead into a back-and-forth
+- Parameters: question (the prompt text), choices (array), optional speaker, choiceDelay, markVisited
+  {
+    "question": "You stand at a crossroads. Three paths lie before you.",
+    "choices": [
+      { "id": "c1", "text": "Take the forest path", "target": "beat_forest" },
+      { "id": "c2", "text": "Follow the river", "target": "beat_river" },
+      { "id": "c3", "text": "Climb the mountain", "target": "beat_mountain" }
+    ]
+  }
+- Optional per-choice fields: effects[] (variable/counter/inventory ops), conditions[] (filter choices by state), soundEffect
+- Optional speaker: set to a character name to attribute the prompt to an NPC; leave empty for narrator-style
+- Connections: Multiple → derived from each choice's target
+- ⚠️ Use dialogTree instead when the dialog needs MULTIPLE TURNS (player asks → NPC responds → player picks again) or NESTED choices.
+
+**dialogTree** - Multi-turn NPC dialogue with nested choices (for back-and-forth conversation)
+- Use this when the player needs a real back-and-forth with an NPC: ask a question, NPC responds, player picks a follow-up, NPC responds again, etc. The nesting is the value.
+- Use multiChoice instead for one-shot choice screens (no follow-up turn).
+- Use: Character interactions, interrogations, negotiations, branching dialogues with NPC follow-ups
+- Example (multi-turn):
+  { "dialogTree": { "id": "root", "speaker": "Guard", "text": "Halt! Who goes there?", "choices": [
+    { "id": "c1", "text": "I'm a traveler", "dialogNode": { "id": "n1", "speaker": "Guard", "text": "What's your business?", "choices": [
+      { "id": "c2", "text": "Just passing through", "target": "beat_let_pass" },
+      { "id": "c3", "text": "I seek the king", "target": "beat_questioning" }
+    ] } },
+    { "id": "c4", "text": "None of your business", "target": "beat_fight" }
   ] } }
 - Parameters: dialogTree with this EXACT structure (NO "root" wrapper!):
   {
@@ -189,11 +208,11 @@ const BEAT_TYPE_GUIDE = `
 - Example: NPC asks question → [Player response A | Player response B] → NPC responds
 
 **movementChoice** - Spatial navigation via on-scene hotspots (SPECIALIZED — not the default!)
-- 🚨 DO NOT use movementChoice as a generic "multiple choices" beat. Use dialogTree instead for that.
+- 🚨 DO NOT use movementChoice as a generic "multiple choices" beat. Use multiChoice instead for that.
 - movementChoice renders choices as INVISIBLE HOTSPOTS placed on a background scene. Players have to hover or click on regions of the image to reveal them. This is confusing when there's no meaningful spatial layout.
-- Only use movementChoice when: the scene has a background image AND each choice maps to a spatial location in that image (e.g., clicking on the library door, the staircase, the garden gate). If the choices are abstract (actions, answers, decisions), use dialogTree.
+- Only use movementChoice when: the scene has a background image AND each choice maps to a spatial location in that image (e.g., clicking on the library door, the staircase, the garden gate). If the choices are abstract (actions, answers, decisions), use multiChoice.
 - Use: Exploration on a visual map/scene where clicking parts of the image is the point
-- When in doubt: use dialogTree.
+- When in doubt: use multiChoice for single-screen prompts; use dialogTree for multi-turn dialogue.
 - Parameters: question, choices (array of {id, text, location, target})
   - id: Unique identifier for the choice (e.g., "choice_library", "c1")
   - text: What the player sees (e.g., "Go to the Library")
