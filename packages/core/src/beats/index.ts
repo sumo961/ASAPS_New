@@ -2,6 +2,7 @@ export { Beat } from './Beat';
 export { InfoTextBeat } from './InfoTextBeat';
 export { TitleScreenBeat } from './TitleScreenBeat';
 export { MovementChoiceBeat } from './MovementChoiceBeat';
+export { MultiChoiceBeat } from './MultiChoiceBeat';
 export { PickPropBeat } from './PickPropBeat';
 export { ConditionBeat } from './ConditionBeat';
 export { EndScreenBeat } from './EndScreenBeat';

@@ -46,6 +46,19 @@
       },
       "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. P3-3c-9 — optional `hotspot` (normalized 0–1 against the spatial image) flips the CURRENT dialog node into spatial mode: the renderer composes speaker/text into flow slots over the beat background and turns the choices into clickable regions on the image. Per-node, so a dialogTree can mix spatial nodes (a scene) with positioned nodes (a close-up monologue)."
     },
+    "multiChoiceOption": {
+      "description": "A button-style choice in a MultiChoice beat (NPC text + several response buttons, single level, no spatial layer). Same per-choice effect surface as a movementOption / dialogChoice, but no location / hotspot fields — the choice is always a button.",
+      "schema": {
+        "id": "string",
+        "text": "string",
+        "displayText": "string?",
+        "target": "string",
+        "conditions": "condition[]?",
+        "effects": "effect[]?",
+        "soundEffect": "string?"
+      },
+      "notes": "displayText is the translated/display label; text is the internal identifier. soundEffect plays when this choice is selected. Effects apply per-choice (variable/counter/inventory/affect/etc.) — same surface as DialogTree's dialogChoice and MovementChoice's movementOption."
+    },
     "movementOption": {
       "description": "A movement choice",
       "schema": {
@@ -517,6 +530,83 @@
         "effects": "Use effects on choices to modify counters or variables when player selects that choice",
         "example": "{ id: 'root', speaker: 'NPC', text: 'Hello!', choices: [{ id: 'c1', text: 'Hi there!', dialogNode: { id: 'n1', speaker: 'NPC', text: 'Nice day!', choices: [{ id: 'c2', text: 'Indeed it is. Goodbye!', target: 'next_beat' }] } }] }"
       }
+    },
+
+    "multiChoice": {
+      "category": "visible",
+      "displayName": "Multi Choice",
+      "icon": "🔘",
+      "description": "NPC prompt + several response buttons. Simpler than DialogTree (no nesting, single level), more powerful than ConversationChoice (full per-choice effects + conditions).",
+      "connectionType": "multiple",
+      "parameters": {
+        "question": {
+          "type": "string",
+          "required": true,
+          "default": "What do you say?",
+          "description": "Prompt text shown above the choice buttons"
+        },
+        "choices": {
+          "type": "array<multiChoiceOption>",
+          "required": true,
+          "minItems": 1,
+          "description": "Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices)."
+        },
+        "choiceDelay": {
+          "type": "number",
+          "required": false,
+          "description": "Delay in seconds before the choices fade in (lets the player read the prompt first)",
+          "ui": {
+            "control": "number",
+            "min": 0,
+            "max": 30,
+            "step": 0.5,
+            "label": "Choice Delay (seconds)"
+          }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Block and dim choices that lead to previously visited beats"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks the prompt (for TTS voice routing and optional display)",
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        }
+      },
+      "locations": ["question", "choices"],
+      "locationMapping": {
+        "question": "question"
+      },
+      "slots": [
+        {
+          "name": "question",
+          "role": "body",
+          "source": "question"
+        }
+      ],
+      "transitions": true,
+      "sound": true,
+      "renderer": "multiChoice",
+      "_authoringNote": "Simpler-than-DialogTree counterpart in the Multi Choice → Buttons sub-group. Use this when the player picks ONE of several responses on a single screen — no nested follow-ups, no spatial map, no in-text links. For multi-turn back-and-forth use DialogTree; for spatial map navigation use MovementChoice."
     },
 
     "movementChoice": {

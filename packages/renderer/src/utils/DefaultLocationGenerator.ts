@@ -100,7 +100,7 @@ export function generateDefaultLocations(
 
   beatDef.locations.forEach((locationName: string, index: number) => {
     // Skip static locations that are handled dynamically
-    if ((beatType === 'movementChoice' || beatType === 'dialogTree') && locationName === 'choices') return;
+    if ((beatType === 'movementChoice' || beatType === 'dialogTree' || beatType === 'multiChoice') && locationName === 'choices') return;
     if (beatType === 'pickProp' && locationName === 'props') return;
 
     const typeInfo = LOCATION_TYPE_MAP[locationName] || { kind: 'text' as const };
@@ -187,8 +187,10 @@ export function generateDefaultLocations(
     locations.push(location);
   });
 
-  // Handle dynamic elements (choices for dialogTree, movementChoice, pickProp)
-  if (beatType === 'dialogTree' && content.choices && Array.isArray(content.choices)) {
+  // Handle dynamic elements (choices for dialogTree, multiChoice, movementChoice, pickProp).
+  // dialogTree and multiChoice share the same button-stack layout — text
+  // prompt above, vertically-stacked buttons below.
+  if ((beatType === 'dialogTree' || beatType === 'multiChoice') && content.choices && Array.isArray(content.choices)) {
     const buttonHeight = 50;
     const buttonWidth = 300;
     let buttonY = currentY;

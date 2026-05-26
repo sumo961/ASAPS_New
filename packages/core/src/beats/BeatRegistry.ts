@@ -3,6 +3,7 @@ import { TitleScreenBeat } from './TitleScreenBeat';
 import { InfoTextBeat } from './InfoTextBeat';
 import { DialogTreeBeat } from './DialogTreeBeat';
 import { ConversationChoiceBeat } from './ConversationChoiceBeat';
+import { MultiChoiceBeat } from './MultiChoiceBeat';
 import { MovementChoiceBeat } from './MovementChoiceBeat';
 import { PickPropBeat } from './PickPropBeat';
 import { VideoBeat } from './VideoBeat';
@@ -68,6 +69,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('introText', InfoTextBeat); // Legacy alias - renamed to infoText in v2.3
     this.registerBeatType('dialogTree', DialogTreeBeat);
     this.registerBeatType('conversationChoice', ConversationChoiceBeat); // Legacy
+    this.registerBeatType('multiChoice', MultiChoiceBeat);
     this.registerBeatType('movementChoice', MovementChoiceBeat);
     this.registerBeatType('pickProp', PickPropBeat);
     this.registerBeatType('videoBeat', VideoBeat);

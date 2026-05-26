@@ -114,7 +114,10 @@ function mapCustomType(typeName: string): string {
     'connection': 'Connection',
   };
 
-  return customTypeMap[typeName] || typeName;
+  // Fall back to a PascalCase-converted name so newly-added customTypes
+  // (e.g. multiChoiceOption → MultiChoiceOption) work without having to
+  // touch the codegen for every new entry.
+  return customTypeMap[typeName] || toPascalCase(typeName);
 }
 
 /**

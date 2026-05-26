@@ -892,6 +892,11 @@ export const Inspector: React.FC<InspectorProps> = ({
           text: params.question || 'Where do you want to go?',
           choices: params.choices || []
         };
+      case 'multiChoice':
+        return {
+          text: params.question || 'What do you say?',
+          choices: params.choices || []
+        };
       case 'pickProp':
         return {
           text: params.question || 'What do you want to pick up?',
@@ -941,6 +946,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       const beatDef = getBeatDefinition(beat.type);
       if (beatDef?.connectionType === 'multiple') {
         if (beat.type === 'movementChoice' && !beatData.parameters.choices) {
+          beatData.parameters.choices = [];
+        } else if (beat.type === 'multiChoice' && !beatData.parameters.choices) {
           beatData.parameters.choices = [];
         } else if (beat.type === 'pickProp' && !beatData.parameters.props) {
           beatData.parameters.props = [];
@@ -1152,6 +1159,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
         break;
       case 'movementChoice':
+      case 'multiChoice':
         if (!localBeat.parameters?.choices?.length) {
           errors.push('At least one choice is required');
         } else {
@@ -3808,13 +3816,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
-                {/* Movement Choice */}
-                {beat.type === 'movementChoice' && (
+                {/* Movement Choice & MultiChoice — share the choice editor.
+                    multiChoice is the no-spatial sibling: just text + buttons +
+                    per-choice effects. The spatial-specific fields (location-
+                    name picker, "Create hotspot", show-text-on-hover) are
+                    conditionally hidden below. */}
+                {(beat.type === 'movementChoice' || beat.type === 'multiChoice') && (
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
                       <TextFieldWithVariables
-                        value={localBeat.parameters?.question || 'Where do you want to go?'}
+                        value={localBeat.parameters?.question || (beat.type === 'multiChoice' ? 'What do you say?' : 'Where do you want to go?')}
                         onChange={(val) => handleParameterChange('question', val)}
                         availableVariables={availableVariables}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -3854,21 +3866,23 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </span>
                           </label>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="showTextOnHover-movement"
-                            checked={localBeat.parameters?.showTextOnHover || false}
-                            onChange={(e) => handleParameterChange('showTextOnHover', e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                          <label htmlFor="showTextOnHover-movement" className="text-sm text-gray-700">
-                            Show text on hover only
-                            <span className="text-xs text-gray-500 block">
-                              Hotspot text appears when cursor hovers over it
-                            </span>
-                          </label>
-                        </div>
+                        {beat.type !== 'multiChoice' && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="showTextOnHover-movement"
+                              checked={localBeat.parameters?.showTextOnHover || false}
+                              onChange={(e) => handleParameterChange('showTextOnHover', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <label htmlFor="showTextOnHover-movement" className="text-sm text-gray-700">
+                              Show text on hover only
+                              <span className="text-xs text-gray-500 block">
+                                Hotspot text appears when cursor hovers over it
+                              </span>
+                            </label>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -3929,17 +3943,20 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 className="w-full px-2 py-1 text-sm border rounded"
                               />
 
-                              <input
-                                type="text"
-                                value={choice.location || ''}
-                                onChange={(e) => handleUpdateChoice(index, 'location', e.target.value)}
-                                placeholder="Location description"
-                                className="w-full px-2 py-1 text-sm border rounded"
-                              />
+                              {beat.type !== 'multiChoice' && (
+                                <input
+                                  type="text"
+                                  value={choice.location || ''}
+                                  onChange={(e) => handleUpdateChoice(index, 'location', e.target.value)}
+                                  placeholder="Location description"
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                              )}
                             </>
                           )}
 
-                          {/* Hotspot/Prop Association */}
+                          {/* Hotspot/Prop Association — movementChoice only */}
+                          {beat.type !== 'multiChoice' && (
                           <div className="flex gap-2">
                             <select
                               value={choice.locationName || ''}
@@ -3977,6 +3994,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               New
                             </button>
                           </div>
+                          )}
 
                           {/* P3-3c-4 — spatial hotspot (normalized 0–1 on the
                               image rect). Independent from the locationName /
@@ -3984,8 +4002,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                               choice has one (and the beat has no baked
                               locations), the beat composes through
                               SpatialFlowView and the canvas editor lets the
-                              author drag-place them visually. */}
-                          {(() => {
+                              author drag-place them visually. multiChoice
+                              skips this entirely — it's button-only. */}
+                          {beat.type !== 'multiChoice' && (() => {
                             const sp = (choice as any).hotspot;
                             return (
                               <div>

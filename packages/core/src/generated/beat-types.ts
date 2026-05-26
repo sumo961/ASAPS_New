@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-05-25T00:32:55.210Z
+ * Generated: 2026-05-26T14:21:01.418Z
  */
 
 // ============================================
@@ -42,6 +42,19 @@ export interface DialogChoice {
   counterValue?: number;
   soundEffect?: string;
   hotspot?: SpatialHotspot;
+}
+
+/**
+ * A button-style choice in a MultiChoice beat (NPC text + several response buttons, single level, no spatial layer). Same per-choice effect surface as a movementOption / dialogChoice, but no location / hotspot fields — the choice is always a button.
+ */
+export interface MultiChoiceOption {
+  id: string;
+  text: string;
+  displayText?: string;
+  target: string;
+  conditions?: Condition[];
+  effects?: Effect[];
+  soundEffect?: string;
 }
 
 /**
@@ -122,11 +135,11 @@ export interface PanoramaHotspot {
  */
 export interface TitleScreenParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Responsive motion intent for the SPATIAL layer (Phase-3 composite image). Cinematic enter presets — ken-burns, zoom-in, zoom-out, pan-{left,right,up,down}. Resolved against the image's currently-rendered rect, so motion survives reflow / viewport. Distinct from slotAnimations (flow layer). Absent → no animation. Only meaningful for spatial-mode beats. */
-  spatialAnimations?: object | undefined;
+  spatialAnimations?: Object | undefined;
   /** Story title text */
   title: string;
   /** Author name */
@@ -152,7 +165,7 @@ export interface InfoTextParameters {
   /** Text content to display */
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
-  textVariations?: string[] | undefined;
+  textVariations?: String[] | undefined;
   /** Continue button text (also used as connection label) */
   buttonText?: string | undefined;
   /** Who speaks this beat's text (for TTS voice and optional display) */
@@ -162,7 +175,7 @@ export interface InfoTextParameters {
   /** Target beat when button is clicked */
   connection: Connection;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
 }
 
 /**
@@ -187,6 +200,26 @@ export interface DialogTreeParameters {
   showSpeaker?: boolean | undefined;
   /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
+}
+
+/**
+ * Multi Choice - NPC prompt + several response buttons. Simpler than DialogTree (no nesting, single level), more powerful than ConversationChoice (full per-choice effects + conditions).
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface MultiChoiceParameters {
+  /** Prompt text shown above the choice buttons */
+  question: string;
+  /** Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices). */
+  choices: MultiChoiceOption[];
+  /** Delay in seconds before the choices fade in (lets the player read the prompt first) */
+  choiceDelay?: number | undefined;
+  /** Block and dim choices that lead to previously visited beats */
+  markVisited?: boolean | undefined;
+  /** Who speaks the prompt (for TTS voice routing and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
 }
 
 /**
@@ -266,9 +299,9 @@ export interface VideoBeatParameters {
  */
 export interface EndScreenParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Ending message */
   message?: string | undefined;
   /** Show restart button */
@@ -398,13 +431,13 @@ export interface ConditionBeatParameters {
  */
 export interface DurScreenParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Text to display */
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
-  textVariations?: string[] | undefined;
+  textVariations?: String[] | undefined;
   /** Display duration in SECONDS (fractional allowed, e.g. 0.5). Set proportional to text length — roughly ceil(words / 200 * 60 * 1.5), minimum ~3s. Legacy projects storing milliseconds (value > 60) are auto-migrated to seconds on load. */
   duration: number;
   /** Who speaks this beat's text (for TTS voice and optional display) */
@@ -632,7 +665,7 @@ export interface HyperTextParameters {
   /** Main text content with hyperlinked words */
   text: string;
   /** Array of { word: string, targetBeatId: string, style?: object } */
-  hyperlinks: object[];
+  hyperlinks: Object[];
   /** Whether user can click multiple links */
   allowMultipleClicks?: boolean | undefined;
   /** Color for hyperlinked text */
@@ -652,15 +685,15 @@ export interface HyperTextParameters {
  */
 export interface OnlineContentParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search */
   sourceType: string;
   /** API URL to fetch (supports ${variable} interpolation) */
   apiUrl?: string | undefined;
   /** Query parameters for the API */
-  apiParams?: object | undefined;
+  apiParams?: Object | undefined;
   /** JSONPath to extract data (e.g., $.current.temp_c) */
   jsonPath?: string | undefined;
   /** Query for AI to search and summarize (supports ${variable} interpolation) */
@@ -688,7 +721,7 @@ export interface AiConditionParameters {
   /** Prompt describing what the AI should evaluate */
   prompt: string;
   /** Categories for AI to choose from */
-  categories: object[];
+  categories: Object[];
   /** Include player variables in evaluation */
   evaluateVariables?: boolean | undefined;
   /** Include player inventory in evaluation */
@@ -728,7 +761,7 @@ export interface AiDialogTreeParameters {
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
   /** Exit targets for conversation outcomes */
-  exitTargets: object[];
+  exitTargets: Object[];
   /** Delay before showing choices */
   choiceDelay?: number | undefined;
 }
@@ -740,9 +773,9 @@ export interface AiDialogTreeParameters {
  */
 export interface AiSummaryParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Custom instructions for summary style */
   prompt?: string | undefined;
   /** Include player variables in summary */
@@ -804,13 +837,13 @@ export interface AiSummaryParameters {
  */
 export interface AiInfoTextParameters {
   /** Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow. */
-  slotIntent?: object | undefined;
+  slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
-  slotAnimations?: object | undefined;
+  slotAnimations?: Object | undefined;
   /** Context/instruction for AI (e.g., "A merchant's reply when the player can't afford the item") */
   prompt: string;
   /** Specific variables to include in AI context (leave empty for all) */
-  contextVariables?: string[] | undefined;
+  contextVariables?: String[] | undefined;
   /** Include player variables in context */
   includeVariables?: boolean | undefined;
   /** Include player inventory in context */
@@ -840,7 +873,7 @@ export interface AiDurScreenParameters {
   /** Context/instruction for AI (e.g., "Describe the atmosphere as the player enters the dark cave") */
   prompt: string;
   /** Specific variables to include in AI context (leave empty for all) */
-  contextVariables?: string[] | undefined;
+  contextVariables?: String[] | undefined;
   /** Include player variables in context */
   includeVariables?: boolean | undefined;
   /** Include player inventory in context */
@@ -880,7 +913,7 @@ export interface AiConversationParameters {
   /** NPC's opening line (if empty, AI generates one) */
   openingLine?: string | undefined;
   /** Conversation directions: trigger + action pairs that steer the conversation dynamically */
-  directions?: object[] | undefined;
+  directions?: Object[] | undefined;
   /** Maximum conversation turns before fallback exit */
   maxTurns?: number | undefined;
   /** Target beat when max turns reached */
@@ -912,6 +945,7 @@ export type BeatType =
   | 'titleScreen'
   | 'infoText'
   | 'dialogTree'
+  | 'multiChoice'
   | 'movementChoice'
   | 'pickProp'
   | 'videoBeat'
@@ -944,6 +978,7 @@ export interface BeatParameterMap {
   'titleScreen': TitleScreenParameters;
   'infoText': InfoTextParameters;
   'dialogTree': DialogTreeParameters;
+  'multiChoice': MultiChoiceParameters;
   'movementChoice': MovementChoiceParameters;
   'pickProp': PickPropParameters;
   'videoBeat': VideoBeatParameters;
