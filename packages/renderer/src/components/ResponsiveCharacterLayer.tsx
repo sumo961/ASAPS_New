@@ -109,9 +109,20 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
     const el = containerRef.current;
     if (!el) return;
     const update = () => {
-      const r = el.getBoundingClientRect();
-      stageSizeRef.current = { width: r.width, height: r.height };
-      console.log(`[RCL container] size=${r.width.toFixed(0)}x${r.height.toFixed(0)} (this is the container — NOT necessarily the spatial image rect)`);
+      // Use clientWidth/clientHeight (LAYOUT box) instead of
+      // getBoundingClientRect (which includes ancestor CSS transforms).
+      // PreviewWindow wraps everything in a `transform: scale(fitScale)`
+      // so the rendered stage looks ~83% the size of the layout box.
+      // If we used the bounding rect, our stageScale calc would
+      // double-count that outer transform — sprites would render at
+      // 83% of native, then get scaled another 83% by the wrapper,
+      // ending up ~70% size. clientWidth gives us the pre-transform
+      // layout size, which is what the rest of the stage (hotspots,
+      // image, ScaledStage in fixed mode) is also positioned against.
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      stageSizeRef.current = { width: w, height: h };
+      console.log(`[RCL container] size=${w}x${h} (clientWidth/Height — pre-transform layout box)`);
       setResizeTick(t => t + 1);
     };
     update();
