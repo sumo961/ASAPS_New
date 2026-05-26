@@ -385,11 +385,13 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         // Sprites should never block clicks on choices / buttons; the
         // sprite layer is purely visual.
         pointerEvents: 'none',
-        // Sits above the spatial image / hotspots (z 2) and below the
-        // flow text/buttons (z 1 in SpatialFlowView's stack); using a
-        // mid value here lets adjacent layers re-stack without
-        // colliding with the sprite layer.
-        zIndex: 2,
+        // Sits ABOVE the spatial image (which is at z 0) but BELOW
+        // the flow text / buttons (SlotFlowView's anchored buttons
+        // render at z 4). In spatial mode the imgInsets wrapper
+        // around RCL takes care of parent-stack positioning at z 2,
+        // so this value only matters for slot mode (where RCL mounts
+        // directly inside SlotFlowView's stack).
+        zIndex: 1,
       }}
     >
       {locations.map((loc, idx) => {
