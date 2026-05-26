@@ -615,17 +615,30 @@
       "locationMapping": {
         "question": "question"
       },
+      "layoutMode": "slot",
       "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
         {
           "name": "question",
           "role": "body",
-          "source": "question"
+          "source": "question",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "dynamicSource": "choices"
         }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "multiChoice",
-      "_authoringNote": "Simpler-than-DialogTree counterpart in the Multi Choice → Buttons sub-group. Use this when the player picks ONE of several responses on a single screen — no nested follow-ups, no spatial map, no in-text links. For multi-turn back-and-forth use DialogTree; for spatial map navigation use MovementChoice."
+      "_authoringNote": "Simpler-than-DialogTree counterpart in the Multi Choice → Buttons sub-group. Use this when the player picks ONE of several responses on a single screen — no nested follow-ups, no spatial map, no in-text links. For multi-turn back-and-forth use DialogTree; for spatial map navigation use MovementChoice. layoutMode:'slot' + dynamicSource on the action slot lets the responsive renderer treat each choice as a flow button without the schema needing to enumerate them by name like infoText's `continueButton`."
     },
 
     "movementChoice": {
