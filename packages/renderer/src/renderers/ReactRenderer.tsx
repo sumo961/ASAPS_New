@@ -12,6 +12,7 @@ import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
 import { SpatialFlowView } from '../components/SpatialFlowView';
 import { shouldUseSlotMode, getSlotSpec, shouldUseSpatialMode, getSpatialSpec } from '../utils/slotLayout';
+import type { SlotSpec } from '../utils/slotLayout';
 import { PanoramaView } from '../components/PanoramaView';
 // MapBeatLeaflet replaces the v0.9.48 MapBeatPlaceholder. Same props,
 // real interactive OpenStreetMap tiles + target/player markers + radius
@@ -2382,14 +2383,23 @@ export class ReactRenderer extends BaseRenderer {
     }
 
     // v0.9.62 — MultiChoice composes its prompt + choices as a single
-    // SlotFlowView render in renderChoices. The renderDialog call from
-    // MultiChoiceBeat.performAction is purely a TTS / context-stashing
-    // hook; the absolute dialog render would just flash for one frame
-    // before SlotFlowView paints on top. Same pattern as
-    // dialogNodeIsSpatial above.
+    // SlotFlowView render in renderChoices when going through slot mode.
+    // Skip the absolute dialog render here so it doesn't flash for one
+    // frame before SlotFlowView paints on top. When the author has baked
+    // locations (fixed-mode path), we DO want the absolute prompt render
+    // — renderChoices will follow with the buttons.
     const currentBeatType = this.getState('currentBeatType') as string | undefined;
-    if (currentBeatType === 'multiChoice') {
+    if (currentBeatType === 'multiChoice' && !layoutAuthorPositioned(locations)) {
       return;
+    }
+    // DialogTree's conversation template also composes via a single
+    // SlotFlowView render in renderChoices — same flash-prevention.
+    if (
+      (currentBeatType === 'dialogTree' || currentBeatType === 'aiDialogTree') &&
+      !layoutAuthorPositioned(locations)
+    ) {
+      const lt = this.getState('layoutTemplate') as string | undefined;
+      if (lt === 'conversation') return;
     }
 
     // Positioned mode - render as before
@@ -2648,22 +2658,38 @@ export class ReactRenderer extends BaseRenderer {
     // Slot-mode dispatch — when the current beat is slot-mode and the
     // author has NOT baked pixel locations, route through SlotFlowView
     // with dynamicChoices instead of falling through to the absolute
-    // path. v0.9.62: MultiChoice is the first consumer. DialogTree
-    // positioned mode follows in a later commit (task #280).
-    const slotSpec = getSlotSpec(beatType);
+    // path. v0.9.62: MultiChoice is the first consumer. DialogTree's
+    // 'conversation' template joins via an inline slot spec (the
+    // dialogTree schema doesn't declare layoutMode:'slot' itself —
+    // only the conversation template opts in).
     const slotAuthorPositioned = layoutAuthorPositioned(locations);
-    if (slotSpec && !slotAuthorPositioned && beatType === 'multiChoice') {
+    const rawTemplate = this.getState('layoutTemplate') as string | undefined;
+    const dialogTreeConversation =
+      (beatType === 'dialogTree' || beatType === 'aiDialogTree') &&
+      rawTemplate === 'conversation';
+    const schemaSlotSpec = getSlotSpec(beatType);
+    const inlineDialogTreeSlots: SlotSpec[] | null = dialogTreeConversation
+      ? [
+          { name: 'speaker', role: 'speaker', source: 'speaker' },
+          { name: 'text', role: 'body', source: 'text', grow: true, scroll: true },
+          { name: 'actions', role: 'action' },
+        ]
+      : null;
+    const effectiveSlotSpec = inlineDialogTreeSlots ?? schemaSlotSpec;
+    const useSlotMode =
+      !!effectiveSlotSpec &&
+      !slotAuthorPositioned &&
+      (beatType === 'multiChoice' || dialogTreeConversation);
+
+    if (useSlotMode && effectiveSlotSpec) {
       const slotBg = this.backgroundImageUrl
         ? 'transparent'
         : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
       const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
-      // Layout template forwarded from MultiChoiceBeat via state. Only
-      // 'stacked' and 'conversation' are routed through SlotFlowView;
-      // 'chat-bubble' / 'custom' fall through (chat-bubble uses the
-      // existing ChatDialogView path, custom is a later commit).
-      const rawTemplate = this.getState('layoutTemplate') as string | undefined;
       const slotTemplate: 'stacked' | 'conversation' = rawTemplate === 'conversation' ? 'conversation' : 'stacked';
+      // multiChoice's body slot reads `question`; dialogTree's reads `text`.
+      const bodyKey = dialogTreeConversation ? 'text' : 'question';
       return new Promise<string>(resolve => {
         this.resolveAction = (id: string) => {
           this.resolveAction = null;
@@ -2671,12 +2697,12 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
-            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-multiChoice'}
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? `slot-${beatType}`}
             beatType={beatType}
-            slots={slotSpec}
+            slots={effectiveSlotSpec}
             content={{
               speaker: dialogContext.speaker || '',
-              question: dialogContext.text || '',
+              [bodyKey]: dialogContext.text || '',
             }}
             theme={this.theme}
             backgroundUrl={this.backgroundImageUrl}

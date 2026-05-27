@@ -1475,11 +1475,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const isHotspotChoicePreview =
     hotspotItemsKey !== null
     && (hotspotItems.some((c: any) => c && c.hotspot) || hotspotItems.length === 0);
+  // Project-level gate for the schema-declared slot/spatial editor.
+  // Fixed projects keep the legacy positioned editor for slot-mode beats
+  // — the responsive (slot) editor is opt-in via the project layout-mode
+  // flag, and the schema's slot declaration alone is not sufficient.
+  // Hotspot-based spatial preview (isHotspotChoicePreview) is per-beat
+  // author intent and stays regardless of project mode.
+  const projectIsResponsive = resolveLayoutMode(globalSettings as any, beats as any) === 'responsive';
+  const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations;
+  const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations;
   const isSpatialPreview =
-    (!!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations)
+    (projectIsResponsive && schemaSpatial)
     || isHotspotChoicePreview;
   const isSlotPreview =
-    (!!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations)
+    (projectIsResponsive && schemaSlot)
     || isSpatialPreview;
   const slotSpec = isSpatialPreview
     ? (getSpatialSpec(beat!.type)?.slots ?? null)
@@ -1521,6 +1530,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // text becomes a flow slot; the choices appear as hotspots
               // on the spatial layer (rendered by the editor overlay).
               question: slotPreviewParams.question || 'Where do you want to go?',
+              speaker: slotPreviewSpeaker,
+            }
+        : beat.type === 'multiChoice'
+          ? {
+              question: slotPreviewParams.question || 'What do you want to say?',
               speaker: slotPreviewSpeaker,
             }
         : beat.type === 'pickProp'
@@ -5049,6 +5063,42 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
                   setHasChanges(true);
                 } : undefined}
+                layoutTemplate={(() => {
+                  // multiChoice: only when project is responsive (the picker
+                  // doesn't apply in fixed mode). dialogTree/aiDialogTree:
+                  // always — its templates include chat-scroll/chat-bubble
+                  // which work regardless of project layout mode (they
+                  // bypass the absolute path at runtime).
+                  if (beat.type === 'multiChoice' && projectIsResponsive) {
+                    return (beat as any).layoutTemplate || 'stacked';
+                  }
+                  if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
+                    return (beat as any).layoutTemplate || 'stacked';
+                  }
+                  return undefined;
+                })()}
+                onLayoutTemplateChange={(() => {
+                  if (!onBeatUpdate) return undefined;
+                  const handler = (template: string) => {
+                    (beat as any).layoutTemplate = template;
+                    // Keep legacy presentationMode synced for one release so
+                    // any reader that still consumes it sees the right value
+                    // (DialogTreeBeat updateParameters migrates the other way).
+                    if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
+                      const legacy = template === 'chat-scroll' || template === 'chat-bubble'
+                        ? template
+                        : 'positioned';
+                      (beat as any).presentationMode = legacy;
+                      onBeatUpdate(beat.id, { layoutTemplate: template, presentationMode: legacy } as any);
+                    } else {
+                      onBeatUpdate(beat.id, { layoutTemplate: template } as any);
+                    }
+                    setHasChanges(true);
+                  };
+                  if (beat.type === 'multiChoice' && projectIsResponsive) return handler;
+                  if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
+                  return undefined;
+                })()}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||
@@ -5641,6 +5691,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     slotAnimations={
                       (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
                     }
+                    dynamicChoices={beat!.type === 'multiChoice'
+                      ? (() => {
+                          const cs = Array.isArray(slotPreviewParams?.choices) ? slotPreviewParams!.choices as Array<{ id: string; text: string }> : [];
+                          return cs.length > 0
+                            ? cs.map((c) => ({ id: c.id, text: c.text || c.id }))
+                            : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
+                        })()
+                      : undefined}
+                    layoutTemplate={beat!.type === 'multiChoice'
+                      ? ((slotPreviewParams?.layoutTemplate === 'conversation' ? 'conversation' : 'stacked') as 'stacked' | 'conversation')
+                      : undefined}
                     previewWidth={isFixed ? devW : undefined}
                     previewCoarse={selVp.coarse}
                     onResolve={(res) =>

@@ -561,27 +561,22 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     position: 'absolute',
     inset: 0,
     display: 'flex',
-    // Conversation template runs the body scroller + action row as
-    // side-by-side siblings (NPC text on one side, player choices on
-    // the other). Stacked keeps the legacy column layout. Other
-    // templates collapse to 'column' until they get a dedicated layout.
     flexDirection: isConversation ? 'row' : 'column',
-    // In conversation layout, the inner panels fit naturally; align them
-    // vertically against the stage top so a short prompt doesn't get
-    // dragged to mid-height.
-    alignItems: isConversation ? 'stretch' : undefined,
-    gap: isConversation ? 'clamp(16px, 3vw, 32px)' : undefined,
+    alignItems: isConversation ? 'flex-start' : undefined,
+    gap: isConversation ? 'clamp(12px, 2vw, 24px)' : undefined,
     overflow: 'hidden',
     background: backgroundUrl ? undefined : backgroundColor,
     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    // Safe-area insets (notch / Dynamic Island / home indicator). env()
-    // resolves to 0 on desktop, so this is free there.
     paddingTop: 'env(safe-area-inset-top, 0px)',
-    paddingRight: 'env(safe-area-inset-right, 0px)',
+    paddingRight: isConversation
+      ? 'max(env(safe-area-inset-right, 0px), clamp(20px, 4vw, 48px))'
+      : 'env(safe-area-inset-right, 0px)',
     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-    paddingLeft: 'env(safe-area-inset-left, 0px)',
+    paddingLeft: isConversation
+      ? 'max(env(safe-area-inset-left, 0px), clamp(20px, 4vw, 48px))'
+      : 'env(safe-area-inset-left, 0px)',
     // Bug 16 — apply theme.colors.textAlpha (0-100) to the inherited
     // text color using the same #RRGGBB+AA hex pattern used elsewhere.
     // This colors only TEXT (buttons override `color` via buttonStyle),
@@ -999,7 +994,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             maxWidth: READABLE_MAX_WIDTH,
             width: '100%',
             padding: 'clamp(24px, 5vh, 64px) clamp(20px, 5vw, 48px)',
-            margin: '0 auto',
+            // Conversation: body card hugs the right side of its scroller
+            // so it sits visually adjacent to the action panel, not
+            // centered with a gulf of whitespace between them.
+            margin: isConversation ? '0 0 0 auto' : '0 auto',
             // Body wrapper always uses its natural content height. With
             // extraInScrollAfterBody (dialogTree choices) rendered
             // below it inside the same scroller during pre-earn, this
@@ -1204,13 +1202,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // width fraction of the stage; body scroller flexes to
                 // fill the rest. Without flex-basis the empty-buttons
                 // row collapses to zero width.
-                flexBasis: isConversation ? 'clamp(180px, 38%, 360px)' : undefined,
-                alignSelf: isConversation ? 'center' : undefined,
-                justifyContent: isConversation ? 'center' : actionJustify,
+                flexBasis: isConversation ? 'clamp(160px, 28%, 280px)' : undefined,
+                // Conversation: top-align with the body card so the
+                // buttons sit at the same Y as the NPC text, not floated
+                // mid-stage. paddingTop matches the body card's top
+                // padding so the first button visually aligns with the
+                // first line of the prompt.
+                alignSelf: isConversation ? 'flex-start' : undefined,
+                justifyContent: isConversation ? 'flex-start' : actionJustify,
                 gap: 'clamp(12px, 2vw, 24px)',
-                // gap intent controls the space above the row (under the body in
-                // below-body mode; bottom inset stays comfortable either way).
-                paddingTop: actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)',
+                paddingTop: isConversation
+                  ? 'clamp(24px, 5vh, 64px)'
+                  : (actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)'),
                 paddingBottom: 'clamp(16px, 3vh, 28px)',
                 paddingLeft: 16,
                 paddingRight: 16,

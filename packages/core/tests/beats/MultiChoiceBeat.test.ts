@@ -141,7 +141,7 @@ describe('MultiChoiceBeat', () => {
         ],
       });
       const next = await (beat as any).performAction(context, renderer);
-      expect(renderer.renderDialog).toHaveBeenCalledWith('', 'Friend or foe?');
+      expect(renderer.renderDialog).toHaveBeenCalledWith('', 'Friend or foe?', undefined, []);
       expect(renderer.renderChoices).toHaveBeenCalledTimes(1);
       expect(next).toBe('beat_friend');
     });
@@ -157,7 +157,7 @@ describe('MultiChoiceBeat', () => {
         choices: [{ id: 'a', text: 'Hi back', target: 'beat_next' }],
       });
       await (beat as any).performAction(context, renderer);
-      expect(renderer.renderDialog).toHaveBeenCalledWith('Alex', 'Hi!');
+      expect(renderer.renderDialog).toHaveBeenCalledWith('Alex', 'Hi!', undefined, []);
     });
 
     it('applies per-choice effects on selection', async () => {

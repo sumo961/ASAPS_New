@@ -735,9 +735,16 @@ export function adjustElementsForCollisions(
     return [...otherElements, ...adjustedTextElements];
   }
 
-  // For endScreen, endScreenCredits, and aiSummary: respect user-positioned button layout
-  // These beats have action buttons (restart, credits) that users position intentionally
-  // Only do minimal collision avoidance with text, don't force vertical stacking
+  // multiChoice: full author freedom. No text-collision push-down, no
+  // degenerate-overlap repair, no alignment — exactly the positions the
+  // author dragged to. Designers were giving up on the old auto-layout;
+  // we trust their placement (including buttons above the prompt).
+  if (beatType === 'multiChoice') {
+    return [...otherElements, ...adjustedTextElements, ...buttonElements];
+  }
+
+  // Beats whose button positions reflect deliberate author intent — leave
+  // them alone except for minimal collision avoidance with text.
   const preserveButtonLayout = beatType === 'endScreen' || beatType === 'endScreenCredits' || beatType === 'aiSummary';
 
   if (preserveButtonLayout) {
@@ -4890,6 +4897,31 @@ export function createPositionedElementData(
           targetBeatId = choice.target;
         }
         console.log(`[createPositionedElementData] DialogTree: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}", markVisited=${markVisited}`);
+      }
+    }
+
+    // For multiChoice: match location.name (set to choice.text by the
+    // SchemaLocationInitializer) to the choice's id. Without this branch
+    // every button fires with no actionId and the beat resolves the first
+    // available choice — three buttons all advance to choice[0]'s target.
+    if (beatType === 'multiChoice' && content.choices && Array.isArray(content.choices)) {
+      let choice = content.choices.find((c: any) => c.text === location.name);
+      if (!choice && location.kind === 'button' && content.choices.length > 0) {
+        // Button position fallback (covers locations baked before a
+        // choice rename desynced location.name from choice.text).
+        const buttonIndex = locations
+          .slice(0, locations.indexOf(location))
+          .filter(loc => loc.kind === 'button').length;
+        if (buttonIndex >= 0 && buttonIndex < content.choices.length) {
+          choice = content.choices[buttonIndex];
+        }
+      }
+      if (choice) {
+        actionId = choice.id;
+        if (markVisited) targetBeatId = choice.target;
+        console.log(`[createPositionedElementData] MultiChoice: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}"`);
+      } else if (location.kind === 'button') {
+        console.warn(`[createPositionedElementData] MultiChoice: NO MATCH for button "${location.name}"`);
       }
     }
 

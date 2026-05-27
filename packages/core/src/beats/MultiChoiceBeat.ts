@@ -127,9 +127,24 @@ export class MultiChoiceBeat extends Beat {
     // into slot-mode (SlotFlowView with dynamicChoices) when in
     // responsive layout. ReactRenderer.renderChoices reads currentBeatType
     // to look up the slot spec; layoutTemplate drives the within-SlotFlowView
-    // visual (stacked vs. conversation in a future commit).
+    // visual (stacked vs. conversation).
     renderer.setState('currentBeatType', 'multiChoice');
     renderer.setState('layoutTemplate', this.layoutTemplate);
+
+    // chat-bubble template routes through ChatDialogView (same path
+    // DialogTree uses). presentationMode is the legacy state key the
+    // chat path keys off; we reset it to 'positioned' for non-chat
+    // templates so a prior chat beat doesn't strand the renderer in
+    // chat mode.
+    const isChatMode = this.layoutTemplate === 'chat-bubble';
+    renderer.setState('presentationMode', isChatMode ? 'chat-bubble' : 'positioned');
+    if (isChatMode) {
+      const variables = context.getVariables();
+      const playerName = (variables as any).playerName || (variables as any).name || (variables as any).player || 'You';
+      renderer.setState('playerName', playerName);
+      renderer.setState('responseDelay', 0);
+      if (renderer.clearChatHistory) renderer.clearChatHistory();
+    }
 
     // Mark-visited dimming state for the choice renderer.
     renderer.setState('markVisited', this.markVisited || false);
@@ -151,11 +166,18 @@ export class MultiChoiceBeat extends Beat {
       const processedSpeaker = this.processText(this.speaker || '', context);
       const processedQuestion = this.processText(this.question, context);
 
+      // Author-baked locations from the Visual Editor. When present, the
+      // renderer takes the absolute (fixed-pixel) path and lays the prompt
+      // + buttons at the positions the author authored. When absent the
+      // renderer falls through to slot mode (responsive). MovementChoice /
+      // DialogTree follow the same convention.
+      const locations = Array.from(this.locations.values());
+
       // Render the NPC prompt. We always call renderDialog (even with an
       // empty speaker) so the prompt sits in the dialog/body slot — the
       // same slot DialogTree uses, which is what the responsive layout +
       // theme are built around.
-      await renderer.renderDialog(processedSpeaker, processedQuestion);
+      await renderer.renderDialog(processedSpeaker, processedQuestion, undefined, locations);
 
       // Optional pre-choice delay (lets the player read the prompt before
       // the buttons fade in). Same convention as MovementChoiceBeat.
@@ -170,6 +192,7 @@ export class MultiChoiceBeat extends Beat {
           // displayText is the translated label; renderer picks it up via
           // the same channel renderChoices already uses for other beats.
         })),
+        locations,
       );
 
       const selected = availableChoices.find(c => c.id === choiceId);

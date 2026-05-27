@@ -43,8 +43,10 @@ interface ParameterDefinition {
     dependsOn?: { field: string; value: any };
     // Visual grouping - fields sharing the same group render inside a bordered container
     group?: string;
-    // Scope: 'beat' means this is a top-level beat property, not a parameter
-    scope?: 'beat';
+    // Scope:
+    //   'beat'    — top-level beat property, not a parameter
+    //   've-left' — owned by the Visual Editor's left sidebar (Inspector skips it)
+    scope?: 'beat' | 've-left';
     // Hide field from the Inspector (managed elsewhere, e.g. in the Visual Editor)
     hidden?: boolean;
   };
@@ -259,6 +261,12 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
 
     // Skip fields marked as hidden in schema
     if (paramDef.ui?.hidden) {
+      return null;
+    }
+
+    // Skip fields scoped to the Visual Editor's left sidebar — they live
+    // in VisualPropertiesPanel, not here.
+    if (paramDef.ui?.scope === 've-left') {
       return null;
     }
 

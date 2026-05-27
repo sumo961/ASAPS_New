@@ -132,6 +132,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'durScreen',
       'pickProp',
       'movementChoice',
+      'multiChoice',
       'dialogTree',
       'endScreen',
       'videoBeat',

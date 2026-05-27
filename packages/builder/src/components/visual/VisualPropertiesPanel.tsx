@@ -72,6 +72,10 @@ interface VisualPropertiesPanelProps {
   onShowAvatarsChange?: (show: boolean) => void;
   responseDelay?: number;
   onResponseDelayChange?: (delay: number) => void;
+  // Unified layout template (multiChoice today; dialogTree migrates here next).
+  // Values vary by beat type — multiChoice has no chat-scroll, dialogTree does.
+  layoutTemplate?: string;
+  onLayoutTemplateChange?: (template: string) => void;
   // Panorama hotspot props
   allBeats?: { id: string; name: string; type: string }[];
   panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
@@ -139,6 +143,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onShowAvatarsChange,
   responseDelay,
   onResponseDelayChange,
+  layoutTemplate,
+  onLayoutTemplateChange,
   allBeats,
   panoramaHotspots,
   onPanoramaHotspotUpdate,
@@ -627,7 +633,51 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
         )}
 
         {/* Dialog Settings Section - For dialogTree and aiDialogTree beats */}
-        {(beatType === 'dialogTree' || beatType === 'aiDialogTree') && onPresentationModeChange && (
+        {beatType === 'multiChoice' && onLayoutTemplateChange && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('dialogSettings')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="font-medium text-sm">Layout</span>
+              </div>
+              {expandedSections.dialogSettings ? (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+            {expandedSections.dialogSettings && (
+              <div className="px-4 pb-4 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Layout Template
+                  </label>
+                  <select
+                    value={layoutTemplate || 'stacked'}
+                    onChange={(e) => onLayoutTemplateChange(e.target.value)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="stacked">Stacked (prompt + buttons)</option>
+                    <option value="conversation">Conversation (side-by-side)</option>
+                    <option value="chat-bubble">Chat - Single Bubble</option>
+                    <option value="custom">Custom (drag-place)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {(!layoutTemplate || layoutTemplate === 'stacked') && 'Prompt on top, choice buttons below — the default.'}
+                    {layoutTemplate === 'conversation' && 'NPC prompt on the left, choice buttons on the right.'}
+                    {layoutTemplate === 'chat-bubble' && 'Prompt rendered as a chat bubble; choices as reply buttons.'}
+                    {layoutTemplate === 'custom' && 'Place prompt and buttons manually on the stage.'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(beatType === 'dialogTree' || beatType === 'aiDialogTree') && onLayoutTemplateChange && (
           <div className="border-b border-gray-200">
             <button
               onClick={() => toggleSection('dialogSettings')}
@@ -646,29 +696,31 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
 
             {expandedSections.dialogSettings && (
               <div className="px-4 pb-4 space-y-3">
-                {/* Presentation Mode */}
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-1 block">
-                    Presentation Mode
+                    Layout Template
                   </label>
                   <select
-                    value={presentationMode || 'positioned'}
-                    onChange={(e) => onPresentationModeChange(e.target.value as 'positioned' | 'chat-scroll' | 'chat-bubble')}
+                    value={layoutTemplate || 'stacked'}
+                    onChange={(e) => onLayoutTemplateChange(e.target.value)}
                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                   >
-                    <option value="positioned">Positioned (Visual Novel)</option>
+                    <option value="stacked">Stacked (Visual Novel)</option>
+                    <option value="conversation">Conversation (side-by-side)</option>
                     <option value="chat-scroll">Chat - Scrollable History</option>
                     <option value="chat-bubble">Chat - Single Bubble</option>
+                    <option value="custom">Custom (drag-place)</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    {presentationMode === 'chat-scroll' && 'Messages stack vertically with scrollable history'}
-                    {presentationMode === 'chat-bubble' && 'Shows one message at a time in chat style'}
-                    {(!presentationMode || presentationMode === 'positioned') && 'Traditional positioned dialog elements'}
+                    {(!layoutTemplate || layoutTemplate === 'stacked') && 'Traditional dialog box on top, choices below — the classic visual-novel layout.'}
+                    {layoutTemplate === 'conversation' && 'NPC text on one side, player choices on the other — short back-and-forth.'}
+                    {layoutTemplate === 'chat-scroll' && 'Messages stack vertically with scrollable history.'}
+                    {layoutTemplate === 'chat-bubble' && 'Shows one message at a time in chat style.'}
+                    {layoutTemplate === 'custom' && 'Place dialog and buttons manually on the stage.'}
                   </p>
                 </div>
 
-                {/* Show Avatars - Only visible in chat modes */}
-                {(presentationMode === 'chat-scroll' || presentationMode === 'chat-bubble') && onShowAvatarsChange && (
+                {(layoutTemplate === 'chat-scroll' || layoutTemplate === 'chat-bubble') && onShowAvatarsChange && (
                   <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
@@ -683,8 +735,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </div>
                 )}
 
-                {/* Response Delay - Only visible in chat modes */}
-                {(presentationMode === 'chat-scroll' || presentationMode === 'chat-bubble') && onResponseDelayChange && (
+                {(layoutTemplate === 'chat-scroll' || layoutTemplate === 'chat-bubble') && onResponseDelayChange && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       NPC Response Delay (seconds)

@@ -43,7 +43,7 @@ function normalizeDialogTreeLayoutTemplate(v: unknown): DialogTreeLayoutTemplate
   ) {
     return v;
   }
-  return 'conversation';
+  return 'stacked';
 }
 
 /** True when the layout template is one of the existing chat-style modes
@@ -90,13 +90,15 @@ export class DialogTreeBeat extends Beat {
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
     // v0.9.62 — unified layoutTemplate. Migrate legacy presentationMode:
-    //   'positioned' → 'conversation' (back-and-forth is the new default)
+    //   'positioned' → 'stacked' (preserves the visual-novel rendering
+    //                  legacy dialogTrees were authored against)
     //   'chat-scroll' / 'chat-bubble' → kept verbatim
+    //   'conversation' is a NEW option an author opts into explicitly.
     // layoutTemplate wins when both are set on disk (new authoring path).
     const legacyPM = (config.parameters as any)?.presentationMode as
       | 'positioned' | 'chat-scroll' | 'chat-bubble' | undefined;
     const legacyMigrated: DialogTreeLayoutTemplate | undefined = legacyPM === 'positioned'
-      ? 'conversation'
+      ? 'stacked'
       : legacyPM === 'chat-scroll'
         ? 'chat-scroll'
         : legacyPM === 'chat-bubble'
@@ -386,7 +388,7 @@ export class DialogTreeBeat extends Beat {
         ? 'chat-scroll'
         : params.presentationMode === 'chat-bubble'
           ? 'chat-bubble'
-          : 'conversation';
+          : 'stacked';
     }
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
     if (params.spatialFit !== undefined) {
