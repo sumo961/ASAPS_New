@@ -833,6 +833,13 @@ export interface HtmlExportOptions {
   enableAIOnTheFly?: boolean;
   /** Show session log export button in player menu */
   showSessionLog?: boolean;
+  /**
+   * Pre-computed story zip. When supplied, downloadHtmlExport skips its
+   * internal createStoryZip step and uses this blob directly. Set by the
+   * export dialog after it has run the size-warning gate, so the user
+   * isn't waiting for the zip to be built twice.
+   */
+  precomputedStoryZip?: Blob;
 }
 
 export interface HtmlExportResult {
@@ -863,8 +870,11 @@ export async function exportAsHtml(
 
   // First, export the project as a playable .asaps.zip. The optional
   // startBeatId from the export dialog overrides metadata.firstBeatId so
-  // the published story begins at the author's chosen beat.
-  const storyZipBlob = await createStoryZip(projectId, options.startBeatId);
+  // the published story begins at the author's chosen beat. When the
+  // dialog has already computed the zip to run the size-warning gate,
+  // reuse it via precomputedStoryZip so we don't re-zip everything.
+  const storyZipBlob = options.precomputedStoryZip
+    ?? await createStoryZip(projectId, options.startBeatId);
 
   if (options.mode === 'single-file') {
     return exportAsSingleFile(project, storyZipBlob, options);
@@ -879,6 +889,16 @@ export async function exportAsHtml(
 async function createStoryZip(projectId: string, startBeatId?: string): Promise<Blob> {
   const { exportProjectAsZip } = await import('../utils/projectZipManager');
   return exportProjectAsZip(projectId, startBeatId ? { overrideFirstBeatId: startBeatId } : undefined);
+}
+
+/**
+ * Pre-compute the story zip so the dialog can show a size-warning gate
+ * before committing to the full export. Returns the same Blob the
+ * exporter would normally generate internally; pass it back via
+ * HtmlExportOptions.precomputedStoryZip so we don't re-zip.
+ */
+export async function previewStoryZip(projectId: string, startBeatId?: string): Promise<Blob> {
+  return createStoryZip(projectId, startBeatId);
 }
 
 /**

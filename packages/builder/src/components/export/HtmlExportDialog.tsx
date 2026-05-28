@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
-import { downloadHtmlExport, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
+import { downloadHtmlExport, previewStoryZip, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
@@ -43,6 +43,17 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [enableAIOnTheFly, setEnableAIOnTheFly] = useState(false);
   const [showSessionLog, setShowSessionLog] = useState(false);
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
+  // Pre-export size-warning gate. When the dialog is in 'single-file'
+  // mode AND the story zip exceeds a tier, we stage the warning here
+  // and wait for the user to confirm before invoking the full export.
+  // sizeWarning is null when no warning is active.
+  type SizeWarning = {
+    tier: 'info' | 'warn';
+    zipMB: number;
+    embeddedMB: number;
+    storyZipBlob: Blob;
+  };
+  const [sizeWarning, setSizeWarning] = useState<SizeWarning | null>(null);
   // Start-beat picker (v0.9.49+). Defaults to the currently-selected beat
   // if any, else the project's first titleScreen, else the first beat in
   // the list. Author can change before clicking Download.
@@ -169,7 +180,37 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         startBeatId: startBeatId || undefined,
       };
 
-      await downloadHtmlExport(projectId, projectName, options);
+      // Pre-export size-warning gate (single-file mode only).
+      //
+      // The single-file path embeds the story as base64 inside an inline
+      // <script>. Browser memory cost during decode peaks at ~3× the zip
+      // size. Desktop browsers handle 50 MB+ fine, but iOS Safari has a
+      // ~100 MB per-page ceiling (iPhone SE class) — a 30 MB zip is
+      // already in the danger zone. Tiers:
+      //   < 10 MB           : safe everywhere, no warning
+      //   10 - 25 MB        : info banner (works on most phones)
+      //   > 25 MB           : warn (likely to fail on older mobile)
+      //
+      // Pre-zipping here lets us read the actual size and pass the same
+      // blob into downloadHtmlExport via precomputedStoryZip — no
+      // double-zipping.
+      if (mode === 'single-file') {
+        const storyZipBlob = await previewStoryZip(projectId, startBeatId || undefined);
+        const zipMB = storyZipBlob.size / (1024 * 1024);
+        const embeddedMB = zipMB * 4 / 3;
+        if (zipMB > 25) {
+          setSizeWarning({ tier: 'warn', zipMB, embeddedMB, storyZipBlob });
+          return;
+        }
+        if (zipMB > 10) {
+          setSizeWarning({ tier: 'info', zipMB, embeddedMB, storyZipBlob });
+          return;
+        }
+        // Small enough — straight through, reuse the zip we just made.
+        await downloadHtmlExport(projectId, projectName, { ...options, precomputedStoryZip: storyZipBlob });
+      } else {
+        await downloadHtmlExport(projectId, projectName, options);
+      }
       onClose();
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -181,7 +222,71 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
+
+  // Called from the size-warning banner's "Continue anyway" button.
+  // Reuses the pre-computed zip so the user isn't waiting for it twice.
+  const handleConfirmSizeWarning = useCallback(async () => {
+    if (!sizeWarning) return;
+    const warning = sizeWarning;
+    setSizeWarning(null);
+    setExporting(true);
+    setError(null);
+    try {
+      const hasAIConfig = aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
+      const selectedTranslations: TranslationResource[] = translationState.translations.filter(
+        t => includedTranslations.has(t.languageCode)
+      );
+      const needsAIConfig = (enableAI && hasAIConfig) || enableAIOnTheFly;
+      const savedTTS = getSavedTTSConfig();
+      const { getStorageManager } = await import('../../storage');
+      const projResult = await getStorageManager().getProject(projectId);
+      const ttsSettings = projResult.data?.globalSettings?.tts;
+      const providerKey = savedTTS?.providerType || 'web-speech';
+      const speakerVoices = ttsSettings?.speakerVoices?.[providerKey];
+      const options: HtmlExportOptions = {
+        mode,
+        responsive: true,
+        enableAI,
+        showApiKeyPrompt: enableAI && !hasAIConfig,
+        aiProvider: needsAIConfig ? aiProvider : undefined,
+        aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
+        aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
+        aiModel: needsAIConfig && aiModel ? aiModel : undefined,
+        ttsProvider: savedTTS?.providerType,
+        ttsApiKey: savedTTS?.apiKey,
+        ttsModel: savedTTS?.model,
+        ttsBaseUrl: savedTTS?.baseUrl,
+        ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
+        ttsSpeakerVoices: speakerVoices,
+        ttsEnabled: typeof window !== 'undefined'
+          ? localStorage.getItem('asaps_tts_enabled') !== 'false'
+          : true,
+        existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
+        enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
+        showSessionLog,
+        startBeatId: startBeatId || undefined,
+        precomputedStoryZip: warning.storyZipBlob,
+      };
+      await downloadHtmlExport(projectId, projectName, options);
+      onClose();
+    } catch (err) {
+      console.error('[HtmlExportDialog] Export failed:', err);
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
+
+  const handleSwitchToFolder = useCallback(() => {
+    setSizeWarning(null);
+    setMode('folder');
+  }, []);
+
+  const handleCancelSizeWarning = useCallback(() => {
+    setSizeWarning(null);
+    setExporting(false);
+  }, []);
 
   const toggleTranslation = useCallback((code: string) => {
     setIncludedTranslations(prev => {
@@ -608,6 +713,77 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             </div>
           </div>
 
+          {/* Pre-export size-warning gate (single-file mode).
+              Surfaced after the dialog has actually computed the story
+              zip — we know the real size, not an estimate. The blob is
+              held on `sizeWarning.storyZipBlob` so confirming reuses it
+              instead of re-zipping. */}
+          {sizeWarning && (
+            <div
+              className={`${
+                sizeWarning.tier === 'warn'
+                  ? 'bg-orange-50 border-orange-200 text-orange-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+              } border rounded-lg p-4 text-sm space-y-3`}
+            >
+              <div className="font-medium">
+                {sizeWarning.tier === 'warn'
+                  ? `Large single-file export — ${sizeWarning.zipMB.toFixed(1)} MB story (~${sizeWarning.embeddedMB.toFixed(1)} MB embedded as base64)`
+                  : `Medium single-file export — ${sizeWarning.zipMB.toFixed(1)} MB story (~${sizeWarning.embeddedMB.toFixed(1)} MB embedded as base64)`}
+              </div>
+              {sizeWarning.tier === 'warn' ? (
+                <div className="space-y-2 text-xs leading-relaxed">
+                  <p>
+                    Desktop browsers (Safari, Chrome, Firefox on macOS / Windows) will handle this fine — files up to ~58 MB have been confirmed to play on desktop Safari.
+                  </p>
+                  <p>
+                    On mobile, the embedded story has to fit in the device's per-page memory budget (decode peaks at ~3× the zip size). At this size, <strong>iPhone SE class will almost certainly crash</strong>; iPad and newer iPhones may still work but are not guaranteed.
+                  </p>
+                  <p>
+                    <strong>If your audience includes phones,</strong> switch to Folder export — the separate <code>story.asaps.zip</code> next to <code>index.html</code> is streamed and decoded incrementally, sidestepping the mobile memory ceiling.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 text-xs leading-relaxed">
+                  <p>
+                    Works on most desktop and mobile browsers. Older mobile devices (5+ year old phones, iPhone SE class) may stall or fail during the in-memory base64 decode.
+                  </p>
+                  <p>
+                    For maximum reliability on phones, Folder export streams the story zip alongside <code>index.html</code> and avoids the embedded-decode step.
+                  </p>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSwitchToFolder}
+                  className={`px-3 py-1.5 text-xs font-medium rounded ${
+                    sizeWarning.tier === 'warn'
+                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Switch to Folder export
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSizeWarning}
+                  disabled={exporting}
+                  className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Continue with single-file
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelSizeWarning}
+                  className="px-3 py-1.5 text-xs font-medium rounded text-gray-600 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 text-red-700 rounded-lg p-4 text-sm">
@@ -627,7 +803,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           </button>
           <button
             onClick={handleExport}
-            disabled={exporting}
+            disabled={exporting || !!sizeWarning}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             {exporting ? (

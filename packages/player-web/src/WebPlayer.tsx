@@ -114,6 +114,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
     const initPlayer = async () => {
       console.log('[WebPlayer] Initializing...', { story: typeof story, enableAI });
+      // Tracks the Content-Type when we fetched the story over the
+      // network. The magic-byte failure hint at the end keys off this
+      // to emit server-config-specific guidance (the most common cause
+      // of "not a valid zip" is a static host returning text/html for
+      // a missing path).
+      let fetchedContentType = '';
 
       if (!containerRef.current) {
         console.error('[WebPlayer] Container ref not ready');
@@ -183,15 +189,17 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             // Soft-validate content type — many static hosts mislabel .zip
             // as text/html when serving a soft-404 fallback. Warn but
             // continue; the magic-byte check below is the real gate.
-            const contentType = response.headers.get('content-type') ?? '';
+            // Capture the value so the magic-byte failure hint below can
+            // include it in the user-visible error.
+            fetchedContentType = response.headers.get('content-type') ?? '';
             if (
-              contentType &&
-              !contentType.includes('zip') &&
-              !contentType.includes('octet-stream') &&
-              !contentType.includes('binary')
+              fetchedContentType &&
+              !fetchedContentType.includes('zip') &&
+              !fetchedContentType.includes('octet-stream') &&
+              !fetchedContentType.includes('binary')
             ) {
               console.warn(
-                `[WebPlayer] Unexpected Content-Type for story fetch: '${contentType}'. ` +
+                `[WebPlayer] Unexpected Content-Type for story fetch: '${fetchedContentType}'. ` +
                   `Expected application/zip or application/octet-stream. ` +
                   `Server may be returning a fallback HTML page instead of the zip.`,
               );
@@ -246,10 +254,29 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             preview += b >= 32 && b < 127 ? String.fromCharCode(b) : `\\x${b.toString(16).padStart(2, '0')}`;
           }
           const looksLikeHtml = preview.startsWith('<') || preview.toLowerCase().includes('<!doc');
-          const hint = looksLikeHtml
-            ? `The data starts with '<' which suggests the server returned an HTML page instead of the zip — typical when the path is wrong or the server doesn't serve .zip files. Check that 'story.asaps.zip' exists at the same URL path as your index.html.`
-            : `Expected a zip file starting with 'PK' but got bytes starting with '${preview}'. The file may be corrupted or wasn't a zip to begin with.`;
-          throw new Error(`Story is not a valid zip file. ${hint}`);
+          const serverReturnedHtml = looksLikeHtml || fetchedContentType.includes('text/html');
+          let hint: string;
+          if (serverReturnedHtml) {
+            const ctNote = fetchedContentType
+              ? ` (server reported Content-Type: '${fetchedContentType}')`
+              : '';
+            hint =
+              `Your server returned an HTML page where the story zip was expected${ctNote}. ` +
+              `This almost always means the .zip URL didn't resolve and the server fell back to index.html or a 404 page. To fix:\n\n` +
+              `  1. Confirm 'story.asaps.zip' is uploaded next to your index.html (same folder, same URL path).\n` +
+              `  2. Make sure your host serves .zip files with Content-Type 'application/zip' instead of falling back to HTML for unknown paths.\n\n` +
+              `Common host configs:\n` +
+              `  • Netlify: add a '_headers' file with '/*.zip\\n  Content-Type: application/zip'\n` +
+              `  • Vercel: 'vercel.json' headers entry mapping '\\.zip$' to 'application/zip'\n` +
+              `  • Apache: '.htaccess' with 'AddType application/zip .zip'\n` +
+              `  • nginx: 'types { application/zip zip; }' in your server block\n` +
+              `  • GitHub Pages / S3 static: usually correct by default — re-check the URL path.`;
+          } else {
+            hint =
+              `Expected a zip file starting with 'PK' but got bytes starting with '${preview}'. ` +
+              `The file may be corrupted or wasn't a zip to begin with.`;
+          }
+          throw new Error(`Story is not a valid zip file.\n\n${hint}`);
         }
 
         if (!mounted) return;
