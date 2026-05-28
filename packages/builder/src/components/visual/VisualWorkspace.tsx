@@ -26,7 +26,7 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, type TimerHudConfig } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, type TimerHudConfig } from '@asaps/renderer';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
 
@@ -1487,6 +1487,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // session but the responsive flow is what the author chose. In fixed
   // projects the schema declaration is only suggestive; baked author
   // positions still win (the editor stays on the absolute path).
+  const beatLayoutTemplate = beat ? ((beat as any).layoutTemplate as string | undefined) : undefined;
   const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type)
     && (projectIsResponsive || !beatHasAuthorLocations);
   const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type)
@@ -4028,6 +4029,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           choices: translatedChoices
         };
       }
+      case 'multiChoice': {
+        const rawChoices = params.choices || [];
+        const translatedChoices = rawChoices.map((c: any, i: number) => ({
+          ...c,
+          text: translations[`choices.${i}.text`] ?? c.text,
+        }));
+        const question = t('question', params.question || 'What do you say?');
+        return {
+          speaker: params.speaker || '',
+          question,
+          // Mirror question → text so VBE's ChatDialogView preview (which
+          // keys off content.text) shows the prompt in chat-bubble mode.
+          text: question,
+          choices: translatedChoices,
+        };
+      }
       case 'pickProp': {
         const rawProps = params.props || [];
         const translatedProps = rawProps.map((p: any, i: number) => ({
@@ -5117,6 +5134,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
                   return undefined;
                 })()}
+                slotIntent={beat.type === 'multiChoice' && projectIsResponsive
+                  ? ((beat as any).slotIntent as Record<string, any> | undefined)
+                  : undefined}
+                onSlotIntentChange={beat.type === 'multiChoice' && projectIsResponsive && onBeatUpdate ? (nextIntent) => {
+                  (beat as any).slotIntent = nextIntent;
+                  onBeatUpdate(beat.id, { slotIntent: nextIntent } as any);
+                  setHasChanges(true);
+                } : undefined}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||
@@ -5696,7 +5721,47 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       );
                     })()}
                   </>
-                ) : (
+                ) : (() => {
+                  // multiChoice chat-* templates render through ChatDialogView
+                  // in the responsive slot preview — same component the
+                  // runtime uses, so the editor preview matches PW.
+                  const lt = beat!.type === 'multiChoice'
+                    ? (slotPreviewParams?.layoutTemplate as string | undefined)
+                    : undefined;
+                  if (lt === 'chat-bubble' || lt === 'chat-scroll') {
+                    const speakerName = (slotPreviewContent as any)?.speaker || 'Character';
+                    const promptText = (slotPreviewContent as any)?.question
+                      || (slotPreviewContent as any)?.text
+                      || 'What do you say?';
+                    const previewChoices = (() => {
+                      const cs = Array.isArray(slotPreviewParams?.choices)
+                        ? slotPreviewParams!.choices as Array<{ id: string; text: string }>
+                        : [];
+                      return cs.length > 0
+                        ? cs.map(c => ({ id: c.id, text: c.text || c.id }))
+                        : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
+                    })();
+                    return (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden' }}>
+                        <ChatDialogView
+                          messages={[{
+                            id: 'preview-npc',
+                            speaker: speakerName,
+                            text: promptText,
+                            isPlayer: false,
+                          }]}
+                          choices={previewChoices}
+                          mode={lt as 'chat-scroll' | 'chat-bubble'}
+                          theme={renderTheme ?? undefined}
+                          backgroundUrl={backgroundUrl || null}
+                          backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
+                          onChoiceSelect={() => { /* preview is read-only */ }}
+                          responsive
+                        />
+                      </div>
+                    );
+                  }
+                  return (
                   <SlotFlowView
                     key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
                     beatType={beat!.type}
@@ -5718,7 +5783,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         })()
                       : undefined}
                     layoutTemplate={beat!.type === 'multiChoice'
-                      ? ((slotPreviewParams?.layoutTemplate === 'conversation' ? 'conversation' : 'stacked') as 'stacked' | 'conversation')
+                      ? ((slotPreviewParams?.layoutTemplate === 'conversation'
+                          ? 'conversation'
+                          : slotPreviewParams?.layoutTemplate === 'custom'
+                            ? 'custom'
+                            : 'stacked') as 'stacked' | 'conversation' | 'custom')
                       : undefined}
                     previewWidth={isFixed ? devW : undefined}
                     previewCoarse={selVp.coarse}
@@ -5737,7 +5806,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     }
                     onAction={() => { /* read-only preview — clicks inert in the editor */ }}
                   />
-                )}
+                  );
+                })()}
                 {/* 3d-4 — direct-manipulation gap grip. Delta is divided by
                     the viewport scale so a screen-pixel drag maps to the
                     right number of LOGICAL px even when the rect is
@@ -6207,7 +6277,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             globalSettings={globalSettings}
             themeAssets={themeAssets}
             overrideCountdownMeter={(beat as any).overrideCountdownMeter}
-            presentationMode={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).presentationMode || 'positioned') : undefined}
+            presentationMode={(() => {
+              // dialogTree/aiDialogTree: read the legacy presentationMode
+              // field that VBE's chat-preview branch keys on.
+              if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
+                return (beat as any).presentationMode || 'positioned';
+              }
+              // multiChoice: map layoutTemplate → presentationMode so VBE's
+              // ChatDialogView preview fires for chat-scroll/chat-bubble.
+              if (beat.type === 'multiChoice') {
+                const lt = (beat as any).layoutTemplate as string | undefined;
+                if (lt === 'chat-scroll' || lt === 'chat-bubble') return lt;
+                return 'positioned';
+              }
+              return undefined;
+            })()}
             initialZoom={vbeZoomRef.current}
             onZoomChange={(z: number) => { vbeZoomRef.current = z; }}
             initialScroll={vbeScrollRef.current}

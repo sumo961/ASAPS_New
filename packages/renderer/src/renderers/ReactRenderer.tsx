@@ -2390,6 +2390,8 @@ export class ReactRenderer extends BaseRenderer {
     // — renderChoices will follow with the buttons. Responsive projects
     // override "has author locations" because the project flag is
     // authoritative there (stale bakes left over from fixed authoring).
+    // layoutTemplate:'custom' opts the beat out of slot-flow rendering;
+    // the absolute prompt + button render is what we want.
     const currentBeatType = this.getState('currentBeatType') as string | undefined;
     const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
     const projectIsResponsive = projectLayoutMode === 'responsive';
@@ -2701,7 +2703,11 @@ export class ReactRenderer extends BaseRenderer {
         : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
       const slotIntent = (this.getState('slotIntent') as SlotIntent | undefined);
       const slotAnimations = (this.getState('slotAnimations') as Record<string, any> | undefined);
-      const slotTemplate: 'stacked' | 'conversation' = rawTemplate === 'conversation' ? 'conversation' : 'stacked';
+      const slotTemplate: 'stacked' | 'conversation' | 'custom' = rawTemplate === 'conversation'
+        ? 'conversation'
+        : rawTemplate === 'custom'
+          ? 'custom'
+          : 'stacked';
       // multiChoice's body slot reads `question`; dialogTree's reads `text`.
       const bodyKey = dialogTreeConversation ? 'text' : 'question';
       return new Promise<string>(resolve => {

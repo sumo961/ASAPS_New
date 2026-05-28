@@ -63,6 +63,8 @@ export class MultiChoiceBeat extends Beat {
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
       layoutTemplate: this.layoutTemplate,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
       speaker: this.speaker,
       showSpeaker: this.showSpeaker,
     };
@@ -88,6 +90,8 @@ export class MultiChoiceBeat extends Beat {
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.layoutTemplate !== undefined) this.layoutTemplate = normalizeLayoutTemplate(params.layoutTemplate);
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
     if (params.speaker !== undefined) this.speaker = params.speaker;
     if (params.showSpeaker !== undefined) this.showSpeaker = params.showSpeaker;
   }

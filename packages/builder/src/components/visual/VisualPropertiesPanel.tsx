@@ -76,6 +76,10 @@ interface VisualPropertiesPanelProps {
   // Values vary by beat type — multiChoice has no chat-scroll, dialogTree does.
   layoutTemplate?: string;
   onLayoutTemplateChange?: (template: string) => void;
+  // Per-slot author intent (anchor h/v per slot name). Surfaced as a 3×3
+  // grid picker per slot when layoutTemplate === 'custom'.
+  slotIntent?: Record<string, { anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' } }>;
+  onSlotIntentChange?: (next: Record<string, { anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' } }>) => void;
   // Panorama hotspot props
   allBeats?: { id: string; name: string; type: string }[];
   panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
@@ -145,6 +149,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onResponseDelayChange,
   layoutTemplate,
   onLayoutTemplateChange,
+  slotIntent,
+  onSlotIntentChange,
   allBeats,
   panoramaHotspots,
   onPanoramaHotspotUpdate,
@@ -676,6 +682,84 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             )}
           </div>
         )}
+
+        {beatType === 'multiChoice' && layoutTemplate === 'custom' && onSlotIntentChange && (() => {
+          // 3×3 anchor picker per slot. Phase 1 of "custom" — discrete
+          // positions, fast to author, covers the 9 canonical placements
+          // (top-left, top-center, top-right, mid-left, … bottom-right).
+          // Phase 2 will let authors drag slots on the stage and snap to
+          // these same anchors.
+          const slots: Array<{ name: string; label: string; desc: string }> = [
+            { name: 'question', label: 'Question', desc: 'NPC prompt (the speaker label rides along)' },
+            { name: 'actions', label: 'Choices', desc: 'Response buttons' },
+          ];
+          const hValues: Array<'left' | 'center' | 'right'> = ['left', 'center', 'right'];
+          const vValues: Array<'top' | 'middle' | 'bottom'> = ['top', 'middle', 'bottom'];
+          const setAnchor = (slot: string, h: 'left' | 'center' | 'right', v: 'top' | 'middle' | 'bottom') => {
+            const cur = slotIntent ?? {};
+            const next = { ...cur, [slot]: { ...(cur[slot] ?? {}), anchor: { h, v } } };
+            onSlotIntentChange(next);
+          };
+          return (
+            <div className="border-b border-gray-200">
+              <button
+                onClick={() => toggleSection('slotPositions')}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="font-medium text-sm">Slot Positions</span>
+                </div>
+                {expandedSections.slotPositions !== false ? (
+                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+              {expandedSections.slotPositions !== false && (
+                <div className="px-4 pb-4 space-y-4">
+                  <p className="text-xs text-gray-500">
+                    Click a cell to pin each slot to that stage corner / edge / center. The responsive layout still adapts to the viewport — these are soft positions, not pixels.
+                  </p>
+                  {slots.map(slot => {
+                    const cur = slotIntent?.[slot.name]?.anchor;
+                    return (
+                      <div key={slot.name}>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-medium text-gray-700">{slot.label}</label>
+                          <span className="text-[10px] text-gray-400">{slot.desc}</span>
+                        </div>
+                        <div
+                          className="inline-grid gap-0.5 p-1 rounded border border-gray-200 bg-gray-50"
+                          style={{ gridTemplateColumns: 'repeat(3, 24px)', gridTemplateRows: 'repeat(3, 24px)' }}
+                        >
+                          {vValues.map(v =>
+                            hValues.map(h => {
+                              const active = cur?.h === h && cur?.v === v;
+                              return (
+                                <button
+                                  key={`${slot.name}-${h}-${v}`}
+                                  type="button"
+                                  title={`${v} ${h}`}
+                                  onClick={() => setAnchor(slot.name, h, v)}
+                                  className={`w-full h-full rounded-sm border ${
+                                    active
+                                      ? 'bg-blue-500 border-blue-600'
+                                      : 'bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400'
+                                  }`}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {(beatType === 'dialogTree' || beatType === 'aiDialogTree') && onLayoutTemplateChange && (
           <div className="border-b border-gray-200">

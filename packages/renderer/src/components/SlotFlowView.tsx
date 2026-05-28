@@ -208,7 +208,7 @@ interface SlotFlowViewProps {
    * 'custom' will read slotIntent anchors in a later commit. Unset →
    * 'stacked'.
    */
-  layoutTemplate?: 'stacked' | 'conversation';
+  layoutTemplate?: 'stacked' | 'conversation' | 'custom';
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -256,6 +256,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   layoutTemplate = 'stacked',
 }) => {
   const isConversation = layoutTemplate === 'conversation';
+  const isCustom = layoutTemplate === 'custom';
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
   // scrollbar) doesn't leak to other mounts.
@@ -424,6 +425,40 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const actionAnchor = actionSlot
     ? slotIntentFor(slotIntent, actionSlot.name)?.anchor
     : undefined;
+  // Body anchor — drives horizontal alignment of the card within the
+  // column flow. Custom-template authoring writes this from the 3×3
+  // picker in VisualPropertiesPanel. (Speaker rides along with the
+  // body card; there's no separate speaker anchor.)
+  const bodyAnchor = bodySlot
+    ? slotIntentFor(slotIntent, bodySlot.name)?.anchor
+    : undefined;
+  const horizontalAlignSelf = (h?: 'left' | 'center' | 'right') =>
+    h === 'left' ? 'flex-start' : h === 'right' ? 'flex-end' : 'center';
+  // Custom-template absolute placement. Each anchored slot becomes a
+  // position:absolute wrapper inside the root, anchored to one of the 9
+  // (h × v) zones with a small stage margin. transform handles centering
+  // for the 'center' / 'middle' values. Returns null when there's no
+  // anchor (slot keeps the default flow layout).
+  const customSlotStyle = (anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' }): React.CSSProperties | null => {
+    if (!isCustom || !anchor || (!anchor.h && !anchor.v)) return null;
+    const inset = 'clamp(16px, 4vw, 48px)';
+    const style: React.CSSProperties = { position: 'absolute' };
+    const tx: string[] = [];
+    if (anchor.h === 'left') style.left = inset;
+    else if (anchor.h === 'right') style.right = inset;
+    else { style.left = '50%'; tx.push('translateX(-50%)'); }
+    if (anchor.v === 'top') style.top = inset;
+    else if (anchor.v === 'bottom') style.bottom = inset;
+    else { style.top = '50%'; tx.push('translateY(-50%)'); }
+    if (tx.length > 0) style.transform = tx.join(' ');
+    return style;
+  };
+  // Speaker rides along with the body card — it's a small label above
+  // the prompt, not an independently positioned element. We omit a custom
+  // anchor here so the speaker always stays inside the body scroller and
+  // moves wherever the body moves.
+  const customBodyStyle = customSlotStyle(bodyAnchor);
+  const customActionStyle = customSlotStyle(actionAnchor);
   const belowBody = actionAnchor?.relativeTo === 'element';
   const actionJustify =
     actionAnchor?.h === 'left'
@@ -563,7 +598,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     display: 'flex',
     flexDirection: isConversation ? 'row' : 'column',
     alignItems: isConversation ? 'flex-start' : undefined,
-    gap: isConversation ? 'clamp(12px, 2vw, 24px)' : undefined,
+    justifyContent: isConversation ? 'space-between' : undefined,
+    gap: isConversation ? 'clamp(20px, 4vw, 64px)' : undefined,
     overflow: 'hidden',
     background: backgroundUrl ? undefined : backgroundColor,
     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
@@ -984,24 +1020,47 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           // to the stage bottom with a void in between). Long content
           // still scrolls internally via the maxHeight cap.
           flex: (belowBody || (hasDynamicChoices && !isConversation)) ? '0 1 auto' : 1,
+          // Conversation: cap the body scroller so the NPC card hugs the
+          // left half of the stage (with the action panel on the right).
+          // Without a cap, flex:1 lets the scroller fill all leftover
+          // width, dragging the card mid-stage and leaving an oversized
+          // left margin next to a too-tight right margin.
+          maxWidth: isConversation ? 'clamp(280px, 50%, 560px)' : undefined,
           maxHeight: (belowBody || (hasDynamicChoices && !isConversation)) ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'flex-start',
-          alignItems: 'center',
+          alignItems: isConversation ? 'flex-start' : 'center',
+          // Custom-template absolute placement: when an author anchors
+          // the body slot, lift its scroller out of the column flow and
+          // pin it to the requested anchor zone on the stage.
+          ...(customBodyStyle ?? {}),
         }}
       >
         <div
           style={{
-            maxWidth: READABLE_MAX_WIDTH,
+            // When a custom-template author has anchored the body to a
+            // side, cap the card narrower so the move actually reads as
+            // a position change instead of being absorbed by the
+            // READABLE_MAX_WIDTH (760) covering most of the stage.
+            maxWidth: bodyAnchor?.h ? 'clamp(280px, 45%, 520px)' : READABLE_MAX_WIDTH,
             width: '100%',
             padding: 'clamp(24px, 5vh, 64px) clamp(20px, 5vw, 48px)',
-            // Conversation: body card hugs the right side of its scroller
-            // so it sits visually adjacent to the action panel, not
-            // centered with a gulf of whitespace between them.
-            margin: isConversation ? '0 0 0 auto' : '0 auto',
+            // Conversation: scroller is capped on the left half of the
+            // stage; the card aligns to its left edge so the NPC text
+            // reads from the stage's left padding, not floated mid-card.
+            // Custom template (and any other slotIntent author): honor
+            // bodyAnchor.h to push the card left / center / right within
+            // its scroller.
+            margin: isConversation
+              ? '0 auto 0 0'
+              : bodyAnchor?.h === 'left'
+                ? '0 auto 0 0'
+                : bodyAnchor?.h === 'right'
+                  ? '0 0 0 auto'
+                  : '0 auto',
             // Body wrapper always uses its natural content height. With
             // extraInScrollAfterBody (dialogTree choices) rendered
             // below it inside the same scroller during pre-earn, this
@@ -1182,7 +1241,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         return (
           <>
             <div
-              className={`${a.className ?? ''} ${isConversation ? '' : 'slotflow-action-slide-in'}`}
+              className={`${a.className ?? ''} ${(isConversation || customActionStyle) ? '' : 'slotflow-action-slide-in'}`}
               data-slotflow-slot={actionSlot.name}
               style={{
                 // Position + zIndex so this row stacks ABOVE the
@@ -1202,7 +1261,23 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // choice menus. System-action rows (Continue, restart +
                 // credits) keep the horizontal flex they always had.
                 flexDirection: (isConversation || hasDynamicChoices) ? 'column' : undefined,
-                alignItems: hasDynamicChoices ? 'center' : undefined,
+                // Buttons inside the panel stretch to match the widest
+                // one for visual consistency. Their horizontal position
+                // on the stage is controlled by the panel's alignSelf
+                // below (which moves the whole panel left/center/right
+                // based on actionAnchor.h from the custom-template picker).
+                alignItems: hasDynamicChoices ? 'stretch' : undefined,
+                // Move the whole action panel left/center/right based on
+                // the anchor. In conversation the panel is row-aligned
+                // (top-of-row) to keep buttons next to the body; in
+                // stacked/custom the anchor controls cross-axis
+                // positioning so "right" actually puts the buttons at
+                // the right edge of the stage.
+                alignSelf: isConversation
+                  ? 'flex-start'
+                  : (hasDynamicChoices
+                      ? horizontalAlignSelf(actionAnchor?.h)
+                      : undefined),
                 // In conversation mode the action panel claims a fixed
                 // width fraction of the stage; body scroller flexes to
                 // fill the rest. Without flex-basis the empty-buttons
@@ -1212,16 +1287,24 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // buttons sit at the same Y as the NPC text, not floated
                 // mid-stage. paddingTop matches the body card's top
                 // padding so the first button visually aligns with the
-                // first line of the prompt.
-                alignSelf: isConversation ? 'flex-start' : undefined,
+                // first line of the prompt. (Stacked alignSelf is set
+                // above to 'stretch' when dynamicChoices are present.)
                 justifyContent: isConversation ? 'flex-start' : actionJustify,
                 gap: 'clamp(12px, 2vw, 24px)',
                 paddingTop: isConversation
                   ? 'clamp(24px, 5vh, 64px)'
                   : (actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)'),
                 paddingBottom: 'clamp(16px, 3vh, 28px)',
-                paddingLeft: 16,
-                paddingRight: 16,
+                // Match the body card's horizontal padding in conversation
+                // so buttons aren't packed tighter against the panel edge
+                // than text is against the card edge — the visible
+                // content edges end up the same distance from the stage
+                // margin on both sides.
+                paddingLeft: isConversation ? 'clamp(20px, 5vw, 48px)' : 16,
+                paddingRight: isConversation ? 'clamp(20px, 5vw, 48px)' : 16,
+                // Custom-template absolute placement: lift the action
+                // panel out of the column flow and pin it to the anchor.
+                ...(customActionStyle ?? {}),
                 // When every button is individually anchored the row is
                 // empty; collapse its vertical inset so it doesn't leave
                 // a phantom stripe at the bottom.
