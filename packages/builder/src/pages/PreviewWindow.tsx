@@ -1691,6 +1691,12 @@ export const PreviewWindow: React.FC = () => {
       const allBeats = story.getAllBeats();
       const projectLayoutMode = resolveLayoutMode(previewData?.settings, allBeats);
       initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT, projectLayoutMode);
+      // Surface the resolved project layout mode to the renderer so its
+      // routing (slot vs absolute) can treat the project flag as
+      // authoritative for slot/spatial beats — leftover baked locations
+      // from a prior fixed-mode session shouldn't strand the runtime on
+      // the absolute path when the author has switched to responsive.
+      rendererRef.current?.setState('projectLayoutMode', projectLayoutMode);
 
       // Merge assets into story environment
       const existingEnvironment = story.getEnvironment() || {};

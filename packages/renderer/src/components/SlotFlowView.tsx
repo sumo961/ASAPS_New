@@ -979,8 +979,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       <div
         className="slotflow-scroll"
         style={{
-          flex: belowBody ? '0 1 auto' : 1,
-          maxHeight: belowBody ? '100%' : undefined,
+          // In stacked mode with dynamic choices the body sits at natural
+          // height so the action row follows right below it (not pinned
+          // to the stage bottom with a void in between). Long content
+          // still scrolls internally via the maxHeight cap.
+          flex: (belowBody || (hasDynamicChoices && !isConversation)) ? '0 1 auto' : 1,
+          maxHeight: (belowBody || (hasDynamicChoices && !isConversation)) ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
@@ -1191,13 +1195,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 zIndex: 5,
                 flexShrink: 0,
                 display: 'flex',
-                // Conversation layout: stack buttons VERTICALLY on the
-                // right-side panel so the back-and-forth reads as
-                // "NPC text ← → player choices" rather than "NPC text
-                // above a horizontal button row inside its own panel".
-                // The legacy row layout (stacked template) keeps the
-                // horizontal flex it always had.
-                flexDirection: isConversation ? 'column' : undefined,
+                // Stack buttons VERTICALLY whenever dynamicChoices are
+                // present (MultiChoice + DialogTree-conversation). Reads as
+                // a list of player responses, not a horizontal toolbar —
+                // matches the convention the rest of the app uses for
+                // choice menus. System-action rows (Continue, restart +
+                // credits) keep the horizontal flex they always had.
+                flexDirection: (isConversation || hasDynamicChoices) ? 'column' : undefined,
+                alignItems: hasDynamicChoices ? 'center' : undefined,
                 // In conversation mode the action panel claims a fixed
                 // width fraction of the stage; body scroller flexes to
                 // fill the rest. Without flex-basis the empty-buttons

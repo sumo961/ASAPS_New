@@ -228,6 +228,11 @@ function getDefaultTextForLocation(
     if (nameLower.includes('question')) return params.question || '';
   }
 
+  // MultiChoice — the prompt is stored as `question`, same as movementChoice.
+  if (beatType === 'multiChoice') {
+    if (nameLower.includes('question')) return params.question || '';
+  }
+
   // Panorama
   if (beatType === 'panorama') {
     if (nameLower.includes('prompt')) return params.prompt || '';

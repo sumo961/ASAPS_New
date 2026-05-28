@@ -1482,8 +1482,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Hotspot-based spatial preview (isHotspotChoicePreview) is per-beat
   // author intent and stays regardless of project mode.
   const projectIsResponsive = resolveLayoutMode(globalSettings as any, beats as any) === 'responsive';
-  const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type) && !beatHasAuthorLocations;
-  const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type) && !beatHasAuthorLocations;
+  // In responsive projects the schema's slot/spatial declaration is
+  // authoritative — baked locations may linger from a prior fixed-mode
+  // session but the responsive flow is what the author chose. In fixed
+  // projects the schema declaration is only suggestive; baked author
+  // positions still win (the editor stays on the absolute path).
+  const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type)
+    && (projectIsResponsive || !beatHasAuthorLocations);
+  const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type)
+    && (projectIsResponsive || !beatHasAuthorLocations);
   const isSpatialPreview =
     (projectIsResponsive && schemaSpatial)
     || isHotspotChoicePreview;
@@ -3358,9 +3365,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // doesn't warn about a missing `locations` array on XR beat schemas.
     const isXrBeat = beat.type === 'gpsLocation' || beat.type === 'indoorLocation';
     if (!isXrBeat && elements.length === 0 && beat.locations.size === 0) {
-      console.log(`[VisualWorkspace] Using SchemaLocationInitializer for ${beat.type}`);
-      const schemaElements = initializeLocationsFromSchema(beat, params, projectSettings);
-      elements = schemaElements;
+      // In a responsive project, schema-declared slot/spatial beats must
+      // stay empty — auto-baking default locations here re-bakes what the
+      // fixed→responsive migration just cleared and re-strands the beat
+      // on the absolute path. The slot preview branch above will paint
+      // the responsive layout instead. Fixed projects still get defaults.
+      const skipForResponsiveSlot =
+        projectIsResponsive && (isSlotModeBeatType(beat.type) || isSpatialModeBeatType(beat.type));
+      if (skipForResponsiveSlot) {
+        console.log(`[VisualWorkspace] Responsive project + slot/spatial beat — skipping default location bake for ${beat.type}`);
+      } else {
+        console.log(`[VisualWorkspace] Using SchemaLocationInitializer for ${beat.type}`);
+        const schemaElements = initializeLocationsFromSchema(beat, params, projectSettings);
+        elements = schemaElements;
+      }
     }
 
     // VideoBeat: keep only the video element, remove stale elements (e.g. old "Controls" text)

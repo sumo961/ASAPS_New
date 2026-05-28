@@ -2387,16 +2387,21 @@ export class ReactRenderer extends BaseRenderer {
     // Skip the absolute dialog render here so it doesn't flash for one
     // frame before SlotFlowView paints on top. When the author has baked
     // locations (fixed-mode path), we DO want the absolute prompt render
-    // — renderChoices will follow with the buttons.
+    // — renderChoices will follow with the buttons. Responsive projects
+    // override "has author locations" because the project flag is
+    // authoritative there (stale bakes left over from fixed authoring).
     const currentBeatType = this.getState('currentBeatType') as string | undefined;
-    if (currentBeatType === 'multiChoice' && !layoutAuthorPositioned(locations)) {
+    const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
+    const projectIsResponsive = projectLayoutMode === 'responsive';
+    const treatAsAuthorPositioned = !projectIsResponsive && layoutAuthorPositioned(locations);
+    if (currentBeatType === 'multiChoice' && !treatAsAuthorPositioned) {
       return;
     }
     // DialogTree's conversation template also composes via a single
     // SlotFlowView render in renderChoices — same flash-prevention.
     if (
       (currentBeatType === 'dialogTree' || currentBeatType === 'aiDialogTree') &&
-      !layoutAuthorPositioned(locations)
+      !treatAsAuthorPositioned
     ) {
       const lt = this.getState('layoutTemplate') as string | undefined;
       if (lt === 'conversation') return;
@@ -2662,7 +2667,16 @@ export class ReactRenderer extends BaseRenderer {
     // 'conversation' template joins via an inline slot spec (the
     // dialogTree schema doesn't declare layoutMode:'slot' itself —
     // only the conversation template opts in).
-    const slotAuthorPositioned = layoutAuthorPositioned(locations);
+    // Responsive projects: the project flag is authoritative for slot/
+    // spatial beats. Leftover baked locations from a prior fixed-mode
+    // session shouldn't strand the runtime on the absolute path — the
+    // VE has been ignoring them under the same rule since the
+    // multiChoice responsive fix.
+    const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
+    const projectIsResponsive = projectLayoutMode === 'responsive';
+    const slotAuthorPositioned = projectIsResponsive
+      ? false
+      : layoutAuthorPositioned(locations);
     const rawTemplate = this.getState('layoutTemplate') as string | undefined;
     const dialogTreeConversation =
       (beatType === 'dialogTree' || beatType === 'aiDialogTree') &&

@@ -1049,6 +1049,9 @@ export const StoryPreview: React.FC<StoryPreviewProps> = ({ story, settings, ass
       const projectLayoutMode = resolveLayoutMode(settings, allBeats);
       console.log('[StoryPreview] Initializing locations for', allBeats.length, 'beats; projectLayoutMode=', projectLayoutMode);
       initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT, projectLayoutMode);
+      // Mirror in renderer state so slot-routing can treat the project
+      // setting as authoritative for slot/spatial beats.
+      rendererRef.current?.setState('projectLayoutMode', projectLayoutMode);
 
       // CRITICAL: Merge environment.nodes from both imported ASML and builder assets
       // This makes the Story object self-contained with all asset URLs, enabling:
