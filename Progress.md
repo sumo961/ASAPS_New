@@ -1,5 +1,98 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-28: MultiChoice beat + unified layoutTemplate + responsive routing (v0.9.62)
+
+### Overview
+
+A new beat type — **MultiChoice** — and a unified layout-template surface that subsumes the patchwork of presentationMode / hardcoded stacked-by-default / chat-mode toggles. MultiChoice is the single-screen "prompt + N response buttons" beat the palette was missing: simpler than DialogTree (no nested follow-up nodes), more powerful than the legacy conversationChoice (full per-choice effects + conditions). Same authoring as DialogTree's choices, no spatial layer, single screen by design.
+
+The new `layoutTemplate` field unifies the rendering surface across MultiChoice + DialogTree:
+
+- **stacked** — prompt on top, choice buttons below (the visual-novel default)
+- **conversation** — NPC text on one side, choice buttons on the other (responsive back-and-forth)
+- **chat-scroll** / **chat-bubble** — existing ChatDialogView modes, now keyed off layoutTemplate
+- **custom** — author-positioned via the new 3×3 slot-anchor picker (responsive, not the legacy fixed-pixel editor)
+
+The migration from legacy `presentationMode` runs transparently: positioned → stacked, chat-* preserved, so existing dialogTrees render exactly as before.
+
+### MultiChoice beat
+
+- New beat class extending Beat with the same per-choice effect / condition surface as DialogTree (`migrateChoiceEffects` on the choices array; visited-choice tracking + `recordChoice` calls match).
+- Schema declares `layoutMode: 'slot'` with three slots: speaker, question (body), actions (dynamicSource: 'choices'). MultiChoice is the first consumer of the dynamicSource concept — the renderer treats each choice as a flow button without enumerating them by name in the schema.
+- Two-call render surface: `renderDialog(speaker, question, undefined, locations)` then `renderChoices(choices, locations)`. Passing locations both times lets the runtime take the absolute path in fixed-mode projects with baked positions, and slot mode in responsive ones.
+- PositionedBeatView gets a multiChoice branch in `createPositionedElementData` that maps `location.name` (= choice text) → `choice.id`. Without it every button fired with no actionId and the beat resolved to the first available choice — three buttons all routed to choice[0]'s target.
+- PositionedBeatView's `adjustElementsForCollisions` short-circuits for multiChoice — no text-collision push-down, no degenerate-overlap repair, no alignment. The author's positions are honored exactly (including buttons above the prompt or overlapping each other). The aggressive auto-layout was driving designer beta testers to give up.
+- Inspector reuses the movementChoice / dialogTree per-choice editor for MultiChoice; the spatial-only fields (locationName picker, "Create hotspot", show-text-on-hover) are conditionally hidden.
+
+### Unified layoutTemplate
+
+- New optional `layoutTemplate` parameter on both DialogTreeBeat and MultiChoiceBeat. Source of truth for which rendering surface engages at runtime.
+- DialogTreeBeat constructor migrates legacy `presentationMode`: `'positioned'` → `'stacked'`, `'chat-scroll'` / `'chat-bubble'` preserved verbatim. layoutTemplate wins when both are set on disk. `presentationMode` stays mirror-written for one release for any reader that still consumes it.
+- DialogTreeBeat exposes `isChatLayoutTemplate()` helper that replaces the previous `presentationMode !== 'positioned'` checks in five places.
+- VisualPropertiesPanel's old "Presentation Mode" picker becomes a "Layout Template" picker with all five values for dialogTree, four for multiChoice (no chat-scroll — single-screen by design).
+- SchemaFormGenerator skips any field with `ui.scope: 've-left'` so the layoutTemplate parameter doesn't double-render in the Inspector.
+
+### MultiChoice in the Visual Editor
+
+- Added `multiChoice` to WorkspaceView's `visualBeatTypes` allowlist (the "Visual Editor" tab wasn't showing at all for these beats).
+- SchemaLocationInitializer skips the static 'choices' placeholder for multiChoice (matching movementChoice/dialogTree) and generates one button location per choice in both `initializeLocationsFromSchema` and `regenerateChoiceElements`. Buttons get `type: 'button'` (no spatial hotspot semantics).
+- VE preview wires `dynamicChoices` + `layoutTemplate` through `SlotFlowView`, with a `(Add a choice to preview)` placeholder when the choices array is empty instead of the misleading "Play Again" endScreen fallback.
+
+### Conversation template
+
+- New responsive layout for short back-and-forth. Body card on one side of the stage, action panel on the other — readable as "NPC text ← → player choices" rather than "prompt above buttons".
+- SlotFlowView root uses `flexDirection: 'row'` with `justifyContent: 'space-between'`. Body scroller caps at `clamp(280px, 50%, 560px)` so the NPC card sits on the left half (margin '0 auto 0 0') rather than floating mid-stage with a wide right margin. Action panel padding matches the body card's horizontal padding (`clamp(20px, 5vw, 48px)`) and buttons right-align inside it (`alignItems: 'flex-end'`).
+- DialogTree-conversation routes through SlotFlowView with an inline slot spec (the dialogTree schema doesn't declare `layoutMode: 'slot'` itself — only the conversation template opts in via this runtime dispatch). Same body + action side-by-side layout per dialog turn.
+- renderDialog skip-guard extended to dialogTree-conversation so the absolute prompt doesn't flash for one frame before the slot view paints.
+
+### Stacked template polish
+
+- Choice buttons stack VERTICALLY (alignItems control on `hasDynamicChoices`) instead of laying out as a horizontal toolbar at the stage bottom. System-action rows (Continue, restart+credits) keep horizontal flex.
+- Body sits at natural height in stacked + dynamic-choices mode (`flex: '0 1 auto'`) so the action row follows directly below the prompt instead of being pushed to the stage bottom with a void in between.
+
+### Chat-bubble for MultiChoice
+
+- MultiChoiceBeat sets `presentationMode='chat-bubble'` (and clears chat history, sets playerName) when layoutTemplate is `'chat-bubble'`, `'positioned'` otherwise — so a prior chat beat doesn't strand the renderer in chat mode.
+- VE preview detects layoutTemplate ∈ {chat-scroll, chat-bubble} for multiChoice and renders ChatDialogView directly in the slot preview — same component PW uses, editor matches runtime.
+- `getBeatContent` grows a multiChoice case so the speaker / question flow into the chat message (`text` mirrors `question` for ChatDialogView, which keys off `content.text`).
+
+### Custom template — phase 1: 3×3 anchor picker
+
+- VisualPropertiesPanel adds a "Slot Positions" section when multiChoice + custom is selected. Two slots — Question, Choices — each with a 3×3 grid (top-left → bottom-right). Click a cell → writes `slotIntent[slot].anchor.{h, v}`. The speaker label rides along with the question; no separate picker.
+- SlotFlowView supports custom positioning: when `layoutTemplate === 'custom'` and a slot has anchor.h or anchor.v set, the slot wrapper becomes `position: absolute` and pins to one of the 9 stage zones (`clamp(16px, 4vw, 48px)` inset; center/middle via `translate(-50%, …)`).
+- Slide-in animation on the action panel is suppressed when custom-positioned — its keyframe `transform: translateY(0)` was clobbering the centering `translate(-50%, -50%)` so center-center wasn't actually centered.
+- The action panel in stacked/custom uses `alignSelf` based on `actionAnchor.h` (with `alignItems: 'stretch'` inside) so left/right actually shift the whole panel instead of just nudging buttons inside an edge-to-edge container.
+- Body card narrows to `clamp(280px, 45%, 520px)` when bodyAnchor.h is set — wide enough to read, narrow enough that "left" vs "right" looks like a position change instead of being absorbed by READABLE_MAX_WIDTH (760).
+- MultiChoiceBeat round-trips `slotIntent` + `slotAnimations` through `get/updateParameters`.
+
+### Responsive routing — project flag is authoritative
+
+- PreviewWindow + StoryPreview push the resolved `projectLayoutMode` into renderer state at startup.
+- ReactRenderer's `renderDialog` skip-guard and `renderChoices` slot-mode dispatch treat "author positioned" as `false` for slot/spatial beats in responsive projects. Leftover baked locations from a prior fixed-mode session no longer strand the runtime on the absolute path.
+- VisualWorkspace's element loader skips the schema default location bake for slot/spatial beats in responsive projects (was re-baking what the fixed→responsive migration had just cleared, and re-stranding the beat).
+- VisualWorkspace's `isSlotPreview` / `isSpatialPreview` gates the `!beatHasAuthorLocations` check on the project mode — in responsive projects the schema declaration is authoritative; in fixed projects baked positions still win (so dialogTree's legacy positioned variant continues to render as authored).
+- SchemaLocationInitializer adds a multiChoice branch to `getDefaultTextForLocation` so the question field actually picks up `params.question` (was falling through to undefined; empty NPC textbox in fixed mode).
+
+### Beat palette reorganization
+
+- Picker tree restructured around the new taxonomy: Single Choice / Multi Choice / Timed / Logic, with sub-groups. AI pills and mobile/sensor badges (📱) where applicable.
+- MultiChoice slots into the new "Multi Choice → Buttons" sub-group as the no-frills baseline. DialogTree stays as the multi-turn back-and-forth.
+- AI prompt templates teach the model about MultiChoice as the new default for "ask N things on one screen".
+
+**Files modified across this release:**
+- `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`
+- `packages/core/src/beats/Beat.ts`, `MultiChoiceBeat.ts`, `DialogTreeBeat.ts`, `BeatRegistry.ts`, `BeatTypeRegistry.ts`
+- `packages/core/tests/beats/MultiChoiceBeat.test.ts`
+- `packages/renderer/src/components/SlotFlowView.tsx`, `PositionedBeatView.tsx`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`
+- `packages/builder/src/components/visual/VisualWorkspace.tsx`, `VisualPropertiesPanel.tsx`, `VisualBeatEditor.tsx`
+- `packages/builder/src/components/Inspector.tsx`, `SchemaFormGenerator.tsx`, `WorkspaceView.tsx`
+- `packages/builder/src/utils/SchemaLocationInitializer.ts`
+- `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/components/preview/StoryPreview.tsx`
+- `packages/builder/src/services/prompts/dialogGeneration.ts`, `storyGeneration.ts`, `storyGenerationEnhanced.ts`
+
+---
+
 ## 2026-05-26: Responsive layout — Fixed→Responsive migration completed end-to-end (v0.9.61)
 
 ### Overview
