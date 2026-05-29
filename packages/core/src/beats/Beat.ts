@@ -160,6 +160,18 @@ export abstract class Beat {
         renderer.setState('animations', undefined);
       }
 
+      // Push slotIntent + slotAnimations to renderer state so the slot/
+      // spatial render paths (SlotFlowView, SpatialFlowView) see the
+      // author's anchor + motion intent for THIS beat. Without this, the
+      // VE preview reads from beat.slotIntent directly while the
+      // runtime reads getState('slotIntent') which stays undefined —
+      // anchors set via the custom-template 3×3 picker are honored in
+      // the editor but ignored at runtime. Reset to undefined on every
+      // beat so a prior beat's intent doesn't leak into one that has
+      // none of its own.
+      renderer.setState('slotIntent', this.slotIntent);
+      renderer.setState('slotAnimations', this.slotAnimations);
+
       // Prepare transition (set hidden state) BEFORE rendering
       if (this.transition && renderer.prepareTransition) {
         renderer.prepareTransition(this.transition);

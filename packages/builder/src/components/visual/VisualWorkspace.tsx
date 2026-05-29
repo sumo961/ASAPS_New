@@ -1492,15 +1492,32 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     && (projectIsResponsive || !beatHasAuthorLocations);
   const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type)
     && (projectIsResponsive || !beatHasAuthorLocations);
+  // DialogTree opts into slot mode template-by-template (the schema
+  // doesn't declare layoutMode:'slot' on its own). When the author has
+  // picked stacked / conversation / custom, the preview fires the slot
+  // branch and uses the same inline slot spec the runtime uses
+  // (speaker + body 'text' + actions). chat-* takes ChatDialogView.
+  const dialogTreeSlotTemplate =
+    !!beat && (beat.type === 'dialogTree' || beat.type === 'aiDialogTree')
+    && (beatLayoutTemplate === 'stacked' || beatLayoutTemplate === 'conversation' || beatLayoutTemplate === 'custom')
+    && (projectIsResponsive || !beatHasAuthorLocations);
+  const INLINE_DIALOGTREE_SLOTS = [
+    { name: 'speaker', role: 'speaker', source: 'speaker' },
+    { name: 'text', role: 'body', source: 'text', grow: true, scroll: true },
+    { name: 'actions', role: 'action' },
+  ] as Array<{ name: string; role: 'speaker' | 'body' | 'action' | 'title'; source?: string; grow?: boolean; scroll?: boolean; buttons?: string[] }>;
   const isSpatialPreview =
     (projectIsResponsive && schemaSpatial)
     || isHotspotChoicePreview;
   const isSlotPreview =
     (projectIsResponsive && schemaSlot)
+    || (projectIsResponsive && dialogTreeSlotTemplate)
     || isSpatialPreview;
   const slotSpec = isSpatialPreview
     ? (getSpatialSpec(beat!.type)?.slots ?? null)
-    : (isSlotPreview ? getSlotSpec(beat!.type) : null);
+    : (isSlotPreview
+        ? (dialogTreeSlotTemplate ? INLINE_DIALOGTREE_SLOTS : getSlotSpec(beat!.type))
+        : null);
   // Plain (non-memoized) derivation: the switch is trivial, and param edits
   // from the Inspector mutate the same Beat instance without changing its
   // identity — a useMemo keyed on `beat` would go stale on text edits.
@@ -5134,14 +5151,30 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
                   return undefined;
                 })()}
-                slotIntent={beat.type === 'multiChoice' && projectIsResponsive
-                  ? ((beat as any).slotIntent as Record<string, any> | undefined)
-                  : undefined}
-                onSlotIntentChange={beat.type === 'multiChoice' && projectIsResponsive && onBeatUpdate ? (nextIntent) => {
-                  (beat as any).slotIntent = nextIntent;
-                  onBeatUpdate(beat.id, { slotIntent: nextIntent } as any);
-                  setHasChanges(true);
-                } : undefined}
+                slotIntent={(() => {
+                  // multiChoice: only when project is responsive (no
+                  // legacy authoring concept exists in fixed mode).
+                  // dialogTree: always; its chat templates also use
+                  // slotIntent and they work in both modes.
+                  if (beat.type === 'multiChoice' && projectIsResponsive) {
+                    return (beat as any).slotIntent as Record<string, any> | undefined;
+                  }
+                  if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
+                    return (beat as any).slotIntent as Record<string, any> | undefined;
+                  }
+                  return undefined;
+                })()}
+                onSlotIntentChange={(() => {
+                  if (!onBeatUpdate) return undefined;
+                  const handler = (nextIntent: Record<string, any>) => {
+                    (beat as any).slotIntent = nextIntent;
+                    onBeatUpdate(beat.id, { slotIntent: nextIntent } as any);
+                    setHasChanges(true);
+                  };
+                  if (beat.type === 'multiChoice' && projectIsResponsive) return handler;
+                  if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
+                  return undefined;
+                })()}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||
@@ -5774,15 +5807,24 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     slotAnimations={
                       (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
                     }
-                    dynamicChoices={beat!.type === 'multiChoice'
+                    dynamicChoices={(beat!.type === 'multiChoice'
+                      || ((beat!.type === 'dialogTree' || beat!.type === 'aiDialogTree') && dialogTreeSlotTemplate))
                       ? (() => {
-                          const cs = Array.isArray(slotPreviewParams?.choices) ? slotPreviewParams!.choices as Array<{ id: string; text: string }> : [];
+                          // multiChoice stores choices flat; dialogTree
+                          // nests them under dialogTree.choices (current
+                          // node — preview always uses the root node).
+                          const rawChoices = beat!.type === 'multiChoice'
+                            ? slotPreviewParams?.choices
+                            : (slotPreviewParams as any)?.dialogTree?.choices;
+                          const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string }> : [];
                           return cs.length > 0
                             ? cs.map((c) => ({ id: c.id, text: c.text || c.id }))
                             : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
                         })()
                       : undefined}
-                    layoutTemplate={beat!.type === 'multiChoice'
+                    layoutTemplate={(beat!.type === 'multiChoice'
+                      || beat!.type === 'dialogTree'
+                      || beat!.type === 'aiDialogTree')
                       ? ((slotPreviewParams?.layoutTemplate === 'conversation'
                           ? 'conversation'
                           : slotPreviewParams?.layoutTemplate === 'custom'

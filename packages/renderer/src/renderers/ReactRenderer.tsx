@@ -2399,14 +2399,16 @@ export class ReactRenderer extends BaseRenderer {
     if (currentBeatType === 'multiChoice' && !treatAsAuthorPositioned) {
       return;
     }
-    // DialogTree's conversation template also composes via a single
-    // SlotFlowView render in renderChoices — same flash-prevention.
+    // DialogTree's stacked / conversation / custom templates all
+    // compose via a single SlotFlowView render in renderChoices —
+    // same flash-prevention as multiChoice. chat-* takes the
+    // ChatDialogView path higher up.
     if (
       (currentBeatType === 'dialogTree' || currentBeatType === 'aiDialogTree') &&
       !treatAsAuthorPositioned
     ) {
       const lt = this.getState('layoutTemplate') as string | undefined;
-      if (lt === 'conversation') return;
+      if (lt === 'stacked' || lt === 'conversation' || lt === 'custom') return;
     }
 
     // Positioned mode - render as before
@@ -2560,9 +2562,21 @@ export class ReactRenderer extends BaseRenderer {
     // detecting per-node; renderDialog skipped its absolute render
     // already. We compose the full turn (image + speaker/text slots
     // + hotspot choices) in a single SpatialFlowView render.
+    //
+    // v0.9.63 — dialogTree's stacked / conversation / custom templates
+    // take the slot dispatch below instead. Spatial mode only fires
+    // when there's an actual reason for it: at least one choice with a
+    // hotspot, OR the legacy "no template was set" case (kept for
+    // dialogTrees authored before layoutTemplate existed).
     const dialogNodeIsSpatial = !!this.getState('dialogNodeIsSpatial');
     const authorPositioned = layoutAuthorPositioned(locations);
-    if (dialogNodeIsSpatial && !authorPositioned) {
+    const _earlyBeatType = (this.getState('currentBeatType') as string) || 'dialogTree';
+    const _earlyRawTemplate = this.getState('layoutTemplate') as string | undefined;
+    const dialogTreeWantsSlotInstead =
+      (_earlyBeatType === 'dialogTree' || _earlyBeatType === 'aiDialogTree')
+      && (_earlyRawTemplate === 'stacked' || _earlyRawTemplate === 'conversation' || _earlyRawTemplate === 'custom');
+    const anyChoiceHasHotspot = choices.some(c => !!c.hotspot);
+    if (dialogNodeIsSpatial && !authorPositioned && !dialogTreeWantsSlotInstead && anyChoiceHasHotspot) {
       const spatialSpec = getSpatialSpec('dialogTree');
       if (spatialSpec) {
         // Bug 26 — per-beat fit override.
@@ -2680,11 +2694,17 @@ export class ReactRenderer extends BaseRenderer {
       ? false
       : layoutAuthorPositioned(locations);
     const rawTemplate = this.getState('layoutTemplate') as string | undefined;
-    const dialogTreeConversation =
+    // dialogTree's slot-mode templates: stacked (responsive visual-novel
+    // — body on top, action below), conversation (side-by-side per turn),
+    // and custom (slotIntent-anchored). chat-* takes the ChatDialogView
+    // path above. The schema doesn't declare layoutMode:'slot' on its
+    // own — these templates opt in via this runtime dispatch + an
+    // inline slot spec.
+    const dialogTreeSlotTemplate =
       (beatType === 'dialogTree' || beatType === 'aiDialogTree') &&
-      rawTemplate === 'conversation';
+      (rawTemplate === 'stacked' || rawTemplate === 'conversation' || rawTemplate === 'custom');
     const schemaSlotSpec = getSlotSpec(beatType);
-    const inlineDialogTreeSlots: SlotSpec[] | null = dialogTreeConversation
+    const inlineDialogTreeSlots: SlotSpec[] | null = dialogTreeSlotTemplate
       ? [
           { name: 'speaker', role: 'speaker', source: 'speaker' },
           { name: 'text', role: 'body', source: 'text', grow: true, scroll: true },
@@ -2695,7 +2715,7 @@ export class ReactRenderer extends BaseRenderer {
     const useSlotMode =
       !!effectiveSlotSpec &&
       !slotAuthorPositioned &&
-      (beatType === 'multiChoice' || dialogTreeConversation);
+      (beatType === 'multiChoice' || dialogTreeSlotTemplate);
 
     if (useSlotMode && effectiveSlotSpec) {
       const slotBg = this.backgroundImageUrl
@@ -2709,7 +2729,7 @@ export class ReactRenderer extends BaseRenderer {
           ? 'custom'
           : 'stacked';
       // multiChoice's body slot reads `question`; dialogTree's reads `text`.
-      const bodyKey = dialogTreeConversation ? 'text' : 'question';
+      const bodyKey = dialogTreeSlotTemplate ? 'text' : 'question';
       return new Promise<string>(resolve => {
         this.resolveAction = (id: string) => {
           this.resolveAction = null;

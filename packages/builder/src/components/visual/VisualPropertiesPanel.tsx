@@ -683,16 +683,27 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
 
-        {beatType === 'multiChoice' && layoutTemplate === 'custom' && onSlotIntentChange && (() => {
+        {(beatType === 'multiChoice' || beatType === 'dialogTree' || beatType === 'aiDialogTree') && layoutTemplate === 'custom' && onSlotIntentChange && (() => {
           // 3×3 anchor picker per slot. Phase 1 of "custom" — discrete
           // positions, fast to author, covers the 9 canonical placements
           // (top-left, top-center, top-right, mid-left, … bottom-right).
           // Phase 2 will let authors drag slots on the stage and snap to
           // these same anchors.
-          const slots: Array<{ name: string; label: string; desc: string }> = [
-            { name: 'question', label: 'Question', desc: 'NPC prompt (the speaker label rides along)' },
-            { name: 'actions', label: 'Choices', desc: 'Response buttons' },
-          ];
+          //
+          // Slot names match what the renderer reads:
+          //   multiChoice  → 'question' (body), 'actions' (buttons)
+          //   dialogTree   → 'text'     (body), 'actions' (buttons)
+          // The speaker label rides along inside the body card on both.
+          const isDialogTree = beatType === 'dialogTree' || beatType === 'aiDialogTree';
+          const slots: Array<{ name: string; label: string; desc: string }> = isDialogTree
+            ? [
+                { name: 'text', label: 'Dialog', desc: 'NPC dialog card (the speaker label rides along)' },
+                { name: 'actions', label: 'Choices', desc: 'Response buttons' },
+              ]
+            : [
+                { name: 'question', label: 'Question', desc: 'NPC prompt (the speaker label rides along)' },
+                { name: 'actions', label: 'Choices', desc: 'Response buttons' },
+              ];
           const hValues: Array<'left' | 'center' | 'right'> = ['left', 'center', 'right'];
           const vValues: Array<'top' | 'middle' | 'bottom'> = ['top', 'middle', 'bottom'];
           const setAnchor = (slot: string, h: 'left' | 'center' | 'right', v: 'top' | 'middle' | 'bottom') => {

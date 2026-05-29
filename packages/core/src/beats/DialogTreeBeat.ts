@@ -340,6 +340,8 @@ export class DialogTreeBeat extends Beat {
       backgroundAssetId: this.backgroundAssetId,
       phaseOverrides: this.phaseOverrides,
       layoutTemplate: this.layoutTemplate,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
       // Continue to emit the legacy presentationMode for one release so
       // older ASML / ZIP readers don't blow up; v0.9.63 will drop it.
       presentationMode: this.presentationMode,
@@ -390,6 +392,8 @@ export class DialogTreeBeat extends Beat {
           ? 'chat-bubble'
           : 'stacked';
     }
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
     if (params.spatialFit !== undefined) {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'

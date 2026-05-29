@@ -428,8 +428,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // Body anchor — drives horizontal alignment of the card within the
   // column flow. Custom-template authoring writes this from the 3×3
   // picker in VisualPropertiesPanel. (Speaker rides along with the
-  // body card; there's no separate speaker anchor.)
-  const bodyAnchor = bodySlot
+  // body card; there's no separate speaker anchor.) Only read for the
+  // custom template so anchors set during a custom session don't leak
+  // into stacked / conversation when the author switches templates.
+  const bodyAnchor = isCustom && bodySlot
     ? slotIntentFor(slotIntent, bodySlot.name)?.anchor
     : undefined;
   const horizontalAlignSelf = (h?: 'left' | 'center' | 'right') =>
@@ -460,10 +462,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const customBodyStyle = customSlotStyle(bodyAnchor);
   const customActionStyle = customSlotStyle(actionAnchor);
   const belowBody = actionAnchor?.relativeTo === 'element';
+  // h-derived positioning of the action panel is custom-template only —
+  // otherwise an anchor set during a custom session keeps left/right
+  // pulling buttons around in stacked / conversation when the author
+  // switches templates. gap and relativeTo stay live across all
+  // templates because they're orthogonal layout signals.
+  const actionAnchorH = isCustom ? actionAnchor?.h : undefined;
   const actionJustify =
-    actionAnchor?.h === 'left'
+    actionAnchorH === 'left'
       ? 'flex-start'
-      : actionAnchor?.h === 'right'
+      : actionAnchorH === 'right'
         ? 'flex-end'
         : 'center';
   const actionGap =
@@ -1089,7 +1097,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   fontFamily: theme.fonts.textFont || 'sans-serif',
                   fontWeight: 600,
                   letterSpacing: '0.04em',
-                  textAlign: 'center',
+                  // Conversation: left-align the speaker label so it
+                  // sits above the (left-aligned) body card. Stacked /
+                  // custom keep the centered label above the centered
+                  // body for the visual-novel feel.
+                  textAlign: isConversation ? 'left' : 'center',
+                  alignSelf: isConversation ? 'flex-start' : 'center',
                   opacity: 0.78,
                   marginBottom: 'clamp(6px, 1vh, 12px)',
                   // ~70% of body font size — sits as a label, not a heading.
@@ -1157,7 +1170,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   // readable column and looks oversized.
                   width: 'fit-content',
                   maxWidth: '100%',
-                  alignSelf: 'center',
+                  // Conversation: left-align the body card so it sits
+                  // near the stage's left padding instead of floating
+                  // mid-scroller. Stacked / custom keep the centered
+                  // visual-novel feel.
+                  alignSelf: isConversation ? 'flex-start' : 'center',
                   ...textBoxCardStyle(theme, { isTitle: false }),
                   ...bodyReveal.fadeStyle,
                   ...a.style,
@@ -1261,12 +1278,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // choice menus. System-action rows (Continue, restart +
                 // credits) keep the horizontal flex they always had.
                 flexDirection: (isConversation || hasDynamicChoices) ? 'column' : undefined,
-                // Buttons inside the panel stretch to match the widest
-                // one for visual consistency. Their horizontal position
-                // on the stage is controlled by the panel's alignSelf
-                // below (which moves the whole panel left/center/right
-                // based on actionAnchor.h from the custom-template picker).
-                alignItems: hasDynamicChoices ? 'stretch' : undefined,
+                // Conversation right-aligns buttons at their NATURAL
+                // widths inside the panel — the panel sizes to the
+                // widest button + padding, and each button fits its
+                // text on one line. Stacked / custom stretches buttons
+                // to a common width for the centered visual-novel look.
+                alignItems: hasDynamicChoices
+                  ? (isConversation ? 'flex-end' : 'stretch')
+                  : undefined,
                 // Move the whole action panel left/center/right based on
                 // the anchor. In conversation the panel is row-aligned
                 // (top-of-row) to keep buttons next to the body; in
@@ -1276,13 +1295,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 alignSelf: isConversation
                   ? 'flex-start'
                   : (hasDynamicChoices
-                      ? horizontalAlignSelf(actionAnchor?.h)
+                      ? horizontalAlignSelf(actionAnchorH)
                       : undefined),
                 // In conversation mode the action panel claims a fixed
                 // width fraction of the stage; body scroller flexes to
                 // fill the rest. Without flex-basis the empty-buttons
-                // row collapses to zero width.
-                flexBasis: isConversation ? 'clamp(160px, 28%, 280px)' : undefined,
+                // row collapses to zero width. Widened from 28%/280
+                // because the previous max squeezed longer button text
+                // ("Your name is Kim, right?") onto 2-3 lines even when
+                // there was plenty of horizontal room on stage.
+                flexBasis: isConversation ? 'clamp(200px, 34%, 380px)' : undefined,
                 // Conversation: top-align with the body card so the
                 // buttons sit at the same Y as the NPC text, not floated
                 // mid-stage. paddingTop matches the body card's top
