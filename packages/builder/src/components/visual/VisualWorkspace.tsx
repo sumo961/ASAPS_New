@@ -1191,9 +1191,27 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [leftPanelWidth, setLeftPanelWidth] = useState(320); // Default w-80 = 320px
   const [isResizingPanel, setIsResizingPanel] = useState(false);
 
-  // Phase navigation state for DialogTree beats
+  // Phase id of the currently-walked dialogTree node. Derived from
+  // dialogTreeNodePath in a useEffect below; phaseOverrides still keys
+  // off this. Drives only the persistence side of the per-phase
+  // element-override system — no UI sets it directly anymore.
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-  const [phasesExpanded, setPhasesExpanded] = useState(true);
+
+  // Keep selectedPhaseId in sync with dialogTreeNodePath. The legacy
+  // per-phase override system (phaseOverrides) keys off selectedPhaseId,
+  // and there's no UI that sets it directly any more — the breadcrumb +
+  // preview step-into write to dialogTreeNodePath instead. This effect
+  // walks the tree to the node at the path end and surfaces its id, so
+  // phaseOverrides persistence continues to work without a parallel UI.
+  useEffect(() => {
+    if (beat?.type !== 'dialogTree') return;
+    const params = beat.getParameters ? beat.getParameters() : {};
+    const node = dialogNodeAt(params?.dialogTree, dialogTreeNodePath);
+    const derived = node?.id || params?.dialogTree?.id || 'root';
+    if (derived !== selectedPhaseId) {
+      setSelectedPhaseId(derived);
+    }
+  }, [beat, dialogTreeNodePath, selectedPhaseId]);
 
   // Panorama view mode toggle: layout (flat equirect + VE tools) vs preview (PSV 360°)
   // Panorama beats always use preview mode (no layout mode)
@@ -4533,60 +4551,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             </div>
           )}
 
-          {/* DialogTree Phase Navigator */}
-          {isDialogTreeBeat && (
-            <div className="border-b border-gray-200 bg-purple-50">
-              {/* Header with expand/collapse */}
-              <button
-                onClick={() => setPhasesExpanded(!phasesExpanded)}
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-purple-700 hover:bg-purple-100 transition-colors"
-              >
-                {phasesExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-                <MessageSquare className="w-4 h-4" />
-                <span>Dialog Phases ({flattenedPhases.length})</span>
-              </button>
-
-              {/* Phase tree list */}
-              {phasesExpanded && (
-                <div className="px-2 pb-2 max-h-48 overflow-y-auto">
-                  {flattenedPhases.map((phase, index) => (
-                    <button
-                      key={phase.id}
-                      onClick={() => handlePhaseSelect(phase.id)}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                        selectedPhaseId === phase.id
-                          ? 'bg-purple-200 text-purple-900 ring-1 ring-purple-400'
-                          : 'hover:bg-purple-100 text-purple-800'
-                      }`}
-                      style={{ paddingLeft: `${8 + phase.depth * 12}px` }}
-                      title={phase.fullText}
-                    >
-                      <div className="flex items-start gap-1">
-                        <span className="text-purple-500 font-medium shrink-0">
-                          {index + 1}.
-                        </span>
-                        <div className="min-w-0">
-                          {phase.choiceText && (
-                            <div className="text-purple-400 text-[10px] truncate">
-                              [{phase.choiceText}] →
-                            </div>
-                          )}
-                          <div className="truncate">
-                            <span className="font-medium">{phase.speaker}:</span>{' '}
-                            {phase.text}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Legacy left-side "Dialog Phases" panel removed (v0.9.63).
+              Phase navigation lives on the canvas now: a breadcrumb
+              shows the current node path, and clicking a choice button
+              in the responsive preview steps into its nested dialog.
+              Inspector's DialogTreeEditor keeps its Walk button so
+              both sides can drive dialogTreeNodePath. selectedPhaseId
+              is now derived from dialogTreeNodePath so phaseOverrides
+              continues to key per-phase without a separate UI. */}
 
           {/* EndScreen Credits Phase Navigator */}
           {isEndScreenWithCredits && (
@@ -5381,8 +5353,73 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Main Visual Editor Canvas */}
-      <div className="flex-1 overflow-hidden relative">
+      {/* Canvas column — wraps the breadcrumb bar (above) + the canvas
+          (below) in a flex column so the breadcrumb stretches the full
+          canvas width without breaking the outer flex-row layout. */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* DialogTree breadcrumb — above the canvas, full width. Replaces
+            the legacy left-side "Dialog Phases" panel. Always visible for
+            dialogTree beats (shows "Root" at empty path); each segment is
+            a clickable button that truncates the path back to that depth.
+            Walks go through dialogTreeNodePath, which also drives the
+            Inspector's tree highlight via the asaps:dialogTreeWalkChanged
+            event — so clicking here keeps the Inspector in sync. */}
+        {(beat?.type === 'dialogTree' || beat?.type === 'aiDialogTree') && (() => {
+          const tree = (beat?.getParameters?.() as any)?.dialogTree;
+          const labels: Array<{ idx: number; label: string }> = [];
+          let cur = tree;
+          for (let i = 0; i < dialogTreeNodePath.length; i++) {
+            const id = dialogTreeNodePath[i];
+            const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
+            if (!choice) break;
+            labels.push({ idx: i, label: choice.text || choice.id });
+            cur = choice.dialogNode;
+          }
+          return (
+            <div className="shrink-0 flex items-center gap-2 px-5 py-3 bg-gradient-to-b from-slate-50 to-slate-100 border-b-2 border-slate-300 text-base overflow-x-auto shadow-sm">
+              <MessageSquare className="w-5 h-5 text-slate-500 shrink-0" />
+              <span className="text-slate-600 text-sm font-semibold uppercase tracking-wide mr-2 shrink-0">Dialog path</span>
+              <button
+                type="button"
+                onClick={() => setDialogTreeNodePath([])}
+                className={`px-3 py-1.5 rounded-md transition-colors font-medium ${
+                  labels.length === 0
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
+                }`}
+                title="Back to root node"
+              >
+                Root
+              </button>
+              {labels.map((seg, i) => {
+                const isCurrent = i === labels.length - 1;
+                return (
+                  <React.Fragment key={seg.idx}>
+                    <span className="text-slate-400 text-lg select-none">›</span>
+                    <button
+                      type="button"
+                      onClick={() => setDialogTreeNodePath(prev => prev.slice(0, seg.idx + 1))}
+                      className={`px-3 py-1.5 rounded-md transition-colors font-medium truncate max-w-[260px] ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-white text-slate-700 border border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
+                      }`}
+                      title={seg.label}
+                    >
+                      {seg.label}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+              {labels.length === 0 && (
+                <span className="text-slate-500 text-sm ml-2 italic">click a choice on the canvas to step in, or use the Inspector tree</span>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Main Visual Editor Canvas */}
+        <div className="flex-1 overflow-hidden relative">
         {isPanoramaBeat ? (
           /* Panorama Preview Mode: PSV interactive 360° viewer */
           <PanoramaPreviewSection
@@ -5559,21 +5596,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             // into; resolve labels by re-walking the tree so a rename
             // updates them automatically. Click a segment to step back
             // up to that depth (root = path index -1).
-            const dialogBreadcrumb = beat?.type === 'dialogTree' && dialogTreeNodePath.length > 0
-              ? (() => {
-                  const tree = slotPreviewParams?.dialogTree;
-                  const labels: Array<{ idx: number; label: string }> = [];
-                  let cur = tree;
-                  for (let i = 0; i < dialogTreeNodePath.length; i++) {
-                    const id = dialogTreeNodePath[i];
-                    const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
-                    if (!choice) break;
-                    labels.push({ idx: i, label: choice.text || choice.id });
-                    cur = choice.dialogNode;
-                  }
-                  return labels;
-                })()
-              : null;
+            // Breadcrumb has moved out of the canvas overlay to its
+            // own full-width bar above the canvas — see the section
+            // just before the canvas div.
             const previewInner = (
               <>
                 {slotPreviewUsesSample && (
@@ -5581,31 +5606,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     Sample body — replaced by generated content at runtime
                   </div>
                 )}
-                {dialogBreadcrumb && dialogBreadcrumb.length > 0 && (
-                  <div className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-white text-[11px] font-medium">
-                    <button
-                      type="button"
-                      onClick={() => setDialogTreeNodePath([])}
-                      className="hover:underline"
-                      title="Back to root node"
-                    >
-                      Root
-                    </button>
-                    {dialogBreadcrumb.map((seg, i) => (
-                      <React.Fragment key={seg.idx}>
-                        <span className="text-white/50">›</span>
-                        <button
-                          type="button"
-                          onClick={() => setDialogTreeNodePath(prev => prev.slice(0, seg.idx + 1))}
-                          className={`hover:underline truncate max-w-[120px] ${i === dialogBreadcrumb.length - 1 ? 'text-amber-300' : ''}`}
-                          title={seg.label}
-                        >
-                          {seg.label}
-                        </button>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                )}
+                {/* Breadcrumb moved out to a full-width bar above the
+                    canvas — see the section before the canvas div. */}
                 {isSpatialPreview ? (
                   <>
                     <SpatialFlowView
@@ -5811,11 +5813,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       || ((beat!.type === 'dialogTree' || beat!.type === 'aiDialogTree') && dialogTreeSlotTemplate))
                       ? (() => {
                           // multiChoice stores choices flat; dialogTree
-                          // nests them under dialogTree.choices (current
-                          // node — preview always uses the root node).
-                          const rawChoices = beat!.type === 'multiChoice'
-                            ? slotPreviewParams?.choices
-                            : (slotPreviewParams as any)?.dialogTree?.choices;
+                          // nests them — walk to the current node via
+                          // dialogTreeNodePath so stepping into a choice
+                          // updates the displayed buttons (and the speaker
+                          // + body, which the dialogTree case in
+                          // slotPreviewContent already walks to).
+                          let rawChoices: any;
+                          if (beat!.type === 'multiChoice') {
+                            rawChoices = slotPreviewParams?.choices;
+                          } else {
+                            const curNode = dialogNodeAt(
+                              (slotPreviewParams as any)?.dialogTree,
+                              dialogTreeNodePath,
+                            ) ?? (slotPreviewParams as any)?.dialogTree;
+                            rawChoices = curNode?.choices;
+                          }
                           const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string }> : [];
                           return cs.length > 0
                             ? cs.map((c) => ({ id: c.id, text: c.text || c.id }))
@@ -5846,7 +5858,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           : res
                       )
                     }
-                    onAction={() => { /* read-only preview — clicks inert in the editor */ }}
+                    onAction={(id?: string) => {
+                      // dialogTree: clicking a choice button in the
+                      // preview walks the canvas into that choice's
+                      // nested dialogNode (if any). Mirrors the spatial
+                      // path's Step-in behavior so authors can navigate
+                      // the tree from either side. Choices without a
+                      // dialogNode are inert (they'd be exits at runtime).
+                      if (!id || (beat!.type !== 'dialogTree' && beat!.type !== 'aiDialogTree')) return;
+                      const tree = (slotPreviewParams as any)?.dialogTree;
+                      const cur = dialogNodeAt(tree, dialogTreeNodePath);
+                      const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
+                      if (choice?.dialogNode) {
+                        setDialogTreeNodePath(prev => [...prev, id]);
+                      }
+                    }}
                   />
                   );
                 })()}
@@ -6369,6 +6395,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             }}
           />
         )}
+        </div>
       </div>
 
       {/* Asset Selection Modal */}
