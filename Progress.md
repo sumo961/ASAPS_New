@@ -1,5 +1,64 @@
 # ASAPS Modern - Progress Log
 
+## 2026-05-30: DialogTree slot-mode parity + canvas breadcrumb + HTML-export safety (v0.9.63)
+
+### Overview
+
+A consolidation release. DialogTree gets the same responsive-authoring surface MultiChoice shipped in v0.9.62 — slot-mode routing for the stacked / conversation / custom templates, slotIntent anchors reaching runtime, the 3×3 per-slot anchor picker for custom-template authoring. The legacy left-side "Dialog Phases" panel is replaced by a prominent breadcrumb above the canvas with click-anywhere-to-step-back navigation. HTML-export grows two safety surfaces: server-config-specific guidance when the fetched zip looks like HTML, and a tiered pre-export size warning (mobile devices crash around 25 MB embedded base64).
+
+### DialogTree slot-mode parity with MultiChoice
+
+- DialogTree's `layoutTemplate` field now drives slot-mode routing for stacked / conversation / custom in addition to the existing chat-* templates. Each template gets the responsive flow (SlotFlowView) via an inline slot spec (`speaker` + `text` + `actions`) — dialogTree's schema doesn't declare `layoutMode: 'slot'` itself, so each non-chat template opts in via this runtime dispatch.
+- ReactRenderer's spatial path now requires at least one choice to actually have a hotspot — previously it was firing for every dialogTree with no baked locations, returning before the slot dispatch and stranding the runtime on `SpatialFlowView`. Genuinely spatial nodes (with hotspots) still get spatial composition; flat text-choice nodes correctly reach the slot flow.
+- `DialogTreeBeat` round-trips `slotIntent` + `slotAnimations` through `getParameters` / `updateParameters` (matches `MultiChoiceBeat`).
+- The 3×3 anchor picker in `VisualPropertiesPanel` now appears for dialogTree + custom too, with a beat-type-aware slot list: dialogTree uses "Dialog" (writes slot `text`); multiChoice keeps "Question" (slot `question`). Speaker rides along on both.
+- VisualWorkspace's `dialogTreeSlotTemplate` flag engages the VE slot preview for stacked / conversation / custom on dialogTree even without hotspots. `dynamicChoices` now walks `dialogTreeNodePath` to find the current node and uses its `choices` array — stepping into a nested dialog updates the displayed buttons.
+
+### slotIntent reaches the runtime
+
+- `Beat.execute` (base class) now pushes `slotIntent` + `slotAnimations` to renderer state on every beat execution. Before this, VE previews read `beat.slotIntent` directly while the runtime read `getState('slotIntent')`, which stayed undefined — anchors set via the 3×3 picker were honored in the editor but ignored at runtime. Single fix in the base class, every beat that has slotIntent benefits.
+
+### Canvas breadcrumb (replaces left-side Dialog Phases)
+
+- Legacy left-side "Dialog Phases" panel (purple, ~50 lines of UI in VisualWorkspace) is gone.
+- New full-width breadcrumb bar above the canvas. Gradient bg, 2px border, speech-bubble icon + "DIALOG PATH" label, pill buttons with hover state, solid-blue highlight on the current segment. Stays visible for dialogTree even at root (shows "Root" + italic hint to click a choice or use the Inspector).
+- Click any segment to truncate `dialogTreeNodePath` back to that depth. The bar lives in a flex-col wrapper around the canvas so it stretches the full canvas-area width without breaking the outer flex-row layout.
+- `SlotFlowView` preview's `onAction` is no longer inert for dialogTree — clicking a choice button on the canvas walks `dialogTreeNodePath` into the choice's nested `dialogNode` (if any), mirroring the spatial-path Step-in behavior.
+- `selectedPhaseId` is kept but derived from `dialogTreeNodePath` via a new useEffect — `phaseOverrides` persistence keeps working without a parallel UI driving it. `handlePhaseSelect` stays for endScreen's main/credits tabs.
+- Inspector ↔ canvas bidirectional sync was already in place from v0.9.59 (`asaps:dialogTreeWalkChanged` / `Request` events); the canvas breadcrumb plugs into the same `dialogTreeNodePath` state, so Inspector tree expansion + node highlight follow automatically.
+
+### Conversation-layout polish (continued from v0.9.62)
+
+- Anchor reads in `SlotFlowView` (`bodyAnchor`, `actionAnchorH`) gated on `isCustom` — anchors set during a custom session no longer leak into stacked / conversation when the author switches templates. `actionAnchor.gap` and `.relativeTo` stay live across all templates because they're orthogonal layout signals.
+- Action panel in conversation mode widened: `flexBasis: clamp(200px, 34%, 380px)` (was 28%/280) so "Your name is Kim, right?" fits on a single line instead of wrapping into a 3-line button.
+- Conversation buttons size to their natural text widths (`alignItems: 'flex-end'` instead of `'stretch'`). Short text isn't stretched, long text doesn't wrap unless it genuinely doesn't fit.
+- Body card + speaker label left-align in conversation (`alignSelf: 'flex-start'`), so the NPC text sits near the stage's left padding instead of floating mid-scroller. Stacked / custom keep the centered visual-novel feel.
+- Slide-in animation on the action panel suppressed when custom-positioned — its keyframe `transform: translateY(0)` was clobbering the centering `translate(-50%, -50%)` so center-center wasn't actually centered.
+
+### HTML export safety (the deferred follow-ups from v0.9.55)
+
+**WebPlayer Content-Type guidance.** When the fetched zip's magic bytes don't match AND either the first bytes look like HTML OR `Content-Type` was `text/html`, the error includes the actual reported Content-Type and host-specific fix snippets for Netlify (`_headers`), Vercel (`vercel.json`), Apache (`.htaccess`), nginx (`types` block), and a "re-check the URL path" note for GitHub Pages / S3.
+
+**Pre-export size warning (single-file mode).** Three tiers based on the actual story-zip size (decode peaks at ~3× the zip):
+- Under 10 MB — straight through, no warning.
+- 10-25 MB — blue info banner.
+- Over 25 MB — orange warning.
+
+Empirical thresholds from web research: iPhone SE class crashes around 100 MB total page memory; Hartmut's 58 MB single-file confirmed working on desktop Safari. Banner explicitly contrasts desktop (handles 58 MB+) vs older mobile (crashes near 25 MB binary), with a one-click "Switch to Folder export" action and a "Continue with single-file" action that reuses the pre-computed zip blob (no re-zipping).
+
+### Memory captured
+
+- New project memory: **fixed mode is first-class**. Decision (2026-05-29): fixed and responsive are parallel authoring intents, NOT successor/legacy. Never label fixed as deprecated; equal VE polish for both modes. Suggested v0.9 / v1.0 / v2+ positioning; NewProjectDialog should eventually reframe as "what's your target?" instead of a binary toggle.
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualWorkspace.tsx`, `VisualPropertiesPanel.tsx`
+- `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/builder/src/export/HtmlExporter.ts`
+- `packages/player-web/src/WebPlayer.tsx`
+- `packages/renderer/src/components/SlotFlowView.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`
+- `packages/core/src/beats/Beat.ts`, `DialogTreeBeat.ts`, `MultiChoiceBeat.ts`
+
+---
+
 ## 2026-05-28: MultiChoice beat + unified layoutTemplate + responsive routing (v0.9.62)
 
 ### Overview

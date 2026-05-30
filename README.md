@@ -22,19 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.62** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.62 ships a new beat type —
-MultiChoice — and a unified `layoutTemplate` field** that subsumes the
-patchwork of presentationMode / hardcoded stacked-by-default / chat-mode
-toggles across MultiChoice + DialogTree. Five templates: stacked,
-conversation (responsive back-and-forth), chat-scroll, chat-bubble, and
-custom (3×3 anchor picker for free placement in the responsive flow).
-The renderer's slot-mode routing now treats the project's layoutMode
-flag as authoritative, so a responsive project no longer strands beats
-on the absolute path because of stale baked locations from a prior
-fixed-mode session. Legacy `presentationMode` migrates transparently
-(positioned → stacked, chat-* preserved) — existing dialogTrees render
-exactly as before.
+Current release: **v0.9.63** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.63 is a consolidation release**
+extending the v0.9.62 MultiChoice work to DialogTree: all four non-chat
+templates (stacked / conversation / custom) route through the responsive
+slot flow, slotIntent anchors set via the 3×3 picker now reach the
+runtime (single fix in `Beat.execute`), and the legacy left-side "Dialog
+Phases" panel is replaced by a prominent breadcrumb above the canvas
+with click-anywhere-to-step-back navigation. HTML export grows two
+safety surfaces: server-config-specific guidance when the fetched zip
+looks like HTML (Netlify / Vercel / Apache / nginx snippets), and a
+tiered pre-export size warning calibrated against the iPhone SE ~100 MB
+page-memory ceiling. Existing projects render exactly as before — fixed
+mode is a first-class authoring choice, not a legacy path being phased out.
 For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
