@@ -315,7 +315,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
                       {sg.label}
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-1.5">
                     {sg.beats.map(beat => (
                       <BeatTile key={beat.type} beat={beat} onDragStart={onDragStart} />
                     ))}
@@ -331,7 +331,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
             <h4 className="text-sm font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200" title="Beats in the schema not yet placed in the BeatPalette taxonomy. Update TAXONOMY in BeatPalette.tsx to give them a proper home.">
               Other
             </h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-1.5">
               {orphanBeats.map(beat => (
                 <BeatTile key={beat.type} beat={beat} onDragStart={onDragStart} />
               ))}
@@ -355,6 +355,18 @@ interface BeatTileProps {
 }
 
 const BeatTile: React.FC<BeatTileProps> = ({ beat, onDragStart }) => {
+  // Some AI beats bake a leading 🤖 into their schema icon (e.g.
+  // "🤖📝" for AI Info Text). The "AI" pill on the right already
+  // signals AI-ness, so the robot is redundant — strip it for display
+  // and let the canonical category emoji read clearly. Schema stays
+  // unchanged; this is a presentation-only normalization.
+  const displayIcon = beat.isAi
+    ? beat.icon.replace(/^🤖\s*/, '') || beat.icon
+    : beat.icon;
+  // mobileOnly metadata moves to the tooltip — it's information about
+  // what the beat USES (sensors), not what it IS, and competing with
+  // the label for horizontal space was the main reason tile names got
+  // truncated. The tooltip below carries the full context.
   return (
     <div
       className={`flex items-center gap-2 p-2 rounded-lg cursor-move transition-colors border-2 border-transparent hover:border-gray-300 ${
@@ -365,23 +377,16 @@ const BeatTile: React.FC<BeatTileProps> = ({ beat, onDragStart }) => {
       style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
       title={`${beat.name}${beat.isAi ? ' (AI-powered)' : ''}${beat.mobileOnly ? ' — requires mobile sensors at runtime' : ''}: ${beat.description}`}
     >
-      <span className="text-xl">{beat.icon}</span>
+      <span className="text-xl shrink-0">{displayIcon}</span>
       <span className="text-sm font-medium flex-1 truncate">{beat.name}</span>
-      <div className="flex items-center gap-1">
-        {beat.isAi && (
-          <span
-            className="text-[9px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-purple-200 text-purple-800"
-            title="Generates content at playback time via an AI model"
-          >
-            AI
-          </span>
-        )}
-        {beat.mobileOnly && (
-          <span title="Requires mobile sensors (GPS / indoor positioning) at runtime — desktop preview can mock the input" className="text-[11px]">
-            📱
-          </span>
-        )}
-      </div>
+      {beat.isAi && (
+        <span
+          className="text-[9px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-purple-200 text-purple-800 shrink-0"
+          title="Generates content at playback time via an AI model"
+        >
+          AI
+        </span>
+      )}
     </div>
   );
 };

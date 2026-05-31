@@ -164,7 +164,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       </div>
       
       {/* Beat Palette */}
-      <div className={`${paletteCollapsed ? 'w-12' : 'w-80'} flex-shrink-0 bg-gray-100 border-l border-gray-300 overflow-y-auto transition-all duration-300`}>
+      <div className={`${paletteCollapsed ? 'w-12' : 'w-56'} flex-shrink-0 bg-gray-100 border-l border-gray-300 overflow-y-auto transition-all duration-300`}>
         <BeatPalette 
           collapsed={paletteCollapsed}
           onToggleCollapse={onTogglePalette}
