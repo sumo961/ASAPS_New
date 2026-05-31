@@ -898,6 +898,36 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // drives the fit factor.
   const [slotScaleMode, setSlotScaleMode] = useState<'auto' | 'fit' | 'one'>('auto');
   const [slotStageSize, setSlotStageSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+
+  // Drag-to-snap for custom-template slots. When the author pointer-
+  // downs on a slot in the responsive preview AND layoutTemplate is
+  // 'custom', we track the drag; on release we snap to the nearest of
+  // the 9 anchor zones and write slotIntent. The 3×3 grid overlay is
+  // only visible during the drag.
+  type SlotDrag = {
+    slotName: string;
+    stageRect: DOMRect;
+    pointerX: number;
+    pointerY: number;
+  };
+  const [slotDrag, setSlotDrag] = useState<SlotDrag | null>(null);
+  const slotIntentRef = useRef<Record<string, any> | undefined>(undefined);
+
+  // Snap a pointer position (in stage coords) to its 3×3 zone.
+  const snapPointerToZone = useCallback((x: number, y: number, stageRect: DOMRect): {
+    h: 'left' | 'center' | 'right';
+    v: 'top' | 'middle' | 'bottom';
+    col: number;
+    row: number;
+  } => {
+    const colW = stageRect.width / 3;
+    const rowH = stageRect.height / 3;
+    const col = Math.max(0, Math.min(2, Math.floor(x / colW)));
+    const row = Math.max(0, Math.min(2, Math.floor(y / rowH)));
+    const h = (['left', 'center', 'right'] as const)[col];
+    const v = (['top', 'middle', 'bottom'] as const)[row];
+    return { h, v, col, row };
+  }, []);
   const slotStageRoRef = useRef<ResizeObserver | null>(null);
   // Callback ref: (dis)connects a ResizeObserver as the preview container
   // mounts/unmounts — no dependency on later-declared state (TDZ-safe) and
@@ -1543,6 +1573,150 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // correct and cheap.
   const slotPreviewParams =
     isSlotPreview && beat ? beat.getParameters() : undefined;
+
+  // Drag-to-snap: attach pointerdown handlers to body + action slot DOM
+  // elements when slot preview is active and layoutTemplate is 'custom'.
+  // Speaker is intentionally not draggable (rides along with body).
+  // Re-runs when the slot preview re-mounts (key changes), the template
+  // flips, or the beat changes.
+  const customDragActive =
+    isSlotPreview && slotPreviewParams?.layoutTemplate === 'custom' &&
+    !!onSlotIntentChange;
+  useEffect(() => {
+    if (!customDragActive) return;
+    // Slot elements come and go inside SlotFlowView (the action panel
+    // returns null while the read-gate is unearned after a body-text
+    // change — typical right after a step-in walk). A one-shot query
+    // misses panels that mount later. We attach idempotently via a
+    // WeakSet, and re-scan via a MutationObserver on the stage.
+    const cleanups: Array<() => void> = [];
+    const DRAG_THRESHOLD = 5; // px — distinguishes drag from a button click
+    const attached = new WeakSet<HTMLElement>();
+    const stage = document.querySelector('[data-slotflow-stage]') as HTMLElement | null;
+    if (!stage) return;
+
+    const attachToSlot = (slot: HTMLElement) => {
+      if (attached.has(slot)) return;
+      const slotName = slot.getAttribute('data-slotflow-slot');
+      if (!slotName || slotName === 'speaker') return;
+      attached.add(slot);
+      // Pending drag: pointer-downed but not yet moved past the threshold.
+      // We DON'T preventDefault / stopPropagation here so a quick click
+      // (no movement) still passes through to the button's onClick
+      // (which step-ins into the dialog node). Only once movement
+      // crosses the threshold do we activate the drag.
+      let pending: { x: number; y: number; stage: HTMLElement } | null = null;
+      const onDown = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        // Stage rect comes from the marked SlotFlowView wrapper
+        // (data-slotflow-stage), not the slot's offsetParent — the
+        // latter shifts when the body scroller becomes positioned
+        // (after an anchor is set on the body), making the body's
+        // drag overlay rect a sub-rectangle of the action panel's.
+        const st = (slot.closest('[data-slotflow-stage]') as HTMLElement | null);
+        if (!st) return;
+        pending = { x: e.clientX, y: e.clientY, stage: st };
+      };
+      const onMoveThreshold = (e: PointerEvent) => {
+        if (!pending) return;
+        const dx = e.clientX - pending.x;
+        const dy = e.clientY - pending.y;
+        if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
+        const st = pending.stage;
+        pending = null;
+        setSlotDrag({
+          slotName,
+          stageRect: st.getBoundingClientRect(),
+          pointerX: e.clientX,
+          pointerY: e.clientY,
+        });
+      };
+      const onUpClear = () => { pending = null; };
+      slot.addEventListener('pointerdown', onDown);
+      document.addEventListener('pointermove', onMoveThreshold);
+      document.addEventListener('pointerup', onUpClear);
+      const prevCursor = slot.style.cursor;
+      slot.style.cursor = 'grab';
+      cleanups.push(() => {
+        slot.removeEventListener('pointerdown', onDown);
+        document.removeEventListener('pointermove', onMoveThreshold);
+        document.removeEventListener('pointerup', onUpClear);
+        slot.style.cursor = prevCursor;
+      });
+    };
+
+    // Initial scan.
+    stage.querySelectorAll<HTMLElement>('[data-slotflow-slot]').forEach(attachToSlot);
+
+    // Re-scan whenever the stage subtree mutates. Catches the action
+    // panel re-mounting after the read-gate fires post-step-in. We
+    // gate the observer callback on whether a drag is in flight —
+    // during a drag the slot DOM is stable (just style updates we
+    // already track), and the live-preview re-renders can fire dozens
+    // of mutation events per frame, which froze the page on long
+    // drags before this guard.
+    const observer = new MutationObserver(() => {
+      if (slotDragRef.current) return;
+      stage.querySelectorAll<HTMLElement>('[data-slotflow-slot]').forEach(attachToSlot);
+    });
+    observer.observe(stage, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      cleanups.forEach(c => c());
+    };
+  }, [customDragActive, beat?.id, beat?.type, slotPreviewParams?.layoutTemplate, dialogTreeNodePath]);
+
+  // Global pointer tracking during an active drag. Move updates the
+  // overlay + the live-preview anchor; up snaps and commits the anchor.
+  //
+  // Two performance guards:
+  //   • rAF-throttle pointermove so we update React state at most once
+  //     per frame. Without this, a fast pointer move fires dozens of
+  //     events per frame, each forcing a SlotFlowView re-render with a
+  //     new previewSlotIntent — easily enough to choke the main thread
+  //     into a "page unresponsive" dialog.
+  //   • Deps key off slotDrag's *identity*, not its values — slotDrag
+  //     null vs non-null. The pointermove closure reads through a ref
+  //     so it always sees the latest stageRect / slotName without
+  //     forcing the effect to re-attach listeners on every frame.
+  const slotDragRef = useRef<SlotDrag | null>(null);
+  useEffect(() => {
+    slotDragRef.current = slotDrag;
+  }, [slotDrag]);
+  const slotDragActive = !!slotDrag;
+  useEffect(() => {
+    if (!slotDragActive || !onSlotIntentChange) return;
+    let raf = 0;
+    let nextX = 0;
+    let nextY = 0;
+    const flush = () => {
+      raf = 0;
+      setSlotDrag(prev => prev ? { ...prev, pointerX: nextX, pointerY: nextY } : null);
+    };
+    const onMove = (e: PointerEvent) => {
+      nextX = e.clientX;
+      nextY = e.clientY;
+      if (!raf) raf = requestAnimationFrame(flush);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      const cur = slotDragRef.current;
+      if (!cur) return;
+      const x = e.clientX - cur.stageRect.left;
+      const y = e.clientY - cur.stageRect.top;
+      const { h, v } = snapPointerToZone(x, y, cur.stageRect);
+      onSlotIntentChange(cur.slotName, { anchor: { h, v } });
+      setSlotDrag(null);
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+  }, [slotDragActive, onSlotIntentChange, snapPointerToZone]);
   // Bug 27 — speaker visibility for the VE slot preview, mirroring the
   // runtime's resolveSpeakerForSlot. Beat-level showSpeaker wins;
   // otherwise the global theme.speakerDisplay.showNames flag decides.
@@ -5573,7 +5747,22 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             };
             // 3d-4 — live gap while dragging the action grip (uncommitted).
             const liveGap = slotGapDrag ? slotGapDrag.gap : anchorGap;
-            const previewSlotIntent =
+            // Drag-to-snap live preview: while the author drags a slot,
+            // splice the current snap zone into the slot's anchor so
+            // SlotFlowView re-renders the slot at the prospective new
+            // position on every pointer move. Release commits via
+            // onSlotIntentChange (no double-write here).
+            const dragLivePatch: Record<string, any> = {};
+            if (slotDrag) {
+              const sx = slotDrag.pointerX - slotDrag.stageRect.left;
+              const sy = slotDrag.pointerY - slotDrag.stageRect.top;
+              const { h: dh, v: dv } = snapPointerToZone(sx, sy, slotDrag.stageRect);
+              dragLivePatch[slotDrag.slotName] = {
+                ...(curIntent[slotDrag.slotName] ?? {}),
+                anchor: { h: dh, v: dv },
+              };
+            }
+            const baseIntent =
               slotGapDrag && actionSlotName
                 ? {
                     ...curIntent,
@@ -5588,7 +5777,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       },
                     },
                   }
-                : slotPreviewParams?.slotIntent;
+                : (slotPreviewParams?.slotIntent ?? curIntent);
+            const previewSlotIntent = slotDrag
+              ? { ...baseIntent, ...dragLivePatch }
+              : baseIntent;
             // The faithful preview contents — defined once, hosted by either
             // the scaled fixed-device rect or the editor-fill wrapper.
             // P3-3c-12 — breadcrumb of the current dialogTree node path.
@@ -5802,6 +5994,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     beatType={beat!.type}
                     slots={slotSpec}
                     content={slotPreviewContent}
+                    // Editor preview opts out of the read-gate: at
+                    // runtime the action panel hides until the player
+                    // has read the body, but in the editor we always
+                    // want everything visible (including for slot
+                    // drag-to-snap, which needs the panel mounted so
+                    // its DOM node can carry pointer handlers). Without
+                    // this, the action panel returned null between a
+                    // body-text change and the gate firing, leaving
+                    // post-step-in dialogTree levels un-draggable.
+                    requireFullRead={false}
                     theme={renderTheme ?? undefined}
                     backgroundUrl={backgroundUrl || null}
                     backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
@@ -6276,6 +6478,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     >
                       <div
                         className="relative bg-black shadow-xl ring-2 ring-amber-400/80"
+                        data-slotflow-stage="true"
                         style={{
                           width: devW,
                           height: devH,
@@ -6288,7 +6491,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     </div>
                   ) : (
                     // "Editor" preset — fill the area, truly responsive to it.
-                    <div className="relative w-full h-full bg-black shadow-xl ring-2 ring-amber-400/80">
+                    <div className="relative w-full h-full bg-black shadow-xl ring-2 ring-amber-400/80" data-slotflow-stage="true">
                       {previewInner}
                     </div>
                   )}
@@ -6397,6 +6600,59 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         )}
         </div>
       </div>
+
+      {/* Drag-to-snap overlay — faint 3×3 zone grid positioned over
+          the SlotFlowView stage during an active custom-template slot
+          drag. The slot itself now visibly moves to the live zone
+          (previewSlotIntent splices in the snap target), so the
+          overlay just hints at the snap grid without an active-cell
+          highlight + a small zone label at the top so the author knows
+          where it'll land. */}
+      {slotDrag && (() => {
+        const { stageRect, pointerX, pointerY } = slotDrag;
+        const x = pointerX - stageRect.left;
+        const y = pointerY - stageRect.top;
+        const { h, v } = snapPointerToZone(x, y, stageRect);
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left: stageRect.left,
+              top: stageRect.top,
+              width: stageRect.width,
+              height: stageRect.height,
+              pointerEvents: 'none',
+              zIndex: 9999,
+              backgroundImage:
+                'linear-gradient(to right, rgba(59,130,246,0.5) 1px, transparent 1px),' +
+                'linear-gradient(to bottom, rgba(59,130,246,0.5) 1px, transparent 1px)',
+              backgroundSize: `${stageRect.width / 3}px ${stageRect.height / 3}px`,
+              backgroundPosition: '0 0',
+              boxShadow: 'inset 0 0 0 2px rgba(59,130,246,0.3)',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 8,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                padding: '6px 14px',
+                borderRadius: 999,
+                background: 'rgba(59,130,246,0.95)',
+                color: 'white',
+                fontWeight: 600,
+                fontSize: 13,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              }}
+            >
+              {v} · {h}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Asset Selection Modal */}
       <AssetSelectionModal
