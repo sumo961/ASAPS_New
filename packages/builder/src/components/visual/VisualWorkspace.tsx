@@ -4828,7 +4828,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 elements={visualElements}
                 selectedElements={selectedElementIds}
                 onBackgroundSelect={handleBackgroundSelect}
-                onElementSelect={(id: string | null) => setSelectedElementIds(id ? [id] : [])}
+                onElementSelect={(id: string | null) => {
+                  // Selection is exclusive across the panel: choosing an
+                  // element clears any expanded slot row, and vice versa
+                  // (see onExpandedSlotKeyChange below). One thing
+                  // highlighted at a time.
+                  setSelectedElementIds(id ? [id] : []);
+                  if (id) setExpandedSlotKey(null);
+                }}
                 onElementUpdate={(elementId, updates) => {
                   // Capture snapshot for undo before first property change
                   if (!snapshotRef.current) {
@@ -5359,7 +5366,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 })()}
                 slotResolutions={slotResolutions}
                 expandedSlotKey={expandedSlotKey}
-                onExpandedSlotKeyChange={setExpandedSlotKey}
+                onExpandedSlotKeyChange={(next) => {
+                  setExpandedSlotKey(next);
+                  // Selection is exclusive — expanding a slot row clears
+                  // any selected free-positioned element.
+                  if (next) setSelectedElementIds([]);
+                }}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||

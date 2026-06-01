@@ -356,11 +356,12 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
       style={{
         position: 'absolute',
         inset: 0,
-        // Sprites should never block clicks on choices / buttons at
-        // runtime — the sprite layer is purely visual. In editor mode
-        // individual sprites override this to 'auto' so the author can
-        // click to select.
-        pointerEvents: editorMode ? 'auto' : 'none',
+        // The CONTAINER is always click-through. Sprites individually
+        // opt back in (pointerEvents: 'auto') when editorMode is on.
+        // Keeping the container 'none' is what lets clicks on the
+        // EMPTY area between sprites fall through to the slot content
+        // (title / body cards) sitting underneath at z 1.
+        pointerEvents: 'none',
         // Sits ABOVE the spatial image (which is at z 0) but BELOW
         // the flow text / buttons (SlotFlowView's anchored buttons
         // render at z 4). In spatial mode the imgInsets wrapper
