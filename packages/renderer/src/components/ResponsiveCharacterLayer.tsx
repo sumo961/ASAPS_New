@@ -60,6 +60,16 @@ export interface ResponsiveCharacterLayerProps {
    *  size the sprite by `frameWidth × frameHeight` and use background-
    *  image to crop to the first frame. */
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
+  /** Editor mode — when true, sprites become clickable so the host
+   *  Visual Editor can select an element from the stage. Selected
+   *  sprite renders with a yellow outline. Runtime mode (the default)
+   *  keeps sprites click-through. */
+  editorMode?: boolean;
+  /** Currently-selected element id (location.name). Lights up that
+   *  sprite's outline. */
+  selectedElementName?: string;
+  /** Fired when the author clicks a sprite in editor mode. */
+  onElementSelect?: (locationName: string) => void;
 }
 
 interface AnimatedPosition {
@@ -88,6 +98,9 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
   characterResolver,
   assetResolver,
   spriteDataResolver,
+  editorMode,
+  selectedElementName,
+  onElementSelect,
 }, ref) => {
   // Animated-position map, keyed by location.name (which legacy
   // AnimationPath.elementId matches against).
@@ -343,9 +356,11 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
       style={{
         position: 'absolute',
         inset: 0,
-        // Sprites should never block clicks on choices / buttons; the
-        // sprite layer is purely visual.
-        pointerEvents: 'none',
+        // Sprites should never block clicks on choices / buttons at
+        // runtime — the sprite layer is purely visual. In editor mode
+        // individual sprites override this to 'auto' so the author can
+        // click to select.
+        pointerEvents: editorMode ? 'auto' : 'none',
         // Sits ABOVE the spatial image (which is at z 0) but BELOW
         // the flow text / buttons (SlotFlowView's anchored buttons
         // render at z 4). In spatial mode the imgInsets wrapper
@@ -454,6 +469,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         if (animPos?.flipX) transformParts.push('scaleX(-1)');
         const transform = transformParts.length ? transformParts.join(' ') : undefined;
 
+        const isSelected = !!editorMode && selectedElementName === loc.name;
         const commonStyle: React.CSSProperties = {
           position: 'absolute',
           left: x,
@@ -464,7 +480,22 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           transform,
           transformOrigin: 'center center',
           imageRendering: 'pixelated',
+          // In editor mode, individual sprites accept clicks so the
+          // author can select them. The yellow outline marks the
+          // currently-selected element — matches the existing
+          // ring-amber-400 stage frame in VisualWorkspace so the
+          // selection feels consistent with the rest of the editor.
+          pointerEvents: editorMode ? 'auto' : undefined,
+          cursor: editorMode ? 'pointer' : undefined,
+          outline: isSelected ? '2px solid #fbbf24' : undefined,
+          outlineOffset: isSelected ? 2 : undefined,
         };
+        const handleEditorClick = editorMode && onElementSelect
+          ? (e: React.MouseEvent) => {
+              e.stopPropagation();
+              onElementSelect(loc.name);
+            }
+          : undefined;
 
         if (useSprite) {
           // When the sprite sheet is smaller/larger than the visual
@@ -482,6 +513,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
             <div
               key={loc.id ?? `${loc.name}-${idx}`}
               data-character-name={loc.name}
+              onClick={handleEditorClick}
               style={{
                 ...commonStyle,
                 backgroundImage: `url(${url})`,
@@ -499,6 +531,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
             src={url}
             alt=""
             draggable={false}
+            onClick={handleEditorClick}
             style={commonStyle}
           />
         );

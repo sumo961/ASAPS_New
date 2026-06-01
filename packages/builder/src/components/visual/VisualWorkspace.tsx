@@ -5985,6 +5985,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           animations: ss.animations,
                         };
                       }}
+                      // Editor selection: clicking a sprite on the
+                      // stage selects the matching element in the left
+                      // panel + highlights the sprite in yellow.
+                      editorMode={true}
+                      selectedElementName={(() => {
+                        if (selectedElementIds.length !== 1) return undefined;
+                        const el = visualElements.find(e => e.id === selectedElementIds[0]);
+                        return el?.name;
+                      })()}
+                      onElementSelect={(locationName) => {
+                        const el = visualElements.find(e => e.name === locationName);
+                        if (el) setSelectedElementIds([el.id]);
+                      }}
                     />
                     {/* P3-3c-3 — interactive hotspot editor overlay. Only for
                         movementChoice in spatial mode; sits above the read-only

@@ -91,6 +91,10 @@ interface SpatialFlowViewProps {
   characterResolver?: (characterId: string, stateId?: string) => string | undefined;
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
+  /** Editor-only: makes free-positioned sprites clickable for selection. */
+  editorMode?: boolean;
+  selectedElementName?: string;
+  onElementSelect?: (locationName: string) => void;
   /** Same timer hookup as SlotFlowView — see notes there. */
   timerState?: {
     totalTime: number;
@@ -251,6 +255,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   characterResolver,
   assetResolver,
   spriteDataResolver,
+  editorMode,
+  selectedElementName,
+  onElementSelect,
   timerState: initialTimerState,
   onSubscribeTimerState,
 }) => {
@@ -893,6 +900,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
             characterResolver={characterResolver}
             assetResolver={assetResolver}
             spriteDataResolver={spriteDataResolver}
+            editorMode={editorMode}
+            selectedElementName={selectedElementName}
+            onElementSelect={onElementSelect}
           />
         </div>
       )}
