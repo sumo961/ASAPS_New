@@ -438,10 +438,19 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         const visualW = useSprite ? frameW * stageScale : w;
         const visualH = useSprite ? frameH * stageScale : h;
 
-        // Common transform — scale / rotate / flip per animation state.
+        // Common transform — scale / rotate / flip.
+        // Authored static values come from the element itself
+        // (`loc.size` is a 10–200 scale percent like ASML; `loc.rotation`
+        // is degrees). Animation waypoints OVERRIDE these when set
+        // (so an explicit `scale: 2` waypoint wins over an authored
+        // size of 100%), matching the absolute renderer's behaviour.
+        const authoredScale = typeof loc.size === 'number' && loc.size > 0 ? loc.size / 100 : 1;
+        const authoredRot = typeof loc.rotation === 'number' ? loc.rotation : 0;
+        const effectiveScale = animPos?.scale != null ? animPos.scale : authoredScale;
+        const effectiveRot = animPos?.rotation != null ? animPos.rotation : authoredRot;
         const transformParts: string[] = [];
-        if (animPos?.scale != null) transformParts.push(`scale(${animPos.scale})`);
-        if (animPos?.rotation != null) transformParts.push(`rotate(${animPos.rotation}deg)`);
+        if (effectiveScale !== 1) transformParts.push(`scale(${effectiveScale})`);
+        if (effectiveRot !== 0) transformParts.push(`rotate(${effectiveRot}deg)`);
         if (animPos?.flipX) transformParts.push('scaleX(-1)');
         const transform = transformParts.length ? transformParts.join(' ') : undefined;
 
