@@ -1173,13 +1173,18 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   represents a piece of slot content on stage AND owns the
                   per-slot intent controls (lines, anchor, pin). Click a
                   row to expand its controls inline. Text values are still
-                  edited in the right Inspector. */}
+                  edited in the right Inspector.
+
+                  Action button rows + the shared "Action layout" group are
+                  visually wrapped together so it's obvious which buttons
+                  the placement controls govern. */}
               {slotRows.length > 0 && (
                 <div className="space-y-1 mb-2">
                   <div className="text-[10px] uppercase tracking-wide text-blue-600 font-medium px-1">
                     On stage (from slots)
                   </div>
-                  {slotRows.map(row => {
+                  {/* Non-action slot rows render in document order first. */}
+                  {slotRows.filter(r => r.role !== 'action').map(row => {
                     const expanded = expandedSlotKey === row.key;
                     const res = resolutionForSlot(row.slotName);
                     const slotEntry = (slotIntent?.[row.slotName] ?? {}) as Record<string, any>;
@@ -1363,12 +1368,13 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       </div>
                     );
                   })}
-                  {/* Action layout — shared placement controls for the
-                      whole action slot (where the button row sits, its
-                      horizontal alignment, and the gap between siblings).
-                      Lives once at the end of the slot rows rather than
-                      duplicated per button. */}
+                  {/* Action slot group: button rows + their shared
+                      placement controls inside one bordered container.
+                      Makes it visually clear that "Action layout" governs
+                      the buttons listed above it. */}
                   {actionSlotName && (() => {
+                    const actionRows = slotRows.filter(r => r.role === 'action');
+                    if (actionRows.length === 0) return null;
                     const slotEntry = (slotIntent?.[actionSlotName] ?? {}) as Record<string, any>;
                     const anchor = (slotEntry.anchor ?? {}) as Record<string, any>;
                     const anchorMode: 'bottom' | 'belowBody' =
@@ -1376,9 +1382,123 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     const anchorH = (anchor.h ?? 'center') as 'left' | 'center' | 'right';
                     const anchorGap = typeof anchor.gap === 'number' ? anchor.gap : 16;
                     return (
-                      <div className="mt-1 px-3 py-2 rounded border border-blue-200 bg-blue-50/40 space-y-2">
+                      <div className="mt-1 rounded border border-blue-300 bg-blue-50/30 p-1.5 space-y-1">
+                        <div className="text-[10px] uppercase tracking-wide text-blue-700 font-medium px-1 pt-0.5">
+                          Action slot
+                        </div>
+                        {/* Render each action button row inside the group. */}
+                        {actionRows.map(row => {
+                          const expanded = expandedSlotKey === row.key;
+                          const res = resolutionForSlot(row.slotName);
+                          const slotEntry = (slotIntent?.[row.slotName] ?? {}) as Record<string, any>;
+                          return (
+                            <div
+                              key={row.key}
+                              className={`rounded border ${expanded ? 'border-blue-400 bg-blue-50' : 'border-blue-200 bg-white/80'}`}
+                            >
+                              <button
+                                type="button"
+                                className="w-full text-left p-2"
+                                title={row.tooltip}
+                                onClick={() => setExpandedSlotKey(expanded ? null : row.key)}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-blue-600 opacity-60 text-xs w-3 flex-shrink-0">
+                                    {expanded ? '▼' : '▶'}
+                                  </span>
+                                  {row.icon}
+                                  <span className="text-sm font-medium truncate">{row.label}</span>
+                                  <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-medium flex-shrink-0">
+                                    slot
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-600 mt-0.5 truncate pl-6" title={row.preview}>
+                                  {row.preview}
+                                </div>
+                              </button>
+                              {expanded && row.buttonId && (() => {
+                                const buttonAnchors = (slotEntry.buttonAnchors ?? {}) as Record<string, any>;
+                                const cur = buttonAnchors[row.buttonId];
+                                type PinPreset = 'row' | 'bl' | 'bc' | 'br' | 'tl' | 'tr';
+                                const presets: Array<{ key: PinPreset; title: string; glyph: string }> = [
+                                  { key: 'row', title: 'In shared row', glyph: '—' },
+                                  { key: 'tl', title: 'Top-left',      glyph: '⌜' },
+                                  { key: 'tr', title: 'Top-right',     glyph: '⌝' },
+                                  { key: 'bl', title: 'Bottom-left',   glyph: '⌞' },
+                                  { key: 'bc', title: 'Bottom-center', glyph: '⎵' },
+                                  { key: 'br', title: 'Bottom-right',  glyph: '⌟' },
+                                ];
+                                const currentKey: PinPreset = !cur
+                                  ? 'row'
+                                  : cur.v === 'top' && cur.h === 'left' ? 'tl'
+                                  : cur.v === 'top' && cur.h === 'right' ? 'tr'
+                                  : cur.h === 'left' ? 'bl'
+                                  : cur.h === 'right' ? 'br'
+                                  : 'bc';
+                                const applyPreset = (k: PinPreset) => {
+                                  if (k === 'row') return setButtonAnchorIntent(row.slotName, row.buttonId!, null);
+                                  const map: Record<Exclude<PinPreset, 'row'>, Record<string, any>> = {
+                                    tl: { h: 'left',   v: 'top',    relativeTo: 'stage' },
+                                    tr: { h: 'right',  v: 'top',    relativeTo: 'stage' },
+                                    bl: { h: 'left',   v: 'bottom', relativeTo: 'stage' },
+                                    bc: { h: 'center', v: 'bottom', relativeTo: 'stage' },
+                                    br: { h: 'right',  v: 'bottom', relativeTo: 'stage' },
+                                  };
+                                  setButtonAnchorIntent(row.slotName, row.buttonId!, { ...map[k], gap: cur?.gap ?? 16 });
+                                };
+                                return (
+                                  <div className="px-3 pb-2.5 pt-1 border-t border-blue-200/60 space-y-2">
+                                    <div className="flex items-center gap-1 text-xs text-gray-700">
+                                      <span className="opacity-70">Pin</span>
+                                      <div className="flex rounded overflow-hidden border border-gray-300">
+                                        {presets.map(p => (
+                                          <button
+                                            key={p.key}
+                                            type="button"
+                                            onClick={() => applyPreset(p.key)}
+                                            title={p.title}
+                                            className={`px-2 py-1 text-sm leading-none ${
+                                              currentKey === p.key
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-white hover:bg-gray-50 text-gray-700'
+                                            }`}
+                                          >
+                                            {p.glyph}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    {cur && (
+                                      <div className="flex items-center gap-2 text-xs text-gray-700">
+                                        <span className="opacity-70">Gap</span>
+                                        <input
+                                          type="range"
+                                          min={0}
+                                          max={64}
+                                          step={4}
+                                          value={typeof cur.gap === 'number' ? cur.gap : 16}
+                                          onChange={e => setButtonAnchorIntent(row.slotName, row.buttonId!, { gap: parseInt(e.target.value, 10) || 0 })}
+                                          className="flex-1"
+                                          title={`${cur.gap ?? 16}px`}
+                                        />
+                                        <span className="w-8 tabular-nums text-right opacity-70">{cur.gap ?? 16}px</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          );
+                        })}
+                        {/* Layout sub-section — the connector visually
+                            between the buttons (above) and these controls
+                            ("applies to ↑ buttons above"). */}
+                        <div className="rounded border border-blue-300 bg-white/70 px-2.5 py-2 space-y-2 mt-1">
                         <div className="text-[10px] uppercase tracking-wide text-blue-600 font-medium">
                           Action layout
+                          <span className="ml-1 opacity-60 normal-case font-normal text-gray-600">
+                            applies to the button{actionRows.length === 1 ? '' : 's'} above
+                          </span>
                         </div>
                         <div className="flex items-center gap-1 text-xs text-gray-700">
                           <span className="opacity-70 w-12">Where</span>
@@ -1429,6 +1549,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             title={`${anchorGap}px`}
                           />
                           <span className="w-8 tabular-nums text-right opacity-70">{anchorGap}px</span>
+                        </div>
                         </div>
                       </div>
                     );
@@ -1657,9 +1778,108 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   const effectiveX = selected.x + (selected.width - effectiveWidth) / 2;
                   const effectiveY = selected.y + (selected.height - effectiveHeight) / 2;
 
+                  // Character / prop free-positioned elements use
+                  // percentage in any project (the runtime always reads
+                  // xPercent/yPercent first; pixel x/y is the fallback for
+                  // pre-migration data). So percentage controls are the
+                  // canonical authoring surface for these element types
+                  // regardless of the per-instance layoutMode.
+                  const isFreePositioned = selected.type === 'character' || selected.type === 'prop';
                   return (
                     <>
-                      {layoutMode === 'absolute' ? (
+                      {isFreePositioned ? (
+                        // Free-positioned characters/props: percentage
+                        // position is canonical (runtime reads xPercent/
+                        // yPercent first; the pixel x/y stays populated
+                        // as a fallback for pre-migration data and absolute
+                        // mode). Slot content (title/body/buttons) is
+                        // anchor-managed in the left panel's slot rows.
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Position
+                            <span className="ml-1 text-gray-500 font-normal">
+                              · % of stage
+                            </span>
+                          </label>
+                          {(() => {
+                            const stageW = stageWidth || 1024;
+                            const stageH = stageHeight || 768;
+                            // Read xPercent if set, else derive from pixel x.
+                            const xPct = typeof (selected as any).xPercent === 'number'
+                              ? (selected as any).xPercent as number
+                              : (selected.x / stageW) * 100;
+                            const yPct = typeof (selected as any).yPercent === 'number'
+                              ? (selected as any).yPercent as number
+                              : (selected.y / stageH) * 100;
+                            const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+                            const updateXPct = (v: number) => {
+                              const next = clamp(v, 0, 100);
+                              onElementUpdate(selected.id, {
+                                xPercent: next,
+                                // Keep pixel x in sync as a fallback.
+                                x: Math.round((next / 100) * stageW),
+                              } as any);
+                            };
+                            const updateYPct = (v: number) => {
+                              const next = clamp(v, 0, 100);
+                              onElementUpdate(selected.id, {
+                                yPercent: next,
+                                y: Math.round((next / 100) * stageH),
+                              } as any);
+                            };
+                            return (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-xs text-gray-600">X %</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={xPct}
+                                      onChange={(e) => updateXPct(parseFloat(e.target.value))}
+                                      className="flex-1"
+                                    />
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={Math.round(xPct * 10) / 10}
+                                      onChange={(e) => updateXPct(parseFloat(e.target.value) || 0)}
+                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-600">Y %</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={yPct}
+                                      onChange={(e) => updateYPct(parseFloat(e.target.value))}
+                                      className="flex-1"
+                                    />
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      step={0.5}
+                                      value={Math.round(yPct * 10) / 10}
+                                      onChange={(e) => updateYPct(parseFloat(e.target.value) || 0)}
+                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : layoutMode === 'absolute' ? (
                         <div>
                           <label className="text-xs font-medium text-gray-700 mb-1 block">
                             Position
@@ -1672,7 +1892,6 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 value={Math.round(effectiveX)}
                                 onChange={(e) => {
                                   const newEffectiveX = parseInt(e.target.value) || 0;
-                                  // Convert effective X back to base X
                                   const baseX = newEffectiveX - (selected.width - effectiveWidth) / 2;
                                   onElementUpdate(selected.id, { x: Math.round(baseX) });
                                 }}
@@ -1686,7 +1905,6 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 value={Math.round(effectiveY)}
                                 onChange={(e) => {
                                   const newEffectiveY = parseInt(e.target.value) || 0;
-                                  // Convert effective Y back to base Y
                                   const baseY = newEffectiveY - (selected.height - effectiveHeight) / 2;
                                   onElementUpdate(selected.id, { y: Math.round(baseY) });
                                 }}
@@ -1696,14 +1914,12 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           </div>
                         </div>
                       ) : (
-                        // Slot / spatial: position is engine/anchor-managed
-                        // (the layout engine resolves it from the slot's
-                        // role + slotIntent.anchor). Pixel X/Y is meaningless
-                        // here and was previously misleading. Size/Scale/
-                        // Rotation are element-intrinsic and STAY visible.
+                        // Other slot/spatial elements (text/dialog/button)
+                        // are anchored by the slot system itself; pixel
+                        // position would be misleading.
                         <div className="text-xs text-gray-500 italic px-1 py-1.5 rounded bg-gray-50 border border-dashed border-gray-300">
                           Position is managed by the {layoutMode === 'spatial' ? 'spatial' : 'slot'} layout.
-                          Edit anchor / preferred lines in the right-side panel or on the preview.
+                          Edit anchor / preferred lines in the left panel's slot rows.
                         </div>
                       )}
 
