@@ -1923,44 +1923,136 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         </div>
                       )}
 
-                      {/* Size - shows effective size accounting for scale */}
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">
-                          Size
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-xs text-gray-600">Width</label>
-                            <input
-                              type="number"
-                              value={Math.round(effectiveWidth)}
-                              onChange={(e) => {
-                                const newEffectiveWidth = parseInt(e.target.value) || 50;
-                                // Convert effective width back to base width
-                                const baseWidth = newEffectiveWidth / scale;
-                                onElementUpdate(selected.id, { width: Math.round(baseWidth) });
-                              }}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                              min="10"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600">Height</label>
-                            <input
-                              type="number"
-                              value={Math.round(effectiveHeight)}
-                              onChange={(e) => {
-                                const newEffectiveHeight = parseInt(e.target.value) || 50;
-                                // Convert effective height back to base height
-                                const baseHeight = newEffectiveHeight / scale;
-                                onElementUpdate(selected.id, { height: Math.round(baseHeight) });
-                              }}
-                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                              min="10"
-                            />
+                      {/* Size — characters have a dedicated "Size (N%)"
+                          slider in the Character section below, so suppress
+                          the bounding-box editor here (it'd be confusing to
+                          show two different size controls). Free-positioned
+                          props get widthPercent/heightPercent sliders so
+                          they scale with the stage at any viewport, with
+                          pixel width/height as derived secondary inputs.
+                          Other elements (text/dialog/button) keep the pixel
+                          width/height inputs. */}
+                      {selected.type === 'character' ? null : isFreePositioned ? (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Size
+                            <span className="ml-1 text-gray-500 font-normal">
+                              · % of stage
+                            </span>
+                          </label>
+                          {(() => {
+                            const stageW = stageWidth || 1024;
+                            const stageH = stageHeight || 768;
+                            const widthPct = typeof (selected as any).widthPercent === 'number'
+                              ? (selected as any).widthPercent as number
+                              : (selected.width / stageW) * 100;
+                            const heightPct = typeof (selected as any).heightPercent === 'number'
+                              ? (selected as any).heightPercent as number
+                              : (selected.height / stageH) * 100;
+                            const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+                            const updateWPct = (v: number) => {
+                              const next = clamp(v, 1, 100);
+                              onElementUpdate(selected.id, {
+                                widthPercent: next,
+                                width: Math.round((next / 100) * stageW),
+                              } as any);
+                            };
+                            const updateHPct = (v: number) => {
+                              const next = clamp(v, 1, 100);
+                              onElementUpdate(selected.id, {
+                                heightPercent: next,
+                                height: Math.round((next / 100) * stageH),
+                              } as any);
+                            };
+                            return (
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-xs text-gray-600">W %</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="range"
+                                      min={1}
+                                      max={100}
+                                      step={0.5}
+                                      value={widthPct}
+                                      onChange={(e) => updateWPct(parseFloat(e.target.value))}
+                                      className="flex-1"
+                                    />
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={100}
+                                      step={0.5}
+                                      value={Math.round(widthPct * 10) / 10}
+                                      onChange={(e) => updateWPct(parseFloat(e.target.value) || 1)}
+                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-600">H %</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="range"
+                                      min={1}
+                                      max={100}
+                                      step={0.5}
+                                      value={heightPct}
+                                      onChange={(e) => updateHPct(parseFloat(e.target.value))}
+                                      className="flex-1"
+                                    />
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={100}
+                                      step={0.5}
+                                      value={Math.round(heightPct * 10) / 10}
+                                      onChange={(e) => updateHPct(parseFloat(e.target.value) || 1)}
+                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700 mb-1 block">
+                            Size
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-600">Width</label>
+                              <input
+                                type="number"
+                                value={Math.round(effectiveWidth)}
+                                onChange={(e) => {
+                                  const newEffectiveWidth = parseInt(e.target.value) || 50;
+                                  const baseWidth = newEffectiveWidth / scale;
+                                  onElementUpdate(selected.id, { width: Math.round(baseWidth) });
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                min="10"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600">Height</label>
+                              <input
+                                type="number"
+                                value={Math.round(effectiveHeight)}
+                                onChange={(e) => {
+                                  const newEffectiveHeight = parseInt(e.target.value) || 50;
+                                  const baseHeight = newEffectiveHeight / scale;
+                                  onElementUpdate(selected.id, { height: Math.round(baseHeight) });
+                                }}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                min="10"
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </>
                   );
                 })()}
