@@ -5326,14 +5326,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   return undefined;
                 })()}
                 slotIntent={(() => {
-                  // multiChoice: only when project is responsive (no
-                  // legacy authoring concept exists in fixed mode).
-                  // dialogTree: always; its chat templates also use
-                  // slotIntent and they work in both modes.
+                  // Expose slotIntent for any beat type that participates
+                  // in slot/spatial layout — the panel's per-slot rows
+                  // (Title lines, Pin, Action layout) read/write it.
+                  // Falls through to undefined for purely-absolute beats.
                   if (beat.type === 'multiChoice' && projectIsResponsive) {
                     return (beat as any).slotIntent as Record<string, any> | undefined;
                   }
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
+                    return (beat as any).slotIntent as Record<string, any> | undefined;
+                  }
+                  if (projectIsResponsive && (isSlotModeBeatType(beat.type) || isSpatialModeBeatType(beat.type))) {
                     return (beat as any).slotIntent as Record<string, any> | undefined;
                   }
                   return undefined;
@@ -5347,8 +5350,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   };
                   if (beat.type === 'multiChoice' && projectIsResponsive) return handler;
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
+                  if (projectIsResponsive && (isSlotModeBeatType(beat.type) || isSpatialModeBeatType(beat.type))) return handler;
                   return undefined;
                 })()}
+                slotResolutions={slotResolutions}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||
@@ -6373,15 +6378,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       🔒 {orientPolicy}
                     </span>
                   ) : null}
-                  {overridden.map(r => (
-                    <span
-                      key={r.slot}
-                      title={r.overrideReason || ''}
-                      className="px-1.5 py-0.5 rounded bg-amber-500/90 text-black font-medium"
-                    >
-                      ⚠ {slotLabel(r.slot)}{r.holdsAboveWidth ? ` · holds ≥ ${r.holdsAboveWidth}px` : ' · overridden here'}
-                    </span>
-                  ))}
+                  {/* Slot status badges + per-slot controls used to live
+                      here. They now sit next to each slot row in the left
+                      Elements panel — see VisualPropertiesPanel slot rows.
+                      Only collision badges (which span multiple slots and
+                      can't live on a single row) stay surfaced up here. */}
                   {customCollisions.map(c => (
                     <span
                       key={`coll-${c.zone}`}
@@ -6391,208 +6392,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       ⚠ {c.slots.map(slotLabel).join(' + ')} overlap at {c.zone.replace('-', '·')}
                     </span>
                   ))}
-                  {allApplied && customCollisions.length === 0 && (
-                    slotResolutions.map(r => {
-                      const summary = r.requested?.preferredLines
-                        ? `${r.requested.preferredLines} line${r.requested.preferredLines === 1 ? '' : 's'}`
-                        : 'applied';
-                      return (
-                        <span
-                          key={`ok-${r.slot}`}
-                          title={`${slotLabel(r.slot)} renders with the requested layout intent here.`}
-                          className="px-1.5 py-0.5 rounded bg-emerald-600/80 text-white"
-                        >
-                          ✓ {slotLabel(r.slot)} · {summary}
-                        </span>
-                      );
-                    })
-                  )}
-                </div>
-                {/* 3d-2 — slot-intent control panel (precise, discoverable;
-                    drag handles for the spatial anchor land in 3d-4). */}
-                <div className="flex items-center gap-3 px-3 py-1.5 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0 bg-white/[0.03]">
-                  {titleSlotName && (
-                    <div className="flex items-center gap-1">
-                      <span className="opacity-70">Title lines</span>
-                      <button
-                        type="button"
-                        className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30"
-                        disabled={(titleLines ?? 0) <= 1 && titleLines !== undefined}
-                        onClick={() =>
-                          setTitleLines(titleLines == null ? 1 : Math.max(1, titleLines - 1))
-                        }
-                      >
-                        −
-                      </button>
-                      <span className="w-7 text-center tabular-nums">
-                        {titleLines ?? 'auto'}
-                      </span>
-                      <button
-                        type="button"
-                        className="w-5 h-5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30"
-                        disabled={(titleLines ?? 0) >= 4}
-                        onClick={() =>
-                          setTitleLines(titleLines == null ? 2 : Math.min(4, titleLines + 1))
-                        }
-                      >
-                        +
-                      </button>
-                      {titleLines != null && (
-                        <button
-                          type="button"
-                          className="ml-1 px-1 rounded bg-white/5 hover:bg-white/15 opacity-70"
-                          title="Clear (auto)"
-                          onClick={() => setTitleLines(null)}
-                        >
-                          auto
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {actionSlotName && (
-                    <>
-                      <span className="opacity-30">|</span>
-                      <div className="flex items-center gap-1">
-                        <span className="opacity-70">Buttons</span>
-                        {(['bottom', 'belowBody'] as const).map(m => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => setAnchor({ __mode: m })}
-                            className={`px-1.5 py-0.5 rounded ${
-                              anchorMode === m
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white/5 hover:bg-white/15 text-white/80'
-                            }`}
-                            title={m === 'bottom' ? 'Pinned to bottom of stage' : 'Directly below the body text'}
-                          >
-                            {m === 'bottom' ? 'Stage bottom' : 'Below body'}
-                          </button>
-                        ))}
-                        <span className="opacity-50 ml-1">align</span>
-                        {(['left', 'center', 'right'] as const).map(h => (
-                          <button
-                            key={h}
-                            type="button"
-                            onClick={() => setAnchor({ h })}
-                            className={`w-6 py-0.5 rounded ${
-                              anchorH === h
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white/5 hover:bg-white/15 text-white/80'
-                            }`}
-                            title={h}
-                          >
-                            {h === 'left' ? '⟸' : h === 'right' ? '⟹' : '≡'}
-                          </button>
-                        ))}
-                        <span className="opacity-50 ml-1">gap</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={64}
-                          step={4}
-                          value={anchorGap}
-                          onChange={e => setAnchor({ gap: parseInt(e.target.value, 10) || 0 })}
-                          className="w-20 align-middle"
-                          title={`${anchorGap}px`}
-                        />
-                        <span className="w-7 tabular-nums opacity-70">{anchorGap}px</span>
-                      </div>
-                      {/* Phase 2.2 — per-button anchor pins. One control
-                          per visible button in the action slot. Default
-                          ("In row") keeps the button in the shared flex
-                          row above; the other presets lift it out and
-                          anchor it absolutely against the stage. */}
-                      {visibleActionButtonIds.length > 0 && (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="opacity-50">|</span>
-                          <span className="opacity-70">Pin</span>
-                          {visibleActionButtonIds.map(bid => {
-                            const cur = buttonAnchors[bid];
-                            // Prefer the author's actual button text so the
-                            // label matches what's on stage ("Pin Start" not
-                            // "Pin Continue" when the author renamed it).
-                            const params = (slotPreviewParams as any) ?? {};
-                            const fallbackMap: Record<string, string> = {
-                              continueButton: 'Continue',
-                              restartButton: 'Restart',
-                              creditsButton: 'Credits',
-                            };
-                            const authoredMap: Record<string, string | undefined> = {
-                              continueButton: params.buttonText,
-                              restartButton: params.restartText,
-                              creditsButton: params.creditsText,
-                            };
-                            const label = (authoredMap[bid] && String(authoredMap[bid]).trim()) || fallbackMap[bid] || bid;
-                            type PinPreset = 'row' | 'bl' | 'bc' | 'br' | 'tl' | 'tr';
-                            const presets: Array<{ key: PinPreset; title: string; glyph: string }> = [
-                              { key: 'row', title: 'In shared row', glyph: '—' },
-                              { key: 'tl', title: 'Top-left',      glyph: '⌜' },
-                              { key: 'tr', title: 'Top-right',     glyph: '⌝' },
-                              { key: 'bl', title: 'Bottom-left',   glyph: '⌞' },
-                              { key: 'bc', title: 'Bottom-center', glyph: '⎵' },
-                              { key: 'br', title: 'Bottom-right',  glyph: '⌟' },
-                            ];
-                            const currentKey: PinPreset = !cur
-                              ? 'row'
-                              : cur.v === 'top' && cur.h === 'left' ? 'tl'
-                              : cur.v === 'top' && cur.h === 'right' ? 'tr'
-                              : cur.h === 'left' ? 'bl'
-                              : cur.h === 'right' ? 'br'
-                              : 'bc';
-                            const applyPreset = (k: PinPreset) => {
-                              if (k === 'row') return setButtonAnchor(bid, null);
-                              const map: Record<Exclude<PinPreset, 'row'>, Record<string, any>> = {
-                                tl: { h: 'left',   v: 'top',    relativeTo: 'stage' },
-                                tr: { h: 'right',  v: 'top',    relativeTo: 'stage' },
-                                bl: { h: 'left',   v: 'bottom', relativeTo: 'stage' },
-                                bc: { h: 'center', v: 'bottom', relativeTo: 'stage' },
-                                br: { h: 'right',  v: 'bottom', relativeTo: 'stage' },
-                              };
-                              setButtonAnchor(bid, { ...map[k], gap: cur?.gap ?? 16 });
-                            };
-                            return (
-                              <div key={bid} className="flex items-center gap-1 rounded bg-white/[0.04] px-1.5 py-0.5">
-                                <span className="opacity-80">{label}</span>
-                                <div className="flex rounded overflow-hidden border border-white/15">
-                                  {presets.map(p => (
-                                    <button
-                                      key={p.key}
-                                      type="button"
-                                      onClick={() => applyPreset(p.key)}
-                                      title={p.title}
-                                      className={`px-1.5 py-0.5 ${
-                                        currentKey === p.key
-                                          ? 'bg-blue-600 text-white'
-                                          : 'bg-white/5 hover:bg-white/15 text-white/80'
-                                      }`}
-                                    >
-                                      {p.glyph}
-                                    </button>
-                                  ))}
-                                </div>
-                                {cur && (
-                                  <>
-                                    <span className="opacity-50 ml-0.5">gap</span>
-                                    <input
-                                      type="range"
-                                      min={0}
-                                      max={64}
-                                      step={4}
-                                      value={typeof cur.gap === 'number' ? cur.gap : 16}
-                                      onChange={e => setButtonAnchor(bid, { gap: parseInt(e.target.value, 10) || 0 })}
-                                      className="w-14 align-middle"
-                                      title={`${cur.gap ?? 16}px`}
-                                    />
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  )}
                 </div>
                 <div
                   ref={slotStageRef}

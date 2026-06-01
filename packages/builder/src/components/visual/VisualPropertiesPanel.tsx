@@ -78,10 +78,21 @@ interface VisualPropertiesPanelProps {
   // Values vary by beat type — multiChoice has no chat-scroll, dialogTree does.
   layoutTemplate?: string;
   onLayoutTemplateChange?: (template: string) => void;
-  // Per-slot author intent (anchor h/v per slot name). Surfaced as a 3×3
-  // grid picker per slot when layoutTemplate === 'custom'.
-  slotIntent?: Record<string, { anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' } }>;
-  onSlotIntentChange?: (next: Record<string, { anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' } }>) => void;
+  // Per-slot author intent (anchor h/v per slot name, preferredLines, gap,
+  // buttonAnchors, etc.). The panel reads and writes the whole map so it
+  // can render per-slot controls inline with each slot row.
+  slotIntent?: Record<string, any>;
+  onSlotIntentChange?: (next: Record<string, any>) => void;
+  // Renderer-reported applied/override status per slot. Drives a small
+  // status indicator next to each slot row so the author sees if their
+  // intent took effect at the current viewport.
+  slotResolutions?: Array<{
+    slot: string;
+    applied: boolean;
+    requested?: { preferredLines?: number };
+    holdsAboveWidth?: number;
+    overrideReason?: string;
+  }>;
   // Panorama hotspot props
   allBeats?: { id: string; name: string; type: string }[];
   panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
@@ -154,6 +165,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onLayoutTemplateChange,
   slotIntent,
   onSlotIntentChange,
+  slotResolutions,
   allBeats,
   panoramaHotspots,
   onPanoramaHotspotUpdate,
@@ -225,15 +237,24 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   // Slot-content rows — derived from the beat's slot schema + current params.
   // These render alongside scene elements so the Elements panel reflects what's
   // actually on stage, not just free-form characters/props/text the author placed.
-  // The rows are read-only here; the author edits the underlying values in the
-  // right Inspector panel.
+  // Each row carries enough metadata to render its own per-slot intent controls
+  // inline (Title lines stepper, Pin presets, etc.) so the top toolbar stays
+  // focused on stage-level concerns.
   type SlotRow = {
     key: string;
     icon: React.ReactNode;
     label: string;
     preview: string;
     tooltip: string;
+    role: 'title' | 'body' | 'action' | 'speaker';
+    slotName: string;
+    // For action rows: which button this row represents.
+    buttonId?: string;
   };
+  // Slot-row selection — clicking a row expands it and exposes its
+  // controls below the preview line. Independent from selectedElements
+  // (which is for free-form character/prop/text rows).
+  const [expandedSlotKey, setExpandedSlotKey] = useState<string | null>(null);
   const slotRows: SlotRow[] = (() => {
     if (!beatType) return [];
     // Both slot-mode and spatial-mode beats expose slots — spatial beats
@@ -262,16 +283,16 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     for (const s of spec) {
       if (s.role === 'title') {
         const preview = ellipsize(p[s.source ?? 'title']) || '(empty)';
-        rows.push({ key: `slot:${s.name}`, icon: <Type className="w-4 h-4 text-blue-600" />, label: 'Title', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Title.` });
+        rows.push({ key: `slot:${s.name}`, icon: <Type className="w-4 h-4 text-blue-600" />, label: 'Title', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Title.`, role: 'title', slotName: s.name });
       } else if (s.role === 'speaker') {
         const preview = ellipsize(p[s.source ?? 'speaker']) || '(unset)';
-        rows.push({ key: `slot:${s.name}`, icon: <User className="w-4 h-4 text-blue-600" />, label: 'Speaker', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Speaker.` });
+        rows.push({ key: `slot:${s.name}`, icon: <User className="w-4 h-4 text-blue-600" />, label: 'Speaker', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Speaker.`, role: 'speaker', slotName: s.name });
       } else if (s.role === 'body') {
         const label = titleCase(s.name);
         const preview = ellipsize(p[s.source ?? s.name]) || '(empty)';
-        rows.push({ key: `slot:${s.name}`, icon: <MessageSquare className="w-4 h-4 text-blue-600" />, label, preview, tooltip: `Slot "${s.name}" — edit in the right inspector under ${label}.` });
+        rows.push({ key: `slot:${s.name}`, icon: <MessageSquare className="w-4 h-4 text-blue-600" />, label, preview, tooltip: `Slot "${s.name}" — edit in the right inspector under ${label}.`, role: 'body', slotName: s.name });
       } else if (s.role === 'action') {
-        for (const bid of s.buttons ?? []) {
+        for (const bid of (s as any).buttons ?? []) {
           // Skip restart/credits if the author chose to hide them on endScreen.
           if (bid === 'restartButton' && p.showRestart === false) continue;
           if (bid === 'creditsButton' && p.showCredits !== true) continue;
@@ -281,12 +302,74 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             label: buttonLabel(bid),
             preview: 'Action button',
             tooltip: `Action button "${bid}" — edit in the right inspector under Button Text.`,
+            role: 'action',
+            slotName: s.name,
+            buttonId: bid,
           });
         }
       }
     }
     return rows;
   })();
+  // Find the action slot (used for the shared "Action layout" group +
+  // per-button anchor reads/writes).
+  const actionSlotName = slotRows.find(r => r.role === 'action')?.slotName;
+  // Look up the renderer's resolution status for a given slot.
+  const resolutionForSlot = (name: string) =>
+    slotResolutions?.find(r => r.slot === name);
+  // SlotIntent mutators — derive from the slotIntent map + onSlotIntentChange.
+  // The map keys are slot names; each entry can carry preferredLines, anchor,
+  // gap, buttonAnchors, etc. Setters do shallow merge so unrelated fields
+  // (e.g. animations) survive each change.
+  const writeSlotIntent = (slot: string, patch: Record<string, any>) => {
+    if (!onSlotIntentChange) return;
+    const cur = slotIntent ?? {};
+    const next = { ...cur };
+    const prev = (cur[slot] ?? {}) as Record<string, any>;
+    const merged = { ...prev, ...patch };
+    // Prune null/undefined keys so the intent stays minimal.
+    Object.keys(merged).forEach(k => {
+      if (merged[k] === undefined || merged[k] === null) delete merged[k];
+    });
+    if (Object.keys(merged).length === 0) {
+      delete next[slot];
+    } else {
+      next[slot] = merged;
+    }
+    onSlotIntentChange(next);
+  };
+  const setSlotPreferredLines = (slot: string, lines: number | null) => {
+    writeSlotIntent(slot, { preferredLines: lines == null ? null : lines });
+  };
+  const setActionAnchor = (slot: string, patch: { __mode?: 'bottom' | 'belowBody'; h?: 'left' | 'center' | 'right'; gap?: number }) => {
+    if (!onSlotIntentChange) return;
+    const cur = slotIntent ?? {};
+    const prev = (cur[slot] ?? {}) as Record<string, any>;
+    const prevAnchor = (prev.anchor ?? {}) as Record<string, any>;
+    let nextAnchor: Record<string, any> = { ...prevAnchor };
+    if (patch.__mode === 'bottom') {
+      nextAnchor = { ...nextAnchor, v: 'bottom', relativeTo: 'stage' };
+    } else if (patch.__mode === 'belowBody') {
+      nextAnchor = { ...nextAnchor, v: 'top', relativeTo: 'element', edge: 'below' };
+    }
+    if (patch.h) nextAnchor.h = patch.h;
+    if (typeof patch.gap === 'number') nextAnchor.gap = patch.gap;
+    writeSlotIntent(slot, { anchor: nextAnchor });
+  };
+  const setButtonAnchorIntent = (slot: string, buttonId: string, patch: Record<string, any> | null) => {
+    if (!onSlotIntentChange) return;
+    const cur = slotIntent ?? {};
+    const prev = (cur[slot] ?? {}) as Record<string, any>;
+    const prevAnchors = ((prev.buttonAnchors ?? {}) as Record<string, any>);
+    const nextAnchors = { ...prevAnchors };
+    if (patch === null) {
+      delete nextAnchors[buttonId];
+    } else {
+      const curBtn = nextAnchors[buttonId] ?? { h: 'center', v: 'bottom', relativeTo: 'stage', gap: 16 };
+      nextAnchors[buttonId] = { ...curBtn, ...patch };
+    }
+    writeSlotIntent(slot, { buttonAnchors: Object.keys(nextAnchors).length > 0 ? nextAnchors : undefined });
+  };
   // Count reflects what's visible in the panel — slot rows + non-empty
   // scene elements. Visually-empty rows are hidden, so don't pad the count.
   const totalElementCount = slotRows.length + sortedElements.length;
@@ -1086,33 +1169,270 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                 )}
               </div>
 
-              {/* Slot-content rows (slot/spatial mode only). Read-only — the
-                  underlying value is authored via the right Inspector panel.
-                  These rows make the panel reflect what's actually on stage,
-                  alongside any free-form characters/props/text. */}
+              {/* Slot-content rows (slot/spatial mode only). Each row
+                  represents a piece of slot content on stage AND owns the
+                  per-slot intent controls (lines, anchor, pin). Click a
+                  row to expand its controls inline. Text values are still
+                  edited in the right Inspector. */}
               {slotRows.length > 0 && (
                 <div className="space-y-1 mb-2">
                   <div className="text-[10px] uppercase tracking-wide text-blue-600 font-medium px-1">
                     On stage (from slots)
                   </div>
-                  {slotRows.map(row => (
-                    <div
-                      key={row.key}
-                      className="p-2 rounded border border-blue-200 bg-blue-50/60"
-                      title={row.tooltip}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        {row.icon}
-                        <span className="text-sm font-medium truncate">{row.label}</span>
-                        <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-medium flex-shrink-0">
-                          slot
-                        </span>
+                  {slotRows.map(row => {
+                    const expanded = expandedSlotKey === row.key;
+                    const res = resolutionForSlot(row.slotName);
+                    const slotEntry = (slotIntent?.[row.slotName] ?? {}) as Record<string, any>;
+                    return (
+                      <div
+                        key={row.key}
+                        className={`rounded border ${expanded ? 'border-blue-400 bg-blue-50' : 'border-blue-200 bg-blue-50/60'}`}
+                      >
+                        <button
+                          type="button"
+                          className="w-full text-left p-2"
+                          title={row.tooltip}
+                          onClick={() => setExpandedSlotKey(expanded ? null : row.key)}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-blue-600 opacity-60 text-xs w-3 flex-shrink-0">
+                              {expanded ? '▼' : '▶'}
+                            </span>
+                            {row.icon}
+                            <span className="text-sm font-medium truncate">{row.label}</span>
+                            <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-medium flex-shrink-0">
+                              slot
+                            </span>
+                            {/* Status indicator — applied (green) or
+                                override (amber). Anchored to the row it
+                                describes; gone is the floating top-toolbar
+                                badge that didn't name what it applied to. */}
+                            {res && row.role !== 'action' && (
+                              res.applied ? (
+                                <span
+                                  className="ml-auto text-[10px] px-1 py-0.5 bg-emerald-100 text-emerald-700 rounded flex-shrink-0"
+                                  title="Renders with the requested layout intent at this viewport."
+                                >
+                                  ✓ {res.requested?.preferredLines
+                                    ? `${res.requested.preferredLines} line${res.requested.preferredLines === 1 ? '' : 's'}`
+                                    : 'applied'}
+                                </span>
+                              ) : (
+                                <span
+                                  className="ml-auto text-[10px] px-1 py-0.5 bg-amber-200 text-amber-900 rounded flex-shrink-0"
+                                  title={res.overrideReason || ''}
+                                >
+                                  ⚠ {res.holdsAboveWidth ? `holds ≥ ${res.holdsAboveWidth}px` : 'overridden'}
+                                </span>
+                              )
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5 truncate pl-6" title={row.preview}>
+                            {row.preview}
+                          </div>
+                        </button>
+                        {expanded && (
+                          <div className="px-3 pb-2.5 pt-1 border-t border-blue-200/60 space-y-2">
+                            {/* Title row controls: preferred lines stepper +
+                                clear-to-auto. The number lives in slotIntent
+                                under the slot's name. */}
+                            {row.role === 'title' && (
+                              <div className="flex items-center gap-2 text-xs text-gray-700">
+                                <span className="opacity-70">Lines</span>
+                                <button
+                                  type="button"
+                                  className="w-6 h-6 rounded bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-30"
+                                  disabled={(slotEntry.preferredLines ?? 1) <= 1}
+                                  onClick={() =>
+                                    setSlotPreferredLines(
+                                      row.slotName,
+                                      Math.max(1, (slotEntry.preferredLines ?? 1) - 1),
+                                    )
+                                  }
+                                >
+                                  −
+                                </button>
+                                <span className="w-8 text-center tabular-nums">
+                                  {slotEntry.preferredLines ?? 'auto'}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="w-6 h-6 rounded bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-30"
+                                  disabled={(slotEntry.preferredLines ?? 0) >= 4}
+                                  onClick={() =>
+                                    setSlotPreferredLines(
+                                      row.slotName,
+                                      Math.min(4, (slotEntry.preferredLines ?? 1) + 1),
+                                    )
+                                  }
+                                >
+                                  +
+                                </button>
+                                {slotEntry.preferredLines != null && (
+                                  <button
+                                    type="button"
+                                    className="ml-1 px-2 py-0.5 rounded border border-gray-300 bg-white hover:bg-gray-50 opacity-70"
+                                    title="Clear (auto)"
+                                    onClick={() => setSlotPreferredLines(row.slotName, null)}
+                                  >
+                                    auto
+                                  </button>
+                                )}
+                                {res && !res.applied && res.overrideReason && (
+                                  <span className="ml-1 text-[10px] text-amber-700 italic" title={res.overrideReason}>
+                                    overridden here
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {/* Action button rows: per-button Pin presets
+                                (row / four corners / bottom-center) + gap. */}
+                            {row.role === 'action' && row.buttonId && (() => {
+                              const buttonAnchors = (slotEntry.buttonAnchors ?? {}) as Record<string, any>;
+                              const cur = buttonAnchors[row.buttonId];
+                              type PinPreset = 'row' | 'bl' | 'bc' | 'br' | 'tl' | 'tr';
+                              const presets: Array<{ key: PinPreset; title: string; glyph: string }> = [
+                                { key: 'row', title: 'In shared row', glyph: '—' },
+                                { key: 'tl', title: 'Top-left',      glyph: '⌜' },
+                                { key: 'tr', title: 'Top-right',     glyph: '⌝' },
+                                { key: 'bl', title: 'Bottom-left',   glyph: '⌞' },
+                                { key: 'bc', title: 'Bottom-center', glyph: '⎵' },
+                                { key: 'br', title: 'Bottom-right',  glyph: '⌟' },
+                              ];
+                              const currentKey: PinPreset = !cur
+                                ? 'row'
+                                : cur.v === 'top' && cur.h === 'left' ? 'tl'
+                                : cur.v === 'top' && cur.h === 'right' ? 'tr'
+                                : cur.h === 'left' ? 'bl'
+                                : cur.h === 'right' ? 'br'
+                                : 'bc';
+                              const applyPreset = (k: PinPreset) => {
+                                if (k === 'row') return setButtonAnchorIntent(row.slotName, row.buttonId!, null);
+                                const map: Record<Exclude<PinPreset, 'row'>, Record<string, any>> = {
+                                  tl: { h: 'left',   v: 'top',    relativeTo: 'stage' },
+                                  tr: { h: 'right',  v: 'top',    relativeTo: 'stage' },
+                                  bl: { h: 'left',   v: 'bottom', relativeTo: 'stage' },
+                                  bc: { h: 'center', v: 'bottom', relativeTo: 'stage' },
+                                  br: { h: 'right',  v: 'bottom', relativeTo: 'stage' },
+                                };
+                                setButtonAnchorIntent(row.slotName, row.buttonId!, { ...map[k], gap: cur?.gap ?? 16 });
+                              };
+                              return (
+                                <>
+                                  <div className="flex items-center gap-1 text-xs text-gray-700">
+                                    <span className="opacity-70">Pin</span>
+                                    <div className="flex rounded overflow-hidden border border-gray-300">
+                                      {presets.map(p => (
+                                        <button
+                                          key={p.key}
+                                          type="button"
+                                          onClick={() => applyPreset(p.key)}
+                                          title={p.title}
+                                          className={`px-2 py-1 text-sm leading-none ${
+                                            currentKey === p.key
+                                              ? 'bg-blue-600 text-white'
+                                              : 'bg-white hover:bg-gray-50 text-gray-700'
+                                          }`}
+                                        >
+                                          {p.glyph}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  {cur && (
+                                    <div className="flex items-center gap-2 text-xs text-gray-700">
+                                      <span className="opacity-70">Gap</span>
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={64}
+                                        step={4}
+                                        value={typeof cur.gap === 'number' ? cur.gap : 16}
+                                        onChange={e => setButtonAnchorIntent(row.slotName, row.buttonId!, { gap: parseInt(e.target.value, 10) || 0 })}
+                                        className="flex-1"
+                                        title={`${cur.gap ?? 16}px`}
+                                      />
+                                      <span className="w-8 tabular-nums text-right opacity-70">{cur.gap ?? 16}px</span>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-600 mt-0.5 truncate pl-6" title={row.preview}>
-                        {row.preview}
+                    );
+                  })}
+                  {/* Action layout — shared placement controls for the
+                      whole action slot (where the button row sits, its
+                      horizontal alignment, and the gap between siblings).
+                      Lives once at the end of the slot rows rather than
+                      duplicated per button. */}
+                  {actionSlotName && (() => {
+                    const slotEntry = (slotIntent?.[actionSlotName] ?? {}) as Record<string, any>;
+                    const anchor = (slotEntry.anchor ?? {}) as Record<string, any>;
+                    const anchorMode: 'bottom' | 'belowBody' =
+                      anchor.relativeTo === 'element' ? 'belowBody' : 'bottom';
+                    const anchorH = (anchor.h ?? 'center') as 'left' | 'center' | 'right';
+                    const anchorGap = typeof anchor.gap === 'number' ? anchor.gap : 16;
+                    return (
+                      <div className="mt-1 px-3 py-2 rounded border border-blue-200 bg-blue-50/40 space-y-2">
+                        <div className="text-[10px] uppercase tracking-wide text-blue-600 font-medium">
+                          Action layout
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-gray-700">
+                          <span className="opacity-70 w-12">Where</span>
+                          {(['bottom', 'belowBody'] as const).map(m => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setActionAnchor(actionSlotName, { __mode: m })}
+                              className={`px-2 py-1 rounded border ${
+                                anchorMode === m
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                              }`}
+                              title={m === 'bottom' ? 'Pinned to bottom of stage' : 'Directly below the body text'}
+                            >
+                              {m === 'bottom' ? 'Stage bottom' : 'Below body'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-gray-700">
+                          <span className="opacity-70 w-12">Align</span>
+                          {(['left', 'center', 'right'] as const).map(h => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => setActionAnchor(actionSlotName, { h })}
+                              className={`w-8 py-1 rounded border ${
+                                anchorH === h
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                              }`}
+                              title={h}
+                            >
+                              {h === 'left' ? '⟸' : h === 'right' ? '⟹' : '≡'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-700">
+                          <span className="opacity-70 w-12">Gap</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={64}
+                            step={4}
+                            value={anchorGap}
+                            onChange={e => setActionAnchor(actionSlotName, { gap: parseInt(e.target.value, 10) || 0 })}
+                            className="flex-1"
+                            title={`${anchorGap}px`}
+                          />
+                          <span className="w-8 tabular-nums text-right opacity-70">{anchorGap}px</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })()}
                 </div>
               )}
 
