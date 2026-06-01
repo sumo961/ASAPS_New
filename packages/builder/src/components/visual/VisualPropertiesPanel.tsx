@@ -93,6 +93,12 @@ interface VisualPropertiesPanelProps {
     holdsAboveWidth?: number;
     overrideReason?: string;
   }>;
+  // Optional controlled expand state for slot rows. Pass these in to
+  // share selection with stage clicks (so clicking a slot on the stage
+  // expands the matching panel row, and vice versa). Omit for uncontrolled
+  // local state.
+  expandedSlotKey?: string | null;
+  onExpandedSlotKeyChange?: (next: string | null) => void;
   // Panorama hotspot props
   allBeats?: { id: string; name: string; type: string }[];
   panoramaHotspots?: { id: string; target: string; text: string; displayText?: string; icon?: string; pitch: number; yaw: number }[];
@@ -166,6 +172,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   slotIntent,
   onSlotIntentChange,
   slotResolutions,
+  expandedSlotKey: controlledExpandedSlotKey,
+  onExpandedSlotKeyChange,
   allBeats,
   panoramaHotspots,
   onPanoramaHotspotUpdate,
@@ -254,7 +262,16 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   // Slot-row selection — clicking a row expands it and exposes its
   // controls below the preview line. Independent from selectedElements
   // (which is for free-form character/prop/text rows).
-  const [expandedSlotKey, setExpandedSlotKey] = useState<string | null>(null);
+  //
+  // When the parent supplies expandedSlotKey + onExpandedSlotKeyChange,
+  // selection lives upstream (so stage clicks and panel clicks share
+  // the same source of truth). Otherwise we fall back to local state.
+  const [localExpandedSlotKey, setLocalExpandedSlotKey] = useState<string | null>(null);
+  const expandedSlotKey = controlledExpandedSlotKey ?? localExpandedSlotKey;
+  const setExpandedSlotKey = (next: string | null) => {
+    if (onExpandedSlotKeyChange) onExpandedSlotKeyChange(next);
+    else setLocalExpandedSlotKey(next);
+  };
   const slotRows: SlotRow[] = (() => {
     if (!beatType) return [];
     // Both slot-mode and spatial-mode beats expose slots — spatial beats

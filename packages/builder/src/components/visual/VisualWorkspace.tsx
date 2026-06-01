@@ -906,6 +906,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // project setting). When the policy is locked it is forced to the lock.
   const [slotPreviewOrient, setSlotPreviewOrient] = useState<'portrait' | 'landscape'>('portrait');
   const [slotResolutions, setSlotResolutions] = useState<SlotIntentResolution[]>([]);
+  // Slot-row expansion state — shared between the panel rows and stage
+  // clicks. Stage click on a slot sets it; panel click toggles the same
+  // key. Shape: `slot:{name}` or `slot:{name}:{buttonId}`.
+  const [expandedSlotKey, setExpandedSlotKey] = useState<string | null>(null);
   // 3d-4 — transient gap while dragging the action grip. Live (uncommitted)
   // so the preview reflows per-frame WITHOUT spamming the undo stack; a
   // single setAnchor commit fires on pointer-up.
@@ -5354,6 +5358,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   return undefined;
                 })()}
                 slotResolutions={slotResolutions}
+                expandedSlotKey={expandedSlotKey}
+                onExpandedSlotKeyChange={setExpandedSlotKey}
                 spatialFit={
                   beat.type === 'titleScreen' ||
                   beat.type === 'movementChoice' ||
@@ -5985,9 +5991,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           animations: ss.animations,
                         };
                       }}
-                      // Editor selection: clicking a sprite on the
-                      // stage selects the matching element in the left
-                      // panel + highlights the sprite in yellow.
+                      // Editor selection: clicking a sprite OR slot
+                      // content on the stage selects the matching row
+                      // in the left panel + highlights the clicked
+                      // thing in yellow.
                       editorMode={true}
                       selectedElementName={(() => {
                         if (selectedElementIds.length !== 1) return undefined;
@@ -5997,6 +6004,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       onElementSelect={(locationName) => {
                         const el = visualElements.find(e => e.name === locationName);
                         if (el) setSelectedElementIds([el.id]);
+                        // Clear slot expansion so the user's attention
+                        // moves to the sprite they just clicked.
+                        setExpandedSlotKey(null);
+                      }}
+                      selectedSlotKey={expandedSlotKey ?? undefined}
+                      onSlotSelect={(slotName, buttonId) => {
+                        const key = buttonId
+                          ? `slot:${slotName}:${buttonId}`
+                          : `slot:${slotName}`;
+                        setExpandedSlotKey(prev => prev === key ? null : key);
+                        // Clear free-positioned selection so only one
+                        // thing is highlighted at a time.
+                        setSelectedElementIds([]);
                       }}
                     />
                     {/* P3-3c-3 — interactive hotspot editor overlay. Only for

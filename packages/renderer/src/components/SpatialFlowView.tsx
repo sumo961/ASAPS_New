@@ -91,10 +91,14 @@ interface SpatialFlowViewProps {
   characterResolver?: (characterId: string, stateId?: string) => string | undefined;
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
-  /** Editor-only: makes free-positioned sprites clickable for selection. */
+  /** Editor-only: makes free-positioned sprites + slot content clickable for selection. */
   editorMode?: boolean;
+  /** For free-positioned sprite selection (location.name match). */
   selectedElementName?: string;
   onElementSelect?: (locationName: string) => void;
+  /** For slot-content selection ("slot:title" / "slot:actions:continueButton"). */
+  selectedSlotKey?: string;
+  onSlotSelect?: (slotName: string, buttonId?: string) => void;
   /** Same timer hookup as SlotFlowView — see notes there. */
   timerState?: {
     totalTime: number;
@@ -258,6 +262,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   editorMode,
   selectedElementName,
   onElementSelect,
+  selectedSlotKey,
+  onSlotSelect,
   timerState: initialTimerState,
   onSubscribeTimerState,
 }) => {
@@ -817,6 +823,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           slotAnimations={slotAnimations}
           onResolve={onResolve}
           onAction={onAction}
+          editorMode={editorMode}
+          selectedSlotKey={selectedSlotKey}
+          onSlotSelect={onSlotSelect}
           previewWidth={previewWidth}
           previewCoarse={previewCoarse}
           extraExitMs={spatialExitMs}

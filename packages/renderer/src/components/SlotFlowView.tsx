@@ -209,6 +209,18 @@ interface SlotFlowViewProps {
    * 'stacked'.
    */
   layoutTemplate?: 'stacked' | 'conversation' | 'custom';
+  /** Editor mode — when true, slot wrappers (title / body / action
+   *  buttons) become clickable so the host Visual Editor can select
+   *  a slot from the stage. In runtime mode (default) clicks pass
+   *  through to onAction etc. */
+  editorMode?: boolean;
+  /** Slot row key currently selected in the left panel.
+   *  Shape: "slot:{slotName}" or "slot:{slotName}:{buttonId}".
+   *  The matching slot/button renders with a yellow outline. */
+  selectedSlotKey?: string;
+  /** Fired when the author clicks a slot or button in editor mode.
+   *  buttonId is set for action-button clicks, omitted otherwise. */
+  onSlotSelect?: (slotName: string, buttonId?: string) => void;
 }
 
 // Authored design width — the fluid font term is zero-offset here so a beat
@@ -250,6 +262,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   characterResolver,
   assetResolver,
   spriteDataResolver,
+  editorMode,
+  selectedSlotKey,
+  onSlotSelect,
   timerState: initialTimerState,
   onSubscribeTimerState,
   dynamicChoices,
@@ -1214,14 +1229,21 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           })()}
           {titleSlot && titleText && (() => {
             const a = phaseAnim(titleSlotName);
+            const isSelected = !!editorMode && selectedSlotKey === `slot:${titleSlotName}`;
+            const editorClick = editorMode && onSlotSelect && titleSlotName
+              ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(titleSlotName, undefined); }
+              : undefined;
             return (
               <div
                 ref={titleRef}
                 className={a.className}
                 data-slotflow-slot={titleSlotName}
+                onClick={editorClick}
                 style={{
                   fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
                   fontWeight: 700,
+                  ...(editorMode ? { cursor: 'pointer' } : null),
+                  ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                   lineHeight: 1.25,
                   textAlign: 'center',
                   marginBottom: 'clamp(16px, 3vh, 32px)',
@@ -1251,12 +1273,20 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           })()}
           {bodyText && (() => {
             const a = phaseAnim(bodySlot?.name);
+            const bodyName = bodySlot?.name;
+            const isSelected = !!editorMode && bodyName && selectedSlotKey === `slot:${bodyName}`;
+            const editorClick = editorMode && onSlotSelect && bodyName
+              ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(bodyName, undefined); }
+              : undefined;
             return (
               <div
                 className={a.className}
                 data-slotflow-slot={bodySlot?.name}
+                onClick={editorClick}
                 style={{
                   whiteSpace: 'pre-wrap',
+                  ...(editorMode ? { cursor: 'pointer' } : null),
+                  ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                   lineHeight: 1.6,
                   textAlign: 'center',
                   fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
@@ -1434,30 +1464,48 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 ...a.style,
               }}
             >
-              {flowButtons.map(b => (
-                <button
-                  key={b.id}
-                  className="slotflow-btn"
-                  onClick={b.onClick}
-                  style={buttonStyle(theme, buttonFluid)}
-                >
-                  {b.text}
-                </button>
-              ))}
+              {flowButtons.map(b => {
+                const actionSlotName = actionSlot?.name;
+                const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
+                const handleClick = editorMode && onSlotSelect && actionSlotName
+                  ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
+                  : b.onClick;
+                return (
+                  <button
+                    key={b.id}
+                    className="slotflow-btn"
+                    onClick={handleClick}
+                    style={{
+                      ...buttonStyle(theme, buttonFluid),
+                      ...(editorMode ? { cursor: 'pointer' } : null),
+                      ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+                    }}
+                  >
+                    {b.text}
+                  </button>
+                );
+              })}
             </div>
             {anchoredButtons.map(b => {
               const anchor = buttonAnchors![b.id];
+              const actionSlotName = actionSlot?.name;
+              const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
+              const handleClick = editorMode && onSlotSelect && actionSlotName
+                ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
+                : b.onClick;
               return (
                 <button
                   key={`anchored-${b.id}`}
                   className={`slotflow-btn ${a.className ?? ''}`}
-                  onClick={b.onClick}
+                  onClick={handleClick}
                   style={{
                     ...buttonStyle(theme, buttonFluid),
                     position: 'absolute',
                     ...anchoredButtonPlacement(anchor),
                     zIndex: 4,
                     ...a.style,
+                    ...(editorMode ? { cursor: 'pointer' } : null),
+                    ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                   }}
                 >
                   {b.text}
