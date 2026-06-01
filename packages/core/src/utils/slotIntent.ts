@@ -65,6 +65,27 @@ export interface SlotIntentEntry {
    * the corner, Restart centered" without splitting beats.
    */
   buttonAnchors?: Record<string, SlotAnchor>;
+  /**
+   * Per-slot type / transform overrides. Each is OPTIONAL; absent fields
+   * inherit from the project theme (font / fontSize) or render at the
+   * neutral default (rotation 0, no width/height clamp). Applies to the
+   * slot's main element — for action slots this means the button row /
+   * shared button style; per-button overrides aren't supported.
+   *
+   * - font          → CSS font-family override (font display name; the
+   *                   theme converter resolves it to the full stack).
+   * - fontSize      → fontSize in px at the design width; the responsive
+   *                   font fluid still scales it with the viewport.
+   * - rotation      → degrees, 0-360. Applied via CSS transform: rotate().
+   * - widthPercent  → maxWidth = stage * (widthPercent / 100). Useful for
+   *                   bounding a body card to a column.
+   * - heightPercent → minHeight equivalent; mostly relevant to body cards.
+   */
+  font?: string;
+  fontSize?: number;
+  rotation?: number;
+  widthPercent?: number;
+  heightPercent?: number;
 }
 
 /** Per-beat map: slot name → author intent for that slot. */

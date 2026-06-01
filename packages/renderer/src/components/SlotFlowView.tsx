@@ -1233,6 +1233,15 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             const editorClick = editorMode && onSlotSelect && titleSlotName
               ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(titleSlotName, undefined); }
               : undefined;
+            // Per-slot type/transform overrides (font / fontSize / rotation
+            // / widthPercent). Falls through to theme defaults when absent.
+            const slotOv = titleSlotName ? slotIntentFor(slotIntent, titleSlotName) : undefined;
+            const ovFont = slotOv?.font;
+            const ovFontSizePx = typeof slotOv?.fontSize === 'number' ? slotOv.fontSize : undefined;
+            const ovRotation = typeof slotOv?.rotation === 'number' ? slotOv.rotation : undefined;
+            const ovWidthPx = typeof slotOv?.widthPercent === 'number' && previewWidth
+              ? Math.round((slotOv.widthPercent / 100) * previewWidth)
+              : undefined;
             return (
               <div
                 ref={titleRef}
@@ -1240,7 +1249,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 data-slotflow-slot={titleSlotName}
                 onClick={editorClick}
                 style={{
-                  fontFamily: theme.fonts.titleFont || theme.fonts.textFont || 'serif',
+                  fontFamily: ovFont || theme.fonts.titleFont || theme.fonts.textFont || 'serif',
                   fontWeight: 700,
                   ...(editorMode ? { cursor: 'pointer' } : null),
                   ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
@@ -1265,6 +1274,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   alignSelf: 'center',
                   ...titleReveal.fadeStyle,
                   ...a.style,
+                  // Per-slot overrides win over theme + fluid defaults.
+                  ...(ovFontSizePx ? { fontSize: `${ovFontSizePx}px` } : null),
+                  ...(ovRotation ? { transform: `rotate(${ovRotation}deg)`, transformOrigin: 'center center' } : null),
+                  ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                 }}
               >
                 {titleReveal.rendered}
@@ -1278,6 +1291,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             const editorClick = editorMode && onSlotSelect && bodyName
               ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(bodyName, undefined); }
               : undefined;
+            // Per-slot overrides — see title block for the contract.
+            const slotOv = bodyName ? slotIntentFor(slotIntent, bodyName) : undefined;
+            const ovFont = slotOv?.font;
+            const ovFontSizePx = typeof slotOv?.fontSize === 'number' ? slotOv.fontSize : undefined;
+            const ovRotation = typeof slotOv?.rotation === 'number' ? slotOv.rotation : undefined;
+            const ovWidthPx = typeof slotOv?.widthPercent === 'number' && previewWidth
+              ? Math.round((slotOv.widthPercent / 100) * previewWidth)
+              : undefined;
             return (
               <div
                 className={a.className}
@@ -1290,6 +1311,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   lineHeight: 1.6,
                   textAlign: 'center',
                   fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
+                  ...(ovFont ? { fontFamily: ovFont } : null),
                   // Bug 14 — wrap body text in the theme's card. Card
                   // hugs short text but wraps long paragraphs at the
                   // readable column width (max-width on a fit-content
@@ -1306,6 +1328,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...textBoxCardStyle(theme, { isTitle: false }),
                   ...bodyReveal.fadeStyle,
                   ...a.style,
+                  // Per-slot overrides win over theme + fluid defaults.
+                  ...(ovFontSizePx ? { fontSize: `${ovFontSizePx}px` } : null),
+                  ...(ovRotation ? { transform: `rotate(${ovRotation}deg)`, transformOrigin: 'center center' } : null),
+                  ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                 }}
               >
                 {bodyReveal.rendered}
@@ -1470,6 +1496,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 const handleClick = editorMode && onSlotSelect && actionSlotName
                   ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
                   : b.onClick;
+                // Per-slot type/transform overrides apply to the whole
+                // action slot — all buttons inherit the same font,
+                // fontSize, rotation, width.
+                const slotOv = actionSlotName ? slotIntentFor(slotIntent, actionSlotName) : undefined;
+                const ovFont = slotOv?.font;
+                const ovFontSizePx = typeof slotOv?.fontSize === 'number' ? slotOv.fontSize : undefined;
+                const ovRotation = typeof slotOv?.rotation === 'number' ? slotOv.rotation : undefined;
+                const ovWidthPx = typeof slotOv?.widthPercent === 'number' && previewWidth
+                  ? Math.round((slotOv.widthPercent / 100) * previewWidth)
+                  : undefined;
                 return (
                   <button
                     key={b.id}
@@ -1479,6 +1515,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       ...buttonStyle(theme, buttonFluid),
                       ...(editorMode ? { cursor: 'pointer' } : null),
                       ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+                      ...(ovFont ? { fontFamily: ovFont } : null),
+                      ...(ovFontSizePx ? { fontSize: `${ovFontSizePx}px` } : null),
+                      ...(ovRotation ? { transform: `rotate(${ovRotation}deg)` } : null),
+                      ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                     }}
                   >
                     {b.text}

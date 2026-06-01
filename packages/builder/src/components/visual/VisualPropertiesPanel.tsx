@@ -387,6 +387,140 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     }
     writeSlotIntent(slot, { buttonAnchors: Object.keys(nextAnchors).length > 0 ? nextAnchors : undefined });
   };
+  // Renders the per-slot type/transform controls (font / fontSize /
+  // rotation / width%) used inside every expanded slot row. The values
+  // live in slotIntent[slot].{font, fontSize, rotation, widthPercent};
+  // absent fields render as "default / theme / none" and the renderer
+  // falls back to theme + intrinsic defaults.
+  const renderSlotTypeTransform = (slotName: string): React.ReactNode => {
+    const entry = (slotIntent?.[slotName] ?? {}) as Record<string, any>;
+    const font: string | undefined = entry.font;
+    const fontSize: number | undefined = entry.fontSize;
+    const rotation: number = typeof entry.rotation === 'number' ? entry.rotation : 0;
+    const widthPercent: number | undefined = entry.widthPercent;
+    const builtin = fonts.filter(f => f.type === 'builtin');
+    const custom = fonts.filter(f => f.type === 'custom');
+    return (
+      <div className="space-y-2 text-xs text-gray-700">
+        {/* Font family */}
+        <div className="flex items-center gap-2">
+          <span className="opacity-70 w-14 flex-shrink-0">Font</span>
+          <select
+            value={font ?? ''}
+            onChange={(e) => writeSlotIntent(slotName, { font: e.target.value || null })}
+            className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+          >
+            <option value="">Theme default</option>
+            {builtin.map(f => (
+              <option key={f.id} value={f.displayName}>{f.displayName}</option>
+            ))}
+            {custom.length > 0 && (
+              <optgroup label="Custom Fonts">
+                {custom.map(f => (
+                  <option key={f.id} value={f.displayName}>{f.displayName}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+        {/* Font size */}
+        <div className="flex items-center gap-2">
+          <span className="opacity-70 w-14 flex-shrink-0">Size</span>
+          <input
+            type="range"
+            min={10}
+            max={72}
+            step={1}
+            value={fontSize ?? 0}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              writeSlotIntent(slotName, { fontSize: v > 0 ? v : null });
+            }}
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min={10}
+            max={72}
+            value={fontSize ?? ''}
+            placeholder="auto"
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              writeSlotIntent(slotName, { fontSize: Number.isFinite(v) && v > 0 ? v : null });
+            }}
+            className="w-14 px-1 py-1 border border-gray-300 rounded text-xs text-center"
+          />
+          {fontSize != null && (
+            <button
+              type="button"
+              className="px-1.5 py-0.5 rounded border border-gray-300 bg-white text-[10px] text-gray-600 hover:bg-gray-50"
+              title="Clear font-size override (use theme default)"
+              onClick={() => writeSlotIntent(slotName, { fontSize: null })}
+            >
+              auto
+            </button>
+          )}
+        </div>
+        {/* Rotation */}
+        <div className="flex items-center gap-2">
+          <span className="opacity-70 w-14 flex-shrink-0">Rotation</span>
+          <input
+            type="range"
+            min={0}
+            max={360}
+            step={1}
+            value={rotation}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10) || 0;
+              writeSlotIntent(slotName, { rotation: v === 0 ? null : v });
+            }}
+            className="flex-1"
+          />
+          <input
+            type="number"
+            min={0}
+            max={360}
+            value={rotation}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10) || 0;
+              writeSlotIntent(slotName, { rotation: v === 0 ? null : v });
+            }}
+            className="w-14 px-1 py-1 border border-gray-300 rounded text-xs text-center"
+          />
+          <span className="opacity-60">°</span>
+        </div>
+        {/* Width % */}
+        <div className="flex items-center gap-2">
+          <span className="opacity-70 w-14 flex-shrink-0">Width</span>
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={1}
+            value={widthPercent ?? 100}
+            onChange={(e) => {
+              const v = parseInt(e.target.value, 10);
+              writeSlotIntent(slotName, { widthPercent: v < 100 ? v : null });
+            }}
+            className="flex-1"
+          />
+          <span className="w-10 tabular-nums text-right opacity-70">
+            {widthPercent != null ? `${widthPercent}%` : 'auto'}
+          </span>
+          {widthPercent != null && (
+            <button
+              type="button"
+              className="px-1.5 py-0.5 rounded border border-gray-300 bg-white text-[10px] text-gray-600 hover:bg-gray-50"
+              title="Clear width override"
+              onClick={() => writeSlotIntent(slotName, { widthPercent: null })}
+            >
+              auto
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
   // Count reflects what's visible in the panel — slot rows + non-empty
   // scene elements. Visually-empty rows are hidden, so don't pad the count.
   const totalElementCount = slotRows.length + sortedElements.length;
@@ -1307,6 +1441,13 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 )}
                               </div>
                             )}
+                            {/* Per-slot type / transform overrides — apply
+                                to all slot roles that render text or visible
+                                content. Falls through to theme defaults when
+                                fields are unset. */}
+                            {(row.role === 'title' || row.role === 'body' || row.role === 'speaker') && (
+                              renderSlotTypeTransform(row.slotName)
+                            )}
                             {/* Action button rows: per-button Pin presets
                                 (row / four corners / bottom-center) + gap. */}
                             {row.role === 'action' && row.buttonId && (() => {
@@ -1566,6 +1707,14 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             title={`${anchorGap}px`}
                           />
                           <span className="w-8 tabular-nums text-right opacity-70">{anchorGap}px</span>
+                        </div>
+                        {/* Type/transform overrides for the whole
+                            action slot — affects every button in the
+                            row uniformly. Per-button overrides aren't
+                            supported (would clutter the UI for little
+                            authoring gain). */}
+                        <div className="border-t border-blue-200/60 pt-2 mt-1">
+                          {renderSlotTypeTransform(actionSlotName)}
                         </div>
                         </div>
                       </div>
