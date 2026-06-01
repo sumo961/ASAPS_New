@@ -24,6 +24,7 @@ import {
   DoorOpen,
 } from 'lucide-react';
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
+import { getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 import type { Asset } from '../assets/AssetManager';
 import type { VisualElement } from './VisualBeatEditor';
 import type { Character, CharacterState } from '../../types/character';
@@ -58,6 +59,7 @@ interface VisualPropertiesPanelProps {
   stageHeight: number;
   beatType?: string;  // Beat type to control which elements are available
   beatName?: string;  // Beat name for display in header
+  beatParams?: Record<string, any>; // Current beat parameter values (for slot-content preview rows)
   onOpenCharacterManager?: (callback: (character: any) => void) => void;  // For changing character
   characters?: Character[];  // Project characters for state selection
   // Beat-level settings
@@ -136,6 +138,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   stageHeight,
   beatType,
   beatName,
+  beatParams,
   onOpenCharacterManager,
   characters = [],
   beatTransition,
@@ -218,6 +221,75 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   const selectedElement = selectedElements.length === 1 ? selectedElements[0] : null;
   const selected = selectedElement ? elements.find(el => el.id === selectedElement) : undefined;
   const sortedElements = [...elements].sort((a, b) => b.z - a.z); // Sort by z-index descending
+
+  // Slot-content rows — derived from the beat's slot schema + current params.
+  // These render alongside scene elements so the Elements panel reflects what's
+  // actually on stage, not just free-form characters/props/text the author placed.
+  // The rows are read-only here; the author edits the underlying values in the
+  // right Inspector panel.
+  type SlotRow = {
+    key: string;
+    icon: React.ReactNode;
+    label: string;
+    preview: string;
+    tooltip: string;
+  };
+  const slotRows: SlotRow[] = (() => {
+    if (!beatType) return [];
+    // Both slot-mode and spatial-mode beats expose slots — spatial beats
+    // composite their flow slots over a background image. titleScreen is
+    // spatial, infoText is slot. Either way the slot content tells us
+    // what's on stage.
+    const spec = getSlotSpec(beatType) ?? getSpatialSpec(beatType)?.slots ?? null;
+    // Show slot-content rows whenever the beat TYPE declares slots — even
+    // when this instance has author-positioned absolute locations (layoutMode
+    // 'absolute'). The slot content (title/body/buttons) still describes
+    // what's on stage; the absolute path just decides positioning.
+    if (!spec) return [];
+    const p = beatParams || {};
+    const ellipsize = (s: unknown, n = 60): string => {
+      const str = (typeof s === 'string' ? s : '') || '';
+      return str.length > n ? `${str.slice(0, n - 1)}…` : str;
+    };
+    const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    const buttonLabel = (id: string): string => {
+      if (id === 'continueButton') return (p.buttonText && String(p.buttonText).trim()) || 'Continue';
+      if (id === 'restartButton') return (p.restartText && String(p.restartText).trim()) || 'Restart';
+      if (id === 'creditsButton') return (p.creditsText && String(p.creditsText).trim()) || 'Credits';
+      return id;
+    };
+    const rows: SlotRow[] = [];
+    for (const s of spec) {
+      if (s.role === 'title') {
+        const preview = ellipsize(p[s.source ?? 'title']) || '(empty)';
+        rows.push({ key: `slot:${s.name}`, icon: <Type className="w-4 h-4 text-blue-600" />, label: 'Title', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Title.` });
+      } else if (s.role === 'speaker') {
+        const preview = ellipsize(p[s.source ?? 'speaker']) || '(unset)';
+        rows.push({ key: `slot:${s.name}`, icon: <User className="w-4 h-4 text-blue-600" />, label: 'Speaker', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Speaker.` });
+      } else if (s.role === 'body') {
+        const label = titleCase(s.name);
+        const preview = ellipsize(p[s.source ?? s.name]) || '(empty)';
+        rows.push({ key: `slot:${s.name}`, icon: <MessageSquare className="w-4 h-4 text-blue-600" />, label, preview, tooltip: `Slot "${s.name}" — edit in the right inspector under ${label}.` });
+      } else if (s.role === 'action') {
+        for (const bid of s.buttons ?? []) {
+          // Skip restart/credits if the author chose to hide them on endScreen.
+          if (bid === 'restartButton' && p.showRestart === false) continue;
+          if (bid === 'creditsButton' && p.showCredits !== true) continue;
+          rows.push({
+            key: `slot:${s.name}:${bid}`,
+            icon: <Square className="w-4 h-4 text-blue-600" />,
+            label: buttonLabel(bid),
+            preview: 'Action button',
+            tooltip: `Action button "${bid}" — edit in the right inspector under Button Text.`,
+          });
+        }
+      }
+    }
+    return rows;
+  })();
+  // Count reflects what's visible in the panel — slot rows + non-empty
+  // scene elements. Visually-empty rows are hidden, so don't pad the count.
+  const totalElementCount = slotRows.length + sortedElements.length;
 
   // Get audio assets for custom sound selection
   const audioAssets = assets.filter(a => a.type === 'audio' && a.subType === 'sfx');
@@ -950,7 +1022,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           >
             <div className="flex items-center gap-2">
               <Box className="w-4 h-4" />
-              <span className="font-medium text-sm">Elements ({elements.length})</span>
+              <span className="font-medium text-sm">Elements ({totalElementCount})</span>
             </div>
           </button>
 
@@ -1014,21 +1086,74 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                 )}
               </div>
 
+              {/* Slot-content rows (slot/spatial mode only). Read-only — the
+                  underlying value is authored via the right Inspector panel.
+                  These rows make the panel reflect what's actually on stage,
+                  alongside any free-form characters/props/text. */}
+              {slotRows.length > 0 && (
+                <div className="space-y-1 mb-2">
+                  <div className="text-[10px] uppercase tracking-wide text-blue-600 font-medium px-1">
+                    On stage (from slots)
+                  </div>
+                  {slotRows.map(row => (
+                    <div
+                      key={row.key}
+                      className="p-2 rounded border border-blue-200 bg-blue-50/60"
+                      title={row.tooltip}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {row.icon}
+                        <span className="text-sm font-medium truncate">{row.label}</span>
+                        <span className="text-[10px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-medium flex-shrink-0">
+                          slot
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mt-0.5 truncate pl-6" title={row.preview}>
+                        {row.preview}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Element List */}
               {sortedElements.length === 0 ? (
-                <div className="text-xs text-gray-500 italic py-2 text-center">
-                  No elements yet. Add one above.
-                </div>
+                slotRows.length === 0 ? (
+                  <div className="text-xs text-gray-500 italic py-2 text-center">
+                    No elements yet. Add one above.
+                  </div>
+                ) : null
               ) : (
                 <div className="space-y-1">
-                  {sortedElements.map((element, index) => (
+                  {sortedElements.map((element, index) => {
+                    // Orphan = a character-type element that references no
+                    // resolvable character (either explicitly null or its
+                    // name doesn't match any project character). These tend
+                    // to accumulate in old projects after a character is
+                    // renamed/deleted and the location row is left behind.
+                    // Legacy data carries a `character` field; current type
+                    // uses `characterId`. Read either so older projects
+                    // still resolve.
+                    const elementCharacterRef =
+                      (element as { character?: string | null }).character ??
+                      element.characterId;
+                    const isOrphanCharacter =
+                      element.type === 'character' &&
+                      !characters.some(c =>
+                        c.id === elementCharacterRef ||
+                        c.name === elementCharacterRef ||
+                        c.name === element.name
+                      );
+                    return (
                     <div
                       key={element.id}
                       className={`
                         p-2 rounded border transition-colors cursor-pointer
                         ${selectedElements.includes(element.id)
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
+                          : isOrphanCharacter
+                            ? 'border-amber-300 bg-amber-50 hover:border-amber-400'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}
                       `}
                       onClick={() => onElementSelect(element.id)}
                     >
@@ -1038,6 +1163,14 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           <span className="text-sm font-medium truncate">
                             {element.name}
                           </span>
+                          {isOrphanCharacter && (
+                            <span
+                              className="text-[10px] px-1 py-0.5 bg-amber-200 text-amber-900 rounded font-medium"
+                              title={`No character named "${elementCharacterRef || element.name}" exists in this project. This row is a leftover from a deleted/renamed character — use Delete to clean it up.`}
+                            >
+                              ⚠ orphan
+                            </span>
+                          )}
                           {element.groupId && (
                             <span className="text-[10px] px-1 py-0.5 bg-purple-100 text-purple-600 rounded" title="Grouped">G</span>
                           )}
@@ -1121,7 +1254,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

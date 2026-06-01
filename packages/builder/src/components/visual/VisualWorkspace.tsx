@@ -77,10 +77,21 @@ import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 function resolveCharacterImageUrl(
   state: { visual?: { assetId?: string; image?: string } } | null,
   defaultImage: string | undefined,
-  assets: Asset[]
+  assets: Asset[],
+  // Last-resort fallback for characters that have no per-state image and
+  // no defaultImage — only a spritesheet. The renderer crops to a single
+  // frame using frameWidth/Height. Without this, an authored character
+  // location with only a spritesheet renders as nothing on stage.
+  spriteSheet?: { url?: string; assetId?: string }
 ): string | undefined {
   if (!state?.visual) {
-    return defaultImage;
+    // Even with no state, try defaultImage then spritesheet.
+    if (defaultImage) return defaultImage;
+    if (spriteSheet?.assetId) {
+      const asset = assets.find(a => a.id === spriteSheet.assetId);
+      if (asset?.url) return asset.url;
+    }
+    return spriteSheet?.url;
   }
 
   // Try to resolve via assetId first (this gives fresh blob URLs)
@@ -100,7 +111,14 @@ function resolveCharacterImageUrl(
     return state.visual.image;
   }
 
-  return defaultImage;
+  if (defaultImage) return defaultImage;
+
+  // Final fallback: spritesheet (assetId first for fresh blob, then raw url).
+  if (spriteSheet?.assetId) {
+    const asset = assets.find(a => a.id === spriteSheet.assetId);
+    if (asset?.url) return asset.url;
+  }
+  return spriteSheet?.url;
 }
 
 /**
@@ -1735,10 +1753,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       : beat.type === 'titleScreen'
         ? {
             // P3-anim-6.5 — titleScreen (spatial mode). The flow slots are
-            // 'title' (heading) + 'actions' (start button); the spatial
-            // image rides on the beat background asset, threaded as
-            // imageUrl on SpatialFlowView.
+            // 'title' (heading) + 'author' (body) + 'actions' (start button);
+            // the spatial image rides on the beat background asset, threaded
+            // as imageUrl on SpatialFlowView.
             title: slotPreviewParams.title || 'Untitled Story',
+            author: slotPreviewParams.author || '',
             buttonText: slotPreviewParams.buttonText || 'Start',
           }
         : beat.type === 'movementChoice'
@@ -1810,8 +1829,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   // True when the preview body above fell back to the editor-only sample
   // (drives the "sample text" caption so it isn't mistaken for content).
+  // titleScreen and endScreen have their own body fields (author / message),
+  // not text/summary, and never use the sample-body fallback — skip them.
   const slotPreviewUsesSample =
-    isSlotPreview && !!beat && !!slotPreviewParams && beat.type !== 'endScreen'
+    isSlotPreview && !!beat && !!slotPreviewParams &&
+    beat.type !== 'endScreen' && beat.type !== 'titleScreen'
       ? !(
           (beat.type === 'aiSummary'
             ? (slotPreviewParams.summary ?? slotPreviewParams.fallbackText)
@@ -2717,7 +2739,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               const stateId = loc.stateId || character.defaultState;
               const state = character.states?.find((s: any) => s.id === stateId);
               if (state) {
-                const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+                const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets, character.visual?.spriteSheet);
                 if (resolvedUrl) {
                   element.imageUrl = resolvedUrl;
                 }
@@ -3249,7 +3271,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
           // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
           if (character) {
-            const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+            const resolvedUrl = resolveCharacterImageUrl(
+              state,
+              character.visual?.defaultImage,
+              assets,
+              character.visual?.spriteSheet,
+            );
             if (resolvedUrl) {
               element.imageUrl = resolvedUrl;
               resolved = true;
@@ -3461,7 +3488,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
           // Resolve image URL using helper (handles stale blob URLs via assetId lookup)
           if (character) {
-            const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+            const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets, character.visual?.spriteSheet);
             if (resolvedUrl) {
               element.imageUrl = resolvedUrl;
             }
@@ -5234,6 +5261,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 stageHeight={projectSettings?.height || 768}
                 beatType={beat.type}
                 beatName={beat.name}
+                beatParams={beat.getParameters?.() ?? {}}
                 onSelectAsset={onAssetSelect}
                 onOpenCharacterManager={onOpenCharacterManager}
                 characters={characters}
@@ -5681,6 +5709,39 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             const overridden = slotResolutions.filter(r => !r.applied);
             const allApplied =
               slotResolutions.length > 0 && overridden.length === 0;
+            // Friendly label for a slot name. Slot keys are technical
+            // ("question", "actions", "text", "title", "speaker") —
+            // present them with the same vocabulary the author sees in
+            // the picker / inspector.
+            const slotLabel = (name: string): string => {
+              if (name === 'question') return 'Question';
+              if (name === 'text') return 'Dialog';
+              if (name === 'actions') return 'Choices';
+              if (name === 'title') return 'Title';
+              if (name === 'speaker') return 'Speaker';
+              if (name === 'body') return 'Body';
+              return name.charAt(0).toUpperCase() + name.slice(1);
+            };
+            // Custom-template collision detection: when two slots are
+            // anchored to the same (h, v) zone, the later one renders
+            // on top of the other. The renderer doesn't catch this
+            // (each slot's absolute placement is independent), so we
+            // surface it from the editor side — read straight from
+            // slotIntent at the current viewport.
+            const customCollisions: Array<{ zone: string; slots: string[] }> = (() => {
+              if (beatLayoutTemplate !== 'custom') return [];
+              const intent = (slotPreviewParams?.slotIntent ?? {}) as Record<string, any>;
+              const byZone: Record<string, string[]> = {};
+              for (const [name, entry] of Object.entries(intent)) {
+                const a = entry?.anchor;
+                if (!a || (!a.h && !a.v)) continue;
+                const key = `${a.v ?? 'middle'}-${a.h ?? 'center'}`;
+                (byZone[key] ??= []).push(name);
+              }
+              return Object.entries(byZone)
+                .filter(([, names]) => names.length > 1)
+                .map(([zone, slots]) => ({ zone, slots }));
+            })();
             // Slot-intent control panel (3d-2): title preferredLines + the
             // action slot's anchor. Slot names come from the schema spec so
             // we target the right keys in slotIntent.
@@ -5876,6 +5937,49 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         )
                       }
                       onAction={() => { /* read-only preview */ }}
+                      // Free-positioned character/prop locations from the
+                      // beat. SpatialFlowView renders these as a sprite
+                      // layer on top of the background. Mirrors the
+                      // runtime wiring in ReactRenderer (pickFreePositioned).
+                      // beat.locations is a Map<string, Location>, not an
+                      // array — iterate values.
+                      characterLocations={(() => {
+                        const locsMap = (beat as any)?.locations as Map<string, any> | any[] | undefined;
+                        if (!locsMap) return undefined;
+                        const list: any[] = Array.isArray(locsMap)
+                          ? locsMap
+                          : (typeof locsMap.values === 'function' ? Array.from(locsMap.values()) : []);
+                        const out = list.filter(l => l?.kind === 'character' || l?.kind === 'prop');
+                        return out.length > 0 ? out : undefined;
+                      })()}
+                      // Resolve a character's current image URL by id/state.
+                      // Falls through state.visual.image → defaultImage →
+                      // spritesheet, same chain the panel uses.
+                      characterResolver={(characterId: string, stateId?: string) => {
+                        const ch = characters.find(c => c.id === characterId);
+                        if (!ch) return undefined;
+                        const st = ch.states?.find(s => s.id === (stateId || ch.defaultState)) ?? null;
+                        return resolveCharacterImageUrl(
+                          st,
+                          ch.visual?.defaultImage,
+                          assets,
+                          ch.visual?.spriteSheet,
+                        );
+                      }}
+                      // Provide sprite metadata so the renderer can crop the
+                      // spritesheet to a single frame (otherwise it draws the
+                      // whole tiled sheet). Mirrors ReactRenderer.spriteDataResolver.
+                      spriteDataResolver={(characterId: string) => {
+                        const ch = characters.find(c => c.id === characterId);
+                        const ss = ch?.visual?.spriteSheet;
+                        if (!ss || !ss.frameWidth || !ss.frameHeight) return null;
+                        return {
+                          frameWidth: ss.frameWidth,
+                          frameHeight: ss.frameHeight,
+                          imageWidth: ss.imageWidth,
+                          animations: ss.animations,
+                        };
+                      }}
                     />
                     {/* P3-3c-3 — interactive hotspot editor overlay. Only for
                         movementChoice in spatial mode; sits above the read-only
@@ -6275,13 +6379,33 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       title={r.overrideReason || ''}
                       className="px-1.5 py-0.5 rounded bg-amber-500/90 text-black font-medium"
                     >
-                      ⚠ {r.slot}: preference overridden here
+                      ⚠ {slotLabel(r.slot)}{r.holdsAboveWidth ? ` · holds ≥ ${r.holdsAboveWidth}px` : ' · overridden here'}
                     </span>
                   ))}
-                  {allApplied && (
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-600/80 text-white">
-                      ✓ layout intent applied
+                  {customCollisions.map(c => (
+                    <span
+                      key={`coll-${c.zone}`}
+                      title={`Slots ${c.slots.map(slotLabel).join(' + ')} are both anchored to ${c.zone.replace('-', ' · ')}. They will overlap on stage. Drag one to a different zone to fix.`}
+                      className="px-1.5 py-0.5 rounded bg-orange-500/90 text-black font-medium"
+                    >
+                      ⚠ {c.slots.map(slotLabel).join(' + ')} overlap at {c.zone.replace('-', '·')}
                     </span>
+                  ))}
+                  {allApplied && customCollisions.length === 0 && (
+                    slotResolutions.map(r => {
+                      const summary = r.requested?.preferredLines
+                        ? `${r.requested.preferredLines} line${r.requested.preferredLines === 1 ? '' : 's'}`
+                        : 'applied';
+                      return (
+                        <span
+                          key={`ok-${r.slot}`}
+                          title={`${slotLabel(r.slot)} renders with the requested layout intent here.`}
+                          className="px-1.5 py-0.5 rounded bg-emerald-600/80 text-white"
+                        >
+                          ✓ {slotLabel(r.slot)} · {summary}
+                        </span>
+                      );
+                    })
                   )}
                 </div>
                 {/* 3d-2 — slot-intent control panel (precise, discoverable;
@@ -6385,12 +6509,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           <span className="opacity-70">Pin</span>
                           {visibleActionButtonIds.map(bid => {
                             const cur = buttonAnchors[bid];
-                            const labelMap: Record<string, string> = {
+                            // Prefer the author's actual button text so the
+                            // label matches what's on stage ("Pin Start" not
+                            // "Pin Continue" when the author renamed it).
+                            const params = (slotPreviewParams as any) ?? {};
+                            const fallbackMap: Record<string, string> = {
                               continueButton: 'Continue',
                               restartButton: 'Restart',
                               creditsButton: 'Credits',
                             };
-                            const label = labelMap[bid] || bid;
+                            const authoredMap: Record<string, string | undefined> = {
+                              continueButton: params.buttonText,
+                              restartButton: params.restartText,
+                              creditsButton: params.creditsText,
+                            };
+                            const label = (authoredMap[bid] && String(authoredMap[bid]).trim()) || fallbackMap[bid] || bid;
                             type PinPreset = 'row' | 'bl' | 'bc' | 'br' | 'tl' | 'tr';
                             const presets: Array<{ key: PinPreset; title: string; glyph: string }> = [
                               { key: 'row', title: 'In shared row', glyph: '—' },

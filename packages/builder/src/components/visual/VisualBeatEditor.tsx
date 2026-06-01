@@ -54,10 +54,22 @@ import { computeSnap, type SnapLine } from './snapGuides';
 function resolveCharacterImageUrl(
   state: { visual?: { assetId?: string; image?: string } } | undefined,
   defaultImage: string | undefined,
-  assets: Asset[]
+  assets: Asset[],
+  // Last-resort fallback for characters that have only a spritesheet
+  // (no per-state image, no defaultImage). The renderer crops to a
+  // single frame via frameWidth/Height.
+  spriteSheet?: { url?: string; assetId?: string }
 ): string | undefined {
+  const spriteFallback = (): string | undefined => {
+    if (spriteSheet?.assetId) {
+      const asset = assets.find(a => a.id === spriteSheet.assetId);
+      if (asset?.url) return asset.url;
+    }
+    return spriteSheet?.url;
+  };
+
   if (!state?.visual) {
-    return defaultImage;
+    return defaultImage || spriteFallback();
   }
 
   // Try to resolve via assetId first (this gives fresh blob URLs)
@@ -68,8 +80,9 @@ function resolveCharacterImageUrl(
     }
   }
 
-  // Fall back to stored image URL (may be stale blob URL)
-  return state.visual.image || defaultImage;
+  // Fall back to stored image URL (may be stale blob URL), then default,
+  // then spritesheet.
+  return state.visual.image || defaultImage || spriteFallback();
 }
 
 export interface VisualElement {
@@ -592,7 +605,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
           };
         } else {
           // Static character - resolve from state or default
-          const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets);
+          const resolvedUrl = resolveCharacterImageUrl(state, character.visual?.defaultImage, assets, character.visual?.spriteSheet);
           if (resolvedUrl) {
             el.assetUrl = resolvedUrl;
           }

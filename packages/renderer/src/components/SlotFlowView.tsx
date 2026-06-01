@@ -377,7 +377,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const cs = window.getComputedStyle(el);
     const fontPx = parseFloat(cs.fontSize) || 16;
     const lineHeightPx = fontPx * 1.25; // matches the title lineHeight below
-    const measuredLines = Math.max(1, Math.round(el.offsetHeight / lineHeightPx));
+    // Subtract vertical chrome (padding + border) so we measure text
+    // height, not box height. Without this, a 1-line title in a card
+    // with 20px padding + 3px border reads as offsetHeight ≈ 94px and
+    // rounds to 2 lines.
+    const padTop = parseFloat(cs.paddingTop) || 0;
+    const padBottom = parseFloat(cs.paddingBottom) || 0;
+    const borderTop = parseFloat(cs.borderTopWidth) || 0;
+    const borderBottom = parseFloat(cs.borderBottomWidth) || 0;
+    const textHeight = Math.max(0, el.offsetHeight - padTop - padBottom - borderTop - borderBottom);
+    const measuredLines = Math.max(1, Math.round(textHeight / lineHeightPx));
 
     // First pass (no bias yet): if the title naturally renders on FEWER
     // lines than wanted, narrow the box to coax it toward the target.
@@ -395,14 +404,103 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
     // Report the outcome (applied vs overridden) for override-visibility.
     const applied = measuredLines === titlePreferredLines;
+
+    // Threshold probe: at what stage width does the preferred line
+    // count first hold? Clone the title offscreen, sweep widths via
+    // binary search, find the smallest column width that produces
+    // `titlePreferredLines`. Stage width ≈ column width + a constant
+    // accounting for the body scroller's clamp(20px, 5vw, 48px)
+    // padding and the title card's internal padding. Useful to
+    // surface as "holds ≥ Xpx" in the override badge so authors
+    // know what viewport size their intent kicks back in at.
+    let holdsAboveWidth: number | undefined;
+    try {
+      const clone = el.cloneNode(true) as HTMLElement;
+      clone.style.position = 'absolute';
+      clone.style.visibility = 'hidden';
+      clone.style.pointerEvents = 'none';
+      clone.style.left = '-99999px';
+      clone.style.top = '0';
+      // Remove the title's max-width bias so the clone can be probed
+      // freely; preserve font + textbox style by using cloneNode.
+      clone.style.maxWidth = '';
+      clone.style.marginLeft = '0';
+      clone.style.marginRight = '0';
+      clone.style.display = 'block';
+      // Pin computed font properties — cloneNode preserves inline
+      // styles + classes but NOT inherited values. Reparenting to
+      // document.body drops the title's inherited font-size, font-
+      // family, weight, etc., so the clone would measure at the body
+      // defaults (typically 16px sans-serif) instead of the on-page
+      // 38px Cinzel. That produces a wildly wrong threshold.
+      clone.style.fontFamily = cs.fontFamily;
+      clone.style.fontSize = cs.fontSize;
+      clone.style.fontWeight = cs.fontWeight;
+      clone.style.fontStyle = cs.fontStyle;
+      clone.style.fontVariant = cs.fontVariant;
+      clone.style.letterSpacing = cs.letterSpacing;
+      clone.style.wordSpacing = cs.wordSpacing;
+      clone.style.lineHeight = cs.lineHeight;
+      clone.style.textTransform = cs.textTransform;
+      clone.style.whiteSpace = cs.whiteSpace;
+      // Strip padding/border — we're measuring pure text geometry,
+      // not the title card's visual chrome. Otherwise offsetHeight
+      // includes the box chrome and a 1-line title looks like 2 lines
+      // after dividing by lineHeight.
+      clone.style.padding = '0';
+      clone.style.border = '0';
+      clone.style.boxSizing = 'content-box';
+      document.body.appendChild(clone);
+      const linesAt = (width: number): number => {
+        clone.style.width = `${width}px`;
+        return Math.max(1, Math.round(clone.offsetHeight / lineHeightPx));
+      };
+      // Single-line width = the title's natural unwrapped width.
+      // Pad by a few px to absorb subpixel quantization — max-content
+      // sometimes rounds down past the actual fit width, which would
+      // make linesAt(singleLineW) return 2 lines instead of 1.
+      clone.style.width = 'max-content';
+      const singleLineW = Math.max(40, clone.offsetWidth) + 8;
+      // Binary search for the smallest column width where the line
+      // count drops to ≤ preferredLines. Search range bracketed by
+      // singleLineWidth / preferredLines (lower) and singleLineWidth
+      // (upper — at full width, lines == 1 ≤ preferred).
+      let lo = Math.max(40, Math.floor(singleLineW / titlePreferredLines));
+      let hi = singleLineW;
+      // If even the full single-line width doesn't satisfy, bail.
+      if (linesAt(hi) <= titlePreferredLines) {
+        // Binary search: find smallest width with lines <= preferred.
+        while (lo < hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          if (linesAt(mid) <= titlePreferredLines) {
+            hi = mid;
+          } else {
+            lo = mid + 1;
+          }
+        }
+        const columnW = lo;
+        // Stage threshold = title's column width + an offset for the
+        // body scroller's outer padding + the title card's internal
+        // padding. Empirically ~96 (2 × 48 scroller padding at the
+        // clamp ceiling) + 40 (card padding) = ~136. Slightly generous
+        // so the badge underclaims rather than overclaims.
+        holdsAboveWidth = Math.round(columnW + 150);
+      }
+      document.body.removeChild(clone);
+    } catch {
+      // DOM clone can fail in headless / SSR contexts. Silent skip —
+      // the badge still works without the threshold value.
+    }
+
     const res: SlotIntentResolution = {
       slot: titleSlotName!,
       requested: { preferredLines: titlePreferredLines },
       applied,
+      holdsAboveWidth,
       overrideReason: applied
         ? undefined
         : measuredLines > titlePreferredLines
-          ? `Title needs ${measuredLines} lines at this width to stay legible (wanted ${titlePreferredLines}).`
+          ? `Title needs ${measuredLines} lines at this width to stay legible (wanted ${titlePreferredLines}).${holdsAboveWidth ? ` Holds ≥ ${holdsAboveWidth}px.` : ''}`
           : `Title only fills ${measuredLines} line(s) here (wanted ${titlePreferredLines}); not enough text for the target at this width.`,
     };
     onResolveRef.current?.([res]);
