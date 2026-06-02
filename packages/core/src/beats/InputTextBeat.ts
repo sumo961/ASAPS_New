@@ -72,7 +72,9 @@ export class InputTextBeat extends Beat {
       // Include visual data
       node: this.node,
       locs: this.locs,
-      backgroundSound: this.backgroundSound
+      backgroundSound: this.backgroundSound,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
   }
 
@@ -99,6 +101,8 @@ export class InputTextBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.locs !== undefined) this.locs = params.locs;
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   /**

@@ -42,6 +42,8 @@ export class MovementChoiceBeat extends Beat {
       markVisited: this.markVisited,
       showTextOnHover: this.showTextOnHover,
       spatialFit: this.spatialFit,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
     console.log('[MovementChoiceBeat.getParameters] Returning:', params);
     return params;
@@ -84,6 +86,8 @@ export class MovementChoiceBeat extends Beat {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
         ? params.spatialFit : undefined;
     }
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
 
     console.log('[MovementChoiceBeat.updateParameters] AFTER:', {
       question: this.question,

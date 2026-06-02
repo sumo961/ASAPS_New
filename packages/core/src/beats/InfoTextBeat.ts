@@ -34,6 +34,7 @@ export class InfoTextBeat extends Beat {
       buttonText: this.buttonText,
       node: this.node,
       backgroundSound: this.backgroundSound,
+      slotIntent: this.slotIntent,
       slotAnimations: this.slotAnimations,
     };
     if (this.textVariations && this.textVariations.length > 0) {
@@ -52,6 +53,7 @@ export class InfoTextBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.locs !== undefined) this.locs = params.locs;
     if (params.backgroundSound !== undefined) this.backgroundSound = params.backgroundSound;
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 

@@ -35,6 +35,8 @@ export class PickPropBeat extends Beat {
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
       spatialFit: this.spatialFit,
+      slotIntent: this.slotIntent,
+      slotAnimations: this.slotAnimations,
     };
   }
 
@@ -61,6 +63,8 @@ export class PickPropBeat extends Beat {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
         ? params.spatialFit : undefined;
     }
+    if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
+    if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
   /**

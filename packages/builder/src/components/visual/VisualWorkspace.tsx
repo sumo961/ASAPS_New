@@ -6256,6 +6256,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         setDialogTreeNodePath(prev => [...prev, id]);
                       }
                     }}
+                    editorMode={true}
+                    selectedSlotKey={expandedSlotKey ?? undefined}
+                    onSlotSelect={(slotName, buttonId) => {
+                      const key = buttonId
+                        ? `slot:${slotName}:${buttonId}`
+                        : `slot:${slotName}`;
+                      setExpandedSlotKey(prev => prev === key ? null : key);
+                      setSelectedElementIds([]);
+                    }}
                   />
                   );
                 })()}
