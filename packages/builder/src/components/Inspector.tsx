@@ -13,6 +13,7 @@ import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
 import type { Character } from '../types/character';
 import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
+import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import { extractStoryStateReferences } from '../utils/storyStateExtraction';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { useUsedNames } from './characters/useUsedNames';
@@ -189,12 +190,18 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [activeTab, setActiveTab] = useState<'properties' | 'visual'>('properties');
 
   // P3-3c-15 — spatial hotspots only fire at runtime when the beat
-  // composes through SpatialFlowView, which requires no baked
-  // locations[]. If the author has baked layout, the absolute path
-  // wins and any choice.hotspot is inert. Surface that as an inline
-  // advisory in the Spatial-hotspot row so saving a hotspot that
-  // won't do anything isn't silently mysterious.
+  // composes through SpatialFlowView. In FIXED projects that needs
+  // baked locations to be absent — otherwise the absolute path wins
+  // and any choice.hotspot is inert. In RESPONSIVE projects the
+  // runtime now treats hotspots as authoritative even with leftover
+  // baked positions (see commit ee44c110), so the warning is stale
+  // there.
   const beatHasAuthorLocations = !!beat && (beat.locations?.size ?? 0) > 0;
+  const projectIsResponsive =
+    resolveLayoutMode(globalSettings as any, allBeats as any) === 'responsive';
+  // Show the "Inactive" warning only when the runtime would actually
+  // skip the hotspot — i.e. fixed project AND baked positions exist.
+  const hotspotIsInactive = beatHasAuthorLocations && !projectIsResponsive;
 
   // P3-3c-7 — bidirectional hotspot hover link. Canvas dispatches
   // `asaps:hotspotHover` with the hovered choice id (or null on leave);
@@ -3497,6 +3504,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       characterObjects={characters}
                       allBeats={availableTargets}
                       beatHasAuthorLocations={beatHasAuthorLocations}
+                      projectIsResponsive={projectIsResponsive}
                       counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
                       variables={availableVariables.map(v => v.name)}
                       availableCounters={availableCounters}
@@ -4048,9 +4056,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   </>
                                 )}
                               </div>
-                              {sp && beatHasAuthorLocations && (
+                              {sp && hotspotIsInactive && (
                                 <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
-                                  ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                                  ⚠ Inactive — this project is in fixed-layout mode and the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Either clear the baked positions, or switch the project to Responsive layout (header → Responsive layout).
                                 </p>
                               )}
                               </div>
@@ -4666,9 +4674,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   </button>
                                 )}
                               </div>
-                              {sp && beatHasAuthorLocations && (
+                              {sp && hotspotIsInactive && (
                                 <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
-                                  ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                                  ⚠ Inactive — this project is in fixed-layout mode and the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Either clear the baked positions, or switch the project to Responsive layout (header → Responsive layout).
                                 </p>
                               )}
                               </div>

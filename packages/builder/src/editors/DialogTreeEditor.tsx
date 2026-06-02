@@ -92,9 +92,14 @@ interface DialogTreeEditorProps {
   emotionPalette?: ReadonlyArray<import('@asaps/core').EmotionDefinition>;
   /** P3-3c-15 — true when the parent beat has baked locations[]. Spatial
    * hotspots only fire when the beat composes through SpatialFlowView,
-   * which requires no baked locations; when this is true the per-choice
-   * spatial-hotspot row shows an inactive advisory. */
+   * which requires no baked locations in a FIXED project. In responsive
+   * projects the runtime ignores baked positions for spatial routing, so
+   * this flag is only inactive when both conditions hold (see Inspector). */
   beatHasAuthorLocations?: boolean;
+  /** True when the project is in responsive layout mode. Used to suppress
+   * the "Inactive — clear baked positions" advisory because spatial fires
+   * regardless of baked positions in responsive projects. */
+  projectIsResponsive?: boolean;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -132,6 +137,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   availableVariables: availableVariablesProp,
   availableInventoryItems: availableInventoryItemsProp,
   allBeats = [],
+  projectIsResponsive = false,
   expanded = false,
   speakerNameResolver,
   onDefineAsCharacter,
@@ -879,9 +885,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                               </button>
                             )}
                           </div>
-                          {sp && beatHasAuthorLocations && (
+                          {sp && beatHasAuthorLocations && !projectIsResponsive && (
                             <p className="text-[10px] text-amber-700 mt-0.5 leading-snug">
-                              ⚠ Inactive — the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Clear the baked positions in the Visual Editor to enable spatial mode.
+                              ⚠ Inactive — this project is in fixed-layout mode and the beat has baked positions, so the absolute layout runs and the hotspot isn't fired. Either clear the baked positions, or switch the project to Responsive layout (header → Responsive layout).
                             </p>
                           )}
                           </div>
