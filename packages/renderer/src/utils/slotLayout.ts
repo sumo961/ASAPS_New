@@ -24,8 +24,11 @@ export interface SlotSpec {
    *   'action'  = button row.
    *   'speaker' = small label above the body (NPC name in dialog mode).
    *               Bug 19a — separates "who speaks" from "what they say"
-   *               so the speaker isn't styled as a title in spatial dialog. */
-  role: 'body' | 'action' | 'title' | 'speaker';
+   *               so the speaker isn't styled as a title in spatial dialog.
+   *   'input'   = a single-line text input field (inputText beat). Submits
+   *               via Enter or the paired action button; the value is the
+   *               action id passed to onAction. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */
@@ -34,6 +37,8 @@ export interface SlotSpec {
   scroll?: boolean;
   /** For action slots: the schema location names of the buttons in this row. */
   buttons?: string[];
+  /** For input slots: content key holding the placeholder string. */
+  placeholderSource?: string;
 }
 
 /**

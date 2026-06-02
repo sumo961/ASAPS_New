@@ -288,6 +288,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // Bug 19a — speaker role (small label above the body). Used by
   // dialogTree spatial so "Character" isn't styled as a giant title.
   const speakerSlot = slots.find(s => s.role === 'speaker');
+  // inputText's single-line text field. Submit on Enter or via the
+  // paired action button — both fire onAction(currentValue) so the
+  // beat resolves with the user's typed string.
+  const inputSlot = slots.find(s => s.role === 'input');
+  const [inputValue, setInputValue] = React.useState('');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -928,7 +933,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
 
   const handleRestart = () => dispatchAction('restart');
   const handleCredits = () => dispatchAction('credits');
-  const handleContinue = () => dispatchAction('continue');
+  // inputText resolves with the typed value (not a static action id).
+  // When an input slot is present, the continue button submits the
+  // current input string; otherwise it falls through to the legacy
+  // 'continue' marker every other beat type uses.
+  const handleContinue = () => dispatchAction(inputSlot ? inputValue : 'continue');
 
   // P3-anim-4.5 — timer-driven exit for click-less beats (durScreen). Wait
   // (autoExitMs - maxExitMs) ms, then flip to 'exit' so the leaving
@@ -1357,6 +1366,59 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           has natural height and its own internal scroll, while these
           choices sit in their own row at the bottom of the stage. */}
       {extraInScrollAfterBody && gateEarned ? extraInScrollAfterBody : null}
+
+      {/* Input slot — single-line text field for inputText beats.
+          Sits between body and action row. Enter submits via the
+          paired continue button (handleContinue picks up inputValue
+          when inputSlot is present). */}
+      {inputSlot && (() => {
+        const placeholder = inputSlot.placeholderSource
+          ? (content[inputSlot.placeholderSource] ?? '')
+          : '';
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${inputSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(inputSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={inputSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            <input
+              type="text"
+              value={inputValue}
+              placeholder={String(placeholder)}
+              disabled={!!editorMode}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleContinue();
+                }
+              }}
+              style={{
+                fontFamily: theme.fonts.textFont || 'sans-serif',
+                fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
+                padding: 'clamp(6px, 1.2vh, 12px) clamp(10px, 2vw, 16px)',
+                borderRadius: theme.textBox?.borderRadius ?? 4,
+                border: `2px solid ${theme.textBox?.borderColor ?? 'rgba(255,255,255,0.4)'}`,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#ffffff',
+                width: 'clamp(200px, 60%, 480px)',
+                textAlign: 'center',
+                outline: 'none',
+              }}
+            />
+          </div>
+        );
+      })()}
 
       {/* Action slot — pinned, always visible, overlap-proof.
           Single continue (aiInfoText/onlineContent) vs restart/credits

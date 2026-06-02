@@ -254,7 +254,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     label: string;
     preview: string;
     tooltip: string;
-    role: 'title' | 'body' | 'action' | 'speaker';
+    role: 'title' | 'body' | 'action' | 'speaker' | 'input';
     slotName: string;
     // For action rows: which button this row represents.
     buttonId?: string;
@@ -304,6 +304,12 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
       } else if (s.role === 'speaker') {
         const preview = ellipsize(p[s.source ?? 'speaker']) || '(unset)';
         rows.push({ key: `slot:${s.name}`, icon: <User className="w-4 h-4 text-blue-600" />, label: 'Speaker', preview, tooltip: `Slot "${s.name}" — edit in the right inspector under Speaker.`, role: 'speaker', slotName: s.name });
+      } else if (s.role === 'input') {
+        // inputText's single-line text field. Authored value is the
+        // placeholder (the runtime value comes from the user typing).
+        const ph = (s as any).placeholderSource ? p[(s as any).placeholderSource] : '';
+        const preview = ellipsize(ph) || '(no placeholder)';
+        rows.push({ key: `slot:${s.name}`, icon: <Type className="w-4 h-4 text-blue-600" />, label: 'Input field', preview, tooltip: `Slot "${s.name}" — single-line text input. Edit the placeholder in the right inspector under Placeholder.`, role: 'input', slotName: s.name });
       } else if (s.role === 'body') {
         const label = titleCase(s.name);
         const preview = ellipsize(p[s.source ?? s.name]) || '(empty)';
@@ -1445,7 +1451,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 to all slot roles that render text or visible
                                 content. Falls through to theme defaults when
                                 fields are unset. */}
-                            {(row.role === 'title' || row.role === 'body' || row.role === 'speaker') && (
+                            {(row.role === 'title' || row.role === 'body' || row.role === 'speaker' || row.role === 'input') && (
                               renderSlotTypeTransform(row.slotName)
                             )}
                             {/* Action button rows: per-button Pin presets

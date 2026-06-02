@@ -1904,6 +1904,13 @@
         "inputField": "placeholder",
         "submitButton": "buttonText"
       },
+      "layoutMode": "slot",
+      "slots": [
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
+        { "name": "prompt", "role": "body", "source": "prompt" },
+        { "name": "input", "role": "input", "placeholderSource": "placeholder" },
+        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "inputText"

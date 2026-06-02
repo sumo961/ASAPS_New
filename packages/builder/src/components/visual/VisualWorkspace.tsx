@@ -1816,6 +1816,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               restartText: slotPreviewParams.restartText,
               creditsText: slotPreviewParams.creditsText,
             }
+          : beat.type === 'inputText'
+          ? {
+              // inputText slot mode: prompt (body) + input field +
+              // continue button. The input slot reads placeholder via
+              // placeholderSource; the value is editor-disabled so the
+              // author can author without typing.
+              prompt: slotPreviewParams.prompt ?? '',
+              placeholder: slotPreviewParams.placeholder ?? '',
+              buttonText: slotPreviewParams.buttonText ?? 'Continue',
+              speaker: slotPreviewSpeaker,
+            }
           : {
               // onlineContent / aiInfoText / infoText / durScreen —
               // runtime fetches/generates the body for AI beats; preview
@@ -1837,7 +1848,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // not text/summary, and never use the sample-body fallback — skip them.
   const slotPreviewUsesSample =
     isSlotPreview && !!beat && !!slotPreviewParams &&
-    beat.type !== 'endScreen' && beat.type !== 'titleScreen'
+    beat.type !== 'endScreen' && beat.type !== 'titleScreen' && beat.type !== 'inputText'
       ? !(
           (beat.type === 'aiSummary'
             ? (slotPreviewParams.summary ?? slotPreviewParams.fallbackText)
