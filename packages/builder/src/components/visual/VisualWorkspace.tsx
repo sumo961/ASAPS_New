@@ -3705,10 +3705,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       });
     }
 
-    // Supplement missing static elements for beats with dynamic locations
+    // Supplement missing static elements for beats with dynamic locations.
     // movementChoice/pickProp may have choice/prop hotspots in beat.locations
-    // but be missing the schema-defined "question" text element
-    if (elements.length > 0 && (beat.type === 'movementChoice' || beat.type === 'pickProp')) {
+    // but be missing the schema-defined "question" text element.
+    //
+    // In a responsive project the schema's question slot already renders
+    // the prompt — auto-adding a positioned dialog element would double-
+    // render it (the legacy element row sits next to the slot row in the
+    // panel, and the renderer paints both). Skip the supplement here so
+    // only the slot's question shows.
+    if (
+      elements.length > 0 &&
+      (beat.type === 'movementChoice' || beat.type === 'pickProp') &&
+      !projectIsResponsive
+    ) {
       const questionText = params.question || '';
       const hasQuestion = elements.some((e: VisualElement) =>
         e.name?.toLowerCase().includes('question') ||
