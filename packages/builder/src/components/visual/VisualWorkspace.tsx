@@ -1516,6 +1516,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // can't accidentally bake locations[] and silently flip out of slot mode
   // (the no-bake guard; this is the Phase-1.5 correctness fix).
   const beatHasAuthorLocations = (beat?.locations?.size ?? 0) > 0;
+  // Project-level gate for the schema-declared slot/spatial editor.
+  // Fixed projects keep the legacy positioned editor for slot-mode beats
+  // — the responsive (slot) editor is opt-in via the project layout-mode
+  // flag, and the schema's slot declaration alone is not sufficient.
+  // Hotspot-based spatial preview (isHotspotChoicePreview) is per-beat
+  // author intent and stays regardless of project mode.
+  const projectIsResponsive = resolveLayoutMode(globalSettings as any, beats as any) === 'responsive';
   // P3-anim-6.5 — spatial-mode beats (titleScreen) also get the responsive
   // preview. P3-3c-3 extends this to per-INSTANCE spatial: a movementChoice
   // whose every choice carries a hotspot composes through SpatialFlowView
@@ -1531,9 +1538,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // accessor pair. Reads from the accessor's read(params) so dialogTree's
   // nested `dialogTree.choices` path works the same as movementChoice's
   // top-level `choices`.
+  //
+  // In responsive projects the spatial preview overrides baked locations
+  // — the author opted into responsive flow, so the schema-declared slot
+  // wins over the lingering positioned canvas. Fixed projects still
+  // require !beatHasAuthorLocations so authors who haven't migrated keep
+  // the legacy positioned editor.
   const hotspotAccessor = hotspotItemsAccessorFor(beat);
   const hotspotItemsKey: 'choices' | 'props' | 'dialogChoices' | null =
-    !!beat && !isPanoramaBeat && !beatHasAuthorLocations && !!hotspotAccessor
+    !!beat && !isPanoramaBeat && (projectIsResponsive || !beatHasAuthorLocations) && !!hotspotAccessor
       ? (beat.type === 'movementChoice' ? 'choices'
         : beat.type === 'pickProp' ? 'props'
         : beat.type === 'dialogTree' ? 'dialogChoices'
@@ -1545,13 +1558,6 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const isHotspotChoicePreview =
     hotspotItemsKey !== null
     && (hotspotItems.some((c: any) => c && c.hotspot) || hotspotItems.length === 0);
-  // Project-level gate for the schema-declared slot/spatial editor.
-  // Fixed projects keep the legacy positioned editor for slot-mode beats
-  // — the responsive (slot) editor is opt-in via the project layout-mode
-  // flag, and the schema's slot declaration alone is not sufficient.
-  // Hotspot-based spatial preview (isHotspotChoicePreview) is per-beat
-  // author intent and stays regardless of project mode.
-  const projectIsResponsive = resolveLayoutMode(globalSettings as any, beats as any) === 'responsive';
   // In responsive projects the schema's slot/spatial declaration is
   // authoritative — baked locations may linger from a prior fixed-mode
   // session but the responsive flow is what the author chose. In fixed
