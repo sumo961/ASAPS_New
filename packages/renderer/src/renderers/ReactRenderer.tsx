@@ -2576,7 +2576,11 @@ export class ReactRenderer extends BaseRenderer {
       (_earlyBeatType === 'dialogTree' || _earlyBeatType === 'aiDialogTree')
       && (_earlyRawTemplate === 'stacked' || _earlyRawTemplate === 'conversation' || _earlyRawTemplate === 'custom');
     const anyChoiceHasHotspot = choices.some(c => !!c.hotspot);
-    if (dialogNodeIsSpatial && !authorPositioned && !dialogTreeWantsSlotInstead && anyChoiceHasHotspot) {
+    // Responsive projects let hotspots override baked positions —
+    // mirrors movementChoice / pickProp.
+    const _earlyProjectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
+    const _earlyProjectIsResponsive = _earlyProjectLayoutMode === 'responsive';
+    if (dialogNodeIsSpatial && (_earlyProjectIsResponsive || !authorPositioned) && !dialogTreeWantsSlotInstead && anyChoiceHasHotspot) {
       const spatialSpec = getSpatialSpec('dialogTree');
       if (spatialSpec) {
         // Bug 26 — per-beat fit override.
@@ -2908,7 +2912,12 @@ export class ReactRenderer extends BaseRenderer {
     // should warn the author about that gap; that warning lands separately).
     const authorPositioned = layoutAuthorPositioned(locations);
     const anyHasHotspot = choices.length > 0 && choices.some(c => !!c.hotspot);
-    if (anyHasHotspot && !authorPositioned) {
+    // In responsive projects the schema is authoritative: hotspots mean
+    // spatial mode regardless of leftover baked positions. Matches the
+    // editor's hotspotItemsKey gate so VE and PW agree.
+    const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
+    const projectIsResponsive = projectLayoutMode === 'responsive';
+    if (anyHasHotspot && (projectIsResponsive || !authorPositioned)) {
       const spatialSpec = getSpatialSpec('movementChoice');
       if (spatialSpec) {
         // Bug 26 — per-beat fit override.
@@ -3007,7 +3016,11 @@ export class ReactRenderer extends BaseRenderer {
     // movementChoice spatial routing (P3-3c-2).
     const authorPositioned = layoutAuthorPositioned(locations);
     const anyHasHotspot = props.length > 0 && props.some(p => !!p.hotspot);
-    if (anyHasHotspot && !authorPositioned) {
+    // Mirrors renderMovementChoice — responsive projects let hotspots
+    // win over baked positions.
+    const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
+    const projectIsResponsive = projectLayoutMode === 'responsive';
+    if (anyHasHotspot && (projectIsResponsive || !authorPositioned)) {
       const spatialSpec = getSpatialSpec('pickProp');
       if (spatialSpec) {
         // Bug 26 — per-beat fit override.
