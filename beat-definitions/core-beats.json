@@ -2425,6 +2425,24 @@
       "locationMapping": {
         "dialog": "scenario"
       },
+      "spatialLayer": {
+        "source": "background",
+        "fit": "contain"
+      },
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "dialogTree",
@@ -2933,6 +2951,21 @@
       "locationMapping": {
         "text": "fallbackText"
       },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "durScreen",
