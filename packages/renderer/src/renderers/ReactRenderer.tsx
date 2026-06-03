@@ -3268,7 +3268,16 @@ export class ReactRenderer extends BaseRenderer {
       maxLength: options?.maxLength,
       required: options?.required
     };
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('inputText', content);
+    // Compute authorPositioned from the ORIGINAL locations (before any
+    // default fill) so an inputText beat with no baked layout routes
+    // through the responsive slot-mode path — same pattern as renderText.
+    // Without this, the default schema-generated locations made the
+    // beat look "author-positioned" and forced the absolute renderer,
+    // dropping the prompt/body slot in PW even though VE showed it.
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('inputText', content), locations);
 
     // Speak the prompt as regular dialog (not as a UI prompt that requires readPrompts)
     this.ttsSpeakCallback?.(prompt, this.currentSpeaker);
@@ -3287,7 +3296,7 @@ export class ReactRenderer extends BaseRenderer {
         resolve(value);
       };
 
-      this.renderPositionedBeat('inputText', content, effectiveLocations, true);
+      this.renderPositionedBeat('inputText', content, effectiveLocations, true, undefined, authorPositioned);
     });
   }
 
