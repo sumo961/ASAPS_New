@@ -64,8 +64,13 @@ interface Props {
 }
 
 type DragKind =
-  | { kind: 'move'; id: string; startX: number; startY: number; origX: number; origY: number }
-  | { kind: 'resize'; id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number } }
+  // `live` mirrors the last computed rect so the visual rect can follow the
+  // pointer (the beat is mutated in-place via onChange but that doesn't
+  // trigger React re-renders, so the hotspot prop snapshot stays stale —
+  // we override from `live` while a move/resize is active and use `live`
+  // again at commit so the final position isn't read from the stale prop.
+  | { kind: 'move'; id: string; startX: number; startY: number; origX: number; origY: number; live?: { x: number; y: number; width: number; height: number } }
+  | { kind: 'resize'; id: string; corner: 'tl' | 'tr' | 'bl' | 'br'; startX: number; startY: number; orig: { x: number; y: number; w: number; h: number }; live?: { x: number; y: number; width: number; height: number } }
   | { kind: 'create'; startX: number; startY: number; cur: { x: number; y: number; w: number; h: number } };
 
 const MIN_NORMALIZED = 0.02; // hotspots smaller than 2% are practically un-clickable
@@ -183,12 +188,9 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         const cur = resolveHotspotRect(h, isPortrait);
         const nx = Math.max(0, Math.min(1 - cur.width, drag.origX + dx));
         const ny = Math.max(0, Math.min(1 - cur.height, drag.origY + dy));
-        onChange(
-          drag.id,
-          { x: nx, y: ny, width: cur.width, height: cur.height },
-          false,
-          isPortrait
-        );
+        const liveRect = { x: nx, y: ny, width: cur.width, height: cur.height };
+        setDrag({ ...drag, live: liveRect });
+        onChange(drag.id, liveRect, false, isPortrait);
       } else if (drag.kind === 'resize') {
         const { x, y, w, h } = drag.orig;
         let nx = x, ny = y, nw = w, nh = h;
@@ -213,7 +215,9 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         ny = Math.max(0, Math.min(1 - MIN_NORMALIZED, ny));
         nw = Math.min(1 - nx, nw);
         nh = Math.min(1 - ny, nh);
-        onChange(drag.id, { x: nx, y: ny, width: nw, height: nh }, false, isPortrait);
+        const liveRect = { x: nx, y: ny, width: nw, height: nh };
+        setDrag({ ...drag, live: liveRect });
+        onChange(drag.id, liveRect, false, isPortrait);
       } else {
         // create — track the live rectangle from start point to current.
         const newW = Math.abs(dx);
@@ -242,15 +246,26 @@ export const HotspotEditOverlay: React.FC<Props> = ({
         setDrag(null);
         return;
       }
-      const h = hotspots.find(s => s.id === drag.id);
-      if (h) {
-        const cur = resolveHotspotRect(h, isPortrait);
-        onChange(
-          drag.id,
-          { x: cur.x, y: cur.y, width: cur.width, height: cur.height },
-          true,
-          isPortrait
-        );
+      // Use the live drag rect for the commit, NOT the prop snapshot — the
+      // in-place beat mutation during onMove doesn't re-render the parent,
+      // so `hotspots` still carries the pre-drag values. `live` is set on
+      // the first pointermove; if the pointer never moved, fall back to
+      // the prop (a zero-delta click commits the original position, a
+      // no-op).
+      const liveRect = drag.live;
+      if (liveRect) {
+        onChange(drag.id, liveRect, true, isPortrait);
+      } else {
+        const h = hotspots.find(s => s.id === drag.id);
+        if (h) {
+          const cur = resolveHotspotRect(h, isPortrait);
+          onChange(
+            drag.id,
+            { x: cur.x, y: cur.y, width: cur.width, height: cur.height },
+            true,
+            isPortrait
+          );
+        }
       }
       setDrag(null);
     };
@@ -297,9 +312,35 @@ export const HotspotEditOverlay: React.FC<Props> = ({
   // P3-3c-5 — pointerdown on the image rect (but NOT on an existing
   // hotspot) starts drawing a new rectangle. Bare clicks deselect; a
   // real drag commits to onCreate at pointer-up.
+  //
+  // Sprite passthrough: the overlay sits at zIndex 5 over the
+  // SpatialFlowView character layer (zIndex 2), so a click on a free-
+  // positioned sprite lands here instead of the sprite. Hit-test the
+  // point with elementsFromPoint (overlay temporarily ignored) and, if
+  // a sprite is underneath, forward the click to it so the author can
+  // select it in the panel. Falls through to deselect/create otherwise.
   const handleEmptyPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return; // only the image-rect surface
     if (rect.width <= 0 || rect.height <= 0) return;
+
+    const overlayEl = containerRef.current;
+    if (overlayEl) {
+      const prevPe = overlayEl.style.pointerEvents;
+      overlayEl.style.pointerEvents = 'none';
+      const hits = document.elementsFromPoint(e.clientX, e.clientY) as HTMLElement[];
+      overlayEl.style.pointerEvents = prevPe;
+      for (const hit of hits) {
+        let el: HTMLElement | null = hit;
+        while (el && el !== document.body) {
+          if (el.dataset?.characterName) {
+            el.click();
+            return;
+          }
+          el = el.parentElement;
+        }
+      }
+    }
+
     onSelect(null);
     if (!onCreate) return; // creation disabled — just deselect
     const bcr = e.currentTarget.getBoundingClientRect();
@@ -358,7 +399,20 @@ export const HotspotEditOverlay: React.FC<Props> = ({
           // Render against the resolved variant for this orientation.
           // No portrait override yet → falls back to the canonical rect
           // (matches the runtime's behavior exactly).
-          const cur = resolveHotspotRect(h, isPortrait);
+          // When this hotspot is the one being dragged, override the prop
+          // snapshot with the live drag rect — the in-place beat mutation
+          // doesn't re-render the parent, so without this the rect would
+          // stay frozen at its starting position until pointer-up.
+          const baseRect = resolveHotspotRect(h, isPortrait);
+          const dragLive = (drag?.kind === 'move' || drag?.kind === 'resize')
+            && drag.id === h.id && drag.live
+            ? drag.live
+            : null;
+          const cur = dragLive ?? baseRect;
+          // Pre-migration ASML can carry an authored rotation around the
+          // hotspot's center (e.g. a sofa hotspot drawn at an angle). Apply
+          // it so the editor visualizes the same rect the runtime hits.
+          const rot = typeof h.rotation === 'number' ? h.rotation : 0;
           return (
             <div
               key={h.id}
@@ -371,6 +425,8 @@ export const HotspotEditOverlay: React.FC<Props> = ({
                 top: `${cur.y * 100}%`,
                 width: `${cur.width * 100}%`,
                 height: `${cur.height * 100}%`,
+                transform: rot ? `rotate(${rot}deg)` : undefined,
+                transformOrigin: 'center center',
                 background: isSelected
                   ? 'rgba(96, 165, 250, 0.22)'
                   : isExternalHover

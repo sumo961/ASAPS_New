@@ -6043,9 +6043,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       onElementSelect={(locationName) => {
                         const el = visualElements.find(e => e.name === locationName);
                         if (el) setSelectedElementIds([el.id]);
-                        // Clear slot expansion so the user's attention
-                        // moves to the sprite they just clicked.
+                        // Exclusive selection: clear slot expansion AND
+                        // hotspot selection so only the sprite is highlighted.
                         setExpandedSlotKey(null);
+                        setSelectedHotspotId(null);
                       }}
                       selectedSlotKey={expandedSlotKey ?? undefined}
                       onSlotSelect={(slotName, buttonId) => {
@@ -6053,9 +6054,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           ? `slot:${slotName}:${buttonId}`
                           : `slot:${slotName}`;
                         setExpandedSlotKey(prev => prev === key ? null : key);
-                        // Clear free-positioned selection so only one
-                        // thing is highlighted at a time.
+                        // Exclusive selection: clear free-positioned and
+                        // hotspot selection.
                         setSelectedElementIds([]);
+                        setSelectedHotspotId(null);
                       }}
                     />
                     {/* P3-3c-3 — interactive hotspot editor overlay. Only for
@@ -6091,6 +6093,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           fit={getSpatialSpec(beat!.type)?.fit ?? 'contain'}
                           hotspots={items
                             .filter((c: any) => c && c.hotspot)
+                            // fromProp hotspots are visually represented by the
+                            // prop sprite itself — skip drawing an overlay rect
+                            // so the editor matches the runtime (where the
+                            // overlay is transparent for fromProp anyway) and
+                            // doesn't duplicate the prop with a yellow box.
+                            .filter((c: any) => !c.hotspot.fromProp)
                             .map((c: any) => ({
                               id: c.id,
                               x: c.hotspot.x,
@@ -6098,6 +6106,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               width: c.hotspot.width,
                               height: c.hotspot.height,
                               shape: c.hotspot.shape,
+                              // Pre-migration ASML can carry a rotation on the
+                              // source location (e.g. a sofa hotspot drawn at
+                              // an angle) — pass it through so the editor
+                              // visualizes it the same way the runtime does.
+                              rotation: c.hotspot.rotation,
                               // P3-3e — pass the portrait override
                               // through so the overlay can render the
                               // portrait variant when in portrait
@@ -6107,7 +6120,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               label: c.displayText || c.text || c.displayName || c.name,
                             }))}
                           selectedId={selectedHotspotId}
-                          onSelect={setSelectedHotspotId}
+                          onSelect={(id) => {
+                            setSelectedHotspotId(id);
+                            // Exclusive selection: a hotspot click on the
+                            // stage clears slot expansion and free-positioned
+                            // sprite selection.
+                            if (id) {
+                              setExpandedSlotKey(null);
+                              setSelectedElementIds([]);
+                            }
+                          }}
                           onChange={onHotspotChange}
                           onCreate={onHotspotCreate}
                           onDelete={onHotspotDelete}

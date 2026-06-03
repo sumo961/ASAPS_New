@@ -254,10 +254,15 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     label: string;
     preview: string;
     tooltip: string;
-    role: 'title' | 'body' | 'action' | 'speaker' | 'input';
+    role: 'title' | 'body' | 'action' | 'speaker' | 'input' | 'hotspot';
     slotName: string;
     // For action rows: which button this row represents.
     buttonId?: string;
+    // For hotspot rows: the choice id whose hotspot this represents,
+    // and the normalized (0..1) bounds. Hotspot rows are data-defined
+    // per-choice, not schema-defined like the slot rows above.
+    choiceId?: string;
+    hotspotBounds?: { x: number; y: number; width: number; height: number };
   };
   // Slot-row selection — clicking a row expands it and exposes its
   // controls below the preview line. Independent from selectedElements
@@ -330,6 +335,48 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             buttonId: bid,
           });
         }
+      }
+    }
+    // Hotspot rows for movementChoice / pickProp / dialogTree. Choices
+    // with a hotspot are interactive regions on the spatial image —
+    // surface them in the panel so authors can see + select them like
+    // any other on-stage element. Read from the same per-beat path the
+    // runtime uses.
+    const choicesForHotspots: any[] | null =
+      beatType === 'movementChoice' ? (p.choices as any[]) ?? null
+      : beatType === 'pickProp' ? (p.props as any[]) ?? null
+      : beatType === 'dialogTree' || beatType === 'aiDialogTree'
+        ? (p.dialogTree?.choices as any[]) ?? null
+        : null;
+    if (choicesForHotspots && Array.isArray(choicesForHotspots)) {
+      for (const c of choicesForHotspots) {
+        if (!c?.hotspot) continue;
+        // fromProp hotspots are represented by the prop sprite in the
+        // free-positioned section below — surfacing them again here as a
+        // separate row would suggest there are two distinct elements for
+        // a single visual.
+        if (c.hotspot.fromProp) continue;
+        const label = (c.text || c.name || c.id || 'choice').toString();
+        const x = Math.round(((c.hotspot.x ?? 0) as number) * 100);
+        const y = Math.round(((c.hotspot.y ?? 0) as number) * 100);
+        const w = Math.round(((c.hotspot.width ?? 0) as number) * 100);
+        const h = Math.round(((c.hotspot.height ?? 0) as number) * 100);
+        rows.push({
+          key: `hotspot:${c.id}`,
+          icon: <MousePointer className="w-4 h-4 text-blue-600" />,
+          label,
+          preview: `Hotspot · ${x},${y} · ${w}×${h}%`,
+          tooltip: `Choice "${label}" hotspot — edit on the canvas or in the right inspector under Choices.`,
+          role: 'hotspot',
+          slotName: c.id,
+          choiceId: c.id,
+          hotspotBounds: {
+            x: c.hotspot.x ?? 0,
+            y: c.hotspot.y ?? 0,
+            width: c.hotspot.width ?? 0,
+            height: c.hotspot.height ?? 0,
+          },
+        });
       }
     }
     return rows;

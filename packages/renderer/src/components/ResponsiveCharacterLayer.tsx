@@ -482,13 +482,14 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
           transformOrigin: 'center center',
           imageRendering: 'pixelated',
           // In editor mode, individual sprites accept clicks so the
-          // author can select them. The yellow outline marks the
-          // currently-selected element — matches the existing
-          // ring-amber-400 stage frame in VisualWorkspace so the
-          // selection feels consistent with the rest of the editor.
+          // author can select them. The blue outline marks the
+          // currently-selected element — using the same blue as the
+          // selected-hotspot border so yellow stays reserved exclusively
+          // for unselected hotspot styling (otherwise a selected prop
+          // visually reads as "extra hotspot" on top of a fromProp choice).
           pointerEvents: editorMode ? 'auto' : undefined,
           cursor: editorMode ? 'pointer' : undefined,
-          outline: isSelected ? '2px solid #fbbf24' : undefined,
+          outline: isSelected ? '2px solid rgba(59, 130, 246, 0.95)' : undefined,
           outlineOffset: isSelected ? 2 : undefined,
         };
         const handleEditorClick = editorMode && onElementSelect
