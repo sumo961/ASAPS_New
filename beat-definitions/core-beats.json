@@ -860,6 +860,19 @@
       "locationMapping": {
         "video": "videoFile"
       },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": ["continueButton"]
+        }
+      ],
       "transitions": true,
       "sound": false,
       "renderer": "videoPlayer"
@@ -2027,6 +2040,23 @@
       "locationMapping": {
         "prompt": "prompt"
       },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "keypadGrid",
+          "role": "keypad"
+        }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "keypad"

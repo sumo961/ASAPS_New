@@ -2137,6 +2137,9 @@ export class ReactRenderer extends BaseRenderer {
             theme={this.theme}
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
+            videoUrl={typeof (content as any).videoUrl === 'string' ? (content as any).videoUrl : undefined}
+            videoAutoplay={(content as any).autoplay !== false}
+            videoControls={(content as any).controls === true}
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
             autoExitMs={slotAutoExitMs}
@@ -3096,50 +3099,32 @@ export class ReactRenderer extends BaseRenderer {
     }
     console.log(`[ReactRenderer] renderVideo: resolved="${resolvedVideoUrl?.substring(0, 80)}", autoplay=${autoplay}, controls=${controls}, skipButton=${skipButton}`);
 
-    // Find video element position from locations
-    const videoLoc = locations?.find(l => l.name === 'video' || l.name === 'Video' || l.kind === 'prop');
+    // Route through the slot path: SlotFlowView renders the <video>
+    // element fluidly as the stage background (via the videoUrl prop),
+    // with optional skip button in the action slot. authorPositioned=false
+    // because the video drives the layout — there's no rectangle to bake.
+    const content = {
+      videoUrl: resolvedVideoUrl,
+      autoplay,
+      controls,
+      skipButton,
+      speaker: this.resolveSpeakerForSlot(),
+      buttonText: 'Skip',
+    };
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('videoBeat', content), locations);
 
-    return new Promise(resolve => {
-      const VideoDisplay: React.FC = () => {
-        const videoStyle: React.CSSProperties = videoLoc ? {
-          position: 'absolute',
-          left: `${videoLoc.x}px`,
-          top: `${videoLoc.y}px`,
-          width: `${videoLoc.width}px`,
-          height: `${videoLoc.height}px`,
-        } : {
-          maxWidth: '100%',
-          maxHeight: '100%',
-        };
-
-        return (
-          <div className={`relative ${videoLoc ? '' : 'flex items-center justify-center'} h-full w-full`}
-            style={this.backgroundImageUrl ? {
-              backgroundImage: `url(${this.backgroundImageUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            } : { backgroundColor: 'black' }}
-          >
-            <video
-              src={resolvedVideoUrl}
-              autoPlay={autoplay}
-              controls={controls}
-              style={videoStyle}
-              className={videoLoc ? 'object-contain' : ''}
-              onEnded={() => resolve()}
-            />
-            {skipButton && (
-              <button
-                onClick={() => resolve()}
-                className="absolute bottom-8 right-8 px-6 py-3 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-lg font-semibold transition-all z-10"
-              >
-                Skip
-              </button>
-            )}
-          </div>
-        );
+    return new Promise<void>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;
+      this.handleAction = () => {
+        this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
+        resolve();
       };
-      this.renderComponent(<VideoDisplay />);
+      this.renderPositionedBeat('videoBeat', content, effectiveLocations, true, undefined, authorPositioned);
     });
   }
 
@@ -3328,10 +3313,14 @@ export class ReactRenderer extends BaseRenderer {
       ...options,
     };
 
+    // Compute authorPositioned from the ORIGINAL locations so a keypad
+    // beat with no baked layout routes through the responsive slot path
+    // (where the new role:'keypad' slot renders KeypadElement directly).
+    const authorPositioned = layoutAuthorPositioned(locations);
     // Generate default locations if none provided
     // Filter out 'display' and 'submitButton' locations - KeypadElement handles those internally
-    const effectiveLocations: Location[] = locations && locations.length > 0
-      ? locations
+    const effectiveLocations: Location[] = authorPositioned
+      ? locations!
           .filter(loc => {
             const name = (loc.name || '').toLowerCase();
             return name !== 'display' && name !== 'submitbutton';
@@ -3343,12 +3332,15 @@ export class ReactRenderer extends BaseRenderer {
             }
             return loc;
           })
-      : [
-          // Prompt text
-          { kind: 'text' as const, name: 'prompt', x: 212, y: 30, width: 600, height: 60 },
-          // Keypad grid
-          { kind: 'keypad' as const, name: 'keypadGrid', x: 392, y: 120, width: 240, height: 360 },
-        ];
+      : mergeWithFreePositioned(
+          [
+            // Prompt text
+            { kind: 'text' as const, name: 'prompt', x: 212, y: 30, width: 600, height: 60 },
+            // Keypad grid
+            { kind: 'keypad' as const, name: 'keypadGrid', x: 392, y: 120, width: 240, height: 360 },
+          ],
+          locations
+        );
 
     return new Promise<string>(resolve => {
       const originalHandleAction = this.handleAction;
@@ -3359,7 +3351,7 @@ export class ReactRenderer extends BaseRenderer {
         resolve(value);
       };
 
-      this.renderPositionedBeat('keypad', content, effectiveLocations, true);
+      this.renderPositionedBeat('keypad', content, effectiveLocations, true, undefined, authorPositioned);
     });
   }
 

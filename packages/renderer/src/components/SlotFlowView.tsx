@@ -30,6 +30,7 @@ import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, S
 import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
+import { KeypadElement } from './KeypadElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
@@ -42,6 +43,15 @@ interface SlotFlowViewProps {
   theme?: RenderThemeSettings;
   backgroundUrl?: string | null;
   backgroundColor: string;
+  /**
+   * Video that fills the stage behind the slot composition (videoBeat).
+   * When present, a `<video>` element is mounted at z-index:0 with the
+   * slots layered on top. Native fluid sizing handles responsiveness.
+   * onEnded fires onAction('continue') so the beat resolves at video end.
+   */
+  videoUrl?: string | null;
+  videoAutoplay?: boolean;
+  videoControls?: boolean;
   /**
    * Soft author layout preferences. Currently consumed: `preferredLines`
    * (title). Anchors are carried but their repositioning is applied with
@@ -245,6 +255,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   theme: themeProp,
   backgroundUrl,
   backgroundColor,
+  videoUrl,
+  videoAutoplay,
+  videoControls,
   slotIntent,
   slotAnimations,
   onResolve,
@@ -294,6 +307,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // beat resolves with the user's typed string.
   const inputSlot = slots.find(s => s.role === 'input');
   const [inputValue, setInputValue] = React.useState('');
+  // keypad beat — virtual numeric/PIN/phone keypad. KeypadElement
+  // manages its own display + submit; onSubmit(code) → onAction(code)
+  // so the beat resolves with the entered code (same pattern as input).
+  const keypadSlot = slots.find(s => s.role === 'keypad');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -982,6 +999,27 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         overflowX: 'hidden',
       }}
     >
+      {/* Video layer — videoBeat plays as the stage background, sized
+          via native CSS so it fluidly fits any viewport. onEnded fires
+          onAction('continue') so the beat resolves when playback completes;
+          a skip button (if shown in the action slot) fires the same id. */}
+      {videoUrl && (
+        <video
+          src={videoUrl}
+          autoPlay={videoAutoplay !== false}
+          controls={videoControls === true}
+          onEnded={() => onAction('continue')}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            background: 'black',
+            zIndex: 0,
+          }}
+        />
+      )}
       {/* Default-target countdown bar — pinned to the top of the
           stage. Mirrors the same TimerProgressBar PositionedBeatView
           uses, so a beat that auto-advances after defaultTargetDelay
@@ -1421,6 +1459,50 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 width: 'clamp(200px, 60%, 480px)',
                 textAlign: 'center',
                 outline: 'none',
+              }}
+            />
+          </div>
+        );
+      })()}
+
+      {/* Keypad slot — virtual numeric/PIN/phone keypad for keypad
+          beats. KeypadElement owns its display + submit button, so we
+          just route onSubmit → onAction(code) like the input slot. */}
+      {keypadSlot && (() => {
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${keypadSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(keypadSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={keypadSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            <KeypadElement
+              layout={(content.layout as 'numeric' | 'phone' | 'pin') ?? 'numeric'}
+              maxDigits={(content.maxDigits as number) ?? 4}
+              minDigits={(content.minDigits as number) ?? 1}
+              correctCode={content.correctCode as string | undefined}
+              maxAttempts={(content.maxAttempts as number) ?? 0}
+              maskInput={!!content.maskInput}
+              buttonText={(content.buttonText as string) ?? 'Submit'}
+              clearButtonText={(content.clearButtonText as string) ?? 'Clear'}
+              showDisplay={content.showDisplay !== false}
+              onSubmit={(code) => dispatchAction(code)}
+              theme={{
+                buttonBg: theme.button?.backgroundColor,
+                buttonText: theme.button?.textColor,
+                buttonBorder: theme.button?.borderColor,
+                displayBg: theme.textBox?.backgroundColor,
+                displayText: theme.button?.textColor,
+                frameBg: theme.backgroundColor,
               }}
             />
           </div>

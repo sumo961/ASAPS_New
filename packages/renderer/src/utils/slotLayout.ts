@@ -27,8 +27,11 @@ export interface SlotSpec {
    *               so the speaker isn't styled as a title in spatial dialog.
    *   'input'   = a single-line text input field (inputText beat). Submits
    *               via Enter or the paired action button; the value is the
-   *               action id passed to onAction. */
-  role: 'body' | 'action' | 'title' | 'speaker' | 'input';
+   *               action id passed to onAction.
+   *   'keypad'  = virtual numeric / PIN / phone keypad (keypad beat). The
+   *               keypad owns its own display + submit button internally;
+   *               the entered code is passed to onAction on submit. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */
