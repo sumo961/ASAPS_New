@@ -3382,11 +3382,16 @@ export class ReactRenderer extends BaseRenderer {
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
     this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
-    // Use provided locations or generate default locations from schema
-    const effectiveLocations = locations && locations.length > 0 ? locations : generateDefaultLocations('hyperText', data);
+    // Compute authorPositioned from the ORIGINAL locations so a hyperText
+    // beat with no baked layout routes through the responsive slot path
+    // (same pattern as renderText / renderInputText).
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('hyperText', data), locations);
 
     this.ttsSpeakCallback?.(data.text, this.currentSpeaker);
-    return this.renderPositionedBeat('hyperText', data, effectiveLocations, true);
+    return this.renderPositionedBeat('hyperText', data, effectiveLocations, true, undefined, authorPositioned);
   }
 
   async renderPanorama(panoramaUrl: string, options: {

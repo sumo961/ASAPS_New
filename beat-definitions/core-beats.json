@@ -2086,6 +2086,21 @@
       "locationMapping": {
         "text": "text"
       },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "hyperText"

@@ -239,6 +239,7 @@ const READABLE_MAX_WIDTH = 760;
 let uidCounter = 0;
 
 export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
+  beatType,
   slots,
   content,
   theme: themeProp,
@@ -1343,7 +1344,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                 }}
               >
-                {bodyReveal.rendered}
+                {beatType === 'hyperText' && Array.isArray((content as any).links) && (content as any).links.length > 0
+                  ? <HyperTextBody
+                      text={bodyText}
+                      links={(content as any).links}
+                      onLinkClick={onAction}
+                    />
+                  : bodyReveal.rendered}
               </div>
             );
           })()}
@@ -1812,3 +1819,74 @@ export function applyAlphaToHex(color: string | undefined, alpha: number): strin
     .padStart(2, '0');
   return `${hex}${a}`;
 }
+
+/**
+ * HyperTextBody — body slot renderer for hyperText beats. Splits the
+ * authored text around each link word and wraps it in a clickable span
+ * that fires onLinkClick(targetBeatId). Text reveal (typewriter/fade)
+ * isn't applied here so links are clickable from the first paint.
+ */
+const HyperTextBody: React.FC<{
+  text: string;
+  links: Array<{
+    word: string;
+    targetBeatId: string;
+    style?: { color?: string; hoverColor?: string; underline?: boolean; bold?: boolean };
+  }>;
+  onLinkClick: (targetBeatId: string) => void;
+}> = ({ text, links, onLinkClick }) => {
+  const [hoveredWord, setHoveredWord] = React.useState<string | null>(null);
+
+  const sortedLinks = links
+    .map(link => ({ ...link, index: text.indexOf(link.word) }))
+    .filter(link => link.index >= 0)
+    .sort((a, b) => a.index - b.index);
+
+  if (sortedLinks.length === 0) {
+    return <>{text}</>;
+  }
+
+  const segments: React.ReactNode[] = [];
+  let lastIndex = 0;
+  sortedLinks.forEach((link, i) => {
+    if (link.index > lastIndex) {
+      segments.push(<span key={`text-${i}`}>{text.substring(lastIndex, link.index)}</span>);
+    }
+    const isHovered = hoveredWord === link.word;
+    const linkStyle: React.CSSProperties = {
+      color: isHovered && link.style?.hoverColor
+        ? link.style.hoverColor
+        : (link.style?.color || '#3b82f6'),
+      textDecoration: link.style?.underline !== false ? 'underline' : 'none',
+      fontWeight: link.style?.bold ? 'bold' : 'inherit',
+      cursor: 'pointer',
+    };
+    segments.push(
+      <span
+        key={`link-${i}`}
+        style={linkStyle}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLinkClick(link.targetBeatId);
+        }}
+        onMouseEnter={() => setHoveredWord(link.word)}
+        onMouseLeave={() => setHoveredWord(null)}
+        role="link"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onLinkClick(link.targetBeatId);
+          }
+        }}
+      >
+        {link.word}
+      </span>
+    );
+    lastIndex = link.index + link.word.length;
+  });
+  if (lastIndex < text.length) {
+    segments.push(<span key="text-end">{text.substring(lastIndex)}</span>);
+  }
+  return <>{segments}</>;
+};
