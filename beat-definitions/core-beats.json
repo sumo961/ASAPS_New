@@ -3332,6 +3332,21 @@
         }
       },
       "locations": ["text"],
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "npcName"
+        },
+        {
+          "name": "openingLine",
+          "role": "body",
+          "source": "openingLine",
+          "grow": true,
+          "scroll": true
+        }
+      ],
       "transitions": true,
       "sound": true,
       "renderer": "conversation",
