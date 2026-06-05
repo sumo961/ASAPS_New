@@ -19,6 +19,7 @@ import { UpdateAffectBeat } from './UpdateAffectBeat';
 import { InputTextBeat } from './InputTextBeat';
 import { HyperTextBeat } from './HyperTextBeat';
 import { KeypadBeat } from './KeypadBeat';
+import { QRScanBeat } from './QRScanBeat';
 import { PanoramaBeat } from './PanoramaBeat';
 // XR beats (S4+)
 import { GpsLocationBeat } from './GpsLocationBeat';
@@ -79,6 +80,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('inputText', InputTextBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
     this.registerBeatType('keypad', KeypadBeat);
+    this.registerBeatType('qrScan', QRScanBeat);
     this.registerBeatType('panorama', PanoramaBeat);
 
     // Invisible beats

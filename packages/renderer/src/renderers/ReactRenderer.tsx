@@ -3386,6 +3386,53 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('hyperText', data, effectiveLocations, true, undefined, authorPositioned);
   }
 
+  /** qrScan beat — opens the rear/front camera, decodes QR codes, and
+   *  resolves with the decoded payload (or 'cancelled' /
+   *  'permission_denied'). Routes through SlotFlowView via the
+   *  `camera` slot role; QRScanElement owns the permission flow + the
+   *  per-frame decode loop. */
+  async renderQRScan(
+    prompt: string,
+    options: {
+      facing?: 'rear' | 'front';
+      matchPatterns?: string[];
+      cancelButtonText?: string;
+      helperText?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
+
+    const content = {
+      prompt,
+      facing: options.facing ?? 'rear',
+      matchPatterns: options.matchPatterns,
+      helperText: options.helperText,
+      cancelButtonText: options.cancelButtonText ?? 'Cancel',
+      speaker: this.resolveSpeakerForSlot(),
+    };
+
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('qrScan', content), locations);
+
+    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+
+    return new Promise<string>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;
+      this.handleAction = (value: string) => {
+        this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
+        resolve(value);
+      };
+      this.renderPositionedBeat('qrScan', content, effectiveLocations, true, undefined, authorPositioned);
+    });
+  }
+
   async renderPanorama(panoramaUrl: string, options: {
     hotspots: Array<{
       id: string;

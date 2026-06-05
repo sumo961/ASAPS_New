@@ -2062,6 +2062,131 @@
       "renderer": "keypad"
     },
 
+    "qrScan": {
+      "category": "visible",
+      "displayName": "QR Scan",
+      "icon": "📷",
+      "description": "Opens the camera and waits for the player to scan a QR code. The decoded string is saved to a variable, then the beat branches.",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "default": "Point your camera at the QR code",
+          "description": "Instruction shown above the camera preview",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Prompt"
+          }
+        },
+        "saveTo": {
+          "type": "string",
+          "required": true,
+          "default": "scannedCode",
+          "description": "Variable name to receive the decoded value"
+        },
+        "facing": {
+          "type": "string",
+          "required": false,
+          "default": "rear",
+          "description": "Which camera to use",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "rear", "label": "Rear (environment)" },
+              { "value": "front", "label": "Front (selfie)" }
+            ],
+            "label": "Camera"
+          }
+        },
+        "matchPatterns": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Optional regex patterns — only codes that match resolve. Leave empty to accept any code.",
+          "ui": {
+            "label": "Accept patterns (regex)",
+            "addLabel": "Add Pattern"
+          }
+        },
+        "helperText": {
+          "type": "string",
+          "required": false,
+          "default": "Align the code inside the frame",
+          "description": "Small helper text shown near the scan target",
+          "ui": {
+            "control": "text",
+            "label": "Helper Text"
+          }
+        },
+        "cancelButtonText": {
+          "type": "string",
+          "required": false,
+          "default": "Skip",
+          "description": "Cancel/skip button label"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat after a code is scanned (or the player cancels)"
+        }
+      },
+      "permissions": ["camera"],
+      "onPermissionDenied": {
+        "behavior": "fallthrough",
+        "message": "Camera access is required to scan QR codes."
+      },
+      "locations": ["prompt", "camera"],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "camera",
+          "role": "camera"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": ["cancelButton"]
+        }
+      ],
+      "transitions": true,
+      "sound": false,
+      "renderer": "qrScan",
+      "aiNotes": {
+        "purpose": "Wait for a real-world QR code scan and store its value",
+        "examples": [
+          "Scavenger hunt — players scan codes hidden in the environment",
+          "Authentication — players scan a code on a partner device to continue",
+          "Object identification — different codes lead to different beats"
+        ]
+      }
+    },
+
     "hyperText": {
       "category": "visible",
       "displayName": "Hyper Text",

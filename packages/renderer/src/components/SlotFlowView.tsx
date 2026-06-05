@@ -31,6 +31,7 @@ import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
+import { QRScanElement } from './QRScanElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
@@ -311,6 +312,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // manages its own display + submit; onSubmit(code) → onAction(code)
   // so the beat resolves with the entered code (same pattern as input).
   const keypadSlot = slots.find(s => s.role === 'keypad');
+  // qrScan beat — live camera with QR decode. QRScanElement owns the
+  // permission flow + decode loop; onDecode(code) → onAction(code).
+  // Reserved sentinels 'cancelled' / 'permission_denied' propagate so
+  // the beat can branch on the no-scan path.
+  const cameraSlot = slots.find(s => s.role === 'camera');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -1505,6 +1511,64 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 frameBg: theme.backgroundColor,
               }}
             />
+          </div>
+        );
+      })()}
+
+      {/* Camera slot — QR-scan (Phase 1) and AR (Phase 3) ride here.
+          QRScanElement handles permission flow + decode loop and emits
+          either the decoded value or a reserved sentinel via
+          dispatchAction. The slot has no editor-mode preview yet — the
+          camera UI is intrinsically a runtime concept; in the VE we
+          leave a placeholder so the slot still anchors layout. */}
+      {cameraSlot && (() => {
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${cameraSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(cameraSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={cameraSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            {editorMode ? (
+              <div
+                style={{
+                  width: 'min(80%, 480px)',
+                  aspectRatio: '4 / 3',
+                  borderRadius: 12,
+                  border: '2px dashed rgba(255,255,255,0.35)',
+                  background: 'rgba(0,0,0,0.4)',
+                  color: 'rgba(255,255,255,0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                }}
+              >
+                📷 Camera preview (runtime)
+              </div>
+            ) : (
+              <QRScanElement
+                facing={(content.facing as 'rear' | 'front') ?? 'rear'}
+                matchPatterns={Array.isArray(content.matchPatterns) ? content.matchPatterns : undefined}
+                helperText={typeof content.helperText === 'string' ? content.helperText : undefined}
+                cancelButtonText={typeof content.cancelButtonText === 'string' ? content.cancelButtonText : 'Cancel'}
+                onDecode={(value) => dispatchAction(value)}
+                theme={{
+                  buttonBg: theme.button?.backgroundColor,
+                  buttonText: theme.button?.textColor,
+                  buttonBorder: theme.button?.borderColor,
+                }}
+              />
+            )}
           </div>
         );
       })()}

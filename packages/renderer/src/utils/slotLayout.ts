@@ -30,8 +30,13 @@ export interface SlotSpec {
    *               action id passed to onAction.
    *   'keypad'  = virtual numeric / PIN / phone keypad (keypad beat). The
    *               keypad owns its own display + submit button internally;
-   *               the entered code is passed to onAction on submit. */
-  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad';
+   *               the entered code is passed to onAction on submit.
+   *   'camera'  = live camera preview with an optional decode pipeline
+   *               (qrScan beat — Phase 1, AR beat — Phase 3). The decoded
+   *               value (or 'cancelled' / 'permission_denied') is passed
+   *               to onAction. Permission acquisition is owned by the
+   *               element; the parent renderer doesn't need to know. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */

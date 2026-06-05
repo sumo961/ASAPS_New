@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-06-04T09:37:34.983Z
+ * Generated: 2026-06-04T11:37:32.877Z
  */
 
 // ============================================
@@ -661,6 +661,32 @@ export interface KeypadParameters {
 }
 
 /**
+ * QR Scan - Opens the camera and waits for the player to scan a QR code. The decoded string is saved to a variable, then the beat branches.
+ * Category: visible
+ * Connection Type: single
+ */
+export interface QrScanParameters {
+  /** Instruction shown above the camera preview */
+  prompt: string;
+  /** Variable name to receive the decoded value */
+  saveTo: string;
+  /** Which camera to use */
+  facing?: string | undefined;
+  /** Optional regex patterns — only codes that match resolve. Leave empty to accept any code. */
+  matchPatterns?: String[] | undefined;
+  /** Small helper text shown near the scan target */
+  helperText?: string | undefined;
+  /** Cancel/skip button label */
+  cancelButtonText?: string | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
+  /** Target beat after a code is scanned (or the player cancels) */
+  connection: Connection;
+}
+
+/**
  * Hyper Text - Text with clickable hyperlinked words that branch to different beats
  * Category: visible
  * Connection Type: multiple
@@ -966,6 +992,7 @@ export type BeatType =
   | 'indoorLocation'
   | 'inputText'
   | 'keypad'
+  | 'qrScan'
   | 'hyperText'
   | 'onlineContent'
   | 'aiCondition'
@@ -999,6 +1026,7 @@ export interface BeatParameterMap {
   'indoorLocation': IndoorLocationParameters;
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
+  'qrScan': QrScanParameters;
   'hyperText': HyperTextParameters;
   'onlineContent': OnlineContentParameters;
   'aiCondition': AiConditionParameters;

@@ -571,6 +571,33 @@ export interface IAIService {
 }
 
 /**
+ * Permission identifiers — intent-level (not tied to web/native APIs).
+ * Each runtime target maps these to its own native equivalent:
+ *   web      → navigator.permissions / getUserMedia / Geolocation
+ *   Electron → session.setPermissionRequestHandler
+ *   iOS      → AVCaptureDevice.requestAccess / CLLocationManager
+ *   Android  → ActivityCompat.requestPermissions
+ *
+ * Beats declare the permissions they need via the schema's `permissions`
+ * field; the runtime resolves them via IPermissionManager before
+ * mounting the beat's primary UI.
+ */
+export type Permission = 'camera' | 'microphone' | 'geolocation' | 'network';
+export type PermissionStatus = 'granted' | 'denied' | 'prompt' | 'unavailable';
+
+export interface IPermissionManager {
+  /** Cheap check — does NOT trigger a prompt. */
+  query(p: Permission): Promise<PermissionStatus>;
+  /** Triggers the native consent prompt if needed; resolves when the
+   *  user responds. May resolve with 'denied' or 'unavailable'. */
+  request(p: Permission): Promise<PermissionStatus>;
+  /** Optional hint that the story will need these permissions soon.
+   *  A native runtime can use this to batch prompts at story start
+   *  instead of mid-beat. Web/Electron can no-op. */
+  declare?(perms: Permission[]): void;
+}
+
+/**
  * IRenderer interface defines the contract for all renderers
  * Moved to core package to avoid circular dependencies
  *
@@ -674,6 +701,21 @@ export interface IRenderer {
     clearButtonText: string;
     showDisplay: boolean;
     skinId?: string;
+  }, locations?: Location[]): Promise<string>;
+
+  // QR-scan beat — opens the rear (or front) camera, decodes QR codes
+  // frame-by-frame, resolves with the decoded string when one is found
+  // OR with the literal 'cancelled' / 'permission_denied' on failure
+  // paths. The renderer wires `cameraLayer.onDecode.saveTo` so the beat
+  // can record the scanned value to a variable before branching.
+  renderQRScan?(prompt: string, options: {
+    facing?: 'rear' | 'front';
+    /** Optional regex array — if set, only matching codes resolve. */
+    matchPatterns?: string[];
+    /** Continue button label (lets the player give up). */
+    cancelButtonText?: string;
+    /** Persistent help text shown above the scan target. */
+    helperText?: string;
   }, locations?: Location[]): Promise<string>;
 
   // GPS Location beat (v0.9.48 / S4+) — renders a map UI showing the
