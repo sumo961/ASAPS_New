@@ -98,8 +98,11 @@ export interface ParameterSpec {
   aliases?: string[];
   /** "primitiveToString" — coerce number/boolean values to string. */
   coerce?: 'primitiveToString';
-  /** What the value must resolve to in the story's reference index. */
-  references?: 'character' | 'beat' | 'asset' | 'cluster';
+  /** What the value must resolve to in the story's reference index.
+   *  'beatOrAsapsUri' accepts either a bare beat id or an asaps://
+   *  URI; when the URI is asaps://beat/<id>, the embedded id must
+   *  resolve to a known beat. Other asaps:// verbs pass through. */
+  references?: 'character' | 'beat' | 'asset' | 'cluster' | 'beatOrAsapsUri';
   ui?: any;
   [key: string]: any;
 }

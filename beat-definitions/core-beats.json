@@ -2298,6 +2298,7 @@
             "onTap": {
               "type": "string",
               "required": false,
+              "references": "beatOrAsapsUri",
               "description": "asaps:// URI (e.g. asaps://beat/<id>) OR a bare target beat id to jump to when the anchor is tapped"
             }
           }

@@ -112,6 +112,35 @@ export function validateBeat(
         });
       }
     }
+    // Recurse into array<object> items so itemSchema references are
+    // validated too — e.g. arBeat anchors.onTap can carry asaps:// URIs
+    // or bare beat ids, and we want a warning when the embedded beat
+    // id is dangling. Keeps the check generic: any array<object>
+    // parameter with an itemSchema gets its string-typed fields
+    // checked the same way as top-level params.
+    if (
+      Array.isArray(value)
+      && spec.itemSchema
+      && typeof spec.itemSchema === 'object'
+    ) {
+      value.forEach((item, idx) => {
+        if (!item || typeof item !== 'object') return;
+        for (const [itemFieldName, itemSpec] of Object.entries(spec.itemSchema as Record<string, ParameterSpec>)) {
+          if (!itemSpec || typeof itemSpec !== 'object') continue;
+          const itemValue = (item as Record<string, any>)[itemFieldName];
+          if (itemSpec.references && typeof itemValue === 'string' && itemValue.length > 0) {
+            const ok = referenceResolves(itemValue, itemSpec.references, refIndex);
+            if (!ok) {
+              warnings.push({
+                path: `${path}.parameters.${name}[${idx}].${itemFieldName}`,
+                message: `${name}[${idx}].${itemFieldName} references unknown ${itemSpec.references}: '${itemValue}'`,
+                severity: 'warning',
+              });
+            }
+          }
+        }
+      });
+    }
   }
 
   // Per-condition-type required-field check for conditionBeat
@@ -180,7 +209,7 @@ function primitiveType(v: any): string {
 
 function referenceResolves(
   value: string,
-  kind: 'character' | 'beat' | 'asset' | 'cluster',
+  kind: 'character' | 'beat' | 'asset' | 'cluster' | 'beatOrAsapsUri',
   refIndex: RefIndex
 ): boolean {
   switch (kind) {
@@ -193,5 +222,20 @@ function referenceResolves(
       return refIndex.assetIds.has(value);
     case 'cluster':
       return refIndex.clusterNames.has(value);
+    case 'beatOrAsapsUri':
+      // Used by arBeat anchor.onTap (and any future field that may
+      // carry either a bare beat id OR an asaps:// URI). Bare ids
+      // must resolve like a normal beat ref. asaps://beat/<id> URIs
+      // are parsed and the extracted id is checked the same way.
+      // Other asaps:// verbs (variable, inventory, event) don't
+      // reference beats, so they pass through unchecked.
+      if (!value.startsWith('asaps://')) return refIndex.beatIds.has(value);
+      const m = value.match(/^asaps:\/\/beat\/([^/?#]+)/);
+      if (m) {
+        try { return refIndex.beatIds.has(decodeURIComponent(m[1])); }
+        catch { return false; }
+      }
+      // Non-beat asaps:// URIs — accept; they don't reference beats.
+      return /^asaps:\/\/(variable|inventory|event)\//.test(value);
   }
 }
