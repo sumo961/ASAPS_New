@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-06-04T11:37:32.877Z
+ * Generated: 2026-06-05T10:06:15.541Z
  */
 
 // ============================================
@@ -687,6 +687,32 @@ export interface QrScanParameters {
 }
 
 /**
+ * Web View - Embed a live external web page. The player interacts until they hit the Done button, navigate to an exit URL pattern, or post a result back from the page.
+ * Category: visible
+ * Connection Type: single
+ */
+export interface WebViewParameters {
+  /** URL to embed. NOTE: many public sites block iframe embedding (X-Frame-Options / CSP frame-ancestors). Electron desktop bypasses this; the web/PW preview cannot. */
+  url: string;
+  /** Optional instruction shown above the embedded page */
+  prompt?: string | undefined;
+  /** Optional regex — when the embedded page navigates to a URL matching this pattern, the beat advances automatically. Iframe origin restrictions may prevent detecting cross-origin navigation; Electron <webview> can observe it. */
+  exitUrlPattern?: string | undefined;
+  /** Story variable names to inject into the URL as a hash fragment (e.g. #userName=Alice). Lets the embedded page read story state without an API call. */
+  passContext?: String[] | undefined;
+  /** Variable to receive a value posted from the page via postMessage({asaps:'result', value: ...}). Empty = ignore postMessage. */
+  saveTo?: string | undefined;
+  /** Label for the manual exit button */
+  doneButtonText?: string | undefined;
+  /** Who speaks this beat's text */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
+  /** Target beat after the player exits the web view */
+  connection: Connection;
+}
+
+/**
  * Hyper Text - Text with clickable hyperlinked words that branch to different beats
  * Category: visible
  * Connection Type: multiple
@@ -993,6 +1019,7 @@ export type BeatType =
   | 'inputText'
   | 'keypad'
   | 'qrScan'
+  | 'webView'
   | 'hyperText'
   | 'onlineContent'
   | 'aiCondition'
@@ -1027,6 +1054,7 @@ export interface BeatParameterMap {
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
   'qrScan': QrScanParameters;
+  'webView': WebViewParameters;
   'hyperText': HyperTextParameters;
   'onlineContent': OnlineContentParameters;
   'aiCondition': AiConditionParameters;

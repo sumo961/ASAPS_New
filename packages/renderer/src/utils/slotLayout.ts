@@ -35,8 +35,13 @@ export interface SlotSpec {
    *               (qrScan beat — Phase 1, AR beat — Phase 3). The decoded
    *               value (or 'cancelled' / 'permission_denied') is passed
    *               to onAction. Permission acquisition is owned by the
-   *               element; the parent renderer doesn't need to know. */
-  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera';
+   *               element; the parent renderer doesn't need to know.
+   *   'webview' = embedded external page (webView beat). In browser/PW
+   *               context it's an <iframe>; in Electron the native
+   *               <webview> tag has fewer X-Frame-Options restrictions.
+   *               Exit conditions: manual Done button, URL pattern
+   *               match, or postMessage from the embedded page. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera' | 'webview';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */

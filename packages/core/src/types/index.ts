@@ -718,6 +718,22 @@ export interface IRenderer {
     helperText?: string;
   }, locations?: Location[]): Promise<string>;
 
+  // webView beat — embeds an external URL in an iframe (web) or
+  // <webview> (Electron). Resolves with one of:
+  //  - 'done' when the player clicks the done button
+  //  - the matched URL when exitUrlPattern fires
+  //  - the postMessage value when the page sends {asaps:'result', value}
+  // The page can read variables in the URL hash; we pass them as
+  // #key=value pairs (URL-encoded) for those listed in passContext.
+  renderWebView?(options: {
+    url: string;
+    prompt?: string;
+    exitUrlPattern?: string;
+    /** Pre-resolved query-style hash fragment to append to URL. */
+    contextHash?: string;
+    doneButtonText?: string;
+  }, locations?: Location[]): Promise<string>;
+
   // GPS Location beat (v0.9.48 / S4+) — renders a map UI showing the
   // target location and (when available) the player's current position
   // and distance. In trigger modes, the renderer should resolve when

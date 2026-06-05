@@ -32,6 +32,7 @@ import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from '.
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
+import { WebViewElement } from './WebViewElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
@@ -317,6 +318,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // Reserved sentinels 'cancelled' / 'permission_denied' propagate so
   // the beat can branch on the no-scan path.
   const cameraSlot = slots.find(s => s.role === 'camera');
+  // webView beat — embedded external page. WebViewElement picks
+  // iframe vs Electron <webview> at runtime. Resolves with 'done',
+  // a matched URL, or a postMessage value via onAction.
+  const webViewSlot = slots.find(s => s.role === 'webview');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -1562,6 +1567,68 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 helperText={typeof content.helperText === 'string' ? content.helperText : undefined}
                 cancelButtonText={typeof content.cancelButtonText === 'string' ? content.cancelButtonText : 'Cancel'}
                 onDecode={(value) => dispatchAction(value)}
+                theme={{
+                  buttonBg: theme.button?.backgroundColor,
+                  buttonText: theme.button?.textColor,
+                  buttonBorder: theme.button?.borderColor,
+                }}
+              />
+            )}
+          </div>
+        );
+      })()}
+
+      {/* WebView slot — embedded external page. WebViewElement handles
+          the iframe vs <webview> branch and exit conditions; in editor
+          mode we show a placeholder so the URL doesn't actually load
+          during authoring. */}
+      {webViewSlot && (() => {
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${webViewSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(webViewSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={webViewSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            {editorMode ? (
+              <div
+                style={{
+                  width: 'min(95%, 1200px)',
+                  aspectRatio: '16 / 10',
+                  borderRadius: 12,
+                  border: '2px dashed rgba(255,255,255,0.35)',
+                  background: 'rgba(0,0,0,0.4)',
+                  color: 'rgba(255,255,255,0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  textAlign: 'center',
+                  padding: 16,
+                }}
+              >
+                🌐 Web view (runtime)
+                <br />
+                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                  {typeof content.url === 'string' ? content.url : ''}
+                </span>
+              </div>
+            ) : (
+              <WebViewElement
+                url={typeof content.url === 'string' ? content.url : ''}
+                exitUrlPattern={typeof content.exitUrlPattern === 'string' ? content.exitUrlPattern : undefined}
+                contextHash={typeof content.contextHash === 'string' ? content.contextHash : undefined}
+                doneButtonText={typeof content.doneButtonText === 'string' ? content.doneButtonText : 'Done'}
+                onExit={(value) => dispatchAction(value)}
                 theme={{
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,

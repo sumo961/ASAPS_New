@@ -3433,6 +3433,54 @@ export class ReactRenderer extends BaseRenderer {
     });
   }
 
+  /** webView beat — embeds an external URL via SlotFlowView's
+   *  webview slot. WebViewElement handles iframe vs Electron <webview>
+   *  selection and exit conditions; this method just stitches the
+   *  content into the slot pipeline. */
+  async renderWebView(
+    options: {
+      url: string;
+      prompt?: string;
+      exitUrlPattern?: string;
+      contextHash?: string;
+      doneButtonText?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
+
+    const content = {
+      url: options.url,
+      prompt: options.prompt,
+      exitUrlPattern: options.exitUrlPattern,
+      contextHash: options.contextHash,
+      doneButtonText: options.doneButtonText ?? 'Done',
+      speaker: this.resolveSpeakerForSlot(),
+    };
+
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('webView', content), locations);
+
+    if (options.prompt) {
+      this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker);
+    }
+
+    return new Promise<string>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;
+      this.handleAction = (value: string) => {
+        this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
+        resolve(value);
+      };
+      this.renderPositionedBeat('webView', content, effectiveLocations, true, undefined, authorPositioned);
+    });
+  }
+
   async renderPanorama(panoramaUrl: string, options: {
     hotspots: Array<{
       id: string;

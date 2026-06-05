@@ -2187,6 +2187,119 @@
       }
     },
 
+    "webView": {
+      "category": "visible",
+      "displayName": "Web View",
+      "icon": "🌐",
+      "description": "Embed a live external web page. The player interacts until they hit the Done button, navigate to an exit URL pattern, or post a result back from the page.",
+      "connectionType": "single",
+      "parameters": {
+        "url": {
+          "type": "string",
+          "required": true,
+          "default": "https://example.com",
+          "description": "URL to embed. NOTE: many public sites block iframe embedding (X-Frame-Options / CSP frame-ancestors). Electron desktop bypasses this; the web/PW preview cannot.",
+          "ui": {
+            "control": "text",
+            "label": "URL"
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "required": false,
+          "description": "Optional instruction shown above the embedded page",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Prompt"
+          }
+        },
+        "exitUrlPattern": {
+          "type": "string",
+          "required": false,
+          "description": "Optional regex — when the embedded page navigates to a URL matching this pattern, the beat advances automatically. Iframe origin restrictions may prevent detecting cross-origin navigation; Electron <webview> can observe it.",
+          "ui": {
+            "label": "Auto-exit URL pattern (regex)"
+          }
+        },
+        "passContext": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Story variable names to inject into the URL as a hash fragment (e.g. #userName=Alice). Lets the embedded page read story state without an API call.",
+          "ui": {
+            "label": "Pass variables",
+            "addLabel": "Add Variable"
+          }
+        },
+        "saveTo": {
+          "type": "string",
+          "required": false,
+          "description": "Variable to receive a value posted from the page via postMessage({asaps:'result', value: ...}). Empty = ignore postMessage."
+        },
+        "doneButtonText": {
+          "type": "string",
+          "required": false,
+          "default": "Done",
+          "description": "Label for the manual exit button"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat after the player exits the web view"
+        }
+      },
+      "permissions": ["network"],
+      "locations": ["prompt", "webview"],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "webview",
+          "role": "webview"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": ["doneButton"]
+        }
+      ],
+      "transitions": true,
+      "sound": false,
+      "renderer": "webView",
+      "aiNotes": {
+        "purpose": "Embed an external interactive page",
+        "examples": [
+          "Form fill on a partner site that posts a result back via postMessage",
+          "Reference reading inside a study story",
+          "Embedded calculator or third-party widget"
+        ]
+      }
+    },
+
     "hyperText": {
       "category": "visible",
       "displayName": "Hyper Text",
