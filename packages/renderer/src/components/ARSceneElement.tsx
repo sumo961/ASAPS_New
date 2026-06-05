@@ -69,6 +69,18 @@ export const ARSceneElement: React.FC<ARSceneElementProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const resolvedRef = useRef(false);
   const [state, setState] = useState<State>({ kind: 'init' });
+  // Phase 1b TODO — replace the screen-space anchor cards with
+  // marker-pinned overlays. First attempt used mind-ar via npm but
+  // mind-ar imports `sRGBEncoding` from `three`, which Three removed
+  // in r152; the renderer's transitive three is 0.179. Options:
+  //   1. Wait for mind-ar to fix the bundled sRGBEncoding reference
+  //   2. Load mind-ar via a CDN script tag at runtime (bypasses our
+  //      Vite/Three so its bundle uses its own bundled three)
+  //   3. Switch to a different AR library (AR.js + jsartoolkit, or
+  //      a WebXR-native flow when iOS support catches up)
+  // Schema + IRenderer.renderAR + 'ar' slot role + ARBeat routing
+  // are all in place; only the inside of this component needs to
+  // change when Phase 1b lands.
 
   const stopStream = () => {
     if (streamRef.current) {
