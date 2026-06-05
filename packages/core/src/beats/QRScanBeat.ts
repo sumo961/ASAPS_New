@@ -3,6 +3,7 @@ import type { BeatConfig } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { QrScanParameters } from '../generated/beat-types';
+import { parseAsapsUri } from '../utils/asapsUri';
 
 /**
  * QRScanBeat - Opens the camera and waits for the player to scan a QR
@@ -15,6 +16,7 @@ import type { QrScanParameters } from '../generated/beat-types';
 export class QRScanBeat extends Beat {
   public prompt: string;
   public saveTo: string;
+  public interpretAsapsUri: boolean;
   public facing: 'rear' | 'front';
   public matchPatterns: string[];
   public helperText?: string;
@@ -30,6 +32,8 @@ export class QRScanBeat extends Beat {
     const p = config.parameters ?? ({} as Partial<QrScanParameters>);
     this.prompt = config.prompt || p.prompt || 'Point your camera at the QR code';
     this.saveTo = (config as any).saveTo || (p as any).saveTo || 'scannedCode';
+    const iau = (config as any).interpretAsapsUri ?? (p as any).interpretAsapsUri;
+    this.interpretAsapsUri = iau !== false; // default true
     const facing = (config as any).facing ?? p.facing;
     this.facing = facing === 'front' ? 'front' : 'rear';
     this.matchPatterns = Array.isArray((config as any).matchPatterns)
@@ -44,6 +48,7 @@ export class QRScanBeat extends Beat {
     return {
       prompt: this.prompt,
       saveTo: this.saveTo,
+      interpretAsapsUri: this.interpretAsapsUri,
       facing: this.facing,
       matchPatterns: this.matchPatterns,
       helperText: this.helperText,
@@ -57,6 +62,7 @@ export class QRScanBeat extends Beat {
   updateParameters(params: Record<string, any>): void {
     if (params.prompt !== undefined) this.prompt = params.prompt;
     if (params.saveTo !== undefined) this.saveTo = params.saveTo;
+    if (params.interpretAsapsUri !== undefined) this.interpretAsapsUri = params.interpretAsapsUri !== false;
     if (params.facing !== undefined) {
       this.facing = params.facing === 'front' ? 'front' : 'rear';
     }
@@ -112,6 +118,44 @@ export class QRScanBeat extends Beat {
         text: result === 'cancelled' ? 'Cancelled QR scan' : 'Camera permission denied',
       });
       return this.getNextBeat(context);
+    }
+
+    // ASAPS URI interpretation — when the QR encodes a story-level
+    // intent (asaps://beat/<id>, asaps://variable/<n>/<v>, etc.) apply
+    // it directly instead of forcing the author to write a routing
+    // ConditionBeat. Non-ASAPS payloads (or interpretAsapsUri:false)
+    // fall through to the standard save-to-variable + branch path
+    // below — existing usage stays unchanged.
+    if (this.interpretAsapsUri) {
+      const parsed = parseAsapsUri(result);
+      if (parsed) {
+        context.recordChoice({
+          beatId: this.id,
+          beatName: this.name || this.id,
+          beatType: 'qrScan',
+          choiceText: `Scanned ASAPS URI: ${result}`,
+          choiceContext: this.prompt,
+        });
+        switch (parsed.kind) {
+          case 'beat':
+            // Direct jump — overrides the beat's configured next target.
+            // The story engine validates the target id exists.
+            return parsed.target;
+          case 'variable':
+            context.setVariable(parsed.name, parsed.value);
+            return this.getNextBeat(context);
+          case 'inventory':
+            if (parsed.op === 'add') context.addToInventory(parsed.item);
+            else context.removeFromInventory(parsed.item);
+            return this.getNextBeat(context);
+          case 'event':
+            // Events surface in the AI/timeline context but don't have
+            // a runtime dispatch yet. recordTimelineEvent above already
+            // captured the URI; continue to next beat.
+            return this.getNextBeat(context);
+        }
+      }
+      // Parser returned null — fall through to raw-string save path.
     }
 
     if (this.saveTo) {

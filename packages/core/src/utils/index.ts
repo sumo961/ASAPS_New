@@ -89,3 +89,8 @@ export {
   type XRPermissionVerdict,
   type XRPermissionPolicy,
 } from './xrPermissions';
+export {
+  parseAsapsUri,
+  formatAsapsUri,
+  type AsapsAction,
+} from './asapsUri';

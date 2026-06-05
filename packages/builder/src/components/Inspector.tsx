@@ -20,6 +20,7 @@ import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
 import { XRLocationsEditor, type XRLocationEntry } from '../editors/XRLocationsEditor';
 import { RequirementsEditor } from '../editors/RequirementsEditor';
+import { AsapsQRGenerator } from './inspector/AsapsQRGenerator';
 import { SmartNameDropdown } from '../editors/SmartNameDropdown';
 import { CounterOwnerPicker } from './CounterOwnerPicker';
 import {
@@ -1561,7 +1562,15 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const availableTargets = allBeats.filter(b => b.id !== beat.id);
-  
+  // Lightweight beat list for the QR generator panel. Includes self so
+  // an author can build a "scan this to come back here" loop in
+  // playtesting; the generator's UI is otherwise generic.
+  const allBeatsForQR = allBeats.map((b: any) => ({
+    id: b.id,
+    name: b.name,
+    type: b.type,
+  }));
+
   // Dynamic width for visual editor
   const useVisualEditorWidth = activeTab === 'visual' && supportsVisualEditor(beat.type);
 
@@ -4976,6 +4985,16 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 )}
 
+
+                {/* QR Generator — only for qrScan beats. Authors can
+                    build an asaps:// URI and copy/download the resulting
+                    QR without leaving the editor; pairs with the beat's
+                    interpretAsapsUri flag so the scan auto-routes. */}
+                {beat.type === 'qrScan' && (
+                  <div className="border-t pt-4">
+                    <AsapsQRGenerator beats={allBeatsForQR} />
+                  </div>
+                )}
 
                 {/* Notes Section - Collapsible */}
                 <div className="border-t pt-4">

@@ -2084,7 +2084,17 @@
           "type": "string",
           "required": true,
           "default": "scannedCode",
-          "description": "Variable name to receive the decoded value"
+          "description": "Variable name to receive the decoded value (used when the QR is not an asaps:// URI, or interpretAsapsUri is off)"
+        },
+        "interpretAsapsUri": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "When true and the scanned code is a valid asaps:// URI (e.g. asaps://beat/<id>, asaps://variable/<name>/<value>, asaps://inventory/add/<item>), apply it directly instead of just saving to a variable. Non-asaps codes still save to the variable.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Interpret asaps:// URIs"
+          }
         },
         "facing": {
           "type": "string",

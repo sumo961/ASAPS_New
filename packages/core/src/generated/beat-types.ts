@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-06-05T10:19:45.811Z
+ * Generated: 2026-06-05T11:08:22.534Z
  */
 
 // ============================================
@@ -668,8 +668,10 @@ export interface KeypadParameters {
 export interface QrScanParameters {
   /** Instruction shown above the camera preview */
   prompt: string;
-  /** Variable name to receive the decoded value */
+  /** Variable name to receive the decoded value (used when the QR is not an asaps:// URI, or interpretAsapsUri is off) */
   saveTo: string;
+  /** When true and the scanned code is a valid asaps:// URI (e.g. asaps://beat/<id>, asaps://variable/<name>/<value>, asaps://inventory/add/<item>), apply it directly instead of just saving to a variable. Non-asaps codes still save to the variable. */
+  interpretAsapsUri?: boolean | undefined;
   /** Which camera to use */
   facing?: string | undefined;
   /** Optional regex patterns — only codes that match resolve. Leave empty to accept any code. */
