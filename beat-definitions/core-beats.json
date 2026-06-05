@@ -2197,6 +2197,184 @@
       }
     },
 
+    "arBeat": {
+      "category": "visible",
+      "displayName": "AR Scene",
+      "icon": "🥽",
+      "description": "Augmented-reality scene with marker tracking. The player aims the camera at a printed marker; overlay anchors (text, image, tappable cards) attach to the marker. Each anchor's tap routes through an asaps:// URI or target beat id, so authors get treasure-hunt / pick-the-clue mechanics without scripting.",
+      "connectionType": "multiple",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": false,
+          "default": "Aim your camera at the marker",
+          "description": "Instruction shown above the AR view",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Prompt"
+          }
+        },
+        "trackingMode": {
+          "type": "string",
+          "required": false,
+          "default": "marker",
+          "description": "How anchors are placed in the scene. Phase 1: only 'marker' is implemented (image-target tracking via MindAR). 'world' and 'face' are reserved for Phase 2.",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "marker", "label": "Image marker (.mind target)" },
+              { "value": "world", "label": "World tracking (Phase 2)" },
+              { "value": "face", "label": "Face tracking (Phase 2)" }
+            ],
+            "label": "Tracking Mode"
+          }
+        },
+        "markerAssetId": {
+          "type": "string",
+          "required": false,
+          "description": "Asset ID of a pre-compiled .mind file produced by the MindAR compiler (https://hiukim.github.io/mind-ar-js-doc/tools/compile/). Used as the image target the camera tracks.",
+          "ui": {
+            "control": "asset-picker",
+            "label": "Marker (.mind file)"
+          }
+        },
+        "anchors": {
+          "type": "array<object>",
+          "required": false,
+          "default": [],
+          "description": "Overlay anchors attached to the marker. Each anchor has a label, optional sprite, and an onTap target (asaps:// URI or beat id).",
+          "ui": {
+            "label": "Anchors",
+            "addLabel": "Add Anchor",
+            "itemLabel": "Anchor"
+          },
+          "itemSchema": {
+            "id": {
+              "type": "string",
+              "required": true,
+              "description": "Stable id for the anchor",
+              "ui": { "label": "ID" }
+            },
+            "label": {
+              "type": "string",
+              "required": false,
+              "description": "Text shown on the anchor card / tooltip",
+              "ui": { "label": "Label" }
+            },
+            "assetId": {
+              "type": "string",
+              "required": false,
+              "description": "Optional image asset shown as a billboard at the anchor position",
+              "ui": { "control": "asset-picker", "label": "Image" }
+            },
+            "anchoredTo": {
+              "type": "string",
+              "required": false,
+              "default": "marker:default",
+              "description": "marker:<id> = pinned to a tracked marker; world:tap = appears where the player taps (Phase 2)"
+            },
+            "offsetX": {
+              "type": "number",
+              "required": false,
+              "default": 0,
+              "description": "Local-space X offset from the marker center (-1..1)",
+              "ui": { "control": "number", "label": "X offset" }
+            },
+            "offsetY": {
+              "type": "number",
+              "required": false,
+              "default": 0,
+              "description": "Local-space Y offset from the marker center (-1..1)",
+              "ui": { "control": "number", "label": "Y offset" }
+            },
+            "scale": {
+              "type": "number",
+              "required": false,
+              "default": 1,
+              "description": "Anchor size multiplier",
+              "ui": { "control": "number", "label": "Scale" }
+            },
+            "onTap": {
+              "type": "string",
+              "required": false,
+              "description": "asaps:// URI (e.g. asaps://beat/<id>) OR a bare target beat id to jump to when the anchor is tapped"
+            }
+          }
+        },
+        "cancelButtonText": {
+          "type": "string",
+          "required": false,
+          "default": "Skip",
+          "description": "Cancel button label"
+        },
+        "fallbackTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+        }
+      },
+      "permissions": ["camera"],
+      "onPermissionDenied": {
+        "behavior": "fallthrough",
+        "message": "Camera access is required for AR scenes."
+      },
+      "locations": ["prompt", "arScene"],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
+      "layoutMode": "slot",
+      "arLayer": {
+        "trackingMode": "marker",
+        "markersSource": "markerAssetId",
+        "anchorsSource": "anchors"
+      },
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "arScene",
+          "role": "ar"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": ["cancelButton"]
+        }
+      ],
+      "transitions": true,
+      "sound": false,
+      "renderer": "arBeat",
+      "aiNotes": {
+        "purpose": "Tap-to-discover AR overlays anchored to a printed marker",
+        "examples": [
+          "Treasure hunt — print marker stickers; each anchor reveals a clue beat",
+          "Museum installation — point at a label to summon a 3D model + narration",
+          "Children's book — marker on the page summons character dialogue"
+        ]
+      }
+    },
+
     "webView": {
       "category": "visible",
       "displayName": "Web View",

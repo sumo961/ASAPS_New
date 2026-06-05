@@ -3433,6 +3433,80 @@ export class ReactRenderer extends BaseRenderer {
     });
   }
 
+  /** arBeat — augmented-reality scene. Phase 1a routes through the
+   *  'ar' slot; ARSceneElement owns camera + (Phase 1b) marker
+   *  tracking. Asset ids (markerAssetId, anchor.assetId) are resolved
+   *  here so the element only deals with URLs. */
+  async renderAR(
+    options: {
+      prompt?: string;
+      trackingMode?: 'marker' | 'world' | 'face';
+      markerAssetId?: string;
+      anchors: Array<{
+        id: string;
+        label?: string;
+        assetId?: string;
+        anchoredTo?: string;
+        offsetX?: number;
+        offsetY?: number;
+        scale?: number;
+        onTap?: string;
+      }>;
+      cancelButtonText?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
+
+    // Resolve asset ids → URLs. Anchors without an image asset just
+    // render as labelled cards; anchors without a label fall back to
+    // showing their id (useful while authoring).
+    const resolvedAnchors = options.anchors.map(a => ({
+      id: a.id,
+      label: a.label,
+      imageUrl: a.assetId ? (this.resolveAssetUrl(a.assetId) || undefined) : undefined,
+      anchoredTo: a.anchoredTo,
+      offsetX: a.offsetX,
+      offsetY: a.offsetY,
+      scale: a.scale,
+      onTap: a.onTap,
+    }));
+    const markerUrl = options.markerAssetId
+      ? (this.resolveAssetUrl(options.markerAssetId) || undefined)
+      : undefined;
+
+    const content = {
+      prompt: options.prompt,
+      trackingMode: options.trackingMode ?? 'marker',
+      markerUrl,
+      anchors: resolvedAnchors,
+      cancelButtonText: options.cancelButtonText ?? 'Skip',
+      speaker: this.resolveSpeakerForSlot(),
+    };
+
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('arBeat', content), locations);
+
+    if (options.prompt) {
+      this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker, true);
+    }
+
+    return new Promise<string>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;
+      this.handleAction = (value: string) => {
+        this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
+        resolve(value);
+      };
+      this.renderPositionedBeat('arBeat', content, effectiveLocations, true, undefined, authorPositioned);
+    });
+  }
+
   /** webView beat — embeds an external URL via SlotFlowView's
    *  webview slot. WebViewElement handles iframe vs Electron <webview>
    *  selection and exit conditions; this method just stitches the

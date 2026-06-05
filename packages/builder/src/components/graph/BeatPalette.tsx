@@ -33,6 +33,7 @@ const BEAT_COLORS: Record<string, string> = {
   inputText: '#06b6d4',
   keypad: '#06b6d4',
   qrScan: '#06b6d4',
+  arBeat: '#0ea5e9',
   // Visible — multi choice
   multiChoice: '#a78bfa',
   dialogTree: '#8b5cf6',
@@ -116,7 +117,7 @@ const TAXONOMY: Array<{
       },
       {
         label: 'Input',
-        beats: ['inputText', 'keypad', 'qrScan'],
+        beats: ['inputText', 'keypad', 'qrScan', 'arBeat'],
       },
     ],
   },

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-06-05T11:08:22.534Z
+ * Generated: 2026-06-05T11:18:10.758Z
  */
 
 // ============================================
@@ -689,6 +689,30 @@ export interface QrScanParameters {
 }
 
 /**
+ * AR Scene - Augmented-reality scene with marker tracking. The player aims the camera at a printed marker; overlay anchors (text, image, tappable cards) attach to the marker. Each anchor's tap routes through an asaps:// URI or target beat id, so authors get treasure-hunt / pick-the-clue mechanics without scripting.
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface ArBeatParameters {
+  /** Instruction shown above the AR view */
+  prompt?: string | undefined;
+  /** How anchors are placed in the scene. Phase 1: only 'marker' is implemented (image-target tracking via MindAR). 'world' and 'face' are reserved for Phase 2. */
+  trackingMode?: string | undefined;
+  /** Asset ID of a pre-compiled .mind file produced by the MindAR compiler (https://hiukim.github.io/mind-ar-js-doc/tools/compile/). Used as the image target the camera tracks. */
+  markerAssetId?: string | undefined;
+  /** Overlay anchors attached to the marker. Each anchor has a label, optional sprite, and an onTap target (asaps:// URI or beat id). */
+  anchors?: Object[] | undefined;
+  /** Cancel button label */
+  cancelButtonText?: string | undefined;
+  /** Target beat when the player skips, when permission is denied, or when no anchor is tapped */
+  fallbackTarget?: string | undefined;
+  /** Who speaks this beat's text */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
+}
+
+/**
  * Web View - Embed a live external web page. The player interacts until they hit the Done button, navigate to an exit URL pattern, or post a result back from the page.
  * Category: visible
  * Connection Type: single
@@ -1021,6 +1045,7 @@ export type BeatType =
   | 'inputText'
   | 'keypad'
   | 'qrScan'
+  | 'arBeat'
   | 'webView'
   | 'hyperText'
   | 'onlineContent'
@@ -1056,6 +1081,7 @@ export interface BeatParameterMap {
   'inputText': InputTextParameters;
   'keypad': KeypadParameters;
   'qrScan': QrScanParameters;
+  'arBeat': ArBeatParameters;
   'webView': WebViewParameters;
   'hyperText': HyperTextParameters;
   'onlineContent': OnlineContentParameters;

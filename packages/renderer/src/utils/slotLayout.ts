@@ -40,8 +40,14 @@ export interface SlotSpec {
    *               context it's an <iframe>; in Electron the native
    *               <webview> tag has fewer X-Frame-Options restrictions.
    *               Exit conditions: manual Done button, URL pattern
-   *               match, or postMessage from the embedded page. */
-  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera' | 'webview';
+   *               match, or postMessage from the embedded page.
+   *   'ar'      = augmented-reality scene (arBeat). Camera + marker
+   *               tracking + tappable anchor overlays. Each anchor's
+   *               onTap resolves through onAction with an asaps:// URI
+   *               (or raw beat id). Sibling layer descriptors hold the
+   *               marker / anchor data; the slot just allocates the
+   *               surface area. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera' | 'webview' | 'ar';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */

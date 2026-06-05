@@ -33,6 +33,7 @@ import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
 import { WebViewElement } from './WebViewElement';
+import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
@@ -322,6 +323,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // iframe vs Electron <webview> at runtime. Resolves with 'done',
   // a matched URL, or a postMessage value via onAction.
   const webViewSlot = slots.find(s => s.role === 'webview');
+  // arBeat — AR scene. ARSceneElement owns camera + (Phase 1b) marker
+  // tracking; onAction receives the tapped anchor's onTap value, or
+  // 'cancelled' / 'permission_denied' sentinels.
+  const arSlot = slots.find(s => s.role === 'ar');
 
   const authoredBody = theme.fonts.textFontSize ?? 18;
   const authoredTitle = theme.fonts.titleFontSize ?? 32;
@@ -1629,6 +1634,70 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 contextHash={typeof content.contextHash === 'string' ? content.contextHash : undefined}
                 doneButtonText={typeof content.doneButtonText === 'string' ? content.doneButtonText : 'Done'}
                 onExit={(value) => dispatchAction(value)}
+                theme={{
+                  buttonBg: theme.button?.backgroundColor,
+                  buttonText: theme.button?.textColor,
+                  buttonBorder: theme.button?.borderColor,
+                }}
+              />
+            )}
+          </div>
+        );
+      })()}
+
+      {/* AR slot — Phase 1a renders a camera + tappable anchor cards
+          in screen space (no real marker tracking yet). Phase 1b
+          swaps the inside for MindAR-driven marker pinning. The slot
+          prop shape stays stable across phases. Editor-mode shows a
+          placeholder so the AR camera isn't requested during
+          authoring. */}
+      {arSlot && (() => {
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${arSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(arSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={arSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            {editorMode ? (
+              <div
+                style={{
+                  width: 'min(95%, 720px)',
+                  aspectRatio: '4 / 3',
+                  borderRadius: 12,
+                  border: '2px dashed rgba(255,255,255,0.35)',
+                  background: 'rgba(0,0,0,0.4)',
+                  color: 'rgba(255,255,255,0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  textAlign: 'center',
+                  padding: 16,
+                }}
+              >
+                🥽 AR scene (runtime)
+                <br />
+                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                  {Array.isArray(content.anchors) ? `${content.anchors.length} anchor(s)` : '0 anchors'}
+                </span>
+              </div>
+            ) : (
+              <ARSceneElement
+                trackingMode={(content.trackingMode as 'marker' | 'world' | 'face') ?? 'marker'}
+                markerUrl={typeof content.markerUrl === 'string' ? content.markerUrl : undefined}
+                anchors={Array.isArray(content.anchors) ? content.anchors : []}
+                cancelButtonText={typeof content.cancelButtonText === 'string' ? content.cancelButtonText : 'Skip'}
+                onAction={(value) => dispatchAction(value)}
                 theme={{
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,

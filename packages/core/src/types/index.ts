@@ -734,6 +734,31 @@ export interface IRenderer {
     doneButtonText?: string;
   }, locations?: Location[]): Promise<string>;
 
+  // arBeat — augmented-reality scene. Camera + marker tracking; anchor
+  // overlays are tappable. Resolves with one of:
+  //  - 'cancelled' / 'permission_denied' — runtime sentinels
+  //  - the anchor's onTap value (asaps:// URI or bare beat id) when
+  //    the player taps an overlay
+  // Asset ids (markerAssetId, anchor.assetId) are passed through and
+  // the renderer resolves them via its registered asset resolver —
+  // same pattern as renderPanorama.
+  renderAR?(options: {
+    prompt?: string;
+    trackingMode?: 'marker' | 'world' | 'face';
+    markerAssetId?: string;
+    anchors: Array<{
+      id: string;
+      label?: string;
+      assetId?: string;
+      anchoredTo?: string;
+      offsetX?: number;
+      offsetY?: number;
+      scale?: number;
+      onTap?: string;
+    }>;
+    cancelButtonText?: string;
+  }, locations?: Location[]): Promise<string>;
+
   // GPS Location beat (v0.9.48 / S4+) — renders a map UI showing the
   // target location and (when available) the player's current position
   // and distance. In trigger modes, the renderer should resolve when
