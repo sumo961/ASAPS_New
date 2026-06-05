@@ -5,7 +5,7 @@ export * from './animation';
 import type { AnimationPath } from './animation';
 
 export interface Location {
-  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter' | 'keypad';
+  kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter' | 'keypad' | 'webview' | 'camera';
   name: string;
   id?: string;  // Unique element ID for animation targeting
   x: number;

@@ -3461,9 +3461,22 @@ export class ReactRenderer extends BaseRenderer {
     };
 
     const authorPositioned = layoutAuthorPositioned(locations);
+    // Ensure any baked location named 'webview' (or with that role
+    // hint) is tagged kind:'webview' so PositionedBeatView's fixed-mode
+    // switch dispatches to WebViewElement. Mirrors how renderKeypad
+    // remaps 'keypadGrid' → kind:'keypad'.
+    const tagWebViewKind = (locs: Location[]): Location[] =>
+      locs.map(loc => {
+        if (!loc.name) return loc;
+        const name = loc.name.toLowerCase();
+        if (name === 'webview' || name.includes('webview')) {
+          return { ...loc, kind: 'webview' as const };
+        }
+        return loc;
+      });
     const effectiveLocations = authorPositioned
-      ? locations!
-      : mergeWithFreePositioned(generateDefaultLocations('webView', content), locations);
+      ? tagWebViewKind(locations!)
+      : tagWebViewKind(mergeWithFreePositioned(generateDefaultLocations('webView', content), locations));
 
     if (options.prompt) {
       this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker);

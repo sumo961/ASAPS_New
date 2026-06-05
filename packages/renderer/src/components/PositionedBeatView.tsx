@@ -11,6 +11,7 @@ import { TimerProgressBar } from './TimerProgressBar';
 import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
 import { KeypadElement } from './KeypadElement';
+import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
 import { renderMarkdownLite } from '../utils/markdownLite';
 
@@ -368,6 +369,11 @@ export interface PositionedElementData {
   keypadButtonText?: string;
   keypadClearButtonText?: string;
   keypadShowDisplay?: boolean;
+  /** WebView-specific fields (for kind='webview') */
+  webViewUrl?: string;
+  webViewExitUrlPattern?: string;
+  webViewContextHash?: string;
+  webViewDoneButtonText?: string;
 }
 
 /**
@@ -2752,6 +2758,24 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         </div>
       );
 
+    case 'webview':
+      // Fixed-mode webView rendering. The element mounts inside the
+      // location's pixel rect (matching the keypad pattern) rather than
+      // the slot-mode full-bleed default — useful when an author wants
+      // the page in a specific frame alongside other positioned text.
+      // onExit routes through onAction the same way as the slot path.
+      return (
+        <div style={{ ...baseStyle, pointerEvents: interactive ? 'auto' : 'none' }}>
+          <WebViewElement
+            url={(element as any).webViewUrl || ''}
+            exitUrlPattern={(element as any).webViewExitUrlPattern}
+            contextHash={(element as any).webViewContextHash}
+            doneButtonText={(element as any).webViewDoneButtonText || 'Done'}
+            onExit={(value) => onAction?.(value)}
+          />
+        </div>
+      );
+
     default:
       return null;
   }
@@ -5012,6 +5036,20 @@ export function createPositionedElementData(
       keypadShowDisplay = content.showDisplay ?? true;
     }
 
+    // Pass webView options through for webview elements — same pattern
+    // as keypad above. Lets fixed-mode authoring embed an external page
+    // at a specific x/y/w/h alongside text overlays.
+    let webViewUrl: string | undefined;
+    let webViewExitUrlPattern: string | undefined;
+    let webViewContextHash: string | undefined;
+    let webViewDoneButtonText: string | undefined;
+    if (location.kind === 'webview' && beatType === 'webView') {
+      webViewUrl = typeof content.url === 'string' ? content.url : '';
+      webViewExitUrlPattern = typeof content.exitUrlPattern === 'string' ? content.exitUrlPattern : undefined;
+      webViewContextHash = typeof content.contextHash === 'string' ? content.contextHash : undefined;
+      webViewDoneButtonText = typeof content.doneButtonText === 'string' ? content.doneButtonText : 'Done';
+    }
+
     return {
       location,
       content: elementContent,
@@ -5034,6 +5072,10 @@ export function createPositionedElementData(
       keypadButtonText,
       keypadClearButtonText,
       keypadShowDisplay,
+      webViewUrl,
+      webViewExitUrlPattern,
+      webViewContextHash,
+      webViewDoneButtonText,
     };
   });
 }
