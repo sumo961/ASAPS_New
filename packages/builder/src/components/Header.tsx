@@ -248,6 +248,21 @@ export const Header: React.FC<HeaderProps> = ({
               {layoutMode === 'responsive' ? 'Responsive layout' : 'Fixed canvas'}
             </button>
           )}
+
+          {/* Top-row unsaved indicator — surfaces dirty state alongside
+              the title where the user is already looking, so they don't
+              have to glance down at SaveStatus. The amber pill matches
+              the layout-fixed badge family so the row reads as one
+              status strip. */}
+          {hasUnsavedChanges && (
+            <span
+              className="px-2.5 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 border border-amber-300"
+              title="You have unsaved changes. Click Save in the toolbar below."
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              ● Unsaved
+            </span>
+          )}
         </div>
       </div>
 

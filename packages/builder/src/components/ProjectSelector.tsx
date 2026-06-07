@@ -128,6 +128,9 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
     }
   };
 
+  // Trigger no longer repeats the project name — the title input
+  // above already shows it. "Projects" is the canonical label so
+  // first-time users know what the button does without hover state.
   const currentProjectName = project?.name || 'No Project';
 
   return (
@@ -136,13 +139,13 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        title={compact ? currentProjectName : undefined}
+        title={compact ? currentProjectName : 'Switch projects, open the library, or start a new one'}
       >
         <Folder className="text-blue-600" size={18} />
         {!compact && (
           <>
-            <span className="text-sm font-medium text-gray-900 max-w-[200px] truncate">
-              {currentProjectName}
+            <span className="text-sm font-medium text-gray-900">
+              Projects
             </span>
             <ChevronDown
               size={16}
@@ -231,7 +234,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                 className="w-full px-4 py-3 flex items-center gap-2 hover:bg-gray-50 transition text-left"
               >
                 <Library className="text-gray-600" size={18} />
-                <span className="text-sm font-medium text-gray-900">Open Library</span>
+                <span className="text-sm font-medium text-gray-900">Browse all projects…</span>
               </button>
             )}
           </div>
