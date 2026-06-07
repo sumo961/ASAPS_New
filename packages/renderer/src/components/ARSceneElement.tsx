@@ -25,6 +25,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { webPermissionManager } from '../utils/webPermissionManager';
+import { ARMarkerScene } from './ARMarkerScene';
 
 export interface ARAnchorProp {
   id: string;
@@ -69,18 +70,14 @@ export const ARSceneElement: React.FC<ARSceneElementProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const resolvedRef = useRef(false);
   const [state, setState] = useState<State>({ kind: 'init' });
-  // Phase 1b TODO — replace the screen-space anchor cards with
-  // marker-pinned overlays. First attempt used mind-ar via npm but
-  // mind-ar imports `sRGBEncoding` from `three`, which Three removed
-  // in r152; the renderer's transitive three is 0.179. Options:
-  //   1. Wait for mind-ar to fix the bundled sRGBEncoding reference
-  //   2. Load mind-ar via a CDN script tag at runtime (bypasses our
-  //      Vite/Three so its bundle uses its own bundled three)
-  //   3. Switch to a different AR library (AR.js + jsartoolkit, or
-  //      a WebXR-native flow when iOS support catches up)
-  // Schema + IRenderer.renderAR + 'ar' slot role + ARBeat routing
-  // are all in place; only the inside of this component needs to
-  // change when Phase 1b lands.
+  // Phase 1b — when a marker asset is configured AND mind-ar loads
+  // (via the runtime CDN loader that bypasses the npm Three.js version
+  // conflict), mount ARMarkerScene which owns the camera + marker
+  // tracking + anchor visibility. Setting `forceFallback` reverts to
+  // the Phase 1a screen-space card layout in this file — used when
+  // ARMarkerScene's error state surfaces a "use simple overlay" button.
+  const [forceFallback, setForceFallback] = useState(false);
+  const useMarkerTracking = trackingMode === 'marker' && !!markerUrl && !forceFallback;
 
   const stopStream = () => {
     if (streamRef.current) {
@@ -97,8 +94,12 @@ export const ARSceneElement: React.FC<ARSceneElementProps> = ({
   };
 
   // Camera acquisition — identical to QRScanElement so the permission
-  // flow stays consistent across all camera-using beats.
+  // flow stays consistent across all camera-using beats. Skip when
+  // ARMarkerScene owns the camera (it acquires via MindAR / its own
+  // getUserMedia); otherwise we'd hold a phantom track and MindAR
+  // would fail to grab the device.
   useEffect(() => {
+    if (useMarkerTracking) return;
     let cancelled = false;
     (async () => {
       setState({ kind: 'requesting' });
@@ -142,7 +143,7 @@ export const ARSceneElement: React.FC<ARSceneElementProps> = ({
       stopStream();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [useMarkerTracking]);
 
   const cancelButton = (
     <button
@@ -162,6 +163,25 @@ export const ARSceneElement: React.FC<ARSceneElementProps> = ({
       {cancelButtonText}
     </button>
   );
+
+  // Marker-tracking branch — ARMarkerScene owns the camera + AR.
+  // We contribute the surrounding frame + cancel button so the
+  // player can always back out.
+  if (useMarkerTracking) {
+    return (
+      <div style={containerStyle}>
+        <div style={frameStyle}>
+          <ARMarkerScene
+            markerUrl={markerUrl!}
+            anchors={anchors}
+            onAction={(v) => resolveOnce(v)}
+            onFallback={() => setForceFallback(true)}
+          />
+        </div>
+        {cancelButton}
+      </div>
+    );
+  }
 
   if (state.kind === 'denied') {
     return (
