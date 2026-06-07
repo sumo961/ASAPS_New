@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square } from 'lucide-react';
+import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square, FileText, Sparkles, Wand2, Download } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
 
@@ -582,14 +582,72 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
         {/* Header */}
         <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Project Library</h2>
-            <button
-              onClick={onCreateProject}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-            >
-              <Plus size={20} />
-              New Project
-            </button>
+            <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
+          </div>
+
+          {/* Start a new project — four create paths. Empty + Import are
+              wired to existing flows; Prompt + Ideator are surfaced now
+              so the layout is final, with disabled affordances until the
+              AI scaffold + Ideator session integrations land in their
+              own phases. */}
+          <div className="mb-4">
+            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Start a new project
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                type="button"
+                onClick={onCreateProject}
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition text-left group"
+              >
+                <FileText className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
+                <div className="text-sm font-semibold text-gray-900">Empty</div>
+                <div className="text-xs text-gray-600 leading-snug">
+                  Title screen + end screen, pick layout up front
+                </div>
+              </button>
+
+              <button
+                type="button"
+                disabled
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl text-left opacity-60 cursor-not-allowed relative"
+                title="Coming soon — describe your idea in a sentence, get a draft scaffold"
+              >
+                <Wand2 className="w-6 h-6 text-purple-500" />
+                <div className="text-sm font-semibold text-gray-900">From Prompt</div>
+                <div className="text-xs text-gray-600 leading-snug">
+                  Describe your story → AI draft scaffold
+                </div>
+                <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+              </button>
+
+              <button
+                type="button"
+                disabled
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl text-left opacity-60 cursor-not-allowed relative"
+                title="Coming soon — multi-turn session to refine your idea"
+              >
+                <Sparkles className="w-6 h-6 text-emerald-500" />
+                <div className="text-sm font-semibold text-gray-900">Ideator</div>
+                <div className="text-xs text-gray-600 leading-snug">
+                  AI-guided session → refined draft
+                </div>
+                <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onImportZip}
+                disabled={!onImportZip}
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white"
+              >
+                <Download className="w-6 h-6 text-orange-500 group-hover:scale-110 transition-transform" />
+                <div className="text-sm font-semibold text-gray-900">Import</div>
+                <div className="text-xs text-gray-600 leading-snug">
+                  .asaps zip or ASML XML file
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Search and controls */}
@@ -712,20 +770,11 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
                 {searchQuery ? 'No projects found' : 'No projects yet'}
               </h3>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-500">
                 {searchQuery
                   ? 'Try a different search term'
-                  : 'Create your first project to get started'}
+                  : 'Pick one of the options above to get started.'}
               </p>
-              {!searchQuery && (
-                <button
-                  onClick={onCreateProject}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                >
-                  <Plus size={20} />
-                  Create Project
-                </button>
-              )}
             </div>
           ) : (
             <div
