@@ -33,8 +33,13 @@ export interface ProjectLibraryProps {
   /** ZIP export handler */
   onExportZip?: () => void;
 
-  /** ZIP import handler */
+  /** ZIP import handler — opens the file picker. */
   onImportZip?: () => void;
+
+  /** ZIP import handler that takes a pre-selected File. Used by the
+   *  drag-drop zone on the Browser surface so authors can drop a
+   *  .asaps zip directly without going through the file picker. */
+  onImportZipFile?: (file: File) => Promise<void>;
 
   /** Called when renaming a project */
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
@@ -404,6 +409,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   onOpenIdeator,
   onExportZip,
   onImportZip,
+  onImportZipFile,
   onRenameProject,
   isModal = false,
   onClose,
@@ -420,6 +426,52 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  // Drag-drop import overlay state. Counter (not boolean) because
+  // child elements fire enter/leave events as the cursor moves over
+  // them — a counter increment-on-enter / decrement-on-leave reliably
+  // tracks whether the cursor is still within the modal, immune to
+  // re-firing on internal boundaries.
+  const [dragCounter, setDragCounter] = useState(0);
+  const isDragOver = dragCounter > 0;
+
+  const dragImportAvailable = !!onImportZipFile;
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!dragImportAvailable) return;
+    // Only react when a file is being dragged; ignores text / DOM
+    // drags that don't carry the 'Files' transfer type (avoids the
+    // overlay flashing when the user drags a beat from the palette).
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
+    e.preventDefault();
+    setDragCounter(c => c + 1);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!dragImportAvailable) return;
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
+    e.preventDefault();
+    setDragCounter(c => Math.max(0, c - 1));
+  };
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!dragImportAvailable) return;
+    if (!Array.from(e.dataTransfer?.types || []).includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  const handleDrop = async (e: React.DragEvent) => {
+    if (!dragImportAvailable) return;
+    e.preventDefault();
+    setDragCounter(0);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    // Lenient extension check — the import flow's own validator will
+    // surface a friendly error for non-zip payloads, but we filter
+    // obvious mismatches here to fail fast.
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip')) {
+      alert(`Only .zip / .asaps files are supported for drag-drop import.\nReceived: ${file.name}`);
+      return;
+    }
+    await onImportZipFile!(file);
+  };
 
   /**
    * Load projects from storage
@@ -587,9 +639,29 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   return (
     <div className={containerClass} onClick={isModal ? onClose : undefined}>
       <div
-        className={contentClass}
+        className={`${contentClass} relative`}
         onClick={(e) => e.stopPropagation()}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
+        {/* Drag-drop import overlay — visible while a file drag is in
+            progress. Visual cue + giant drop target so the author
+            doesn't have to land precisely on the small Import card. */}
+        {isDragOver && dragImportAvailable && (
+          <div
+            className="absolute inset-0 z-30 bg-blue-50/95 border-4 border-dashed border-blue-400 rounded-xl flex flex-col items-center justify-center pointer-events-none"
+            aria-hidden="true"
+          >
+            <Download className="w-16 h-16 text-blue-500 mb-3" />
+            <div className="text-xl font-bold text-blue-700">Drop to import</div>
+            <div className="text-sm text-blue-600 mt-2">
+              .asaps zip — will be added to your projects
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between mb-4">

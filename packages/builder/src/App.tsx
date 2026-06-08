@@ -3946,6 +3946,51 @@ function App() {
     }
   }, [actions, assets, characters, state.title, currentProject]);
 
+  // Core ZIP import — takes a pre-selected File. Shared by the toolbar
+  // "Import ZIP" button (which opens the picker) AND the Project
+  // Browser drag-drop zone, so the conflict-resolution + load-after-
+  // import flow stays consistent across entry points.
+  const handleImportZipFile = useCallback(async (file: File) => {
+    const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
+      const result = await importProjectFromZip(file, options);
+
+      if (result.conflict) {
+        const existingName = result.conflict.existingProjectName || 'Unknown';
+        const incomingName = result.conflict.incomingProjectName || 'Unknown';
+
+        const choice = await showImportConflictPrompt(
+          `A project with this ID already exists!\n\nExisting: "${existingName}"\nImporting: "${incomingName}"\n\nEnter a new name or type "OVERWRITE" to replace:`,
+          incomingName + ' (Copy)'
+        );
+
+        if (choice === null) {
+          return;
+        } else if (choice.toUpperCase() === 'OVERWRITE') {
+          return doImport({ overwrite: true });
+        } else if (choice.trim()) {
+          return doImport({ generateNewId: true, newName: choice.trim() });
+        } else {
+          alert('Please enter a valid name or "OVERWRITE"');
+          return;
+        }
+      }
+
+      if (result.success && result.projectId) {
+        await loadProject(result.projectId);
+        alert('Project imported successfully!');
+      } else if (result.error) {
+        throw new Error(result.error);
+      }
+    };
+
+    try {
+      await doImport({ generateNewId: false });
+    } catch (error) {
+      console.error('ZIP import failed:', error);
+      alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }, [loadProject]);
+
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -3954,54 +3999,11 @@ function App() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-
-      const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
-        const result = await importProjectFromZip(file, options);
-
-        if (result.conflict) {
-          // Show modal dialog for conflict resolution (Electron compatible)
-          const existingName = result.conflict.existingProjectName || 'Unknown';
-          const incomingName = result.conflict.incomingProjectName || 'Unknown';
-
-          const choice = await showImportConflictPrompt(
-            `A project with this ID already exists!\n\nExisting: "${existingName}"\nImporting: "${incomingName}"\n\nEnter a new name or type "OVERWRITE" to replace:`,
-            incomingName + ' (Copy)'
-          );
-
-          if (choice === null) {
-            // User cancelled
-            return;
-          } else if (choice.toUpperCase() === 'OVERWRITE') {
-            // Overwrite existing
-            return doImport({ overwrite: true });
-          } else if (choice.trim()) {
-            // Import with new ID and name
-            return doImport({ generateNewId: true, newName: choice.trim() });
-          } else {
-            alert('Please enter a valid name or "OVERWRITE"');
-            return;
-          }
-        }
-
-        if (result.success && result.projectId) {
-          // Load the imported project
-          await loadProject(result.projectId);
-          alert('Project imported successfully!');
-        } else if (result.error) {
-          throw new Error(result.error);
-        }
-      };
-
-      try {
-        await doImport({ generateNewId: false });
-      } catch (error) {
-        console.error('ZIP import failed:', error);
-        alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
+      await handleImportZipFile(file);
     };
 
     input.click();
-  }, [loadProject]);
+  }, [handleImportZipFile]);
 
   const handlePreview = useCallback(() => {
     if (state.beats.length === 0) {
@@ -5673,6 +5675,7 @@ function App() {
         onExportZip={handleExportZip}
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
+        onImportZipFile={handleImportZipFile}
         onImportTwine={handleImportTwine}
         onPreview={handleTogglePreviewWindow}
         previewWindowOpen={previewWindowOpen}

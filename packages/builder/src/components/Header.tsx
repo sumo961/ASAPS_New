@@ -30,6 +30,11 @@ interface HeaderProps {
   onExportZip?: () => void;
   onExportAsmlWithAssets?: () => void;
   onImportZip?: () => void;
+  /** Drag-drop variant of import — takes a pre-selected File. The
+   *  Project Browser's dropzone uses this so authors can drag a
+   *  .asaps zip directly onto the modal without going through the
+   *  file picker. */
+  onImportZipFile?: (file: File) => Promise<void>;
   onImportTwine?: () => void;
   onPreview?: () => void;
   onSettings?: () => void;
@@ -86,6 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportZip,
   onExportAsmlWithAssets,
   onImportZip,
+  onImportZipFile,
   onImportTwine,
   onPreview,
   onSettings,
@@ -980,6 +986,7 @@ export const Header: React.FC<HeaderProps> = ({
           } : undefined}
           onExportZip={onExportZip}
           onImportZip={onImportZip}
+          onImportZipFile={onImportZipFile}
           onRenameProject={onRenameProject}
           isModal={true}
           onClose={() => setShowProjectLibrary(false)}
