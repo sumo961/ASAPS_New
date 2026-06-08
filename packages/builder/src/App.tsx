@@ -1846,6 +1846,32 @@ function App() {
             const loaded = await loadProject(lastProjectId);
             if (loaded) {
               console.log('[App] SUCCESS: Restored last session project');
+              // Phase 4 — 24h auto-load heuristic. We always restore
+              // the user's place (loaded project + ready to edit), but
+              // if they've been away long enough that the project is
+              // stale, we surface the Project Browser on top so they
+              // can decide: continue editing this one, switch to
+              // another, or start fresh. Threshold matches the spec.
+              const STALE_MS = 24 * 60 * 60 * 1000;
+              try {
+                const projectsResult = await storage.listProjects();
+                if (projectsResult.success && projectsResult.data) {
+                  const proj = projectsResult.data.find((p: any) => p.id === lastProjectId);
+                  if (proj) {
+                    const ageMs = Date.now() - new Date(proj.modifiedAt).getTime();
+                    if (ageMs > STALE_MS) {
+                      console.log(`[App] Last project is ${Math.round(ageMs / 3600000)}h old; opening Project Browser`);
+                      // Dispatched on next tick so the editor mounts
+                      // first and the Browser overlays cleanly.
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('asaps:open-project-browser'));
+                      }, 0);
+                    }
+                  }
+                }
+              } catch (staleErr) {
+                console.warn('[App] Staleness check failed (non-fatal):', staleErr);
+              }
               return; // Exit early - project loaded
             } else {
               console.log('[App] Last project no longer exists, falling back to untitled search');

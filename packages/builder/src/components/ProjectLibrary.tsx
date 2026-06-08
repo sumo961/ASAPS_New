@@ -585,6 +585,42 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             <h2 className="text-2xl font-bold text-gray-900">Projects</h2>
           </div>
 
+          {/* Phase 3 — Continue-editing banner. When the Browser is
+              opened while a project is loaded (user clicks Projects,
+              or boot's 24h staleness check fires), show the loaded
+              project at the top with a single CTA that returns the
+              user to the editor exactly where they left off. The
+              banner only renders when we can identify the project in
+              the list — otherwise we'd flash an empty banner during
+              the storage fetch. */}
+          {(() => {
+            if (!currentProjectId || !isModal || !onClose) return null;
+            const currentProj = projects.find(p => p.id === currentProjectId);
+            if (!currentProj) return null;
+            return (
+              <div className="mb-4 flex items-center justify-between gap-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Folder className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                      Currently editing
+                    </div>
+                    <div className="text-sm font-semibold text-gray-900 truncate">
+                      {currentProj.name}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+                >
+                  Continue editing →
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Start a new project — four create paths. Empty + Import are
               wired to existing flows; Prompt + Ideator are surfaced now
               so the layout is final, with disabled affordances until the

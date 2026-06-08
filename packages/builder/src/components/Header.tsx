@@ -182,6 +182,17 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [triggerNewProject]);
 
+  // Phase 4 — boot-time staleness check. App.tsx dispatches this event
+  // when the auto-restored project's modifiedAt is > 24h old, so the
+  // user lands on the Browser with a Continue option instead of being
+  // dropped silently into editing. Decoupled via a window event so App
+  // doesn't have to thread state down through the Header prop list.
+  useEffect(() => {
+    const handler = () => setShowProjectLibrary(true);
+    window.addEventListener('asaps:open-project-browser', handler);
+    return () => window.removeEventListener('asaps:open-project-browser', handler);
+  }, []);
+
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
     if (!success) {
