@@ -21,6 +21,15 @@ export interface ProjectLibraryProps {
   /** Called when requesting to create a new project */
   onCreateProject: () => void;
 
+  /** Called when the From Prompt card is picked. The library closes
+   *  itself; the parent opens the AI Story Generator. Omit to leave
+   *  the card disabled with the SOON badge. */
+  onOpenStoryFromPrompt?: () => void;
+
+  /** Called when the Ideator card is picked. Closes the library;
+   *  parent opens the SessionsPanel. Omit to leave the card SOON. */
+  onOpenIdeator?: () => void;
+
   /** ZIP export handler */
   onExportZip?: () => void;
 
@@ -391,6 +400,8 @@ const ProjectCard: React.FC<{
 export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   onLoadProject,
   onCreateProject,
+  onOpenStoryFromPrompt,
+  onOpenIdeator,
   onExportZip,
   onImportZip,
   onRenameProject,
@@ -645,30 +656,40 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
 
               <button
                 type="button"
-                disabled
-                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl text-left opacity-60 cursor-not-allowed relative"
-                title="Coming soon — describe your idea in a sentence, get a draft scaffold"
+                onClick={onOpenStoryFromPrompt}
+                disabled={!onOpenStoryFromPrompt}
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                title={onOpenStoryFromPrompt
+                  ? 'Describe your idea in a sentence and let the AI draft a scaffold'
+                  : 'Coming soon — describe your idea in a sentence, get a draft scaffold'}
               >
-                <Wand2 className="w-6 h-6 text-purple-500" />
+                <Wand2 className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
                 <div className="text-sm font-semibold text-gray-900">From Prompt</div>
                 <div className="text-xs text-gray-600 leading-snug">
                   Describe your story → AI draft scaffold
                 </div>
-                <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                {!onOpenStoryFromPrompt && (
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                )}
               </button>
 
               <button
                 type="button"
-                disabled
-                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl text-left opacity-60 cursor-not-allowed relative"
-                title="Coming soon — multi-turn session to refine your idea"
+                onClick={onOpenIdeator}
+                disabled={!onOpenIdeator}
+                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                title={onOpenIdeator
+                  ? 'Open a guided ideation session to refine your story'
+                  : 'Coming soon — multi-turn session to refine your idea'}
               >
-                <Sparkles className="w-6 h-6 text-emerald-500" />
+                <Sparkles className="w-6 h-6 text-emerald-500 group-hover:scale-110 transition-transform" />
                 <div className="text-sm font-semibold text-gray-900">Ideator</div>
                 <div className="text-xs text-gray-600 leading-snug">
                   AI-guided session → refined draft
                 </div>
-                <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                {!onOpenIdeator && (
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                )}
               </button>
 
               <button

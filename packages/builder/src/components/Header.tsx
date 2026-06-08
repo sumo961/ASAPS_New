@@ -960,6 +960,15 @@ export const Header: React.FC<HeaderProps> = ({
             setShowProjectLibrary(false);
             setShowNewProjectDialog(true);
           }}
+          // Phase 5 — Prompt path. Only enabled when the host App
+          // wired an onStoryGenerated handler (it does, for normal
+          // editor flow). Closes the library and opens the existing
+          // StoryGenerator dialog; its onStoryGenerated fires the App's
+          // handleStoryGenerated which spins up a new project.
+          onOpenStoryFromPrompt={onStoryGenerated ? () => {
+            setShowProjectLibrary(false);
+            setShowStoryGenerator(true);
+          } : undefined}
           onExportZip={onExportZip}
           onImportZip={onImportZip}
           onRenameProject={onRenameProject}
