@@ -86,6 +86,64 @@ function formatDate(date: Date): string {
 }
 
 /**
+ * Resolve a thumbnail URL for a project's card by finding the
+ * titleScreen beat's background asset (stored as `parameters.node`)
+ * and asking the storage adapter for a viewable object URL. Falls
+ * back to null when the project has no titleScreen, no background,
+ * or the asset can't be resolved — the card renders the folder icon
+ * placeholder in that case.
+ *
+ * Storage's getAssetObjectURL manages its own blob-URL lifecycle, so
+ * we don't revoke on unmount — premature revocation breaks any other
+ * card or editor surface that's mounted the same URL.
+ */
+function useProjectThumbnail(project: Project): string | null {
+  const { storage } = usePersistence();
+  const [url, setUrl] = useState<string | null>(null);
+
+  const assetId = React.useMemo(() => {
+    const story = (project as any).story;
+    if (!story || !Array.isArray(story.beats)) return null;
+    const ts = story.beats.find((b: any) => b?.type === 'titleScreen');
+    // `node` carries the background asset id. Older projects sometimes
+    // had non-asset strings here (e.g. a UI node label); we trust it
+    // looks like an identifier (non-empty string) and let the storage
+    // adapter's getAsset() error fall through to the folder fallback.
+    const id = ts?.parameters?.node || ts?.node;
+    return typeof id === 'string' && id.length > 0 ? id : null;
+  }, [project]);
+
+  useEffect(() => {
+    if (!assetId) {
+      setUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    storage.getAsset(assetId)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success && result.data?.blob) {
+          createdUrl = URL.createObjectURL(result.data.blob);
+          setUrl(createdUrl);
+        } else {
+          setUrl(null);
+        }
+      })
+      .catch(() => { if (!cancelled) setUrl(null); });
+    return () => {
+      cancelled = true;
+      // We own this URL — revoke it when the card unmounts so the
+      // blob can be garbage collected. Browser-mounted URLs leak
+      // memory until the page is closed otherwise.
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [assetId, storage]);
+
+  return url;
+}
+
+/**
  * Project card component
  */
 const ProjectCard: React.FC<{
@@ -103,6 +161,7 @@ const ProjectCard: React.FC<{
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isSavingRename, setIsSavingRename] = useState(false);
+  const thumbnailUrl = useProjectThumbnail(project);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -177,8 +236,17 @@ const ProjectCard: React.FC<{
             )}
           </button>
         )}
-        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-          <Folder className="text-blue-600" size={24} />
+        <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-blue-100 flex items-center justify-center">
+          {thumbnailUrl ? (
+            <img
+              src={thumbnailUrl}
+              alt=""
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          ) : (
+            <Folder className="text-blue-600" size={24} />
+          )}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -272,7 +340,7 @@ const ProjectCard: React.FC<{
 
   return (
     <div
-      className={`relative border rounded-lg p-6 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+      className={`relative border rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
         isCurrentProject
           ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
           : isSelected
@@ -283,43 +351,58 @@ const ProjectCard: React.FC<{
     >
       {/* Current project badge */}
       {isCurrentProject && (
-        <div className="absolute -top-2 left-4 px-2 py-0.5 bg-green-500 text-white text-xs font-semibold rounded shadow">
+        <div className="absolute top-2 left-2 z-10 px-2 py-0.5 bg-green-500 text-white text-xs font-semibold rounded shadow">
           OPEN
         </div>
       )}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-2">
-          {showCheckbox && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleSelect?.();
-              }}
-              className="p-1 rounded hover:bg-gray-100"
-            >
-              {isSelected ? (
-                <CheckSquare className="text-blue-600" size={20} />
-              ) : (
-                <Square className="text-gray-400" size={20} />
-              )}
-            </button>
-          )}
-          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Folder className="text-blue-600" size={24} />
+      {/* Thumbnail strip — full-width 16:9 banner showing the title
+          screen's background when available. Folder icon fallback
+          on a soft blue field matches the rest of the icon language
+          when the project has no titleScreen background asset. */}
+      <div className="relative w-full aspect-[16/9] bg-blue-100 overflow-hidden">
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Folder className="text-blue-300" size={48} />
           </div>
-        </div>
-        <button
-          onClick={handleDelete}
-          className={`p-2 rounded-md transition-colors opacity-0 group-hover:opacity-100 ${
-            showDeleteConfirm
-              ? 'bg-red-500 text-white'
-              : 'hover:bg-red-50 text-red-600'
-          }`}
-          title={showDeleteConfirm ? 'Click again to confirm' : 'Delete project'}
-        >
-          <Trash2 size={16} />
-        </button>
+        )}
+        {showCheckbox && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
+            className="absolute top-2 right-2 z-10 p-1 rounded bg-white/90 hover:bg-white shadow"
+          >
+            {isSelected ? (
+              <CheckSquare className="text-blue-600" size={20} />
+            ) : (
+              <Square className="text-gray-400" size={20} />
+            )}
+          </button>
+        )}
       </div>
+      {/* Delete control floats over the thumbnail strip on hover —
+          replaces the old toolbar-row layout that lived next to the
+          folder icon. */}
+      <button
+        onClick={handleDelete}
+        className={`absolute top-2 right-2 z-20 p-1.5 rounded-md transition-opacity opacity-0 group-hover:opacity-100 ${
+          showDeleteConfirm
+            ? 'bg-red-500 text-white'
+            : 'bg-white/90 hover:bg-red-50 text-red-600 shadow'
+        }`}
+        title={showDeleteConfirm ? 'Click again to confirm' : 'Delete project'}
+      >
+        <Trash2 size={16} />
+      </button>
+      <div className="p-6">
 
       {isRenaming ? (
         <div className="mb-4" onClick={(e) => e.stopPropagation()}>
@@ -394,6 +477,7 @@ const ProjectCard: React.FC<{
           <Calendar size={12} />
           <span>Created {formatDate(project.createdAt)}</span>
         </div>
+      </div>
       </div>
     </div>
   );
