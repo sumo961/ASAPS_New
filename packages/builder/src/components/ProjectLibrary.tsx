@@ -86,61 +86,31 @@ function formatDate(date: Date): string {
 }
 
 /**
- * Resolve a thumbnail URL for a project's card by finding the
- * titleScreen beat's background asset (stored as `parameters.node`)
- * and asking the storage adapter for a viewable object URL. Falls
- * back to null when the project has no titleScreen, no background,
- * or the asset can't be resolved — the card renders the folder icon
- * placeholder in that case.
- *
- * Storage's getAssetObjectURL manages its own blob-URL lifecycle, so
- * we don't revoke on unmount — premature revocation breaks any other
- * card or editor surface that's mounted the same URL.
+ * Pull at-a-glance metadata off a Project for the card badges. The
+ * full Project (with story + characters) is what listProjects
+ * actually returns, so we read these directly off project.story
+ * rather than threading another fetch through the card. Reads are
+ * defensive — older / imported projects may not carry every field.
  */
-function useProjectThumbnail(project: Project): string | null {
-  const { storage } = usePersistence();
-  const [url, setUrl] = useState<string | null>(null);
-
-  const assetId = React.useMemo(() => {
-    const story = (project as any).story;
-    if (!story || !Array.isArray(story.beats)) return null;
-    const ts = story.beats.find((b: any) => b?.type === 'titleScreen');
-    // `node` carries the background asset id. Older projects sometimes
-    // had non-asset strings here (e.g. a UI node label); we trust it
-    // looks like an identifier (non-empty string) and let the storage
-    // adapter's getAsset() error fall through to the folder fallback.
-    const id = ts?.parameters?.node || ts?.node;
-    return typeof id === 'string' && id.length > 0 ? id : null;
-  }, [project]);
-
-  useEffect(() => {
-    if (!assetId) {
-      setUrl(null);
-      return;
-    }
-    let cancelled = false;
-    let createdUrl: string | null = null;
-    storage.getAsset(assetId)
-      .then((result) => {
-        if (cancelled) return;
-        if (result.success && result.data?.blob) {
-          createdUrl = URL.createObjectURL(result.data.blob);
-          setUrl(createdUrl);
-        } else {
-          setUrl(null);
-        }
-      })
-      .catch(() => { if (!cancelled) setUrl(null); });
-    return () => {
-      cancelled = true;
-      // We own this URL — revoke it when the card unmounts so the
-      // blob can be garbage collected. Browser-mounted URLs leak
-      // memory until the page is closed otherwise.
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
-    };
-  }, [assetId, storage]);
-
-  return url;
+function getProjectMeta(project: Project): {
+  beatCount: number;
+  layoutLabel: string | null;
+  characterCount: number;
+} {
+  const story = (project as any).story;
+  const beats = Array.isArray(story?.beats) ? story.beats : [];
+  const layoutMode = story?.layoutMode || story?.globalSettings?.layoutMode;
+  const characters = Array.isArray(story?.characters) ? story.characters : [];
+  const layoutLabel = layoutMode === 'responsive'
+    ? 'Responsive'
+    : layoutMode === 'fixed'
+    ? 'Fixed'
+    : null;
+  return {
+    beatCount: beats.length,
+    layoutLabel,
+    characterCount: characters.length,
+  };
 }
 
 /**
@@ -161,7 +131,7 @@ const ProjectCard: React.FC<{
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(project.name);
   const [isSavingRename, setIsSavingRename] = useState(false);
-  const thumbnailUrl = useProjectThumbnail(project);
+  const meta = getProjectMeta(project);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -236,17 +206,8 @@ const ProjectCard: React.FC<{
             )}
           </button>
         )}
-        <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-blue-100 flex items-center justify-center">
-          {thumbnailUrl ? (
-            <img
-              src={thumbnailUrl}
-              alt=""
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          ) : (
-            <Folder className="text-blue-600" size={24} />
-          )}
+        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+          <Folder className="text-blue-600" size={24} />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -340,7 +301,7 @@ const ProjectCard: React.FC<{
 
   return (
     <div
-      className={`relative border rounded-lg overflow-hidden hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
+      className={`relative border rounded-lg p-5 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group ${
         isCurrentProject
           ? 'border-green-500 bg-green-50 ring-2 ring-green-200'
           : isSelected
@@ -349,60 +310,43 @@ const ProjectCard: React.FC<{
       }`}
       onClick={onLoad}
     >
-      {/* Current project badge */}
+      {/* Current-project badge — small inline pill at top-left now
+          that the thumbnail strip is gone. Sits above the title row. */}
       {isCurrentProject && (
-        <div className="absolute top-2 left-2 z-10 px-2 py-0.5 bg-green-500 text-white text-xs font-semibold rounded shadow">
+        <div className="mb-2 inline-block px-2 py-0.5 bg-green-500 text-white text-xs font-semibold rounded">
           OPEN
         </div>
       )}
-      {/* Thumbnail strip — full-width 16:9 banner showing the title
-          screen's background when available. Folder icon fallback
-          on a soft blue field matches the rest of the icon language
-          when the project has no titleScreen background asset. */}
-      <div className="relative w-full aspect-[16/9] bg-blue-100 overflow-hidden">
-        {thumbnailUrl ? (
-          <img
-            src={thumbnailUrl}
-            alt=""
-            className="w-full h-full object-cover"
-            draggable={false}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Folder className="text-blue-300" size={48} />
-          </div>
-        )}
-        {showCheckbox && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelect?.();
-            }}
-            className="absolute top-2 right-2 z-10 p-1 rounded bg-white/90 hover:bg-white shadow"
-          >
-            {isSelected ? (
-              <CheckSquare className="text-blue-600" size={20} />
-            ) : (
-              <Square className="text-gray-400" size={20} />
-            )}
-          </button>
-        )}
-      </div>
-      {/* Delete control floats over the thumbnail strip on hover —
-          replaces the old toolbar-row layout that lived next to the
-          folder icon. */}
+      {/* Hover-revealed selection + delete controls. Selection
+          pinned top-left when in selection mode (slides in over the
+          OPEN badge in a wash of white so both stay readable);
+          delete pinned top-right. */}
+      {showCheckbox && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect?.();
+          }}
+          className="absolute top-3 left-3 z-10 p-1 rounded bg-white/95 hover:bg-white shadow"
+        >
+          {isSelected ? (
+            <CheckSquare className="text-blue-600" size={20} />
+          ) : (
+            <Square className="text-gray-400" size={20} />
+          )}
+        </button>
+      )}
       <button
         onClick={handleDelete}
-        className={`absolute top-2 right-2 z-20 p-1.5 rounded-md transition-opacity opacity-0 group-hover:opacity-100 ${
+        className={`absolute top-3 right-3 z-10 p-1.5 rounded-md transition-opacity opacity-0 group-hover:opacity-100 ${
           showDeleteConfirm
             ? 'bg-red-500 text-white'
-            : 'bg-white/90 hover:bg-red-50 text-red-600 shadow'
+            : 'bg-white/90 hover:bg-red-50 text-red-600 shadow-sm'
         }`}
         title={showDeleteConfirm ? 'Click again to confirm' : 'Delete project'}
       >
         <Trash2 size={16} />
       </button>
-      <div className="p-6">
 
       {isRenaming ? (
         <div className="mb-4" onClick={(e) => e.stopPropagation()}>
@@ -462,22 +406,37 @@ const ProjectCard: React.FC<{
             )}
           </h3>
 
+          {/* Badges row — beat count, layout mode, character count.
+              Dot-separated to read at a glance without burning a
+              second vertical row each. Pieces that aren't meaningful
+              (e.g. layoutLabel null on a never-edited project) drop
+              out entirely rather than rendering as 'unknown'. */}
+          <div className="text-xs text-gray-500 mb-2 truncate">
+            {meta.beatCount > 0 && (
+              <span>{meta.beatCount} {meta.beatCount === 1 ? 'beat' : 'beats'}</span>
+            )}
+            {meta.beatCount > 0 && meta.layoutLabel && <span className="mx-1.5">·</span>}
+            {meta.layoutLabel && <span>{meta.layoutLabel}</span>}
+            {(meta.beatCount > 0 || meta.layoutLabel) && meta.characterCount > 0 && (
+              <span className="mx-1.5">·</span>
+            )}
+            {meta.characterCount > 0 && (
+              <span>{meta.characterCount} {meta.characterCount === 1 ? 'character' : 'characters'}</span>
+            )}
+            {meta.beatCount === 0 && !meta.layoutLabel && meta.characterCount === 0 && (
+              <span className="italic text-gray-400">empty project</span>
+            )}
+          </div>
+
           {project.description && (
-            <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+            <p className="text-sm text-gray-600 mb-3 line-clamp-2">{project.description}</p>
           )}
         </>
       )}
 
-      <div className="space-y-2 text-xs text-gray-500">
-        <div className="flex items-center gap-1">
-          <Clock size={12} />
-          <span>Modified {formatDate(project.modifiedAt)}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Calendar size={12} />
-          <span>Created {formatDate(project.createdAt)}</span>
-        </div>
-      </div>
+      <div className="flex items-center gap-1 text-xs text-gray-500">
+        <Clock size={12} />
+        <span>Modified {formatDate(project.modifiedAt)}</span>
       </div>
     </div>
   );
@@ -804,9 +763,9 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition text-left group"
               >
                 <FileText className="w-6 h-6 text-blue-600 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">Empty</div>
+                <div className="text-sm font-semibold text-gray-900">Empty project</div>
                 <div className="text-xs text-gray-600 leading-snug">
-                  Title screen + end screen, pick layout up front
+                  Pick layout up front, then start adding beats
                 </div>
               </button>
 
@@ -816,13 +775,13 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 disabled={!onOpenStoryFromPrompt}
                 className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
                 title={onOpenStoryFromPrompt
-                  ? 'Describe your idea in a sentence and let the AI draft a scaffold'
-                  : 'Coming soon — describe your idea in a sentence, get a draft scaffold'}
+                  ? 'Describe your idea in a sentence and the AI drafts the rest'
+                  : 'Coming soon — describe your idea in a sentence and the AI drafts the rest'}
               >
                 <Wand2 className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">From Prompt</div>
+                <div className="text-sm font-semibold text-gray-900">Build from a prompt</div>
                 <div className="text-xs text-gray-600 leading-snug">
-                  Describe your story → AI draft scaffold
+                  One line → AI drafts the rest
                 </div>
                 {!onOpenStoryFromPrompt && (
                   <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
@@ -835,13 +794,13 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 disabled={!onOpenIdeator}
                 className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
                 title={onOpenIdeator
-                  ? 'Open a guided ideation session to refine your story'
-                  : 'Coming soon — multi-turn session to refine your idea'}
+                  ? 'Develop your idea in a conversation with an AI agent'
+                  : 'Coming soon — develop your idea in a conversation with an AI agent'}
               >
                 <Sparkles className="w-6 h-6 text-emerald-500 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">Ideator</div>
+                <div className="text-sm font-semibold text-gray-900">Co-write with AI</div>
                 <div className="text-xs text-gray-600 leading-snug">
-                  AI-guided session → refined draft
+                  Develop your idea in conversation
                 </div>
                 {!onOpenIdeator && (
                   <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>

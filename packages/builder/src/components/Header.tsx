@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search } from 'lucide-react';
+import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
+import { NewProjectPicker } from './NewProjectPicker';
 import { ProjectLibrary } from './ProjectLibrary';
 import { UndoRedoToolbar } from './UndoRedoToolbar';
 import { SaveStatus } from './SaveStatus';
@@ -135,6 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
   const translationActions = useTranslationActions();
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
+  const [showNewProjectPicker, setShowNewProjectPicker] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [showBeatCreator, setShowBeatCreator] = useState(false);
@@ -310,6 +312,30 @@ export const Header: React.FC<HeaderProps> = ({
               }
             }}
           />
+          {/* Direct + New entry — opens the picker with the same three
+              create paths as the Project Browser. Frequent action,
+              previously two clicks deep (Projects dropdown → + New).
+              Guarded by hasUnsavedChanges via the same prompt the
+              Browser uses, so a user with dirty edits doesn't blow
+              them away by accident. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (hasUnsavedChanges && onSave) {
+                const proceed = window.confirm(
+                  'You have unsaved changes in the current project. Save them before continuing?\n\nOK to save and continue, Cancel to stay here.'
+                );
+                if (!proceed) return;
+                onSave();
+              }
+              setShowNewProjectPicker(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+            title="Start a new project (Empty, Prompt, or Co-write with AI)"
+          >
+            <Plus size={16} />
+            <span>New</span>
+          </button>
 
           <div className="w-px h-6 bg-gray-300 mx-1" />
 
@@ -1022,6 +1048,23 @@ export const Header: React.FC<HeaderProps> = ({
         />
         );
       })()}
+
+      {/* New Project Picker — the in-editor + New entry. Routes to the
+          same destinations as the Browser's create row (without
+          Import — that's a Browser-only flow). */}
+      <NewProjectPicker
+        isOpen={showNewProjectPicker}
+        onClose={() => setShowNewProjectPicker(false)}
+        onPickEmpty={() => {
+          if (onInterceptNewProject) {
+            const intercepted = onInterceptNewProject();
+            if (intercepted) return;
+          }
+          setShowNewProjectDialog(true);
+        }}
+        onPickPrompt={onStoryGenerated ? () => setShowStoryGenerator(true) : undefined}
+        onPickIdeator={onIdeator ? () => onIdeator() : undefined}
+      />
 
       {/* AI Configuration Dialog */}
       <AIConfigDialog
