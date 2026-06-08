@@ -3759,6 +3759,9 @@
         }
       },
       "locations": ["text"],
+      "locationMapping": {
+        "text": "openingLine"
+      },
       "layoutMode": "slot",
       "slots": [
         {

@@ -293,20 +293,25 @@ describe('PathInterpolator', () => {
     });
 
     describe('sprite animation properties', () => {
-      it('should use start waypoint sprite animation', () => {
+      // 270ff12b — sprite-related props (spriteAnimation, spriteFrames,
+      // spriteFrameDuration) now resolve from the END waypoint of each
+      // segment, not the START. Fixes the beat_1 first-segment cycling
+      // bug where a multi-waypoint character was stuck cycling through
+      // the previous segment's frames until the next segment landed.
+      it('should use end waypoint sprite animation', () => {
         const start = createWaypoint(0, 0, { spriteAnimation: 'walk' });
         const end = createWaypoint(100, 100, { spriteAnimation: 'run' });
 
         const result = interpolateSegment(0.5, start, end, 'linear');
-        expect(result.spriteAnimation).toBe('walk');
+        expect(result.spriteAnimation).toBe('run');
       });
 
-      it('should use start waypoint sprite frames', () => {
+      it('should use end waypoint sprite frames', () => {
         const start = createWaypoint(0, 0, { spriteFrames: [0, 1, 2] });
         const end = createWaypoint(100, 100, { spriteFrames: [3, 4, 5] });
 
         const result = interpolateSegment(0.5, start, end, 'linear');
-        expect(result.spriteFrames).toEqual([0, 1, 2]);
+        expect(result.spriteFrames).toEqual([3, 4, 5]);
       });
     });
 
