@@ -1846,31 +1846,26 @@ function App() {
             const loaded = await loadProject(lastProjectId);
             if (loaded) {
               console.log('[App] SUCCESS: Restored last session project');
-              // Phase 4 — 24h auto-load heuristic. We always restore
-              // the user's place (loaded project + ready to edit), but
-              // if they've been away long enough that the project is
-              // stale, we surface the Project Browser on top so they
-              // can decide: continue editing this one, switch to
-              // another, or start fresh. Threshold matches the spec.
-              const STALE_MS = 24 * 60 * 60 * 1000;
-              try {
-                const projectsResult = await storage.listProjects();
-                if (projectsResult.success && projectsResult.data) {
-                  const proj = projectsResult.data.find((p: any) => p.id === lastProjectId);
-                  if (proj) {
-                    const ageMs = Date.now() - new Date(proj.modifiedAt).getTime();
-                    if (ageMs > STALE_MS) {
-                      console.log(`[App] Last project is ${Math.round(ageMs / 3600000)}h old; opening Project Browser`);
-                      // Dispatched on next tick so the editor mounts
-                      // first and the Browser overlays cleanly.
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('asaps:open-project-browser'));
-                      }, 0);
-                    }
-                  }
-                }
-              } catch (staleErr) {
-                console.warn('[App] Staleness check failed (non-fatal):', staleErr);
+              // Boot trigger for the Project Browser. We always
+              // restore the user's place (loaded project + ready to
+              // edit), and on the *first* cold load of this browser
+              // / Electron session we overlay the Browser on top so
+              // the author can choose: continue editing the restored
+              // project (one-click via the Continue banner), switch
+              // to another, or start fresh. In-session reloads bypass
+              // the Browser entirely — once the session flag is set,
+              // we trust the author is mid-work and skip straight to
+              // the editor.
+              const SESSION_FLAG = 'asaps:session-started';
+              const isFreshSession = !sessionStorage.getItem(SESSION_FLAG);
+              if (isFreshSession) {
+                sessionStorage.setItem(SESSION_FLAG, '1');
+                console.log('[App] First cold load this session; opening Project Browser');
+                // Dispatched on next tick so the editor mounts first
+                // and the Browser overlays cleanly.
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('asaps:open-project-browser'));
+                }, 0);
               }
               return; // Exit early - project loaded
             } else {
