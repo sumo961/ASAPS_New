@@ -781,7 +781,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 <Wand2 className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
                 <div className="text-sm font-semibold text-gray-900">Build from a prompt</div>
                 <div className="text-xs text-gray-600 leading-snug">
-                  One line → AI drafts the rest
+                  Your prompt → AI drafts the rest
                 </div>
                 {!onOpenStoryFromPrompt && (
                   <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>

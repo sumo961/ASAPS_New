@@ -85,7 +85,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
             <Wand2 className="w-7 h-7 text-purple-500 group-hover:scale-110 transition-transform" />
             <div className="text-base font-semibold text-gray-900">Build from a prompt</div>
             <div className="text-sm text-gray-600 leading-snug">
-              One line → AI drafts the rest
+              Your prompt → AI drafts the rest
             </div>
             {!onPickPrompt && (
               <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
