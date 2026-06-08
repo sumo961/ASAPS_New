@@ -21,6 +21,14 @@ import { ProjectLibrary } from '../components/ProjectLibrary';
 import { useProject } from '../contexts/PersistenceContext';
 import { importProjectFromZip } from '../utils/projectZipManager';
 
+// macOS Electron uses `titleBarStyle: 'hiddenInset'` which puts the
+// red/yellow/green traffic-light buttons inside the content area at
+// the top-left. Without a left inset, our 📁 + ASAPS Builder header
+// sits under the buttons. Match the editor's offset (~80px).
+const isElectronMac = typeof window !== 'undefined' &&
+  !!(window as any).electronAPI?.isElectron &&
+  (window as any).electronAPI?.platform === 'darwin';
+
 interface StartIntent {
   openProject?: string;
   createEmpty?: boolean;
@@ -94,8 +102,22 @@ export const StartWindow: React.FC = () => {
   // Pass through what we know; isModal=false makes it render full-page.
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="px-6 py-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-3">
+      <header
+        className="px-6 py-4 border-b border-gray-200 bg-white"
+        style={{
+          // Reserve space for the macOS traffic-light buttons that
+          // overlay the top-left of the content area. WebKit's
+          // `-webkit-app-region: drag` makes the whole header
+          // draggable; the icon + title block opt out so they're
+          // still clickable / focusable.
+          paddingLeft: isElectronMac ? 96 : undefined,
+          ...(({ WebkitAppRegion: 'drag' } as React.CSSProperties)),
+        }}
+      >
+        <div
+          className="flex items-center gap-3"
+          style={{ ...(({ WebkitAppRegion: 'no-drag' } as React.CSSProperties)) }}
+        >
           <div className="text-2xl">📁</div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">ASAPS Builder</h1>
