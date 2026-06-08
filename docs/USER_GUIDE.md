@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.63.114*
+*Last revised against build 0.9.64.115*
 
 ---
 
@@ -102,40 +102,66 @@ ASAPS Modern keeps every project you've ever started in a single, friendly **Pro
 
 The app checks your local browser storage for the last project you had open:
 
-- **If it's there and you were in it recently**, ASAPS opens it straight away — same flowchart, same selection, same place in your work.
-- **If it's there but you haven't touched it in more than 24 hours**, ASAPS still loads it (so nothing is lost), but it also pops open the Project Browser over the top, with a blue **CURRENTLY EDITING** banner offering a one-click **Continue editing →** button. Use it to dive back in, switch to a different project, or kick off something new.
+- **In-session reloads** open it straight away — same flowchart, same selection, same place in your work. If you've already used ASAPS at least once during this browser/Electron session, refresh and you land directly back in the editor.
+- **On the first cold load of a session** (you just launched the browser, opened a new tab, or re-launched the Electron app), ASAPS still loads your last project so it's ready in the editor underneath, but it *also* pops open the Project Browser on top with a blue **CURRENTLY EDITING** banner offering a one-click **Continue editing →** button. Use it to dive straight back in, switch to a different project, or kick off something new.
 - **If no last project is found** (first time opening the app, or you cleared browser storage), ASAPS creates a fresh untitled project so you have somewhere to start.
 
-This is intentional: ASAPS would rather show you the work you were doing than a blank screen.
+This is intentional: the first time you sit down at ASAPS each session, we want to surface your full project list — both as a reminder of what you've made and as a quick door into something different. Once you're working, we get out of your way.
+
+> **Under the hood.** The session boundary is tracked by a `sessionStorage` flag (`asaps:session-started`) that lives only as long as the browser session is open. Closing the browser/tab and reopening = fresh session = Browser overlay reappears.
 
 ![The Project Browser overlay with the Continue-editing banner](images/45-project-browser.png)
-*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty / From Prompt / Ideator / Import), and below that the searchable, sortable list of every project saved on this machine.*
+*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), and below that the searchable, sortable list of every project saved on this machine. Project cards are compact: a title, a one-line badge row (beat count · layout mode · character count, dot-separated), an optional description, and a modified date — fields drop out gracefully when they're not meaningful (an untouched project just reads "empty project" in italics).*
+
+### Electron start window vs web modal Browser
+
+Depending on how you're running ASAPS, the Project Browser appears in one of two shapes — both surface the same content and create paths.
+
+- **In the web build** (your browser), the Browser is an *in-editor modal*: the editor mounts behind it and the Browser overlays as a centered dialog with a backdrop. Click outside, hit Escape, or pick **Continue editing** to dismiss.
+- **In the Electron desktop app**, app launch opens a *dedicated start window* — its own native window (1100×800, with macOS traffic-light buttons) titled **📁 ASAPS Builder** with the tagline *"Start a new project or continue where you left off"*. It's a full-page version of the same Browser, with a **LAST PROJECT** banner pointing at the project from your previous session. When you pick something (open a project, start an empty project, kick off Build from a prompt or Co-write with AI), the main process opens the editor with your intent and closes the start window. **Browse all projects…** inside the editor (Electron) reopens the same start window again — picks apply mid-session via IPC, the editor isn't recreated.
+
+![The Electron start window — full-page Browser with the Last Project banner](images/47-start-window.png)
+*The Electron start window. Same four create paths and project grid as the in-editor Browser, just full-page in a window of its own. (Web build: this surface is reachable in dev at `/#/start-window` for visual reference, but the production web flow keeps the modal Browser.)*
 
 ### The 📁 Projects button
 
-At any point, click the **📁 Projects** button in the top toolbar to open a quick dropdown showing the current project, your most recent projects, **+ New Project**, and **Browse all projects…** (which opens the full Project Browser shown above).
+At any point, click the **📁 Projects** button in the top toolbar to open a quick dropdown showing the current project, your most recent projects (up to 5), and **Browse all projects…** (which opens the full Project Browser shown above — in Electron, the start window; in web, the modal).
 
 The Projects button always reads "Projects" — your project's own name lives in the title field one row above, where you can also edit it directly. This separation keeps the toolbar predictable: the button is a *navigation* affordance, not a *naming* one.
 
+> **No "+ New Project" entry in the dropdown anymore.** That used to live here; it's been promoted to a dedicated **+ New** button in the toolbar (right next to Projects) so a brand-new project is one click away regardless of where you are. The Projects dropdown is now purely for switching.
+
 ![The Projects dropdown showing current project and recents](images/44-projects-dropdown.png)
-*The 📁 Projects dropdown. Quick switch to any recent project, or open the full Browser via "Browse all projects…".*
+*The 📁 Projects dropdown. Current project, your most recent projects, and "Browse all projects…" — no creation actions, those live on the **+ New** toolbar button and inside the Browser itself.*
+
+### The + New toolbar button
+
+The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in the top toolbar. Click it to open a compact picker titled *"Start a new project"* with three cards:
+
+- **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Fixed) and orientation, then drops you into a genuinely empty project ready for you to add beats from the palette.
+- **⚡ Build from a prompt** — *"Your prompt → AI drafts the rest."* Opens the Story Generator dialog. Disabled with a SOON badge when no AI provider is wired — set one up under **AI → Configure AI**.
+- **✨ Co-write with AI** — *"Develop your idea in conversation."* Opens the Ideator pop-out so you can talk through your idea before the AI drafts anything. Also gated on having an AI provider configured.
+
+The picker deliberately does *not* include an Import card — importing a zip isn't a "new project" flow conceptually; it lives on the Browser and in the toolbar's **Import** dropdown.
+
+If the current project has unsaved changes when you click **+ New** (or any create-path in the Browser, or any project-load from the dropdown), ASAPS pauses and asks: *"You have unsaved changes in the current project. Save them before continuing?"* — OK saves and continues, Cancel keeps you where you are.
 
 ### Starting a new project — four paths in
 
-The Project Browser opens with a **START A NEW PROJECT** row offering four cards, each tuned to a different starting point:
+The full Project Browser opens with a **START A NEW PROJECT** row offering four cards, each tuned to a different starting point:
 
 | Card | When to pick it |
 |------|-----------------|
-| 📝 **Empty** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Fixed) and orientation up front, then drops you into a Title Screen → End Screen scaffold ready to fill out. |
-| ⚡ **From Prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
-| ✨ **Ideator** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
-| 📥 **Import** | You have an existing `.asaps` zip or `.asml` file. Pick the file with the standard import dialog — same conflict-resolution flow as the toolbar Import button. |
+| 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Fixed) and orientation up front, then drops you into a brand-new empty project. Add beats from the palette to start building. |
+| ⚡ **Build from a prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
+| ✨ **Co-write with AI** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
+| 📥 **Import** | You have an existing `.asaps` zip or `.asml` file. Pick the file with the standard import dialog — same conflict-resolution flow as the toolbar Import button. (Browser-only — the **+ New** toolbar button picker omits this card by design.) |
 
 If any of the AI-powered cards reads SOON, that just means no AI provider is configured yet — open **AI → Configure AI** to set one up and the cards light up.
 
 ### Drag-drop import
 
-The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card.
+The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project.
 
 This is the fastest way to bring in a backup, a project a collaborator emailed you, or one of the sample projects shipped with ASAPS.
 
@@ -197,7 +223,7 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.63.114), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.64.115), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
 
 When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
 
@@ -205,7 +231,8 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 
 | Left Side | What it Does |
 |-----------|--------------|
-| **📁 Projects** | Single button (folder icon). Click to drop down the current project, recent projects, **+ New Project**, and **Browse all projects…** (which opens the full Project Browser). The button label is always *Projects* — your project's name lives in the title field above. |
+| **📁 Projects** | Single button (folder icon). Click to drop down the current project, your most recent projects, and **Browse all projects…** (which opens the full Project Browser). Dropdown is for *switching* — creation lives on the + New button next door. |
+| **+ New** | Direct create-project entry. Opens a compact picker with three cards (Empty project / Build from a prompt / Co-write with AI). Guarded by an unsaved-changes prompt so you don't lose work in flight. |
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
 | **Import** | Dropdown: import ASML, ZIP, or Twine files |
@@ -295,7 +322,7 @@ The palette is organized into four top-level groups, each split into smaller sub
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
 - **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, Set Timer, Update Affect).
 
-AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The three new device-aware beats — QR Scan, AR Scene, and Web View — are documented in detail in [Part 3](#part-3-understanding-beats).
+AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The three device-aware beats — **QR Scan**, **AR Scene**, and **Web View** — carry an amber `EXP` pill on the palette flagging them as experimental: working but not yet hardware-verified across the device matrix. They're documented in detail in [Part 3](#part-3-understanding-beats).
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -504,6 +531,8 @@ Fail: "Alarm Triggered" beat
 <a id="qr-scan-beat"></a>
 ### QR Scan
 
+> **EXP** — QR Scan ships with an amber `EXP` pill on the palette. The beat is fully implemented and works on real phone hardware, but it hasn't yet been through the full hardware-verification pass we want before calling it stable across the device matrix. Author with confidence on devices you can test; expect refinements over the next few releases.
+
 **Purpose:** Scan a real-world QR code and either route the story based on what's encoded, or store the decoded value in a variable.
 
 This is your bridge into the physical world. Print stickers, hide codes around a room, scatter them across a museum — when the interactor scans one, the story responds. The beat opens the device camera, watches for a code, and then does one of two things depending on what's encoded:
@@ -535,6 +564,8 @@ This is your bridge into the physical world. Print stickers, hide codes around a
 <a id="web-view-beat"></a>
 ### Web View
 
+> **EXP** — Web View ships with an amber `EXP` pill on the palette. Embedding works end-to-end, but the cross-browser and cross-iframe-policy matrix is broad; expect surprises with specific host sites until we've worked through more real-world cases. Test on the platform you intend to ship to (web vs Electron) before committing to it for a critical scene.
+
 **Purpose:** Embed a live external web page inside your story.
 
 Drop a real website into your narrative — a news article, a research paper, an interactive simulation, an external form. The interactor browses the page, then continues via a Done button, an auto-exit URL pattern, or a `postMessage` from the page itself.
@@ -560,6 +591,8 @@ Drop a real website into your narrative — a news article, a research paper, an
 
 <a id="ar-scene-beat"></a>
 ### AR Scene
+
+> **EXP** — AR Scene ships with an amber `EXP` pill on the palette. Marker tracking via MindAR is solid, but hardware-verification across phones, tablets, and lighting conditions is ongoing — and as noted further down, world-tracking and face-tracking are placeholder Phase 2 dropdown entries. Author marker-based scenes today and treat the rest as roadmap.
 
 **Purpose:** An augmented-reality scene with image-marker tracking. The interactor aims their device camera at a printed marker; tappable anchors anchored to that marker appear when it's in view.
 
@@ -3030,7 +3063,7 @@ Quick reference for all beat types.
 
 **AR Scene Beat** - Visible beat that runs an augmented-reality scene with image-marker tracking (via MindAR, lazy-loaded from CDN). The player aims the camera at a printed marker; tappable anchors attached to the marker route through their `onTap` value (a beat id or `asaps://` URI). Phase 1 supports image-marker tracking only; world / face tracking are reserved.
 
-**Project Browser** - The full-screen project list overlay opened via **📁 Projects → Browse all projects…** (or auto-opened on boot when the last project hasn't been touched in more than 24 hours). Shows a *Currently editing* banner for the loaded project, a **Start a new project** row with four create paths (Empty / From Prompt / Ideator / Import), and the searchable / sortable list of every project saved on this machine. Also accepts drag-and-drop `.asaps` zip imports anywhere on its surface.
+**Project Browser** - The project list surface opened via **📁 Projects → Browse all projects…** (web build: in-editor modal; Electron: dedicated start window). Also auto-opens once on the first cold load of each browser/Electron session so authors can pick where to start before diving into the editor. Shows a *Currently editing* (modal) or *Last project* (start window) banner for the loaded project, a **Start a new project** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), and the searchable / sortable list of every project saved on this machine. Cards are compact: title, dot-separated badges (beat count · layout mode · character count, with fields dropping out when empty and an italic "empty project" fallback for never-edited entries), optional description, modified date. Also accepts drag-and-drop `.asaps` zip imports anywhere on its surface, and dismisses on successful import.
 
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
