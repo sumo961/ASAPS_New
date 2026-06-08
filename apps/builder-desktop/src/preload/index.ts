@@ -175,6 +175,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isOpen: () => ipcRenderer.invoke('start:is-open'),
     pick: (intent: Record<string, string> = {}) =>
       ipcRenderer.invoke('start:pick', intent),
+    /** Main sends an intent to the running editor when the user
+     *  picks a project / create path from the start window (opened
+     *  via "Browse all projects" while the editor was already up).
+     *  Returns an unsubscribe function. */
+    onApplyIntent: (callback: (intent: Record<string, string>) => void) => {
+      const handler = (_: unknown, intent: Record<string, string>) => callback(intent);
+      ipcRenderer.on('start:apply-intent', handler);
+      return () => ipcRenderer.removeListener('start:apply-intent', handler);
+    },
   },
 
   // Ideator window operations (pop-out conversational ideation tool).

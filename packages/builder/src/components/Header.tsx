@@ -307,14 +307,20 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between">
         {/* Left: Project, Undo/Redo, Save, Import/Export */}
         <div className="flex items-center space-x-2">
-          {/* Project Selector */}
+          {/* Project Selector — "Browse all projects" routes to the
+              dedicated Electron start window when available, else
+              falls back to the in-editor modal Browser. Same surface
+              either way; the Electron variant is a separate window
+              for parity with the cold-launch experience. */}
           <ProjectSelector
             onOpenLibrary={() => {
               if (onInterceptProjectLibrary) {
                 const intercepted = onInterceptProjectLibrary();
-                if (!intercepted) {
-                  setShowProjectLibrary(true);
-                }
+                if (intercepted) return;
+              }
+              const electronStart = (window as any).electronAPI?.start;
+              if (electronStart?.open) {
+                electronStart.open();
               } else {
                 setShowProjectLibrary(true);
               }

@@ -1288,11 +1288,22 @@ ipcMain.handle('start:is-open', async () => {
 });
 
 ipcMain.handle('start:pick', async (_, intent: Record<string, string> = {}) => {
-  // Open the editor with the intent as URL params.
-  createWindow(intent);
-  // Close the start window once the editor is on its way up. The
-  // editor's ready-to-show fires after createWindow returns; closing
-  // here is fine — the editor BrowserWindow already exists.
+  // Two cases:
+  //   1. Editor doesn't exist yet (cold launch path) — create it
+  //      with the intent encoded as URL params. The editor's boot
+  //      logic consumes the params on first render.
+  //   2. Editor already exists (user opened the start window from
+  //      the editor's "Browse all projects" action) — send the
+  //      intent via IPC so the existing editor can apply it
+  //      without a window recreate. Closing + reopening would
+  //      drop unsaved state and flash an empty window.
+  const editorExists = mainWindow && !mainWindow.isDestroyed();
+  if (editorExists) {
+    mainWindow!.webContents.send('start:apply-intent', intent);
+    mainWindow!.focus();
+  } else {
+    createWindow(intent);
+  }
   if (startWindow && !startWindow.isDestroyed()) {
     startWindow.close();
   }

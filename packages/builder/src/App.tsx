@@ -458,6 +458,7 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+
   // Subscribe to preview window state changes
   useEffect(() => {
     const unsubscribe = previewWindowManager.subscribe((windowState: PreviewWindowState) => {
@@ -1086,6 +1087,30 @@ function App() {
       unregisterSyncCallback();
     };
   }, [syncProjectData, registerSyncCallback, unregisterSyncCallback]);
+
+  // Receive intents from the Electron start window when the user
+  // picks something with the editor already running (e.g. opened
+  // start window via "Browse all projects"). Same fan-out as the
+  // boot-intent consumer but applied mid-session — load the picked
+  // project directly, or fire the matching window event for the
+  // create-path destinations. Web build never sees this IPC.
+  useEffect(() => {
+    const electronStart = (window as any).electronAPI?.start;
+    if (!electronStart?.onApplyIntent) return;
+    const unsubscribe = electronStart.onApplyIntent((intent: Record<string, string>) => {
+      console.log('[App] start:apply-intent from start window:', intent);
+      if (intent.openProject) {
+        loadProject(intent.openProject);
+      } else if (intent.openStoryGen === '1') {
+        window.dispatchEvent(new CustomEvent('asaps:open-story-generator'));
+      } else if (intent.openIdeator === '1') {
+        window.dispatchEvent(new CustomEvent('asaps:open-ideator'));
+      } else if (intent.createEmpty === '1') {
+        window.dispatchEvent(new CustomEvent('asaps:open-new-project-dialog'));
+      }
+    });
+    return unsubscribe;
+  }, [loadProject]);
 
   /**
    * Save theme ID to project when it changes
