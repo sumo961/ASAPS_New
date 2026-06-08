@@ -956,15 +956,38 @@ export const Header: React.FC<HeaderProps> = ({
       )}
 
       {/* Project Library */}
-      {showProjectLibrary && (
+      {showProjectLibrary && (() => {
+        // Guard create/load actions when the current project has
+        // unsaved edits. From Prompt and Ideator BOTH funnel through
+        // handleStoryGenerated which calls actions.clearStory() with
+        // auto-save paused — a path the auto-saver can't rescue, so
+        // any unsaved beats would silently vanish. Save-then-proceed
+        // is the right default; auto-save will have caught up by the
+        // time the user clicks the prompt anyway, but the explicit
+        // call protects the rare just-edited-then-jumped case.
+        const guardCreate = (action: () => void) => {
+          if (hasUnsavedChanges && onSave) {
+            const proceed = window.confirm(
+              'You have unsaved changes in the current project. Save them before continuing?\n\nOK to save and continue, Cancel to stay here.'
+            );
+            if (!proceed) return;
+            onSave();
+          }
+          action();
+        };
+        return (
         <ProjectLibrary
           onLoadProject={(projectId) => {
-            handleLoadProject(projectId);
-            setShowProjectLibrary(false);
+            guardCreate(() => {
+              handleLoadProject(projectId);
+              setShowProjectLibrary(false);
+            });
           }}
           onCreateProject={() => {
-            setShowProjectLibrary(false);
-            setShowNewProjectDialog(true);
+            guardCreate(() => {
+              setShowProjectLibrary(false);
+              setShowNewProjectDialog(true);
+            });
           }}
           // Phase 5 — Prompt path. Only enabled when the host App
           // wired an onStoryGenerated handler (it does, for normal
@@ -972,8 +995,10 @@ export const Header: React.FC<HeaderProps> = ({
           // StoryGenerator dialog; its onStoryGenerated fires the App's
           // handleStoryGenerated which spins up a new project.
           onOpenStoryFromPrompt={onStoryGenerated ? () => {
-            setShowProjectLibrary(false);
-            setShowStoryGenerator(true);
+            guardCreate(() => {
+              setShowProjectLibrary(false);
+              setShowStoryGenerator(true);
+            });
           } : undefined}
           // Phase 6 — Ideator path. Closes the library and opens the
           // existing Ideator pop-out window via App's handleOpenIdeator.
@@ -981,8 +1006,10 @@ export const Header: React.FC<HeaderProps> = ({
           // → AI generator → handleStoryGenerated → new project, same
           // pipeline as the Prompt path.
           onOpenIdeator={onIdeator ? () => {
-            setShowProjectLibrary(false);
-            onIdeator();
+            guardCreate(() => {
+              setShowProjectLibrary(false);
+              onIdeator();
+            });
           } : undefined}
           onExportZip={onExportZip}
           onImportZip={onImportZip}
@@ -993,7 +1020,8 @@ export const Header: React.FC<HeaderProps> = ({
           currentProjectId={currentProjectId}
           onCurrentProjectDeleted={onCurrentProjectDeleted}
         />
-      )}
+        );
+      })()}
 
       {/* AI Configuration Dialog */}
       <AIConfigDialog
