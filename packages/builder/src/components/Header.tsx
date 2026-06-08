@@ -969,6 +969,15 @@ export const Header: React.FC<HeaderProps> = ({
             setShowProjectLibrary(false);
             setShowStoryGenerator(true);
           } : undefined}
+          // Phase 6 — Ideator path. Closes the library and opens the
+          // existing Ideator pop-out window via App's handleOpenIdeator.
+          // The pop-out's session-end SUBMIT_REQUEST hits handleIdeatorSubmit
+          // → AI generator → handleStoryGenerated → new project, same
+          // pipeline as the Prompt path.
+          onOpenIdeator={onIdeator ? () => {
+            setShowProjectLibrary(false);
+            onIdeator();
+          } : undefined}
           onExportZip={onExportZip}
           onImportZip={onImportZip}
           onRenameProject={onRenameProject}
