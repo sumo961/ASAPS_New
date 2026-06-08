@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Folder, Plus, Library } from 'lucide-react';
+import { ChevronDown, Folder, Library } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
 
@@ -17,17 +17,11 @@ export interface ProjectSelectorProps {
   /** Called when user wants to open full project library */
   onOpenLibrary?: () => void;
 
-  /** Called when user wants to create a new project */
-  onCreateProject?: () => void;
-
   /** Maximum number of recent projects to show (default: 5) */
   maxRecentProjects?: number;
 
   /** Show "Open Library" button (default: true) */
   showLibraryButton?: boolean;
-
-  /** Show "New Project" button (default: true) */
-  showNewButton?: boolean;
 
   /** Compact mode - show only icon (default: false) */
   compact?: boolean;
@@ -38,10 +32,8 @@ export interface ProjectSelectorProps {
  */
 export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   onOpenLibrary,
-  onCreateProject,
   maxRecentProjects = 5,
   showLibraryButton = true,
-  showNewButton = true,
   compact = false,
 }) => {
   const { storage } = usePersistence();
@@ -105,16 +97,6 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
     const success = await load(projectId);
     if (!success) {
       alert('Failed to load project');
-    }
-  };
-
-  /**
-   * Handle create new project
-   */
-  const handleCreateNew = () => {
-    setIsOpen(false);
-    if (onCreateProject) {
-      onCreateProject();
     }
   };
 
@@ -217,18 +199,15 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="border-t border-gray-200">
-            {showNewButton && onCreateProject && (
-              <button
-                onClick={handleCreateNew}
-                className="w-full px-4 py-3 flex items-center gap-2 hover:bg-gray-50 transition text-left border-b border-gray-100"
-              >
-                <Plus className="text-blue-600" size={18} />
-                <span className="text-sm font-medium text-gray-900">New Project</span>
-              </button>
-            )}
-            {showLibraryButton && onOpenLibrary && (
+          {/* Browse all projects — opens the start screen / Project
+              Browser, which doubles as the recent-projects surface
+              for anything beyond the top-5 shortcut list above.
+              The + New entry that used to live here was removed when
+              the dedicated + New toolbar button took over the
+              create-project entry point; keeping both created
+              inconsistency over which new-project flow ran. */}
+          {showLibraryButton && onOpenLibrary && (
+            <div className="border-t border-gray-200">
               <button
                 onClick={handleOpenLibrary}
                 className="w-full px-4 py-3 flex items-center gap-2 hover:bg-gray-50 transition text-left"
@@ -236,8 +215,8 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                 <Library className="text-gray-600" size={18} />
                 <span className="text-sm font-medium text-gray-900">Browse all projects…</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

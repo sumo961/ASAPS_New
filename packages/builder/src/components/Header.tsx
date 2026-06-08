@@ -301,16 +301,6 @@ export const Header: React.FC<HeaderProps> = ({
                 setShowProjectLibrary(true);
               }
             }}
-            onCreateProject={() => {
-              if (onInterceptNewProject) {
-                const intercepted = onInterceptNewProject();
-                if (!intercepted) {
-                  setShowNewProjectDialog(true);
-                }
-              } else {
-                setShowNewProjectDialog(true);
-              }
-            }}
           />
           {/* Direct + New entry — opens the picker with the same three
               create paths as the Project Browser. Frequent action,
