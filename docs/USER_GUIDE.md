@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.59.110*
+*Last revised against build 0.9.63.114*
 
 ---
 
@@ -93,6 +93,52 @@ This is the skeleton of a simple linear experience. Your job? Transform it into 
 
 You just edited your first beat. That's the core workflow: select something, change its properties, preview the result. But notice—right now this is still a linear experience. The real magic happens when you add **choices** and **branches**.
 
+<a id="project-organization"></a>
+## Finding Your Way Around Your Projects
+
+ASAPS Modern keeps every project you've ever started in a single, friendly **Project Browser**, and it does its best to drop you back where you left off when you return.
+
+### When you launch ASAPS
+
+The app checks your local browser storage for the last project you had open:
+
+- **If it's there and you were in it recently**, ASAPS opens it straight away — same flowchart, same selection, same place in your work.
+- **If it's there but you haven't touched it in more than 24 hours**, ASAPS still loads it (so nothing is lost), but it also pops open the Project Browser over the top, with a blue **CURRENTLY EDITING** banner offering a one-click **Continue editing →** button. Use it to dive back in, switch to a different project, or kick off something new.
+- **If no last project is found** (first time opening the app, or you cleared browser storage), ASAPS creates a fresh untitled project so you have somewhere to start.
+
+This is intentional: ASAPS would rather show you the work you were doing than a blank screen.
+
+![The Project Browser overlay with the Continue-editing banner](images/45-project-browser.png)
+*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty / From Prompt / Ideator / Import), and below that the searchable, sortable list of every project saved on this machine.*
+
+### The 📁 Projects button
+
+At any point, click the **📁 Projects** button in the top toolbar to open a quick dropdown showing the current project, your most recent projects, **+ New Project**, and **Browse all projects…** (which opens the full Project Browser shown above).
+
+The Projects button always reads "Projects" — your project's own name lives in the title field one row above, where you can also edit it directly. This separation keeps the toolbar predictable: the button is a *navigation* affordance, not a *naming* one.
+
+![The Projects dropdown showing current project and recents](images/44-projects-dropdown.png)
+*The 📁 Projects dropdown. Quick switch to any recent project, or open the full Browser via "Browse all projects…".*
+
+### Starting a new project — four paths in
+
+The Project Browser opens with a **START A NEW PROJECT** row offering four cards, each tuned to a different starting point:
+
+| Card | When to pick it |
+|------|-----------------|
+| 📝 **Empty** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Fixed) and orientation up front, then drops you into a Title Screen → End Screen scaffold ready to fill out. |
+| ⚡ **From Prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
+| ✨ **Ideator** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
+| 📥 **Import** | You have an existing `.asaps` zip or `.asml` file. Pick the file with the standard import dialog — same conflict-resolution flow as the toolbar Import button. |
+
+If any of the AI-powered cards reads SOON, that just means no AI provider is configured yet — open **AI → Configure AI** to set one up and the cards light up.
+
+### Drag-drop import
+
+The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card.
+
+This is the fastest way to bring in a backup, a project a collaborator emailed you, or one of the sample projects shipped with ASAPS.
+
 ## The Big Picture: Systems, Not Scripts
 
 Before we dive deeper, let's establish the mental models that will serve you well.
@@ -151,13 +197,15 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 The header spans the top of the screen in three rows:
 
 **Row 1 -- Branding and Title:**
-The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.59.110), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
+The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.63.114), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
+
+When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
 
 **Row 2 -- Main Controls:**
 
 | Left Side | What it Does |
 |-----------|--------------|
-| **Project Selector** | Dropdown to switch projects, create new, or open the project library |
+| **📁 Projects** | Single button (folder icon). Click to drop down the current project, recent projects, **+ New Project**, and **Browse all projects…** (which opens the full Project Browser). The button label is always *Projects* — your project's name lives in the title field above. |
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
 | **Import** | Dropdown: import ASML, ZIP, or Twine files |
@@ -240,10 +288,14 @@ The Inspector changes based on what you've selected. Select a Dialog Tree and yo
 
 Your beat shopping catalog, docked to the right edge of the flowchart. Drag any beat type onto the canvas to add it to your system. Click the collapse arrow to hide it when you need more canvas space.
 
-The palette is organized into three categories:
-- **Visible Beats** - Moments the interactor encounters (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Video Beat, End Screen, Duration Screen, Input Text, Keypad, Hyper Text, 360 Panorama)
-- **Logic Beats** - Behind-the-scenes processing (Set Variable/Counter, Condition Check, Random Target, Set Timer, Inventory Management)
-- **AI Beats** - AI-powered dynamic content (Online Content, AI Condition, AI Dialog Tree, AI Conversation, AI Summary, AI Info Text, AI Duration Screen)
+The palette is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need:
+
+- **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, Keypad, **QR Scan**, **AR Scene**).
+- **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
+- **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
+- **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, Set Timer, Update Affect).
+
+AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The three new device-aware beats — QR Scan, AR Scene, and Web View — are documented in detail in [Part 3](#part-3-understanding-beats).
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -446,6 +498,130 @@ Correct Code: 4815162342
 Max Attempts: 3
 Fail: "Alarm Triggered" beat
 ```
+
+---
+
+<a id="qr-scan-beat"></a>
+### QR Scan
+
+**Purpose:** Scan a real-world QR code and either route the story based on what's encoded, or store the decoded value in a variable.
+
+This is your bridge into the physical world. Print stickers, hide codes around a room, scatter them across a museum — when the interactor scans one, the story responds. The beat opens the device camera, watches for a code, and then does one of two things depending on what's encoded:
+
+- If the code is a valid **`asaps://` URI** (see [The asaps:// URI Scheme](#asaps-uri-scheme) below) and *Interpret asaps:// URIs* is on (it is, by default), the URI is applied directly: jump to a beat, set a variable, add an inventory item, or fire an event.
+- Otherwise, the decoded value is saved into the variable you specified (default: `scannedCode`) and the beat advances to its connected target. Useful for capturing arbitrary codes — barcodes, ticket numbers, anything QR-encoded.
+
+![QR Scan inspector with the live QR generator panel](images/46-qrscan-generator-panel.png)
+*A QR Scan beat in the Inspector. Below the standard fields is the **📷 Generate QR for asaps:// link** panel — pick an action kind (jump-to-beat / set variable / inventory / event), choose a target, and a live QR code renders. Copy the URI or download a printable PNG without leaving the editor.*
+
+**Key Settings:**
+- **Prompt** — Instruction shown above the camera preview (default: *"Point your camera at the QR code"*)
+- **Save To** — Variable that receives the decoded value when the code isn't an `asaps://` URI (default: `scannedCode`)
+- **Interpret asaps:// URIs** — When on, ASAPS URI codes are applied directly; non-ASAPS codes still save to the variable above (default: on)
+- **Camera** — Rear (environment) or Front (selfie)
+- **Accept patterns (regex)** — Optional regex patterns; only codes matching at least one pattern resolve. Leave empty to accept any code.
+- **Helper Text** — Small caption near the scan target (default: *"Align the code inside the frame"*)
+- **Cancel button text** — Label for the skip / cancel button
+- **Speaker / Show Speaker Name** — Standard speaker controls (the prompt can be read aloud via TTS)
+
+**The built-in QR generator.** The QR Scan inspector includes a **📷 Generate QR for asaps:// link** panel that turns the editor into a printable-code maker. Pick an action (jump to beat, set variable, inventory add/remove, fire event), fill in the target, and a live QR code renders on the right with **Copy URI** and **Download PNG** buttons. The downloaded PNG is high-resolution — print it on a sticker, paste it on a museum label, or include it in a worksheet. Any QR Scan beat with *Interpret asaps:// URIs* on will respond to it.
+
+**Permissions:** Camera access. If the interactor denies camera permission, the beat falls through to its connected target with a brief message ("Camera access is required to scan QR codes."). The preview window cannot exercise the camera fully — desktop/laptop browsers without a rear camera are a limited test environment — but you can verify the inspector and routing behaviour there, then preview on a real phone via HTML export.
+
+**When to Use:** Scavenger hunts, escape rooms, museum installations, classroom worksheets, partnered installations where two devices coordinate, any moment your story wants to acknowledge a real-world object.
+
+---
+
+<a id="web-view-beat"></a>
+### Web View
+
+**Purpose:** Embed a live external web page inside your story.
+
+Drop a real website into your narrative — a news article, a research paper, an interactive simulation, an external form. The interactor browses the page, then continues via a Done button, an auto-exit URL pattern, or a `postMessage` from the page itself.
+
+**Key Settings:**
+- **URL** — The page to embed (e.g., `https://example.com`)
+- **Prompt** — Optional instruction shown above the embedded page
+- **Auto-exit URL pattern (regex)** — When the embedded page navigates to a URL matching this pattern, the beat advances automatically. Useful for "the player must navigate to the contact form" flows.
+- **Pass variables** — A list of story variable names; their current values are injected into the URL as a hash fragment (e.g., `#userName=Alice&playerAge=16`), so the embedded page can read story state without an API call.
+- **Save To** — Variable that receives a value the embedded page sends back via `postMessage({ asaps: 'result', value: ... })`. Leave empty to ignore postMessage.
+- **Done button text** — Label for the manual exit button (default: *"Done"*)
+- **Speaker / Show Speaker Name** — Standard speaker controls
+
+**A note on iframe restrictions.** Many public websites (Google, Facebook, banks, anything security-sensitive) refuse to be embedded in iframes via `X-Frame-Options` or CSP `frame-ancestors` headers. In the web Preview and the player runtime, those pages will refuse to load. The **Electron desktop build** uses a native `<webview>` element which bypasses these restrictions, so when you ship to desktop it just works — but it's a real difference between web and desktop preview, so test on the platform you plan to ship to. For pages you control (your own forms, your own dashboards), iframe-embedding works everywhere.
+
+**Permissions:** Network access. The browser may also block cross-origin URLs in some hosting setups; if a hosted HTML export refuses to load the embedded page, check whether the host adds `Content-Security-Policy: frame-ancestors` headers.
+
+**When to Use:** Citing real sources mid-story, embedded research material, real surveys, integrations with external tools (a calendar booking page, a payment flow, a research consent form), educational stories that incorporate live websites.
+
+**Responsive and Fixed both supported.** Web View renders through ASAPS's slot system in Responsive projects (the iframe fills a dedicated `webview` slot) and respects baked locations in Fixed-canvas projects. Either way, the Done button sits in the action slot at the bottom of the stage.
+
+---
+
+<a id="ar-scene-beat"></a>
+### AR Scene
+
+**Purpose:** An augmented-reality scene with image-marker tracking. The interactor aims their device camera at a printed marker; tappable anchors anchored to that marker appear when it's in view.
+
+This is the closest ASAPS gets to physical-world storytelling. Print a marker image (a museum label, a flyer, a sticker on an object), compile it into a `.mind` file, upload it as an ASSET, and attach anchors — labelled cards or images — that route to different beats when tapped. Treasure hunts, museum installations, illustrated children's books where each page summons different content: AR Scene is the building block.
+
+**Key Settings:**
+- **Prompt** — Optional instruction shown above the AR view (default: *"Aim your camera at the marker"*)
+- **Tracking Mode** — Currently only **Image marker (.mind target)** is implemented. *World tracking* and *Face tracking* are reserved for Phase 2 and appear in the dropdown but aren't yet functional — leave Tracking Mode on *marker* for now.
+- **Marker (.mind file)** — Asset picker pointing to a pre-compiled `.mind` file (see *Creating a marker* below)
+- **Anchors** — An array of overlay anchors attached to the marker. Each anchor carries:
+  - **ID** — Stable identifier
+  - **Label** — Text shown on the anchor card / tooltip
+  - **Image** — Optional asset shown as a billboard at the anchor's position
+  - **Anchored to** — Currently `marker:default` (pinned to the tracked marker)
+  - **X / Y offset** — Local-space offset from the marker center (-1 to 1)
+  - **Scale** — Size multiplier
+  - **onTap** — Where to go when the interactor taps this anchor. Accepts a bare beat id OR an `asaps://` URI (see [The asaps:// URI Scheme](#asaps-uri-scheme)). The schema validator catches dangling references — if an `onTap` points at a beat that no longer exists, you'll see a warning at lint time.
+- **Cancel button text** — Label for the skip button
+- **Fallback target** — Where to go when the interactor skips, the camera permission is denied, or no anchor is tapped before they leave
+- **Speaker / Show Speaker Name** — Standard speaker controls
+
+**Creating a marker.** ASAPS uses the MindAR image-tracking library. To prepare a marker:
+
+1. Pick or create a marker image — high-contrast, asymmetric photos or illustrations work best (logos with a lot of repeated structure are weaker matches).
+2. Compile it into a `.mind` file using MindAR's free web tool: https://hiukim.github.io/mind-ar-js-doc/tools/compile/
+3. Upload the resulting `.mind` file as an asset in the Asset Manager.
+4. Point the AR Scene beat's **Marker** field at the uploaded `.mind` asset.
+
+The MindAR library itself is lazy-loaded from a CDN at runtime — there's no build-time dependency, so projects without AR Scene beats don't pay for the AR tooling.
+
+**Permissions:** Camera access. Falls through to **Fallback target** (or shows a brief message) if denied.
+
+**When to Use:** Treasure hunts where marker stickers hide around a venue, museum installations where each label is a marker that summons related content, illustrated print materials where pointing the device at a page reveals dialogue or 3D models, classroom "scan-the-poster" experiences.
+
+> **Heads-up — AR Scene is Phase 1.** Marker tracking works end-to-end; world-tracking and face-tracking dropdown options are placeholders for upcoming phases. The implementation also uses screen-space anchor cards while waiting for a marker to lock — pinch-zoom and 3D billboarding are coming later. For Phase 1, design your scenes around tappable cards rather than 3D models in space.
+
+---
+
+<a id="asaps-uri-scheme"></a>
+### The asaps:// URI Scheme
+
+QR codes, AR anchors, and (eventually) deep links all need a way to encode story-level intent into a string. ASAPS uses the **`asaps://` URI scheme** for this: a small grammar that says "jump to this beat", "set this variable", "add this to inventory", or "fire this event". One parser, one set of semantics, used everywhere a string can travel.
+
+**The grammar:**
+
+| URI | What it does |
+|-----|--------------|
+| `asaps://beat/<beatId>` | Jump directly to the named beat |
+| `asaps://variable/<name>/<value>` | Set the variable `<name>` to `<value>`, then continue to the connected target |
+| `asaps://inventory/add/<item>` | Add `<item>` to the player's inventory |
+| `asaps://inventory/remove/<item>` | Remove `<item>` from the player's inventory |
+| `asaps://event/<eventName>` | Record an event in the session timeline (useful for analytics-style traces) |
+
+All segments are URL-encoded, so names containing spaces, slashes, or unusual characters are safe. Unknown verbs are ignored — if a QR code reads `asaps://something_we_dont_know`, the QR Scan beat falls back to saving the raw string to its variable.
+
+**Where the URI scheme is used:**
+
+- **QR Scan beats** — When *Interpret asaps:// URIs* is on, scanning a code containing an `asaps://` URI applies it directly. Non-ASAPS codes still save to the variable.
+- **AR Scene anchor onTap** — Anchor onTap fields accept either a bare beat id (e.g. `beat_42`) or a full `asaps://` URI. Use the full form when you want side effects (e.g. *"tapping this anchor adds the clue to inventory AND jumps to the explanation beat"* — though for that you'd actually chain two beats; one URI does one action).
+- **The QR generator panel** in the QR Scan inspector composes URIs for you — pick action kind + target + value, and the editor renders a live QR code with Copy URI and Download PNG buttons.
+
+The scheme is designed to ride through any string-carrying channel — including future support for deep links on native iOS / Android, postMessage from embedded WebView pages, or anything else that can carry a string from the real world into your story.
 
 ---
 
@@ -1259,7 +1435,7 @@ Every project carries a **layout mode** — either *Responsive* or *Fixed canvas
 
 ### Picking the mode at project creation
 
-The **New Project** dialog (Project Selector → *New Project*) now has two extra rows under the description field:
+The **New Project** dialog (📁 Projects → *+ New Project*, or the **Empty** card on the Project Browser) now has two extra rows under the description field:
 
 - **Layout Mode** — *Responsive* (default) or *Fixed canvas*. Two side-by-side cards.
 - **Orientation** — appears only when Layout Mode is *Responsive*. Three options: *Flexible* (adapts to device rotation, default), *Landscape* (locks to landscape — player shows a "rotate your device" overlay otherwise), *Portrait* (locks to portrait the same way). When Layout Mode is *Fixed canvas* the Orientation row collapses, because fixed-canvas projects always render at their authored aspect ratio.
@@ -1274,6 +1450,10 @@ Click the **layout-mode pill** in the header (green *Responsive layout* or amber
 - **Responsive → Fixed** bakes the current schema-driven positions into explicit `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
 
 The migrator preview lists the per-beat changes so you can see what will happen before committing. Either direction is destructive in the sense that the previous shape isn't preserved — back up (or commit to git) before switching if you might want to revert.
+
+### Which beats render through slot mode?
+
+As of build 0.9.63, the slot system covers most of the visible beat catalogue: Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen, Input Text, Keypad, **QR Scan**, **AR Scene**, Multi Choice, Hyper Text, Duration Screen, AI Duration Screen, Video Beat, and AI Conversation. AI Dialog Tree carries the slot scaffolding too. New slot **roles** added this cycle — `camera` (QR Scan), `webview` (Web View), and `ar` (AR Scene) — mount self-contained elements via `SlotFlowView`. If you're authoring in Responsive mode, these beats reflow cleanly across desktop, tablet, and phone viewports out of the box; use the Preview Window's Viewport switcher (Fit / Desktop / Tablet / Phone) to sanity-check.
 
 ### Authoring affordances that change with the mode
 
@@ -2695,6 +2875,9 @@ Quick reference for all beat types.
 | Video Beat | Video playback | video asset, autoplay, controls, skip |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
 | Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
+| QR Scan | Real-world QR code scan | prompt, saveTo, interpretAsapsUri, facing (rear/front), matchPatterns (regex), helperText, cancelButtonText, speaker (also: built-in `asaps://` QR generator panel) |
+| Web View | Embed external URL | url, prompt, exitUrlPattern (regex), passContext (variable names to inject as URL hash), saveTo (from postMessage), doneButtonText, speaker |
+| AR Scene | AR with image-marker tracking | prompt, trackingMode (marker), markerAssetId (`.mind` file), anchors[] (id, label, assetId, offsetX/Y, scale, onTap as beat id or `asaps://` URI), cancelButtonText, fallbackTarget, speaker |
 | Hyper Text | Clickable text | text with links, link targets |
 | 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
 | End Screen | Story ending | message, show restart, show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
@@ -2838,6 +3021,16 @@ Quick reference for all beat types.
 **Hotspot Portrait Override** - Optional second rect on a spatial hotspot (v0.9.59+) that the runtime uses when the stage is portrait-oriented. Authored by switching the Visual Editor preview to a portrait viewport preset and dragging the hotspot — drags in portrait mode write to `hotspot.portrait`, drags in landscape write the canonical rect. Falls back to landscape values when no portrait override exists.
 
 **Action Slot Button Pin** - Per-button override (v0.9.59+) that lifts one of the action-slot buttons (*Continue*, *Restart*, *Credits*) out of the shared flex row and pins it to one of five stage corners (or back into the row). Authored from the **Pin** row in the slot-intent toolbar; each pinned button gets its own gap slider.
+
+**asaps:// URI** - The URI scheme ASAPS uses to encode story-level intent in any string-carrying channel — QR codes, AR anchor targets, deep links, postMessage payloads. Grammar: `asaps://beat/<id>`, `asaps://variable/<name>/<value>`, `asaps://inventory/add/<item>`, `asaps://inventory/remove/<item>`, `asaps://event/<name>`. See [The asaps:// URI Scheme](#asaps-uri-scheme).
+
+**QR Scan Beat** - Visible beat that opens the device camera and waits for the player to scan a QR code. If the code is an `asaps://` URI and *Interpret asaps:// URIs* is on, the URI is applied directly; otherwise the decoded string saves to a variable. The Inspector includes a built-in QR generator panel that composes `asaps://` URIs and renders printable PNGs.
+
+**Web View Beat** - Visible beat that embeds an external URL via iframe (web/PW) or `<webview>` (Electron). Player exits via Done button, an auto-exit URL regex match, or a `postMessage({asaps:'result', value:...})` from the embedded page. Story variables can be injected into the URL as a hash fragment via the **Pass variables** field.
+
+**AR Scene Beat** - Visible beat that runs an augmented-reality scene with image-marker tracking (via MindAR, lazy-loaded from CDN). The player aims the camera at a printed marker; tappable anchors attached to the marker route through their `onTap` value (a beat id or `asaps://` URI). Phase 1 supports image-marker tracking only; world / face tracking are reserved.
+
+**Project Browser** - The full-screen project list overlay opened via **📁 Projects → Browse all projects…** (or auto-opened on boot when the last project hasn't been touched in more than 24 hours). Shows a *Currently editing* banner for the loaded project, a **Start a new project** row with four create paths (Empty / From Prompt / Ideator / Import), and the searchable / sortable list of every project saved on this machine. Also accepts drag-and-drop `.asaps` zip imports anywhere on its surface.
 
 **Speaker Portrait** - A small face/head image assigned to a character that appears in or above the text box during dialog. Configured in the Character Editor's Visual tab.
 
