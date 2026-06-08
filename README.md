@@ -22,21 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.64** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.64 ships a camera/AR beat
-trio and overhauls the project organization surface.** Three new beats —
-**QR Scan**, **Web View**, **AR Scene** — land alongside an `asaps://` URI
-scheme that lets QR codes and AR anchors route into the story without
-scripting; all three are flagged experimental (built end-to-end but not
-hardware-verified). Six more beats joined the responsive slot mechanic.
-The **Project Browser** is redesigned with four create-path cards
-(Empty / Build from a prompt / Co-write with AI / Import), compact
-metadata-rich project cards, drag-drop import, and a Continue banner;
-**Electron gets a dedicated start window** that opens at app launch —
-authors land on the welcome surface instead of being dropped straight
-into the editor. Boot trigger is now session-based (first cold load
-opens the start screen; in-session reloads skip it). For what shipped
-when, see:
+Current release: **v0.9.65** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.65 is a security hot-patch
+on top of v0.9.64** — no new features. Electron bumps from 40.6.1 to
+40.10.2 (closes 18 advisories patched in the 40.x series, including
+AppleScript injection in `app.moveToApplicationsFolder` on macOS),
+the vitest test runner moves to 4.x, and a fresh sweep of transitive
+deps takes the local `npm audit` count from 35 entries (2 critical,
+14 high) down to 5 (0 critical, 2 high — both build-toolchain only,
+not in the shipped product). Users on v0.9.64 will auto-update.
+For everything that shipped in v0.9.64 (camera/AR beats, Project
+Browser overhaul, Electron start window), see Progress.md. For what
+shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

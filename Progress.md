@@ -1,5 +1,53 @@
 # ASAPS Modern - Progress Log
 
+## 2026-06-08: Security patch release (v0.9.65)
+
+### Overview
+
+Hot-patch release immediately following v0.9.64 to push security fixes to end users via auto-update. No new features. The shipped v0.9.64 DMG / exe contained Electron 40.6.1 and a handful of vulnerable transitive deps; v0.9.65 ships Electron 40.10.2 (closes 18 separate advisories inside the 40.x series, including AppleScript injection in `app.moveToApplicationsFolder` on macOS) plus a fresh sweep of patched transitive deps. The local `npm audit` count dropped from 35 distinct entries (2 critical, 14 high, 18 moderate, 1 low) to 5 (0 critical, 2 high, 3 moderate, 0 low). The 5 remaining advisories are all build-toolchain only (capacitor's bundled tar, esbuild, uuid in the web-service workspace, vite) — none reach the shipped product.
+
+### Electron 40.6.1 → 40.10.2
+
+Within the 40.x semver range — `^40.0.0` already permitted the upgrade; just refreshed the lockfile. Closes 18 advisories patched between 40.7.0 and 40.8.5 (use-after-free in various callback paths, AppleScript injection in moveToApplicationsFolder, service-worker IPC spoofing, permission-handler origin confusion, executeJavaScript IPC reply spoofing, several more). The only one with end-user runtime exposure on macOS was the AppleScript injection — the rest are dev-time / very-narrow-trigger.
+
+### vitest 2.x → 4.x
+
+Major-version bump of the test runner (build-time only, never shipped). Closes the 2 remaining critical CVEs that survived the patch-level sweep. Three vitest-4 behavior changes the test fixtures had to adapt to:
+
+1. Strict `testTimeout` enforcement. Three Hollow-Star-fixture analysis tests run ~45-50 seconds (StateSimulationAnalyzer over a 1000+ raw-path graph). Vitest 2 was lenient; vitest 4 hard-fails at the 10 s default. Each gets an explicit `{ timeout: 90_000 }` annotation with an explanatory comment.
+2. `global.X = ...` no longer aliases to `window.X` in jsdom. The `AudioManager` test patched `global.fetch` / `global.AudioContext`; the source reads `window.fetch` / `window.AudioContext`. Switched to `vi.stubGlobal` (patches both slots) with `vi.unstubAllGlobals()` in `afterEach` so mocks don't leak.
+3. `vi.fn().mockImplementation(() => ({...}))` returns an arrow function which isn't `new`-able. `AudioManager` calls `new AudioContext()`, so the mock implementation must be a regular function expression — switched to `vi.fn(function () { return {...} })`.
+
+### Transitive dep refresh
+
+`npm update` swept everything within current semver ranges to latest patch / minor: `brace-expansion`, `xmldom`, `fast-uri`, `flatted`, `lodash` (prototype pollution in `_.unset` / `_.omit`), `minimatch`, `path-to-regexp` (ReDoS via multiple route params), `picomatch`, `rollup` (arbitrary file write via path traversal), `tmp` (path traversal via unsanitized prefix/postfix), `@microsoft/api-extractor`. All non-breaking, no `package.json` range changes required.
+
+### CI install: `npm ci` → `npm install`
+
+The first patched-deps build (workflow run 27163390922) failed both macOS and Windows install steps with npm complaining about missing `emnapi` / `@napi-rs/wasm-runtime` resolutions. Root cause: npm's well-documented cross-platform optional-dep gap — `npm install` on macOS does NOT record Linux-only optional native binaries in the lockfile, so CI's strict `npm ci` walks off the cliff trying to verify them. Switched to `npm install --no-audit --no-fund` which resolves on the target platform. Trade-off: each CI run does a fresh resolve, no install-cache reuse. Acceptable since the workflow only fires on release tags + manual dispatch.
+
+### @types/express 5 type widening
+
+The lockfile regen brought in `@types/express@5.0.6` which (correctly, per the spec) widens `req.params.X` to `string | string[]`. URL query params with repeated keys can be arrays; URL path params (`:id` in `/:id`) cannot. Six call sites in `packages/builder/src/api/server.ts` cast to `string` with an explanatory comment so a future reader doesn't try to "fix" the cast with a runtime guard that can never fire.
+
+### Memory captured
+
+- Lockfile contains cross-platform optional-dep gaps when generated on macOS; CI's `npm ci` can't reconcile. Future security sweeps that touch optional native packages should use `npm install` in CI rather than `npm ci`. Documented in the CI workflow comment so the next operator understands the trade-off.
+
+### Verification
+
+- Full test suite (2788 tests across `@asaps/core`, `@asaps/renderer`, `@asaps/builder`) green after vitest 4 bump.
+- Workflow run 27164501461 successfully built macOS + Windows artifacts with the patched lockfile. Hartmut verified the local dev build runs end-to-end before tagging the release.
+
+**Files modified:**
+- `apps/builder-desktop/src/main/index.ts` (only via Electron transitive), `.github/workflows/build-desktop.yml`
+- `package.json`, `package-lock.json`, `mcp-server/package.json`, `mcp-server-desktop/package.json`, `packages/{builder,core,player,renderer}/package.json`
+- `packages/builder/src/api/server.ts`
+- `packages/renderer/tests/audio/AudioManager.test.ts`
+- `packages/core/tests/analysis/{PathTree,ConstraintPathAnalyzer,StoryWarnings}.test.ts`
+
+---
+
 ## 2026-06-08: Camera/AR beats + Project Browser overhaul + Electron start window (v0.9.64)
 
 ### Overview
