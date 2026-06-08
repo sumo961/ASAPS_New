@@ -1,5 +1,81 @@
 # ASAPS Modern - Progress Log
 
+## 2026-06-08: Camera/AR beats + Project Browser overhaul + Electron start window (v0.9.64)
+
+### Overview
+
+A two-themed release. **Theme one** is three new beats that pull ASAPS into the camera/AR/web-embed space — qrScan, webView, arBeat — plus an `asaps://` URI scheme that lets QR codes and AR anchors route into the story without scripting. All three new beats are flagged experimental in the schema: built and shipped end-to-end but not verified against the hardware they need at runtime (printed QR codes, compiled `.mind` markers, real cameras). The palette surfaces an amber EXP pill so authors know what they're building with. **Theme two** is a sweep of the project-organization surface: a redesigned in-editor Browser modal, a Project Browser overhaul (four create paths, compact metadata-rich cards, drag-drop import), and — for Electron — a dedicated start window that opens at app launch. Boot now lands the author on the start surface for the first cold load of a session and skips it on in-session reloads. Six more beats joined the responsive slot mechanic, and the Visual Editor got a fresh round of hotspot polish.
+
+### Three new beats (all experimental)
+
+**QR Scan** (`qrScan`, 📷, Input). Opens the device camera, waits for a QR code, saves the decoded string to a variable, then branches. When `interpretAsapsUri` is on (default), an `asaps://` payload routes the story directly instead. The inspector ships a QR generator panel that produces printable `.png` codes for any beat in the story with one click.
+
+**Web View** (`webView`, 🌐, Display). Embed a live external page via `iframe` on web/PW or `<webview>` on Electron. Exits via the Done button, an exit-URL pattern match, or a `postMessage` from the page. Slot mode (responsive) AND fixed-locations mode both supported, so authors can mix it into either layout intent.
+
+**AR Scene** (`arBeat`, 🥽, Input). Augmented-reality scene with image-marker tracking via MindAR — lazy-loaded from CDN at runtime to bypass an upstream Three.js version conflict. Authors upload a compiled `.mind` file plus anchors (text / image / tappable cards); each anchor's `onTap` resolves through the same `asaps://` parser as qrScan, so a single field handles "jump to beat", "set variable", "add to inventory", or "record event".
+
+### asaps:// URI scheme
+
+A new core utility (`packages/core/src/utils/asapsUri.ts`) defines and parses four verb forms: `asaps://beat/<id>`, `asaps://variable/<name>/<value>`, `asaps://inventory/{add|remove}/<item>`, `asaps://event/<name>`. The schema validator gains a `references: 'beatOrAsapsUri'` field kind that accepts either a bare beat id or `asaps://beat/<id>`, and recurses into `itemSchema` for array<object> fields so dangling refs in nested anchor `onTap` values get flagged at lint time.
+
+### Six more beats responsive
+
+`aiDurScreen`, `aiDialogTree`, `hyperText`, `keypad`, `videoBeat`, and `aiConversation` joined the slot mechanic. New slot roles `camera`, `webview`, `ar`, and `keypad` mount self-contained elements via SlotFlowView. Each beat gets the responsive flow without a separate fixed-mode authoring surface to maintain.
+
+### Project organization overhaul
+
+The folder-icon dropdown that used to repeat the project name is gone — the header now has a clean `📁 Projects ▾` button (switches between recent projects) plus a `+ New` button (opens the create-path picker). An amber `● Unsaved` pill rides next to the layout-mode badge when state is dirty.
+
+The **Project Browser** got a major redesign:
+- Four create-path cards across the top: **Empty project** (truly empty — creates a story with no beats), **Build from a prompt** (AI story generator), **Co-write with AI** (Ideator pop-out session), **Import** (.asaps zip / ASML XML).
+- A blue **"Currently editing → Continue editing →"** banner at the top when a project is loaded.
+- Compact project cards with at-a-glance metadata: `beat count · layout mode · character count`, plus description and modified date. About 2× more cards visible without scrolling vs the earlier version.
+- Drag-drop import on the Browser surface — drop a `.asaps` zip directly, no file picker.
+- Multi-select for bulk delete (kept from earlier).
+
+The **boot trigger** changed: instead of a 24h staleness check, the Browser now opens on the first cold load of a browser/Electron session (sessionStorage flag). In-session reloads bypass the Browser. Authors get a chance-to-redirect moment on launch without friction during a working session.
+
+A **save-before-navigate confirm** wraps the create paths and project-load handlers — dirty state can no longer get silently destroyed by the AI generator's `clearStory()` path.
+
+### Electron start window
+
+App launch in Electron now opens a dedicated start window (its own `BrowserWindow`, 1100×800) before the editor — same pattern Xcode and VS Code use for their welcome surface. The user picks a project / create path; main opens the editor with the intent encoded as URL params and closes the start window. The web build keeps the in-editor modal.
+
+In-editor "Browse all projects…" routes to the same start window in Electron (consistency with cold launch). When the user picks something with the editor already running, a new `start:apply-intent` IPC channel sends the intent to the running editor; renderer applies it mid-session via the same fan-out as the boot-intent consumer (loadProject directly, or fires the matching window event for create-path destinations).
+
+### Visual Editor polish
+
+Hotspot editor:
+- Rotation now renders in the editor (was data-correct but visually unrotated).
+- Drag works end-to-end (was reading stale prop snapshot, no-op'd).
+- `fromProp` hotspots are hidden in the editor — the prop sprite is the click target, no duplicate yellow rect.
+- Selected prop outline switched to blue (yellow now reserved for hotspot styling).
+- Exclusive selection across sprite/slot/hotspot.
+
+VE↔PW parity for `inputText` (was forcing absolute path even with no baked locations). MovementChoice/PickProp spatial preview honors responsive projects even with baked positions. Stop auto-supplementing movementChoice/pickProp question elements in responsive projects. Stale "Inactive" hotspot advisory corrected for responsive projects.
+
+### Test cleanup
+
+Two pre-existing failing PathInterpolator sprite tests updated to match the END-waypoint sprite-prop rule from commit `270ff12b` (May 25). Schema integrity test caught a missing `locationMapping` on aiConversation after the slot-schema add — fixed.
+
+### Memory captured
+
+- **arBeat anchor refs** lint catches `onTap` values that point at non-existent beats (the `beatOrAsapsUri` reference kind recurses into nested items via the new `itemSchema` validator path).
+- Project memory: **fixed mode is first-class** (carried from v0.9.63, re-confirmed during the Browser overhaul — Empty doesn't pre-commit to a layout mode, NewProjectDialog still asks).
+
+**Files modified:**
+- New beats: `packages/core/src/beats/QrScanBeat.ts`, `WebViewBeat.ts`, `ArBeat.ts`; `packages/renderer/src/components/QRScanElement.tsx`, `WebViewElement.tsx`, `ARSceneElement.tsx`, `ARMarkerScene.tsx`; `packages/renderer/src/utils/mindarLoader.ts`, `webPermissionManager.ts`
+- URI scheme: `packages/core/src/utils/asapsUri.ts`, `packages/builder/src/components/ai/AsapsQRGenerator.tsx`
+- Schema: `beat-definitions/core-beats.json` (qrScan / webView / arBeat / experimental flag; six beats made responsive); `packages/core/src/generated/beat-types.ts`
+- Project Browser: `packages/builder/src/components/ProjectLibrary.tsx`, `ProjectSelector.tsx`, `NewProjectPicker.tsx`, `Header.tsx`
+- Start window: `packages/builder/src/pages/StartWindow.tsx`, `apps/builder-desktop/src/main/index.ts`, `apps/builder-desktop/src/preload/index.ts`
+- App boot: `packages/builder/src/App.tsx`
+- VE / hotspot polish: `packages/builder/src/components/visual/VisualBeatEditor.tsx`, `HotspotEditOverlay.tsx`, related visual components
+- Docs: `docs/USER_GUIDE.md` (refreshed by user-guide-qa subagent)
+- Tests: `packages/renderer/tests/animation/PathInterpolator.test.ts`
+
+---
+
 ## 2026-05-30: DialogTree slot-mode parity + canvas breadcrumb + HTML-export safety (v0.9.63)
 
 ### Overview

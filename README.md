@@ -22,20 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.63** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.63 is a consolidation release**
-extending the v0.9.62 MultiChoice work to DialogTree: all four non-chat
-templates (stacked / conversation / custom) route through the responsive
-slot flow, slotIntent anchors set via the 3×3 picker now reach the
-runtime (single fix in `Beat.execute`), and the legacy left-side "Dialog
-Phases" panel is replaced by a prominent breadcrumb above the canvas
-with click-anywhere-to-step-back navigation. HTML export grows two
-safety surfaces: server-config-specific guidance when the fetched zip
-looks like HTML (Netlify / Vercel / Apache / nginx snippets), and a
-tiered pre-export size warning calibrated against the iPhone SE ~100 MB
-page-memory ceiling. Existing projects render exactly as before — fixed
-mode is a first-class authoring choice, not a legacy path being phased out.
-For what shipped when, see:
+Current release: **v0.9.64** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.64 ships a camera/AR beat
+trio and overhauls the project organization surface.** Three new beats —
+**QR Scan**, **Web View**, **AR Scene** — land alongside an `asaps://` URI
+scheme that lets QR codes and AR anchors route into the story without
+scripting; all three are flagged experimental (built end-to-end but not
+hardware-verified). Six more beats joined the responsive slot mechanic.
+The **Project Browser** is redesigned with four create-path cards
+(Empty / Build from a prompt / Co-write with AI / Import), compact
+metadata-rich project cards, drag-drop import, and a Continue banner;
+**Electron gets a dedicated start window** that opens at app launch —
+authors land on the welcome surface instead of being dropped straight
+into the editor. Boot trigger is now session-based (first cold load
+opens the start screen; in-session reloads skip it). For what shipped
+when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
@@ -52,7 +53,8 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 
 ### Story Authoring
 - **Visual Story Builder**: Drag-and-drop graph editor for the story structure, plus a per-beat Visual Editor for in-beat layout (positioned text, dialogs, hotspots, props, characters, meters)
-- **24+ Beat Types**: Visible, invisible, and AI-runtime beats (full catalog below)
+- **27+ Beat Types**: Visible, invisible, AI-runtime, and experimental camera/AR beats (full catalog below)
+- **Project Browser** *(redesigned in v0.9.64)*: One welcome surface for "where do I go next?". Four create paths (Empty / Build from a prompt / Co-write with AI / Import), compact project cards with beat-count and character-count badges, drag-drop import, a Continue banner for the last session. In Electron, the Browser opens as a dedicated window at app launch; web build keeps the in-editor modal
 - **Real-time Preview Window**: Independent window with state-injection presets, InputText pre-fills, and a live red trace painted back onto the flowchart
 - **Undo/Redo Everywhere**: Full command history including beat operations, character editor, global settings, and visual editor moves/resizes — with a clickable history panel
 - **Asset Manager**: Project-level library with per-element pickers for images, audio, video, and fonts; automatic missing-asset detection and relocation tools
@@ -102,6 +104,8 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 - **Language-Aware AI**: AI beats generate content in the active translation language with translated preview UI
 
 ### XR & Location-Based Storytelling
+- **QR Scan, Web View, AR Scene** *(experimental, v0.9.64)*: Three new beats that pull authoring into camera / embed / AR territory. **QR Scan** opens the device camera, decodes a QR code, and either saves the string to a variable or — when the payload is an `asaps://` URI — routes the story directly. The inspector ships a printable-QR generator for any beat. **Web View** embeds a live external page via iframe / Electron `<webview>`. **AR Scene** does image-marker tracking via MindAR; anchors attached to the marker route via the same `asaps://` parser. All three are flagged experimental on the palette — built end-to-end but not hardware-verified
+- **`asaps://` URI scheme** *(v0.9.64)*: A four-verb URI scheme for "do this in the story" — `asaps://beat/<id>` (jump), `asaps://variable/<n>/<v>` (set), `asaps://inventory/{add|remove}/<item>`, `asaps://event/<n>`. Lets QR codes and AR anchors drive the story without scripting. Schema validator recurses into nested `itemSchema` so dangling refs in anchor `onTap` values lint at authoring time
 - **GpsLocationBeat & IndoorLocationBeat**: Both are multi-location beats — like MovementChoice on a map / floor plan. Each location has its own next-beat target and Effects bundle (counters, mood, sentiment, bookmarks, the full ChoiceEffectsEditor range). The first location the player crosses wins
 - **Visual Editors for both XR beats**: drag markers to reposition, click empty map / floor to add a new location, "Fit all" button for overview, selection sync between Visual Editor and Properties tab
 - **Per-beat floor plans**: each indoor beat carries its own room/space — floor plan asset + dimensions in metres. Different beats can show different rooms or scales. Locations carry their own (x, y); the same beacon UUID can appear at different positions on different beats
