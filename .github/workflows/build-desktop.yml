@@ -66,7 +66,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # npm install rather than `npm ci` to tolerate the cross-platform
+        # optional-dep gap in our lockfile. The local dev install on
+        # macOS cannot resolve Linux-only emnapi/wasi-threads packages
+        # that some workspace tooling pulls in transitively; `npm ci`
+        # fails strictly, `npm install` resolves them on the target
+        # platform. Trade-off: each CI run does a fresh resolve instead
+        # of a cached one — acceptable since this workflow only runs
+        # on release tags and manual dispatch.
+        run: npm install --no-audit --no-fund
 
       - name: Build all packages
         run: npm run build
@@ -112,7 +120,15 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        # npm install rather than `npm ci` to tolerate the cross-platform
+        # optional-dep gap in our lockfile. The local dev install on
+        # macOS cannot resolve Linux-only emnapi/wasi-threads packages
+        # that some workspace tooling pulls in transitively; `npm ci`
+        # fails strictly, `npm install` resolves them on the target
+        # platform. Trade-off: each CI run does a fresh resolve instead
+        # of a cached one — acceptable since this workflow only runs
+        # on release tags and manual dispatch.
+        run: npm install --no-audit --no-fund
 
       - name: Build all packages
         run: npm run build
