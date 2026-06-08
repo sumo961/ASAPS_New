@@ -10,24 +10,32 @@ describe('AudioManager', () => {
   let audioManager: AudioManager;
 
   beforeEach(() => {
-    // Mock Web Audio API
-    global.AudioContext = vi.fn().mockImplementation(() => ({
-      createGain: vi.fn().mockReturnValue({
-        gain: { value: 0.7 },
-        connect: vi.fn(),
-      }),
-      createBufferSource: vi.fn().mockReturnValue({
-        buffer: null,
-        connect: vi.fn(),
-        start: vi.fn(),
-        onended: null,
-      }),
-      decodeAudioData: vi.fn().mockResolvedValue({}),
-      destination: {},
-      state: 'running',
-      resume: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-    })) as any;
+    // Mock Web Audio API. Two vitest-4 changes are at play:
+    //   1. global.X = ... no longer aliases to window.X in jsdom;
+    //      we use vi.stubGlobal which patches both slots.
+    //   2. vi.fn().mockImplementation(() => ...) returns an arrow,
+    //      which isn't `new`-able. AudioManager calls
+    //      `new AudioContext()`, so the implementation must be a
+    //      regular function expression that can be constructed.
+    vi.stubGlobal('AudioContext', vi.fn(function () {
+      return {
+        createGain: vi.fn().mockReturnValue({
+          gain: { value: 0.7 },
+          connect: vi.fn(),
+        }),
+        createBufferSource: vi.fn().mockReturnValue({
+          buffer: null,
+          connect: vi.fn(),
+          start: vi.fn(),
+          onended: null,
+        }),
+        decodeAudioData: vi.fn().mockResolvedValue({}),
+        destination: {},
+        state: 'running',
+        resume: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+      };
+    }));
 
     audioManager = new AudioManager();
   });
@@ -35,6 +43,10 @@ describe('AudioManager', () => {
   afterEach(() => {
     audioManager.dispose();
     vi.clearAllMocks();
+    // Vitest 4: stubGlobal-installed globals persist across tests
+    // unless we explicitly tear them down. Restores `fetch` to the
+    // jsdom-vended impl between tests so we don't leak mocks.
+    vi.unstubAllGlobals();
   });
 
   describe('Initialization', () => {
@@ -89,7 +101,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       await audioManager.preloadSound('https://example.com/sound.mp3');
       expect(mockFetch).toHaveBeenCalledWith('https://example.com/sound.mp3');
@@ -99,7 +111,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       const urls = [
         'https://example.com/sound1.mp3',
@@ -115,7 +127,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       await audioManager.preloadSound('https://example.com/sound.mp3');
       await audioManager.preloadSound('https://example.com/sound.mp3');
@@ -124,7 +136,7 @@ describe('AudioManager', () => {
 
     it('should handle preload errors gracefully', async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       // Should not throw
       await expect(audioManager.preloadSound('https://example.com/sound.mp3')).resolves.toBeUndefined();
@@ -136,7 +148,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       await audioManager.playSound('https://example.com/sound.mp3');
       expect(mockFetch).toHaveBeenCalledWith('https://example.com/sound.mp3');
@@ -146,7 +158,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       await audioManager.playSound('https://example.com/sound.mp3', 0.5);
       expect(mockFetch).toHaveBeenCalledWith('https://example.com/sound.mp3');
@@ -154,7 +166,7 @@ describe('AudioManager', () => {
 
     it('should handle playback errors gracefully', async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error('Playback error'));
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       // Should not throw
       await expect(audioManager.playSound('https://example.com/sound.mp3')).resolves.toBeUndefined();
@@ -164,7 +176,7 @@ describe('AudioManager', () => {
       const mockFetch = vi.fn().mockResolvedValue({
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       });
-      global.fetch = mockFetch as any;
+      vi.stubGlobal('fetch', mockFetch);
 
       await audioManager.playSoundWithPreset('click', 'https://example.com/click.mp3', 0.8);
       expect(mockFetch).toHaveBeenCalledWith('https://example.com/click.mp3');

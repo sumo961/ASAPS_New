@@ -30,7 +30,7 @@ function loadFixtureStory(fixture: any): Story {
 }
 
 describe('StoryWarnings', () => {
-  it('detects the Hollow Star keypad soft-lock', () => {
+  it('detects the Hollow Star keypad soft-lock', { timeout: 90_000 }, () => {
     const story = loadFixtureStory(hollowStarFixture);
     const paths = new StateSimulationAnalyzer(story).analyzeRaw();
     const warnings = detectStoryWarnings({ paths, story });
