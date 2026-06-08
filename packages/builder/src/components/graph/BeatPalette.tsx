@@ -17,6 +17,11 @@ interface BeatType {
   description: string;
   isAi: boolean;
   mobileOnly: boolean;
+  /** Beats flagged as experimental in the schema. Surfaces an EXP
+   *  pill next to the AI pill and an explanatory tooltip so authors
+   *  know the runtime needs real hardware (camera / printed marker /
+   *  external URL) we couldn't verify end-to-end pre-release. */
+  experimental: boolean;
 }
 
 // Per-type colour overrides for the left-border accent. Categories that
@@ -195,6 +200,7 @@ function buildBeatTypeMap(): Map<string, BeatType> {
     displayName: string;
     icon: string;
     description?: string;
+    experimental?: boolean;
   }>;
   const out = new Map<string, BeatType>();
   for (const [type, def] of Object.entries(schemaBeats)) {
@@ -212,6 +218,7 @@ function buildBeatTypeMap(): Map<string, BeatType> {
       description: def.description || `Add a ${def.displayName} beat`,
       isAi: ai,
       mobileOnly: MOBILE_ONLY.has(type),
+      experimental: def.experimental === true,
     });
   }
   return out;
@@ -273,11 +280,14 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
               className="w-full p-1 mb-1 cursor-move hover:bg-gray-100 rounded transition-colors relative"
               draggable
               onDragStart={(e) => onDragStart(e, beat.type)}
-              title={`${beat.name}${beat.isAi ? ' (AI)' : ''}${beat.mobileOnly ? ' — needs mobile device' : ''}: ${beat.description}`}
+              title={`${beat.name}${beat.isAi ? ' (AI)' : ''}${beat.mobileOnly ? ' — needs mobile device' : ''}${beat.experimental ? ' — experimental' : ''}: ${beat.description}`}
             >
               <span className="text-lg block text-center">{beat.icon}</span>
               {beat.mobileOnly && (
                 <span className="absolute top-0 right-0 text-[10px]">📱</span>
+              )}
+              {beat.experimental && (
+                <span className="absolute top-0 left-0 text-[8px] font-bold text-amber-700 bg-amber-100 px-0.5 rounded">EXP</span>
               )}
             </div>
           ))}
@@ -379,10 +389,18 @@ const BeatTile: React.FC<BeatTileProps> = ({ beat, onDragStart }) => {
       draggable
       onDragStart={(e) => onDragStart(e, beat.type)}
       style={{ borderLeftColor: beat.color, borderLeftWidth: '4px' }}
-      title={`${beat.name}${beat.isAi ? ' (AI-powered)' : ''}${beat.mobileOnly ? ' — requires mobile sensors at runtime' : ''}: ${beat.description}`}
+      title={`${beat.name}${beat.isAi ? ' (AI-powered)' : ''}${beat.mobileOnly ? ' — requires mobile sensors at runtime' : ''}${beat.experimental ? ' — experimental, not yet hardware-verified' : ''}: ${beat.description}`}
     >
       <span className="text-xl shrink-0">{displayIcon}</span>
       <span className="text-sm font-medium flex-1 truncate">{beat.name}</span>
+      {beat.experimental && (
+        <span
+          className="text-[9px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-amber-200 text-amber-900 shrink-0"
+          title="Experimental — runtime needs hardware we couldn't verify pre-release. Build with it, but expect rough edges."
+        >
+          EXP
+        </span>
+      )}
       {beat.isAi && (
         <span
           className="text-[9px] font-semibold uppercase tracking-wide px-1 py-0.5 rounded bg-purple-200 text-purple-800 shrink-0"

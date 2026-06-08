@@ -2068,6 +2068,7 @@
       "icon": "📷",
       "description": "Opens the camera and waits for the player to scan a QR code. The decoded string is saved to a variable, then the beat branches.",
       "connectionType": "single",
+      "experimental": true,
       "parameters": {
         "prompt": {
           "type": "string",
@@ -2203,6 +2204,7 @@
       "icon": "🥽",
       "description": "Augmented-reality scene with marker tracking. The player aims the camera at a printed marker; overlay anchors (text, image, tappable cards) attach to the marker. Each anchor's tap routes through an asaps:// URI or target beat id, so authors get treasure-hunt / pick-the-clue mechanics without scripting.",
       "connectionType": "multiple",
+      "experimental": true,
       "parameters": {
         "prompt": {
           "type": "string",
@@ -2382,6 +2384,7 @@
       "icon": "🌐",
       "description": "Embed a live external web page. The player interacts until they hit the Done button, navigate to an exit URL pattern, or post a result back from the page.",
       "connectionType": "single",
+      "experimental": true,
       "parameters": {
         "url": {
           "type": "string",
