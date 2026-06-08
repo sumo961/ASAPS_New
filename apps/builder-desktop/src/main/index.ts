@@ -267,12 +267,20 @@ function checkForUpdatesManually(): void {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let startWindow: BrowserWindow | null = null;
 let previewWindow: BrowserWindow | null = null;
 let debugWindow: BrowserWindow | null = null;
 let ideatorWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 
-function createWindow(): void {
+function createWindow(intent?: Record<string, string>): void {
+  // If a previous editor window is still around (e.g. user picked
+  // from the start window while editor was running), just focus it.
+  // Multi-window-editor support comes in a later phase.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.focus();
+    return;
+  }
   mainWindow = new BrowserWindow({
     width: 1800,
     height: 950,
@@ -294,16 +302,26 @@ function createWindow(): void {
     mainWindow?.show();
   });
 
+  // Encode the start-window intent as a query string. The editor's
+  // boot logic reads these params and routes to the right surface
+  // (open project, new-project dialog, story generator, ideator).
+  const params = new URLSearchParams(intent || {});
+  const query = params.toString();
+  const suffix = query ? `?${query}` : '';
+
   // Load the app
   // In development, load from the builder's dev server (port 5173)
   // In production, load the builder's built files copied to resources
   if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
     const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
-    mainWindow.loadURL(devUrl);
+    mainWindow.loadURL(`${devUrl}${suffix}`);
     mainWindow.webContents.openDevTools();
   } else {
     // In production, the builder's dist is copied to app.asar/builder
-    mainWindow.loadFile(join(__dirname, '../../builder/index.html'));
+    // Electron's loadFile + query string: append manually as search.
+    mainWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      search: query || undefined,
+    });
   }
 
   // Handle external links
@@ -314,6 +332,58 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+// ============================================================================
+// Start Window — the Electron launch screen. Opened first at app
+// `ready` instead of the editor; user picks a project / create path
+// and the start window IPCs the intent to main, which opens the
+// editor with the encoded intent and closes the start window.
+// ============================================================================
+function createStartWindow(): void {
+  if (startWindow && !startWindow.isDestroyed()) {
+    startWindow.focus();
+    return;
+  }
+
+  startWindow = new BrowserWindow({
+    width: 1100,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: { x: 16, y: 16 },
+    title: 'ASAPS Builder',
+    show: false,
+  });
+
+  startWindow.once('ready-to-show', () => {
+    startWindow?.show();
+  });
+
+  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    startWindow.loadURL(`${devUrl}#/start-window`);
+  } else {
+    startWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      hash: '/start-window',
+    });
+  }
+
+  startWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  startWindow.on('closed', () => {
+    startWindow = null;
   });
 }
 
@@ -1191,6 +1261,44 @@ ipcMain.on('ideator:ping', () => {
   }
 });
 
+// ============================================================================
+// Start Window IPC handlers
+// ============================================================================
+// The start window is the app's launch surface. When the user picks
+// a project / create path, it sends `start:pick` with the intent
+// encoded as a flat string map. Main opens the editor with the intent
+// as URL params and closes the start window. The editor's boot
+// reader (App.tsx) consumes the params and routes to the destination.
+// ============================================================================
+
+ipcMain.handle('start:open', async () => {
+  createStartWindow();
+  return true;
+});
+
+ipcMain.handle('start:close', async () => {
+  if (startWindow && !startWindow.isDestroyed()) {
+    startWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle('start:is-open', async () => {
+  return startWindow !== null && !startWindow.isDestroyed();
+});
+
+ipcMain.handle('start:pick', async (_, intent: Record<string, string> = {}) => {
+  // Open the editor with the intent as URL params.
+  createWindow(intent);
+  // Close the start window once the editor is on its way up. The
+  // editor's ready-to-show fires after createWindow returns; closing
+  // here is fine — the editor BrowserWindow already exists.
+  if (startWindow && !startWindow.isDestroyed()) {
+    startWindow.close();
+  }
+  return true;
+});
+
 // Ideator pop-out → main builder (SUBMIT_REQUEST is the load-bearing one;
 // the user's confirmed StoryGenerationRequest comes back this way and main
 // runs aiService.generateStory() on it).
@@ -1222,14 +1330,25 @@ app.whenReady().then(async () => {
   }
 
   createMenu();
-  createWindow();
+  // Open the start window first instead of the editor. The user
+  // picks a project / create path, which IPCs back to main and
+  // triggers createWindow() with the encoded intent. Same boot
+  // shape as Xcode's welcome window.
+  createStartWindow();
 
   // Setup auto-updater after window is created
   setupAutoUpdater();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+    // Dock click with no windows open — re-show the start window if
+    // there's no editor running. If the editor is running, focus it.
+    const allWindows = BrowserWindow.getAllWindows();
+    if (allWindows.length === 0) {
+      createStartWindow();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.focus();
+    } else if (startWindow && !startWindow.isDestroyed()) {
+      startWindow.focus();
     }
   });
 });

@@ -10,6 +10,7 @@ import { StoryPreview } from './components/preview/StoryPreview';
 import { PreviewWindow } from './pages/PreviewWindow';
 import { DebugWindow } from './pages/DebugWindow';
 import { IdeatorWindow } from './pages/IdeatorWindow';
+import { StartWindow } from './pages/StartWindow';
 import { previewWindowManager, type PreviewWindowState } from './services/PreviewWindowManager';
 import { debugWindowManager } from './services/DebugWindowManager';
 import { ideatorWindowManager } from './services/IdeatorWindowManager';
@@ -135,6 +136,11 @@ const isDebugWindowRoute = () => typeof window !== 'undefined' && window.locatio
 const isIdeatorWindowRoute = () =>
   typeof window !== 'undefined' && window.location.hash.startsWith('#/ideator-window');
 
+// Check if we're in the Start Window route — the Electron app's
+// launch screen, also reachable in web for visual dev / verification.
+const isStartWindowRoute = () =>
+  typeof window !== 'undefined' && window.location.hash.startsWith('#/start-window');
+
 // Refs to hold current state for sync operations (avoids stale closures)
 // These are updated on every render and provide immediate access to current values
 
@@ -236,6 +242,13 @@ function App() {
   // Pop-out Ideator ideation window
   if (isIdeatorWindowRoute()) {
     return <IdeatorWindow />;
+  }
+
+  // Electron start window — launches first in Electron, picks
+  // route into the editor window with intent params. Reachable
+  // in web at /#/start-window for dev-time visual verification.
+  if (isStartWindowRoute()) {
+    return <StartWindow />;
   }
 
   const { state, actions, initializeStory } = useStoryBuilder();
@@ -1835,6 +1848,65 @@ function App() {
 
       if (!hasAnyProjects && state.beats.length === 0) {
         console.log('[App] No current project and no beats - checking for last session or existing projects');
+
+        // Start-window boot intent. When the Electron start window
+        // hands off to the editor, it encodes the user's pick as
+        // URL query params. Consuming them here overrides the
+        // standard lastProjectId restore so the user lands exactly
+        // where they intended. The session-flag trigger that opens
+        // the in-editor modal Browser also gets suppressed for
+        // these explicit-pick boots so the user isn't shown the
+        // Browser they just used.
+        try {
+          const url = new URL(window.location.href);
+          const intent = {
+            openProject: url.searchParams.get('openProject') || undefined,
+            createEmpty: url.searchParams.get('createEmpty') === '1',
+            openStoryGen: url.searchParams.get('openStoryGen') === '1',
+            openIdeator: url.searchParams.get('openIdeator') === '1',
+          };
+          const hasIntent = !!(intent.openProject || intent.createEmpty || intent.openStoryGen || intent.openIdeator);
+          if (hasIntent) {
+            console.log('[App] Consuming start-window boot intent:', intent);
+            // Mark session as started so the in-editor Browser
+            // doesn't overlay on top of the intent's destination.
+            sessionStorage.setItem('asaps:session-started', '1');
+            hasInitializedRef.current = true;
+
+            // Clean the params from the URL so a manual reload
+            // doesn't re-fire the same intent — keep the path/hash,
+            // drop the query.
+            window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+
+            if (intent.openProject) {
+              const loaded = await loadProject(intent.openProject);
+              if (!loaded) {
+                console.warn('[App] openProject intent failed; project not found, falling through');
+                hasInitializedRef.current = false;
+              } else {
+                return; // Done — editor lands on the chosen project.
+              }
+            } else if (intent.openStoryGen) {
+              // Defer to next tick so the Header listener is mounted.
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('asaps:open-story-generator'));
+              }, 0);
+            } else if (intent.openIdeator) {
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('asaps:open-ideator'));
+              }, 0);
+            } else if (intent.createEmpty) {
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('asaps:open-new-project-dialog'));
+              }, 0);
+            }
+            // Empty / Prompt / Ideator intents fall through to the
+            // existing untitled-project bootstrap so the editor has
+            // a baseline to load into.
+          }
+        } catch (intentErr) {
+          console.warn('[App] Failed to read start-window intent (non-fatal):', intentErr);
+        }
 
         // FIRST: Check if we have a last used project ID in localStorage
         // This restores the user's session when they come back after being away

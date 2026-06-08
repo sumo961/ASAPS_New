@@ -201,6 +201,24 @@ export const Header: React.FC<HeaderProps> = ({
     return () => window.removeEventListener('asaps:open-project-browser', handler);
   }, []);
 
+  // Boot intents from the Electron start window. When main hands off
+  // to the editor with createEmpty / openStoryGen / openIdeator query
+  // params, App.tsx fires the matching event so the right surface
+  // pops on first paint without state-prop plumbing.
+  useEffect(() => {
+    const newProjectHandler = () => setShowNewProjectDialog(true);
+    const storyGenHandler = () => setShowStoryGenerator(true);
+    const ideatorHandler = () => onIdeator?.();
+    window.addEventListener('asaps:open-new-project-dialog', newProjectHandler);
+    window.addEventListener('asaps:open-story-generator', storyGenHandler);
+    window.addEventListener('asaps:open-ideator', ideatorHandler);
+    return () => {
+      window.removeEventListener('asaps:open-new-project-dialog', newProjectHandler);
+      window.removeEventListener('asaps:open-story-generator', storyGenHandler);
+      window.removeEventListener('asaps:open-ideator', ideatorHandler);
+    };
+  }, [onIdeator]);
+
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
     if (!success) {

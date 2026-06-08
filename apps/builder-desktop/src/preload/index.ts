@@ -164,6 +164,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('debug:message-to-main', handler);
   },
 
+  // Start Window — the Electron launch screen. Lives in its own
+  // BrowserWindow, opened by main at app `ready` instead of the
+  // editor. The page (StartWindow.tsx) calls `start.pick(intent)` to
+  // hand off the user's choice; main opens the editor with the
+  // intent encoded as URL params and closes the start window.
+  start: {
+    open: () => ipcRenderer.invoke('start:open'),
+    close: () => ipcRenderer.invoke('start:close'),
+    isOpen: () => ipcRenderer.invoke('start:is-open'),
+    pick: (intent: Record<string, string> = {}) =>
+      ipcRenderer.invoke('start:pick', intent),
+  },
+
   // Ideator window operations (pop-out conversational ideation tool).
   // Mirrors `preview` and `debug`. The pop-out is opened by the main builder
   // via IPC (since Electron's setWindowOpenHandler denies window.open),
