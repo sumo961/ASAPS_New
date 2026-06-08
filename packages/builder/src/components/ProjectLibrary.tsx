@@ -50,8 +50,18 @@ export interface ProjectLibraryProps {
   /** Called when modal should close */
   onClose?: () => void;
 
-  /** Currently active/open project ID */
+  /** Currently active/open project ID. In the in-editor modal mode
+   *  this is the project the editor has loaded; in non-modal mode
+   *  (the StartWindow page) this is the last-session project read
+   *  from localStorage, surfaced as a Continue CTA. */
   currentProjectId?: string;
+
+  /** Optional handler for the Continue banner CTA when the Library
+   *  is rendered as a non-modal page (StartWindow). When omitted,
+   *  the banner falls back to onClose if the Library is modal.
+   *  Picks the existing project and routes the user into the
+   *  editor — typically via electronAPI.start.pick. */
+  onContinueLast?: () => void;
 
   /** Called after the currently open project is deleted so the host can reset */
   onCurrentProjectDeleted?: () => void;
@@ -457,6 +467,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   isModal = false,
   onClose,
   currentProjectId,
+  onContinueLast,
   onCurrentProjectDeleted,
 }) => {
   const { storage } = usePersistence();
@@ -729,16 +740,29 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
               the list — otherwise we'd flash an empty banner during
               the storage fetch. */}
           {(() => {
-            if (!currentProjectId || !isModal || !onClose) return null;
+            if (!currentProjectId) return null;
+            // Pick the right handler for whichever surface mounted us:
+            //   - modal (in-editor): clicking Continue closes the modal,
+            //     returning the user to the editor on the loaded project
+            //   - non-modal (StartWindow): clicking Continue dispatches
+            //     the pick to main, opening the editor on the last
+            //     project. No onClose here because there's no overlay.
+            const handler = isModal ? onClose : onContinueLast;
+            if (!handler) return null;
             const currentProj = projects.find(p => p.id === currentProjectId);
             if (!currentProj) return null;
+            // Different labels for the two contexts. In modal mode the
+            // user is already in the editor — "Currently editing" is
+            // accurate. In the cold-launch start window they aren't,
+            // so we say "Last project" to keep the framing honest.
+            const label = isModal ? 'Currently editing' : 'Last project';
             return (
               <div className="mb-4 flex items-center justify-between gap-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
                 <div className="flex items-center gap-3 min-w-0">
                   <Folder className="w-5 h-5 text-blue-600 flex-shrink-0" />
                   <div className="min-w-0">
                     <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
-                      Currently editing
+                      {label}
                     </div>
                     <div className="text-sm font-semibold text-gray-900 truncate">
                       {currentProj.name}
@@ -747,7 +771,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handler}
                   className="flex-shrink-0 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
                 >
                   Continue editing →

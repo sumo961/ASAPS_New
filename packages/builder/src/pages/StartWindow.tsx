@@ -59,8 +59,16 @@ function dispatchPick(intent: StartIntent) {
   window.location.href = query ? `/?${query}` : '/';
 }
 
+const LAST_PROJECT_KEY = 'asaps-last-project-id';
+
 export const StartWindow: React.FC = () => {
   const { create: createProject } = useProject();
+  // Read the last-session project id so the Continue banner can
+  // surface it. The full Project metadata is fetched by ProjectLibrary
+  // during its listProjects sweep; we just need the id to flag it.
+  const lastProjectId = typeof window !== 'undefined'
+    ? localStorage.getItem(LAST_PROJECT_KEY) || undefined
+    : undefined;
 
   // Empty path — create a fresh project right here in the start
   // window's storage context (same IndexedDB) and hand the new id
@@ -134,6 +142,8 @@ export const StartWindow: React.FC = () => {
             onOpenStoryFromPrompt={handlePrompt}
             onOpenIdeator={handleIdeator}
             onImportZipFile={handleImportFile}
+            currentProjectId={lastProjectId}
+            onContinueLast={lastProjectId ? () => handleLoadExisting(lastProjectId) : undefined}
           />
         </div>
       </div>
