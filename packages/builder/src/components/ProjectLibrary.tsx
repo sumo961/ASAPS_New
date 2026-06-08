@@ -514,6 +514,15 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
       return;
     }
     await onImportZipFile!(file);
+    // Close the modal after a drop-import so the editor is visible
+    // on the newly-loaded project. Without this, the user is left
+    // staring at the Browser modal while the editor behind it has
+    // already switched to the imported project. The Import card
+    // closure handler runs the same way once it triggers a project
+    // load, but the drag-drop path needs an explicit nudge because
+    // the host doesn't know whether onImportZipFile loaded a project
+    // or surfaced an error.
+    if (isModal) onClose?.();
   };
 
   /**
