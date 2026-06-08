@@ -393,7 +393,10 @@ export class APIServer {
     // Get project by ID
     router.get('/:id', async (req: Request, res: Response) => {
       try {
-        const project = await ctx.storage.loadProject(req.params.id);
+        // @types/express 5 widens req.params.X to string | string[] —
+        // URL path params can never actually be arrays in Express
+        // (only repeated query params can), so the cast is safe.
+        const project = await ctx.storage.loadProject(req.params.id as string);
         if (!project) {
           return res.status(404).json({ error: 'Project not found' });
         }
@@ -437,7 +440,7 @@ export class APIServer {
     // Delete project
     router.delete('/:id', async (req: Request, res: Response) => {
       try {
-        await ctx.storage.deleteProject(req.params.id);
+        await ctx.storage.deleteProject(req.params.id as string);
 
         // Broadcast update via WebSocket
         this.broadcast('project:deleted', { projectId: req.params.id });
@@ -463,7 +466,7 @@ export class APIServer {
         const { projectId } = req.params;
         const beat = req.body;
 
-        const project = await ctx.storage.loadProject(projectId);
+        const project = await ctx.storage.loadProject(projectId as string);
         if (!project) {
           return res.status(404).json({ error: 'Project not found' });
         }
@@ -492,7 +495,7 @@ export class APIServer {
     // List assets for project
     router.get('/:projectId', async (req: Request, res: Response) => {
       try {
-        const assets = await ctx.storage.listAssets(req.params.projectId);
+        const assets = await ctx.storage.listAssets(req.params.projectId as string);
         res.json({ assets });
       } catch (error) {
         res.status(500).json({ error: (error as Error).message });
@@ -518,7 +521,7 @@ export class APIServer {
     // Get asset
     router.get('/:projectId/:assetId', async (req: Request, res: Response) => {
       try {
-        const info = await ctx.storage.loadAssetInfo(req.params.assetId);
+        const info = await ctx.storage.loadAssetInfo(req.params.assetId as string);
         if (!info) {
           return res.status(404).json({ error: 'Asset not found' });
         }
@@ -531,7 +534,7 @@ export class APIServer {
     // Delete asset
     router.delete('/:projectId/:assetId', async (req: Request, res: Response) => {
       try {
-        await ctx.storage.deleteAsset(req.params.assetId);
+        await ctx.storage.deleteAsset(req.params.assetId as string);
 
         this.broadcast('asset:deleted', {
           projectId: req.params.projectId,
