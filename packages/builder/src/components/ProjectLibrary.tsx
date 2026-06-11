@@ -13,6 +13,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square, FileText, Sparkles, Wand2, Download } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
+import { getProjectMeta } from '../utils/projectMeta';
 
 export interface ProjectLibraryProps {
   /** Called when a project is selected to load */
@@ -95,33 +96,7 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString();
 }
 
-/**
- * Pull at-a-glance metadata off a Project for the card badges. The
- * full Project (with story + characters) is what listProjects
- * actually returns, so we read these directly off project.story
- * rather than threading another fetch through the card. Reads are
- * defensive — older / imported projects may not carry every field.
- */
-function getProjectMeta(project: Project): {
-  beatCount: number;
-  layoutLabel: string | null;
-  characterCount: number;
-} {
-  const story = (project as any).story;
-  const beats = Array.isArray(story?.beats) ? story.beats : [];
-  const layoutMode = story?.layoutMode || story?.globalSettings?.layoutMode;
-  const characters = Array.isArray(story?.characters) ? story.characters : [];
-  const layoutLabel = layoutMode === 'responsive'
-    ? 'Responsive'
-    : layoutMode === 'fixed'
-    ? 'Fixed'
-    : null;
-  return {
-    beatCount: beats.length,
-    layoutLabel,
-    characterCount: characters.length,
-  };
-}
+// getProjectMeta moved to ../utils/projectMeta — see import above.
 
 /**
  * Project card component

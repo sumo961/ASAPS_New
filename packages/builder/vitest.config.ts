@@ -25,10 +25,14 @@ function lucideDirectImports(): Plugin {
           const parts = name.split(/\s+as\s+/);
           const iconName = parts[0].trim();
           const alias = parts.length > 1 ? parts[1].trim() : iconName;
-          // Convert PascalCase to kebab-case
+          // Convert PascalCase to kebab-case. Lucide names with
+          // trailing digits (Wand2, Tally5) live in wand-2.js /
+          // tally-5.js — the letter→digit boundary needs its own
+          // hyphen, which the original two-rule conversion misses.
           const kebab = iconName
             .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
             .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+            .replace(/([A-Za-z])(\d)/g, '$1-$2')
             .toLowerCase();
           return `import ${alias} from 'lucide-react/dist/esm/icons/${kebab}.js';`;
         }).join('\n');
