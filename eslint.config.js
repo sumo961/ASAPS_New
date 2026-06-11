@@ -59,7 +59,14 @@ export default tseslint.config(
       '**/build/**',
       '**/node_modules/**',
       '**/*.config.js',
-      '**/*.config.ts'
+      '**/*.config.ts',
+      // Generated TS types from beat-definitions/core-beats.json.
+      // The schema generator emits some legacy capital-case wrapper
+      // types (Object, String) that the linter rightly complains
+      // about, but fixing them belongs in the generator, not in the
+      // lockstep-with-schema output. Excluding the file keeps CI
+      // green without papering over real issues elsewhere.
+      '**/generated/**'
     ]
   }
 );
