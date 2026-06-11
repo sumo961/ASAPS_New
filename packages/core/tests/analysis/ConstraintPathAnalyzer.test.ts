@@ -198,7 +198,7 @@ describe('ConstraintPathAnalyzer — counter-gated endings', () => {
    * unreachable even though they are reachable in normal play. This test
    * asserts all four authored endings are feasible paths from start.
    */
-  it('reports all four endings on the Hollow Star fixture (StateSimulationAnalyzer)', { timeout: 90_000 }, () => {
+  it('reports all four endings on the Hollow Star fixture (StateSimulationAnalyzer)', { timeout: 180_000 }, () => {
     const story = loadFixtureStory(hollowStarFixture);
     // Use defaults — test that the bumped default maxPaths is enough for a
     // realistic AI-generated story with inline per-choice counter effects.

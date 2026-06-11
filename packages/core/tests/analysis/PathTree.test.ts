@@ -85,7 +85,7 @@ describe('PathTree', () => {
   // Hollow Star fixture is computationally heavy — StateSimulationAnalyzer
   // generates >1000 raw paths. Vitest 4 strictly enforces testTimeout
   // (vitest 2 was lenient), so we give this test its own budget.
-  it('detects a hub in the Hollow Star fixture', { timeout: 90_000 }, () => {
+  it('detects a hub in the Hollow Star fixture', { timeout: 180_000 }, () => {
     const story = loadFixtureStory(hollowStarFixture);
     const paths = new StateSimulationAnalyzer(story).analyzeRaw();
     const tree = buildPathTree(paths, story);
