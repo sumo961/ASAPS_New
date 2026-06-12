@@ -1,7 +1,6 @@
 export { BaseRenderer } from './renderers/BaseRenderer';
 export { ReactRenderer } from './renderers/ReactRenderer';
 export { EditableReactRenderer, type EditCallbacks } from './renderers/EditableReactRenderer';
-export { WebRenderer } from './renderers/WebRenderer';
 export type { RenderContext, RenderOptions, RenderTheme, AssetCache } from './types';
 
 // Mood-pad HUD widget — exported so PreviewWindow / standalone player

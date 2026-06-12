@@ -130,3 +130,7 @@ docs/Claude on ASAPS and MM.md
 docs/Eladhari_Koenitz_2023_Mind Stories.pdf
 docs/MM_Article.pdf
 docs/Prompts and results/
+
+# Local debugging screenshots — visual-verification artifacts that
+# don't belong in source control.
+screenshots/
