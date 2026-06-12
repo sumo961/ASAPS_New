@@ -444,8 +444,12 @@ export function parseOptionsRpy(content: string): {
     result.version = versionMatch[1];
   }
 
-  // Try to extract author from gui.about or copyright
-  const aboutMatch = content.match(/gui\.about\s*=\s*_?\s*p?\s*"""[\s\S]*?(?:by|author|created by|made by)[:\s]+([^"\n<]+)/i);
+  // Try to extract author from gui.about or copyright.
+  // Real Ren'Py uses `_p("""...""")` (translation marker + parenthesized
+  // triple-quoted string) as the canonical syntax. The optional `\(?\s*`
+  // before `"""` handles BOTH the parenthesized form AND the legacy
+  // bare-call form (`_p"""..."""`).
+  const aboutMatch = content.match(/gui\.about\s*=\s*_?\s*p?\s*\(?\s*"""[\s\S]*?(?:by|author|created by|made by)[:\s]+([^"\n<]+)/i);
   if (aboutMatch) {
     result.author = aboutMatch[1].trim();
   }
