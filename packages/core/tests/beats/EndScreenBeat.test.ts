@@ -280,6 +280,53 @@ describe('EndScreenBeat', () => {
       expect(result).toBeNull();
     });
 
+    it('should return null on EMPTY action with showRestart-only (regression: no phantom restart)', async () => {
+      // Regression test for the "showRestart:true + showCredits:false +
+      // empty action → infinite restart loop" bug. The single-button
+      // shortcut at the bottom of the loop says "any click restarts",
+      // but an empty string action means "no click happened" (e.g. a
+      // non-interactive renderer surface or beat-skip path). Treating
+      // no-click as restart would loop forever.
+      (renderer.renderEndScreen as any).mockResolvedValue('');
+
+      const beat = new EndScreenBeat({
+        id: 'end1',
+        name: 'Ending',
+        type: 'endScreen',
+        showRestart: true,    // single-button mode
+        showCredits: false,
+      });
+
+      const result = await beat.execute(context, renderer);
+
+      // Empty action with single-button mode falls through to doExit,
+      // NOT doRestart.
+      expect(result).toBeNull();
+      // Sanity: the loop didn't iterate forever — renderer called once.
+      expect((renderer.renderEndScreen as any).mock.calls.length).toBe(1);
+    });
+
+    it('should still restart on a NON-EMPTY click with showRestart-only (no regression for the intended path)', async () => {
+      // Ensure the fix didn't break the original "any click → restart"
+      // contract. The "any click" rule is meant to catch arbitrary
+      // button text the renderer might emit ("close", "ok", "next");
+      // those non-empty values must still trigger restart.
+      (renderer.renderEndScreen as any).mockResolvedValue('next');
+
+      const beat = new EndScreenBeat({
+        id: 'end1',
+        name: 'Ending',
+        type: 'endScreen',
+        showRestart: true,
+        showCredits: false,
+      });
+      beat.connections = [{ targetId: 'first_beat' }];
+
+      const result = await beat.execute(context, renderer);
+
+      expect(result).toBe('first_beat');
+    });
+
     it('should reset context when reset is true', async () => {
       (renderer.renderEndScreen as any).mockResolvedValue('');
       context.setVariable('test', 'value');

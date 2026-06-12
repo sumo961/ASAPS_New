@@ -196,8 +196,12 @@ export class EndScreenBeat extends Beat {
         return doExit();
       }
 
-      // If only one button exists and showRestart is true, any click should restart
-      if (this.showRestart && !this.showCredits) {
+      // If only one button exists and showRestart is true, any click should restart.
+      // Guard against empty action: an empty string means the renderer resolved
+      // without a click (a non-interactive surface, a beat-skip path, or a future
+      // headless mode). Treating "no click" as "any click → restart" would loop
+      // forever; fall through to doExit() instead.
+      if (this.showRestart && !this.showCredits && actionLower) {
         return doRestart();
       }
 
