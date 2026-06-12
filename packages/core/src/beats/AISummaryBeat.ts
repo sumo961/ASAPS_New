@@ -361,7 +361,11 @@ export class AISummaryBeat extends Beat {
         return null;
       }
 
-      if (this.showRestart && !this.showCredits) {
+      // Same single-button shortcut as EndScreenBeat: "any click → restart"
+      // when only the restart button is configured. Guard against empty
+      // result: an empty string means the renderer resolved without a
+      // click; treating that as "any click" would loop forever.
+      if (this.showRestart && !this.showCredits && resultLower) {
         return doRestart();
       }
 

@@ -305,6 +305,32 @@ describe('AISummaryBeat', () => {
         expect(next).toBe('start');
       }
     });
+
+    it('empty action with showRestart-only does NOT phantom-restart (regression)', async () => {
+      // Same bug class as EndScreenBeat: the "any click → restart"
+      // single-button shortcut at the bottom of the loop must NOT
+      // fire on an empty action. An empty string means the renderer
+      // resolved without a click; restarting would loop forever
+      // through the same EndScreen.
+      const { renderer, methods } = makeRenderer({ renderAISummary: '' });
+      const beat = new AISummaryBeat({
+        id: 'b1',
+        parameters: {
+          resetOnRestart: false,
+          showRestart: true,  // single-button mode
+          showCredits: false,
+        },
+      } as any);
+      const ctx = makeContext(() => {}, storyWithFirstBeat('start'));
+
+      const next = await beat.execute(ctx, renderer);
+
+      // Empty action falls through to getNextBeat (not doRestart).
+      // No connections + no defaultTarget → null.
+      expect(next).toBeNull();
+      // Sanity: the loop didn't iterate forever — renderer called once.
+      expect(methods.renderAISummary).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('reset matrix on restart', () => {
