@@ -108,6 +108,15 @@ export class ClaudeProvider extends BaseAIProvider {
     const match = m.match(/^claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
     if (!match) return false;
     const [, majorStr, minorStr] = match;
+    // A 3rd segment longer than 2 digits is a date snapshot (YYYYMMDD) —
+    // e.g. claude-sonnet-4-20250514, the original undated-generation Sonnet 4.
+    // Those models predate adaptive thinking and use the legacy
+    // enabled+budget_tokens shape. Without this guard the regex reads the
+    // date as the minor version (20250514 >= 5) and wrongly routes the
+    // DEFAULT model to the adaptive shape, which 400s when reasoningEffort
+    // is set. Verified against the Anthropic API reference: adaptive thinking
+    // is Opus 4.6+ / Sonnet 4.6+ / Fable 5 only.
+    if (minorStr.length > 2) return false;
     const major = parseInt(majorStr, 10);
     const minor = parseInt(minorStr, 10);
     if (major >= 5) return true;

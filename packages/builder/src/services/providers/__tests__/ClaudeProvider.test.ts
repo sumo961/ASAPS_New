@@ -84,13 +84,28 @@ describe('requiresAdaptiveThinking (model detection)', () => {
     expect(detect('some-other-model')).toBe(false);
   });
 
-  it('FLAG: date-suffixed claude-sonnet-4-20250514 is currently treated as adaptive', () => {
-    // The regex reads "20250514" as the minor version (>= 5) so this older
-    // dated Sonnet-4 is classed as adaptive-thinking. That is very likely
-    // unintended — the dated May-2025 model predates the adaptive shape and
-    // should use the legacy budget_tokens path. Pinned to make the behavior
-    // visible; revisit against the Anthropic docs before changing.
-    expect(detect('claude-sonnet-4-20250514')).toBe(true);
+  it('treats date-suffixed model ids (claude-sonnet-4-20250514) as legacy, not adaptive', () => {
+    // Regression: the regex used to read the date "20250514" as the minor
+    // version (>= 5) and class the original May-2025 Sonnet 4 as adaptive.
+    // Verified against the Anthropic API reference: that model predates
+    // adaptive thinking and uses the legacy enabled+budget_tokens shape.
+    // Since it is ALSO the provider's default model, the misclassification
+    // would 400 every reasoningEffort request. The >2-digit-segment guard
+    // fixes it.
+    expect(detect('claude-sonnet-4-20250514')).toBe(false);
+    expect(detect('claude-opus-4-20250514')).toBe(false);
+  });
+});
+
+describe('default model uses the legacy thinking shape', () => {
+  it('applyThinkingConfig emits enabled+budget_tokens for the default model', () => {
+    // End-to-end guard tying the fix to observable behavior: the default
+    // model + an effort must produce the legacy shape, never adaptive.
+    p.configure(cfg({ reasoningEffort: 'high' })); // no model → default claude-sonnet-4-20250514
+    const body: any = {};
+    (p as any).applyThinkingConfig(body);
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 20000 });
+    expect(body.output_config).toBeUndefined();
   });
 });
 
