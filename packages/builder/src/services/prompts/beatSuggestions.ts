@@ -5,7 +5,6 @@
  */
 
 import type { BeatSuggestionRequest } from '../../types/ai';
-import type { BeatConfig } from '@asaps/core';
 
 /**
  * Build system prompt for beat suggestions
@@ -154,27 +153,6 @@ export function buildBeatSuggestionsUserPrompt(request: BeatSuggestionRequest): 
   parts.push(`\nSuggest ${count} logical next beats.`);
 
   return parts.join('\n');
-}
-
-/**
- * Format beat context summary
- */
-function formatBeatSummary(beat: BeatConfig): string {
-  const parts = [
-    `${beat.type}: "${beat.name}"`
-  ];
-
-  if (beat.parameters) {
-    const keyParams = Object.entries(beat.parameters)
-      .slice(0, 2)
-      .map(([key, val]) => `${key}=${JSON.stringify(val)}`)
-      .join(', ');
-    if (keyParams) {
-      parts.push(`(${keyParams})`);
-    }
-  }
-
-  return parts.join(' ');
 }
 
 /**
