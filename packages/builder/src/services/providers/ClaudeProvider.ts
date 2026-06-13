@@ -31,7 +31,7 @@ import { getAIValidator } from '../AIValidator';
 export class ClaudeProvider extends BaseAIProvider {
   readonly name = 'claude';
   private client: Anthropic | null = null;
-  private model: string = 'claude-sonnet-4-20250514';
+  private model: string = 'claude-sonnet-4-6';
   private useProxy: boolean = false;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
   private proxyEndpoint: string = typeof window !== 'undefined' && window.location?.port === '5173'
@@ -56,7 +56,7 @@ export class ClaudeProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'claude-sonnet-4-20250514';
+      this.model = config.model || 'claude-sonnet-4-6';
 
       console.log(`[ClaudeProvider] Configured with model: ${this.model}${config.baseUrl ? ` using proxy for baseURL: ${config.baseUrl}` : ' (direct API)'}`);
     }
@@ -69,9 +69,9 @@ export class ClaudeProvider extends BaseAIProvider {
    * support the thinking parameter).
    *
    * Used only for older Claude models that still accept the legacy
-   * `thinking.type='enabled'` + `budget_tokens` shape. Newer models
-   * (Opus 4.7, Sonnet 4.6, Haiku 4.5+) require the adaptive shape via
-   * applyThinkingConfig().
+   * `thinking.type='enabled'` + `budget_tokens` shape. The X.6 generation
+   * (Opus 4.6+, Sonnet 4.6+) requires the adaptive shape via
+   * applyThinkingConfig(). Haiku has no adaptive variant.
    */
   private getThinkingBudget(): number | undefined {
     if (this.useProxy) return undefined;
@@ -96,31 +96,36 @@ export class ClaudeProvider extends BaseAIProvider {
    * (thinking.type='adaptive' + output_config.effort) instead of the
    * legacy thinking.type='enabled' + budget_tokens shape.
    *
-   * As of 2026-05, the newer shape is required by claude-opus-4-7,
-   * claude-sonnet-4-6, claude-haiku-4-5+. Older models still accept the
-   * legacy shape. The API rejects mixing the two: sending the legacy
-   * shape to a newer model returns 400 with the message
+   * The newer shape is required by Opus 4.6+ and Sonnet 4.6+ (and any
+   * Opus/Sonnet major >= 5). Opus/Sonnet 4.5-and-earlier and ALL Haiku
+   * models still use the legacy shape. The API rejects mixing the two:
+   * sending the legacy shape to an adaptive-only model returns 400 with
    * "thinking.type.enabled is not supported for this model".
    */
   private requiresAdaptiveThinking(): boolean {
     const m = this.model.toLowerCase();
-    // claude-{opus,sonnet,haiku}-X-Y where X >= 4 AND Y >= 5, or X >= 5
-    const match = m.match(/^claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
+    // Adaptive thinking (thinking.type='adaptive' + output_config.effort) is
+    // supported only from the X.6 generation onward — Opus 4.6+, Sonnet 4.6+,
+    // and any Opus/Sonnet major >= 5. Verified against the Anthropic API
+    // reference. Two family-specific exclusions:
+    //   - NO Haiku model supports it yet (Haiku 4.5 rejects the effort param).
+    //   - Opus/Sonnet 4.5-and-earlier use the legacy enabled+budget_tokens
+    //     shape, so the cutoff is minor >= 6, not >= 5.
+    const match = m.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/);
     if (!match) return false;
-    const [, majorStr, minorStr] = match;
-    // A 3rd segment longer than 2 digits is a date snapshot (YYYYMMDD) —
-    // e.g. claude-sonnet-4-20250514, the original undated-generation Sonnet 4.
-    // Those models predate adaptive thinking and use the legacy
-    // enabled+budget_tokens shape. Without this guard the regex reads the
-    // date as the minor version (20250514 >= 5) and wrongly routes the
-    // DEFAULT model to the adaptive shape, which 400s when reasoningEffort
-    // is set. Verified against the Anthropic API reference: adaptive thinking
-    // is Opus 4.6+ / Sonnet 4.6+ / Fable 5 only.
+    const [, family, majorStr, minorStr] = match;
+    // A 3rd segment longer than 2 digits is a YYYYMMDD snapshot of the
+    // original (undated) generation — e.g. claude-sonnet-4-20250514 — which
+    // predates adaptive thinking and uses the legacy shape. Without this the
+    // regex would read the date as the minor version (20250514 >= 6).
     if (minorStr.length > 2) return false;
     const major = parseInt(majorStr, 10);
     const minor = parseInt(minorStr, 10);
+    // Haiku has no adaptive variant below major 5.
+    if (family === 'haiku') return major >= 5;
+    // Opus / Sonnet: adaptive arrived with the X.6 generation.
     if (major >= 5) return true;
-    if (major === 4 && minor >= 5) return true;
+    if (major === 4 && minor >= 6) return true;
     return false;
   }
 

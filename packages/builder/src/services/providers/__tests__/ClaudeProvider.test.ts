@@ -32,13 +32,13 @@ describe('configure', () => {
   it('is not ready and keeps defaults when the api key is missing', () => {
     p.configure(cfg({ apiKey: '' }));
     expect(p.isReady()).toBe(false);
-    expect((p as any).model).toBe('claude-sonnet-4-20250514'); // unchanged default
+    expect((p as any).model).toBe('claude-sonnet-4-6'); // unchanged default
   });
 
   it('becomes ready and defaults the model when none is supplied', () => {
     p.configure(cfg());
     expect(p.isReady()).toBe(true);
-    expect((p as any).model).toBe('claude-sonnet-4-20250514');
+    expect((p as any).model).toBe('claude-sonnet-4-6');
     expect((p as any).useProxy).toBe(false);
   });
 
@@ -63,20 +63,33 @@ describe('requiresAdaptiveThinking (model detection)', () => {
     return (p as any).requiresAdaptiveThinking();
   };
 
-  it('is true for 4.x models at minor >= 5', () => {
+  it('is true for Opus/Sonnet from the X.6 generation', () => {
     expect(detect('claude-sonnet-4-6')).toBe(true);
-    expect(detect('claude-haiku-4-5')).toBe(true);
+    expect(detect('claude-opus-4-6')).toBe(true);
     expect(detect('claude-opus-4-7')).toBe(true);
+    expect(detect('claude-opus-4-8')).toBe(true);
   });
 
-  it('is true for any major >= 5', () => {
+  it('is true for any Opus/Sonnet major >= 5', () => {
     expect(detect('claude-opus-5-0')).toBe(true);
     expect(detect('claude-sonnet-5-1')).toBe(true);
   });
 
-  it('is false for 4.x models below minor 5', () => {
+  it('is false for Opus/Sonnet 4.5-and-earlier (legacy budget_tokens)', () => {
+    // 4.5 predates adaptive thinking — effort errors on Sonnet 4.5, and
+    // adaptive is documented as Opus 4.6+/Sonnet 4.6+ only.
+    expect(detect('claude-opus-4-5')).toBe(false);
+    expect(detect('claude-sonnet-4-5')).toBe(false);
     expect(detect('claude-opus-4-1')).toBe(false);
     expect(detect('claude-sonnet-4-0')).toBe(false);
+  });
+
+  it('is false for ALL Haiku 4.x — Haiku has no adaptive variant', () => {
+    // Per the Anthropic API reference, Haiku 4.5 rejects the effort param
+    // and is not in the adaptive-thinking list. A hypothetical Haiku 5+
+    // would qualify on the major>=5 rule.
+    expect(detect('claude-haiku-4-5')).toBe(false);
+    expect(detect('claude-haiku-5-0')).toBe(true);
   });
 
   it('is false for non-matching model ids (e.g. claude-3-5-sonnet)', () => {
@@ -97,11 +110,19 @@ describe('requiresAdaptiveThinking (model detection)', () => {
   });
 });
 
-describe('default model uses the legacy thinking shape', () => {
-  it('applyThinkingConfig emits enabled+budget_tokens for the default model', () => {
-    // End-to-end guard tying the fix to observable behavior: the default
-    // model + an effort must produce the legacy shape, never adaptive.
-    p.configure(cfg({ reasoningEffort: 'high' })); // no model → default claude-sonnet-4-20250514
+describe('thinking shape end-to-end (applyThinkingConfig)', () => {
+  it('default model (Sonnet 4.6) emits the adaptive shape', () => {
+    p.configure(cfg({ reasoningEffort: 'high' })); // no model → default claude-sonnet-4-6
+    const body: any = {};
+    (p as any).applyThinkingConfig(body);
+    expect(body.thinking).toEqual({ type: 'adaptive' });
+    expect(body.output_config).toEqual({ effort: 'high' });
+  });
+
+  it('a dated legacy model emits enabled+budget_tokens (regression guard)', () => {
+    // The original dated Sonnet 4 must take the legacy path, not adaptive —
+    // this is the bug the >2-digit-segment guard fixes.
+    p.configure(cfg({ model: 'claude-sonnet-4-20250514', reasoningEffort: 'high' }));
     const body: any = {};
     (p as any).applyThinkingConfig(body);
     expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 20000 });

@@ -561,7 +561,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
               'anthropic-dangerous-direct-browser-access': 'true',
             },
             body: JSON.stringify({
-              model: config.model || 'claude-sonnet-4-20250514',
+              model: config.model || 'claude-sonnet-4-6',
               max_tokens: 8192,
               system: systemPrompt,
               messages: [{ role: 'user', content: userMessage }],
@@ -797,7 +797,7 @@ export interface HtmlExportOptions {
   aiApiKey?: string;
   /** Custom base URL for API (OpenAI-compatible endpoints) */
   aiBaseUrl?: string;
-  /** Model override (e.g., 'gpt-5.5', 'claude-sonnet-4-20250514') */
+  /** Model override (e.g., 'gpt-5.5', 'claude-sonnet-4-6') */
   aiModel?: string;
   /** TTS provider type */
   ttsProvider?: string;

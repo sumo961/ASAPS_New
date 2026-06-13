@@ -2202,7 +2202,7 @@ Always be helpful and try to interpret the user's intent, even if the command is
     // Claude provider
     if (provider.name === 'claude' && provider.client) {
       const response = await provider.client.messages.create({
-        model: provider.model || 'claude-sonnet-4-20250514',
+        model: provider.model || 'claude-sonnet-4-6',
         max_tokens: 4096,
         temperature: 0.3, // Lower temperature for more consistent parsing
         system: systemPrompt,

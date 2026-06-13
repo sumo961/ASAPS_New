@@ -191,7 +191,7 @@ function createAIServiceAdapter(): IAIService | null {
   const useProxy = !!savedConfig.baseUrl && !isLocalUrl;
 
   if (savedConfig.provider === 'claude') {
-    const model = savedConfig.model || 'claude-sonnet-4-20250514';
+    const model = savedConfig.model || 'claude-sonnet-4-6';
     const client = !useProxy ? new Anthropic({
       apiKey: savedConfig.apiKey,
       dangerouslyAllowBrowser: true,

@@ -142,7 +142,7 @@ function createAIServiceAdapter(): IAIService | null {
   }
 
   if (savedConfig.provider === 'claude') {
-    const model = savedConfig.model || 'claude-sonnet-4-20250514';
+    const model = savedConfig.model || 'claude-sonnet-4-6';
 
     // Only create direct client if not using proxy
     const client = !useProxy ? new Anthropic({

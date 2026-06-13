@@ -126,7 +126,7 @@ export function getDefaultModel(provider: AIProvider): string {
     case 'openai':
       return 'gpt-5.2';
     case 'anthropic':
-      return 'claude-sonnet-4-20250514';
+      return 'claude-sonnet-4-6';
     case 'local':
       return 'gemma-3-4b';
     case 'custom':

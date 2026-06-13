@@ -398,7 +398,7 @@ Respond with ONLY the category name, nothing else.`;
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: model || 'claude-sonnet-4-20250514',
+        model: model || 'claude-sonnet-4-6',
         max_tokens: maxTokens || 1000,
         messages: [{ role: 'user', content: prompt }],
       }),
@@ -471,7 +471,7 @@ Respond with ONLY the category name, nothing else.`;
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: model || 'claude-sonnet-4-20250514',
+        model: model || 'claude-sonnet-4-6',
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
