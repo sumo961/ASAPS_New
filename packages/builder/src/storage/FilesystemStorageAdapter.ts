@@ -447,6 +447,16 @@ export class FilesystemStorageAdapter implements IStorageAdapter {
             const metadata: AssetStorageInfo = JSON.parse(data);
             if (metadata.projectId === fromProjectId) {
               metadata.projectId = toProjectId;
+              // The asset binary is moved from assets/<from>/… to
+              // assets/<to>/… below, so the stored path must follow it.
+              // Without this the path still points at the old (now empty)
+              // location and loadAsset returns null for every reassociated
+              // asset.
+              const fromAssetDir = path.join(this.baseDir, 'assets', fromProjectId);
+              const toAssetDir = path.join(this.baseDir, 'assets', toProjectId);
+              if (metadata.path && metadata.path.startsWith(fromAssetDir)) {
+                metadata.path = toAssetDir + metadata.path.slice(fromAssetDir.length);
+              }
               fs.writeFileSync(filePath, JSON.stringify(metadata, null, 2));
               count++;
             }

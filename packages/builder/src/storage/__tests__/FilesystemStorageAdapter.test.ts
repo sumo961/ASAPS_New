@@ -475,6 +475,46 @@ describe('FilesystemStorageAdapter', () => {
     });
   });
 
+  describe('reassociateAssets', () => {
+    it('moves assets and metadata from one project id to another', async () => {
+      const asset = createTestAsset('proj-A', 1024);
+      await adapter.saveAsset(asset);
+
+      const moved = await adapter.reassociateAssets('proj-A', 'proj-B');
+      expect(moved).toBe(1);
+
+      // metadata now points at the new project
+      const info = await adapter.loadAssetInfo(asset.id);
+      expect(info?.projectId).toBe('proj-B');
+
+      // the asset is listed under the new project and not the old one
+      expect((await adapter.listAssets('proj-B')).length).toBe(1);
+      expect((await adapter.listAssets('proj-A')).length).toBe(0);
+
+      // the physical directory moved
+      expect(fs.existsSync(path.join(testDir, 'assets', 'proj-A'))).toBe(false);
+      expect(fs.existsSync(path.join(testDir, 'assets', 'proj-B'))).toBe(true);
+    });
+
+    it('keeps the asset loadable after reassociation (path is rewritten)', async () => {
+      // Regression: reassociateAssets used to update projectId but not the
+      // stored metadata.path, so loadAsset returned null for every moved
+      // asset because the path still pointed at the emptied source folder.
+      const asset = createTestAsset('proj-A', 1024);
+      await adapter.saveAsset(asset);
+
+      await adapter.reassociateAssets('proj-A', 'proj-B');
+
+      const blob = await adapter.loadAsset(asset.id);
+      expect(blob).not.toBeNull();
+      expect(blob?.size).toBe(asset.blob.size);
+    });
+
+    it('returns 0 when there are no assets for the source project', async () => {
+      expect(await adapter.reassociateAssets('nope-A', 'nope-B')).toBe(0);
+    });
+  });
+
   describe('Singleton Pattern', () => {
     it('should return same instance', () => {
       const instance1 = getFilesystemStorage();
