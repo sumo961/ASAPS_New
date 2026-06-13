@@ -16,7 +16,6 @@ export { DialogTreeBeat, type PhaseOverride } from './DialogTreeBeat';
 export { DurScreenBeat } from './DurScreenBeat';
 export { VideoBeat } from './VideoBeat';
 export { ConversationChoiceBeat } from './ConversationChoiceBeat';
-export { SWFBeat } from './SWFBeat';
 export { InputTextBeat } from './InputTextBeat';
 export { HyperTextBeat } from './HyperTextBeat';
 export { PanoramaBeat } from './PanoramaBeat';

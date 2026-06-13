@@ -76,7 +76,6 @@ const CATEGORY_FALLBACK_COLOR: Record<string, string> = {
 // them as new-beat options.
 const EXCLUDED_BEATS = new Set([
   'conversationChoice', // Legacy — superseded by MultiChoice (v0.9.62)
-  'SWFBeat',            // Legacy Flash
 ]);
 
 // Beat types that need device-specific runtime capabilities (camera,

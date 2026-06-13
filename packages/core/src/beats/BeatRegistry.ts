@@ -11,7 +11,6 @@ import { EndScreenBeat } from './EndScreenBeat';
 import { SetVariableBeat } from './SetVariableBeat';
 import { ConditionBeat } from './ConditionBeat';
 import { DurScreenBeat } from './DurScreenBeat';
-import { SWFBeat } from './SWFBeat';
 import { RandomTargetBeat } from './RandomTargetBeat';
 import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
@@ -78,7 +77,6 @@ export class BeatTypeRegistry {
     this.registerBeatType('videoBeat', VideoBeat);
     this.registerBeatType('endScreen', EndScreenBeat);
     this.registerBeatType('durScreen', DurScreenBeat);
-    this.registerBeatType('SWFBeat', SWFBeat); // Legacy
     this.registerBeatType('inputText', InputTextBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
     this.registerBeatType('keypad', KeypadBeat);
