@@ -319,18 +319,15 @@ export function useStoryBuilder() {
   const disconnectBeats = useCallback((sourceBeatId: string, targetBeatId: string) => {
     setState(prev => {
       const sourceBeat = prev.beats.find(b => b.id === sourceBeatId);
-      
+
       if (!sourceBeat) return prev;
-      
-      // Remove connection from source beat
-      const connections = sourceBeat.getConnections();
-      const filteredConnections = connections.filter(c => c.targetId !== targetBeatId);
-      
-      // Clear and re-add connections
-      while (connections.length > 0) {
-        connections.pop();
-      }
-      filteredConnections.forEach(c => sourceBeat.addConnection(c));
+
+      // Remove the connection from the source beat. NOTE: getConnections()
+      // returns a COPY, so the old "pop the array then re-add the filtered
+      // set" approach mutated a throwaway copy and left the beat's real
+      // connections untouched — the edge persisted after a disconnect. Use
+      // the Beat's own removeConnection(), which filters this.connections.
+      sourceBeat.removeConnection(targetBeatId);
 
       return {
         ...prev,
