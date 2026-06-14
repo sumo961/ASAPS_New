@@ -15,9 +15,18 @@
  * safe); they are not an assertion that the current mapping is the
  * API-correct one. See the date-suffixed-model test for a flagged edge.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ClaudeProvider } from '../ClaudeProvider';
 import type { AIProviderConfig } from '../../../types/ai';
+
+// generateStory loads the beat schema via the AIValidator singleton — stub it
+// so the streaming test doesn't depend on real schema/IndexedDB.
+vi.mock('../../AIValidator', () => ({
+  getAIValidator: () => ({
+    ensureSchemaLoaded: async () => {},
+    getSchema: () => ({ beatTypes: { infoText: { category: 'visible' } } }),
+  }),
+}));
 
 function cfg(over: Partial<AIProviderConfig> = {}): AIProviderConfig {
   return { provider: 'claude', apiKey: 'sk-test', ...over };
@@ -245,5 +254,51 @@ describe('repairTruncatedJson', () => {
   it('does not treat braces inside string values as structure', () => {
     const out = repair('{"a": "x{y}z"}');
     expect(JSON.parse(out)).toEqual({ a: 'x{y}z' });
+  });
+});
+
+describe('generateStory streams the direct-API response', () => {
+  // Regression guard: generateStory must use messages.stream() (not the
+  // buffered messages.create()), because a non-streaming request holds the
+  // connection until generation finishes and the SDK aborts it at the fixed
+  // 10-min timeout — which large max_tokens + adaptive thinking blow past.
+  function fakeClient(storyText: string, onText?: (event: string, cb: any) => void) {
+    const stream = vi.fn().mockReturnValue({
+      on: vi.fn(onText ?? (() => {})),
+      finalMessage: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: storyText }] }),
+    });
+    const create = vi.fn(); // must NOT be called
+    return { client: { messages: { stream, create } }, stream, create };
+  }
+
+  function ready(client: any) {
+    p.configure(cfg()); // direct API (no baseUrl) → useProxy false
+    (p as any).client = client; // swap the real SDK client for the fake
+  }
+
+  it('calls messages.stream() and never the buffered messages.create()', async () => {
+    const story = JSON.stringify({ metadata: { title: 'Streamed Tale' }, beats: [] });
+    const f = fakeClient(story);
+    ready(f.client);
+
+    const result = await p.generateStory({ prompt: 'a quiet drama' } as any);
+
+    expect(f.stream).toHaveBeenCalledOnce();
+    expect(f.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ metadata: { title: 'Streamed Tale' } });
+  });
+
+  it('forwards cumulative char count to onProgress via the text event', async () => {
+    const story = JSON.stringify({ metadata: { title: 'X' }, beats: [] });
+    // Fire the text event once with an accumulated snapshot.
+    const f = fakeClient(story, (event, cb) => {
+      if (event === 'text') cb('chunk', 'accumulated snapshot');
+    });
+    ready(f.client);
+
+    const onProgress = vi.fn();
+    await p.generateStory({ prompt: 'x', onProgress } as any);
+
+    expect(onProgress).toHaveBeenCalledWith('accumulated snapshot'.length);
   });
 });

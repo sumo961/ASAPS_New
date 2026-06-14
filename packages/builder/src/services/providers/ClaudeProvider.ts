@@ -367,10 +367,27 @@ export class ClaudeProvider extends BaseAIProvider {
         // Use proxy for custom providers; thread signal for cancel support.
         response = await this.makeProxyRequest(requestBody, request.signal);
       } else {
-        // Direct API call for official Anthropic
-        const apiResponse = await this.client!.messages.create(requestBody as any, {
+        // Direct API call for official Anthropic — STREAM the response.
+        //
+        // A non-streaming messages.create() holds the HTTP connection open
+        // until the ENTIRE response is generated, so the SDK's fixed request
+        // timeout (default 10 min) aborts long runs with
+        // APIConnectionTimeoutError. A large max_tokens + adaptive thinking
+        // (xhigh ⇒ 96K) routinely runs past that — thinking expands to fill
+        // the budget. Streaming returns headers immediately and reads SSE
+        // chunks as they arrive, so the initial-fetch timeout clears early
+        // and the body streams for as long as generation takes.
+        // .finalMessage() reassembles the complete Message.
+        const stream = this.client!.messages.stream(requestBody as any, {
           signal: request.signal,
         });
+        // Drive the UI progress indicator with the real cumulative char count.
+        if (request.onProgress) {
+          stream.on('text', (_delta: string, snapshot: string) => {
+            request.onProgress!(snapshot.length);
+          });
+        }
+        const apiResponse = await stream.finalMessage();
         response = { content: apiResponse.content };
       }
 
