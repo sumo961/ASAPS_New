@@ -467,7 +467,10 @@ function parseRemoveCommand(elementType: string, beatType: string, context: Help
     'textbox': 'textbox',
   };
 
-  const locationKind = elementToKind[elementType];
+  // The matching regex `(\w+)s?` is greedy, so a plural element ("meters",
+  // "buttons") is captured WITH its trailing 's' — the s? never strips it.
+  // Fall back to the de-pluralized key so the documented plural forms work.
+  const locationKind = elementToKind[elementType] ?? elementToKind[elementType.replace(/s$/, '')];
   if (!locationKind) {
     return {
       matched: true,
