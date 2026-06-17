@@ -1055,6 +1055,19 @@ export class ASMLParser {
     logDebug('[ASMLParser] Settings element children: ' + Array.from(settingsElement.children).map(c => c.tagName).join(', '));
     logDebug('[ASMLParser] Settings XML: ' + settingsElement.outerHTML.substring(0, 1500));
 
+    // Project settings — ASMLGenerator always emits <project width height
+    // aspectRatio scalingMode/>, but this parser previously ignored it, so a
+    // generate→parse round-trip lost the stage dimensions. Read it back.
+    const projectElement = settingsElement.querySelector('project');
+    if (projectElement) {
+      settings.project = {
+        width: parseInt(projectElement.getAttribute('width') || '1024'),
+        height: parseInt(projectElement.getAttribute('height') || '768'),
+        aspectRatio: projectElement.getAttribute('aspectRatio') || '4:3',
+        scalingMode: projectElement.getAttribute('scalingMode') || 'fit',
+      };
+    }
+
     // Debug settings
     const debugElement = settingsElement.querySelector('debug');
     if (debugElement) {
@@ -1744,6 +1757,18 @@ export class ASMLParser {
         const connectionEl = functionElement.querySelector('connection');
         if (connectionEl) {
           connections.push(this.parseConnection(connectionEl));
+        }
+        // Read the nested <variable type name val [operation]/> element that
+        // ASMLGenerator emits for setVariable — without this the variable's
+        // name/value/type are dropped on a generate→parse round-trip.
+        const variableEl = functionElement.querySelector('variable');
+        if (variableEl) {
+          const varType = variableEl.getAttribute('type');
+          if (varType) parameters.type = varType;
+          parameters.name = variableEl.getAttribute('name') || '';
+          parameters.value = variableEl.getAttribute('val') ?? '';
+          const varOp = variableEl.getAttribute('operation');
+          if (varOp) parameters.operation = varOp;
         }
         break;
 
