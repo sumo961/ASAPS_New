@@ -18,7 +18,7 @@
   "author": "ASAPS Team",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0"
+    "@modelcontextprotocol/sdk": "^1.25.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

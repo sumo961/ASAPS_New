@@ -54,6 +54,10 @@
     "node": ">=18.0.0",
     "npm": ">=7.0.0"
   },
+  "_overridesComment": "Security pins for transitive deps with no in-range parent fix.",
+  "overrides": {
+    "shell-quote": "1.8.4"
+  },
   "dependencies": {
     "jszip": "^3.10.1"
   }
