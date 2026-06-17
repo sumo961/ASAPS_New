@@ -1,5 +1,54 @@
 # ASAPS Modern - Progress Log
 
+## 2026-06-16: Test-coverage hardening + bug-fix release (v0.9.66)
+
+### Overview
+
+A stability-focused release: no new authoring features, but a very large test-coverage push that raised the suite from **2788 → 4728 passing tests** (+~1940 across `@asaps/core`, `@asaps/builder`, `@asaps/renderer`) and, in the process, surfaced and fixed **nine real bugs** plus one user-facing runtime hang. The coverage work was deliberately breadth-first over previously-untested modules — storage adapters, AI providers, the helper-command engine, theme service, the undo/redo command classes, the React hooks, all three pop-out window managers, the layout migrator, and a long tail of core/renderer utilities. The headline fix is that AI story generation no longer stalls past the SDK's 10-minute request timeout; the rest are quieter correctness fixes that tests pinned in place. ~3700 lines of dead code were also removed.
+
+### Runtime fix: AI generation no longer hangs (streaming)
+
+`ClaudeProvider.generateStory` now streams the response (`client.messages.stream().finalMessage()`) instead of buffering a single `messages.create()` call. Root cause of the user-reported "stuck at 21 minutes" generation: the non-streaming call holds the connection open until the whole story is produced, so a long high-effort run blows past the Anthropic SDK's fixed 10-minute request timeout, which aborts and silently retries. This was newly triggered when the xhigh `max_tokens` ceiling was raised 32K→96K — adaptive thinking expands to fill the larger budget, pushing big runs over the wall. Streaming returns headers immediately, so there is no body-timeout. Two regression tests assert the stream path is used and that `onProgress` is forwarded.
+
+### Real bugs fixed (pinned by new tests)
+
+- **`disconnectBeats` never removed the edge.** It mutated a *copy* returned by `getConnections()` and re-added, so the source beat kept the connection; now calls `Beat.removeConnection()` directly.
+- **Claude thinking-shape misclassification (two fixes).** A date-suffixed model id like `claude-sonnet-4-20250514` had its YYYYMMDD read as the minor version, classing the default model as "adaptive" and 400-ing whenever a reasoning effort was set. A second fix corrected `claude-haiku-4-5` / `claude-sonnet-4-5` being treated as adaptive. Default Claude model bumped to `claude-sonnet-4-6` across all fallback sites.
+- **Asset path not rewritten on reassociation.** `FilesystemStorageAdapter.reassociateAssets` updated `metadata.projectId` and moved the binaries but left `metadata.path` at the old location, so every reassociated asset silently failed to load after an untitled→named save. Now rewrites the path prefix.
+- **`DeterministicCommandParser` plural elements.** A greedy `(\w+)s?` capture swallowed the trailing "s", so plural element kinds never matched their location-kind lookup.
+- **Ren'Py author dropped for canonical `_p("""...""")` syntax** — author-extraction regex now handles the parenthesized triple-quote form.
+- **EndScreen / AISummary phantom restart loop** — an empty action string was treated as "restart", spinning the single-button exit loop; both now guard on a non-empty action.
+- **CI**: scoped the security audit to production deps and switched lint to exclude generated files.
+
+### Test coverage added (+~1940 tests)
+
+- **Storage layer**: `StorageManager`, `HybridStorageAdapter`, `AssetStorageAdapter`, `DirectoryAdapter`, thin IndexedDB/Zip adapters, `FilesystemStorageAdapter` — all against `fake-indexeddb`.
+- **AI providers & services**: `ClaudeProvider`, `OpenAIProvider`, `HelperCommandExecutor`, `HelperCommandFilter`, `AIDebugService`, `AIService` mocks, `providerQuirks`, the four `services/prompts/` builders, Ideator system prompts.
+- **Themes**: `ThemeService` (CRUD/assets/inheritance/recency), `GlobalSettingsAdapter`, theme conversion helpers.
+- **Undo/redo**: `Command` base + `CommandRegistry`, `BeatCommands`, `ElementCommands`, `CommandManager`.
+- **Hooks**: `useStoryBuilder`, `useAutoSave`, `useThemes`/`useTheme`, `useStorageQuota`, `PersistenceContext`.
+- **Pop-out window managers**: `DebugWindowManager`, `IdeatorWindowManager`, `PreviewWindowManager` (web `window.open` + `postMessage` path).
+- **Migration / import**: `projectLayoutMigrator` (fixed⇄responsive), `TwineImporter`, `RenpyAssetExtractor`, `HtmlExporter`.
+- **Renderer components**: Timer/Keypad/Meter/Mood/Map placeholders, `ChatDialogView`, `CharacterInventoryFrame`, `QRScanElement`.
+- **Core**: `StoryEngine` orchestrator, `storyLogicValidator`, `ConstraintSet`/`PathQuery`, `fontRegistry`, beat-execution harness + several beats, plus a long tail of older utility modules.
+
+### Dead code removed (~3700 lines)
+
+Deleted 13 unused builder modules (legacy preview debugger, cluster-positioning, abandoned text-transformer/AI-helper plumbing, superseded panorama panel, the old `WebRenderer`), the legacy Flash `SWFBeat`, and several dead test files that pinned removed behavior.
+
+### Verification
+
+- Full suite green: **core 2358 / builder 1956 / renderer 414 = 4728 passing** (78 core tests skipped by design); builder type-check clean.
+- Local unsigned macOS `--dir` build packaged, ad-hoc signed, `codesign --verify --deep --strict` passed, and launched cleanly (renderer up, no crash-on-launch) before tagging.
+
+**Files modified:**
+- `packages/builder/src/**` — new `__tests__/` suites across `commands/`, `services/`, `hooks/`, `storage/`, `themes/`, `utils/`; bug fixes in `ClaudeProvider.ts`, `useStoryBuilder.ts`, `FilesystemStorageAdapter.ts`, `DeterministicCommandParser.ts`.
+- `packages/core/src` + `packages/core/tests/**`, `packages/renderer/tests/**` — coverage additions and the EndScreen/AISummary/Ren'Py fixes.
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.66.
+- `.github/workflows/build-desktop.yml`, `ci.yml` — CI audit/lint scoping.
+
+---
+
 ## 2026-06-08: Security patch release (v0.9.65)
 
 ### Overview

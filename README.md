@@ -22,15 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.65** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.65 is a security hot-patch
-on top of v0.9.64** — no new features. Electron bumps from 40.6.1 to
-40.10.2 (closes 18 advisories patched in the 40.x series, including
-AppleScript injection in `app.moveToApplicationsFolder` on macOS),
-the vitest test runner moves to 4.x, and a fresh sweep of transitive
-deps takes the local `npm audit` count from 35 entries (2 critical,
-14 high) down to 5 (0 critical, 2 high — both build-toolchain only,
-not in the shipped product). Users on v0.9.64 will auto-update.
+Current release: **v0.9.66** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.66 is a stability release** — no
+new authoring features, but a large test-coverage push (the suite grew
+from 2788 to **4728 passing tests**) that surfaced and fixed **nine real
+bugs** plus one user-facing hang. The headline fix: AI story generation
+now **streams**, so long high-effort generations no longer stall past the
+Anthropic SDK's 10-minute request timeout (the "stuck at 21 minutes"
+report). Other fixes include beat-disconnect not actually removing the
+edge, Claude thinking-config misclassification for date-suffixed/4.5
+model ids (default model now `claude-sonnet-4-6`), and silent asset-load
+failures after an untitled→named save. ~3700 lines of dead code were
+removed. Users on v0.9.65 will auto-update.
 For everything that shipped in v0.9.64 (camera/AR beats, Project
 Browser overhaul, Electron start window), see Progress.md. For what
 shipped when, see:
