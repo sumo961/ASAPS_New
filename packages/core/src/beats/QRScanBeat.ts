@@ -22,6 +22,10 @@ export class QRScanBeat extends Beat {
   public helperText?: string;
   public cancelButtonText: string;
   public backgroundSound?: string;
+  /** Authoring metadata only (not used at runtime): beat IDs that printed
+   *  asaps://beat/<id> QR codes jump to. Persisted so the flowchart can draw
+   *  these otherwise-invisible jumps as dashed edges. */
+  public qrJumpTargets: string[];
 
   constructor(config: BeatConfig & {
     node?: string;
@@ -41,6 +45,9 @@ export class QRScanBeat extends Beat {
       : Array.isArray(p.matchPatterns) ? p.matchPatterns : [];
     this.helperText = (config as any).helperText ?? p.helperText;
     this.cancelButtonText = (config as any).cancelButtonText || p.cancelButtonText || 'Skip';
+    this.qrJumpTargets = Array.isArray((config as any).qrJumpTargets)
+      ? (config as any).qrJumpTargets
+      : Array.isArray((p as any).qrJumpTargets) ? (p as any).qrJumpTargets : [];
     this.node = config.node || (p as any).node;
   }
 
@@ -53,6 +60,7 @@ export class QRScanBeat extends Beat {
       matchPatterns: this.matchPatterns,
       helperText: this.helperText,
       cancelButtonText: this.cancelButtonText,
+      qrJumpTargets: this.qrJumpTargets,
       node: this.node,
       slotIntent: this.slotIntent,
       slotAnimations: this.slotAnimations,
@@ -71,6 +79,9 @@ export class QRScanBeat extends Beat {
     }
     if (params.helperText !== undefined) this.helperText = params.helperText;
     if (params.cancelButtonText !== undefined) this.cancelButtonText = params.cancelButtonText;
+    if (params.qrJumpTargets !== undefined) {
+      this.qrJumpTargets = Array.isArray(params.qrJumpTargets) ? params.qrJumpTargets : [];
+    }
     if (params.node !== undefined) this.node = params.node;
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;

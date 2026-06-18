@@ -212,6 +212,24 @@ describe('TreeLayoutAlgorithm', () => {
       expect(edges).toContainEqual({ source: 'hyper1', target: 'target2' });
     });
 
+    it('should extract qrScan qrJumpTargets (so QR-jumped beats are reachable in layout)', () => {
+      const beats = [{
+        id: 'qr1',
+        type: 'qrScan',
+        parameters: {
+          connection: { target: 'fallback' },
+          qrJumpTargets: ['jumpA', 'jumpB'],
+        },
+      }];
+
+      const edges = extractConnectionsFromBeats(beats);
+
+      // the required Target Beat connection + both QR jumps
+      expect(edges).toContainEqual({ source: 'qr1', target: 'fallback' });
+      expect(edges).toContainEqual({ source: 'qr1', target: 'jumpA' });
+      expect(edges).toContainEqual({ source: 'qr1', target: 'jumpB' });
+    });
+
     it('should deduplicate edges', () => {
       const beats = [{
         id: 'beat1',

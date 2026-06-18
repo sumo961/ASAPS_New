@@ -2120,6 +2120,14 @@
             "addLabel": "Add Pattern"
           }
         },
+        "qrJumpTargets": {
+          "type": "array<string>",
+          "required": false,
+          "description": "Authoring metadata only: beat IDs that printed asaps://beat/<id> QR codes for this beat jump to. NOT a runtime route (the scanned code carries the jump) — these are declared in the QR generator so the flowchart can draw the otherwise-invisible jumps as dashed edges. No generic inspector control; managed by the QR generator panel.",
+          "ui": {
+            "hidden": true
+          }
+        },
         "helperText": {
           "type": "string",
           "required": false,

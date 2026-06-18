@@ -755,6 +755,40 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
         });
       }
+
+      // qrScan QR-jump targets — printed asaps://beat/<id> codes declared in
+      // the QR generator. These aren't a runtime connection (the scanned code
+      // carries the jump and overrides the Target Beat), so they'd otherwise be
+      // invisible to the flowchart. Draw them as distinct dashed purple edges
+      // labelled "QR" so authors can see where a scanned code can send players.
+      if (beat.type === 'qrScan') {
+        const qrParams = typeof beat.getParameters === 'function' ? beat.getParameters() : ((beat as any).parameters || {});
+        const jumpTargets: any[] = Array.isArray(qrParams?.qrJumpTargets) ? qrParams.qrJumpTargets : [];
+        jumpTargets.forEach((target) => {
+          if (typeof target !== 'string' || !target) return;
+          const edge = createEdge(beat.id, target, {
+            id: `qrjump-${beat.id}-${target}`,
+            type: 'custom',
+            animated: false,
+            label: 'QR',
+            style: {
+              stroke: '#a855f7',
+              strokeWidth: 2,
+              strokeDasharray: '4 4',
+            },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: '#a855f7',
+            },
+          });
+          if (edge && !edgeIds.has(edge.id)) {
+            edgeIds.add(edge.id);
+            allEdges.push(edge);
+          }
+        });
+      }
     });
 
     return allEdges;

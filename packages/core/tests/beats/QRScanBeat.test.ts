@@ -372,5 +372,22 @@ describe('QRScanBeat', () => {
       expect(beat.facing).toBe('front');
       expect(beat.matchPatterns).toEqual(['^X$']);
     });
+
+    it('round-trips qrJumpTargets (flowchart metadata) through get/updateParameters', () => {
+      // qrJumpTargets is authoring-only — the flowchart draws these as dashed
+      // edges. It must survive get/updateParameters or the inspector edit is
+      // dropped when the beat is reconstructed.
+      const beat = new QRScanBeat({ id: 'b1', parameters: { qrJumpTargets: ['beat_2', 'beat_3'] } } as any);
+      expect(beat.qrJumpTargets).toEqual(['beat_2', 'beat_3']);
+      expect(beat.getParameters().qrJumpTargets).toEqual(['beat_2', 'beat_3']);
+
+      beat.updateParameters({ qrJumpTargets: ['beat_9'] });
+      expect(beat.getParameters().qrJumpTargets).toEqual(['beat_9']);
+
+      // defaults to [] when unset; non-array is coerced to []
+      expect(new QRScanBeat({ id: 'b2' } as any).getParameters().qrJumpTargets).toEqual([]);
+      beat.updateParameters({ qrJumpTargets: 'nope' as any });
+      expect(beat.qrJumpTargets).toEqual([]);
+    });
   });
 });

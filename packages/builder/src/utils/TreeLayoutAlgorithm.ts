@@ -185,6 +185,18 @@ export function extractConnectionsFromBeats(
         }
       });
     }
+
+    // qrScan QR-jump targets — declared in the QR generator (printed
+    // asaps://beat/<id> codes). Counted as edges so the jumped-to beats are
+    // positioned by layout and not flagged unreachable when they're only
+    // reachable via a scanned code. (Rendered as dashed edges in GraphEditor.)
+    if (beat.type === 'qrScan' && Array.isArray(params.qrJumpTargets)) {
+      params.qrJumpTargets.forEach((target: any) => {
+        if (typeof target === 'string' && target) {
+          addEdge(beat.id, target);
+        }
+      });
+    }
   });
 
   return edges;

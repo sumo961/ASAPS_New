@@ -4751,8 +4751,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs text-gray-600 mb-1">
-                            Target Beat {beat.type === 'setTimer' ? '(Timer Expiry)' : '(Required)'}
+                            {beat.type === 'qrScan'
+                              ? 'Default Next Beat (Required)'
+                              : `Target Beat ${beat.type === 'setTimer' ? '(Timer Expiry)' : '(Required)'}`}
                           </label>
+                          {beat.type === 'qrScan' && (
+                            <p className="text-xs text-gray-500 mb-1 leading-snug">
+                              Where the beat advances for unrecognized codes, a cancelled scan, or
+                              when <em>Interpret asaps:// URIs</em> is off. A scanned{' '}
+                              <span className="font-mono">asaps://beat/…</span> QR overrides this and
+                              jumps directly (use the QR generator below to track such jumps as dashed edges).
+                            </p>
+                          )}
                           <select
                             value={localBeat.connections?.[0]?.targetId || localBeat.defaultTarget || ''}
                             onChange={(e) => {
@@ -4992,7 +5002,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                     interpretAsapsUri flag so the scan auto-routes. */}
                 {beat.type === 'qrScan' && (
                   <div className="border-t pt-4">
-                    <AsapsQRGenerator beats={allBeatsForQR} />
+                    <AsapsQRGenerator
+                      beats={allBeatsForQR}
+                      jumpTargets={localBeat.parameters?.qrJumpTargets || []}
+                      onJumpTargetsChange={(t) => handleParameterChange('qrJumpTargets', t)}
+                    />
                   </div>
                 )}
 

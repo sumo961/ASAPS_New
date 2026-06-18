@@ -25,11 +25,23 @@ interface Props {
   beats?: BeatOption[];
   /** Initial action (e.g. pre-filled to the surrounding beat's id). */
   initial?: AsapsAction;
+  /** Beat IDs the surrounding qrScan beat has declared as QR-jump targets
+   *  (`parameters.qrJumpTargets`). When provided alongside onJumpTargetsChange,
+   *  the panel shows a "track in flowchart" affordance so these otherwise-
+   *  invisible jumps render as dashed edges. */
+  jumpTargets?: string[];
+  onJumpTargetsChange?: (targets: string[]) => void;
 }
 
 type ActionKind = AsapsAction['kind'];
 
-export const AsapsQRGenerator: React.FC<Props> = ({ beats = [], initial }) => {
+export const AsapsQRGenerator: React.FC<Props> = ({ beats = [], initial, jumpTargets, onJumpTargetsChange }) => {
+  const beatLabel = (id: string) => {
+    const b = beats.find((x) => x.id === id);
+    return b ? `${b.name || b.id}${b.type ? ` (${b.type})` : ''}` : id;
+  };
+  const tracked = jumpTargets ?? [];
+  const canTrack = !!onJumpTargetsChange;
   const [kind, setKind] = useState<ActionKind>(initial?.kind ?? 'beat');
   const [beatTarget, setBeatTarget] = useState(initial?.kind === 'beat' ? initial.target : '');
   const [variableName, setVariableName] = useState(initial?.kind === 'variable' ? initial.name : '');
@@ -131,6 +143,43 @@ export const AsapsQRGenerator: React.FC<Props> = ({ beats = [], initial }) => {
             ))}
           </select>
         </label>
+      )}
+
+      {/* Flowchart-tracking for "Jump to beat" QRs. A printed asaps://beat/<id>
+          code overrides this beat's Target Beat at runtime but is invisible to
+          the flowchart — tracking it here draws a dashed "QR" edge so the jump
+          is visible to authors. Tracking is optional and editor-only. */}
+      {kind === 'beat' && canTrack && (
+        <div className="mb-2 rounded border border-purple-200 bg-purple-50 p-2">
+          <div className="text-xs text-purple-900 mb-1">
+            Show this jump in the flowchart (dashed <span className="font-mono">QR</span> edge)
+          </div>
+          <button
+            type="button"
+            disabled={!beatTarget || tracked.includes(beatTarget)}
+            onClick={() => onJumpTargetsChange!([...tracked, beatTarget])}
+            className="px-2 py-1 text-xs border border-purple-300 rounded bg-white hover:bg-purple-100 disabled:opacity-50"
+          >
+            {beatTarget && tracked.includes(beatTarget) ? '✓ Tracked' : '➕ Track this jump'}
+          </button>
+          {tracked.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {tracked.map(t => (
+                <li key={t} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-gray-700">↪ {beatLabel(t)}</span>
+                  <button
+                    type="button"
+                    onClick={() => onJumpTargetsChange!(tracked.filter(x => x !== t))}
+                    className="px-1 text-purple-700 hover:text-purple-900"
+                    title="Stop tracking this jump"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {kind === 'variable' && (
