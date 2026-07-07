@@ -587,7 +587,11 @@ export const Header: React.FC<HeaderProps> = ({
           {onCharacters && (
             <button
               className="px-3 py-1.5 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors flex items-center gap-1.5"
-              onClick={onCharacters}
+              // Wrap so the click event is NOT passed as onCharacters' argument.
+              // onCharacters -> handleOpenCharacterManager(callback): leaking the
+              // event made it a truthy non-function "callback", which turned on
+              // selectionMode and crashed on select ("... is not a function").
+              onClick={() => onCharacters()}
               title="Create and manage characters with appearances, stats, and inventory"
             >
               <Users className="w-4 h-4" />

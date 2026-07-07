@@ -59,8 +59,9 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({
     >
       {/* Action Buttons */}
       <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {/* Edit Button - shown in selection mode */}
-        {selectionMode && onEdit && (
+        {/* Edit Button — shown whenever an edit handler is available, in both
+            manage and selection modes (so the ✎ affordance is never lost). */}
+        {onEdit && (
           <button
             onClick={handleEdit}
             className="p-1.5 bg-white rounded-full hover:bg-blue-100"

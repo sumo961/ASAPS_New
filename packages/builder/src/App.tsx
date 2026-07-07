@@ -4518,8 +4518,12 @@ function App() {
   }, [applyGlobalSettingsChange, globalSettings]);
 
   const handleOpenCharacterManager = useCallback((callback?: (character: Character) => void) => {
-    // Store the callback so we can call it when a character is selected
-    characterSelectionCallbackRef.current = callback || null;
+    // Store the callback so we can call it when a character is selected.
+    // Guard against non-function args (e.g. a click event leaking in when a
+    // button wires onClick={onCharacters}) — a truthy non-function here would
+    // switch the manager into selection mode and then throw on select.
+    characterSelectionCallbackRef.current =
+      typeof callback === 'function' ? callback : null;
     setShowCharacterManager(true);
   }, []);
 
@@ -6109,7 +6113,7 @@ function App() {
                 onAssetAdd={handleAssetAdd}
                 selectionMode={characterSelectionCallbackRef.current !== null}
                 onCharacterSelect={(character) => {
-                  if (characterSelectionCallbackRef.current) {
+                  if (typeof characterSelectionCallbackRef.current === 'function') {
                     characterSelectionCallbackRef.current(character);
                     handleCloseCharacterManager();
                   }
