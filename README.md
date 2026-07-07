@@ -22,18 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.66** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.66 is a stability release** — no
-new authoring features, but a large test-coverage push (the suite grew
-from 2788 to **4728 passing tests**) that surfaced and fixed **nine real
-bugs** plus one user-facing hang. The headline fix: AI story generation
-now **streams**, so long high-effort generations no longer stall past the
-Anthropic SDK's 10-minute request timeout (the "stuck at 21 minutes"
-report). Other fixes include beat-disconnect not actually removing the
-edge, Claude thinking-config misclassification for date-suffixed/4.5
-model ids (default model now `claude-sonnet-4-6`), and silent asset-load
-failures after an untitled→named save. ~3700 lines of dead code were
-removed. Users on v0.9.65 will auto-update.
+Current release: **v0.9.67** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.67 is a correctness-and-polish
+release.** The headline is a set of **Visual Editor fixes**: the per-beat
+element-add buttons (**Character / Prop / Text**) had gone missing in
+responsive (slot/spatial) beats and are now restored in every layout mode,
+and the toolbar **Characters** button no longer crashes when picking a
+character. It also clarifies **QR-Scan** target semantics and draws QR jumps
+as flowchart edges, fixes the **ASML** importer to round-trip project
+metadata and variables it previously dropped, adds **~280 further tests**
+across the largest previously-thin areas (the "giant" renderer views,
+camera/AR beats, STT/TTS providers, hooks, and the undo/redo command
+classes), and clears two web-service security advisories. Users on v0.9.66
+will auto-update.
 For everything that shipped in v0.9.64 (camera/AR beats, Project
 Browser overhaul, Electron start window), see Progress.md. For what
 shipped when, see:

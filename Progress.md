@@ -1,5 +1,51 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-07: Visual-editor fixes + QR/ASML correctness + more coverage (v0.9.67)
+
+### Overview
+
+A correctness-and-polish release. The headline is a set of **Visual Editor fixes**: the per-beat element-add buttons (Character / Prop / Text) had become invisible in slot/spatial (responsive) beats, and the toolbar **Characters** button crashed on selection. Alongside these, QR-Scan target-beat handling was clarified and its jumps are now drawn on the flowchart, the ASML importer round-trips project/variable metadata it previously dropped, and the test suite gained a further **~280 tests** across the largest previously-thin areas (the "giant" renderer views, camera/AR beats, STT/TTS providers, hooks, and the undo/redo command classes). Two web-service security advisories were also cleared.
+
+### Visual Editor fixes
+
+- **Element-add buttons restored in every layout mode.** The **Character / Prop / Text** buttons in the Elements panel were gated on `layoutMode === 'absolute'`, so they disappeared entirely in slot/spatial (responsive) beats — leaving no visible way to add a character/prop/text to those beats. They now render in all modes; the per-mode graphics behaviour of *what adding does* stays the concern of `onElementAdd` / the renderer, but the affordance is never hidden.
+- **Toolbar "Characters" button no longer crashes.** `Header` wired `onClick={onCharacters}`, passing the React click event in as the manager's selection callback. That truthy non-function value forced the manager into selection mode and then threw `characterSelectionCallbackRef.current is not a function` on click. The click is now wrapped, and the callback ref is guarded to accept functions only.
+- **Character-card edit (✎) button restored.** It now shows whenever an edit handler is available, in both the manage and selection modes, instead of only in selection mode.
+
+### QR Scan: clearer target semantics + flowchart edges
+
+`qrScan` target-beat semantics were clarified, and QR-jump transitions are now drawn as edges in the flowchart so a scan's destination is visible in the graph rather than hidden in the beat's parameters.
+
+### ASML round-trip fix
+
+The ASML importer now reads the `<project>` and `<variable>` elements it previously ignored, so exported stories re-import with their project metadata and variables intact. Two parser bugs fixed, pinned by 11 new round-trip tests.
+
+### Continued test-coverage expansion (~280 tests)
+
+- **"Giant" renderer views**: `SlotFlowView`, `SpatialFlowView`, `PositionedBeatView`, `PanoramaView`, and `ReactRenderer` mount/content.
+- **Camera / AR / spatial beats**: `ARMarkerScene` (mind-ar tracking + fallback), `ARSceneElement` (permission/camera lifecycle), `IndoorMapBeat` (beacon-proximity triggers), `TimerProgressBar` / `OrientationGate` / `WebViewElement`.
+- **STT/TTS providers**: the four previously-untested speech providers (51 tests).
+- **Hooks & commands**: `useAI` / `useSTT` / `useTTS` / `useAIDebug`, `useAvailableCountersAndVariables` / `useCommandManager`, and the Batch/Animation/ProjectState command classes.
+- **Builder UI**: `SearchPanel`, `MissingAssetsDialog`, `ProjectSelector`/`ProjectBadge`, `NewProjectDialog`, `InputTextValuesModal`, `UndoRedoToolbar`/`MockSensorPanel`, `StoryExporter`, `SchemaLocationInitializer` — several behind a new `renderWithProviders` harness.
+
+### Security
+
+- **`multer` 1.4.5-lts → 2.2.0** in the web-service workspace (closes 7 high-severity DoS advisories).
+- Cleared the remaining Dependabot **criticals** across the repo and both MCP servers.
+
+### Verification
+
+- Builder type-check clean; the changed Visual Editor / character-manager fixes verified live in the running app (element-add buttons confirmed present in a responsive slot-mode `movementChoice` beat; the Characters button opens without the console error).
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualPropertiesPanel.tsx` — ungate the Character/Prop/Text add buttons.
+- `packages/builder/src/components/Header.tsx`, `App.tsx` — fix the Characters-button event-leak crash + guard the callback ref.
+- `packages/builder/src/components/characters/CharacterCard.tsx` — always show the ✎ edit button when editing is available.
+- `packages/core/src/**`, `packages/renderer/**`, `packages/builder/src/**` — the qrScan flowchart edges, the ASML `<project>`/`<variable>` parser fix, and the new test suites listed above.
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.67.
+
+---
+
 ## 2026-06-16: Test-coverage hardening + bug-fix release (v0.9.66)
 
 ### Overview
