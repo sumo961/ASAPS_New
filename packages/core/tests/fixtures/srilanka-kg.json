@@ -1,0 +1,2496 @@
+{
+  "metadata": {
+    "exportVersion": "1.1.0",
+    "exportedAt": "2026-06-19T11:44:48.965Z",
+    "exportedBy": "ASAPS Builder",
+    "projectId": "2f49ac42-9dbc-4b04-b1cf-2c4f507e8b41",
+    "projectName": "Anonymized Project"
+  },
+  "project": {
+    "id": "2f49ac42-9dbc-4b04-b1cf-2c4f507e8b41",
+    "name": "Anonymized Project",
+    "createdAt": "2026-04-27T11:01:16.645Z",
+    "modifiedAt": "2026-06-19T11:44:48.914Z",
+    "version": "1.0.0",
+    "settings": {
+      "fonts": [
+        "Arial",
+        "Helvetica",
+        "sans-serif"
+      ],
+      "height": 768,
+      "width": 1024
+    },
+    "globalSettings": {
+      "colors": {
+        "bgColor": "#1a1a2e",
+        "nonpalpha": 92,
+        "nonpcolor": "#0d0d1a",
+        "nonptextcolor": "#ffffff",
+        "palpha": 100,
+        "pcolor": "#3d3d5c",
+        "ptextcolor": "#ffffff",
+        "textBoxBorder": "#6666aa"
+      },
+      "copyright": {
+        "notice": "",
+        "owner": "",
+        "year": "2026"
+      },
+      "debug": {
+        "firstbeat": "",
+        "showvals": false
+      },
+      "fonts": {
+        "btnFont": "\"Noto Sans\", \"Segoe UI\", sans-serif",
+        "fontSize": {
+          "button": 18,
+          "text": 20,
+          "title": 42
+        },
+        "textFont": "\"Noto Sans\", \"Segoe UI\", sans-serif",
+        "titleFont": "\"Noto Serif\", Georgia, serif"
+      },
+      "hotspots": {
+        "highlightColor": "#ffffff",
+        "labelDisplay": "hover",
+        "labels": true,
+        "opacity": 50,
+        "showInPreview": "visible",
+        "visible": true
+      },
+      "project": {
+        "aspectRatio": "4:3",
+        "height": 768,
+        "scalingMode": "fit",
+        "width": 1024
+      },
+      "sound": {
+        "backgroundMusic": "",
+        "backgroundMusicAssetId": "",
+        "backgroundMusicName": "",
+        "backgroundVolume": 100,
+        "mute": false
+      },
+      "textEffects": {
+        "animation": "none",
+        "fadeInDuration": 300,
+        "typewriterSpeed": 40
+      },
+      "textbox": {
+        "borderWidth": 2,
+        "boxVisibility": "all",
+        "opacity": 92,
+        "padding": 24,
+        "position": "bottom",
+        "radius": 0
+      },
+      "variables": [
+        {
+          "defaultValue": "",
+          "description": "",
+          "name": "Scenario2Response",
+          "type": "string"
+        },
+        {
+          "defaultValue": "",
+          "description": "",
+          "name": "Scenario5Response",
+          "type": "string"
+        }
+      ]
+    },
+    "themeId": "builtin-visual-novel",
+    "story": {
+      "metadata": {
+        "title": "Placeholder text.",
+        "author": "Placeholder text.",
+        "firstBeatId": "beat_3"
+      },
+      "beats": [
+        {
+          "id": "beat_10",
+          "name": "LetTheStoryBegin",
+          "type": "durScreen",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 86,
+              "id": "element_text_1777313187344_0",
+              "kind": "dialog",
+              "manuallyResized": true,
+              "name": "Text",
+              "textAlign": "center",
+              "width": 265,
+              "x": 380,
+              "y": 341,
+              "zIndex": 0
+            }
+          ],
+          "connections": [
+            {
+              "targetId": "beat_12"
+            }
+          ],
+          "defaultTarget": "beat_12",
+          "x": 2060.960656369524,
+          "y": 171.68680404939,
+          "parameters": {
+            "text": "Placeholder text.",
+            "duration": 3000
+          }
+        },
+        {
+          "id": "beat_12",
+          "name": "StoryPart_1",
+          "type": "dialogTree",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 111,
+              "id": "npc",
+              "kind": "dialog",
+              "manuallyResized": true,
+              "name": "NPC: Character",
+              "width": 819,
+              "x": 102,
+              "y": 162,
+              "zIndex": 0
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_0",
+              "kind": "button",
+              "name": "Choice 0",
+              "width": 614,
+              "x": 205,
+              "y": 329,
+              "zIndex": 1
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_1",
+              "kind": "button",
+              "name": "Choice 1",
+              "width": 614,
+              "x": 205,
+              "y": 425,
+              "zIndex": 2
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_2",
+              "kind": "button",
+              "name": "Choice 2",
+              "width": 614,
+              "x": 205,
+              "y": 521,
+              "zIndex": 3
+            }
+          ],
+          "connections": [],
+          "x": 2062.0276198217134,
+          "y": 286.9307797360094,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777314250098",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_20"
+                },
+                {
+                  "id": "choice_1777315287554",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777470025945",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_20"
+                  }
+                },
+                {
+                  "id": "choice_1777315302832",
+                  "text": "Placeholder text.",
+                  "visible": true,
+                  "target": "beat_13"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_13",
+          "name": "CounterCheck_StoryPart_1_O3",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_63"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_17"
+            }
+          ],
+          "x": 2600,
+          "y": 417.49817326221324,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "support",
+              "value": 1
+            },
+            "trueTarget": "beat_63",
+            "falseTarget": "beat_17",
+            "variableName": "support",
+            "value": 1,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_17",
+          "name": "CounterCheck_StoryPart_1_O3_Fail",
+          "type": "durScreen",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 98,
+              "id": "element_text_1777316747148_0",
+              "initialAutoSized": true,
+              "kind": "dialog",
+              "name": "Text",
+              "textAlign": "center",
+              "width": 800,
+              "x": 112,
+              "y": 335,
+              "zIndex": 0
+            }
+          ],
+          "connections": [
+            {
+              "targetId": "beat_20"
+            }
+          ],
+          "defaultTarget": "beat_20",
+          "x": 2700,
+          "y": 537.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "duration": 3000
+          }
+        },
+        {
+          "id": "beat_20",
+          "name": "StoryPart_1_Conclusion",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_23"
+            }
+          ],
+          "defaultTarget": "beat_23",
+          "x": 1516.562258619507,
+          "y": 401.9090581326117,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_23",
+          "name": "StoryPart_2",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 1512.5,
+          "y": 537.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777471082219",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    },
+                    {
+                      "target": "Scenario2Response",
+                      "type": "setVariable",
+                      "value": "positive"
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777473199944",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [
+                      {
+                        "id": "choice_1777473229984",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "self esteem",
+                            "type": "incrementCounter",
+                            "value": 1
+                          }
+                        ],
+                        "visible": true,
+                        "target": "beat_24"
+                      },
+                      {
+                        "id": "choice_1777473242542",
+                        "text": "Placeholder text.",
+                        "visible": true,
+                        "target": "beat_24"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "choice_1777471101704",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "Scenario2Response",
+                      "type": "setVariable",
+                      "value": "neutral"
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777473312018",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [
+                      {
+                        "id": "choice_1777473336463",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "self esteem",
+                            "type": "incrementCounter",
+                            "value": -1
+                          }
+                        ],
+                        "visible": true,
+                        "target": "beat_24"
+                      },
+                      {
+                        "id": "choice_1777473341732",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "support",
+                            "type": "incrementCounter",
+                            "value": 1
+                          }
+                        ],
+                        "visible": true,
+                        "target": "beat_24"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "choice_1777471113747",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    },
+                    {
+                      "target": "Scenario2Response",
+                      "type": "setVariable",
+                      "value": "negative"
+                    },
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777473381247",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_24"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_24",
+          "name": "StoryPart_2_Conclusion",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_25"
+            }
+          ],
+          "defaultTarget": "beat_25",
+          "x": 1512.5,
+          "y": 657.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_25",
+          "name": "StoryPart_3",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_28"
+            }
+          ],
+          "defaultTarget": "beat_28",
+          "x": 1512.5,
+          "y": 777.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_28",
+          "name": "StoryPart_2_PositiveOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_30"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_29"
+            }
+          ],
+          "x": 1512.5,
+          "y": 897.4981732622132,
+          "parameters": {
+            "conditionType": "variable",
+            "condition": {
+              "type": "variable",
+              "operator": "==",
+              "variableName": "Scenario2Response",
+              "value": "positive"
+            },
+            "trueTarget": "beat_30",
+            "falseTarget": "beat_29",
+            "variableName": "Scenario2Response",
+            "value": "positive",
+            "operator": "==",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_29",
+          "name": "StoryPart_2_NeutralOrNegative",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_31"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_32"
+            }
+          ],
+          "x": 2200,
+          "y": 1017.4981732622132,
+          "parameters": {
+            "conditionType": "variable",
+            "condition": {
+              "type": "variable",
+              "operator": "==",
+              "variableName": "Scenario2Response",
+              "value": "neutral"
+            },
+            "trueTarget": "beat_31",
+            "falseTarget": "beat_32",
+            "variableName": "Scenario2Response",
+            "value": "neutral",
+            "operator": "==",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_3",
+          "name": "TitleScreen",
+          "type": "titleScreen",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 92,
+              "id": "element_title_1777312316405_0",
+              "kind": "text",
+              "name": "Title",
+              "textAlign": "center",
+              "width": 353,
+              "x": 336,
+              "y": 172,
+              "zIndex": 0
+            },
+            {
+              "autosize": false,
+              "fontSize": 16,
+              "height": 66,
+              "id": "element_author_1777312316405_1",
+              "kind": "text",
+              "name": "Author",
+              "textAlign": "center",
+              "width": 480,
+              "x": 272,
+              "y": 390,
+              "zIndex": 1
+            },
+            {
+              "autosize": true,
+              "height": 43,
+              "id": "element_startButton_1777312316405_2",
+              "kind": "button",
+              "name": "Start Button",
+              "textAlign": "center",
+              "width": 120,
+              "x": 452,
+              "y": 523,
+              "zIndex": 2
+            }
+          ],
+          "connections": [
+            {
+              "targetId": "beat_4"
+            }
+          ],
+          "defaultTarget": "beat_4",
+          "x": 2062.4001152808883,
+          "y": 63.837759381998694,
+          "parameters": {
+            "title": "Placeholder text.",
+            "author": "Placeholder text.",
+            "buttonText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_30",
+          "name": "StoryPart_3_Positive",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 825,
+          "y": 1017.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777475243846",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_33"
+                },
+                {
+                  "id": "choice_1777475251667",
+                  "text": "Placeholder text.",
+                  "effects": [],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777475462973",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_33"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_31",
+          "name": "StoryPart_3_Neutral",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 2100,
+          "y": 1137.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777475536706",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777475815478",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [
+                      {
+                        "id": "choice_1777475847701",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "self esteem",
+                            "type": "incrementCounter",
+                            "value": -1
+                          }
+                        ],
+                        "visible": true,
+                        "target": "beat_33"
+                      },
+                      {
+                        "id": "choice_1777475858120",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "support",
+                            "type": "incrementCounter",
+                            "value": 1
+                          }
+                        ],
+                        "visible": true,
+                        "target": "beat_33"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "choice_1777475608693",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_33"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_32",
+          "name": "StoryPart_3_Negative",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 2300,
+          "y": 1137.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777475639910",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777475657310",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_33"
+                  }
+                },
+                {
+                  "id": "choice_1777475647228",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_33"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_33",
+          "name": "StoryPart_3_Conclusion",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_34"
+            }
+          ],
+          "defaultTarget": "beat_34",
+          "x": 825,
+          "y": 1137.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_34",
+          "name": "StoryPart_4",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 823.75,
+          "y": 1257.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777831774917",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1778321594676",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_38"
+                  }
+                },
+                {
+                  "id": "choice_1777831804276",
+                  "text": "Placeholder text.",
+                  "visible": true,
+                  "target": "beat_35"
+                },
+                {
+                  "id": "choice_1777831805699",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    },
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777831877933",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_38"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_35",
+          "name": "StoryPart_4_SupportCheck",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_36"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_37"
+            }
+          ],
+          "x": 200,
+          "y": 1377.4981732622132,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "support",
+              "value": 2
+            },
+            "trueTarget": "beat_36",
+            "falseTarget": "beat_37",
+            "variableName": "support",
+            "value": 2,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_36",
+          "name": "StoryPart_4_SupportCheckPassed",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 100,
+          "y": 1497.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777832029504",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_38"
+                },
+                {
+                  "id": "choice_1777832039784",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_38"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_37",
+          "name": "StoryPart_4_SupportCheckFailed",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 300,
+          "y": 1497.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777832096580",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_38"
+                },
+                {
+                  "id": "choice_1778321674028",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_38"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_38",
+          "name": "StoryPart_4_Conclusion",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_39"
+            }
+          ],
+          "defaultTarget": "beat_39",
+          "x": 1450,
+          "y": 1377.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_39",
+          "name": "StoryPart_5",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 1450,
+          "y": 1497.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777832376207",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    },
+                    {
+                      "target": "Scenario5Response",
+                      "type": "setVariable",
+                      "value": "selfesteem"
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777832999514",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_42"
+                  }
+                },
+                {
+                  "id": "choice_1777832377242",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": 1
+                    },
+                    {
+                      "target": "Scenario5Response",
+                      "type": "setVariable",
+                      "value": "support"
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777833027258",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_42"
+                  }
+                },
+                {
+                  "id": "choice_1777832378206",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    },
+                    {
+                      "target": "Scenario5Response",
+                      "type": "setVariable",
+                      "value": "negative"
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777833049483",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_42"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_4",
+          "name": "IdnIntro",
+          "type": "infoText",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 123,
+              "id": "element_text_1777312547871_0",
+              "kind": "dialog",
+              "manuallyResized": true,
+              "name": "Text",
+              "textAlign": "center",
+              "width": 794,
+              "x": 115,
+              "y": 281,
+              "zIndex": 0
+            },
+            {
+              "autosize": true,
+              "height": 43,
+              "id": "element_continueButton_1777312547871_1",
+              "kind": "button",
+              "name": "Continue Button",
+              "textAlign": "center",
+              "width": 120,
+              "x": 452,
+              "y": 459,
+              "zIndex": 1
+            }
+          ],
+          "connections": [
+            {
+              "targetId": "beat_64"
+            }
+          ],
+          "defaultTarget": "beat_64",
+          "x": 2052.200838667702,
+          "y": 371.69664316685805,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_40",
+          "name": "StoryPart_5.5_SelfEsteem",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 1100,
+          "y": 1859.0143187942685,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777833925872",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1778321807891",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_47"
+                  }
+                },
+                {
+                  "id": "choice_1777833946299",
+                  "text": "Placeholder text.",
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1778321844732",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_47"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_41",
+          "name": "StoryPart_6",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_48"
+            }
+          ],
+          "defaultTarget": "beat_48",
+          "x": 1100,
+          "y": 2097.498173262213,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_42",
+          "name": "StoryPart_5_Conclusion",
+          "type": "durScreen",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_43"
+            }
+          ],
+          "defaultTarget": "beat_43",
+          "x": 1450,
+          "y": 1617.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "duration": 3000
+          }
+        },
+        {
+          "id": "beat_43",
+          "name": "StoryPart_5_SelfEsteemOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_40"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_44"
+            }
+          ],
+          "x": 1450,
+          "y": 1737.4981732622132,
+          "parameters": {
+            "conditionType": "variable",
+            "condition": {
+              "type": "variable",
+              "operator": "==",
+              "variableName": "Scenario5Response",
+              "value": "selfesteem"
+            },
+            "trueTarget": "beat_40",
+            "falseTarget": "beat_44",
+            "variableName": "Scenario5Response",
+            "value": "selfesteem",
+            "operator": "==",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_44",
+          "name": "StoryPart_5_SupportOrNegative",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_45"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_46"
+            }
+          ],
+          "x": 1800,
+          "y": 1857.4981732622132,
+          "parameters": {
+            "conditionType": "variable",
+            "condition": {
+              "type": "variable",
+              "operator": "==",
+              "variableName": "Scenario5Response",
+              "value": "support"
+            },
+            "trueTarget": "beat_45",
+            "falseTarget": "beat_46",
+            "variableName": "Scenario5Response",
+            "value": "support",
+            "operator": "==",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_45",
+          "name": "StoryPart_5.5_Support",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 1700,
+          "y": 1977.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777834074060",
+                  "text": "Placeholder text.",
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777834079118",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [
+                      {
+                        "id": "choice_1777834087936",
+                        "text": "Placeholder text.",
+                        "effects": [
+                          {
+                            "target": "support",
+                            "type": "incrementCounter",
+                            "value": 1
+                          }
+                        ],
+                        "visible": true,
+                        "dialogNode": {
+                          "id": "node_1778321884589",
+                          "speaker": "Character",
+                          "text": "Placeholder text.",
+                          "choices": [],
+                          "target": "beat_47"
+                        }
+                      },
+                      {
+                        "id": "choice_1777834089572",
+                        "text": "Placeholder text.",
+                        "visible": true,
+                        "dialogNode": {
+                          "id": "node_1778321900683",
+                          "speaker": "Character",
+                          "text": "Placeholder text.",
+                          "choices": [],
+                          "target": "beat_47"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_46",
+          "name": "StoryPart_5.5_Negative",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 1900,
+          "y": 1977.4981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777834120058",
+                  "text": "Placeholder text.",
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1778321948464",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_47"
+                  }
+                },
+                {
+                  "id": "choice_1777834122286",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": -1
+                    },
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_47"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_47",
+          "name": "StoryPart_5.5_Conclusion",
+          "type": "infoText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_41"
+            }
+          ],
+          "defaultTarget": "beat_41",
+          "x": 1100,
+          "y": 1977.4981732622132,
+          "parameters": {
+            "text": "Placeholder text.",
+            "buttonText": "Placeholder text.",
+            "backgroundSound": ""
+          }
+        },
+        {
+          "id": "beat_48",
+          "name": "StoryPart_6_SupportPositiveOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_59"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_50"
+            }
+          ],
+          "x": 1100,
+          "y": 2217.498173262213,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "support",
+              "value": 0
+            },
+            "trueTarget": "beat_59",
+            "falseTarget": "beat_50",
+            "variableName": "support",
+            "value": 0,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_50",
+          "name": "StoryPart_6_SupportNegative_SelfEsteemPositiveOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_52"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_57"
+            }
+          ],
+          "x": 1400,
+          "y": 2337.498173262213,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "self esteem",
+              "value": 0
+            },
+            "trueTarget": "beat_52",
+            "falseTarget": "beat_57",
+            "variableName": "self esteem",
+            "value": 0,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_52",
+          "name": "EndScreen_NegativeSupport_PositiveSelfEsteem",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 1300,
+          "y": 2457.498173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_53",
+          "name": "EndScreen_PositiveSupport_PositiveSelfEsteem",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 900,
+          "y": 2577.498173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_54",
+          "name": "EndScreen_SupportAbove5_SelfEsteemPositive",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 500,
+          "y": 2577.498173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_56",
+          "name": "EndScreen_PositiveSupport_NegativeSelfEsteem",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 1100,
+          "y": 2577.498173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_57",
+          "name": "EndScreen_NegativeSupport_NegativeSelfEsteem",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 1500,
+          "y": 2458.748173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_59",
+          "name": "StoryPart_6_SupportAbove5OrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_60"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_62"
+            }
+          ],
+          "x": 800,
+          "y": 2337.498173262213,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "support",
+              "value": 5
+            },
+            "trueTarget": "beat_60",
+            "falseTarget": "beat_62",
+            "variableName": "support",
+            "value": 5,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_6",
+          "name": "SelectChildTrait",
+          "type": "dialogTree",
+          "locations": [
+            {
+              "autosize": true,
+              "height": 70,
+              "id": "npc",
+              "kind": "dialog",
+              "manuallyResized": true,
+              "name": "NPC: Character",
+              "width": 741,
+              "x": 142,
+              "y": 179,
+              "zIndex": 0
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_0",
+              "kind": "button",
+              "name": "Choice 0",
+              "width": 551,
+              "x": 237,
+              "y": 249,
+              "zIndex": 1
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_1",
+              "kind": "button",
+              "name": "Choice 1",
+              "width": 551,
+              "x": 237,
+              "y": 344,
+              "zIndex": 2
+            },
+            {
+              "autosize": true,
+              "height": 80,
+              "id": "choice_2",
+              "kind": "button",
+              "name": "Choice 2",
+              "width": 551,
+              "x": 237,
+              "y": 430,
+              "zIndex": 3
+            }
+          ],
+          "connections": [],
+          "x": 2066.244777599176,
+          "y": 725.3730437722758,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777312656838",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "setCounter",
+                      "value": 0
+                    },
+                    {
+                      "target": "self esteem",
+                      "type": "setCounter",
+                      "value": -3
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_10"
+                },
+                {
+                  "id": "choice_1777312664118",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "setCounter",
+                      "value": 3
+                    },
+                    {
+                      "target": "self esteem",
+                      "type": "setCounter",
+                      "value": 0
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_10"
+                },
+                {
+                  "id": "choice_1777312667215",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "setCounter",
+                      "value": 0
+                    },
+                    {
+                      "target": "self esteem",
+                      "type": "setCounter",
+                      "value": 3
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_10"
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_60",
+          "name": "StoryPart_6_SupportAbove5_SelfEsteemPositiveOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_54"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_61"
+            }
+          ],
+          "x": 600,
+          "y": 2457.498173262213,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "self esteem",
+              "value": 0
+            },
+            "trueTarget": "beat_54",
+            "falseTarget": "beat_61",
+            "variableName": "self esteem",
+            "value": 0,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_61",
+          "name": "EndScreen_SupportAbove5_SelfEsteemNegative",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 700,
+          "y": 2577.498173262213,
+          "parameters": {
+            "message": "Placeholder text.",
+            "showRestart": true,
+            "showCredits": false,
+            "reset": true,
+            "resetVariables": true,
+            "resetCounters": true,
+            "resetInventory": true,
+            "resetTimers": true,
+            "resetFictionalTime": true,
+            "resetVisitedTracking": true,
+            "resetHistory": true,
+            "buttonText": "Placeholder text.",
+            "creditsPageTitle": "Placeholder text.",
+            "creditsPageBody": "",
+            "creditsCloseText": "Placeholder text."
+          }
+        },
+        {
+          "id": "beat_62",
+          "name": "StoryPart_6_SupportPositive_SelfEsteemPositiveOrNot",
+          "type": "conditionBeat",
+          "locations": [],
+          "connections": [
+            {
+              "label": "true",
+              "targetId": "beat_53"
+            },
+            {
+              "label": "false",
+              "targetId": "beat_56"
+            }
+          ],
+          "x": 1000,
+          "y": 2457.498173262213,
+          "parameters": {
+            "conditionType": "counter",
+            "condition": {
+              "type": "counter",
+              "operator": ">",
+              "variableName": "self esteem",
+              "value": 0
+            },
+            "trueTarget": "beat_53",
+            "falseTarget": "beat_56",
+            "variableName": "self esteem",
+            "value": 0,
+            "operator": ">",
+            "quantityCheck": false,
+            "compareSource": "inventory",
+            "moodAxis": "valence"
+          }
+        },
+        {
+          "id": "beat_63",
+          "name": "CounterCheck_StoryPart_1_O3_Success",
+          "type": "dialogTree",
+          "locations": [],
+          "connections": [],
+          "x": 2485,
+          "y": 554.9981732622132,
+          "speaker": "Character",
+          "showSpeaker": true,
+          "parameters": {
+            "dialogTree": {
+              "id": "root",
+              "speaker": "Character",
+              "text": "Placeholder text.",
+              "emotion": "neutral",
+              "choices": [
+                {
+                  "id": "choice_1777921146481",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "self esteem",
+                      "type": "incrementCounter",
+                      "value": 1
+                    }
+                  ],
+                  "visible": true,
+                  "target": "beat_20"
+                },
+                {
+                  "id": "choice_1777921147368",
+                  "text": "Placeholder text.",
+                  "effects": [
+                    {
+                      "target": "support",
+                      "type": "incrementCounter",
+                      "value": -1
+                    }
+                  ],
+                  "visible": true,
+                  "dialogNode": {
+                    "id": "node_1777921178325",
+                    "speaker": "Character",
+                    "text": "Placeholder text.",
+                    "choices": [],
+                    "target": "beat_20"
+                  }
+                }
+              ]
+            },
+            "markVisited": false,
+            "presentationMode": "positioned",
+            "showAvatars": true
+          }
+        },
+        {
+          "id": "beat_64",
+          "name": "Get Child Name",
+          "type": "inputText",
+          "locations": [],
+          "connections": [
+            {
+              "targetId": "beat_6"
+            }
+          ],
+          "defaultTarget": "beat_6",
+          "x": 2038.4070405475318,
+          "y": 554.0225749291317,
+          "parameters": {
+            "prompt": "Placeholder text.",
+            "saveToType": "variable",
+            "variable": "childName",
+            "characterId": "char_1777312733784_dumgwg1qe",
+            "counterOperation": "set",
+            "validation": "none",
+            "required": false,
+            "buttonText": "Placeholder text.",
+            "locs": [],
+            "backgroundSound": ""
+          }
+        }
+      ],
+      "settings": {},
+      "environment": {
+        "props": [],
+        "nodes": []
+      },
+      "characters": [
+        {
+          "counters": [
+            {
+              "displayName": "Support",
+              "name": "support",
+              "value": 0,
+              "visible": true
+            }
+          ],
+          "createdAt": "2026-04-27T17:58:46.834Z",
+          "defaultState": "default",
+          "displayName": "Player",
+          "goals": [],
+          "id": "char_1777312726834_wjdvsu24u",
+          "inventory": [],
+          "name": "player",
+          "role": "player",
+          "states": [
+            {
+              "displayName": "Default",
+              "id": "default",
+              "name": "default",
+              "visual": {}
+            }
+          ],
+          "tags": [],
+          "traits": [],
+          "updatedAt": "2026-04-27T18:51:43.482Z",
+          "visual": {
+            "type": "static"
+          }
+        },
+        {
+          "counters": [
+            {
+              "displayName": "Self Esteem",
+              "name": "self esteem",
+              "value": 0,
+              "visible": true
+            }
+          ],
+          "createdAt": "2026-04-27T17:58:53.784Z",
+          "defaultState": "default",
+          "displayName": "Child",
+          "goals": [],
+          "id": "char_1777312733784_dumgwg1qe",
+          "inventory": [],
+          "name": "child",
+          "role": "npc",
+          "states": [
+            {
+              "displayName": "Default",
+              "id": "default",
+              "name": "default",
+              "visual": {}
+            }
+          ],
+          "tags": [],
+          "traits": [],
+          "updatedAt": "2026-04-27T18:52:00.275Z",
+          "visual": {
+            "type": "static"
+          }
+        }
+      ],
+      "clusters": [],
+      "containerBeatPositions": [
+        {
+          "beatId": "beat_12",
+          "clusterId": "cluster_1777313633609",
+          "position": {
+            "x": 20,
+            "y": 20,
+            "z": 0
+          }
+        }
+      ],
+      "title": "Anonymized Story",
+      "author": "Anonymous",
+      "connections": [
+        {
+          "source": "beat_10",
+          "target": "beat_12"
+        },
+        {
+          "source": "beat_13",
+          "target": "beat_63",
+          "label": "true"
+        },
+        {
+          "source": "beat_13",
+          "target": "beat_17",
+          "label": "false"
+        },
+        {
+          "source": "beat_17",
+          "target": "beat_20"
+        },
+        {
+          "source": "beat_20",
+          "target": "beat_23"
+        },
+        {
+          "source": "beat_24",
+          "target": "beat_25"
+        },
+        {
+          "source": "beat_25",
+          "target": "beat_28"
+        },
+        {
+          "source": "beat_28",
+          "target": "beat_30",
+          "label": "true"
+        },
+        {
+          "source": "beat_28",
+          "target": "beat_29",
+          "label": "false"
+        },
+        {
+          "source": "beat_29",
+          "target": "beat_31",
+          "label": "true"
+        },
+        {
+          "source": "beat_29",
+          "target": "beat_32",
+          "label": "false"
+        },
+        {
+          "source": "beat_3",
+          "target": "beat_4"
+        },
+        {
+          "source": "beat_33",
+          "target": "beat_34"
+        },
+        {
+          "source": "beat_35",
+          "target": "beat_36",
+          "label": "true"
+        },
+        {
+          "source": "beat_35",
+          "target": "beat_37",
+          "label": "false"
+        },
+        {
+          "source": "beat_38",
+          "target": "beat_39"
+        },
+        {
+          "source": "beat_4",
+          "target": "beat_64"
+        },
+        {
+          "source": "beat_41",
+          "target": "beat_48"
+        },
+        {
+          "source": "beat_42",
+          "target": "beat_43"
+        },
+        {
+          "source": "beat_43",
+          "target": "beat_40",
+          "label": "true"
+        },
+        {
+          "source": "beat_43",
+          "target": "beat_44",
+          "label": "false"
+        },
+        {
+          "source": "beat_44",
+          "target": "beat_45",
+          "label": "true"
+        },
+        {
+          "source": "beat_44",
+          "target": "beat_46",
+          "label": "false"
+        },
+        {
+          "source": "beat_47",
+          "target": "beat_41"
+        },
+        {
+          "source": "beat_48",
+          "target": "beat_59",
+          "label": "true"
+        },
+        {
+          "source": "beat_48",
+          "target": "beat_50",
+          "label": "false"
+        },
+        {
+          "source": "beat_50",
+          "target": "beat_52",
+          "label": "true"
+        },
+        {
+          "source": "beat_50",
+          "target": "beat_57",
+          "label": "false"
+        },
+        {
+          "source": "beat_59",
+          "target": "beat_60",
+          "label": "true"
+        },
+        {
+          "source": "beat_59",
+          "target": "beat_62",
+          "label": "false"
+        },
+        {
+          "source": "beat_60",
+          "target": "beat_54",
+          "label": "true"
+        },
+        {
+          "source": "beat_60",
+          "target": "beat_61",
+          "label": "false"
+        },
+        {
+          "source": "beat_62",
+          "target": "beat_53",
+          "label": "true"
+        },
+        {
+          "source": "beat_62",
+          "target": "beat_56",
+          "label": "false"
+        },
+        {
+          "source": "beat_64",
+          "target": "beat_6"
+        },
+        {
+          "source": "beat_12",
+          "target": "beat_20",
+          "label": "Brush off the feeling. They're just a teenager and probably just going through a phase"
+        },
+        {
+          "source": "beat_12",
+          "target": "beat_13",
+          "label": "Go to their room and knock on the door to ask them what's wrong"
+        },
+        {
+          "source": "beat_30",
+          "target": "beat_33",
+          "label": "That’s good to hear, in case you ever want to ask me anything or help you with the subject I’m here!"
+        },
+        {
+          "source": "beat_31",
+          "target": "beat_33",
+          "label": "“Makes sense, I hope the subject doesn’t cause too much trouble.”"
+        },
+        {
+          "source": "beat_32",
+          "target": "beat_33",
+          "label": "Put something on on the radio and continue driving home"
+        },
+        {
+          "source": "beat_34",
+          "target": "beat_35",
+          "label": "“Anything you want to show me?”"
+        },
+        {
+          "source": "beat_36",
+          "target": "beat_38",
+          "label": "“Bummer, I’m always here if you want to talk about it”"
+        },
+        {
+          "source": "beat_37",
+          "target": "beat_38",
+          "label": "Pat them on the shoulder"
+        },
+        {
+          "source": "beat_46",
+          "target": "beat_47",
+          "label": "Keep lecturing them. They need to learn how the real world works sooner or later."
+        },
+        {
+          "source": "beat_6",
+          "target": "beat_10",
+          "label": "Mostly quiet and likes doing things on their own"
+        },
+        {
+          "source": "beat_63",
+          "target": "beat_20",
+          "label": "Say “Okay” and leave"
+        }
+      ],
+      "emotionPalette": [
+        {
+          "name": "joy",
+          "weightToValence": 0.7,
+          "weightToArousal": 0.4,
+          "decayRate": 0.2,
+          "description": "Happy / delighted"
+        },
+        {
+          "name": "anger",
+          "weightToValence": -0.5,
+          "weightToArousal": 0.7,
+          "decayRate": 0.25,
+          "description": "Hostile / aggressive"
+        },
+        {
+          "name": "fear",
+          "weightToValence": -0.6,
+          "weightToArousal": 0.6,
+          "decayRate": 0.2,
+          "description": "Threatened / anxious"
+        },
+        {
+          "name": "sadness",
+          "weightToValence": -0.7,
+          "weightToArousal": -0.4,
+          "decayRate": 0.1,
+          "description": "Grief / sorrow"
+        },
+        {
+          "name": "surprise",
+          "weightToValence": 0,
+          "weightToArousal": 0.8,
+          "decayRate": 0.4,
+          "description": "Startled — fast decay"
+        },
+        {
+          "name": "disgust",
+          "weightToValence": -0.5,
+          "weightToArousal": 0.2,
+          "decayRate": 0.25,
+          "description": "Aversion / revulsion"
+        },
+        {
+          "name": "pride",
+          "weightToValence": 0.5,
+          "weightToArousal": 0.2,
+          "decayRate": 0.15,
+          "description": "Self-satisfaction"
+        },
+        {
+          "name": "shame",
+          "weightToValence": -0.6,
+          "weightToArousal": -0.2,
+          "decayRate": 0.1,
+          "description": "Self-reproach"
+        },
+        {
+          "name": "interest",
+          "weightToValence": 0.3,
+          "weightToArousal": 0.3,
+          "decayRate": 0.3,
+          "description": "Curiosity / engagement"
+        }
+      ],
+      "traitModulations": [
+        {
+          "trait": "neuroticism",
+          "emotion": "fear",
+          "weight": 0.5
+        },
+        {
+          "trait": "neuroticism",
+          "emotion": "sadness",
+          "weight": 0.4
+        },
+        {
+          "trait": "neuroticism",
+          "emotion": "anger",
+          "weight": 0.3
+        },
+        {
+          "trait": "neuroticism",
+          "emotion": "shame",
+          "weight": 0.3
+        },
+        {
+          "trait": "neuroticism",
+          "emotion": "joy",
+          "weight": -0.2
+        },
+        {
+          "trait": "extraversion",
+          "emotion": "joy",
+          "weight": 0.4
+        },
+        {
+          "trait": "extraversion",
+          "emotion": "pride",
+          "weight": 0.3
+        },
+        {
+          "trait": "extraversion",
+          "emotion": "interest",
+          "weight": 0.3
+        },
+        {
+          "trait": "agreeableness",
+          "emotion": "anger",
+          "weight": -0.4
+        },
+        {
+          "trait": "agreeableness",
+          "emotion": "disgust",
+          "weight": -0.3
+        },
+        {
+          "trait": "openness",
+          "emotion": "interest",
+          "weight": 0.4
+        },
+        {
+          "trait": "openness",
+          "emotion": "surprise",
+          "weight": 0.2
+        },
+        {
+          "trait": "conscientiousness",
+          "emotion": "shame",
+          "weight": 0.2
+        }
+      ]
+    }
+  }
+}

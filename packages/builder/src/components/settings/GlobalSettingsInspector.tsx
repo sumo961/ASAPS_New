@@ -5,6 +5,7 @@ import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
 import RenpyThemeImporter from './RenpyThemeImporter';
 import type { RenpyConversionResult } from '@asaps/core';
+import { REFERENCE_CULTURE_PROFILES } from '@asaps/core';
 import { getThemeService } from '../../services/ThemeService';
 import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
 import { MissingAssetsDialog } from './MissingAssetsDialog';
@@ -161,6 +162,20 @@ interface GlobalSettings {
     nameColor?: string;                       // Custom color for inline name (default: inherit)
     graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
     graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
+  };
+  // Experimental capability toggles, hidden by default. Mirrored from
+  // storage/types.ts; keep in sync.
+  features?: {
+    showKnowledgeGraph?: boolean;             // Reveal the Knowledge Graph view (default off)
+  };
+  // Cultural setting — distinct from translation.sourceLanguage. Mirrored from
+  // storage/types.ts; keep in sync.
+  culture?: {
+    label?: string;
+    region?: string;
+    language?: string;
+    profileId?: string;
+    derivedFrom?: { projectId?: string; sourceCulture?: string; targetCulture?: string };
   };
 }
 
@@ -3595,6 +3610,63 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </p>
                 </div>
 
+                {settings.features?.showKnowledgeGraph && (
+                  <div className="p-4 bg-rose-50 rounded border border-rose-200">
+                    <h4 className="text-sm font-medium text-rose-800 mb-1">Cultural setting</h4>
+                    <p className="text-xs text-gray-600 mb-2">
+                      The culture this project is set in — <em>independent of the language above</em>
+                      (e.g. English language · New Zealand culture). Drives the Knowledge Graph's
+                      cultural extraction and adaptation.
+                    </p>
+                    <label className="block text-xs text-gray-600 mb-1">Reference profile</label>
+                    <select
+                      value={settings.culture?.profileId ?? 'custom'}
+                      onChange={(e) => {
+                        const ref = REFERENCE_CULTURE_PROFILES.find((p) => p.id === e.target.value);
+                        setSettings((prev) => ({
+                          ...prev,
+                          culture: ref
+                            ? { profileId: ref.id, label: ref.label, region: ref.region, language: prev.culture?.language }
+                            : { ...prev.culture, profileId: undefined },
+                        }));
+                        setHasChanges(true);
+                      }}
+                      className="w-full px-3 py-2 border rounded mb-2 text-sm"
+                    >
+                      <option value="custom">Custom…</option>
+                      {REFERENCE_CULTURE_PROFILES.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="space-y-2">
+                      <input
+                        placeholder="Culture / country (e.g. Sweden, Sri Lanka, New Zealand)"
+                        value={settings.culture?.label ?? ''}
+                        onChange={(e) => handleChange('culture', 'label', e.target.value)}
+                        className="w-full px-3 py-2 border rounded text-sm"
+                      />
+                      <input
+                        placeholder="Region or ethnicity (e.g. Tamil, Karnataka, Bavaria)"
+                        value={settings.culture?.region ?? ''}
+                        onChange={(e) => handleChange('culture', 'region', e.target.value)}
+                        className="w-full px-3 py-2 border rounded text-sm"
+                      />
+                      <input
+                        placeholder="Associated language (informational, e.g. Tamil, Kannada)"
+                        value={settings.culture?.language ?? ''}
+                        onChange={(e) => handleChange('culture', 'language', e.target.value)}
+                        className="w-full px-3 py-2 border rounded text-sm"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Region or ethnicity refines the culture <em>within</em> it — a sub-national
+                      region or an ethnic group (e.g. Tamil within Sri Lanka), not a country.
+                    </p>
+                  </div>
+                )}
+
                 <div className="mt-6 p-4 bg-blue-50 rounded border border-blue-200">
                   <h4 className="text-sm font-medium text-blue-800 mb-2">Translation Management</h4>
                   <p className="text-xs text-blue-700 mb-3">
@@ -3645,6 +3717,24 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   />
                   <span className="text-sm">Show variable/counter values during preview</span>
                 </label>
+
+                <div className="mt-2 pt-4 border-t">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={settings.features?.showKnowledgeGraph ?? false}
+                      onChange={(e) => handleChange('features', 'showKnowledgeGraph', e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">Show Knowledge Graph view (experimental)</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    Adds a Knowledge Graph tab that maps the project's structure (and,
+                    later, its cultural content) for querying and cultural adaptation.
+                    The project's <strong>Cultural setting</strong> is configured under the
+                    Translation tab.
+                  </p>
+                </div>
 
                 {/* Debug Preview */}
                 <div className="mt-6 p-4 bg-gray-100 rounded">

@@ -2,12 +2,14 @@ import React from 'react';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
 import { VisualWorkspace } from './visual/VisualWorkspace';
-import { Map, Palette } from 'lucide-react';
+import { KnowledgeGraphView } from './knowledgeGraph/KnowledgeGraphView';
+import { Map, Palette, Share2 } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from './settings/GlobalSettingsInspector';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
 
 interface WorkspaceViewProps {
+  projectId?: string;
   beats: Beat[];
   connections: any[];
   clusters: Cluster[];
@@ -71,6 +73,7 @@ interface WorkspaceViewProps {
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
+  projectId,
   beats,
   connections,
   clusters,
@@ -121,7 +124,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onRevertBeat,
   onUpdateVenueBeacons,
 }) => {
-  const [activeView, setActiveView] = React.useState<'flowchart' | 'visual'>('flowchart');
+  const [activeView, setActiveView] = React.useState<'flowchart' | 'visual' | 'knowledgeGraph'>('flowchart');
+
+  const showKnowledgeGraph = globalSettings?.features?.showKnowledgeGraph === true;
 
   // Check if selected beat supports visual editing
   const supportsVisualEditor = (beat: Beat | null) => {
@@ -191,6 +196,20 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
           </button>
         )}
         
+        {showKnowledgeGraph && (
+          <button
+            onClick={() => setActiveView('knowledgeGraph')}
+            className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
+              activeView === 'knowledgeGraph'
+                ? 'border-blue-500 text-blue-600 bg-blue-50'
+                : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <Share2 className="w-4 h-4 inline mr-2" />
+            Knowledge Graph
+          </button>
+        )}
+
         {!showVisualTab && activeView === 'visual' && (
           <div className="px-6 py-3 text-sm text-gray-400 italic">
             Select a visual beat to enable the Visual Editor
@@ -213,7 +232,42 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
       {/* Content Area - Fixed to use full available height */}
       <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
-        {activeView === 'flowchart' ? (
+        {activeView === 'knowledgeGraph' && showKnowledgeGraph ? (
+          <div className="h-full w-full">
+            <KnowledgeGraphView
+              projectId={projectId}
+              beats={beats}
+              connections={connections}
+              characters={characters}
+              globalSettings={globalSettings}
+            />
+          </div>
+        ) : activeView === 'visual' ? (
+          <div className="h-full w-full">
+            <VisualWorkspace
+              // Key includes refreshKey to force re-render on undo/redo
+              // NOTE: Do NOT include _version here — it changes on every Inspector edit,
+              // which remounts the component and resets phase selection (breaks credits phase editing)
+              key={`${selectedBeat?.id}-${refreshKey}`}
+              beat={selectedBeat}
+              beats={beats}
+              assets={assets}
+              onAssetSelect={onAssetSelect}
+              onAssetAdd={onAssetAdd}
+              onAssetRemove={onAssetRemove}
+              onAssetUpdate={onAssetUpdate}
+              onOpenCharacterManager={onOpenCharacterManager}
+              onBeatUpdate={onBeatUpdate}
+              projectSettings={projectSettings}
+              globalSettings={globalSettings}
+              characters={characters}
+              themeAssets={themeAssets}
+              cluster={selectedBeatCluster}
+              onSetClusterSharedVisuals={onSetClusterSharedVisuals}
+              onUpdateVenueBeacons={onUpdateVenueBeacons}
+            />
+          </div>
+        ) : (
           <div className="h-full w-full">
             <Canvas
               beats={beats}
@@ -252,31 +306,6 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onViewBeatDiff={onViewBeatDiff}
               onViewBeatHistory={onViewBeatHistory}
               onRevertBeat={onRevertBeat}
-            />
-          </div>
-        ) : (
-          <div className="h-full w-full">
-            <VisualWorkspace
-              // Key includes refreshKey to force re-render on undo/redo
-              // NOTE: Do NOT include _version here — it changes on every Inspector edit,
-              // which remounts the component and resets phase selection (breaks credits phase editing)
-              key={`${selectedBeat?.id}-${refreshKey}`}
-              beat={selectedBeat}
-              beats={beats}
-              assets={assets}
-              onAssetSelect={onAssetSelect}
-              onAssetAdd={onAssetAdd}
-              onAssetRemove={onAssetRemove}
-              onAssetUpdate={onAssetUpdate}
-              onOpenCharacterManager={onOpenCharacterManager}
-              onBeatUpdate={onBeatUpdate}
-              projectSettings={projectSettings}
-              globalSettings={globalSettings}
-              characters={characters}
-              themeAssets={themeAssets}
-              cluster={selectedBeatCluster}
-              onSetClusterSharedVisuals={onSetClusterSharedVisuals}
-              onUpdateVenueBeacons={onUpdateVenueBeacons}
             />
           </div>
         )}

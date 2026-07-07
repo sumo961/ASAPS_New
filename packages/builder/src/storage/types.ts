@@ -261,6 +261,37 @@ export interface GlobalSettings {
      */
     mockLocation?: { lat: number; lng: number; floor?: number };
   };
+  /**
+   * Experimental / niche capability toggles, hidden by default. Persisted with
+   * the project so a flag travels with the file. See project memory
+   * `project_knowledge_graph_feature`.
+   */
+  features?: {
+    /** Reveal the Knowledge Graph view (systemic + cultural KG). Default off. */
+    showKnowledgeGraph?: boolean;
+  };
+  /**
+   * Cultural setting of the project — DISTINCT from `translation.sourceLanguage`.
+   * A project can be English-language but New-Zealand-culture, or English but
+   * Karnataka-culture. Drives the KG cultural-extraction profile. Language is
+   * informational here; the project's actual language lives in `translation`.
+   */
+  culture?: {
+    /** Display name, e.g. 'Sweden', 'New Zealand', 'Karnataka'. */
+    label?: string;
+    /** Region or ethnicity WITHIN the culture (not a country), e.g. 'Tamil', 'Karnataka'. */
+    region?: string;
+    /** Associated language (informational, BCP-47 or name), e.g. 'Kannada'. */
+    language?: string;
+    /** Reference profile id when one was chosen, else 'custom'. */
+    profileId?: string;
+    /** Lineage: set when this project was produced by cultural adaptation. */
+    derivedFrom?: {
+      projectId?: string;
+      sourceCulture?: string;
+      targetCulture?: string;
+    };
+  };
 }
 
 // ============================================================================

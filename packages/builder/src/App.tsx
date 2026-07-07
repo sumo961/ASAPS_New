@@ -5852,6 +5852,7 @@ function App() {
         <div className="flex flex-1 overflow-hidden">
           <WorkspaceView
             key={currentProject?.id || 'untitled'}
+            projectId={currentProject?.id}
             beats={state.beats}
             connections={state.connections}
             clusters={state.clusters || []}

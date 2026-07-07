@@ -18,6 +18,7 @@ export * from './translation';
 export * from './prompts';
 export * from './normalize';
 export * from './ai';
+export * from './kg';
 
 // Package info
 export const version = '2.0.0';
