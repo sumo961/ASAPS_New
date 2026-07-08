@@ -487,7 +487,25 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
     }
 
     // Validate and fix the dialog tree
-    return this.validateDialogTree(dialogTree);
+    const validated = this.validateDialogTree(dialogTree);
+
+    // Diagnostic: report the actual shape so a flat tree (model didn't nest)
+    // is distinguishable from a nested-but-target-stamped one.
+    const measure = (node: DialogNode, depth = 1): { maxDepth: number; nested: number; targets: number } => {
+      let maxDepth = depth, nested = 0, targets = 0;
+      for (const c of node.choices || []) {
+        if (c.dialogNode) { nested++; const s = measure(c.dialogNode, depth + 1); maxDepth = Math.max(maxDepth, s.maxDepth); nested += s.nested; targets += s.targets; }
+        if (c.target) targets++;
+      }
+      return { maxDepth, nested, targets };
+    };
+    const shape = measure(validated);
+    console.log(`[AIDialogTreeBeat ${this.id}] Tree shape: maxDepth=${shape.maxDepth} (maxTurns=${this.maxTurns}), nested dialogNodes=${shape.nested}, choices-with-target=${shape.targets}`);
+    if (this.maxTurns > 1 && shape.nested === 0) {
+      console.warn(`[AIDialogTreeBeat ${this.id}] ⚠ Model produced a FLAT tree (no nested dialogNodes) despite maxTurns=${this.maxTurns}. The conversation will end after one turn.`);
+    }
+
+    return validated;
   }
 
   /**
@@ -730,6 +748,16 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
         }
       }
 
+      // A nested dialog node means "continue the conversation", and it takes
+      // PRECEDENCE over any exit target on the same choice. Models frequently
+      // stamp target=beat_69 on every choice (because "all branches eventually
+      // exit") while ALSO nesting the next turn — a target-first check would
+      // then collapse the whole multi-turn tree to a single level.
+      if (chosen.dialogNode) {
+        this.currentNode = chosen.dialogNode;
+        continue;
+      }
+
       // Check if this choice exits to a beat
       if (chosen.target) {
         // Generate NPC farewell message if exit target has npcExitMessage prompt
@@ -773,13 +801,8 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
         return chosen.target;
       }
 
-      // Continue to nested dialog node
-      if (chosen.dialogNode) {
-        this.currentNode = chosen.dialogNode;
-      } else {
-        // No more nodes, exit
-        return this.exitTargets[0]?.id || this.getNextBeat(context);
-      }
+      // No nested node and no target — fall back to the first exit.
+      return this.exitTargets[0]?.id || this.getNextBeat(context);
     }
 
     return this.getNextBeat(context);
