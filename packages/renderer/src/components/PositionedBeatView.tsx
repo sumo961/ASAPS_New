@@ -3015,8 +3015,11 @@ const TextElement: React.FC<{
   const bgWithOpacity = shouldHideTextBox ? 'transparent' :
     (bgColor?.startsWith?.('#') ? `${bgColor}${Math.round(opacityValue * 255).toString(16).padStart(2, '0')}` : bgColor);
 
-  // Parse text color and add opacity
-  const textColor = theme.colors.textColor;
+  // Parse text color and add opacity. When the box is hidden the text sits on
+  // the bare stage, so make sure it stays readable against the stage bg.
+  const textColor = shouldHideTextBox
+    ? readableOnStage(theme.colors.textColor, theme.backgroundColor)
+    : theme.colors.textColor;
   const textAlpha = theme.colors.textAlpha / 100;
 
   // Determine animation style
@@ -4758,6 +4761,34 @@ function convertBase64ToBlob(base64: string): string {
   }
 }
 
+/** Relative luminance (0-1) of a #rgb / #rrggbb colour; null if unparseable. */
+function _luminance(hex: string | undefined): number | null {
+  if (typeof hex !== 'string') return null;
+  let h = hex.trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return null;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+/**
+ * When a text element has no text box it sits directly on the stage, so its
+ * colour must contrast the STAGE background — not the (possibly light) text-box
+ * colour that theme.colors.textColor was derived from. We only override when the
+ * requested colour would be near-invisible against the stage (authored, still-
+ * readable colours are kept). Fixes e.g. a titleScreen title rendering black on
+ * a dark stage and vanishing.
+ */
+function readableOnStage(textColor: string, stageBg: string | undefined): string {
+  const tl = _luminance(textColor);
+  const bl = _luminance(stageBg);
+  if (tl === null || bl === null) return textColor;
+  if (Math.abs(tl - bl) >= 0.4) return textColor; // enough contrast — keep authored colour
+  return bl > 0.5 ? '#000000' : '#ffffff';
+}
+
 export function createPositionedElementData(
   locations: Location[],
   content: Record<string, any>,
@@ -5595,7 +5626,10 @@ const FlexTextElement: React.FC<{
   // Use textbox frame image if available (from theme assets, e.g., Ren'Py import)
   const hasFrameImage = !hideTextBox && theme.textboxFrameUrl;
 
-  const textColor = theme.colors.textColor;
+  // Box hidden → text is on the bare stage; keep it readable against the stage bg.
+  const textColor = hideTextBox
+    ? readableOnStage(theme.colors.textColor, theme.backgroundColor)
+    : theme.colors.textColor;
   const textAlpha = theme.colors.textAlpha / 100;
 
   // Determine animation style

@@ -2021,6 +2021,19 @@ export class ReactRenderer extends BaseRenderer {
      */
     authorPositioned: boolean = true
   ): Promise<string> {
+    // Defensive normalisation: builder VisualElement locations (e.g. those
+    // baked by SchemaLocationInitializer) carry the element `type` field
+    // rather than the renderer's canonical `kind`. The visual editor converts
+    // type→kind before rendering (VisualBeatEditor: `kind: el.type`), but the
+    // preview/runtime path did not — so baked locations with only `type` were
+    // silently dropped by every kind-based filter and the beat rendered empty
+    // ("Processing 0 text elements, 0 buttons"). Mirror the editor's mapping
+    // here, at the shared choke point for all positioned beats.
+    locations = locations.map(loc =>
+      loc.kind || !(loc as { type?: string }).type
+        ? loc
+        : { ...loc, kind: (loc as { type?: string }).type as Location['kind'] }
+    );
     console.log(`[ReactRenderer ${this.instanceId}] Rendering positioned ${beatType} with ${locations.length} elements`);
 
     // Split locations into LAYOUT-content (text / button / dialog /
