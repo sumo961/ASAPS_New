@@ -193,6 +193,38 @@ describe('AIConversationBeat', () => {
       expect(params.maxTurns).toBe(20);
       expect(params.enableVoiceInput).toBe(false);
     });
+
+    // Regression: the topic-mention "Keywords" field takes a comma-separated
+    // list, but the getParameters/updateParameters round-trip used to trim +
+    // filter the value, stripping a mid-edit trailing "," / space — so the
+    // author could never start a second keyword (input stuck on one word).
+    it('preserves the raw comma-separated keywords string across the round-trip', () => {
+      const beat = new AIConversationBeat({ id: 'conv1', type: 'aiConversation' });
+
+      // Author has just typed a trailing comma+space to begin a second keyword.
+      beat.updateParameters({
+        directions: [{
+          id: 'd1',
+          triggerType: 'topic-mention',
+          triggerKeywords: 'religion, ',
+          actionType: 'steer',
+          actionInstruction: 'Discuss it',
+        }],
+      });
+      const mid = beat.getParameters();
+      // Verbatim — NOT normalized back to "religion".
+      expect(mid.directions[0].triggerKeywords).toBe('religion, ');
+      // Runtime array stays clean (no empty entry that would match everything).
+      expect(beat.directions[0].trigger.keywords).toEqual(['religion']);
+
+      // Finishing the second keyword round-trips losslessly + cleans the array.
+      beat.updateParameters({
+        directions: [{ ...mid.directions[0], triggerKeywords: 'religion, war' }],
+      });
+      const done = beat.getParameters();
+      expect(done.directions[0].triggerKeywords).toBe('religion, war');
+      expect(beat.directions[0].trigger.keywords).toEqual(['religion', 'war']);
+    });
   });
 
   // -------------------------------------------------------------------------

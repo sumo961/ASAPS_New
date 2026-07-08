@@ -191,7 +191,10 @@ export class AIConversationBeat extends Beat {
       id: d.id,
       triggerType: d.trigger.type,
       triggerNegate: d.trigger.negate ?? false,
-      triggerKeywords: d.trigger.keywords?.join(', ') || '',
+      // Prefer the verbatim authored string so a mid-edit trailing "," / space
+      // isn't normalized away on every keystroke; fall back to joining the
+      // cleaned array for directions created programmatically (e.g. AI-gen).
+      triggerKeywords: d.trigger.keywordsRaw ?? (d.trigger.keywords?.join(', ') || ''),
       triggerSentiment: d.trigger.sentiment || '',
       triggerTurnCount: d.trigger.turnCount,
       triggerVariableName: d.trigger.variableName || '',
@@ -225,7 +228,10 @@ export class AIConversationBeat extends Beat {
     if (flat.triggerNegate) trigger.negate = true;
     switch (trigger.type) {
       case 'topic-mention':
+        // keywords = cleaned array for runtime matching; keywordsRaw = the
+        // author's verbatim string so the inspector field round-trips losslessly.
         trigger.keywords = (flat.triggerKeywords || '').split(',').map((k: string) => k.trim()).filter(Boolean);
+        trigger.keywordsRaw = flat.triggerKeywords || '';
         break;
       case 'sentiment':
         trigger.sentiment = flat.triggerSentiment || 'negative';

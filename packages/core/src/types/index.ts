@@ -933,6 +933,14 @@ export interface ConversationTrigger {
   /** Keywords to detect (topic-mention) */
   keywords?: string[];
 
+  /**
+   * Authoring-only: the exact comma-separated string the author typed in the
+   * inspector, preserved verbatim so mid-edit separators (a trailing "," or
+   * space) survive the flatten/unflatten round-trip. `keywords` remains the
+   * cleaned array used at runtime; this is never read by the trigger logic.
+   */
+  keywordsRaw?: string;
+
   /** Sentiment to detect (sentiment) */
   sentiment?: 'positive' | 'negative' | 'neutral' | 'angry' | 'curious';
 
