@@ -717,8 +717,15 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
 
       const chosenId = await renderer.renderChoices(choiceOptions, locations);
 
-      // Find the chosen choice
-      const chosen: DialogChoice | undefined = visibleChoices.find((c: DialogChoice) => c.id === chosenId);
+      // Find the chosen choice. renderChoices resolves with the button's
+      // action id when set, but falls back to the choice TEXT when it isn't —
+      // so match by id first, then by text (raw or processed), mirroring
+      // DialogTreeBeat. Without the text fallback, chosen was undefined and the
+      // beat exited at turn 1 even though the tree was fully nested.
+      const chosen: DialogChoice | undefined =
+        visibleChoices.find((c: DialogChoice) => c.id === chosenId)
+        || visibleChoices.find((c: DialogChoice) =>
+          c.text === chosenId || this.processText(c.text, context) === chosenId);
       if (!chosen) {
         // Fallback
         return this.exitTargets[0]?.id || this.getNextBeat(context);
