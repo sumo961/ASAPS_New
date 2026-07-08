@@ -37,6 +37,18 @@ jobs:
     - name: Run ESLint
       run: npm run lint
 
+    - name: Run tests
+      # Per-workspace and sequential — never `npx vitest` from the repo root
+      # (no root vitest config → wrong environment → phantom failures) and never
+      # in parallel (the workspace suites can deadlock). apps/* have no test
+      # script, so they're listed explicitly here rather than run via the
+      # `--workspaces` runner (which errors on the missing script). Runs after
+      # the build step so @asaps/builder resolves @asaps/core from its dist.
+      run: |
+        npm run test -w @asaps/core
+        npm run test -w @asaps/renderer
+        npm run test -w @asaps/builder
+
   security:
     runs-on: ubuntu-latest
     permissions:
@@ -66,7 +78,7 @@ jobs:
       # deps.
       run: npm audit --audit-level=critical --omit=dev
 
-# TODO: Re-enable tests after fixing hanging test issues
-# - Tests using jest.fn/jest.mock need conversion to vitest
-# - HybridStorageAdapter tests hang on IndexedDB operations in CI
-# See skipped test files: *.test.ts.skip
+# Tests now run in the `build` job above (core + renderer + builder, ~5000
+# tests). A few legacy suites remain quarantined as `*.test.ts.skip` — the
+# IndexedDB-hanging HybridStorageAdapter and some jest-style mocks awaiting
+# vitest conversion; rename them back to `.ts` to re-include once modernized.
