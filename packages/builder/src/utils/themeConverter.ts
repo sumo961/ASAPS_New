@@ -175,56 +175,79 @@ export function normalizeSpeakerDisplay(sd: any): {
  * @returns Theme settings for the renderer
  */
 export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
+  // Defensive normalisation: older or partially-initialised projects (e.g. an
+  // imported project whose globalSettings is only { project, debug }) may be
+  // missing entire settings sub-objects. Merge each group over sane defaults so
+  // the preview can't crash on `settings.colors.ptextcolor` and friends. The
+  // colour defaults matter because getContrastColor / lightenColor are not
+  // null-safe; fonts default to Arial because getFontFamily isn't either.
+  const colors = {
+    pcolor: '#ffffff',
+    nonpcolor: '#cccccc',
+    bgColor: '#1a1a2e',
+    ptextcolor: '',
+    nonptextcolor: '',
+    ...((settings.colors ?? {}) as Partial<NonNullable<GlobalSettings['colors']>>),
+  } as NonNullable<GlobalSettings['colors']>;
+  const textbox = { ...(settings.textbox ?? {}) } as NonNullable<GlobalSettings['textbox']>;
+  const fonts = {
+    titleFont: 'Arial',
+    textFont: 'Arial',
+    ...((settings.fonts ?? {}) as Partial<NonNullable<GlobalSettings['fonts']>>),
+  } as NonNullable<GlobalSettings['fonts']>;
+  const textEffects = { ...(settings.textEffects ?? {}) } as NonNullable<GlobalSettings['textEffects']>;
+  const hotspots = { ...(settings.hotspots ?? {}) } as NonNullable<GlobalSettings['hotspots']>;
+
   // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
-  const buttonTextColor = settings.colors.ptextcolor || getContrastColor(settings.colors.pcolor);
-  const npcTextColor = settings.colors.nonptextcolor || getContrastColor(settings.colors.nonpcolor);
+  const buttonTextColor = colors.ptextcolor || getContrastColor(colors.pcolor);
+  const npcTextColor = colors.nonptextcolor || getContrastColor(colors.nonpcolor);
 
   return {
     // Stage/canvas background color (used when no background image is set)
-    backgroundColor: settings.colors.bgColor,
+    backgroundColor: colors.bgColor,
     textBox: {
       // NPC/narrator text box uses nonpcolor
-      backgroundColor: settings.colors.nonpcolor,
-      borderColor: settings.colors.textBoxBorder,
-      borderWidth: settings.textbox.borderWidth,
-      borderRadius: settings.textbox.radius,
-      padding: settings.textbox.padding,
-      opacity: normalizeOpacity(settings.textbox.opacity),
-      hideTitleTextBox: settings.textbox.hideTitleTextBox,
+      backgroundColor: colors.nonpcolor,
+      borderColor: colors.textBoxBorder,
+      borderWidth: textbox.borderWidth,
+      borderRadius: textbox.radius,
+      padding: textbox.padding,
+      opacity: normalizeOpacity(textbox.opacity),
+      hideTitleTextBox: textbox.hideTitleTextBox,
     },
     button: {
       // Button/choice uses buttonBg/buttonBgColor if available, otherwise pcolor
-      backgroundColor: settings.colors.buttonBg || settings.colors.buttonBgColor || settings.colors.pcolor,
-      hoverBackgroundColor: lightenColor(settings.colors.buttonBg || settings.colors.buttonBgColor || settings.colors.pcolor, 0.15),
+      backgroundColor: colors.buttonBg || colors.buttonBgColor || colors.pcolor,
+      hoverBackgroundColor: lightenColor(colors.buttonBg || colors.buttonBgColor || colors.pcolor, 0.15),
       textColor: buttonTextColor,
-      borderColor: settings.colors.textBoxBorder,
-      borderWidth: settings.textbox.borderWidth,
-      borderRadius: settings.textbox.radius,
+      borderColor: colors.textBoxBorder,
+      borderWidth: textbox.borderWidth,
+      borderRadius: textbox.radius,
     },
     colors: {
       textColor: npcTextColor, // NPC/narrator text color
       textAlpha: 100, // Text is always fully visible; nonpalpha controls text BOX background, not text
     },
     fonts: {
-      titleFont: getFontFamily(settings.fonts.titleFont),
-      textFont: getFontFamily(settings.fonts.textFont),
-      buttonFont: getFontFamily(settings.fonts.btnFont || settings.fonts.buttonFont || 'Arial'),
-      titleFontSize: settings.fonts.fontSize?.title,
-      textFontSize: settings.fonts.fontSize?.text,
-      buttonFontSize: settings.fonts.fontSize?.button,
+      titleFont: getFontFamily(fonts.titleFont),
+      textFont: getFontFamily(fonts.textFont),
+      buttonFont: getFontFamily(fonts.btnFont || fonts.buttonFont || 'Arial'),
+      titleFontSize: fonts.fontSize?.title,
+      textFontSize: fonts.fontSize?.text,
+      buttonFontSize: fonts.fontSize?.button,
     },
     textEffects: {
-      animation: settings.textEffects.animation,
-      typewriterSpeed: settings.textEffects.typewriterSpeed,
-      fadeInDuration: settings.textEffects.fadeInDuration,
+      animation: textEffects.animation,
+      typewriterSpeed: textEffects.typewriterSpeed,
+      fadeInDuration: textEffects.fadeInDuration,
     },
     hotspot: {
-      highlightColor: settings.hotspots.highlightColor || '#ffff00',
-      visible: settings.hotspots.visible ?? true,
-      showLabels: settings.hotspots.labels ?? true,
-      opacity: (settings.hotspots.opacity ?? 30) / 100,  // Normalize to 0-1
-      showInPreview: settings.hotspots.showInPreview ?? 'visible',
-      labelDisplay: settings.hotspots.labelDisplay ?? 'hover',
+      highlightColor: hotspots.highlightColor || '#ffff00',
+      visible: hotspots.visible ?? true,
+      showLabels: hotspots.labels ?? true,
+      opacity: (hotspots.opacity ?? 30) / 100,  // Normalize to 0-1
+      showInPreview: hotspots.showInPreview ?? 'visible',
+      labelDisplay: hotspots.labelDisplay ?? 'hover',
     },
     speakerDisplay: settings.speakerDisplay ? normalizeSpeakerDisplay(settings.speakerDisplay) : undefined,
   };
