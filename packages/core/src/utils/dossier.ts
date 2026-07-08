@@ -429,6 +429,24 @@ function formatStateBlock(state: CharacterScopedState): string[] {
  * The AI beats pass `context` directly because StoryContext implements all
  * three methods.
  */
+/**
+ * Resolve a character reference to a human display name. A reference is either
+ * a canonical Character.id (stored by the inspector when the author links a
+ * defined character) or a free-text name (e.g. from AI generation). Returns the
+ * matched character's displayName/name when the ref is an id; otherwise returns
+ * the ref unchanged (it is already a name). This lets AI beats render a stored
+ * id like "char_123" as "Father Alonso" in dialog and LLM prompts, while the
+ * raw ref is still used for dossier lookups (which match by id).
+ */
+export function resolveCharacterDisplayName(
+  ref: string | null | undefined,
+  characters: ReadonlyArray<CharacterLike> | null | undefined,
+): string {
+  if (!ref) return ref || '';
+  const match = characters?.find((c) => c.id === ref);
+  return match ? (match.displayName || match.name || ref) : ref;
+}
+
 export function buildDossierForRef(
   characterRef: string | null | undefined,
   characters: ReadonlyArray<CharacterLike> | null | undefined,

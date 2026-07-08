@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDossier, buildDossierForRef } from '../../src/utils/dossier';
+import { buildDossier, buildDossierForRef, resolveCharacterDisplayName } from '../../src/utils/dossier';
 
 const granny = {
   id: 'char_1',
@@ -220,5 +220,29 @@ describe('buildDossierForRef', () => {
     expect(out).toContain('- Greeting');
     expect(out).toContain('- Cookies');
     expect(out).toContain('chose "Yes please"');
+  });
+});
+
+describe('resolveCharacterDisplayName', () => {
+  const characters = [granny]; // id 'char_1', name 'Granny', displayName 'Grandma'
+
+  it('resolves a canonical Character.id to its display name (the AI-beat bug)', () => {
+    // Regression: the NPC field stores the id when linked; the runtime must
+    // render the display name, not "char_1".
+    expect(resolveCharacterDisplayName('char_1', characters)).toBe('Grandma');
+  });
+
+  it('falls back to name when displayName is absent', () => {
+    expect(resolveCharacterDisplayName('c2', [{ id: 'c2', name: 'Bob' }])).toBe('Bob');
+  });
+
+  it('returns a free-text name unchanged when it is not a known id', () => {
+    expect(resolveCharacterDisplayName('Father Alonso', characters)).toBe('Father Alonso');
+  });
+
+  it('returns empty string for empty/nullish refs', () => {
+    expect(resolveCharacterDisplayName('', characters)).toBe('');
+    expect(resolveCharacterDisplayName(undefined, characters)).toBe('');
+    expect(resolveCharacterDisplayName('char_1', null)).toBe('char_1');
   });
 });

@@ -306,4 +306,38 @@ describe('CharacterRefField', () => {
       expect(onChange).toHaveBeenLastCalledWith({ characterRef: undefined, freeText: 'player' });
     });
   });
+
+  describe('focus shows the full list (regression: other characters were hidden)', () => {
+    it('lists all defined characters on focus even when a value is already present', () => {
+      // Bug: focusing a field holding "Grandma" filtered the dropdown down to
+      // just Grandma, hiding every other defined character.
+      render(
+        <CharacterRefField
+          value={{ freeText: 'Grandma' }}
+          onChange={() => {}}
+          characters={[granny, wolf]}
+          testId="f"
+        />
+      );
+      fireEvent.focus(screen.getByDisplayValue('Grandma'));
+      // The other character must still be selectable.
+      expect(screen.getByText('Big Bad Wolf')).toBeTruthy();
+    });
+
+    it('narrows the list only once the user actually types', () => {
+      render(
+        <CharacterRefField
+          value={{ freeText: 'Grandma' }}
+          onChange={() => {}}
+          characters={[granny, wolf]}
+          testId="f"
+        />
+      );
+      const input = screen.getByDisplayValue('Grandma');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: 'Wolf' } });
+      expect(screen.getByText('Big Bad Wolf')).toBeTruthy();
+      expect(screen.queryByText('Grandma')).toBeNull();
+    });
+  });
 });

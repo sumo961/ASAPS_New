@@ -99,6 +99,12 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
   // shows the typed string rather than the linked character's name so the
   // dropdown filter feels responsive.
   const [isEditing, setIsEditing] = useState(false);
+  // Whether the user has actually typed a query since focusing. On focus we
+  // show the FULL character list (so you can switch to any defined character);
+  // we only narrow it once the user starts typing. Without this, focusing a
+  // field that already held e.g. "Father Alonso" filtered the dropdown down to
+  // just that one, hiding every other defined character.
+  const [hasTyped, setHasTyped] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -121,7 +127,7 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [open]);
 
-  const filterText = isEditing ? inputText.trim().toLowerCase() : '';
+  const filterText = isEditing && hasTyped ? inputText.trim().toLowerCase() : '';
   const matchesText = useCallback((s: string | undefined) => {
     if (!filterText) return true;
     return (s || '').toLowerCase().includes(filterText);
@@ -189,6 +195,7 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
     const next = e.target.value;
     setInputText(next);
     setIsEditing(true);
+    setHasTyped(true);
     setOpen(true);
     // Typing in the input means the user is no longer linked to the previous
     // character — store as free text immediately. If they pick a character
@@ -200,6 +207,7 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
     // Keep the cached display name as free text so the field doesn't go blank.
     onChange({ characterRef: undefined, freeText: linkedCharacter?.name || value.freeText || '' });
     setIsEditing(true);
+    setHasTyped(false);
     setOpen(true);
     inputRef.current?.focus();
   }, [linkedCharacter, value.freeText, onChange]);
@@ -231,7 +239,7 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
             type="text"
             value={inputText}
             onChange={handleInputChange}
-            onFocus={() => { setOpen(true); setIsEditing(true); }}
+            onFocus={(e) => { setOpen(true); setIsEditing(true); setHasTyped(false); e.currentTarget.select(); }}
             placeholder={placeholder}
             disabled={disabled}
             style={inputStyle}

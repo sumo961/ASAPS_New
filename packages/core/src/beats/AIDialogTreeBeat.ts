@@ -4,7 +4,7 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
-import { buildDossierForRef } from '../utils/dossier';
+import { buildDossierForRef, resolveCharacterDisplayName } from '../utils/dossier';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
 
 export interface AIDialogExitTarget {
@@ -72,6 +72,11 @@ export class AIDialogTreeBeat extends Beat {
   public scenario: string;
   public npcName: string;
   public npcPersonality?: string;
+  /** Transient: the NPC's resolved human display name for the current run.
+   *  Set at the top of performAction (npcName may be a Character.id) and read
+   *  by generateDialogTree / validateDialogTree / exit handling, which run in
+   *  separate methods where the performAction local is out of scope. */
+  private _npcDisplay = '';
   public includeVariables: boolean;
   public includeInventory: boolean;
   public includeVisitedBeats: boolean;
@@ -233,6 +238,13 @@ export class AIDialogTreeBeat extends Beat {
     const playerName = variables.playerName || variables.name || variables.player || 'You';
     renderer.setState('playerName', playerName);
 
+    // Resolve the NPC field (a canonical Character.id when linked in the
+    // inspector) to a human display name for all rendering + LLM-prompt uses.
+    // The raw ref is kept for buildDossierForRef, which matches by id.
+    this._npcDisplay =
+      resolveCharacterDisplayName(this.npcName, (context.getStory() as any)?.getCharacters?.() || [])
+      || 'the character';
+
     // Clear chat history when starting a new dialog in chat mode
     if (this.presentationMode && this.presentationMode !== 'positioned') {
       if (renderer.clearChatHistory) {
@@ -253,7 +265,7 @@ export class AIDialogTreeBeat extends Beat {
 
         // Show loading indicator while generating dialog tree
         if (renderer.renderLoading) {
-          const npcName = this.npcName || 'the character';
+          const npcName = this._npcDisplay;
           const loadingMessages = [
             `Preparing conversation with ${npcName}...`,
             `${npcName} is getting ready to speak...`,
@@ -380,7 +392,7 @@ export class AIDialogTreeBeat extends Beat {
 ${characterDossier ? `\n${characterDossier}\n` : ''}
 SCENARIO: ${this.scenario}
 
-NPC: ${this.npcName}
+NPC: ${this._npcDisplay}
 ${this.npcPersonality ? `PERSONALITY: ${this.npcPersonality}` : ''}
 
 PLAYER CONTEXT:
@@ -556,7 +568,7 @@ Return a JSON object with this structure:
   private validateDialogTree(node: any): DialogNode {
     const validNode: DialogNode = {
       id: node.id || `node_${Date.now()}`,
-      speaker: node.speaker || this.npcName,
+      speaker: node.speaker || this._npcDisplay,
       text: node.text || '',
       emotion: node.emotion,
       choices: [],
@@ -711,7 +723,7 @@ Return a JSON object with this structure:
         const exitConfig = this.exitTargets.find(t => t.id === chosen.target);
         if (exitConfig?.npcExitMessage && aiService) {
           try {
-            const exitPrompt = `You are ${this.npcName}. ${this.npcPersonality || ''}\n\n` +
+            const exitPrompt = `You are ${this._npcDisplay}. ${this.npcPersonality || ''}\n\n` +
               `SCENARIO: ${this.scenario}\n\n` +
               `The NPC just said: "${processedText}"\n` +
               `The player responded: "${chosen.text}"\n\n` +
@@ -724,7 +736,7 @@ Return a JSON object with this structure:
             });
             const exitText = typeof exitResponse === 'string' ? exitResponse : (exitResponse as any)?.text || '';
             if (exitText.trim()) {
-              await renderer.renderDialog(this.npcName, exitText.trim(), undefined, locations);
+              await renderer.renderDialog(this._npcDisplay, exitText.trim(), undefined, locations);
               console.log(`[AIDialogTreeBeat ${this.id}] NPC exit message: "${exitText.trim().substring(0, 80)}..."`);
               await waitForTTS(renderer);
               await waitForReadingTime(renderer, exitText.trim());

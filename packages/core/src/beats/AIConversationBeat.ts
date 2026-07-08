@@ -32,7 +32,7 @@ import {
   type ConversationTurn,
 } from '../utils/ConversationPromptBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
-import { buildDossierForRef } from '../utils/dossier';
+import { buildDossierForRef, resolveCharacterDisplayName } from '../utils/dossier';
 
 export interface AIConversationBeatParams {
   /** Scene description */
@@ -406,6 +406,11 @@ export class AIConversationBeat extends Beat {
     // the system prompt. Mode A "rebuild every turn" — the LLM never drifts.
     // No-op when the npcName field stores a free-text name.
     const characters = (story as any)?.getCharacters?.() || [];
+    // The NPC field stores a canonical Character.id when the author links a
+    // defined character (so the dossier + personality auto-fill work). Resolve
+    // it to a human name for everything the player/LLM sees; buildDossierForRef
+    // keeps using the raw ref because it matches by id.
+    const npcDisplayName = resolveCharacterDisplayName(this.npcName, characters);
     const characterDossier = buildDossierForRef(this.npcName, characters, context);
 
     const conversationHistory: ConversationTurn[] = [];
@@ -420,13 +425,13 @@ export class AIConversationBeat extends Beat {
       } else {
         // Show loading for initial message
         if (renderer.renderLoading) {
-          renderer.renderLoading(`${this.npcName} is getting ready...`, {
+          renderer.renderLoading(`${npcDisplayName} is getting ready...`, {
             spinnerType: 'dots',
           });
         }
 
         const systemPrompt = buildConversationSystemPrompt({
-          npcName: this.npcName,
+          npcName: npcDisplayName,
           npcPersonality: this.npcPersonality,
           characterDossier,
           scenario: this.scenario,
@@ -447,7 +452,7 @@ export class AIConversationBeat extends Beat {
 
       // Render NPC opening
       conversationHistory.push({ role: 'npc', text: openingText, turnNumber: 0 });
-      await renderer.renderDialog(this.npcName, openingText, undefined, Array.from(this.locations.values()));
+      await renderer.renderDialog(npcDisplayName, openingText, undefined, Array.from(this.locations.values()));
 
       // Record opening in timeline
       context.recordTimelineEvent({
@@ -455,7 +460,7 @@ export class AIConversationBeat extends Beat {
         beatId: this.id,
         beatName: this.name || this.id,
         beatType: 'aiConversation',
-        text: `${this.npcName}: ${openingText}`,
+        text: `${npcDisplayName}: ${openingText}`,
       });
 
       // Main conversation loop
@@ -475,7 +480,7 @@ export class AIConversationBeat extends Beat {
           beatName: this.name || this.id,
           beatType: 'aiConversation',
           choiceText: playerInput,
-          choiceContext: `Turn ${turnNumber} of conversation with ${this.npcName}`,
+          choiceContext: `Turn ${turnNumber} of conversation with ${npcDisplayName}`,
         });
 
         // Evaluate directions against player input
@@ -644,7 +649,7 @@ export class AIConversationBeat extends Beat {
           // Generate NPC exit message if a prompt is provided
           if (exitMessagePrompt) {
             try {
-              const exitSystemPrompt = `You are ${this.npcName}. ${this.npcPersonality || ''}\n\n` +
+              const exitSystemPrompt = `You are ${npcDisplayName}. ${this.npcPersonality || ''}\n\n` +
                 `SCENARIO: ${this.scenario}\n\n` +
                 `Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: ${exitMessagePrompt}\n` +
                 `Keep it to 1-2 sentences. Respond in the SAME LANGUAGE as the conversation.\n` +
@@ -652,7 +657,7 @@ export class AIConversationBeat extends Beat {
               const exitMsg = await this.generateNPCResponse(aiService, exitSystemPrompt, conversationHistory);
               if (exitMsg.trim()) {
                 conversationHistory.push({ role: 'npc', text: exitMsg, turnNumber });
-                await renderer.renderDialog(this.npcName, exitMsg, undefined, Array.from(this.locations.values()));
+                await renderer.renderDialog(npcDisplayName, exitMsg, undefined, Array.from(this.locations.values()));
                 console.log(`[AIConversationBeat ${this.id}] NPC exit message: "${exitMsg.substring(0, 80)}..."`);
                 await waitForTTS(renderer);
                 await waitForReadingTime(renderer, exitMsg);
@@ -679,7 +684,7 @@ export class AIConversationBeat extends Beat {
         // the LLM's understanding of who the NPC currently is.
         const turnDossier = buildDossierForRef(this.npcName, characters, context);
         const systemPrompt = buildConversationSystemPrompt({
-          npcName: this.npcName,
+          npcName: npcDisplayName,
           npcPersonality: this.npcPersonality,
           characterDossier: turnDossier,
           scenario: this.scenario,
@@ -703,7 +708,7 @@ export class AIConversationBeat extends Beat {
 
         // Render NPC response
         await renderer.renderDialog(
-          this.npcName,
+          npcDisplayName,
           npcResponse,
           undefined,
           Array.from(this.locations.values()),
@@ -715,14 +720,14 @@ export class AIConversationBeat extends Beat {
           beatId: this.id,
           beatName: this.name || this.id,
           beatType: 'aiConversation',
-          text: `${this.npcName}: ${npcResponse}`,
+          text: `${npcDisplayName}: ${npcResponse}`,
         });
 
         context.recordAIOutput({
           beatId: this.id,
           beatName: this.name || this.id,
           beatType: 'aiConversation',
-          text: `${this.npcName}: ${npcResponse}`,
+          text: `${npcDisplayName}: ${npcResponse}`,
         });
       }
 
