@@ -1175,7 +1175,11 @@ export class OpenAIProvider extends BaseAIProvider {
             content: userPrompt,
           },
         ],
-        4000,
+        // Dialog trees branch several turns deep; on reasoning models (GPT-5)
+        // reasoning tokens count against this budget, so a 4000 cap truncated
+        // the tree to just the root. buildChatRequest still lets config.maxTokens
+        // override this default.
+        16000,
         0.7
       );
 

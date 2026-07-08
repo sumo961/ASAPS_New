@@ -454,10 +454,17 @@ export class ClaudeProvider extends BaseAIProvider {
     console.log('[ClaudeProvider] Generating dialog with Claude...');
 
     return this.withRetry(async () => {
+      // Dialog trees branch several turns deep; on thinking models (Opus 4.x)
+      // the thinking tokens count against max_tokens, and the response also
+      // carries a routingPlan paragraph. A hardcoded 4000 left no room for a
+      // full branching tree — it got truncated to just the root ("stops at one
+      // level"). Honour the user's configured Max Tokens with a generous
+      // default, same as the story path.
+      const maxTokens = this.config?.maxTokens || 16000;
       // `temperature` omitted — newer Anthropic models reject it as deprecated.
       const requestBody = {
         model: this.model,
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         system: systemPrompt,
         messages: [
           {
