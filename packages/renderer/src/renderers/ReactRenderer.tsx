@@ -1420,6 +1420,11 @@ export class ReactRenderer extends BaseRenderer {
           isPlayer: true,
         });
 
+        // Repaint immediately so the player's bubble appears the instant they
+        // hit Send — with the input swapped for a typing indicator — instead of
+        // waiting for the NPC response and rendering both together.
+        paint({ showInput: false, typing: true });
+
         resolve(text.trim());
       };
 
@@ -1738,39 +1743,46 @@ export class ReactRenderer extends BaseRenderer {
         );
       };
 
-      this.renderComponent(
-        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <ScaledStage
-            width={stageWidth}
-            height={stageHeight}
-            disableScaling={disableScaling}
-            scalingMode={scalingMode}
-            backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
-            backgroundColor={useMobileBg ? backgroundColor : undefined}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <ChatDialogView
-                  messages={[...this.chatMessages]}
-                  choices={[]}
-                  mode={'chat-scroll'}
-                  showAvatars={this.currentShowAvatars}
-                  theme={this.theme}
-                  backgroundUrl={this.backgroundImageUrl}
-                  backgroundColor={backgroundColor}
-                  onChoiceSelect={() => {}}
-                  stageWidth={stageWidth}
-                  stageHeight={stageHeight - 60}
-                  characterAvatarResolver={this.characterAvatarResolver || undefined}
-                  showTypingIndicator={false}
-                  fontScale={this.mobileFontScale}
-                />
+      // Paint the chat view. `showInput` toggles the text input (hidden the
+      // moment the player sends); `typing` shows the NPC "…" indicator while
+      // the response is generated. Called once up front, then again from
+      // handleSubmit so the player's bubble appears immediately on Send.
+      const paint = (opts: { showInput: boolean; typing: boolean }) => {
+        this.renderComponent(
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <ScaledStage
+              width={stageWidth}
+              height={stageHeight}
+              disableScaling={disableScaling}
+              scalingMode={scalingMode}
+              backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
+              backgroundColor={useMobileBg ? backgroundColor : undefined}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <ChatDialogView
+                    messages={[...this.chatMessages]}
+                    choices={[]}
+                    mode={'chat-scroll'}
+                    showAvatars={this.currentShowAvatars}
+                    theme={this.theme}
+                    backgroundUrl={this.backgroundImageUrl}
+                    backgroundColor={backgroundColor}
+                    onChoiceSelect={() => {}}
+                    stageWidth={stageWidth}
+                    stageHeight={opts.showInput ? stageHeight - 60 : stageHeight}
+                    characterAvatarResolver={this.characterAvatarResolver || undefined}
+                    showTypingIndicator={opts.typing}
+                    fontScale={this.mobileFontScale}
+                  />
+                </div>
+                {opts.showInput && <ConversationInput />}
               </div>
-              <ConversationInput />
-            </div>
-          </ScaledStage>
-        </div>
-      );
+            </ScaledStage>
+          </div>
+        );
+      };
+      paint({ showInput: true, typing: false });
     });
   }
 
