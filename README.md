@@ -22,19 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.67** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.67 is a correctness-and-polish
-release.** The headline is a set of **Visual Editor fixes**: the per-beat
-element-add buttons (**Character / Prop / Text**) had gone missing in
-responsive (slot/spatial) beats and are now restored in every layout mode,
-and the toolbar **Characters** button no longer crashes when picking a
-character. It also clarifies **QR-Scan** target semantics and draws QR jumps
-as flowchart edges, fixes the **ASML** importer to round-trip project
-metadata and variables it previously dropped, adds **~280 further tests**
-across the largest previously-thin areas (the "giant" renderer views,
-camera/AR beats, STT/TTS providers, hooks, and the undo/redo command
-classes), and clears two web-service security advisories. Users on v0.9.66
-will auto-update.
+Current release: **v0.9.68** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.68 is a robustness release.** The
+headline is **automatic detection and repair of corrupted projects on load**:
+a story that imported with incomplete display settings and legacy-format
+layout elements used to crash the preview and the Settings panel (and then
+render blank) — the app now detects the damage, resets missing settings to
+full defaults, salvages each beat's layout, deletes the parts it can't
+recover, and tells you to save. It also fixes the **AI Dialog Tree** so it no
+longer collapses to a single level, and several **AI Conversation** authoring
+bugs (comma-separated keywords, deterministic variable/turn-count exit
+conditions, and the interactor's message showing the instant it's sent). The
+experimental **knowledge-graph cultural-adaptation** feature landed behind a
+settings flag, and CI now runs the full test suite. Users on v0.9.67 will
+auto-update.
 For everything that shipped in v0.9.64 (camera/AR beats, Project
 Browser overhaul, Electron start window), see Progress.md. For what
 shipped when, see:

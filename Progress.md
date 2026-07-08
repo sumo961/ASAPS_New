@@ -1,5 +1,65 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-08: Corrupted-project auto-repair + AI beat fixes (v0.9.68)
+
+### Overview
+
+A robustness release driven by real bugs. The headline is **automatic detection and repair of corrupted projects on load**: an imported story with a partial `globalSettings` (only `{ project, debug }`) and legacy-format layout elements previously crashed the preview *and* the Settings panel outright, then — once the crash was patched — rendered blank. The app now detects that damage, resets missing display settings to full defaults, salvages each beat's layout elements, deletes the parts that can't be salvaged, and tells the author (once) so they can save the repaired project. Alongside that, the **AI Dialog Tree** no longer collapses to a single level, and several **AI Conversation** authoring bugs were fixed (comma-separated keywords, deterministic variable/turn-count exit conditions, and the interactor's message now appears the instant it's sent). The experimental **knowledge-graph cultural-adaptation** feature landed behind a settings flag, and CI now runs the full test suite.
+
+### Corrupted-project detection & auto-repair (headline)
+
+A pragmatic detect → reset → salvage → delete flow, applied on the universal project-load path:
+
+- **Detect** — `detectProjectCorruption()` flags an incomplete `globalSettings` (missing `colors` / `fonts` / `textbox` / `textEffects` / `hotspots`) and beat layout elements stored in the builder's legacy `type` format (or otherwise malformed).
+- **Reset settings** — `normalizeGlobalSettings()` fills every missing section with sane defaults while preserving any valid values, applied at all `globalSettings` load sites. No consumer ever sees a partial object again — this fixes, at the source, the `Cannot read properties of undefined (reading 'pcolor')` crashes in both the theme converters and the Settings inspector.
+- **Salvage beats** — `salvageBeatLocations()` upgrades legacy layout elements (`type` → the renderer's canonical `kind`) while preserving their geometry/text, in `deserializeBeats`.
+- **Delete corrupted parts** — layout elements with no recoverable kind are dropped so they regenerate cleanly instead of rendering as nothing.
+- **Notify** — `notifyIfCorrupted()` alerts the author once per project that a repair happened and to save to persist it.
+
+### Preview robustness
+
+- **No crash on partial `globalSettings`.** `convertGlobalSettingsToTheme` now normalises each settings sub-object over defaults before use.
+- **Baked `type`-format locations render.** The renderer keys everything off `kind`; the visual editor converted `type→kind` before rendering but the preview/runtime path did not, so baked locations were dropped entirely (`Processing 0 text elements, 0 buttons`). Normalised at `renderPositionedBeat`, the shared choke point.
+- **Bare-stage text stays readable.** When a text box is hidden, the text sits directly on the stage but used the box-derived colour, so a titleScreen title could render black on a dark stage and vanish. `readableOnStage()` keeps authored colours that already contrast and flips only the near-invisible ones.
+
+### AI Dialog Tree: no longer collapses to one level
+
+The model was building a correct multi-level tree, but a turn-1 choice still exited immediately. Root cause: `AIDialogTreeBeat` matched the chosen choice **only by `c.id`** while `renderChoices` resolves with the choice **text**, so `chosen` was `undefined` and the beat took its exit fallback — the regular `DialogTreeBeat` already had the text fallback. Supporting fixes: raised the `generateDialog` token budget so trees aren't truncated, strengthened the generation prompt to force full nesting, and made runtime navigation prefer a nested `dialogNode` over a stamped exit target. Verified live (turn 1 → turn 2 descent confirmed).
+
+### AI Conversation fixes
+
+- **Keywords field accepts a comma-separated list** again (Conversation Directions) instead of stopping after one word.
+- **Variable-check and turn-count exit conditions are evaluated deterministically** in code (fuzzy topic/sentiment/custom triggers still route to the LLM), so a `misogyny == true` exit fires reliably.
+- **The interactor's message appears the instant they hit Send**, before the AI reply arrives.
+- **NPC id resolves to the display name** and the character picker shows all characters.
+
+### Knowledge Graph (experimental, behind a flag)
+
+Landed the experimental two-layer knowledge-graph cultural-adaptation scaffold behind a settings toggle (`features.showKnowledgeGraph`), with anonymized KG test fixtures.
+
+### CI
+
+- The **core + renderer + builder test suites now run in CI** on every push.
+- GitHub Actions bumped off the deprecated Node 20 runtime.
+
+### Verification
+
+- Builder type-check clean; new logic covered by regression tests (theme normalisation, project repair/salvage, AI dialog-tree navigation, AI conversation triggers/keywords).
+- Repair flow verified live: the detection alert fires on load with the correct issue list, Settings › Colors opens without crashing, and the settings reset to defaults.
+
+**Files modified:**
+- `packages/builder/src/utils/projectRepair.ts` (new) — detection, location salvage, and the one-time notice.
+- `packages/builder/src/utils/themeConverter.ts` — `normalizeGlobalSettings` + defensive `convertGlobalSettingsToTheme`.
+- `packages/builder/src/utils/projectDeserializer.ts`, `App.tsx` — wire salvage + settings normalisation into the load path.
+- `packages/renderer/src/renderers/ReactRenderer.tsx` — `type→kind` normalisation at `renderPositionedBeat`.
+- `packages/renderer/src/components/PositionedBeatView.tsx` — `readableOnStage` bare-stage text contrast.
+- `packages/core/src/beats/AIDialogTreeBeat.ts` — text-fallback choice matching, `dialogNode` precedence, nesting prompt/tokens.
+- `packages/core/src/beats/AIConversationBeat.ts`, `packages/core/src/utils/dossier.ts` — conversation trigger/keyword/NPC-name fixes.
+- `.github/workflows/*` — run test suites; Node runtime bump.
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.68.
+
+---
+
 ## 2026-07-07: Visual-editor fixes + QR/ASML correctness + more coverage (v0.9.67)
 
 ### Overview
