@@ -232,7 +232,7 @@ function createAIServiceAdapter(): IAIService | null {
           : `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
         const requestBody = {
           model,
-          max_tokens: isTextFormat ? 1024 : 8192,
+          max_tokens: isTextFormat ? 1024 : 16000,
           system: systemPrompt,
           messages: [{ role: 'user' as const, content: request.prompt }],
         };
@@ -355,7 +355,7 @@ function createAIServiceAdapter(): IAIService | null {
             { role: 'system' as const, content: systemPrompt },
             { role: 'user' as const, content: request.prompt },
           ],
-          isTextFormat ? 1024 : 8192
+          isTextFormat ? 1024 : 16000
         );
 
         let content: string;

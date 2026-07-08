@@ -404,10 +404,10 @@ ${exitDescriptions}
 ${this.systemInstructions ? `ADDITIONAL INSTRUCTIONS: ${this.systemInstructions}` : ''}
 
 REQUIREMENTS:
-1. Generate a branching dialog tree with up to ${this.maxTurns} conversation turns
+1. Build a genuinely MULTI-LEVEL branching tree that runs the FULL ${this.maxTurns} conversation turns deep. Turn 1 is the root node; EACH of its choices must lead into a nested "dialogNode" (the NPC's turn-2 reply); EACH turn-2 choice must lead into a further nested "dialogNode" (turn 3); continue nesting until turn ${this.maxTurns}. A flat, single-level tree is WRONG.
 2. The NPC should respond based on the player's known state (name, choices, inventory)
 3. Each dialog node has: speaker, text, and 2-4 player choices
-4. Each choice should lead to either another dialog node OR an exit target
+4. A choice either CONTINUES the conversation with a nested "dialogNode", or EXITS with a "target". Use "target" ONLY when a specific exit condition is genuinely satisfied by that choice. For a turn-limit exit (e.g. "after ${this.maxTurns} turns"), ONLY the choices at the DEEPEST turn (turn ${this.maxTurns}) may use "target" — every earlier-turn choice MUST use "dialogNode". NEVER put a "target" on a turn-1 or turn-2 choice for a turn-limit exit; that collapses the whole tree to a single level.
 5. PERSONALIZATION IS CRITICAL: Use the player's actual name, location, profession, and other details from the PLAYER CONTEXT above. Write them directly into the NPC's dialog text (e.g., "Welcome to Stockholm, Mirjam!" not "Welcome to your city!"). Never use placeholder syntax like {playerName}. If you don't know a value, omit it gracefully
 6. Make the conversation feel natural and engaging
 7. For every choice that has a "target" (exits the conversation), include an "exitReason" field — a concrete explanation of what the player said or expressed that satisfies the exit condition. Be specific, not vague.
@@ -418,26 +418,39 @@ CRITICAL STRUCTURE RULES:
 - The "choices" array contains ONLY what the PLAYER would say in response
 - If the NPC asks a question, put the question IN THE TEXT FIELD, then put possible player ANSWERS in choices
 
-Return a JSON object with this structure:
+Return a JSON object with this structure. The example below is a 3-turn tree — NEST TO ${this.maxTurns} TURNS. Notice that ONLY the deepest (final-turn) choices carry a "target"; every earlier choice nests a "dialogNode":
 {
-  "routingPlan": "Explain how you designed the exit routing. E.g.: 'Player context shows location=Sao Paulo. I route to environmental_path when the player asks about pollution or sustainability. I route to economic_path when they focus on cost of living or employment. The farewell exit triggers when the player explicitly ends the conversation.'",
+  "routingPlan": "Explain how you designed the routing and depth. E.g.: 'The only exit is a turn-limit (after 3 turns). So turns 1 and 2 always nest a dialogNode; only the turn-3 choices carry target=beat_69. Branches diverge by the player's attitude (skeptical / curious / dismissive).'",
   "id": "root",
   "speaker": "NPC Name",
-  "text": "NPC's complete speech including any questions they ask",
+  "text": "NPC's complete TURN-1 speech, including the question they ask",
   "choices": [
     {
       "id": "c1",
-      "text": "What the PLAYER says in response",
-      "dialogNode": { /* nested dialog node with NPC's next speech */ }
-    },
-    {
-      "id": "c2",
-      "text": "Alternative PLAYER response",
-      "target": "exit_target_id",
-      "exitReason": "Specific reason: e.g. 'Player expressed concern about air quality, satisfying the environmental interest condition'"
+      "text": "Player's turn-1 response",
+      "dialogNode": {
+        "id": "n2a",
+        "speaker": "NPC Name",
+        "text": "NPC's TURN-2 reply that reacts to this choice",
+        "choices": [
+          {
+            "id": "c1a",
+            "text": "Player's turn-2 response",
+            "dialogNode": {
+              "id": "n3a",
+              "speaker": "NPC Name",
+              "text": "NPC's TURN-3 reply (final turn)",
+              "choices": [
+                { "id": "c1a1", "text": "Player's final response", "target": "exit_target_id", "exitReason": "Concrete reason the exit condition is now satisfied" }
+              ]
+            }
+          }
+        ]
+      }
     }
   ]
-}`;
+}
+(Give the root 2-4 choices, and likewise at each deeper turn — the example shows one branch for brevity, but you must expand every choice.)`;
 
     console.log(`[AIDialogTreeBeat ${this.id}] Generating dialog tree...`);
 
