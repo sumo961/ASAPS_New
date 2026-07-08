@@ -32,6 +32,8 @@ import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
 import { loadProjectData } from './utils/projectDeserializer';
+import { normalizeGlobalSettings } from './utils/themeConverter';
+import { notifyIfCorrupted } from './utils/projectRepair';
 import { downloadProjectAsZip, importProjectFromZip, getProjectDataForExport } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
@@ -2325,7 +2327,8 @@ function App() {
         // Restore global settings from project (if saved)
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
-          setGlobalSettings(currentProject.globalSettings);
+          notifyIfCorrupted(currentProject);
+          setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
           applyProjectAIDefaults(currentProject.globalSettings);
         }
 
@@ -2436,7 +2439,8 @@ function App() {
         // This ensures hotspot settings (showInPreview, labelDisplay) are applied
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from untitled project');
-          setGlobalSettings(currentProject.globalSettings);
+          notifyIfCorrupted(currentProject);
+          setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
         }
 
         // Initialize the default 3-beat story (title, intro, end)
@@ -2628,7 +2632,8 @@ function App() {
         // Restore global settings from project (if saved)
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
-          setGlobalSettings(currentProject.globalSettings);
+          notifyIfCorrupted(currentProject);
+          setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
           applyProjectAIDefaults(currentProject.globalSettings);
         }
 

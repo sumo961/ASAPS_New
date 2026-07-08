@@ -169,6 +169,53 @@ export function normalizeSpeakerDisplay(sd: any): {
 }
 
 /**
+ * Fill in any missing globalSettings sub-objects with sane defaults.
+ *
+ * Older or partially-initialised projects (e.g. an imported project whose
+ * globalSettings is only `{ project, debug }`) otherwise crash every consumer
+ * that reads a nested field like `settings.colors.pcolor` — the theme
+ * converters AND the settings inspector. Apply this once at load so no consumer
+ * ever sees a partial object. Defaults mirror App.tsx's new-project settings.
+ */
+export function normalizeGlobalSettings(
+  gs: Partial<GlobalSettings> | undefined | null
+): GlobalSettings {
+  const s = (gs ?? {}) as any;
+  return {
+    ...s,
+    colors: {
+      pcolor: '#ffffff', palpha: 100, ptextcolor: '',
+      nonpcolor: '#cccccc', nonpalpha: 100, nonptextcolor: '',
+      bgColor: '#1a1a2e', textBoxBorder: '#4a90d9',
+      ...(s.colors ?? {}),
+    },
+    fonts: {
+      titleFont: 'Georgia', textFont: 'Arial', btnFont: 'Arial',
+      ...(s.fonts ?? {}),
+      fontSize: { title: 32, text: 18, button: 18, ...(s.fonts?.fontSize ?? {}) },
+    },
+    textbox: {
+      radius: 8, padding: 20, borderWidth: 2, opacity: 90,
+      position: 'bottom', boxVisibility: 'all',
+      ...(s.textbox ?? {}),
+    },
+    textEffects: {
+      animation: 'none', typewriterSpeed: 15, fadeInDuration: 200,
+      ...(s.textEffects ?? {}),
+    },
+    hotspots: {
+      visible: true, labels: true, highlightColor: '#ffff00',
+      opacity: 30, showInPreview: 'visible', labelDisplay: 'hover',
+      ...(s.hotspots ?? {}),
+    },
+    sound: {
+      backgroundMusic: '', backgroundVolume: 100, mute: false,
+      ...(s.sound ?? {}),
+    },
+  } as GlobalSettings;
+}
+
+/**
  * Convert GlobalSettings to RenderThemeSettings
  *
  * @param settings - Global settings from the builder

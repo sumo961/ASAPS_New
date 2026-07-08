@@ -8,6 +8,7 @@
 import { BeatTypeRegistry, Story, normalizeCharacter } from '@asaps/core';
 import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
+import { salvageBeatLocations } from './projectRepair';
 
 /**
  * Extract target ID from various formats
@@ -440,7 +441,16 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         cluster: beatData.cluster,
         node: beatData.node,
         connections: beatData.connections || [],
-        locations: beatData.locations || [],
+        // Repair legacy/corrupted layout elements: upgrade `type`→`kind` and
+        // drop unsalvageable ones so they regenerate cleanly instead of
+        // rendering as nothing.
+        locations: (() => {
+          const salvage = salvageBeatLocations(beatData.locations || []);
+          if (salvage.normalized || salvage.deleted) {
+            console.warn(`[deserializeBeats] Repaired beat ${beatData.id}: upgraded ${salvage.normalized} legacy location(s), removed ${salvage.deleted} corrupted.`);
+          }
+          return salvage.locations;
+        })(),
         defaultTarget: beatData.defaultTarget,
         defaultTargetDelay: beatData.defaultTargetDelay,
         showTimer: beatData.showTimer,
