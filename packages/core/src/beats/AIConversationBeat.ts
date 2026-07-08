@@ -221,6 +221,37 @@ export class AIConversationBeat extends Beat {
   }
 
   /**
+   * Deterministically evaluate a variable-check or turn-count trigger against
+   * real story state. These conditions are exact, so they must NOT be delegated
+   * to the LLM: the direction-evaluation prompt never includes variable values,
+   * so a variable-check exit could only fire by luck. Fuzzy triggers
+   * (topic-mention, sentiment, custom) are still judged by the LLM.
+   */
+  private static evaluateDeterministicTrigger(
+    d: ConversationDirection,
+    context: StoryContext,
+    turnNumber: number,
+  ): boolean {
+    const t = d.trigger;
+    let met: boolean;
+    switch (t.type) {
+      case 'variable': {
+        const actual = context.getVariable(t.variableName || '');
+        met = (t.variableValue !== undefined && t.variableValue !== '')
+          ? String(actual) === String(t.variableValue)
+          : !!actual;
+        break;
+      }
+      case 'turn-count':
+        met = turnNumber >= (t.turnCount ?? 0);
+        break;
+      default:
+        met = false;
+    }
+    return t.negate ? !met : met;
+  }
+
+  /**
    * Convert flat inspector format back to nested ConversationDirection
    */
   private static unflattenDirection(flat: Record<string, any>): ConversationDirection {
@@ -521,17 +552,40 @@ export class AIConversationBeat extends Beat {
         const variableSets: Array<{ name: string; value: any }> = [];
 
         if (activeDirections.length > 0) {
-          // Use AI to evaluate which directions are triggered
-          const evalPrompt = buildDirectionEvaluationPrompt(
-            playerInput,
-            activeDirections,
-            conversationHistory,
-            turnNumber,
-          );
+          // Deterministic triggers (variable checks, turn counts) are evaluated
+          // in code against real state — the LLM eval prompt has no access to
+          // variable values, so delegating them made variable-check exits fire
+          // only by luck. Fuzzy triggers (topic-mention, sentiment, custom) still
+          // go to the LLM. Indices stay in terms of activeDirections so the
+          // collectActions / once-tracking below are unchanged.
+          const triggeredIndices: number[] = [];
+          const fuzzyDirections: ConversationDirection[] = [];
+          const fuzzyToActiveIdx: number[] = [];
+          activeDirections.forEach((d, i) => {
+            if (d.trigger.type === 'variable' || d.trigger.type === 'turn-count') {
+              if (AIConversationBeat.evaluateDeterministicTrigger(d, context, turnNumber)) {
+                triggeredIndices.push(i);
+              }
+            } else {
+              fuzzyToActiveIdx.push(i);
+              fuzzyDirections.push(d);
+            }
+          });
 
           try {
-            const evalResponse = await this.callAI(aiService, evalPrompt, 'Evaluate which directions triggered');
-            const triggeredIndices = parseDirectionEvaluationResponse(evalResponse);
+            if (fuzzyDirections.length > 0) {
+              const evalPrompt = buildDirectionEvaluationPrompt(
+                playerInput,
+                fuzzyDirections,
+                conversationHistory,
+                turnNumber,
+              );
+              const evalResponse = await this.callAI(aiService, evalPrompt, 'Evaluate which directions triggered');
+              for (const fi of parseDirectionEvaluationResponse(evalResponse)) {
+                const activeIdx = fuzzyToActiveIdx[fi];
+                if (activeIdx !== undefined) triggeredIndices.push(activeIdx);
+              }
+            }
 
             if (triggeredIndices.length > 0) {
               const actions = collectActions(activeDirections, triggeredIndices);

@@ -228,6 +228,49 @@ describe('AIConversationBeat', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Deterministic trigger evaluation (variable-check / turn-count fire in code,
+  // NOT via the LLM — which never sees variable values). Regression: a
+  // variable-check "Exit to Beat" direction failed to fire even when the
+  // variable was set, because the LLM was guessing the condition.
+  // -------------------------------------------------------------------------
+  describe('evaluateDeterministicTrigger', () => {
+    const ctx = (vars: Record<string, any>) => ({ getVariable: (n: string) => vars[n] }) as any;
+    const evalTrig = (d: any, c: any, turn: number) =>
+      (AIConversationBeat as any).evaluateDeterministicTrigger(d, c, turn) as boolean;
+
+    it('fires a variable-check when the variable equals the expected value', () => {
+      const d = { id: 'x', trigger: { type: 'variable', variableName: 'misogyny', variableValue: 'true' } };
+      expect(evalTrig(d, ctx({ misogyny: 'true' }), 1)).toBe(true);
+      expect(evalTrig(d, ctx({ misogyny: 'false' }), 1)).toBe(false);
+      expect(evalTrig(d, ctx({}), 1)).toBe(false);
+    });
+
+    it('coerces types so boolean true matches expected "true"', () => {
+      const d = { id: 'x', trigger: { type: 'variable', variableName: 'm', variableValue: 'true' } };
+      expect(evalTrig(d, ctx({ m: true }), 1)).toBe(true);
+    });
+
+    it('honors negate', () => {
+      const d = { id: 'x', trigger: { type: 'variable', variableName: 'm', variableValue: 'true', negate: true } };
+      expect(evalTrig(d, ctx({ m: 'true' }), 1)).toBe(false);
+      expect(evalTrig(d, ctx({ m: 'false' }), 1)).toBe(true);
+    });
+
+    it('checks existence when no expected value is given', () => {
+      const d = { id: 'x', trigger: { type: 'variable', variableName: 'm' } };
+      expect(evalTrig(d, ctx({ m: 'anything' }), 1)).toBe(true);
+      expect(evalTrig(d, ctx({}), 1)).toBe(false);
+    });
+
+    it('fires turn-count once the threshold is reached', () => {
+      const d = { id: 'x', trigger: { type: 'turn-count', turnCount: 3 } };
+      expect(evalTrig(d, ctx({}), 2)).toBe(false);
+      expect(evalTrig(d, ctx({}), 3)).toBe(true);
+      expect(evalTrig(d, ctx({}), 4)).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // getConnections
   // -------------------------------------------------------------------------
   describe('getConnections()', () => {
