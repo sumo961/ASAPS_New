@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-06-12T22:26:30.079Z
+ * Generated: 2026-07-08T09:37:12.691Z
  */
 
 // ============================================
@@ -676,6 +676,8 @@ export interface QrScanParameters {
   facing?: string | undefined;
   /** Optional regex patterns — only codes that match resolve. Leave empty to accept any code. */
   matchPatterns?: String[] | undefined;
+  /** Authoring metadata only: beat IDs that printed asaps://beat/<id> QR codes for this beat jump to. NOT a runtime route (the scanned code carries the jump) — these are declared in the QR generator so the flowchart can draw the otherwise-invisible jumps as dashed edges. No generic inspector control; managed by the QR generator panel. */
+  qrJumpTargets?: String[] | undefined;
   /** Small helper text shown near the scan target */
   helperText?: string | undefined;
   /** Cancel/skip button label */
