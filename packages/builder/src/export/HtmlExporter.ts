@@ -449,12 +449,42 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
 
         if (story.metadata && story.metadata.title) strings[P + '.metadata.title'] = story.metadata.title;
 
-        // Characters
+        // Characters — mirror the builder-side StoryTranslator: display
+        // names, counter labels, and inventory item labels all surface in
+        // the HUD overlays and must translate. Internal matching keys
+        // (counter.name, inventory item name) are NOT extracted.
         if (Array.isArray(story.characters)) {
           for (var i = 0; i < story.characters.length; i++) {
             var ch = story.characters[i];
-            if (ch.name) strings[P + '.characters.' + i + '.name'] = ch.name;
+            var C = P + '.characters.' + i;
+            if (ch.name) strings[C + '.name'] = ch.name;
+            if (ch.displayName) strings[C + '.displayName'] = ch.displayName;
+            if (Array.isArray(ch.counters)) {
+              for (var j = 0; j < ch.counters.length; j++) {
+                if (ch.counters[j].displayName) {
+                  strings[C + '.counters.' + j + '.displayName'] = ch.counters[j].displayName;
+                }
+              }
+            }
+            if (Array.isArray(ch.inventory)) {
+              for (var j = 0; j < ch.inventory.length; j++) {
+                var invLabel = ch.inventory[j].displayName || ch.inventory[j].name;
+                if (invLabel) strings[C + '.inventory.' + j + '.displayName'] = invLabel;
+                if (ch.inventory[j].description) {
+                  strings[C + '.inventory.' + j + '.description'] = ch.inventory[j].description;
+                }
+              }
+            }
           }
+        }
+
+        // HUD overlay labels (timer / countdown meter)
+        var hud = project.project && project.project.globalSettings && project.project.globalSettings.hudOverlays;
+        if (hud) {
+          var G = 'project.globalSettings.hudOverlays';
+          if (hud.timerHud && hud.timerHud.label) strings[G + '.timerHud.label'] = hud.timerHud.label;
+          if (hud.timerHud && hud.timerHud.staticText) strings[G + '.timerHud.staticText'] = hud.timerHud.staticText;
+          if (hud.countdownMeter && hud.countdownMeter.label) strings[G + '.countdownMeter.label'] = hud.countdownMeter.label;
         }
 
         // Beats
