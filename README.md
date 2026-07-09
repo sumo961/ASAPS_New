@@ -22,22 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.69** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.69 is a targeted OpenAI fix
-release.** The headline is that **Ideator story generation now works with
-OpenAI models**: on the packaged app the same OpenAI config let the runtime
-*beat* functions work while *Ideator* generation failed, because two provider
-methods sent the legacy `max_tokens` field (rejected by GPT‑5 / o‑series /
-gpt‑4o) and forced JSON responses on free-text replies. Both are fixed; **Claude
-is unaffected** (separate provider). It also fixes the AI beat-schema fetch
-under `file://` in the packaged app (it was 404ing and silently using a stale
-fallback) and hardens the translate/export OpenAI paths. Separately, a
-corporate-network symptom — a security proxy (e.g. **Zscaler**) blocking
-`api.openai.com` — is a network-policy block, not an app bug; the workaround is
-the built-in **Local** (Ollama) provider. Users on v0.9.68 will auto-update.
-For everything that shipped in v0.9.64 (camera/AR beats, Project
-Browser overhaul, Electron start window), see Progress.md. For what
-shipped when, see:
+Current release: **v0.9.70** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.70 adds a new beat type: Input
+Image.** The player submits a photo — the camera on mobile, a file picker on
+desktop — a vision-capable AI model analyzes it against an author-defined
+prompt, and the answer text lands in a story variable (think "photograph
+something red and the story reacts to what you shot"). Photos are downscaled
+client-side before upload, and every failure mode (no vision provider, player
+skip, timeout, API error) resolves to an author-set fallback value so the
+story never stalls. Works in the Preview Window and in HTML exports, with
+Claude, OpenAI, and local/Ollama vision models (llava, qwen2.5-vl, gemma3, …);
+branching on the result composes with the AI Condition beat. Users on v0.9.69
+will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

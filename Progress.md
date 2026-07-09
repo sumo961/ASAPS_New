@@ -1,5 +1,62 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-09: Input Image beat — AI vision analysis of player photos (v0.9.70)
+
+### Overview
+
+A feature release adding a new beat type: **Input Image**. The player submits a photo — the OS camera on mobile (via the file-input `capture` attribute) or a file picker on desktop — the image is analyzed by the configured AI provider's vision model against an author-defined analysis prompt, and the AI's answer text is stored in a story variable. It is the visual sibling of Input Text: same "collect input → variable" contract, with AI perception in the middle. V1 is deliberately free-text-only; branching on the result composes with the existing AI Condition beat. The design keeps authors and players safe from every failure mode: no vision-capable provider, a skipped photo, a timeout, or an API error all resolve to an author-set fallback value and the story continues — never a softlock. Verified end-to-end in the Preview Window: photo upload → Claude vision analysis → result in the variable.
+
+### The beat (core)
+
+- **`InputImageBeat`** (`packages/core/src/beats/InputImageBeat.ts`) — parameters: player-facing `prompt`, AI-facing `analysisPrompt`, `saveTo` variable, `imageSource` (camera / upload / both), button labels, `fallbackValue`, and `timeout` (default 30s). Follows the qrScan pattern: slot-mode schema, `recordChoice`/timeline events, graceful fallthrough when the renderer lacks image support.
+- **Fallback at every step** — missing `renderInputImage`, player Skip, missing `aiService`, provider without `analyzeImage`, timeout, or API error each store `fallbackValue` and advance to the next beat.
+- **Schema-driven everywhere** — new `inputImage` entry in `beat-definitions/core-beats.json` (slots: speaker / prompt / imageInput) + regenerated `beat-types.ts`; the inspector, palette metadata, and slot layout all derive from the schema.
+- **Interface additions** — `IAIService.analyzeImage?()` (optional: non-vision providers simply omit it) and `IRenderer.renderInputImage?()`, which resolves with the image as a data URL or the `'cancelled'` sentinel.
+
+**Files modified:**
+- `packages/core/src/beats/InputImageBeat.ts` (new), `BeatRegistry.ts`, `beats/index.ts`
+- `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`
+- `packages/core/src/types/index.ts` — `analyzeImage` + `renderInputImage` interface methods
+
+### Renderer
+
+- **New `imageInput` slot role** and **`ImageInputElement`** — file picker (camera capture on mobile), preview thumbnail (tap to re-pick), own Analyze/Skip buttons (KeypadElement precedent). Crucially, it **downscales via canvas to max 1568px JPEG before base64-encoding**, so a 12 MB phone photo fits vision-API request limits and image-token budgets on every supported model.
+- **Editor-mode placeholder** in `SlotFlowView` (like the camera slot) so authoring never opens a file dialog; `renderInputImage` in `ReactRenderer` follows the renderQRScan promise pattern; `EditableReactRenderer` gets the editor override.
+
+**Files modified:**
+- `packages/renderer/src/components/ImageInputElement.tsx` (new), `SlotFlowView.tsx`
+- `packages/renderer/src/renderers/ReactRenderer.tsx`, `EditableReactRenderer.tsx`
+- `packages/renderer/src/utils/slotLayout.ts` — `imageInput` role
+
+### AI adapters (all three runtime surfaces)
+
+- **Preview Window** — `analyzeImage` in both provider branches: Claude (base64 image content block) and OpenAI-compatible (`image_url` data URL), each on both the direct and proxy paths; the language-aware wrapper passes it through with a respond-in-target-language directive.
+- **Exported stories** — `WebAIProvider.analyzeImage` (Anthropic + OpenAI-compatible), and the `player-web` bundle was rebuilt so HTML exports ship it.
+- **Provider support**: all current Claude models and recent OpenAI models are vision-capable; local/Ollama works with vision models (llava, qwen2.5-vl, gemma3, llama3.2-vision…) and falls back cleanly on text-only ones.
+
+**Files modified:**
+- `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebAIProvider.ts`, `packages/builder/public/player-web.js` (rebuilt)
+
+### Builder & i18n
+
+- Palette: **Input Image** in the Single Choice → Input group with the AI pill.
+- `StoryTranslator`: player-facing `prompt`/`buttonText`/`cancelButtonText`/`fallbackValue` are translated; **`analysisPrompt` intentionally stays in the source language** (it's an AI instruction, not player-facing text) — the language-aware preview adapter handles answer-language instead.
+
+**Files modified:**
+- `packages/builder/src/components/graph/BeatPalette.tsx`, `packages/builder/src/export/StoryTranslator.ts`
+
+### Tests & verification
+
+- **15 new tests** (`packages/core/tests/beats/InputImageBeat.test.ts`) covering constructor/migration paths, every fallback branch, data-URL parsing into base64+mediaType, variable interpolation in both prompts, and the happy path. Shared `beatHarness` gains `renderInputImage` + `analyzeImage` mocks.
+- Full core (2437) and renderer (483) suites pass; type-check clean across workspaces. Live verification via browser automation: beat created from the palette, previewed, image injected, Claude analyzed it, variable populated.
+- Known pre-existing failure (not this release): `projectDeserializer.test.ts › should preserve locations` — the v0.9.68 auto-repair removes the test's legacy-shaped location fixture; tracked as its own fix.
+
+**Files modified:**
+- `packages/core/tests/beats/InputImageBeat.test.ts` (new), `packages/core/tests/helpers/beatHarness.ts`
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.70.
+
+---
+
 ## 2026-07-09: OpenAI request correctness — Ideator + packaged-app fixes (v0.9.69)
 
 ### Overview
