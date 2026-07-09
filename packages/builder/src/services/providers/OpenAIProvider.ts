@@ -213,7 +213,12 @@ export class OpenAIProvider extends BaseAIProvider {
   private buildChatRequest(
     messages: Array<{ role: 'system' | 'user'; content: string }>,
     defaultMaxTokens: number,
-    fallbackTemperature: number
+    fallbackTemperature: number,
+    // Free-text callers (e.g. generateConversationTurn) pass false: forcing
+    // response_format:json_object on them both mangles the reply into JSON and
+    // 400s ("'messages' must contain the word 'json'…") when the prompt has no
+    // "json" in it.
+    jsonMode: boolean = true
   ): ChatCompletionCreateParamsNonStreaming & Record<string, any> {
     const reasoningEffort = this.config?.reasoningEffort;
     const maxTokens = this.config?.maxTokens ?? defaultMaxTokens;
@@ -230,7 +235,7 @@ export class OpenAIProvider extends BaseAIProvider {
       requestBody.max_tokens = maxTokens;
     }
 
-    if (this.useJsonFormat) {
+    if (this.useJsonFormat && jsonMode) {
       requestBody.response_format = { type: 'json_object' };
     }
 
@@ -1363,7 +1368,8 @@ Respond with JSON in this format:
       })),
     ];
 
-    const requestBody = this.buildChatRequest(messages as any, request.maxTokens ?? 1000, 0.8);
+    // Free-text conversational reply — no json_object (see buildChatRequest).
+    const requestBody = this.buildChatRequest(messages as any, request.maxTokens ?? 1000, 0.8, false);
 
     let response;
     if (this.useProxy) {
@@ -1473,17 +1479,31 @@ Respond with JSON in this format:
     // maxTokens (matches buildChatRequest behavior elsewhere in this
     // file), default to 8192 so reasoning_content has room to breathe.
     const toolLoopMaxTokens = this.config?.maxTokens ?? 8192;
+    const reasoningEffort = this.config?.reasoningEffort;
 
     for (let iter = 0; iter < maxIter; iter++) {
-      const requestBody = {
+      // Mirror buildChatRequest's model handling: GPT-5 / o-series / gpt-4o /
+      // Kimi-K2 reject the legacy `max_tokens` field and require
+      // `max_completion_tokens`. This tool loop hand-built the body and always
+      // sent `max_tokens`, so the Ideator (whose generation runs through this
+      // loop) 400'd on gpt-5.5 while the beat paths — which go through
+      // buildChatRequest — worked with the same config.
+      const requestBody: Record<string, any> = {
         model: this.model || 'gpt-4o',
         messages,
         tools: openaiTools,
-        max_tokens: toolLoopMaxTokens,
       };
+      if (requiresMaxCompletionTokens(this.model) || !!reasoningEffort) {
+        requestBody.max_completion_tokens = toolLoopMaxTokens;
+      } else {
+        requestBody.max_tokens = toolLoopMaxTokens;
+      }
+      if (reasoningEffort !== undefined) {
+        requestBody.reasoning_effort = reasoningEffort === 'max' ? 'xhigh' : reasoningEffort;
+      }
       console.log(
         `[OpenAIProvider] tool-loop iter ${iter}/${maxIter}, ` +
-          `${messages.length} messages, requesting up to ${requestBody.max_tokens} tokens`,
+          `${messages.length} messages, requesting up to ${requestBody.max_completion_tokens ?? requestBody.max_tokens} tokens`,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
