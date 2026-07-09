@@ -257,6 +257,21 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       if (params.clearButtonText) strings[`${prefix}.parameters.clearButtonText`] = params.clearButtonText;
       break;
 
+    case 'qrScan':
+      // prompt rides the common fields; these two are player-facing UI labels
+      if (params.helperText) strings[`${prefix}.parameters.helperText`] = params.helperText;
+      if (params.cancelButtonText) strings[`${prefix}.parameters.cancelButtonText`] = params.cancelButtonText;
+      break;
+
+    case 'arBeat':
+      if (params.cancelButtonText) strings[`${prefix}.parameters.cancelButtonText`] = params.cancelButtonText;
+      break;
+
+    case 'webView':
+      // passContext is variable names — NOT translatable
+      if (params.doneButtonText) strings[`${prefix}.parameters.doneButtonText`] = params.doneButtonText;
+      break;
+
     case 'hyperText':
       if (Array.isArray(params.hyperlinks)) {
         for (let j = 0; j < params.hyperlinks.length; j++) {

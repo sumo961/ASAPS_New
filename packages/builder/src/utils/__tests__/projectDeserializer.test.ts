@@ -158,6 +158,10 @@ describe('projectDeserializer', () => {
     });
 
     it('should preserve locations', () => {
+      // Locations need a canonical `kind` (or a salvageable legacy `type`) —
+      // kind-less elements are intentionally dropped by the corrupted-project
+      // repair (salvageBeatLocations, v0.9.68) so they regenerate cleanly.
+      // Repair semantics themselves are covered in projectRepair.test.ts.
       const beatsData = [
         {
           id: 'beat_1',
@@ -165,7 +169,7 @@ describe('projectDeserializer', () => {
           type: 'infoText',
           parameters: { text: 'Hello' },
           locations: [
-            { name: 'char_1', x: 100, y: 200, char: 'character_id' }
+            { kind: 'character', name: 'char_1', x: 100, y: 200 }
           ]
         }
       ];
@@ -177,6 +181,27 @@ describe('projectDeserializer', () => {
       expect(locations[0].name).toBe('char_1');
       expect(locations[0].x).toBe(100);
       expect(locations[0].y).toBe(200);
+    });
+
+    it('upgrades legacy type-format locations instead of dropping them', () => {
+      const beatsData = [
+        {
+          id: 'beat_1',
+          name: 'Dialog',
+          type: 'infoText',
+          parameters: { text: 'Hello' },
+          locations: [
+            { type: 'text', name: 'prompt', x: 50, y: 60, width: 300, height: 80 }
+          ]
+        }
+      ];
+
+      const beats = deserializeBeats(beatsData);
+
+      const locations = Array.from(beats[0].locations.values());
+      expect(locations).toHaveLength(1);
+      expect(locations[0].kind).toBe('text');
+      expect(locations[0].x).toBe(50);
     });
 
     it('should handle beats with node references', () => {
