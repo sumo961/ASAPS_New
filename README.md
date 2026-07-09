@@ -22,20 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.68** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.68 is a robustness release.** The
-headline is **automatic detection and repair of corrupted projects on load**:
-a story that imported with incomplete display settings and legacy-format
-layout elements used to crash the preview and the Settings panel (and then
-render blank) — the app now detects the damage, resets missing settings to
-full defaults, salvages each beat's layout, deletes the parts it can't
-recover, and tells you to save. It also fixes the **AI Dialog Tree** so it no
-longer collapses to a single level, and several **AI Conversation** authoring
-bugs (comma-separated keywords, deterministic variable/turn-count exit
-conditions, and the interactor's message showing the instant it's sent). The
-experimental **knowledge-graph cultural-adaptation** feature landed behind a
-settings flag, and CI now runs the full test suite. Users on v0.9.67 will
-auto-update.
+Current release: **v0.9.69** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.69 is a targeted OpenAI fix
+release.** The headline is that **Ideator story generation now works with
+OpenAI models**: on the packaged app the same OpenAI config let the runtime
+*beat* functions work while *Ideator* generation failed, because two provider
+methods sent the legacy `max_tokens` field (rejected by GPT‑5 / o‑series /
+gpt‑4o) and forced JSON responses on free-text replies. Both are fixed; **Claude
+is unaffected** (separate provider). It also fixes the AI beat-schema fetch
+under `file://` in the packaged app (it was 404ing and silently using a stale
+fallback) and hardens the translate/export OpenAI paths. Separately, a
+corporate-network symptom — a security proxy (e.g. **Zscaler**) blocking
+`api.openai.com` — is a network-policy block, not an app bug; the workaround is
+the built-in **Local** (Ollama) provider. Users on v0.9.68 will auto-update.
 For everything that shipped in v0.9.64 (camera/AR beats, Project
 Browser overhaul, Electron start window), see Progress.md. For what
 shipped when, see:

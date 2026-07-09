@@ -1,5 +1,41 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-09: OpenAI request correctness — Ideator + packaged-app fixes (v0.9.69)
+
+### Overview
+
+A targeted fix release for the OpenAI provider and the packaged (Electron) app. The headline: **Ideator story generation now works with OpenAI models.** On the packaged macOS app, the same OpenAI config made the runtime *beat* functions work while *Ideator* generation failed — because two `OpenAIProvider` methods bypassed the shared, already-correct request builder and sent the legacy `max_tokens` field (rejected by `gpt-5.5` and the whole GPT‑5 / o‑series / gpt‑4o family) plus a `response_format: json_object` on free-text replies (which both mangles the reply and 400s when the prompt has no "json"). The same round also fixes the AI-schema fetch under `file://` (it was 404ing in the packaged app and silently downgrading to a possibly-stale fallback) and hardens the translate/export OpenAI paths. A separate corporate-network symptom (Zscaler blocking `api.openai.com`) was diagnosed as a network-policy block — not an app bug — with a Local-model workaround.
+
+### Ideator × OpenAI: generation now works
+
+- **Tool-call loop sends the correct token parameter.** `generateChatWithTools` — the loop the Ideator drives generation through — hand-built its request body and always sent `max_tokens`, so `gpt-5.5` returned `400: 'max_tokens' is not supported … use 'max_completion_tokens'`. It now mirrors `buildChatRequest`: `max_completion_tokens` for models that require it (GPT‑5 / o‑series / gpt‑4o / Kimi‑K2), with `reasoning_effort` passthrough. This is why the beat functions (which already went through `buildChatRequest`) worked while the Ideator didn't, on one identical config.
+- **Free-text conversation turns opt out of JSON mode.** `generateConversationTurn` returns prose, but `buildChatRequest` unconditionally forced `response_format: json_object` whenever `useJsonFormat` was on — which both distorts the reply and triggers `400: 'messages' must contain the word 'json'` when the prompt lacks it. Added a `jsonMode` opt-out; conversation turns pass `false`. **Claude is unaffected** — it runs through the separate `ClaudeProvider`, which correctly uses `max_tokens` (the Anthropic field) and its own methods.
+
+### Packaged-app (file://) schema loading
+
+- **`AIValidator` resolves the beat schema relative to the document.** It fetched the absolute `/beat-definitions/core-beats.json`, which under `file://` resolves to the filesystem root (`net::ERR_FILE_NOT_FOUND`) and silently fell back to the possibly-stale API server. Now uses `new URL('beat-definitions/core-beats.json', document.baseURI)` so it resolves correctly on the dev server AND in the packaged app.
+
+### Translate / export OpenAI paths hardened
+
+- **`StoryTranslator`** routed its OpenAI request through the shared `buildChatRequestBody` (correct token param + reasoning-model temperature handling) and now guarantees the literal word "json" is present when `json_object` is requested.
+- **`HtmlExporter`** applies the same "json"-in-messages guard and a model-aware token field to the AI code it emits into exported HTML.
+
+### Known limitation (diagnosed, not a code bug)
+
+- **Zscaler / corporate security proxies** can block `api.openai.com` and return a 403 HTML page, which surfaces as a confusing parse error. This is a network-policy block, not fixable in the request. Workaround: use the built-in **Local** provider (Ollama on `localhost`) or a corporate-approved endpoint. A clear-error detection for block-page responses is a possible follow-up.
+
+### Verification
+
+- Builder type-check clean. Fixes are isolated to the OpenAI/validator/translate paths; the Claude provider and the runtime beat paths were confirmed untouched.
+
+**Files modified:**
+- `packages/builder/src/services/providers/OpenAIProvider.ts` — `max_completion_tokens` in the tool loop + `jsonMode` opt-out for conversation turns.
+- `packages/builder/src/services/AIValidator.ts` — document-relative schema fetch (file:// fix).
+- `packages/builder/src/export/StoryTranslator.ts`, `HtmlExporter.ts` — shared request builder + json_object "json"-in-messages guard.
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.69.
+
+---
+
 ## 2026-07-08: Corrupted-project auto-repair + AI beat fixes (v0.9.68)
 
 ### Overview
