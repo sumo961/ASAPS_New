@@ -22,9 +22,18 @@ import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, Dialog
  *      caching v2.2 while the static file was correctly v2.3.)
  */
 async function loadBeatSchema(): Promise<any> {
-  // 1. Static file — canonical
+  // 1. Static file — canonical.
+  // Resolve RELATIVE to the document base, not as an absolute "/…" path: under
+  // file:// (the packaged / dev Electron app) an absolute path resolves to the
+  // filesystem root and 404s (net::ERR_FILE_NOT_FOUND), silently downgrading to
+  // the possibly-stale API-server fallback. `new URL(rel, document.baseURI)`
+  // yields http://host/beat-definitions/… on the dev server and
+  // file:///…/builder/beat-definitions/… in Electron — both resolve correctly.
   try {
-    const staticResponse = await fetch('/beat-definitions/core-beats.json');
+    const schemaUrl = typeof document !== 'undefined' && document.baseURI
+      ? new URL('beat-definitions/core-beats.json', document.baseURI).href
+      : '/beat-definitions/core-beats.json';
+    const staticResponse = await fetch(schemaUrl);
     if (staticResponse.ok) {
       console.log('[AIValidator] Schema loaded from static file');
       return await staticResponse.json();

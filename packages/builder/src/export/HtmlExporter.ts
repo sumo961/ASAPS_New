@@ -576,18 +576,28 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           else url = 'https://api.openai.com/v1/chat/completions';
           var headers = { 'Content-Type': 'application/json' };
           if (config.apiKey) headers['Authorization'] = 'Bearer ' + config.apiKey;
+          var msgs = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage },
+          ];
+          // OpenAI 400s on json_object unless the literal word "json" appears in
+          // the messages — guarantee it.
+          if (!/json/i.test(systemPrompt + userMessage)) {
+            msgs[0].content += '\\n\\nRespond with a single valid JSON object.';
+          }
+          var oaiBody = { model: config.model || 'gpt-4o-mini', messages: msgs, temperature: 0.3, response_format: { type: 'json_object' } };
+          // GPT-5 / o-series / gpt-4o reject the legacy max_tokens field; only
+          // the newer models need an explicit budget here, and they take
+          // max_completion_tokens.
+          if (/^(gpt-5|o1|o3|o4)/i.test(oaiBody.model) || /gpt-4o/i.test(oaiBody.model)) {
+            oaiBody.max_completion_tokens = 8192;
+          } else {
+            oaiBody.max_tokens = 8192;
+          }
           var resp = await fetch(url, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({
-              model: config.model || 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userMessage },
-              ],
-              temperature: 0.3,
-              response_format: { type: 'json_object' },
-            }),
+            body: JSON.stringify(oaiBody),
           });
           if (!resp.ok) throw new Error('AI API error ' + resp.status);
           var data = await resp.json();

@@ -22,6 +22,7 @@ import {
   detectFontsForTranslation,
   syncTranslation,
   applySyncResult,
+  buildChatRequestBody,
 } from '@asaps/core';
 
 export interface TranslationAIConfig {
@@ -656,20 +657,24 @@ async function callOpenAI(
     headers['Authorization'] = `Bearer ${apiKey}`;
   }
 
-  const body: any = {
-    model: model || 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
-    ],
-    temperature: 0.3,
-    // Same headroom as the Anthropic path — prevents Brahmic / CJK / RTL
-    // translations from being silently truncated mid-JSON.
-    max_tokens: 32768,
-  };
-  if (jsonMode) {
-    body.response_format = { type: 'json_object' };
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    { role: 'user' as const, content: userMessage },
+  ];
+  // OpenAI's `json_object` response_format 400s ("'messages' must contain the
+  // word 'json'…") unless the literal word "json" appears somewhere in the
+  // messages — guarantee it when jsonMode is on.
+  if (jsonMode && !/json/i.test(systemPrompt + userMessage)) {
+    messages[0].content += '\n\nRespond with a single valid JSON object.';
   }
+  // Shared request builder: emits max_completion_tokens vs the legacy max_tokens
+  // per model (gpt-4o-mini and the GPT-5 family reject max_tokens) and drops
+  // temperature for reasoning models. Same 32768 headroom as the Anthropic path
+  // — prevents Brahmic / CJK / RTL translations being truncated mid-JSON.
+  const body: any = buildChatRequestBody(model || 'gpt-4o-mini', messages, 32768, {
+    temperature: 0.3,
+    responseFormat: jsonMode ? { type: 'json_object' } : undefined,
+  });
 
   const response = await fetch(url, {
     method: 'POST',
