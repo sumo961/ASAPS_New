@@ -261,6 +261,35 @@ describe('StoryTranslator', () => {
         expect(strings['project.story.beats.0.parameters.choices.2.displayText']).toBe('Library');
       });
 
+      it('should extract multiChoice displayText (text stays the matching key)', () => {
+        const data = createProjectData({
+          story: {
+            beats: [
+              {
+                type: 'multiChoice',
+                parameters: {
+                  question: 'Friend or foe?',
+                  choices: [
+                    { id: 'a', text: 'Friend', displayText: 'Ally', target: 'beat_friend' },
+                    { id: 'b', text: 'Foe', target: 'beat_foe' },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+
+        const strings = extractTranslatableStrings(data);
+
+        // Uses existing displayText, falls back to text — written into
+        // displayText so `text` keeps matching baked button locations.
+        expect(strings['project.story.beats.0.parameters.choices.0.displayText']).toBe('Ally');
+        expect(strings['project.story.beats.0.parameters.choices.1.displayText']).toBe('Foe');
+        expect(strings['project.story.beats.0.parameters.choices.0.text']).toBeUndefined();
+        // The question rides the common fields
+        expect(strings['project.story.beats.0.parameters.question']).toBe('Friend or foe?');
+      });
+
       it('should extract pickProp displayNames and descriptions', () => {
         const data = createProjectData({
           story: {

@@ -183,6 +183,26 @@ describe('MultiChoiceBeat', () => {
       expect(next).toBe('beat_next');
     });
 
+    it('renders displayText when present (translated label), keeping text as fallback', async () => {
+      const renderer = createMockRenderer('a');
+      const beat = new MultiChoiceBeat({
+        id: 'mc1',
+        name: 'Greeting',
+        type: 'multiChoice',
+        choices: [
+          // displayText is written by the translation pipelines; `text`
+          // stays the authored matching key for baked button locations.
+          { id: 'a', text: 'Friend', displayText: 'Freund', target: 'beat_friend' },
+          { id: 'b', text: 'Foe', target: 'beat_foe' },
+        ],
+      });
+      const next = await (beat as any).performAction(context, renderer);
+      const arg = (renderer.renderChoices as any).mock.calls[0][0];
+      expect(arg.map((c: any) => c.text)).toEqual(['Freund', 'Foe']);
+      // Routing stays by id — the translated label doesn't change the target.
+      expect(next).toBe('beat_friend');
+    });
+
     it('filters choices by condition before rendering', async () => {
       const renderer = createMockRenderer('b');
       // Choice "a" gated on a variable that is not set; only "b" should render.

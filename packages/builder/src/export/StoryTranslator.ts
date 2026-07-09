@@ -221,6 +221,19 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       }
       break;
 
+    case 'multiChoice':
+      if (Array.isArray(params.choices)) {
+        for (let j = 0; j < params.choices.length; j++) {
+          const choice = params.choices[j];
+          // Same displayText pattern as movementChoice: `text` stays the
+          // authored matching key for baked button locations; the beat
+          // renders displayText || text (routing is by choice id).
+          const choiceLabel = choice.displayText || choice.text;
+          if (choiceLabel) strings[`${prefix}.parameters.choices.${j}.displayText`] = choiceLabel;
+        }
+      }
+      break;
+
     case 'pickProp':
       if (Array.isArray(params.props)) {
         for (let j = 0; j < params.props.length; j++) {

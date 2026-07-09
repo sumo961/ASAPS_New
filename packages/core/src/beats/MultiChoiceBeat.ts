@@ -192,9 +192,12 @@ export class MultiChoiceBeat extends Beat {
       const choiceId = await renderer.renderChoices(
         availableChoices.map(c => ({
           id: c.id,
-          text: this.processText(c.text, context),
-          // displayText is the translated label; renderer picks it up via
-          // the same channel renderChoices already uses for other beats.
+          // displayText is the translated label (written by the translation
+          // pipelines, movementChoice precedent); `text` stays the authored
+          // matching key for baked button locations. Routing is by id, and
+          // PositionedBeatView's button-position fallback covers baked
+          // locations whose names no longer match the displayed label.
+          text: this.processText(c.displayText || c.text, context),
         })),
         locations,
       );
