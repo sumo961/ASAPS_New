@@ -16,6 +16,7 @@ import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 import { UpdateAffectBeat } from './UpdateAffectBeat';
 import { InputTextBeat } from './InputTextBeat';
+import { InputImageBeat } from './InputImageBeat';
 import { HyperTextBeat } from './HyperTextBeat';
 import { KeypadBeat } from './KeypadBeat';
 import { QRScanBeat } from './QRScanBeat';
@@ -78,6 +79,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('endScreen', EndScreenBeat);
     this.registerBeatType('durScreen', DurScreenBeat);
     this.registerBeatType('inputText', InputTextBeat);
+    this.registerBeatType('inputImage', InputImageBeat);
     this.registerBeatType('hyperText', HyperTextBeat);
     this.registerBeatType('keypad', KeypadBeat);
     this.registerBeatType('qrScan', QRScanBeat);

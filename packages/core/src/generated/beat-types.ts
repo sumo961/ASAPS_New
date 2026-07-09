@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-08T09:37:12.691Z
+ * Generated: 2026-07-09T15:27:28.788Z
  */
 
 // ============================================
@@ -621,6 +621,36 @@ export interface InputTextParameters {
 }
 
 /**
+ * Input Image - Lets the player submit a photo (camera or upload). The image is analyzed by AI and the resulting text is stored in a variable.
+ * Category: visible
+ * Connection Type: single
+ */
+export interface InputImageParameters {
+  /** Question or instruction shown to the player */
+  prompt: string;
+  /** Instruction for the AI describing what to extract from the image. Not shown to the player; stays in the source language. */
+  analysisPrompt: string;
+  /** Variable name that receives the AI's answer text */
+  saveTo: string;
+  /** How the player provides the image */
+  imageSource?: string | undefined;
+  /** Submit button label */
+  buttonText?: string | undefined;
+  /** Skip button label (lets the player continue without an image) */
+  cancelButtonText?: string | undefined;
+  /** Stored in the variable when AI is unavailable, fails, or the player skips */
+  fallbackValue?: string | undefined;
+  /** Maximum AI response time in ms before falling back */
+  timeout?: number | undefined;
+  /** Who speaks this beat's text (for TTS voice and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
+  /** Target beat after the image is analyzed (or the player skips) */
+  connection: Connection;
+}
+
+/**
  * Keypad - Numeric keypad for phone, safe lock, PIN entry
  * Category: visible
  * Connection Type: single
@@ -1045,6 +1075,7 @@ export type BeatType =
   | 'gpsLocation'
   | 'indoorLocation'
   | 'inputText'
+  | 'inputImage'
   | 'keypad'
   | 'qrScan'
   | 'arBeat'
@@ -1081,6 +1112,7 @@ export interface BeatParameterMap {
   'gpsLocation': GpsLocationParameters;
   'indoorLocation': IndoorLocationParameters;
   'inputText': InputTextParameters;
+  'inputImage': InputImageParameters;
   'keypad': KeypadParameters;
   'qrScan': QrScanParameters;
   'arBeat': ArBeatParameters;

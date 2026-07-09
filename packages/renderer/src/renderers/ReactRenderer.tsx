@@ -3458,6 +3458,50 @@ export class ReactRenderer extends BaseRenderer {
     });
   }
 
+  /** inputImage beat — photo picker / camera capture. Routes through the
+   *  'imageInput' slot role; ImageInputElement owns picking, preview,
+   *  downscaling, and its own submit/skip buttons. Resolves with the
+   *  downscaled image's data URL, or 'cancelled' when the player skips. */
+  async renderInputImage(
+    prompt: string,
+    options: {
+      imageSource?: 'upload' | 'camera' | 'both';
+      buttonText?: string;
+      cancelButtonText?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    const backgroundAssetId = this.getState('backgroundAssetId');
+    this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
+    this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
+
+    const content = {
+      prompt,
+      imageSource: options.imageSource ?? 'both',
+      buttonText: options.buttonText ?? 'Analyze',
+      cancelButtonText: options.cancelButtonText ?? 'Skip',
+      speaker: this.resolveSpeakerForSlot(),
+    };
+
+    const authorPositioned = layoutAuthorPositioned(locations);
+    const effectiveLocations = authorPositioned
+      ? locations!
+      : mergeWithFreePositioned(generateDefaultLocations('inputImage', content), locations);
+
+    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+
+    return new Promise<string>(resolve => {
+      const originalHandleAction = this.handleAction;
+      this._originalHandleAction = originalHandleAction;
+      this.handleAction = (value: string) => {
+        this.handleAction = originalHandleAction;
+        this._originalHandleAction = null;
+        resolve(value);
+      };
+      this.renderPositionedBeat('inputImage', content, effectiveLocations, true, undefined, authorPositioned);
+    });
+  }
+
   /** arBeat — augmented-reality scene. Phase 1a routes through the
    *  'ar' slot; ARSceneElement owns camera + (Phase 1b) marker
    *  tracking. Asset ids (markerAssetId, anchor.assetId) are resolved

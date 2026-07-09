@@ -312,6 +312,39 @@ function createAIServiceAdapter(): IAIService | null {
         }
         return categories[0];
       },
+
+      async analyzeImage(
+        image: { base64: string; mediaType: string },
+        prompt: string,
+        options?: { maxTokens?: number }
+      ): Promise<string> {
+        const requestBody = {
+          model,
+          max_tokens: options?.maxTokens || 1024,
+          messages: [{
+            role: 'user' as const,
+            content: [
+              {
+                type: 'image' as const,
+                source: { type: 'base64' as const, media_type: image.mediaType, data: image.base64 },
+              },
+              { type: 'text' as const, text: prompt },
+            ],
+          }],
+        };
+
+        let response;
+        if (useProxy) {
+          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+        } else {
+          const apiResponse = await client!.messages.create(requestBody as any);
+          response = { content: apiResponse.content };
+        }
+
+        const content = response.content[0];
+        if (content.type === 'text') return stripThinkingBlocks(content.text).trim();
+        throw new Error('Unexpected response type from Claude');
+      },
     };
   } else {
     // OpenAI provider (also used for local/Ollama)
@@ -433,6 +466,37 @@ function createAIServiceAdapter(): IAIService | null {
         const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
         return match || categories[0];
       },
+
+      async analyzeImage(
+        image: { base64: string; mediaType: string },
+        prompt: string,
+        options?: { maxTokens?: number }
+      ): Promise<string> {
+        const budget = effectiveMaxTokens(model, options?.maxTokens || 1024);
+        // Multimodal user message — buildChatRequestBody passes messages
+        // through untouched, so the content-parts array survives intact.
+        const requestBody = buildChatRequestBody(
+          model,
+          [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.base64}` } },
+              { type: 'text', text: prompt },
+            ],
+          } as any],
+          budget
+        );
+
+        let content: string;
+        if (useProxy) {
+          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
+          content = response.choices?.[0]?.message?.content || '';
+        } else {
+          const response = await client!.chat.completions.create(requestBody as any);
+          content = response.choices[0]?.message?.content || '';
+        }
+        return stripThinkingBlocks(content).trim();
+      },
     };
   }
 }
@@ -496,6 +560,12 @@ function createLanguageAwareAdapter(
     async classifyContent(prompt, categories) {
       const directive = `\n\nThe player's context may be in ${targetLang}. The category names are in ${sourceLang}. Evaluate regardless of language. Respond with ONLY the category name.`;
       return adapter.classifyContent(prompt + directive, categories);
+    },
+
+    async analyzeImage(image, prompt, options) {
+      if (!adapter.analyzeImage) throw new Error('analyzeImage not available');
+      const directive = `\n\nYou MUST write your answer entirely in ${targetLang}.`;
+      return adapter.analyzeImage(image, prompt + directive, options);
     },
   };
 }

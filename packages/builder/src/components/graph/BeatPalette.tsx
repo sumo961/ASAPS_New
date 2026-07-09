@@ -36,6 +36,7 @@ const BEAT_COLORS: Record<string, string> = {
   webView: '#0891b2',
   endScreen: '#6366f1',
   inputText: '#06b6d4',
+  inputImage: '#06b6d4',
   keypad: '#06b6d4',
   qrScan: '#06b6d4',
   arBeat: '#0ea5e9',
@@ -121,7 +122,7 @@ const TAXONOMY: Array<{
       },
       {
         label: 'Input',
-        beats: ['inputText', 'keypad', 'qrScan', 'arBeat'],
+        beats: ['inputText', 'inputImage', 'keypad', 'qrScan', 'arBeat'],
       },
     ],
   },
@@ -186,7 +187,7 @@ const TAXONOMY: Array<{
 ];
 
 function isAi(beatType: string): boolean {
-  return beatType.startsWith('ai') || beatType === 'onlineContent';
+  return beatType.startsWith('ai') || beatType === 'onlineContent' || beatType === 'inputImage';
 }
 
 /**

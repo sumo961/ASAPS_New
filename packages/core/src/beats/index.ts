@@ -17,6 +17,7 @@ export { DurScreenBeat } from './DurScreenBeat';
 export { VideoBeat } from './VideoBeat';
 export { ConversationChoiceBeat } from './ConversationChoiceBeat';
 export { InputTextBeat } from './InputTextBeat';
+export { InputImageBeat } from './InputImageBeat';
 export { HyperTextBeat } from './HyperTextBeat';
 export { PanoramaBeat } from './PanoramaBeat';
 // UpdateAffectBeat: the class itself + the v0.9.45 legacy-to-Effect[]

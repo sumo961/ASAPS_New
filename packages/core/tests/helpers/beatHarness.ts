@@ -59,6 +59,7 @@ const RENDER_METHODS = [
   'renderPanorama',
   'renderKeypad',
   'renderQRScan',
+  'renderInputImage',
   'renderWebView',
   'renderAR',
   'renderMap',
@@ -176,6 +177,7 @@ export interface MakeAIServiceResult {
   generateDialog: Mock;
   classifyContent: Mock;
   generateConversationTurn: Mock;
+  analyzeImage: Mock;
 }
 
 export function makeAIService(
@@ -184,6 +186,7 @@ export function makeAIService(
     generateDialog: unknown;
     classifyContent: unknown;
     generateConversationTurn: unknown;
+    analyzeImage: unknown;
   }> = {}
 ): MakeAIServiceResult {
   const generateContent = vi.fn().mockResolvedValue(
@@ -201,14 +204,19 @@ export function makeAIService(
       : { text: '' }
   );
 
+  const analyzeImage = vi.fn().mockResolvedValue(
+    responses.analyzeImage !== undefined ? responses.analyzeImage : ''
+  );
+
   const service: IAIService = {
     generateContent,
     generateDialog,
     classifyContent,
     generateConversationTurn,
+    analyzeImage,
   };
 
-  return { service, generateContent, generateDialog, classifyContent, generateConversationTurn };
+  return { service, generateContent, generateDialog, classifyContent, generateConversationTurn, analyzeImage };
 }
 
 /**

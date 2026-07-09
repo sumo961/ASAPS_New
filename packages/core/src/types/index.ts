@@ -568,6 +568,15 @@ export interface IAIService {
     systemPrompt: string;
     messages: Array<{ role: string; content: string }>;
   }): Promise<{ text: string }>;
+
+  /** Analyze an image with a vision-capable model (for InputImageBeat).
+   *  Optional — providers/models without vision support simply omit it
+   *  and the beat falls back to its fallbackValue. */
+  analyzeImage?(
+    image: { base64: string; mediaType: string },
+    prompt: string,
+    options?: { maxTokens?: number }
+  ): Promise<string>;
 }
 
 /**
@@ -716,6 +725,16 @@ export interface IRenderer {
     cancelButtonText?: string;
     /** Persistent help text shown above the scan target. */
     helperText?: string;
+  }, locations?: Location[]): Promise<string>;
+
+  // Input-image beat — file picker / camera capture. Resolves with the
+  // selected image as a data URL (data:image/jpeg;base64,...) or the
+  // literal 'cancelled' when the player skips. The renderer downscales
+  // the image before resolving so it fits vision-API size limits.
+  renderInputImage?(prompt: string, options: {
+    imageSource?: 'upload' | 'camera' | 'both';
+    buttonText?: string;
+    cancelButtonText?: string;
   }, locations?: Location[]): Promise<string>;
 
   // webView beat — embeds an external URL in an iframe (web) or

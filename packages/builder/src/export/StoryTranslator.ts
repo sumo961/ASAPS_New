@@ -246,6 +246,13 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       if (params.placeholder) strings[`${prefix}.parameters.placeholder`] = params.placeholder;
       break;
 
+    case 'inputImage':
+      // prompt/buttonText ride the common fields; analysisPrompt is an AI
+      // instruction and intentionally stays in the source language.
+      if (params.cancelButtonText) strings[`${prefix}.parameters.cancelButtonText`] = params.cancelButtonText;
+      if (params.fallbackValue) strings[`${prefix}.parameters.fallbackValue`] = params.fallbackValue;
+      break;
+
     case 'keypad':
       if (params.clearButtonText) strings[`${prefix}.parameters.clearButtonText`] = params.clearButtonText;
       break;

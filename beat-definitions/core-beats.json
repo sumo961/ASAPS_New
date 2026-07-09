@@ -1929,6 +1929,114 @@
       "renderer": "inputText"
     },
 
+    "inputImage": {
+      "category": "visible",
+      "displayName": "Input Image",
+      "icon": "📸",
+      "description": "Lets the player submit a photo (camera or upload). The image is analyzed by AI and the resulting text is stored in a variable.",
+      "connectionType": "single",
+      "parameters": {
+        "prompt": {
+          "type": "string",
+          "required": true,
+          "default": "Take or choose a photo:",
+          "description": "Question or instruction shown to the player",
+          "ui": { "control": "textarea", "rows": 2, "label": "Prompt" }
+        },
+        "analysisPrompt": {
+          "type": "string",
+          "required": true,
+          "default": "Describe what is shown in this image in one or two sentences.",
+          "description": "Instruction for the AI describing what to extract from the image. Not shown to the player; stays in the source language.",
+          "ui": { "control": "textarea", "rows": 3, "label": "AI Analysis Prompt" }
+        },
+        "saveTo": {
+          "type": "string",
+          "required": true,
+          "default": "imageAnalysis",
+          "description": "Variable name that receives the AI's answer text"
+        },
+        "imageSource": {
+          "type": "string",
+          "required": false,
+          "default": "both",
+          "description": "How the player provides the image",
+          "ui": {
+            "control": "select",
+            "options": [
+              { "value": "both", "label": "Camera or upload" },
+              { "value": "camera", "label": "Camera (mobile)" },
+              { "value": "upload", "label": "Upload only" }
+            ],
+            "label": "Image Source"
+          }
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Analyze",
+          "description": "Submit button label"
+        },
+        "cancelButtonText": {
+          "type": "string",
+          "required": false,
+          "default": "Skip",
+          "description": "Skip button label (lets the player continue without an image)"
+        },
+        "fallbackValue": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Stored in the variable when AI is unavailable, fails, or the player skips",
+          "ui": { "control": "text", "label": "Fallback Value" }
+        },
+        "timeout": {
+          "type": "number",
+          "required": false,
+          "default": 30000,
+          "description": "Maximum AI response time in ms before falling back"
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks this beat's text (for TTS voice and optional display)",
+          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat after the image is analyzed (or the player skips)"
+        }
+      },
+      "locations": ["prompt", "imageInput"],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
+      "layoutMode": "slot",
+      "slots": [
+        { "name": "speaker", "role": "speaker", "source": "speaker" },
+        { "name": "prompt", "role": "body", "source": "prompt" },
+        { "name": "imageInput", "role": "imageInput" }
+      ],
+      "transitions": true,
+      "sound": true,
+      "renderer": "inputImage",
+      "aiNotes": {
+        "purpose": "Collect a photo from the player, analyze it with vision AI, and store the answer text in a variable",
+        "examples": [
+          "Scavenger hunt — 'Photograph something red' and the AI verifies/describes it",
+          "Personalization — the player photographs their surroundings and the story weaves the description in",
+          "Puzzle — the AI reads text or symbols from the photographed object"
+        ]
+      }
+    },
+
     "keypad": {
       "category": "visible",
       "displayName": "Keypad",

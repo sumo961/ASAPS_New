@@ -151,4 +151,22 @@ export class EditableReactRenderer extends ReactRenderer {
     }
     return super.renderHyperText(data);
   }
+
+  async renderInputImage(
+    prompt: string,
+    options: {
+      imageSource?: 'upload' | 'camera' | 'both';
+      buttonText?: string;
+      cancelButtonText?: string;
+    },
+    locations?: Location[]
+  ): Promise<string> {
+    if (this.editMode) {
+      // Editor mode: render but return the skip sentinel immediately
+      this.resolveAction = null;
+      super.renderInputImage(prompt, options, locations);
+      return 'cancelled';
+    }
+    return super.renderInputImage(prompt, options, locations);
+  }
 }

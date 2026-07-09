@@ -345,6 +345,89 @@ Respond with ONLY the category name, nothing else.`;
     return match || categories[0];
   }
 
+  async analyzeImage(
+    image: { base64: string; mediaType: string },
+    prompt: string,
+    options?: { maxTokens?: number }
+  ): Promise<string> {
+    const config = await this.ensureConfig();
+    if (!config) {
+      throw new Error('AI not configured - skipping AI content');
+    }
+
+    const maxTokens = effectiveMaxTokens(config.model, options?.maxTokens ?? 1024);
+
+    if (config.provider === 'anthropic') {
+      const url = config.baseUrl
+        ? `${config.baseUrl.replace(/\/$/, '')}/messages`
+        : 'https://api.anthropic.com/v1/messages';
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: config.model || 'claude-sonnet-4-6',
+          max_tokens: maxTokens,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.base64 } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+      }
+
+      const data = await response.json();
+      return (data.content?.[0]?.text || '').trim();
+    }
+
+    // OpenAI-compatible (openai / custom / local) — vision via image_url
+    // content parts. Local models without vision support return an API
+    // error here, which the beat turns into its fallbackValue.
+    const url = config.baseUrl
+      ? `${config.baseUrl.replace(/\/$/, '')}/chat/completions`
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey || ''}`,
+      },
+      body: JSON.stringify({
+        model: config.model || 'gpt-5.2',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.base64}` } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+        max_completion_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json();
+    const text = data.choices?.[0]?.message?.content || '';
+    return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  }
+
   private async callOpenAI(
     prompt: string,
     apiKey: string,

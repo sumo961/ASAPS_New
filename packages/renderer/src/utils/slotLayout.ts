@@ -46,8 +46,12 @@ export interface SlotSpec {
    *               onTap resolves through onAction with an asaps:// URI
    *               (or raw beat id). Sibling layer descriptors hold the
    *               marker / anchor data; the slot just allocates the
-   *               surface area. */
-  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera' | 'webview' | 'ar';
+   *               surface area.
+   *   'imageInput' = photo picker / camera capture (inputImage beat).
+   *               ImageInputElement owns picking, preview, downscale,
+   *               and its own submit/skip buttons; the selected image's
+   *               data URL (or 'cancelled') is passed to onAction. */
+  role: 'body' | 'action' | 'title' | 'speaker' | 'input' | 'keypad' | 'camera' | 'webview' | 'ar' | 'imageInput';
   /** For body/title slots: the content key to render. */
   source?: string;
   /** For body slots: grow with content. */

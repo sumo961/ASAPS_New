@@ -32,6 +32,7 @@ import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from '.
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
+import { ImageInputElement } from './ImageInputElement';
 import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
@@ -319,6 +320,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // Reserved sentinels 'cancelled' / 'permission_denied' propagate so
   // the beat can branch on the no-scan path.
   const cameraSlot = slots.find(s => s.role === 'camera');
+  // inputImage beat — photo picker / camera capture. ImageInputElement
+  // owns pick + preview + downscale + its own submit/skip buttons;
+  // onSubmit(dataUrl) / onCancel → onAction with the data URL or the
+  // reserved 'cancelled' sentinel.
+  const imageInputSlot = slots.find(s => s.role === 'imageInput');
   // webView beat — embedded external page. WebViewElement picks
   // iframe vs Electron <webview> at runtime. Resolves with 'done',
   // a matched URL, or a postMessage value via onAction.
@@ -1572,6 +1578,63 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 helperText={typeof content.helperText === 'string' ? content.helperText : undefined}
                 cancelButtonText={typeof content.cancelButtonText === 'string' ? content.cancelButtonText : 'Cancel'}
                 onDecode={(value) => dispatchAction(value)}
+                theme={{
+                  buttonBg: theme.button?.backgroundColor,
+                  buttonText: theme.button?.textColor,
+                  buttonBorder: theme.button?.borderColor,
+                }}
+              />
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Image-input slot — photo picker / camera capture for the
+          inputImage beat. ImageInputElement owns pick, preview,
+          downscale, and its own submit/skip buttons (like KeypadElement
+          owns its keypad). In editor mode we show a static placeholder
+          so authoring never opens a file dialog. */}
+      {imageInputSlot && (() => {
+        const isSelected = !!editorMode && selectedSlotKey === `slot:${imageInputSlot.name}`;
+        const editorClick = editorMode && onSlotSelect
+          ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(imageInputSlot.name, undefined); }
+          : undefined;
+        return (
+          <div
+            data-slotflow-slot={imageInputSlot.name}
+            onClick={editorClick}
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              padding: 'clamp(8px, 2vh, 16px) 16px',
+              ...(editorMode ? { cursor: 'pointer' } : null),
+              ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+            }}
+          >
+            {editorMode ? (
+              <div
+                style={{
+                  width: 'min(80%, 480px)',
+                  aspectRatio: '4 / 3',
+                  borderRadius: 12,
+                  border: '2px dashed rgba(255,255,255,0.35)',
+                  background: 'rgba(0,0,0,0.4)',
+                  color: 'rgba(255,255,255,0.7)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                }}
+              >
+                📸 Image input (runtime)
+              </div>
+            ) : (
+              <ImageInputElement
+                imageSource={(content.imageSource as 'upload' | 'camera' | 'both') ?? 'both'}
+                buttonText={typeof content.buttonText === 'string' ? content.buttonText : 'Analyze'}
+                cancelButtonText={typeof content.cancelButtonText === 'string' ? content.cancelButtonText : 'Skip'}
+                onSubmit={(dataUrl) => dispatchAction(dataUrl)}
+                onCancel={() => dispatchAction('cancelled')}
                 theme={{
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,
