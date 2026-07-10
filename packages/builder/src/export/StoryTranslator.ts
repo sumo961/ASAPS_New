@@ -7,6 +7,7 @@
  */
 
 import type { AIProvider } from './HtmlExporter';
+import { UI_STRING_DEFAULTS } from '@asaps/core';
 import type {
   TranslationResource,
   TranslationEntry,
@@ -123,6 +124,16 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
     if (hudOverlays.countdownMeter?.label) {
       strings[`${G}.countdownMeter.label`] = hudOverlays.countdownMeter.label;
     }
+  }
+
+  // Runtime UI strings (renderer chrome, default button labels, AI loading
+  // messages). Always emitted — the catalog is seeded into
+  // globalSettings.uiStrings at export time so translated values apply;
+  // the exported player installs them via setUIStrings(). Source value is
+  // any author override already present, else the English default.
+  const uiOverrides = (globalSettings as any)?.uiStrings || {};
+  for (const key of Object.keys(UI_STRING_DEFAULTS) as Array<keyof typeof UI_STRING_DEFAULTS>) {
+    strings[`project.globalSettings.uiStrings.${key}`] = uiOverrides[key] || UI_STRING_DEFAULTS[key];
   }
 
   // Environment node/prop names
@@ -278,6 +289,14 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
 
     case 'arBeat':
       if (params.cancelButtonText) strings[`${prefix}.parameters.cancelButtonText`] = params.cancelButtonText;
+      if (Array.isArray(params.anchors)) {
+        for (let j = 0; j < params.anchors.length; j++) {
+          // Anchor labels render on the AR overlay; onTap/ids are routing keys
+          if (params.anchors[j].label) {
+            strings[`${prefix}.parameters.anchors.${j}.label`] = params.anchors[j].label;
+          }
+        }
+      }
       break;
 
     case 'webView':
@@ -303,6 +322,14 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
           if (label) strings[`${prefix}.parameters.hotspots.${j}.displayText`] = label;
         }
       }
+      break;
+
+    case 'aiConversation':
+      // openingLine is the NPC's scripted first message — displayed verbatim.
+      // scenario/npcPersonality/systemInstructions are AI instructions and
+      // intentionally stay in the source language (the language-aware
+      // adapter directs the AI's replies at runtime).
+      if (params.openingLine) strings[`${prefix}.parameters.openingLine`] = params.openingLine;
       break;
 
     case 'aiInfoText':

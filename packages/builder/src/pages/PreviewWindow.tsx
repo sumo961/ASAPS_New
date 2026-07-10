@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMe
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
+import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
 import { ReactRenderer, getAudioManager, CharacterMoodFrame } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -571,101 +572,45 @@ function createLanguageAwareAdapter(
 }
 
 /**
- * All known loading message templates from core AI beats.
- * Templates use {name} as a placeholder for dynamic NPC names.
- * Organized as [mainMessages, subMessages] for batch translation.
+ * Pre-translate the runtime UI-string catalog (loading messages, renderer
+ * chrome, default button labels — see UI_STRING_DEFAULTS in @asaps/core)
+ * via a single batch AI call. Returns:
+ *   - byEnglish: english-template → translated (for translateLoadingMessage)
+ *   - byKey:     catalog key → translated (for setUIStrings)
  */
-const LOADING_TEMPLATES = {
-  main: [
-    'Preparing conversation with {name}...',
-    '{name} is getting ready to speak...',
-    'Setting up the conversation...',
-    'Let me connect you with {name}...',
-    'Thinking...',
-    'Fetching data...',
-    'Let me search for that...',
-    'Searching the internet for you...',
-    'Let me find out more...',
-    'Looking that up for you...',
-    'Let me reflect on your journey...',
-    'Summarizing your experience...',
-    'Reviewing your choices...',
-    'Creating your personal summary...',
-  ],
-  sub: [
-    'Generating personalized dialog',
-    'Generating response',
-    'Please wait while I retrieve the information',
-    'This may take a moment',
-    'This will just take a moment',
-  ],
-  /** Common beat UI strings (button labels, defaults) */
-  ui: [
-    'Play Again',
-    'Credits',
-    'Continue',
-    'Your Journey',
-  ],
-};
-
-/** Regex patterns for matching messages with dynamic NPC names */
-const LOADING_NAME_PATTERNS = [
-  { pattern: /^Preparing conversation with (.+)\.\.\.$/, template: 'Preparing conversation with {name}...' },
-  { pattern: /^(.+) is getting ready to speak\.\.\.$/, template: '{name} is getting ready to speak...' },
-  { pattern: /^Let me connect you with (.+)\.\.\.$/, template: 'Let me connect you with {name}...' },
-];
-
-/** Pre-translate all loading messages and UI strings via a single batch AI call */
-async function preTranslateLoadingMessages(
+async function preTranslateUIStrings(
   aiService: IAIService,
   targetLanguage: string,
-): Promise<Map<string, string>> {
-  const allMessages = [...LOADING_TEMPLATES.main, ...LOADING_TEMPLATES.sub, ...LOADING_TEMPLATES.ui];
+): Promise<{ byEnglish: Map<string, string>; byKey: Partial<Record<UIStringKey, string>> }> {
+  const keys = Object.keys(UI_STRING_DEFAULTS) as UIStringKey[];
+  const allMessages = keys.map(k => UI_STRING_DEFAULTS[k]);
   const targetLang = getLanguageName(targetLanguage);
 
   try {
     const response = await aiService.generateContent(
-      `Translate these UI loading messages to ${targetLang}. Keep {name} placeholders exactly as {name}. Return ONLY a JSON array of translated strings in the same order, nothing else.\n\n${JSON.stringify(allMessages)}`,
-      { maxTokens: 500 },
+      `Translate these UI strings to ${targetLang}. Keep {name}, {title} and {count} placeholders exactly as written. Keys containing button labels must be very short. Return ONLY a JSON array of translated strings in the same order, nothing else.\n\n${JSON.stringify(allMessages)}`,
+      { maxTokens: 1000 },
     );
 
-    // Extract JSON array from response
     const jsonMatch = response.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return new Map();
+    if (!jsonMatch) return { byEnglish: new Map(), byKey: {} };
 
     const translations: string[] = JSON.parse(jsonMatch[0]);
-    const map = new Map<string, string>();
-    allMessages.forEach((msg, i) => {
+    const byEnglish = new Map<string, string>();
+    const byKey: Partial<Record<UIStringKey, string>> = {};
+    keys.forEach((key, i) => {
       if (translations[i] && typeof translations[i] === 'string') {
-        map.set(msg, translations[i]);
+        byEnglish.set(UI_STRING_DEFAULTS[key], translations[i]);
+        byKey[key] = translations[i];
       }
     });
 
-    console.log(`[PreviewWindow] Pre-translated ${map.size}/${allMessages.length} loading messages to ${targetLang}`);
-    return map;
+    console.log(`[PreviewWindow] Pre-translated ${byEnglish.size}/${allMessages.length} UI strings to ${targetLang}`);
+    return { byEnglish, byKey };
   } catch (error) {
-    console.warn('[PreviewWindow] Failed to pre-translate loading messages:', error);
-    return new Map();
+    console.warn('[PreviewWindow] Failed to pre-translate UI strings:', error);
+    return { byEnglish: new Map(), byKey: {} };
   }
-}
-
-/** Look up a translated loading message, handling {name} substitution */
-function translateLoadingMessage(message: string, translations: Map<string, string>): string {
-  // Direct match (no name placeholder)
-  if (translations.has(message)) {
-    return translations.get(message)!;
-  }
-
-  // Try pattern match for messages with dynamic NPC names
-  for (const { pattern, template } of LOADING_NAME_PATTERNS) {
-    const match = message.match(pattern);
-    if (match && translations.has(template)) {
-      const translated = translations.get(template)!;
-      return translated.replace('{name}', match[1]);
-    }
-  }
-
-  return message;
 }
 
 export const PreviewWindow: React.FC = () => {
@@ -1617,15 +1562,24 @@ export const PreviewWindow: React.FC = () => {
       });
 
       // Pre-translate loading messages and wrap renderLoading for language-aware display
+      if (!previewData.activeLanguage) {
+        // Source-language preview — clear any UI-string translations left
+        // over from a previous language session in this window.
+        setUIStrings(null);
+        loadingTranslationsRef.current = new Map();
+      }
       if (previewData.activeLanguage && aiServiceAdapter) {
         // Use the raw (unwrapped) adapter for translating UI strings — the language directive
         // would interfere since we're explicitly asking for a specific target language
         const rawAdapter = createAIServiceAdapter();
         if (rawAdapter) {
-          preTranslateLoadingMessages(rawAdapter, previewData.activeLanguage)
-            .then(translations => {
-              loadingTranslationsRef.current = translations;
-              console.log(`[PreviewWindow] Loading message translations ready (${translations.size} entries)`);
+          preTranslateUIStrings(rawAdapter, previewData.activeLanguage)
+            .then(({ byEnglish, byKey }) => {
+              loadingTranslationsRef.current = byEnglish;
+              // Renderer chrome (input placeholders, HUD titles, image
+              // picker, default buttons) reads uiString() live.
+              setUIStrings(byKey);
+              console.log(`[PreviewWindow] UI-string translations ready (${byEnglish.size} entries)`);
             });
         }
 

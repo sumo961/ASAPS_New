@@ -290,6 +290,65 @@ describe('StoryTranslator', () => {
         expect(strings['project.story.beats.0.parameters.question']).toBe('Friend or foe?');
       });
 
+      it('should extract aiConversation openingLine but not AI instructions', () => {
+        const data = createProjectData({
+          story: {
+            beats: [
+              {
+                type: 'aiConversation',
+                parameters: {
+                  openingLine: 'Hello, traveler. What brings you here?',
+                  scenario: 'A tavern conversation',
+                  npcPersonality: 'Gruff but kind',
+                  systemInstructions: 'Stay in character.',
+                },
+              },
+            ],
+          },
+        });
+
+        const strings = extractTranslatableStrings(data);
+        const prefix = 'project.story.beats.0.parameters';
+
+        expect(strings[`${prefix}.openingLine`]).toBe('Hello, traveler. What brings you here?');
+        // AI instructions stay in the source language
+        expect(strings[`${prefix}.scenario`]).toBeUndefined();
+        expect(strings[`${prefix}.npcPersonality`]).toBeUndefined();
+        expect(strings[`${prefix}.systemInstructions`]).toBeUndefined();
+      });
+
+      it('should extract arBeat anchor labels', () => {
+        const data = createProjectData({
+          story: {
+            beats: [
+              {
+                type: 'arBeat',
+                parameters: {
+                  anchors: [
+                    { id: 'a1', label: 'Open the chest', onTap: 'asaps://beat/chest' },
+                    { id: 'a2', onTap: 'asaps://beat/door' },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+
+        const strings = extractTranslatableStrings(data);
+        expect(strings['project.story.beats.0.parameters.anchors.0.label']).toBe('Open the chest');
+        expect(strings['project.story.beats.0.parameters.anchors.1.label']).toBeUndefined();
+      });
+
+      it('should emit the runtime UI-string catalog', () => {
+        const data = createProjectData({ story: { beats: [] } });
+
+        const strings = extractTranslatableStrings(data);
+
+        expect(strings['project.globalSettings.uiStrings.continue']).toBe('Continue');
+        expect(strings['project.globalSettings.uiStrings.inventoryTitle']).toBe('Inventory');
+        expect(strings['project.globalSettings.uiStrings.loadingThinking']).toBe('Thinking...');
+      });
+
       it('should extract pickProp displayNames and descriptions', () => {
         const data = createProjectData({
           story: {
@@ -525,7 +584,7 @@ describe('StoryTranslator', () => {
         expect(strings['project.story.beats.1.parameters.text']).toBe('You wake up in a strange land.');
       });
 
-      it('should return empty object for project with no translatable content', () => {
+      it('should emit only the runtime UI-string catalog for a project with no authored content', () => {
         const data = createProjectData({
           story: {
             metadata: {},
@@ -536,7 +595,11 @@ describe('StoryTranslator', () => {
 
         const strings = extractTranslatableStrings(data);
 
-        expect(Object.keys(strings)).toHaveLength(0);
+        // The runtime UI-string catalog is always emitted (renderer chrome,
+        // loading messages) — no authored strings beyond that.
+        const keys = Object.keys(strings);
+        expect(keys.length).toBeGreaterThan(0);
+        expect(keys.every(k => k.startsWith('project.globalSettings.uiStrings.'))).toBe(true);
       });
     });
   });

@@ -1,4 +1,5 @@
 import React from 'react';
+import { uiString, formatUIString } from '@asaps/core';
 
 /**
  * Dock mode: relative to character or fixed to screen corner
@@ -393,10 +394,13 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   containerDimensions,
   isVisible = true,
   assetResolver,
-  title = 'Inventory',
+  title,
   fontScale = 1.0,
   autoMinimize = false,
 }) => {
+  // HUD chrome default is a UI string so translated stories don't show
+  // an English "Inventory" header; an explicit title prop still wins.
+  const frameTitle = title || uiString('inventoryTitle');
   const [minimized, setMinimized] = React.useState(autoMinimize);
 
   // Hide if no items or not visible
@@ -485,7 +489,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
         }}
         onClick={() => setMinimized(false)}
-        title={`${title} (${items.length} items) - click to expand`}
+        title={formatUIString('inventoryExpandHint', { title: frameTitle, count: items.length })}
       >
         {/* Mini grid icon */}
         <div
@@ -560,7 +564,7 @@ export const CharacterInventoryFrame: React.FC<CharacterInventoryFrameProps> = (
   return (
     <div style={frameStyle}>
       <div style={headerStyle} onClick={autoMinimize ? () => setMinimized(true) : undefined}>
-        {title}{autoMinimize ? ' \u25BC' : ''}
+        {frameTitle}{autoMinimize ? ' \u25BC' : ''}
       </div>
       <div style={gridStyle}>
         {resolvedItems.map((item) => (

@@ -18,6 +18,7 @@ export * from './translation';
 export * from './prompts';
 export * from './normalize';
 export * from './ai';
+export * from './i18n';
 export * from './kg';
 
 // Package info

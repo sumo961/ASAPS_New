@@ -27,7 +27,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
-import { slotIntentFor, slotAnimationsFor } from '@asaps/core';
+import { slotIntentFor, slotAnimationsFor, uiString } from '@asaps/core';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
@@ -641,11 +641,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // action beat — the choice is a fork, not a Continue).
   const hasDynamicChoices = (dynamicChoices?.length ?? 0) > 0;
   const isContinueAction = !hasDynamicChoices && actionButtons.includes('continueButton');
-  const continueText = content.buttonText || 'Continue';
+  const continueText = content.buttonText || uiString('continue');
   const showRestart = content.showRestart !== false;
   const showCredits = content.showCredits === true;
-  const restartText = content.restartText || 'Play Again';
-  const creditsText = content.creditsText || 'Credits';
+  const restartText = content.restartText || uiString('playAgain');
+  const creditsText = content.creditsText || uiString('credits');
 
   // Read-gate model — count VISIBLE action items to decide the layout
   // shape. Single (1 forward path) uses Option A — body grows, outer

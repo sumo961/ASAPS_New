@@ -1,3 +1,4 @@
+import { uiString } from '@asaps/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
@@ -1370,7 +1371,7 @@ export class ReactRenderer extends BaseRenderer {
   }): Promise<string> {
     return new Promise<string>(resolve => {
       // Render the chat view with an inline text input instead of choice buttons
-      const placeholder = options.placeholder || 'Type your response...';
+      const placeholder = options.placeholder || uiString('typeYourResponse');
 
       // Determine background
       const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
@@ -1717,7 +1718,7 @@ export class ReactRenderer extends BaseRenderer {
               value={isListening && interimText ? interimText + '...' : inputText}
               onChange={(e) => { if (!isListening) setInputText(e.target.value); }}
               onKeyDown={(e) => { if (e.key === 'Enter' && inputText.trim()) onSubmit(); }}
-              placeholder={isListening ? 'Listening...' : placeholder}
+              placeholder={isListening ? uiString('listening') : placeholder}
               readOnly={isListening}
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: 20,

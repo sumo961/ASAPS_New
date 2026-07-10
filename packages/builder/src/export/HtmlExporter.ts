@@ -13,6 +13,7 @@
 import JSZip from 'jszip';
 import { getStorageManager } from '../storage/StorageManager';
 import type { TranslationResource } from '@asaps/core';
+import { UI_STRING_DEFAULTS } from '@asaps/core';
 import { applyTranslationResource } from './StoryTranslator';
 import { downloadAndInlineFonts } from './fontBundler';
 
@@ -496,7 +497,8 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             var fields = ['text', 'buttonText', 'prompt', 'question', 'message', 'title', 'author',
                           'restartText', 'creditsText', 'creditsPageTitle', 'creditsPageBody', 'creditsCloseText',
                           'placeholder', 'clearButtonText', 'fallbackText',
-                          'npcName', 'displayTemplate', 'errorMessage'];
+                          'npcName', 'displayTemplate', 'errorMessage',
+                          'openingLine', 'helperText', 'cancelButtonText', 'doneButtonText'];
             for (var f = 0; f < fields.length; f++) {
               if (params[fields[f]] && typeof params[fields[f]] === 'string') {
                 strings[prefix + '.parameters.' + fields[f]] = params[fields[f]];
@@ -535,6 +537,21 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
                 if (params.hyperlinks[j].word) strings[prefix + '.parameters.hyperlinks.' + j + '.word'] = params.hyperlinks[j].word;
               }
             }
+            // AR anchor labels (rendered on the AR overlay)
+            if (Array.isArray(params.anchors)) {
+              for (var j = 0; j < params.anchors.length; j++) {
+                if (params.anchors[j].label) strings[prefix + '.parameters.anchors.' + j + '.label'] = params.anchors[j].label;
+              }
+            }
+          }
+        }
+
+        // Runtime UI strings (seeded into globalSettings.uiStrings before
+        // extraction — see start(); the player installs them via setUIStrings)
+        var ui = project.project && project.project.globalSettings && project.project.globalSettings.uiStrings;
+        if (ui) {
+          for (var k in ui) {
+            if (typeof ui[k] === 'string' && ui[k]) strings['project.globalSettings.uiStrings.' + k] = ui[k];
           }
         }
         return strings;
@@ -716,6 +733,19 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             var zip = await JSZip.loadAsync(zipData);
             var projectJson = await zip.file('project.json').async('string');
             var projectData = JSON.parse(projectJson);
+
+            // Seed the runtime UI-string catalog so it gets translated and
+            // applied along with the story (the player reads
+            // globalSettings.uiStrings via setUIStrings on load).
+            var UI_DEFAULTS = ${JSON.stringify(UI_STRING_DEFAULTS)};
+            if (projectData.project) {
+              projectData.project.globalSettings = projectData.project.globalSettings || {};
+              var seeded = projectData.project.globalSettings.uiStrings || {};
+              for (var dk in UI_DEFAULTS) {
+                if (!seeded[dk]) seeded[dk] = UI_DEFAULTS[dk];
+              }
+              projectData.project.globalSettings.uiStrings = seeded;
+            }
 
             // Extract strings
             var strings = extractStrings(projectData);
@@ -1277,6 +1307,19 @@ export async function downloadHtmlExport(
 
   if (hasExistingTranslations) {
     const projectData = await getProjectDataForExport(projectId);
+
+    // Seed the runtime UI-string catalog before applying resources —
+    // applyTranslationResource writes by path and skips paths whose
+    // parent object doesn't exist. The resource carries translated
+    // values for these keys (StoryTranslator emits the catalog).
+    if (projectData?.project) {
+      projectData.project.globalSettings = projectData.project.globalSettings || {};
+      const seeded: Record<string, string> = projectData.project.globalSettings.uiStrings || {};
+      for (const [dk, dv] of Object.entries(UI_STRING_DEFAULTS)) {
+        if (!seeded[dk]) seeded[dk] = dv;
+      }
+      projectData.project.globalSettings.uiStrings = seeded;
+    }
 
     for (const resource of options.existingTranslations!) {
       console.log(`[HtmlExporter] Processing translation: ${resource.languageName} (${resource.languageCode})`);

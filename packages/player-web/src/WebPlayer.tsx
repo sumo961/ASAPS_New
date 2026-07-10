@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext, CharacterMoodFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
+import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
 import { WebSTTService } from './WebSTTProvider';
@@ -370,6 +371,24 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
+
+          // Install runtime UI strings (translated exports carry a
+          // translated globalSettings.uiStrings catalog; source-language
+          // exports fall back to the English defaults) and wrap
+          // renderLoading so the AI beats' hardcoded loading messages
+          // ("Thinking...", "{name} is getting ready to speak...") show
+          // in the story's language too — mirrors the Preview Window.
+          setUIStrings((gs as any)?.uiStrings);
+          if (renderer.renderLoading) {
+            const loadingMap = buildLoadingTranslationMap();
+            const originalRenderLoading = renderer.renderLoading.bind(renderer);
+            renderer.renderLoading = (message: string, opts?: { subMessage?: string; spinnerType?: 'spinner' | 'dots' | 'pulse' }) => {
+              originalRenderLoading(translateLoadingMessage(message, loadingMap), {
+                ...opts,
+                subMessage: opts?.subMessage ? translateLoadingMessage(opts.subMessage, loadingMap) : opts?.subMessage,
+              });
+            };
+          }
 
           // P2.5 — project orientation policy drives the rotate-device gate.
           const orient = gs?.project?.orientation;

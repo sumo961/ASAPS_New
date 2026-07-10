@@ -1,4 +1,5 @@
 import React from 'react';
+import { uiString } from '@asaps/core';
 
 /**
  * ImageInputElement — the interactive surface of the inputImage beat.
@@ -79,7 +80,7 @@ export const ImageInputElement: React.FC<ImageInputElementProps> = ({
       setPreview(dataUrl);
     } catch (e) {
       console.warn('[ImageInputElement] failed to process image:', e);
-      setError('Could not read that image — please try another one.');
+      setError(uiString('imageReadError'));
     } finally {
       setBusy(false);
     }
@@ -132,7 +133,7 @@ export const ImageInputElement: React.FC<ImageInputElementProps> = ({
           src={preview}
           alt="Selected"
           onClick={() => !busy && fileInputRef.current?.click()}
-          title="Tap to choose a different image"
+          title={uiString('imageRetakeHint')}
           style={{
             maxWidth: '100%',
             maxHeight: '38vh',
@@ -166,12 +167,12 @@ export const ImageInputElement: React.FC<ImageInputElementProps> = ({
           <span style={{ fontSize: 40 }}>📸</span>
           <span>
             {busy
-              ? 'Processing…'
+              ? uiString('imageProcessing')
               : imageSource === 'camera'
-                ? 'Take a photo'
+                ? uiString('imagePickCamera')
                 : imageSource === 'upload'
-                  ? 'Choose an image'
-                  : 'Take or choose a photo'}
+                  ? uiString('imagePickUpload')
+                  : uiString('imagePickBoth')}
           </span>
         </button>
       )}
