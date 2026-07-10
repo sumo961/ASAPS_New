@@ -261,6 +261,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       padding: textbox.padding,
       opacity: normalizeOpacity(textbox.opacity),
       hideTitleTextBox: textbox.hideTitleTextBox,
+      boxVisibility: textbox.boxVisibility,
     },
     button: {
       // Button/choice uses buttonBg/buttonBgColor if available, otherwise pcolor

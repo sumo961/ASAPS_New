@@ -63,6 +63,21 @@ function makeSettings(overrides: any = {}): any {
 }
 
 describe('convertGlobalSettingsToTheme', () => {
+  describe('box visibility', () => {
+    it('passes boxVisibility through to theme.textBox', () => {
+      const theme = convertGlobalSettingsToTheme(
+        makeSettings({ textbox: { boxVisibility: 'hideText' } as any })
+      );
+      expect((theme.textBox as any).boxVisibility).toBe('hideText');
+    });
+
+    it('leaves boxVisibility undefined when unset', () => {
+      const theme = convertGlobalSettingsToTheme(makeSettings({}));
+      expect((theme.textBox as any).boxVisibility).toBeUndefined();
+    });
+  });
+
+
   describe('color fallbacks', () => {
     it('button background prefers buttonBg over buttonBgColor over pcolor', () => {
       // Three-tier precedence per the source. Authors who set

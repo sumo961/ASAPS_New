@@ -1854,6 +1854,15 @@ export class ReactRenderer extends BaseRenderer {
    */
   setTheme(theme: RenderThemeSettings | undefined): void {
     this.theme = theme;
+    // Box visibility rides the theme (Settings → Text Box → Box
+    // Visibility) so the Preview Window and the exported player honor it
+    // without extra wiring. Explicit setHideTextBoxes()/setHideButtonBoxes()
+    // calls (Visual Editor) still work — they run after setTheme.
+    const vis = theme?.textBox?.boxVisibility;
+    if (vis) {
+      this.hideTextBoxes = vis === 'hideText' || vis === 'hideAll';
+      this.hideButtonBoxes = vis === 'hideAll';
+    }
   }
 
   /**

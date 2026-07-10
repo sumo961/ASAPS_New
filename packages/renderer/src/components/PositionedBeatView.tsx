@@ -393,6 +393,11 @@ export interface RenderThemeSettings {
     opacity: number;  // 0-100
     /** Hide text box background for title/author elements (VN style) */
     hideTitleTextBox?: boolean;
+    /** Settings → Text Box → Box Visibility. 'hideText' hides text/dialog
+     *  box backgrounds; 'hideAll' also hides button boxes (bare labels).
+     *  Rides the theme so every surface (VE, Preview Window, exported
+     *  player, slot + absolute paths) honors the same setting. */
+    boxVisibility?: 'all' | 'hideText' | 'hideAll';
   };
   /** Optional textbox frame image URL (from theme assets, e.g., Ren'Py import) */
   textboxFrameUrl?: string;

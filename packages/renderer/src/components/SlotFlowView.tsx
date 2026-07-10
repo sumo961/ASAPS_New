@@ -2028,12 +2028,14 @@ function anchoredButtonPlacement(anchor: SlotAnchor): React.CSSProperties {
 }
 
 function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProperties {
+  // 'hideAll' box visibility strips button boxes too — bare labels.
+  const bare = theme.textBox?.boxVisibility === 'hideAll';
   return {
     fontFamily: theme.fonts.buttonFont || theme.fonts.textFont || 'serif',
     fontSize: `clamp(var(--slotflow-btn-floor), ${fluid}, ${BUTTON_CEILING}px)`,
     color: theme.button?.textColor || '#fff',
-    background: theme.button?.backgroundColor || 'rgba(255,255,255,0.12)',
-    border: `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
+    background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
+    border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
     borderRadius: `${theme.button?.borderRadius ?? 8}px`,
     padding: '0 clamp(20px, 3vw, 36px)',
     minHeight: 44, // Apple HIG minimum tap target
@@ -2072,7 +2074,11 @@ function textBoxCardStyle(
   // Title slot honours `hideTitleTextBox` (VN splash style — title text
   // floats on the spatial image without a card).
   const hideForTitle = opts.isTitle && tb?.hideTitleTextBox === true;
-  if (!tb || hideForTitle) {
+  // Settings → Text Box → Box Visibility: hideText/hideAll strip the
+  // text/dialog card everywhere (matches the absolute path's
+  // hideTextBoxes prop semantics).
+  const hiddenBySetting = tb?.boxVisibility === 'hideText' || tb?.boxVisibility === 'hideAll';
+  if (!tb || hideForTitle || hiddenBySetting) {
     return { background: 'transparent', border: 'none', padding: 0 };
   }
   // Frame-image branch: the image carries its own border/radius/shadow,

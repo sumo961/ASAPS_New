@@ -175,6 +175,8 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       borderRadius: settings.textbox.radius,
       padding: settings.textbox.padding,
       opacity: normalizeOpacity(settings.textbox.opacity),
+      hideTitleTextBox: (settings.textbox as any).hideTitleTextBox,
+      boxVisibility: (settings.textbox as any).boxVisibility,
     },
     button: {
       // Button/choice uses pcolor for background
