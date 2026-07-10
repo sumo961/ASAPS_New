@@ -715,6 +715,203 @@ describe('SetVariableBeat', () => {
     });
   });
 
+  describe('arithmetic expressions (= prefix)', () => {
+    function makeBeat(params: Record<string, any>) {
+      return new SetVariableBeat({
+        id: 'sv1',
+        name: 'Expr Beat',
+        type: 'setVariable',
+        parameters: params,
+        connections: [{ targetId: 'next' }],
+      });
+    }
+
+    it('should evaluate an expression into a variable', async () => {
+      context.setVariable('variable1', 30);
+      context.setVariable('variable2', 70);
+
+      const beat = makeBeat({
+        type: 'variable',
+        name: 'result',
+        value: '= (variable1 + variable2) / 100',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getVariable('result')).toBe(1);
+    });
+
+    it('should resolve ${} syntax and counters in expressions', async () => {
+      context.setVariable('bonus', 5);
+      context.setCounter('score', 20);
+
+      const beat = makeBeat({
+        type: 'variable',
+        name: 'total',
+        value: '= ${score} * 2 + bonus',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getVariable('total')).toBe(45);
+    });
+
+    it('should evaluate an expression into a counter with set operation', async () => {
+      context.setCounter('gold', 40);
+      context.setVariable('rate', 2);
+
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'wealth',
+        value: '= gold * rate',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getCounter('wealth')).toBe(80);
+    });
+
+    it('should evaluate an expression into a counter with change operation', async () => {
+      context.setCounter('score', 10);
+      context.setVariable('bonus', 15);
+
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'score',
+        value: '= bonus * 2',
+        operation: 'change',
+      });
+
+      await beat.execute(context, renderer);
+      // change = add: 10 + (15 * 2)
+      expect(context.getCounter('score')).toBe(40);
+    });
+
+    it('should support character-scoped counters in expressions (owner.counter)', async () => {
+      context.setCharacterCounter('alice', 'trust', 7);
+
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'trustScore',
+        value: '= alice.trust * 10',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getCounter('trustScore')).toBe(70);
+    });
+
+    it('should evaluate an expression into a character-scoped counter target', async () => {
+      context.setCharacterCounter('alice', 'trust', 3);
+      context.setVariable('boost', 4);
+
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'trust',
+        character: 'alice',
+        value: '= boost + 1',
+        operation: 'change',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getCharacterCounter('alice', 'trust')).toBe(8);
+    });
+
+    it('should store the raw string and warn when a variable expression fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const beat = makeBeat({
+        type: 'variable',
+        name: 'broken',
+        value: '= unknownVar + 1',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      expect(context.getVariable('broken')).toBe('= unknownVar + 1');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('could not evaluate expression')
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('should fall back to legacy numeric coercion and warn when a counter expression fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      context.setCounter('score', 50);
+
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'score',
+        value: '= 10 / 0',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      // Legacy: Number('= 10 / 0') || 0 => 0
+      expect(context.getCounter('score')).toBe(0);
+      expect(warnSpy).toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it('should NOT evaluate math-looking strings without the = prefix (variables)', async () => {
+      context.setVariable('var1', 1);
+      context.setVariable('var2', 2);
+
+      const literal = makeBeat({
+        type: 'variable',
+        name: 'plain',
+        value: '5+3',
+        operation: 'set',
+      });
+      await literal.execute(context, renderer);
+      expect(context.getVariable('plain')).toBe('5+3');
+
+      const withRefs = makeBeat({
+        type: 'variable',
+        name: 'refLiteral',
+        value: '(var1 + var2) / 100',
+        operation: 'set',
+      });
+      await withRefs.execute(context, renderer);
+      expect(context.getVariable('refLiteral')).toBe('(var1 + var2) / 100');
+    });
+
+    it('should NOT evaluate math-looking strings without the = prefix (counters)', async () => {
+      const beat = makeBeat({
+        type: 'counter',
+        name: 'count',
+        value: '5+3',
+        operation: 'set',
+      });
+
+      await beat.execute(context, renderer);
+      // Legacy: Number('5+3') || 0 => 0 (unchanged behavior)
+      expect(context.getCounter('count')).toBe(0);
+    });
+
+    it('should leave plain literal values completely unaffected', async () => {
+      const strBeat = makeBeat({
+        type: 'variable',
+        name: 'greeting',
+        value: 'Hello = world',
+        operation: 'set',
+      });
+      await strBeat.execute(context, renderer);
+      expect(context.getVariable('greeting')).toBe('Hello = world');
+
+      const numBeat = makeBeat({
+        type: 'counter',
+        name: 'plainNum',
+        value: 42,
+        operation: 'set',
+      });
+      await numBeat.execute(context, renderer);
+      expect(context.getCounter('plainNum')).toBe(42);
+    });
+  });
+
   describe('default operation', () => {
     it('should use set operation by default', async () => {
       context.setCounter('counter', 50);

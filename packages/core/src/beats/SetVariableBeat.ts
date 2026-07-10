@@ -3,6 +3,11 @@ import type { BeatConfig } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { SetVariableParameters } from '../generated/beat-types';
+import {
+  isArithmeticExpression,
+  evaluateArithmeticExpression,
+  createContextResolver,
+} from '../utils/expression';
 
 export class SetVariableBeat extends Beat {
   private variableType: string;  // 'variable', 'counter', or 'fictionalTime'
@@ -83,6 +88,29 @@ export class SetVariableBeat extends Beat {
     if (params.timeMinute !== undefined) this.timeMinute = params.timeMinute;
   }
 
+  /**
+   * If `value` opts in to arithmetic evaluation (leading '=', spreadsheet
+   * convention — e.g. "= (var1 + var2) / 100"), evaluate it against the
+   * story's variables/counters. Returns the numeric result, or null when the
+   * value is not an expression OR evaluation failed (unknown reference,
+   * division by zero, syntax error). Failures warn so authors can spot them;
+   * callers fall back to legacy literal handling.
+   */
+  private tryEvaluateExpression(context: StoryContext): number | null {
+    if (!isArithmeticExpression(this.value)) return null;
+    const result = evaluateArithmeticExpression(
+      this.value,
+      createContextResolver(context)
+    );
+    if (result === null) {
+      console.warn(
+        `SetVariableBeat ${this.id}: could not evaluate expression '${this.value}' ` +
+          `(unknown reference, division by zero, or syntax error) — falling back to literal value`
+      );
+    }
+    return result;
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -121,7 +149,10 @@ export class SetVariableBeat extends Beat {
         const currentValue = scoped
           ? context.getCharacterCounter(this.character!, this.variableName)
           : context.getCounter(this.variableName) || 0;
-        const numValue = Number(this.value) || 0;
+        // '='-prefixed values are arithmetic expressions (opt-in, spreadsheet
+        // convention); on failure fall back to the legacy numeric coercion.
+        const evaluated = this.tryEvaluateExpression(context);
+        const numValue = evaluated !== null ? evaluated : Number(this.value) || 0;
         let newValue: number;
 
         switch (this.operation) {
@@ -156,9 +187,13 @@ export class SetVariableBeat extends Beat {
         }
         console.log(`SetVariableBeat ${this.id}: Counter '${this.variableName}'${scoped ? ` @${this.character}` : ''} ${this.operation} → ${newValue} (was ${currentValue})`);
       } else {
-        // Handle variable (always set operation)
-        context.setVariable(this.variableName, this.value);
-        console.log(`SetVariableBeat ${this.id}: Variable '${this.variableName}' = ${this.value}`);
+        // Handle variable (always set operation). '='-prefixed values are
+        // arithmetic expressions; on evaluation failure keep legacy behavior
+        // and store the raw string.
+        const evaluated = this.tryEvaluateExpression(context);
+        const valueToStore = evaluated !== null ? evaluated : this.value;
+        context.setVariable(this.variableName, valueToStore);
+        console.log(`SetVariableBeat ${this.id}: Variable '${this.variableName}' = ${valueToStore}`);
       }
     } catch (error) {
       console.error(`Error in SetVariableBeat ${this.id}:`, error);

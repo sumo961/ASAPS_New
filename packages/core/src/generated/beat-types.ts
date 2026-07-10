@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-09T15:27:28.788Z
+ * Generated: 2026-07-10T09:36:02.110Z
  */
 
 // ============================================
@@ -394,7 +394,7 @@ export interface SetVariableParameters {
   name: string;
   /** type='counter' only. Counter owner. OMIT for a story-global counter (default — world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (per-character stats like health/trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'. */
   character?: string | undefined;
-  /** New value (string for variables, number for counters). For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value. */
+  /** New value (string for variables, number for counters). Prefix with '=' (spreadsheet convention) to compute an arithmetic expression at runtime, e.g. "= (var1 + var2) / 100" — supports + - * / parentheses, unary minus, numeric literals, and variable/counter references (plain identifiers like score, plus ${name}, $name$, {name}; names resolve against variables first, then counters; character-scoped counters via owner.counter, e.g. alice.trust). If evaluation fails (unknown reference, division by zero, syntax error) the raw string is stored unchanged. Without the leading '=' nothing is evaluated — '5+3' stays the literal string '5+3'. For type='fictionalTime' with operation='advance'/'subtract', this is the magnitude (paired with timeUnit). Empty/zero is a valid value. */
   value: any;
   /** Variable: 'set'. Counter: 'set' | 'change' | 'add' | 'subtract' | 'multiply'. fictionalTime: 'set' | 'advance' | 'subtract'. */
   operation?: string | undefined;

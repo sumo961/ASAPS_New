@@ -94,3 +94,11 @@ export {
   formatAsapsUri,
   type AsapsAction,
 } from './asapsUri';
+export {
+  isArithmeticExpression,
+  evaluateArithmeticExpression,
+  createContextResolver,
+  coerceNumeric,
+  type NumericRefResolver,
+  type NumericScope,
+} from './expression';
