@@ -431,6 +431,141 @@ describe('projectZipManager', () => {
     });
   });
 
+  describe('character image round-trip (Windows→Mac report)', () => {
+    it('exports character image assets and re-imports them with intact references', async () => {
+      // Character with an uploaded image asset (the CharacterEditor path)
+      testProject.story.characters = [{
+        id: 'char_1',
+        name: 'Hero',
+        visual: { defaultAssetId: 'asset_char_img', defaultImage: 'blob:http://origin-machine/dead' },
+      }];
+      const charAsset: StoredAsset = {
+        id: 'asset_char_img',
+        projectId: 'test-project-id',
+        type: 'image',
+        filename: 'hero.png',
+        mimeType: 'image/png',
+        size: 512,
+        blob: new Blob(['hero image bytes'], { type: 'image/png' }),
+        uploadedAt: new Date('2024-01-01'),
+        metadata: {},
+      };
+      mockStorage.getProject.mockResolvedValue({ success: true, data: testProject });
+      mockStorage.getProjectAssets.mockResolvedValue({ success: true, data: [charAsset] });
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+
+      // Export on "Windows"
+      const zipBlob = await exportProjectAsZip('test-project-id');
+
+      // The zip must actually CONTAIN the character image
+      const zip = await JSZip.loadAsync(zipBlob);
+      const entries = Object.keys(zip.files);
+      const imgEntry = entries.find(e => e.includes('asset_char_img'));
+      expect(imgEntry, `character image missing from zip; entries: ${entries.join(', ')}`).toBeTruthy();
+
+      // Import on "Mac"
+      const file = new File([zipBlob], 'story.asaps', { type: 'application/zip' });
+      const result = await importProjectFromZip(file, { generateNewId: false });
+      expect(result.success, `import failed: ${(result as any).error}`).toBe(true);
+
+      // The asset must be recreated with the same id + type image
+      const created = mockStorage.createAsset.mock.calls.map(c => c[0]);
+      const imported = created.find((a: any) => a.id === 'asset_char_img');
+      expect(imported, `character asset not recreated; created: ${created.map((a: any) => a.id).join(', ')}`).toBeTruthy();
+      expect(imported.type).toBe('image');
+      expect(imported.blob.size).toBeGreaterThan(0);
+
+      // And the character must still reference it
+      const savedProject = mockStorage.createProject.mock.calls[0][0];
+      const chars = savedProject.story.characters;
+      expect(chars[0].visual.defaultAssetId).toBe('asset_char_img');
+    });
+  });
+
+  describe('orphaned timestamp-ID assets (Windows→Mac character-image loss)', () => {
+    it('exports character images referenced by timestamp-format IDs even when not project-linked', async () => {
+      // The real-world shape: the CharacterEditor uploads via
+      // DirectAssetUpload (id: asset_<ts>_<rand>), the character references
+      // it, but the asset is no longer in the project's linked asset list.
+      // The referenced-asset safety net must pull it into the zip.
+      const orphanId = 'asset_1783617637019_x7k2m9p4q';
+      testProject.story.characters = [{
+        id: 'char_1',
+        name: 'Hero',
+        visual: { defaultAssetId: orphanId },
+      }];
+      const orphanAsset: StoredAsset = {
+        id: orphanId,
+        projectId: 'test-project-id',
+        type: 'image',
+        filename: 'hero.png',
+        mimeType: 'image/png',
+        size: 512,
+        blob: new Blob(['hero image bytes'], { type: 'image/png' }),
+        uploadedAt: new Date('2024-01-01'),
+        metadata: {},
+      };
+      mockStorage.getProject.mockResolvedValue({ success: true, data: testProject });
+      // NOT in the linked list — only reachable via getAsset by id
+      mockStorage.getProjectAssets.mockResolvedValue({ success: true, data: [] });
+      mockStorage.getAsset.mockImplementation(async (id: string) =>
+        id === orphanId ? { success: true, data: orphanAsset } : { success: false }
+      );
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+
+      const zipBlob = await exportProjectAsZip('test-project-id');
+
+      const zip = await JSZip.loadAsync(zipBlob);
+      const entries = Object.keys(zip.files);
+      expect(entries.find(e => e.includes(orphanId)), `orphan asset missing from zip; entries: ${entries.join(', ')}`).toBeTruthy();
+
+      // Round-trip: import must recreate the asset with the intact id
+      const file = new File([zipBlob], 'story.asaps', { type: 'application/zip' });
+      const result = await importProjectFromZip(file, { generateNewId: false });
+      expect(result.success, `import failed: ${(result as any).error}`).toBe(true);
+
+      const created = mockStorage.createAsset.mock.calls.map(c => c[0]);
+      const imported = created.find((a: any) => a.id === orphanId);
+      expect(imported).toBeTruthy();
+      expect(imported.filename).toBe('hero.png');
+      const savedProject = mockStorage.createProject.mock.calls[0][0];
+      expect(savedProject.story.characters[0].visual.defaultAssetId).toBe(orphanId);
+    });
+
+    it('imports video assets (videos/ folder was exported but never scanned)', async () => {
+      testAssets.push({
+        id: 'asset_9999_vid',
+        projectId: 'test-project-id',
+        type: 'video',
+        filename: 'intro.mp4',
+        mimeType: 'video/mp4',
+        size: 4096,
+        blob: new Blob(['video bytes'], { type: 'video/mp4' }),
+        uploadedAt: new Date('2024-01-01'),
+        metadata: {},
+      });
+      mockStorage.getProject.mockResolvedValue({ success: true, data: testProject });
+      mockStorage.getProjectAssets.mockResolvedValue({ success: true, data: testAssets });
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+
+      const zipBlob = await exportProjectAsZip('test-project-id');
+      const file = new File([zipBlob], 'story.asaps', { type: 'application/zip' });
+      const result = await importProjectFromZip(file, { generateNewId: false });
+      expect(result.success, `import failed: ${(result as any).error}`).toBe(true);
+
+      const created = mockStorage.createAsset.mock.calls.map(c => c[0]);
+      const video = created.find((a: any) => a.id === 'asset_9999_vid');
+      expect(video, `video asset not imported; created: ${created.map((a: any) => a.id).join(', ')}`).toBeTruthy();
+      expect(video.type).toBe('video');
+    });
+  });
+
   describe('Asset ID Remapping', () => {
     it('should remap asset IDs in beat nodes when generating new ID', async () => {
       const zip = new JSZip();

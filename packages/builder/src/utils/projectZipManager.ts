@@ -292,7 +292,9 @@ export async function importProjectFromZip(
 
     // Import assets first
     const assetIdMap = new Map<string, string>(); // old ID -> new ID mapping
-    const assetFolders = ['backgrounds', 'characters', 'props', 'sounds', 'fonts', 'other'];
+    // 'videos' was written by the exporter but never scanned on import —
+    // video assets silently vanished from imported projects.
+    const assetFolders = ['backgrounds', 'characters', 'props', 'sounds', 'videos', 'fonts', 'other'];
 
     for (const folderName of assetFolders) {
       const folder = zip.folder(folderName);
@@ -339,9 +341,22 @@ export async function importProjectFromZip(
         let extractedId: string | null = null;
         let originalFilename = fullFilename;
 
+        // Deterministic first pass: the exporter names entries
+        // "<assetId>_<filename>" and ships a metadata JSON per asset —
+        // prefix-match against the known IDs (works for every ID format,
+        // including timestamp IDs with alphanumeric suffixes that the
+        // regexes below can't parse unambiguously).
+        for (const knownId of metadataById.keys()) {
+          if (fullFilename.startsWith(knownId + '_')) {
+            extractedId = knownId;
+            originalFilename = fullFilename.slice(knownId.length + 1);
+            break;
+          }
+        }
+
         // Try UUID pattern first
         const uuidPattern = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(.+)$/i;
-        const uuidMatch = fullFilename.match(uuidPattern);
+        const uuidMatch = extractedId ? null : fullFilename.match(uuidPattern);
         if (uuidMatch) {
           extractedId = uuidMatch[1];
           originalFilename = uuidMatch[2];
@@ -349,7 +364,7 @@ export async function importProjectFromZip(
         } else {
           // Try timestamp-based asset ID pattern: asset_TIMESTAMP_INDEX_filename.ext
           const timestampPattern = /^(asset_\d+_\d+)_(.+)$/;
-          const timestampMatch = fullFilename.match(timestampPattern);
+          const timestampMatch = extractedId ? null : fullFilename.match(timestampPattern);
           if (timestampMatch) {
             extractedId = timestampMatch[1];
             originalFilename = timestampMatch[2];
@@ -927,13 +942,24 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
 function extractAssetIdsFromStory(story: any): string[] {
   const assetIds = new Set<string>();
 
-  // UUID pattern for asset IDs
+  // Asset IDs come in TWO formats, depending on the upload path:
+  //   - UUID (ASML importer):          550e8400-e29b-41d4-a716-446655440000
+  //   - timestamp (all in-app uploads): asset_1783617637019_x7k2m9p4q,
+  //     asset_1783617637019_50, asset_1783617637019
+  // This scanner is the safety net that pulls referenced-but-unlinked
+  // assets into the export. It used to accept ONLY UUIDs, which silently
+  // dropped every in-app-uploaded orphan (character images being the
+  // common case: uploaded via the CharacterEditor, referenced by
+  // visual.defaultAssetId, but no longer in the project's linked list) —
+  // the .asaps then imported fine on another machine except for those
+  // images (the "Windows project loses character images on Mac" report).
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const isUuid = (str: string) => uuidPattern.test(str);
+  const timestampPattern = /^asset_\d+(?:_[a-z0-9]+)*$/i;
+  const isAssetId = (str: string) => uuidPattern.test(str) || timestampPattern.test(str);
 
-  // Helper to add ID if it looks like a UUID
+  // Helper to add ID if it looks like an asset ID (either format)
   const addIfUuid = (value: any) => {
-    if (typeof value === 'string' && isUuid(value)) {
+    if (typeof value === 'string' && isAssetId(value)) {
       assetIds.add(value);
     }
   };
