@@ -4843,7 +4843,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             {activeTab === 'elements' && (
               <VisualPropertiesPanel
                 layoutMode={
-                  beat && !beatHasAuthorLocations
+                  // Mirror the canvas gates (schemaSlot/schemaSpatial above):
+                  // the panel and the canvas must agree on the mode, or the
+                  // author sees responsive slot controls next to a fixed
+                  // canvas (the "VE options stay responsive after switching
+                  // to fixed" bug). Responsive projects use the slot/spatial
+                  // panel even with lingering baked locations; fixed projects
+                  // use it only while the beat has no author positions yet.
+                  beat && (projectIsResponsive || !beatHasAuthorLocations)
                     ? isSpatialModeBeatType(beat.type)
                       ? 'spatial'
                       : isSlotModeBeatType(beat.type)

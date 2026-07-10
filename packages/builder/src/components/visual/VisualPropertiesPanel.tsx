@@ -283,11 +283,13 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     // composite their flow slots over a background image. titleScreen is
     // spatial, infoText is slot. Either way the slot content tells us
     // what's on stage.
+    // Absolute (fixed-canvas) mode: the baked elements list below is the
+    // stage content, and the slot rows' controls (per-slot intent, action
+    // layout) only affect the responsive renderer — showing them here made
+    // fixed projects look like they were still responsive. Slot rows are
+    // responsive/spatial-mode UI only.
+    if (layoutMode === 'absolute') return [];
     const spec = getSlotSpec(beatType) ?? getSpatialSpec(beatType)?.slots ?? null;
-    // Show slot-content rows whenever the beat TYPE declares slots — even
-    // when this instance has author-positioned absolute locations (layoutMode
-    // 'absolute'). The slot content (title/body/buttons) still describes
-    // what's on stage; the absolute path just decides positioning.
     if (!spec) return [];
     const p = beatParams || {};
     const ellipsize = (s: unknown, n = 60): string => {

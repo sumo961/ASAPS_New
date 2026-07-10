@@ -167,7 +167,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
             />
           </div>
 
-          {/* Phase 2.5 — Layout mode picker */}
+          {/* Phase 2.5 — Layout mode picker. This is the one authoring
+              decision worth making up front, so the two cards explain the
+              contract in author terms (not renderer jargon). */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Layout Mode
@@ -183,9 +185,17 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
                     : 'border-gray-300 hover:border-gray-400'
                 }`}
               >
-                <div className="text-sm font-semibold text-gray-900">Responsive</div>
-                <div className="text-[11px] text-gray-600 leading-snug mt-0.5">
-                  Adapts to any viewport. Slot + spatial layout.
+                <div className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  <span aria-hidden>📱</span> Responsive
+                  {layoutMode === 'responsive' && <span className="ml-auto text-[10px] font-medium text-blue-600">✓ selected</span>}
+                </div>
+                <div className="text-[11px] text-gray-600 leading-snug mt-1">
+                  Text, buttons, and images flow and adapt to any screen —
+                  phone, tablet, or desktop. You guide the layout; the
+                  player's device decides the exact placement.
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1">
+                  Best for stories played on many devices.
                 </div>
               </button>
               <button
@@ -198,12 +208,24 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
                     : 'border-gray-300 hover:border-gray-400'
                 }`}
               >
-                <div className="text-sm font-semibold text-gray-900">Fixed canvas</div>
-                <div className="text-[11px] text-gray-600 leading-snug mt-0.5">
-                  Pixel-precise authoring on a 1024×768 stage.
+                <div className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  <span aria-hidden>🎯</span> Static (fixed canvas)
+                  {layoutMode === 'fixed' && <span className="ml-auto text-[10px] font-medium text-blue-600">✓ selected</span>}
+                </div>
+                <div className="text-[11px] text-gray-600 leading-snug mt-1">
+                  You place every element at exact pixel positions on a
+                  fixed stage. What you see in the editor is exactly what
+                  the player sees, scaled to fit their screen.
+                </div>
+                <div className="text-[10px] text-gray-400 mt-1">
+                  Best for precise, hand-crafted compositions.
                 </div>
               </button>
             </div>
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              You can switch later in Settings → Project — a migrator converts
+              existing beats between the two modes.
+            </p>
           </div>
 
           {/* Phase 2.5 — Orientation policy (only meaningful in responsive) */}
