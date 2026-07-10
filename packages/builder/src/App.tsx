@@ -24,6 +24,10 @@ import { findReferencesByName, relinkReferences } from './components/characters/
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
+import { MergeStoryDialog } from './components/MergeStoryDialog';
+import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
+import { deserializeBeats } from './utils/projectDeserializer';
+import { getStorageManager } from './storage/StorageManager';
 import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, normalizeStory, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
@@ -332,6 +336,7 @@ function App() {
 
   // Import Twine dialog state
   const [showImportTwineDialog, setShowImportTwineDialog] = useState(false);
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
 
   // VCS Panel state
   const [vcsPanelOpen, setVcsPanelOpen] = useState(false);
@@ -3937,6 +3942,76 @@ function App() {
   /**
    * Open Twine import dialog
    */
+
+  // ── Story merge (.asaps → open project) ─────────────────────────────
+  const handleMergeStory = useCallback(async (
+    analysis: MergeSourceAnalysis,
+    decisions: CharacterDecision[],
+  ): Promise<string> => {
+    const result = computeMerge({
+      source: analysis,
+      existingBeats: state.beats.map(b => ({ id: b.id, x: (b as any).x ?? 0, y: (b as any).y ?? 0 })),
+      existingCharacters: characters,
+      existingClusters: state.clusters || [],
+      existingVariables: (globalSettings as any)?.variables || [],
+      existingAssetIds: assets.map(a => a.id),
+      decisions,
+      targetProjectId: currentProject?.id || 'unsaved',
+    });
+
+    // Persist incoming assets + surface them in the asset panel
+    const storage = getStorageManager();
+    const uiAssets: Asset[] = [];
+    for (const stored of result.assets) {
+      if (currentProject) {
+        try {
+          await storage.createAsset(stored);
+        } catch (e) {
+          console.warn('[handleMergeStory] Failed to persist asset', stored.id, e);
+        }
+      }
+      const url = URL.createObjectURL(stored.blob);
+      uiAssets.push({
+        id: stored.id,
+        name: stored.filename,
+        type: stored.mimeType.startsWith('image/') ? 'image' :
+              stored.mimeType.startsWith('audio/') ? 'audio' :
+              stored.mimeType.startsWith('video/') ? 'video' :
+              stored.mimeType.includes('font') ? 'font' : 'image',
+        url,
+        size: stored.size,
+        uploadedAt: new Date(stored.uploadedAt),
+      } as Asset);
+    }
+    if (uiAssets.length > 0) setAssets(prev => [...prev, ...uiAssets]);
+
+    // Characters (renamed/new only — reused ones already exist)
+    if (result.characters.length > 0) {
+      setCharacters(prev => [...prev, ...result.characters]);
+    }
+
+    // Variables union into global settings
+    if (result.variables.length > 0) {
+      setGlobalSettings(prev => ({
+        ...prev,
+        variables: [...(((prev as any)?.variables) || []), ...result.variables],
+      } as GlobalSettings));
+    }
+
+    // Beats + wrapping cluster (single state update, edges extracted)
+    const newBeats = deserializeBeats(result.beats);
+    actions.mergeBeats(newBeats, result.cluster);
+
+    markChanged();
+
+    const { summary } = result;
+    return `Merged "${analysis.storyTitle}": ${summary.beats} beats, ` +
+      `${summary.charactersAdded} new character(s)` +
+      (summary.charactersReused ? ` (${summary.charactersReused} reused)` : '') +
+      `, ${summary.assets} asset(s), ${summary.variablesAdded} variable(s) — ` +
+      `all in cluster "${summary.clusterName}". Save to persist.`;
+  }, [state.beats, state.clusters, characters, assets, globalSettings, currentProject, actions, markChanged]);
+
   const handleImportTwine = useCallback(() => {
     setShowImportTwineDialog(true);
   }, []);
@@ -5776,6 +5851,7 @@ function App() {
         onExportZip={handleExportZip}
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
+        onMergeStory={() => setShowMergeDialog(true)}
         onImportZipFile={handleImportZipFile}
         onImportTwine={handleImportTwine}
         onPreview={handleTogglePreviewWindow}
@@ -6174,6 +6250,13 @@ function App() {
         isOpen={showImportTwineDialog}
         onImport={handleImportTwineComplete}
         onCancel={handleImportTwineCancel}
+      />
+
+      <MergeStoryDialog
+        isOpen={showMergeDialog}
+        onClose={() => setShowMergeDialog(false)}
+        existingCharacters={characters}
+        onMerge={handleMergeStory}
       />
 
       {/* Settings Modal */}

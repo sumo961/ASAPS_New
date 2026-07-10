@@ -229,6 +229,135 @@ export interface ImportResult {
   };
 }
 
+/** One asset parsed out of an .asaps zip — original id (may be null for
+ *  very old zips) + a StoredAsset shell whose id/projectId the caller sets. */
+export interface ParsedZipAsset {
+  id: string | null;
+  asset: Omit<StoredAsset, 'id' | 'projectId'>;
+}
+
+/**
+ * Read all asset binaries + metadata out of an .asaps zip. Pure reader —
+ * shared by importProjectFromZip and the story-merge flow; the caller
+ * decides ids, projectId, and persistence.
+ */
+export async function readAssetsFromZip(zip: JSZip): Promise<ParsedZipAsset[]> {
+  const out: ParsedZipAsset[] = [];
+  // 'videos' was written by the exporter but never scanned on import —
+  // video assets silently vanished from imported projects.
+  const assetFolders = ['backgrounds', 'characters', 'props', 'sounds', 'videos', 'fonts', 'other'];
+
+  for (const folderName of assetFolders) {
+    const folder = zip.folder(folderName);
+    if (!folder) continue;
+
+    // First, read ALL metadata files in this folder to build ID -> metadata map
+    const metadataFiles = Object.keys(zip.files).filter(
+      path => path.startsWith(`${folderName}/`) && path.endsWith('.json')
+    );
+
+    const metadataById = new Map<string, any>();
+    for (const metadataPath of metadataFiles) {
+      const metadataFile = zip.file(metadataPath);
+      if (!metadataFile) continue;
+
+      try {
+        const metadataContent = await metadataFile.async('text');
+        const metadata = JSON.parse(metadataContent);
+        if (metadata.id) {
+          metadataById.set(metadata.id, metadata);
+        }
+      } catch (e) {
+        console.warn(`[readAssetsFromZip] Failed to parse metadata: ${metadataPath}`, e);
+      }
+    }
+
+    // Get all asset files in this folder (non-JSON files)
+    const assetFiles = Object.keys(zip.files).filter(
+      path => path.startsWith(`${folderName}/`) && !path.endsWith('.json') && !zip.files[path].dir
+    );
+
+    for (const filePath of assetFiles) {
+      const file = zip.file(filePath);
+      if (!file) continue;
+
+      // Get filename from path - may be in format "assetId_originalFilename" or just "originalFilename"
+      const fullFilename = filePath.split('/').pop() || 'unknown';
+
+      let extractedId: string | null = null;
+      let originalFilename = fullFilename;
+
+      // Deterministic first pass: the exporter names entries
+      // "<assetId>_<filename>" and ships a metadata JSON per asset —
+      // prefix-match against the known IDs (works for every ID format,
+      // including timestamp IDs with alphanumeric suffixes that the
+      // regexes below can't parse unambiguously).
+      for (const knownId of metadataById.keys()) {
+        if (fullFilename.startsWith(knownId + '_')) {
+          extractedId = knownId;
+          originalFilename = fullFilename.slice(knownId.length + 1);
+          break;
+        }
+      }
+
+      // Try UUID pattern
+      const uuidPattern = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(.+)$/i;
+      const uuidMatch = extractedId ? null : fullFilename.match(uuidPattern);
+      if (uuidMatch) {
+        extractedId = uuidMatch[1];
+        originalFilename = uuidMatch[2];
+      } else if (!extractedId) {
+        // Try timestamp-based asset ID pattern: asset_TIMESTAMP_INDEX_filename.ext
+        const timestampPattern = /^(asset_\d+_\d+)_(.+)$/;
+        const timestampMatch = fullFilename.match(timestampPattern);
+        if (timestampMatch) {
+          extractedId = timestampMatch[1];
+          originalFilename = timestampMatch[2];
+        }
+      }
+
+      // Look up metadata by ID (from filename prefix or from metadata file)
+      let assetMetadata = extractedId ? metadataById.get(extractedId) : null;
+
+      // Fallback: try to find metadata by original filename (for legacy ZIP format)
+      if (!assetMetadata) {
+        for (const [id, meta] of metadataById) {
+          if (meta.filename === fullFilename || meta.filename === originalFilename) {
+            assetMetadata = meta;
+            extractedId = extractedId || id;
+            break;
+          }
+          if (fullFilename.endsWith('_' + meta.filename)) {
+            assetMetadata = meta;
+            extractedId = extractedId || id;
+            break;
+          }
+        }
+      }
+
+      const finalMetadata = assetMetadata || {};
+
+      // Read asset blob
+      const blob = await file.async('blob');
+
+      out.push({
+        id: extractedId || finalMetadata.id || null,
+        asset: {
+          type: (finalMetadata.type || getAssetTypeFromFolder(folderName)) as AssetType,
+          filename: finalMetadata.filename || originalFilename,
+          mimeType: finalMetadata.mimeType || blob.type || 'application/octet-stream',
+          size: blob.size,
+          blob: blob,
+          uploadedAt: finalMetadata.uploadedAt ? new Date(finalMetadata.uploadedAt) : new Date(),
+          metadata: finalMetadata.metadata,
+        },
+      });
+    }
+  }
+
+  return out;
+}
+
 /**
  * Import project from ZIP file
  * Extracts and restores a project and all its assets to IndexedDB
@@ -292,150 +421,34 @@ export async function importProjectFromZip(
 
     // Import assets first
     const assetIdMap = new Map<string, string>(); // old ID -> new ID mapping
-    // 'videos' was written by the exporter but never scanned on import —
-    // video assets silently vanished from imported projects.
-    const assetFolders = ['backgrounds', 'characters', 'props', 'sounds', 'videos', 'fonts', 'other'];
+    const parsedAssets = await readAssetsFromZip(zip);
 
-    for (const folderName of assetFolders) {
-      const folder = zip.folder(folderName);
-      if (!folder) continue;
+    for (const parsed of parsedAssets) {
+      // Generate new asset ID or use original
+      const originalId = parsed.id;
+      const newAssetId = options.generateNewId ? uuidv4() : (originalId || uuidv4());
 
-      // First, read ALL metadata files in this folder to build ID -> metadata map
-      const metadataFiles = Object.keys(zip.files).filter(
-        path => path.startsWith(`${folderName}/`) && path.endsWith('.json')
-      );
-
-      const metadataById = new Map<string, any>();
-      for (const metadataPath of metadataFiles) {
-        const metadataFile = zip.file(metadataPath);
-        if (!metadataFile) continue;
-
-        try {
-          const metadataContent = await metadataFile.async('text');
-          const metadata = JSON.parse(metadataContent);
-          if (metadata.id) {
-            metadataById.set(metadata.id, metadata);
-            console.log(`[importProjectFromZip] Loaded metadata for ID: ${metadata.id} (filename: ${metadata.filename})`);
-          }
-        } catch (e) {
-          console.warn(`[importProjectFromZip] Failed to parse metadata: ${metadataPath}`, e);
-        }
+      // Store old -> new mapping (needed for updating story references)
+      if (originalId) {
+        assetIdMap.set(originalId, newAssetId);
+        console.log(`[importProjectFromZip] Asset ID mapping: ${originalId} -> ${newAssetId}`);
       }
 
-      // Get all asset files in this folder (non-JSON files)
-      const assetFiles = Object.keys(zip.files).filter(
-        path => path.startsWith(`${folderName}/`) && !path.endsWith('.json') && !zip.files[path].dir
-      );
+      const storedAsset: StoredAsset = {
+        ...parsed.asset,
+        id: newAssetId,
+        projectId: projectId,
+      };
 
-      for (const filePath of assetFiles) {
-        const file = zip.file(filePath);
-        if (!file) continue;
+      // Save to IndexedDB
+      await storage.createAsset(storedAsset);
 
-        // Get filename from path - may be in format "assetId_originalFilename" or just "originalFilename"
-        const fullFilename = filePath.split('/').pop() || 'unknown';
-
-        // Try to extract asset ID from filename prefix
-        // Supports two formats:
-        // 1. UUID format: 550e8400-e29b-41d4-a716-446655440000_filename.ext
-        // 2. Timestamp format: asset_1234567890123_50_filename.ext
-        let extractedId: string | null = null;
-        let originalFilename = fullFilename;
-
-        // Deterministic first pass: the exporter names entries
-        // "<assetId>_<filename>" and ships a metadata JSON per asset —
-        // prefix-match against the known IDs (works for every ID format,
-        // including timestamp IDs with alphanumeric suffixes that the
-        // regexes below can't parse unambiguously).
-        for (const knownId of metadataById.keys()) {
-          if (fullFilename.startsWith(knownId + '_')) {
-            extractedId = knownId;
-            originalFilename = fullFilename.slice(knownId.length + 1);
-            break;
-          }
-        }
-
-        // Try UUID pattern first
-        const uuidPattern = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_(.+)$/i;
-        const uuidMatch = extractedId ? null : fullFilename.match(uuidPattern);
-        if (uuidMatch) {
-          extractedId = uuidMatch[1];
-          originalFilename = uuidMatch[2];
-          console.log(`[importProjectFromZip] Extracted UUID from filename: ${extractedId} -> ${originalFilename}`);
-        } else {
-          // Try timestamp-based asset ID pattern: asset_TIMESTAMP_INDEX_filename.ext
-          const timestampPattern = /^(asset_\d+_\d+)_(.+)$/;
-          const timestampMatch = extractedId ? null : fullFilename.match(timestampPattern);
-          if (timestampMatch) {
-            extractedId = timestampMatch[1];
-            originalFilename = timestampMatch[2];
-            console.log(`[importProjectFromZip] Extracted timestamp ID from filename: ${extractedId} -> ${originalFilename}`);
-          }
-        }
-
-        // Look up metadata by ID (from filename prefix or from metadata file)
-        const assetMetadata = extractedId ? metadataById.get(extractedId) : null;
-
-        // Fallback: try to find metadata by original filename (for legacy ZIP format)
-        // Also check if ZIP filename ends with metadata filename (handles ID prefix case)
-        let fallbackMetadata: any = null;
-        if (!assetMetadata) {
-          for (const [id, meta] of metadataById) {
-            // Exact match
-            if (meta.filename === fullFilename || meta.filename === originalFilename) {
-              fallbackMetadata = meta;
-              extractedId = extractedId || id; // Use metadata ID if we don't have one
-              console.log(`[importProjectFromZip] Found metadata by filename fallback: ${meta.filename} (id: ${id})`);
-              break;
-            }
-            // Check if ZIP filename ends with metadata filename (handles unknown ID prefix formats)
-            if (fullFilename.endsWith('_' + meta.filename)) {
-              fallbackMetadata = meta;
-              extractedId = extractedId || id;
-              console.log(`[importProjectFromZip] Found metadata by filename suffix: ${meta.filename} (id: ${id})`);
-              break;
-            }
-          }
-        }
-
-        const finalMetadata = assetMetadata || fallbackMetadata || {};
-
-        // Read asset blob
-        const blob = await file.async('blob');
-
-        // Generate new asset ID or use original
-        // Use extracted ID from filename, or fallback to metadata ID
-        const originalId = extractedId || finalMetadata.id;
-        const newAssetId = options.generateNewId ? uuidv4() : (originalId || uuidv4());
-
-        // Store old -> new mapping (needed for updating story references)
-        if (originalId) {
-          assetIdMap.set(originalId, newAssetId);
-          console.log(`[importProjectFromZip] Asset ID mapping: ${originalId} -> ${newAssetId}`);
-        }
-
-        // Create stored asset
-        const storedAsset: StoredAsset = {
-          id: newAssetId,
-          projectId: projectId,
-          type: (finalMetadata.type || getAssetTypeFromFolder(folderName)) as AssetType,
-          filename: finalMetadata.filename || originalFilename,
-          mimeType: finalMetadata.mimeType || blob.type || 'application/octet-stream',
-          size: blob.size,
-          blob: blob,
-          uploadedAt: finalMetadata.uploadedAt ? new Date(finalMetadata.uploadedAt) : new Date(),
-          metadata: finalMetadata.metadata
-        };
-
-        // Save to IndexedDB
-        await storage.createAsset(storedAsset);
-
-        console.log('[importProjectFromZip] Asset imported:', {
-          id: newAssetId,
-          originalId: originalId,
-          filename: storedAsset.filename,
-          type: storedAsset.type
-        });
-      }
+      console.log('[importProjectFromZip] Asset imported:', {
+        id: newAssetId,
+        originalId: originalId,
+        filename: storedAsset.filename,
+        type: storedAsset.type
+      });
     }
 
     // Update asset references in story if IDs changed

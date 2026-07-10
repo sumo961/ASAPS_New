@@ -65,6 +65,10 @@ interface StoryBuilderActions {
   exportStory: (assets?: any[], characters?: any[]) => string;
   importStory: (xmlContent: string, options?: ImportStoryOptions) => Promise<ImportStoryResult>;
   importBeats: (beats: Beat[], options?: { title?: string; author?: string; firstBeatId?: string }) => void;
+  /** Story-merge: APPEND already-remapped Beat instances (+ their
+   *  connections, + an optional wrapping cluster) to the current story
+   *  without touching existing beats. */
+  mergeBeats: (beats: Beat[], cluster?: Cluster) => void;
   clearStory: () => void;
   updateSettings: (settings: any) => void;
   loadStoryData: (storyData: any) => void;
@@ -202,6 +206,40 @@ export function useStoryBuilder() {
     setState(prev => ({
       ...prev,
       beats: [...prev.beats, beat],
+    }));
+  }, []);
+
+  // Story-merge: append a remapped batch of beats + their extracted
+  // connections (+ the wrapping cluster) in one state update. Unlike
+  // importBeats this never replaces the existing story.
+  const mergeBeats = useCallback((beats: Beat[], cluster?: Cluster) => {
+    const connections: Array<{ source: string; target: string; label?: string }> = [];
+    const seen = new Set<string>();
+    for (const beat of beats) {
+      if (typeof beat.getConnections === 'function') {
+        for (const conn of beat.getConnections()) {
+          if (conn.targetId) {
+            const key = `${beat.id}->${conn.targetId}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              connections.push({ source: beat.id, target: conn.targetId, label: conn.label });
+            }
+          }
+        }
+      }
+      if (beat.defaultTarget) {
+        const key = `${beat.id}->${beat.defaultTarget}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          connections.push({ source: beat.id, target: beat.defaultTarget });
+        }
+      }
+    }
+    setState(prev => ({
+      ...prev,
+      beats: [...prev.beats, ...beats],
+      connections: [...prev.connections, ...connections],
+      clusters: cluster ? [...(prev.clusters || []), cluster] : prev.clusters,
     }));
   }, []);
 
@@ -1232,6 +1270,7 @@ export function useStoryBuilder() {
     exportStory,
     importStory,
     importBeats,
+      mergeBeats,
     clearStory,
     updateSettings,
     loadStoryData,

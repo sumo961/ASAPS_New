@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
+import { GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { NewProjectPicker } from './NewProjectPicker';
@@ -31,6 +31,8 @@ interface HeaderProps {
   onExportZip?: () => void;
   onExportAsmlWithAssets?: () => void;
   onImportZip?: () => void;
+  /** Merge another story (.asaps) into the open project. */
+  onMergeStory?: () => void;
   /** Drag-drop variant of import — takes a pre-selected File. The
    *  Project Browser's dropzone uses this so authors can drag a
    *  .asaps zip directly onto the modal without going through the
@@ -92,6 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportZip,
   onExportAsmlWithAssets,
   onImportZip,
+  onMergeStory,
   onImportZipFile,
   onImportTwine,
   onPreview,
@@ -417,6 +420,19 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <Upload className="w-4 h-4" />
                       Import Project (ZIP)
+                    </button>
+                  )}
+                  {onMergeStory && (
+                    <button
+                      onClick={() => {
+                        onMergeStory();
+                        setShowImportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Merge another story (.asaps) into this project"
+                    >
+                      <GitMerge className="w-4 h-4" />
+                      Merge Story (.asaps)
                     </button>
                   )}
                   {onImportTwine && (
