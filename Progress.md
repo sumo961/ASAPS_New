@@ -1,5 +1,35 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-10: Static projects get static VE options + clearer layout choice (v0.9.72)
+
+### Overview
+
+A focused fix release for the fixed-canvas (static) authoring experience. **The Visual Editor now shows the static variety of options in static projects** — previously, after switching a project to Fixed canvas, the VE kept presenting the responsive controls (the "On stage (from slots)" rows with per-slot anchor/pin intent and the Action layout group) next to a pixel-positioned canvas, making it look like the switch hadn't happened. And per author request, the **New Project dialog now explains the Responsive vs Static choice in plain author terms**, with a note that the mode can be changed later.
+
+### Visual Editor: mode-consistent options (the bug)
+
+Two divergent gates caused the mismatch:
+
+- **`VisualPropertiesPanel` rendered slot rows whenever the beat TYPE declares slots**, deliberately ignoring the instance's layout mode. In absolute (fixed) mode those controls only affect the responsive renderer and duplicate the baked elements list — so static projects looked permanently responsive. The panel now returns no slot rows for `layoutMode: 'absolute'`; the baked elements list (with z-order/lock/visibility) is the stage content there.
+- **The panel's `layoutMode` prop disagreed with the canvas gates**: the prop used `!beatHasAuthorLocations` alone while the canvas uses `projectIsResponsive || !beatHasAuthorLocations`. Aligned, so panel and canvas always agree on the mode.
+
+Verified live with browser automation + screenshots: responsive project → slot panel + viewport preview; Settings → Fixed canvas → migrator bakes schema-default positions and the VE shows the static options (element rows, 1024×768 pixel stage); switching back restores the responsive editor. The layout-mode migrator itself was confirmed working in both directions ("baked 2 schema-default positions" / "cleared 2 baked positions, inferred slotIntent").
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualPropertiesPanel.tsx` — slot rows are responsive/spatial-mode UI only
+- `packages/builder/src/components/visual/VisualWorkspace.tsx` — panel layoutMode prop mirrors the canvas gates
+
+### New Project dialog: clear Responsive vs Static choice
+
+- The layout-mode picker's copy no longer speaks renderer jargon ("Slot + spatial layout"). Two cards now explain the authoring contract: **Responsive** ("text, buttons, and images flow and adapt to any screen — you guide the layout; the player's device decides exact placement; best for stories played on many devices") vs **Static (fixed canvas)** ("you place every element at exact pixel positions on a fixed stage — what you see in the editor is exactly what the player sees; best for precise, hand-crafted compositions").
+- A ✓ selected marker on the active card and a footnote that the mode can be switched later in Settings → Project via the one-shot migrator.
+
+**Files modified:**
+- `packages/builder/src/components/NewProjectDialog.tsx`
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.72.
+
+---
+
 ## 2026-07-10: Story merge + calculations + full i18n coverage + cross-machine fixes (v0.9.71)
 
 ### Overview
