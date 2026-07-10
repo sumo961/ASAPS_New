@@ -1,5 +1,67 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-10: Story merge + calculations + full i18n coverage + cross-machine fixes (v0.9.71)
+
+### Overview
+
+A big authoring release with two new capabilities and a set of long-standing bugs fixed. **Story Merge** (Import → Merge Story): combine another exported story into the open project without conflicts — incoming beats arrive as their own cluster beside the existing graph, character collisions are decided per character (same person vs. keep both), and every ID/reference is remapped safely. **setVariable calculations**: values starting with '=' are evaluated as arithmetic (`= (var1 + var2) / 100`) with variables, counters, and character-scoped counters — no new beat type needed. Alongside these: text-box **visibility/opacity settings now work everywhere** (they were Visual-Editor-only), **character images survive .asaps export across machines** (the "Windows project loses character images on Mac" report), and the translation audit closed **every remaining gap** — a new runtime UI-string catalog means even renderer chrome and AI loading spinners translate, in the preview and in exports.
+
+### Story Merge (new feature)
+
+- **Import → "Merge Story (.asaps)"** merges an exported story into the open project. Design: incoming beats land as a disconnected group in a new organizational cluster placed beside the existing graph (author wires the stories together afterwards); current project's settings/theme win.
+- **Per-character collision decisions** in the merge dialog: "same character — reuse" rewires all incoming references to the existing character; "keep both" renames the incoming one ("Elena 2" / slug `elena_2`). Collision detection compares both the machine name and displayName, normalized — `environmental_consultant` collides with "Environmental Consultant". Undecided collisions default to keep-both (never silently fuse).
+- **Conflict-free by construction**: beat/character/asset IDs keep their values unless they collide (then suffixed); all references in incoming content are rewritten via a value-equality deep walk (connections, nested dialog trees, condition targets, asset refs). Character name references (speaker etc.) rewrite through a curated field list so story prose is never touched. Variables union by name.
+- Verified live end-to-end: 20-beat project + 2-beat story → 22 beats, collision dialog, reuse honored, cluster created.
+
+**Files modified:**
+- `packages/builder/src/utils/projectMerge.ts` (new), `__tests__/projectMerge.test.ts` (new, 11 tests)
+- `packages/builder/src/components/MergeStoryDialog.tsx` (new), `Header.tsx`, `App.tsx`
+- `packages/builder/src/hooks/useStoryBuilder.ts` — new `mergeBeats` bulk action
+- `packages/builder/src/utils/projectZipManager.ts` — `readAssetsFromZip` extracted as shared pure reader
+
+### setVariable calculations (new)
+
+- **Values starting with `=` are evaluated as arithmetic**: `= (var1 + var2) / 100`. Supports + − × ÷, parentheses, unary minus, all variable-reference syntaxes (`${name}`, `$name$`, `{name}`, bare identifier) and character-scoped counters as `owner.counter` (e.g. `alice.trust`). Safe evaluator (no eval); division by zero / unknown names fail cleanly to the legacy behavior with a console warning — never NaN in story state. Existing stories unaffected ('=' is opt-in; `"5+3"` stays a literal).
+- Works for both the variable path and the counter path (all operations: set/change/add/subtract/multiply/divide, incl. character-scoped targets).
+
+**Files modified:**
+- `packages/core/src/utils/expression.ts` (new, 31 tests), `SetVariableBeat.ts` (+11 tests), `beat-definitions/core-beats.json`
+
+### Text box settings fixed (visibility + opacity)
+
+- **Settings → Text Box → "Box Visibility" now works in the Preview Window, the exported player, and slot-mode (responsive) beats** — it was only wired into the Visual Editor. The setting now rides the theme: both theme converters pass it, the renderer derives its hide flags from it, slot-mode cards and buttons honor it (hideText strips text/dialog cards; hideAll also renders bare button labels). PlayerEngine's converter also gained the previously missing `hideTitleTextBox` passthrough.
+- Opacity confirmed working end-to-end at the same time (verified via DOM assertions: 25% opacity → `rgba(15,52,96,0.25)`).
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx`, `SlotFlowView.tsx`, `renderers/ReactRenderer.tsx`
+- `packages/builder/src/utils/themeConverter.ts`, `packages/player/src/PlayerEngine.ts`
+
+### Character images survive .asaps round-trips (Windows → Mac report)
+
+- Root cause: the exporter's referenced-but-unlinked asset safety net only accepted **UUID-format asset IDs**, but every in-app upload path generates timestamp-format IDs (`asset_<ts>_<suffix>`). A character image that had fallen out of the project's linked-asset list was silently omitted from the .asaps — invisible on the origin machine (asset still in local storage), lost after import elsewhere.
+- Also fixed while tracing: the import never scanned the `videos/` folder the exporter writes (video assets vanished on import), and zip-entry asset-ID extraction now prefix-matches against shipped metadata IDs (handles alphanumeric ID suffixes the old regexes couldn't).
+
+**Files modified:**
+- `packages/builder/src/utils/projectZipManager.ts`, `__tests__/projectZipManager.test.ts` (3 new round-trip tests)
+
+### Translation: every known gap closed
+
+- **New runtime UI-string catalog** (`@asaps/core/i18n/uiStrings`): renderer chrome that was hardcoded English now translates — conversation input placeholder and "Listening...", inventory HUD title/expand hint, all image-picker texts, Continue/Play Again/Credits fallbacks, and all 19 AI loading messages ("Thinking...", "{name} is getting ready to speak..."). Preview Window batch-AI-translates the catalog per active language; HTML exports seed it into `globalSettings.uiStrings` (translated by both export flows); the exported player installs it and wraps renderLoading — loading spinners finally translate in exports.
+- **Authored-text extraction gaps**: `aiConversation.openingLine` (the NPC's scripted first message) and `arBeat.anchors[].label` now extracted by both extractors; multiChoice choice labels translate via the movementChoice displayText pattern (routing by id — safe); qrScan helper/cancel, arBeat cancel, webView done labels; the exported player's on-the-fly extractor now covers inventory items, character/counter display names, and HUD labels (matching the builder-side extractor).
+
+**Files modified:**
+- `packages/core/src/i18n/uiStrings.ts` (new, 9 tests), `packages/core/src/beats/MultiChoiceBeat.ts`
+- `packages/builder/src/export/StoryTranslator.ts`, `HtmlExporter.ts`, `pages/PreviewWindow.tsx`
+- `packages/renderer/src/components/ImageInputElement.tsx`, `CharacterInventoryFrame.tsx`, `SlotFlowView.tsx`, `renderers/ReactRenderer.tsx`
+- `packages/player-web/src/WebPlayer.tsx`, `packages/builder/public/player-web.js` (rebuilt)
+
+### CI
+
+- Test pipeline fully green again (a stale fixture in `projectDeserializer.test.ts` had been failing since the v0.9.68 auto-repair feature). Suites at release: core 2482, renderer 483, builder 2192 — all passing.
+- `package.json`, `apps/builder-desktop/package.json` — version bump to 0.9.71.
+
+---
+
 ## 2026-07-09: Input Image beat — AI vision analysis of player photos (v0.9.70)
 
 ### Overview

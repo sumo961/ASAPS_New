@@ -22,18 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.70** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.70 adds a new beat type: Input
-Image.** The player submits a photo — the camera on mobile, a file picker on
-desktop — a vision-capable AI model analyzes it against an author-defined
-prompt, and the answer text lands in a story variable (think "photograph
-something red and the story reacts to what you shot"). Photos are downscaled
-client-side before upload, and every failure mode (no vision provider, player
-skip, timeout, API error) resolves to an author-set fallback value so the
-story never stalls. Works in the Preview Window and in HTML exports, with
-Claude, OpenAI, and local/Ollama vision models (llava, qwen2.5-vl, gemma3, …);
-branching on the result composes with the AI Condition beat. Users on v0.9.69
-will auto-update. For what shipped when, see:
+Current release: **v0.9.71** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.71 brings Story Merge and
+calculations.** *Merge Story* (Import menu) combines another exported story
+into the open project without conflicts: incoming beats arrive as their own
+cluster beside your graph, and character collisions are decided per character
+(same person vs. keep both). *setVariable* now evaluates arithmetic — a value
+starting with '=' like `= (var1 + var2) / 100` computes with variables,
+counters, and character-scoped counters (existing stories unaffected). Also
+fixed: text-box visibility/opacity settings now work in the preview and
+exported stories (not just the Visual Editor), character images survive
+.asaps export across machines (the Windows→Mac report), and translation
+coverage is now complete — even renderer chrome and AI loading messages
+translate, in preview and exports. Users on v0.9.70 will auto-update. For
+what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
