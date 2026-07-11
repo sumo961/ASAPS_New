@@ -867,7 +867,7 @@ export interface HtmlExportOptions {
   aiApiKey?: string;
   /** Custom base URL for API (OpenAI-compatible endpoints) */
   aiBaseUrl?: string;
-  /** Model override (e.g., 'gpt-5.5', 'claude-sonnet-4-6') */
+  /** Model override (e.g., 'gpt-5.6-sol', 'claude-sonnet-4-6') */
   aiModel?: string;
   /** TTS provider type */
   ttsProvider?: string;

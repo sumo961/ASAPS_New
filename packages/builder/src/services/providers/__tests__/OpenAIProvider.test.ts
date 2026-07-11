@@ -48,10 +48,10 @@ describe('configure', () => {
     expect(p.isReady()).toBe(false);
   });
 
-  it('defaults the model to gpt-5.5 and proxies the default OpenAI endpoint', () => {
+  it('defaults the model to gpt-5.6-sol and proxies the default OpenAI endpoint', () => {
     p.configure(cfg());
     expect(p.isReady()).toBe(true);
-    expect((p as any).model).toBe('gpt-5.5');
+    expect((p as any).model).toBe('gpt-5.6-sol');
     expect((p as any).useProxy).toBe(true); // no baseUrl → proxy
     expect((p as any).useJsonFormat).toBe(true); // json_object on for default
   });

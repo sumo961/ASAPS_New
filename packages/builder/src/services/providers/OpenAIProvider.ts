@@ -33,7 +33,7 @@ import { requiresMaxCompletionTokens, isReasoningModel } from './openai-utils';
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
   private client: OpenAI | null = null;
-  private model: string = 'gpt-5.5';
+  private model: string = 'gpt-5.6-sol';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
@@ -79,7 +79,7 @@ export class OpenAIProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'gpt-5.5';
+      this.model = config.model || 'gpt-5.6-sol';
 
       // Disable response_format for third-party providers that may not support it
       // (e.g., Moonshot, DeepSeek, local Ollama, etc.)

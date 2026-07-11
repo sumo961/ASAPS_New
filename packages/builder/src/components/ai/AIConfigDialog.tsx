@@ -40,13 +40,18 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
   },
   openai: {
     name: 'OpenAI',
-    description: 'GPT-5 (reasoning capable)',
+    description: 'GPT-5.6 (Sol / Terra / Luna)',
     defaultBaseUrl: '',
-    defaultModel: 'gpt-5.5',
+    // GPT-5.6 family (GA 2026-07-09): gpt-5.6-sol (flagship), gpt-5.6-terra
+    // (≈5.5 performance at half price), gpt-5.6-luna (fastest/cheapest).
+    // The bare 'gpt-5.6' alias routes to Sol; we pin the explicit id for
+    // deterministic routing per OpenAI's guidance. Sol costs the same as
+    // gpt-5.5 ($5/$30 per MTok) since OpenAI's May 2026 reprice.
+    defaultModel: 'gpt-5.6-sol',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Get your API key from platform.openai.com',
-    modelHelp: 'Leave empty for default model',
+    modelHelp: 'e.g. gpt-5.6-sol (flagship), gpt-5.6-terra (balanced), gpt-5.6-luna (fastest). Leave empty for default.',
   },
   local: {
     name: 'Local LLM',
@@ -374,7 +379,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'claude'
                 ? 'Claude 4+ extended thinking allocates a thinking budget before responding. Temperature is forced to 1.0 when enabled. Only applies to the direct Anthropic endpoint; most Claude-compatible proxies do not support this.'
-                : 'GPT-5 reasoning uses max_completion_tokens and ignores temperature. Leave blank to use the model default (gpt-5.5 defaults to none).'}
+                : 'GPT-5.x reasoning uses max_completion_tokens and ignores temperature. Values none–xhigh apply to gpt-5.5 and the gpt-5.6 family (Sol/Terra/Luna). Leave blank to use the model default.'}
             </p>
           </div>
 

@@ -406,7 +406,7 @@ Respond with ONLY the category name, nothing else.`;
         'Authorization': `Bearer ${config.apiKey || ''}`,
       },
       body: JSON.stringify({
-        model: config.model || 'gpt-5.2',
+        model: config.model || 'gpt-5.6-sol',
         messages: [{
           role: 'user',
           content: [
@@ -446,7 +446,7 @@ Respond with ONLY the category name, nothing else.`;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: model || 'gpt-5.2',
+        model: model || 'gpt-5.6-sol',
         messages: [{ role: 'user', content: prompt }],
         max_completion_tokens: maxTokens || 1000,
       }),
@@ -515,7 +515,7 @@ Respond with ONLY the category name, nothing else.`;
         'Authorization': `Bearer ${apiKey || ''}`,
       },
       body: JSON.stringify({
-        model: model || 'gpt-5.2',
+        model: model || 'gpt-5.6-sol',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

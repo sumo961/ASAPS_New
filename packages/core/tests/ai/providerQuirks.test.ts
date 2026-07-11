@@ -37,6 +37,16 @@ describe('requiresMaxCompletionTokens', () => {
       expect(requiresMaxCompletionTokens('gpt-5-turbo')).toBe(true);
     });
 
+    it('gpt-5.6 tier family (Sol / Terra / Luna, GA 2026-07-09)', () => {
+      // OpenAI's tiered naming: generation number + capability tier.
+      // All ride the gpt-5 prefix, so detection must cover them.
+      expect(requiresMaxCompletionTokens('gpt-5.6-sol')).toBe(true);
+      expect(requiresMaxCompletionTokens('gpt-5.6-terra')).toBe(true);
+      expect(requiresMaxCompletionTokens('gpt-5.6-luna')).toBe(true);
+      expect(requiresMaxCompletionTokens('gpt-5.6')).toBe(true); // alias → Sol
+      expect(requiresMaxCompletionTokens('gpt-5.5')).toBe(true);
+    });
+
     it('gpt-4o family', () => {
       expect(requiresMaxCompletionTokens('gpt-4o')).toBe(true);
       expect(requiresMaxCompletionTokens('gpt-4o-mini')).toBe(true);
@@ -127,6 +137,13 @@ describe('isReasoningModel', () => {
     expect(isReasoningModel('O1')).toBe(true);
     expect(isReasoningModel('GPT-5-TURBO')).toBe(true);
   });
+  it('detects the gpt-5.6 tier family as reasoning models', () => {
+    expect(isReasoningModel('gpt-5.6-sol')).toBe(true);
+    expect(isReasoningModel('gpt-5.6-terra')).toBe(true);
+    expect(isReasoningModel('gpt-5.6-luna')).toBe(true);
+    expect(isReasoningModel('gpt-5.6')).toBe(true);
+  });
+
 });
 
 describe('effectiveMaxTokens', () => {
