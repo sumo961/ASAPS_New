@@ -220,6 +220,19 @@ describe('computeMerge', () => {
     expect(result.cluster.name).toBe('Merged: Side Story');
     expect(result.beats.every(b => b.cluster === result.cluster.id)).toBe(true);
   });
+
+  it('grows the merged cluster container for large merges (default grid rows)', () => {
+    const source = makeSource({
+      storyTitle: 'Big Story',
+      // 22 beats → 11 grid rows → needs 1260px height (800×600 overflowed)
+      incomingBeats: Array.from({ length: 22 }, (_, i) => ({
+        id: `b${i}`, type: 'infoText', x: i * 10, y: 0, connections: [],
+      })),
+    });
+    const result = computeMerge({ ...baseInput, source });
+    expect(result.cluster.containerBounds.width).toBe(800); // keeps the roomier default width
+    expect(result.cluster.containerBounds.height).toBe(1260);
+  });
 });
 
 describe('computeMerge slug/display collisions', () => {

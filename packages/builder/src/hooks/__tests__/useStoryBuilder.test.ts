@@ -184,6 +184,34 @@ describe('clusters', () => {
     expect(result.current.state.containerBeatPositions).toEqual([]);
   });
 
+  it('moveBeatToCluster grows the container to fit the default member grid', () => {
+    const { result } = setup();
+    act(() => result.current.actions.addCluster({
+      ...cluster('c1'),
+      containerBounds: { width: 400, height: 300 },
+    } as any));
+    // 10 members → 5 grid rows → needs 600px height
+    for (let i = 0; i < 10; i++) {
+      act(() => { result.current.actions.addBeat('infoText', undefined, { id: `m${i}` }); });
+      act(() => result.current.actions.moveBeatToCluster(`m${i}`, 'c1'));
+    }
+    const c: any = result.current.state.clusters[0];
+    expect(c.containerBounds.height).toBe(600);
+    expect(c.containerBounds.width).toBe(400);
+  });
+
+  it('moveBeatToCluster never shrinks an already-large container', () => {
+    const { result } = setup();
+    act(() => result.current.actions.addCluster({
+      ...cluster('c1'),
+      containerBounds: { width: 900, height: 800 },
+    } as any));
+    act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'm0' }); });
+    act(() => result.current.actions.moveBeatToCluster('m0', 'c1'));
+    const c: any = result.current.state.clusters[0];
+    expect(c.containerBounds).toEqual({ width: 900, height: 800 });
+  });
+
   it('removeBeatFromCluster clears membership + container position, beat and connections survive', () => {
     const { result } = setup();
     act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'a' }); });

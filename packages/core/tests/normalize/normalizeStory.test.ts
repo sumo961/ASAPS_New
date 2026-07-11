@@ -83,6 +83,20 @@ describe('buildClustersFromBeats — auto-create from per-beat strings', () => {
     expect(buildClustersFromBeats(beats)).toEqual([]);
   });
 
+  it('sizes containers for the editor member grid, not the raw bbox', () => {
+    // 10 beats spread over a huge horizontal range: the old bbox sizing
+    // would produce a flat, wide box; the member grid needs 5 rows.
+    const beats = Array.from({ length: 10 }, (_, i) => ({
+      id: `b${i}`,
+      type: 'infoText',
+      cluster: 'Act I',
+      position: { x: i * 500, y: 0 },
+    }));
+    const clusters = buildClustersFromBeats(beats);
+    expect(clusters.length).toBe(1);
+    expect(clusters[0].containerBounds).toEqual({ width: 400, height: 600 });
+  });
+
   it('reads x/y from top-level when position is absent', () => {
     const beats = [
       { id: 'b1', type: 'infoText', cluster: 'X', x: 100, y: 200 },

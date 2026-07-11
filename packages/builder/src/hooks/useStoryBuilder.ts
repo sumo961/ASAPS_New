@@ -16,6 +16,7 @@ import {
 } from '@asaps/core';
 import type { DialogNode } from '@asaps/core';
 import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
+import { grownClusterBounds } from '../utils/clusterAutosize';
 import {
   importAsmlAssets,
   linkAssetsToBeats,
@@ -953,20 +954,31 @@ export function useStoryBuilder() {
     }));
   }, []);
 
-  // Move beat to cluster
+  // Move beat to cluster. Also grows (never shrinks) the container so the
+  // new member's default-grid slot is inside the box — without this, drops
+  // into a small cluster render outside its bounds.
   const moveBeatToCluster = useCallback((beatId: string, clusterId: string) => {
     console.log(`[useStoryBuilder] Moving beat ${beatId} to cluster ${clusterId}`);
-    setState(prev => ({
-      ...prev,
-      beats: prev.beats.map(beat => {
+    setState(prev => {
+      const beats = prev.beats.map(beat => {
         if (beat.id === beatId) {
           // Update the cluster property on the existing Beat instance
           beat.cluster = clusterId;
           console.log(`[useStoryBuilder] Beat ${beat.name} now in cluster ${clusterId}`);
         }
         return beat;
-      }),
-    }));
+      });
+      const memberCount = beats.filter(b => b.cluster === clusterId).length;
+      return {
+        ...prev,
+        beats,
+        clusters: prev.clusters.map(cluster =>
+          cluster.id === clusterId
+            ? { ...cluster, containerBounds: grownClusterBounds(cluster.containerBounds, memberCount) }
+            : cluster
+        ),
+      };
+    });
   }, []);
 
   // Move beat position within container (for spatial clusters)

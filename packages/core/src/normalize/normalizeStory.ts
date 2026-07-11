@@ -104,8 +104,6 @@ export function normalizeCharacter(c: any): { character: any; changed: boolean }
 export function buildClustersFromBeats(beats: any[]): any[] {
   if (!Array.isArray(beats) || beats.length === 0) return [];
   const PADDING = 80;
-  const BEAT_W = 240;
-  const BEAT_H = 100;
   const buckets = new Map<string, Array<{ x: number; y: number }>>();
   for (const b of beats) {
     const name = typeof b?.cluster === 'string' ? b.cluster.trim() : '';
@@ -119,14 +117,20 @@ export function buildClustersFromBeats(beats: any[]): any[] {
   for (const [name, positions] of buckets.entries()) {
     const minX = Math.min(...positions.map(p => p.x));
     const minY = Math.min(...positions.map(p => p.y));
-    const maxX = Math.max(...positions.map(p => p.x + BEAT_W));
-    const maxY = Math.max(...positions.map(p => p.y + BEAT_H));
+    // Size for how the editor actually RENDERS members: beats without a
+    // stored in-container position land on a default 2-column grid
+    // (200×110 steps, 160×80 nodes, 20px padding) below a 40px header —
+    // NOT at their global x/y. Sizing from the global bbox (the old
+    // behavior) produced boxes the member grid overflowed.
+    const rows = Math.max(1, Math.ceil(positions.length / 2));
+    const width = 400;
+    const height = Math.max(300, 40 + 20 + (rows - 1) * 110 + 80 + 20);
     out.push({
       id: name,
       name,
       type: 'organizational',
       containerPosition: { x: minX - PADDING, y: minY - PADDING },
-      containerBounds: { width: (maxX - minX) + PADDING * 2, height: (maxY - minY) + PADDING * 2 },
+      containerBounds: { width, height },
       isExpanded: true,
     });
   }

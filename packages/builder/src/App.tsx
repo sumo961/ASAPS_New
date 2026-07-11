@@ -1483,6 +1483,9 @@ function App() {
       if (Array.isArray(story.clusters) && story.clusters.length > 0) {
         for (const c of story.clusters) actions.addCluster(c);
         console.log(`[App.loadStoryData] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
+        // Queue the cluster-aware auto-arrange (sizes containers to their
+        // members and pushes overlapping outside beats clear).
+        pendingClusterArrangeRef.current = true;
       }
 
       // App-level character state. Pipeline already normalized editor-only
@@ -3525,6 +3528,22 @@ function App() {
     markChanged();
   }, [state.beats, state.clusters, actions, markChanged]);
 
+  // Deferred cluster-aware auto-arrange. AI story injection registers
+  // clusters AFTER the batched beat load, so it can't run the arrange
+  // synchronously — it sets this flag instead and the effect fires once
+  // the injected beats + clusters are actually in state (signal-based,
+  // no timers). This is what keeps AI-generated clusters sized to their
+  // members and clear of unclustered beats.
+  const pendingClusterArrangeRef = useRef(false);
+  useEffect(() => {
+    if (!pendingClusterArrangeRef.current) return;
+    const hasClusteredBeats =
+      (state.clusters || []).length > 0 && state.beats.some(b => b.cluster);
+    if (!hasClusteredBeats) return;
+    pendingClusterArrangeRef.current = false;
+    handleAutoLayout();
+  }, [state.beats, state.clusters, handleAutoLayout]);
+
   // Electron integration - View > Auto-arrange Beats menu item
   useEffect(() => {
     if (!isElectron() || !window.electronAPI?.onMenuAutoArrange) {
@@ -5318,6 +5337,8 @@ function App() {
       for (const c of story.clusters) {
         actions.addCluster(c);
       }
+      // Queue the cluster-aware auto-arrange once the batch lands in state.
+      pendingClusterArrangeRef.current = true;
       console.log(`[App] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
     }
 
@@ -6034,16 +6055,29 @@ function App() {
               // Calculate grid layout
               const beatsPerRow = Math.max(1, Math.floor((maxWidth + gap) / (nodeWidth + gap)));
 
+              let maxRight = 0;
+              let maxBottom = 0;
               clusterBeats.forEach((beat, index) => {
                 const row = Math.floor(index / beatsPerRow);
                 const col = index % beatsPerRow;
                 const x = padding + col * (nodeWidth + gap);
                 const y = padding + row * (nodeHeight + gap);
+                maxRight = Math.max(maxRight, x + nodeWidth);
+                maxBottom = Math.max(maxBottom, y + nodeHeight);
 
                 if (actions.moveBeatInContainer) {
                   actions.moveBeatInContainer(beat.id, clusterId, x, y);
                 }
               });
+
+              // Grow the container to fit the grid just laid out (40px
+              // header + bottom padding); never shrink below the author's
+              // width so the grid columns stay stable.
+              if (actions.resizeCluster) {
+                const width = Math.max(cluster.containerBounds?.width || 0, maxRight + padding);
+                const height = Math.max(cluster.containerBounds?.height || 0, 40 + maxBottom + padding);
+                actions.resizeCluster(clusterId, width, height);
+              }
 
               markChanged();
               console.log(`[App] Auto-arranged ${clusterBeats.length} beats in cluster ${cluster.name}`);

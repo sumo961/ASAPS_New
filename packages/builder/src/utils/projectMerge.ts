@@ -27,6 +27,7 @@
 import JSZip from 'jszip';
 import type { StoredAsset } from '../storage/types';
 import { readAssetsFromZip, type ParsedZipAsset } from './projectZipManager';
+import { grownClusterBounds } from './clusterAutosize';
 
 // ---------------------------------------------------------------------------
 // Analysis
@@ -362,7 +363,9 @@ export function computeMerge(input: MergeInput): MergeResult {
     name: clusterName,
     type: 'organizational' as const,
     containerPosition: { x: maxExistingX + 400, y: 50 },
-    containerBounds: { width: 800, height: 600 },
+    // Sized for the editor's default member grid — a fixed 800×600 box
+    // overflowed for merges with more than ~10 beats.
+    containerBounds: grownClusterBounds({ width: 800, height: 600 }, source.incomingBeats.length),
     isExpanded: true,
   };
 
