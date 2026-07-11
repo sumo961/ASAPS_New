@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against build 0.9.64.115*
+*Last revised against v0.9.72*
 
 ---
 
@@ -138,7 +138,7 @@ The Projects button always reads "Projects" — your project's own name lives in
 
 The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in the top toolbar. Click it to open a compact picker titled *"Start a new project"* with three cards:
 
-- **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Fixed) and orientation, then drops you into a genuinely empty project ready for you to add beats from the palette.
+- **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Static) and orientation, then drops you into a genuinely empty project ready for you to add beats from the palette.
 - **⚡ Build from a prompt** — *"Your prompt → AI drafts the rest."* Opens the Story Generator dialog. Disabled with a SOON badge when no AI provider is wired — set one up under **AI → Configure AI**.
 - **✨ Co-write with AI** — *"Develop your idea in conversation."* Opens the Ideator pop-out so you can talk through your idea before the AI drafts anything. Also gated on having an AI provider configured.
 
@@ -152,7 +152,7 @@ The full Project Browser opens with a **START A NEW PROJECT** row offering four 
 
 | Card | When to pick it |
 |------|-----------------|
-| 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Fixed) and orientation up front, then drops you into a brand-new empty project. Add beats from the palette to start building. |
+| 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Static) and orientation up front, then drops you into a brand-new empty project. Add beats from the palette to start building. |
 | ⚡ **Build from a prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
 | ✨ **Co-write with AI** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
 | 📥 **Import** | You have an existing `.asaps` zip or `.asml` file. Pick the file with the standard import dialog — same conflict-resolution flow as the toolbar Import button. (Browser-only — the **+ New** toolbar button picker omits this card by design.) |
@@ -317,7 +317,7 @@ Your beat shopping catalog, docked to the right edge of the flowchart. Drag any 
 
 The palette is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need:
 
-- **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, Keypad, **QR Scan**, **AR Scene**).
+- **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**).
 - **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
 - **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, Set Timer, Update Affect).
@@ -493,6 +493,34 @@ Let interactors type something—their character's name, a password, an answer t
 - **Save To** - Store the input in a variable
 
 **When to Use:** Character naming, puzzles, personalization.
+
+---
+
+### Input Image
+
+**Purpose:** The player submits a photo, an AI vision model looks at it, and the AI's answer lands in a story variable.
+
+This is the visual sibling of Input Text — same "collect input → store it in a variable" contract, with AI perception in the middle. The player takes a photo (the OS camera opens on phones) or picks an image file (on desktop), the configured AI provider analyzes it against your **AI Analysis Prompt**, and whatever the AI answers is stored in the variable you name. Ask the AI to describe the scene, verify the player really photographed something red, read text off a sign — the answer text becomes story state you can weave into later beats.
+
+Input Image carries the purple **AI pill** on the palette (Single Choice → Input group) because it needs a vision-capable AI provider at runtime.
+
+**Key Settings:**
+- **Prompt** — Question or instruction shown to the player ("Take or choose a photo:")
+- **AI Analysis Prompt** — Instruction for the AI describing what to extract from the image ("Describe what is shown in this image in one or two sentences."). Never shown to the player — and when your story is translated, this field intentionally stays in the source language, because it's an instruction to the AI, not player-facing text. (In the Preview Window, the language-aware AI adapter asks the model to *answer* in the active story language.)
+- **Save To** — Variable name that receives the AI's answer text (default: `imageAnalysis`)
+- **Image Source** — *Camera or upload* (default), *Camera (mobile)*, or *Upload only*
+- **Button Text / Cancel Button Text** — Labels for the submit and skip buttons (defaults: *"Analyze"* / *"Skip"*)
+- **Fallback Value** — Stored in the variable when AI is unavailable, fails, or the player skips
+- **Timeout** — Maximum AI response time in ms before falling back (default: 30000)
+- **Speaker / Show Speaker Name** — Standard speaker controls (the prompt can be read aloud via TTS)
+
+**Your story never stalls.** Every failure mode — the player skips, no vision-capable provider is configured, the analysis times out, the API errors — resolves the same way: the **Fallback Value** is stored in the variable and the story advances to the connected beat. Design your fallback accordingly (an empty string, or a sentinel like `"no photo"` you can branch on).
+
+**Branching on the result.** V1 deliberately keeps the beat single-path and free-text: it stores whatever the AI said and moves on. To branch on the answer, follow it with an **AI Condition** beat — "if the photo shows something red, go here; otherwise, go there" is an Input Image feeding an AI Condition.
+
+**Provider support.** All current Claude models and recent OpenAI models (GPT-4o and later) are vision-capable out of the box. Local/Ollama setups work with vision models such as `llava`, `qwen2.5-vl`, or `gemma3`; if the configured local model is text-only, the beat falls back cleanly with the Fallback Value. You don't need to worry about phone photos being huge — the image is automatically downscaled before it's sent, so a 12 MB camera shot fits every provider's request limits.
+
+**When to Use:** Scavenger hunts ("photograph something red" — the AI verifies it), personalization (the story weaves a description of the player's surroundings into the narration), photo puzzles (the AI reads text or symbols off the photographed object), classroom activities that send interactors into the real world.
 
 ---
 
@@ -766,6 +794,21 @@ Set a variable to true/false or modify a counter value. This is how your story r
 - Set `hasKey` to `true` when the player finds a key
 - Add 10 to `gold` when they find treasure
 - Set `reputation` to 50 at story start
+
+**Calculations (v0.9.71+).** Start the value with `=` (spreadsheet convention) and it's evaluated as an arithmetic expression at runtime:
+
+```
+= (var1 + var2) / 100
+= score * 2 - penalty
+= alice.trust + 5
+```
+
+- Supports `+ - * /`, parentheses, and unary minus
+- Reference variables and counters by plain name (`score`) or any of the usual syntaxes (`${name}`, `$name$`, `{name}`); names resolve against variables first, then counters
+- Character-scoped counters work as `owner.counter` — e.g. `alice.trust`
+- Works for both variables and counters, on every operation (set, add, subtract, multiply, divide)
+
+If evaluation fails (unknown name, division by zero, syntax error), the raw string is stored unchanged and a warning appears in the console — never a `NaN` in your story state. And it's fully opt-in: without the leading `=`, nothing is evaluated (`5+3` stays the literal text `5+3`), so existing stories behave exactly as before.
 
 **Flow:** Executes instantly, then moves to the target beat.
 
@@ -1468,10 +1511,14 @@ Every project carries a **layout mode** — either *Responsive* or *Fixed canvas
 
 ### Picking the mode at project creation
 
-The **New Project** dialog (📁 Projects → *+ New Project*, or the **Empty** card on the Project Browser) now has two extra rows under the description field:
+The **New Project** dialog (📁 Projects → *+ New Project*, or the **Empty** card on the Project Browser) has two extra rows under the description field:
 
-- **Layout Mode** — *Responsive* (default) or *Fixed canvas*. Two side-by-side cards.
-- **Orientation** — appears only when Layout Mode is *Responsive*. Three options: *Flexible* (adapts to device rotation, default), *Landscape* (locks to landscape — player shows a "rotate your device" overlay otherwise), *Portrait* (locks to portrait the same way). When Layout Mode is *Fixed canvas* the Orientation row collapses, because fixed-canvas projects always render at their authored aspect ratio.
+- **Layout Mode** — two side-by-side cards, in plain author terms (reworded in v0.9.72):
+  - **📱 Responsive** — *"Text, buttons, and images flow and adapt to any screen — phone, tablet, or desktop. You guide the layout; the player's device decides the exact placement."* Best for stories played on many devices. The default.
+  - **🎯 Static (fixed canvas)** — *"You place every element at exact pixel positions on a fixed stage. What you see in the editor is exactly what the player sees, scaled to fit their screen."* Best for precise, hand-crafted compositions.
+
+  The active card shows a small **✓ selected** marker, and a footnote reminds you that you can switch later in **Settings → Project** — a migrator converts existing beats between the two modes, so this isn't a decision you're locked into.
+- **Orientation** — appears only when Layout Mode is *Responsive*. Three options: *Flexible* (adapts to device rotation, default), *Landscape* (locks to landscape — player shows a "rotate your device" overlay otherwise), *Portrait* (locks to portrait the same way). When Layout Mode is *Static (fixed canvas)* the Orientation row collapses, because fixed-canvas projects always render at their authored aspect ratio.
 
 You can change either setting later from **Settings → Project**.
 
@@ -1479,19 +1526,20 @@ You can change either setting later from **Settings → Project**.
 
 Click the **layout-mode pill** in the header (green *Responsive layout* or amber *Fixed canvas*) — or open **Settings → Project → Layout Mode** — and pick the other mode. ASAPS runs a one-shot **migrator** with a preview:
 
-- **Fixed → Responsive** strips baked pixel positions so beats fall back to schema-driven slot/spatial layout. Best for projects that have only ever used the default layouts.
-- **Responsive → Fixed** bakes the current schema-driven positions into explicit `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
+- **Fixed → Responsive** clears baked pixel positions and infers slot intent from them, so beats fall back to schema-driven slot/spatial layout. Best for projects that have only ever used the default layouts.
+- **Responsive → Fixed** bakes the current schema-default positions into explicit pixel `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
 
 The migrator preview lists the per-beat changes so you can see what will happen before committing. Either direction is destructive in the sense that the previous shape isn't preserved — back up (or commit to git) before switching if you might want to revert.
 
 ### Which beats render through slot mode?
 
-As of build 0.9.63, the slot system covers most of the visible beat catalogue: Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen, Input Text, Keypad, **QR Scan**, **AR Scene**, Multi Choice, Hyper Text, Duration Screen, AI Duration Screen, Video Beat, and AI Conversation. AI Dialog Tree carries the slot scaffolding too. New slot **roles** added this cycle — `camera` (QR Scan), `webview` (Web View), and `ar` (AR Scene) — mount self-contained elements via `SlotFlowView`. If you're authoring in Responsive mode, these beats reflow cleanly across desktop, tablet, and phone viewports out of the box; use the Preview Window's Viewport switcher (Fit / Desktop / Tablet / Phone) to sanity-check.
+The slot system covers most of the visible beat catalogue: Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen, Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**, Multi Choice, Hyper Text, Duration Screen, AI Duration Screen, Video Beat, and AI Conversation. AI Dialog Tree carries the slot scaffolding too. Self-contained slot **roles** — `camera` (QR Scan), `webview` (Web View), `ar` (AR Scene), and `imageInput` (Input Image) — mount their elements via `SlotFlowView`. If you're authoring in Responsive mode, these beats reflow cleanly across desktop, tablet, and phone viewports out of the box; use the Preview Window's Viewport switcher (Fit / Desktop / Tablet / Phone) to sanity-check.
 
 ### Authoring affordances that change with the mode
 
 The Visual Editor adapts to the active mode:
 
+- **Mode-consistent options panel (v0.9.72).** The Visual Editor's properties panel now shows only the controls that belong to your project's mode. In a **Static (fixed canvas)** project you get the baked elements list — every element with pixel positions, z-order, lock, and visibility controls — and the slot-intent rows ("On stage (from slots)" with per-slot anchors/pins) are gone, since they only affect the responsive renderer. In a **Responsive** project you get the slot controls and viewport preview. After switching modes via the migrator, the editor immediately reflects the new mode.
 - **Add Character / Add Prop / Add Text** buttons (in the Elements panel on the right) are **only available in Fixed canvas mode**. In Responsive mode these would create dead pixel positions the responsive renderer ignores, so they're hidden. **Add Hotspot** stays available everywhere because hotspots are normalized 0–1 overlays on the spatial image rect — fundamentally responsive.
 - **Background fit** (Visual Editor left sidebar, just under the background-image picker) lets you toggle *Contain* (show the whole image) vs *Cover* (fill the stage, crop edges) per beat in spatial mode. Defaults to *Contain*. This moved out of the Inspector in v0.9.59 to sit closer to where authors are looking.
 - **Path-keyframe animations** (the absolute-mode animation editor) keep working on beats with baked pixel positions even in responsive projects, but the Animations panel shows a small amber **"Legacy path animation"** banner reminding you that slot-anchored elements use a different animation editor.
@@ -1606,10 +1654,22 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 2. Select **Configure AI** from the dropdown
 3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended)
-   - **OpenAI** - GPT models (default model: **gpt-5.5**)
+   - **OpenAI** - GPT models (default model: **gpt-5.6-sol**)
    - **Ollama** - Local models (free, no API key needed)
 4. Enter your API key (for cloud providers)
 5. Adjust settings (model, temperature, etc.)
+
+### OpenAI Model Tiers (GPT-5.6 Family)
+
+The OpenAI provider defaults to **gpt-5.6-sol**, the current flagship. The GPT-5.6 family has three tiers — type the one you want into the **Model** field:
+
+| Model | Character |
+|-------|-----------|
+| **gpt-5.6-sol** | Flagship — strongest results, the default |
+| **gpt-5.6-terra** | Balanced — roughly gpt-5.5-level performance at about half the price |
+| **gpt-5.6-luna** | Fastest and cheapest |
+
+Leave the field empty to use the default. Older models (gpt-5.5, GPT-4o) keep working if you name them explicitly.
 
 ### Reasoning Effort / Extended Thinking
 
@@ -1623,7 +1683,18 @@ The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anth
 | **X-High** | Most thinking the OpenAI tiers expose; OpenAI providers cap here internally |
 | **Max (Claude 4.5+ only)** | Anthropic-only top tier on Claude 4.5+ models. Selecting it on other providers silently falls back to X-High |
 
-Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. GPT-5 reasoning uses `max_completion_tokens` and ignores temperature; `gpt-5.5` defaults to `none` when no tier is selected.
+Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. GPT-5.x reasoning uses `max_completion_tokens` and ignores temperature; the none–xhigh tiers apply to gpt-5.5 and the whole gpt-5.6 family (Sol/Terra/Luna), and `gpt-5.5` defaults to `none` when no tier is selected.
+
+### Reasoning Mode: Standard vs Pro (OpenAI, GPT-5.6)
+
+When the **OpenAI** provider is selected, the config dialog shows a **Reasoning mode (GPT-5.6)** select with two options:
+
+- **Standard (default)** — the normal request path. What you've always had.
+- **Pro — deepest reasoning (slow, expensive)** — routes requests through OpenAI's Responses API to unlock the deepest reasoning available for GPT-5.6 models.
+
+Pro mode is deliberately conservative about when it activates: it **only takes effect with a gpt-5.6 model on the official OpenAI endpoint**. If you're using any other model, or a custom/local Base URL (Ollama, Kimi, a proxy), the setting is safely ignored and the standard path is used — nothing breaks, you just don't get Pro reasoning.
+
+Expect much longer generation times and noticeably higher costs. Pro shines on **story generation with hard material** — dense systemic subjects, long complex branching — where you want the model to really chew on the structure. It's not recommended for runtime AI beats (AI Conversation, AI Condition, and friends), where the player is sitting there waiting.
 
 ## Ideate with Ideator
 
@@ -2216,6 +2287,26 @@ When you host an HTML export online (rather than just double-clicking a single-f
 3. Select the file
 4. For asset-heavy imports, you'll be guided through asset mapping
 
+### Merging Two Stories (v0.9.71)
+
+Importing replaces what's open — **merging combines**. Merge Story pulls another exported story *into* your currently open project, so you can stitch two narratives together: a colleague's chapter, a reusable puzzle sequence, last semester's class project.
+
+1. Click **Import → Merge Story (.asaps)** in the header
+2. Select the exported story (`.asaps.zip` / `.zip`)
+3. Resolve any character collisions in the merge dialog (see below)
+4. Click through — the incoming beats arrive in your project
+
+**What lands where.** The incoming beats arrive as their own **cluster**, placed beside your existing graph as a disconnected group. Nothing is auto-wired into your flow — *you* connect the two stories afterwards, wherever the join makes narrative sense. Your project's settings and theme win; the incoming story adapts.
+
+**Character collisions.** If both stories have a character with the same name, the merge dialog asks you to decide **per character**:
+
+- **Same character — reuse** — the incoming references are rewired to your existing character. Pick this when it really is the same person in both stories.
+- **Different character — keep both** — the incoming character is renamed with a suffix ("Elena" becomes "Elena 2") so both survive intact.
+
+Undecided collisions default to keep-both — the merge never silently fuses two characters.
+
+**Everything else is conflict-free by construction.** Beat, character, and asset IDs are remapped wherever they'd clash, and every reference inside the incoming content (connections, nested dialog trees, condition targets, asset references) is rewritten to match — your story prose is never touched. **Variables union by name**: if both stories use `trust`, they share it after the merge, which is often exactly what you want when the stories are meant to interlock.
+
 ---
 
 # Part 8: Advanced Techniques
@@ -2460,6 +2551,10 @@ Use sprite sheets for frame-by-frame animation:
 
 **Settings → Text Box:**
 - Text box appearance: corners, padding, borders, position
+- **Background Opacity** — slider (0–100%) controlling how transparent the text-box background is
+- **Box Visibility** — *Show All Boxes*, *Hide Text/Dialog Boxes* (text renders directly on the stage, no box behind it), or *Hide All Boxes* (buttons also render as bare labels). Great for stories where the artwork should carry the frame and text floats over it.
+
+Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual Editor, the Preview Window, exported stories, and responsive (slot-mode) layouts all honor them consistently. What you set here is what your interactors get.
 
 **Settings → Effects:**
 - Text animations (typewriter, fade)
@@ -2869,6 +2964,8 @@ Create localized versions of your story with AI-assisted translation:
 - Translations are stored alongside the story data
 - **Staleness detection** highlights translations that may be outdated when the source text changes
 
+**Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, and an AI Conversation's scripted opening line. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
+
 **VCS-Aware:** Translations persist through git operations (push, pull, merge) and are saved in the directory project format.
 
 ## Transformation Commands
@@ -2907,6 +3004,7 @@ Quick reference for all beat types.
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
+| Input Image | Photo submission + AI vision analysis | prompt, analysisPrompt (AI instruction, stays in source language), saveTo, imageSource (camera/upload/both), buttonText, cancelButtonText, fallbackValue (stored on skip/failure/timeout), timeout, speaker |
 | Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
 | QR Scan | Real-world QR code scan | prompt, saveTo, interpretAsapsUri, facing (rear/front), matchPatterns (regex), helperText, cancelButtonText, speaker (also: built-in `asaps://` QR generator panel) |
 | Web View | Embed external URL | url, prompt, exitUrlPattern (regex), passContext (variable names to inject as URL hash), saveTo (from postMessage), doneButtonText, speaker |
@@ -2920,7 +3018,7 @@ Quick reference for all beat types.
 
 | Beat | Purpose | Key Settings |
 |------|---------|--------------|
-| Set Variable/Counter | Change state | variable name, value (true/false), counter operations, or fictional time |
+| Set Variable/Counter | Change state | variable name, value (true/false, or `=`-prefixed arithmetic expression), counter operations, or fictional time |
 | Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
@@ -3122,8 +3220,8 @@ Yes! Use the language selector (top right) to add target languages. You can tran
 ### What browsers are supported?
 Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects.
 
-### Should I pick Responsive or Fixed canvas for my new project?
-**Responsive layout** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. The runtime adapts to any viewport using ASAPS's slot/spatial system, and the Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. The trade-off is that Responsive is still work-in-progress (shipping, but evolving), and you give up some pixel-precise compositional control. **Fixed canvas** gives you full pixel control on a 1024×768-ish stage — pick it if you're authoring a visual-novel-style project with hand-placed compositions, or if you're porting a pre-v0.9.58 project and don't want to migrate. You can switch later via the header pill or **Settings → Project → Layout Mode** (with a migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
+### Should I pick Responsive or Static (fixed canvas) for my new project?
+**Responsive** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. Text, buttons, and images flow and adapt to any screen: you guide the layout, and the player's device decides exact placement. The Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. **Static (fixed canvas)** gives you full pixel control on a 1024×768-ish stage — what you see in the editor is exactly what the player sees. Pick it for precise, hand-crafted compositions like visual-novel-style layouts, or if you're porting a pre-v0.9.58 project and don't want to migrate. Both modes are fully supported — this is a choice of authoring style, not old-vs-new. And it's not final: switch later via the header pill or **Settings → Project → Layout Mode** (a one-shot migrator converts your beats, with a preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
 
 ---
 

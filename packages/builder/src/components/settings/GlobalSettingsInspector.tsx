@@ -1778,7 +1778,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">
-                    Box Visibility (Editor & Preview)
+                    Box Visibility
                   </label>
                   <select
                     value={settings.textbox.boxVisibility}
@@ -1790,7 +1790,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     <option value="hideAll">Hide All Boxes</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Control whether text/button boxes are visible in the editor and preview. This is useful for visualizing final rendered text without backgrounds.
+                    Control whether text/button boxes are visible everywhere the story renders — editor, preview, and exported HTML. Useful for showing text without backgrounds.
                   </p>
                 </div>
 
