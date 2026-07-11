@@ -11,6 +11,7 @@ import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
 import { ReactRenderer, getAudioManager, CharacterMoodFrame } from '@asaps/renderer';
+import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
 import { resolveLayoutMode } from '../utils/projectLayoutMode';
@@ -3064,6 +3065,18 @@ export const PreviewWindow: React.FC = () => {
                   const ctx = engineRef.current?.getContext();
                   const chars = previewDataRef.current?.characters;
                   if (!ctx || !chars || chars.length === 0) return null;
+                  // Only render the mood tracker when the story actually
+                  // uses the affect system — otherwise it's dead space.
+                  // Authored signals OR (fallback) affect that moved at
+                  // runtime, e.g. AI-conversation sentiment extraction.
+                  const usesAffect =
+                    storyUsesAffect(chars, story?.getAllBeats?.() || []) ||
+                    anyLiveAffect(chars, {
+                      getCharacterMood: (id: string) => ctx.getCharacterMood(id),
+                      getCharacterSentiments: (id: string) => ctx.getCharacterSentiments(id),
+                      getCharacterEmotions: (id: string) => ctx.getCharacterEmotions(id),
+                    });
+                  if (!usesAffect) return null;
                   return (
                     <CharacterAffectPanel
                       characters={chars}
