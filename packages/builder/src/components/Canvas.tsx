@@ -27,6 +27,7 @@ interface CanvasProps {
   onTogglePalette?: () => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
+  onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
@@ -69,6 +70,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onTogglePalette,
   onBeatInContainerMove,
   onDropBeatToCluster,
+  onRemoveBeatFromCluster,
   onClusterResize,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
@@ -140,6 +142,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onClusterExpandCollapse={handleClusterExpandCollapse}
           onBeatInContainerMove={handleBeatInContainerMove}
           onDropBeatToCluster={onDropBeatToCluster}
+          onRemoveBeatFromCluster={onRemoveBeatFromCluster}
           onClusterResize={onClusterResize}
           onAutoLayoutCluster={onAutoLayoutCluster}
           highlightedBeatIds={highlightedBeatIds}

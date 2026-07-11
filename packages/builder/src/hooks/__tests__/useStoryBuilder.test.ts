@@ -163,6 +163,49 @@ describe('clusters', () => {
     act(() => result.current.actions.removeCluster('c1'));
     expect(result.current.state.clusters).toEqual([]);
   });
+
+  it('removeCluster keeps member beats as REAL Beat instances (regression: rest-spread stripped the prototype and crashed extractSpeakers)', () => {
+    const { result } = setup();
+    let beat: any;
+    act(() => { beat = result.current.actions.addBeat('dialogTree', undefined, { id: 'db' }); });
+    act(() => result.current.actions.addCluster(cluster('c1')));
+    act(() => result.current.actions.moveBeatToCluster('db', 'c1'));
+    act(() => result.current.actions.moveBeatInContainer('db', 'c1', 30, 40));
+
+    act(() => result.current.actions.removeCluster('c1'));
+
+    const survivor: any = result.current.state.beats.find((b: any) => b.id === 'db');
+    expect(survivor).toBeDefined();
+    expect(survivor.cluster).toBeUndefined();
+    // The beat must still be a class instance with its methods intact
+    expect(typeof survivor.getParameters).toBe('function');
+    expect(() => survivor.getParameters()).not.toThrow();
+    // Its in-container position is gone with the cluster
+    expect(result.current.state.containerBeatPositions).toEqual([]);
+  });
+
+  it('removeBeatFromCluster clears membership + container position, beat and connections survive', () => {
+    const { result } = setup();
+    act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'a' }); });
+    act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'b' }); });
+    act(() => result.current.actions.connectBeats('a', 'b'));
+    act(() => result.current.actions.addCluster(cluster('c1')));
+    act(() => result.current.actions.moveBeatToCluster('a', 'c1'));
+    act(() => result.current.actions.moveBeatToCluster('b', 'c1'));
+    act(() => result.current.actions.moveBeatInContainer('a', 'c1', 10, 10));
+
+    act(() => result.current.actions.removeBeatFromCluster('a'));
+
+    const a: any = result.current.state.beats.find((x: any) => x.id === 'a');
+    const b: any = result.current.state.beats.find((x: any) => x.id === 'b');
+    expect(a.cluster).toBeUndefined();
+    expect(b.cluster).toBe('c1'); // untouched sibling stays in the cluster
+    expect(typeof a.getParameters).toBe('function');
+    expect(a.getConnections().some((c: any) => c.targetId === 'b')).toBe(true);
+    expect(result.current.state.containerBeatPositions.map((p: any) => p.beatId)).toEqual([]);
+    // cluster itself still exists
+    expect(result.current.state.clusters.map((c: any) => c.id)).toEqual(['c1']);
+  });
 });
 
 describe('settings, import, clear', () => {

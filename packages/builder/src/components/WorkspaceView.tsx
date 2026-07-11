@@ -27,6 +27,7 @@ interface WorkspaceViewProps {
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
+  onRemoveBeatFromCluster?: (beatId: string) => void;
   paletteCollapsed: boolean;
   onTogglePalette: () => void;
   assets?: any[];
@@ -90,6 +91,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onClusterMove,
   onBeatInContainerMove,
   onDropBeatToCluster,
+  onRemoveBeatFromCluster,
   paletteCollapsed,
   onTogglePalette,
   assets = [],
@@ -284,6 +286,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onClusterMove={onClusterMove}
               onBeatInContainerMove={onBeatInContainerMove}
               onDropBeatToCluster={onDropBeatToCluster}
+              onRemoveBeatFromCluster={onRemoveBeatFromCluster}
               paletteCollapsed={paletteCollapsed}
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}

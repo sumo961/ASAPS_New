@@ -5923,6 +5923,10 @@ function App() {
             actions.moveBeatToCluster(beatId, clusterId);
             markChanged();
           }}
+          onRemoveBeatFromCluster={(beatId) => {
+            actions.removeBeatFromCluster(beatId);
+            markChanged();
+          }}
           onToggleCluster={actions.expandCollapseCluster}
           onRenameCluster={(clusterId, name) => {
             actions.renameCluster(clusterId, name);
@@ -5963,6 +5967,10 @@ function App() {
                 actions.moveBeatToCluster(beatId, clusterId);
                 markChanged();
               }
+            }}
+            onRemoveBeatFromCluster={(beatId: string) => {
+              actions.removeBeatFromCluster(beatId);
+              markChanged();
             }}
             paletteCollapsed={paletteCollapsed}
             onTogglePalette={() => setPaletteCollapsed(!paletteCollapsed)}

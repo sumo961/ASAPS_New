@@ -17,6 +17,7 @@ interface ClusterContainerNodeData {
   onExpandCollapse: (clusterId: string) => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
+  onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   containedBeats?: ClusterBeatInfo[];
@@ -97,6 +98,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     onExpandCollapse,
     onBeatInContainerMove,
     onDropBeatToCluster,
+    onRemoveBeatFromCluster,
     onClusterResize,
     onAutoLayoutCluster,
     containedBeats,
@@ -1111,7 +1113,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 <div
                   key={beatInfo.beatId}
                   className={`
-                    absolute rounded-lg border-2 shadow-lg
+                    group absolute rounded-lg border-2 shadow-lg
                     transition-shadow
                     ${isDragging ? 'shadow-2xl z-50 cursor-grabbing' : 'hover:shadow-xl cursor-grab'}
                     ${isSelected && !isHighlighted ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
@@ -1143,6 +1145,21 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                     className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white"
                     style={{ backgroundColor: color, left: '-8px' }}
                   />
+
+                  {/* Eject: take this beat back out of the cluster (hover-revealed) */}
+                  {onRemoveBeatFromCluster && (
+                    <button
+                      className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white border border-gray-300 text-gray-500 shadow opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] leading-none hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300 nodrag"
+                      title="Remove from cluster (beat stays in the story)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveBeatFromCluster(beatInfo.beatId);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      ⏏
+                    </button>
+                  )}
 
                   {/* Node Content */}
                   <div className="px-3 py-2">

@@ -43,6 +43,7 @@ interface GraphEditorProps {
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
+  onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
@@ -108,6 +109,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onClusterMove,
   onBeatInContainerMove,
   onDropBeatToCluster,
+  onRemoveBeatFromCluster,
   onClusterResize,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
@@ -282,6 +284,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           onExpandCollapse: onClusterExpandCollapse || (() => {}),
           onBeatInContainerMove: onBeatInContainerMove,
           onDropBeatToCluster: onDropBeatToCluster,
+          onRemoveBeatFromCluster: onRemoveBeatFromCluster,
           onClusterResize: onClusterResize,
           onAutoLayoutCluster: onAutoLayoutCluster,
           onBeatSelect: onBeatSelect,
@@ -313,7 +316,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound]);
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {

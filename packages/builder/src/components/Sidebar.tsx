@@ -12,6 +12,7 @@ interface SidebarProps {
   onAddBeat: (type: string) => void;
   onAddCluster?: () => void;
   onMoveBeatToCluster: (beatId: string, clusterId: string) => void;
+  onRemoveBeatFromCluster?: (beatId: string) => void;
   onToggleCluster: (clusterId: string) => void;
   onRenameCluster?: (clusterId: string, name: string) => void;
   collapsed?: boolean;
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onAddBeat,
   onAddCluster,
   onMoveBeatToCluster,
+  onRemoveBeatFromCluster,
   onToggleCluster,
   onRenameCluster,
   collapsed = false,
@@ -471,10 +473,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            {/* Unclustered Beats Section - takes remaining space */}
-            {unclusteredBeats.length > 0 && (
-              <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+            {/* Unclustered Beats Section - takes remaining space.
+                Rendered whenever it has content OR clusters exist, so it can
+                serve as the drop target for dragging a beat OUT of a cluster. */}
+            {(unclusteredBeats.length > 0 || clusters.length > 0) && (
+              <div
+                className="flex flex-col min-h-0 flex-1 overflow-hidden"
+                onDragOver={handleDragOver}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const beatId = e.dataTransfer.getData('text/beatId');
+                  if (beatId && onRemoveBeatFromCluster) {
+                    onRemoveBeatFromCluster(beatId);
+                  }
+                }}
+              >
                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 flex-shrink-0">Unclustered Beats</h4>
+                {unclusteredBeats.length === 0 && (
+                  <div className="text-xs text-gray-400 border-2 border-dashed border-gray-200 rounded-lg px-3 py-4 text-center">
+                    Drag a beat here to take it out of its cluster
+                  </div>
+                )}
                 <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
                   {unclusteredBeats.map(beat => (
                     <button

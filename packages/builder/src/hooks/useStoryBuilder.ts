@@ -53,6 +53,7 @@ interface StoryBuilderActions {
   disconnectBeats: (sourceBeatId: string, targetBeatId: string) => void;
   expandCollapseCluster: (clusterId: string) => void;
   moveBeatToCluster: (beatId: string, clusterId: string) => void;
+  removeBeatFromCluster: (beatId: string) => void;
   moveBeatInContainer: (beatId: string, clusterId: string, x: number, y: number) => void;
   moveCluster: (clusterId: string, position: { x: number; y: number }) => void;
   resizeCluster: (clusterId: string, width: number, height: number) => void;
@@ -1039,20 +1040,41 @@ export function useStoryBuilder() {
     }));
   }, []);
 
-  // Remove cluster
+  // Remove cluster (beats survive — they just lose their membership).
+  // NOTE: beats are class instances; never rest-spread one to drop a
+  // property ({...beat} loses the prototype and every Beat method with it,
+  // crashing the next getParameters() call). Clear the field in place.
   const removeCluster = useCallback((clusterId: string) => {
     setState(prev => ({
       ...prev,
       clusters: prev.clusters.filter(cluster => cluster.id !== clusterId),
-      // Also remove any cluster references from beats
       beats: prev.beats.map(beat => {
-        // If beat is associated with the cluster being removed, clear the association
         if (beat.cluster === clusterId) {
-          const { cluster, ...beatWithoutCluster } = beat;
-          return beatWithoutCluster as Beat;
+          beat.cluster = undefined;
         }
         return beat;
       }),
+      // Drop the in-container positions of the dissolved cluster
+      containerBeatPositions: prev.containerBeatPositions.filter(
+        pos => pos.clusterId !== clusterId
+      ),
+    }));
+  }, []);
+
+  // Take a single beat back out of its cluster (the beat keeps its
+  // flowchart position and all connections)
+  const removeBeatFromCluster = useCallback((beatId: string) => {
+    setState(prev => ({
+      ...prev,
+      beats: prev.beats.map(beat => {
+        if (beat.id === beatId && beat.cluster) {
+          beat.cluster = undefined;
+        }
+        return beat;
+      }),
+      containerBeatPositions: prev.containerBeatPositions.filter(
+        pos => pos.beatId !== beatId
+      ),
     }));
   }, []);
 
@@ -1276,6 +1298,7 @@ export function useStoryBuilder() {
     loadStoryData,
     expandCollapseCluster,
     moveBeatToCluster,
+    removeBeatFromCluster,
     moveBeatInContainer,
     moveCluster,
     resizeCluster,
