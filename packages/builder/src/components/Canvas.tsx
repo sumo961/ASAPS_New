@@ -43,7 +43,9 @@ interface CanvasProps {
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   // Beat actions for context menu
   onBeatDuplicate?: (beatId: string) => void;
+  onBeatsDuplicate?: (beatIds: string[]) => void;
   onBeatDelete?: (beatId: string) => void;
+  onBeatsDelete?: (beatIds: string[]) => void;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
@@ -84,7 +86,9 @@ export const Canvas: React.FC<CanvasProps> = ({
   onSetClusterSound,
   onSetClusterSharedVisuals,
   onBeatDuplicate,
+  onBeatsDuplicate,
   onBeatDelete,
+  onBeatsDelete,
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
@@ -156,7 +160,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           onSetClusterSound={onSetClusterSound}
           onSetClusterSharedVisuals={onSetClusterSharedVisuals}
           onBeatDuplicate={onBeatDuplicate}
+          onBeatsDuplicate={onBeatsDuplicate}
           onBeatDelete={onBeatDelete}
+          onBeatsDelete={onBeatsDelete}
           onBeatCopy={onBeatCopy}
           onBeatPaste={onBeatPaste}
           hasBeatClipboard={hasBeatClipboard}

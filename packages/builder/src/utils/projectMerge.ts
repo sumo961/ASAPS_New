@@ -187,7 +187,7 @@ function uniqueName(base: string, taken: Set<string>): string {
   }
 }
 
-function uniqueId(base: string, taken: Set<string>, tag: string): string {
+export function uniqueId(base: string, taken: Set<string>, tag: string): string {
   if (!taken.has(base)) return base;
   for (let n = 1; ; n++) {
     const candidate = `${base}_${tag}${n}`;
@@ -199,7 +199,7 @@ function uniqueId(base: string, taken: Set<string>, tag: string): string {
  * Deep-rewrite every string VALUE in `obj` that exactly matches a key in
  * `valueMap`. Returns a new structure; does not mutate the input.
  */
-function deepRewrite(obj: any, valueMap: Map<string, string>): any {
+export function deepRewrite(obj: any, valueMap: Map<string, string>): any {
   if (typeof obj === 'string') {
     return valueMap.get(obj) ?? obj;
   }

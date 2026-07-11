@@ -27,6 +27,7 @@ import { ImportTwineDialog } from './components/ImportTwineDialog';
 import { MergeStoryDialog } from './components/MergeStoryDialog';
 import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
 import { deserializeBeats } from './utils/projectDeserializer';
+import { cloneBeatsForDuplicate } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
 import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, normalizeStory, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
@@ -2908,6 +2909,36 @@ function App() {
     setSelectedBeat(newBeat);
     markChanged();
   }, [actions, state.beats, markChanged]);
+
+  /** Multi-beat duplicate: clones the whole selection, keeping the
+   *  connections BETWEEN selected beats wired to the copies (and outgoing
+   *  links to unselected beats intact). */
+  const handleBeatsDuplicate = useCallback((beatIds: string[]) => {
+    const idSet = new Set(beatIds);
+    const selected = state.beats.filter(b => idSet.has(b.id));
+    if (selected.length === 0) return;
+    const { clones } = cloneBeatsForDuplicate(selected, state.beats.map(b => b.id));
+    const newBeats = deserializeBeats(clones);
+    if (newBeats.length === 0) return;
+    // mergeBeats appends the instances AND extracts their connections into
+    // state in one update (same path the story-merge uses).
+    actions.mergeBeats(newBeats);
+    setSelectedBeat(newBeats[0]);
+    markChanged();
+  }, [actions, state.beats, markChanged]);
+
+  /** Multi-beat delete (one undoable command per beat). */
+  const handleBeatsDelete = useCallback((beatIds: string[]) => {
+    const idSet = new Set(beatIds);
+    const toDelete = state.beats.filter(b => idSet.has(b.id));
+    if (toDelete.length === 0) return;
+    for (const beat of toDelete) {
+      const cmd = new DeleteBeatCommand(beat, stableMutations.current);
+      getCommandManager().execute(cmd);
+    }
+    setSelectedBeat(null);
+    markChanged();
+  }, [state.beats, markChanged]);
 
   const handleBeatCopy = useCallback((beatId: string) => {
     const beat = state.beats.find(b => b.id === beatId);
@@ -6068,6 +6099,8 @@ function App() {
             themeAssets={themeAssets}
             onBeatDuplicate={handleBeatDuplicate}
             onBeatDelete={handleBeatDelete}
+            onBeatsDuplicate={handleBeatsDuplicate}
+            onBeatsDelete={handleBeatsDelete}
             onBeatCopy={handleBeatCopy}
             onBeatPaste={handleBeatPaste}
             hasBeatClipboard={beatClipboard !== null}

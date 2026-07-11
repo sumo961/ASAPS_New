@@ -63,7 +63,9 @@ interface WorkspaceViewProps {
   themeAssets?: ThemeAssetUrls | null;
   // Beat context menu actions
   onBeatDuplicate?: (beatId: string) => void;
+  onBeatsDuplicate?: (beatIds: string[]) => void;
   onBeatDelete?: (beatId: string) => void;
+  onBeatsDelete?: (beatIds: string[]) => void;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
@@ -117,7 +119,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   themeAssets,
   // Beat context menu actions
   onBeatDuplicate,
+  onBeatsDuplicate,
   onBeatDelete,
+  onBeatsDelete,
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
@@ -302,7 +306,9 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onSetClusterSound={onSetClusterSound}
               onSetClusterSharedVisuals={onSetClusterSharedVisuals}
               onBeatDuplicate={onBeatDuplicate}
+              onBeatsDuplicate={onBeatsDuplicate}
               onBeatDelete={onBeatDelete}
+              onBeatsDelete={onBeatsDelete}
               onBeatCopy={onBeatCopy}
               onBeatPaste={onBeatPaste}
               hasBeatClipboard={hasBeatClipboard}

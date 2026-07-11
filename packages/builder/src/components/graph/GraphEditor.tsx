@@ -62,6 +62,9 @@ interface GraphEditorProps {
   // Beat actions for context menu
   onBeatDuplicate?: (beatId: string) => void;
   onBeatDelete?: (beatId: string) => void;
+  /** Multi-selection actions — receive every selected beat id */
+  onBeatsDuplicate?: (beatIds: string[]) => void;
+  onBeatsDelete?: (beatIds: string[]) => void;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
@@ -124,6 +127,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onSetClusterSharedVisuals,
   onBeatDuplicate,
   onBeatDelete,
+  onBeatsDuplicate,
+  onBeatsDelete,
   onBeatCopy,
   onBeatPaste,
   hasBeatClipboard = false,
@@ -142,6 +147,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     beatId: string | null;
     flowPosition: { x: number; y: number } | null;
   } | null>(null);
+
+  // Ids of all currently multi-selected beat nodes (ReactFlow selection:
+  // shift+drag marquee on the pane, or cmd/ctrl/shift+click on nodes).
+  const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+  const onSelectionChange = useCallback(
+    ({ nodes: selNodes }: { nodes: Node[] }) => {
+      setMultiSelectedIds(selNodes.filter(n => n.type === 'beat').map(n => n.id));
+    },
+    []
+  );
 
   // Use ref for assets to avoid triggering unnecessary useMemo recalculations
   // The cluster nodes will access assets via ref for the popover, which updates on render
@@ -840,7 +855,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       console.log('[GraphEditor] setNodes: updating', nodes.length, 'nodes');
     }
 
-    setNodes(nodes);
+    // Preserve ReactFlow's multi-selection: the freshly-built nodes carry no
+    // `selected` flags, and a bare setNodes(nodes) would wipe the user's
+    // marquee/cmd-click selection on every re-sync (e.g. right after moving
+    // the selected group).
+    setNodes(prev => {
+      const selectedIds = new Set(prev.filter(n => n.selected).map(n => n.id));
+      return selectedIds.size === 0
+        ? nodes
+        : nodes.map(n => (selectedIds.has(n.id) ? { ...n, selected: true } : n));
+    });
 
     // If beats count changed (likely project load or import), mark that we need fitView
     const beatsCountChanged = Math.abs(beats.length - prevBeatsLengthRef.current) > 0;
@@ -1085,9 +1109,18 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     (action: 'duplicate' | 'copy' | 'paste' | 'delete') => {
       if (!contextMenu) return;
 
+      // When the right-clicked beat is part of a multi-selection, the
+      // duplicate/delete actions apply to the whole selection.
+      const multiTarget =
+        contextMenu.beatId && multiSelectedIds.length > 1 && multiSelectedIds.includes(contextMenu.beatId)
+          ? multiSelectedIds
+          : null;
+
       switch (action) {
         case 'duplicate':
-          if (contextMenu.beatId && onBeatDuplicate) {
+          if (multiTarget && onBeatsDuplicate) {
+            onBeatsDuplicate(multiTarget);
+          } else if (contextMenu.beatId && onBeatDuplicate) {
             onBeatDuplicate(contextMenu.beatId);
           }
           break;
@@ -1102,7 +1135,12 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
           break;
         case 'delete':
-          if (contextMenu.beatId && onBeatDelete) {
+          if (multiTarget && onBeatsDelete) {
+            const confirmDelete = window.confirm(`Delete ${multiTarget.length} selected beats?`);
+            if (confirmDelete) {
+              onBeatsDelete(multiTarget);
+            }
+          } else if (contextMenu.beatId && onBeatDelete) {
             const beat = beats.find(b => b.id === contextMenu.beatId);
             const confirmDelete = window.confirm(`Delete beat "${beat?.name || contextMenu.beatId}"?`);
             if (confirmDelete) {
@@ -1113,38 +1151,46 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       }
       closeContextMenu();
     },
-    [contextMenu, beats, onBeatDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, closeContextMenu]
+    [contextMenu, beats, multiSelectedIds, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, onBeatsDelete, closeContextMenu]
   );
 
-  // Handle node drag
+  // Handle node drag. With a multi-selection ReactFlow drags the whole
+  // group and passes every dragged node as the third argument — process
+  // them all so a group drag records every move and can drop several
+  // beats into a cluster at once.
   const onNodeDragStop = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      if (node.type === 'cluster') {
-        onClusterMove(node.id, node.position.x, node.position.y);
-        return;
-      }
+    (event: React.MouseEvent, node: Node, draggedNodes?: Node[]) => {
+      const dragged = draggedNodes && draggedNodes.length > 0 ? draggedNodes : [node];
 
-      // Beat node — first record the move, then check whether the beat was
-      // dropped INSIDE any cluster's bounds. If yes, reassign the beat to
-      // that cluster (mirrors the sidebar→cluster drag flow).
-      onBeatMove(node.id, node.position.x, node.position.y);
+      for (const n of dragged) {
+        if (n.type === 'cluster') {
+          onClusterMove(n.id, n.position.x, n.position.y);
+          continue;
+        }
 
-      if (!onDropBeatToCluster) return;
-      const dropX = node.position.x;
-      const dropY = node.position.y;
-      for (const cluster of clusters) {
-        if (!cluster.isExpanded) continue; // collapsed clusters: no drop zone
-        const cx = cluster.containerPosition?.x ?? 0;
-        const cy = cluster.containerPosition?.y ?? 0;
-        const cw = cluster.containerBounds?.width ?? 0;
-        const ch = cluster.containerBounds?.height ?? 0;
-        if (cw <= 0 || ch <= 0) continue;
-        if (dropX >= cx && dropX <= cx + cw && dropY >= cy && dropY <= cy + ch) {
-          // Don't redundantly fire when the beat is already in this cluster
-          const beatObj = beats.find(b => b.id === node.id);
-          if (beatObj?.cluster === cluster.id) return;
-          onDropBeatToCluster(node.id, cluster.id);
-          return;
+        // Beat node — first record the move, then check whether the beat was
+        // dropped INSIDE any cluster's bounds. If yes, reassign the beat to
+        // that cluster (mirrors the sidebar→cluster drag flow).
+        onBeatMove(n.id, n.position.x, n.position.y);
+
+        if (!onDropBeatToCluster) continue;
+        const dropX = n.position.x;
+        const dropY = n.position.y;
+        for (const cluster of clusters) {
+          if (!cluster.isExpanded) continue; // collapsed clusters: no drop zone
+          const cx = cluster.containerPosition?.x ?? 0;
+          const cy = cluster.containerPosition?.y ?? 0;
+          const cw = cluster.containerBounds?.width ?? 0;
+          const ch = cluster.containerBounds?.height ?? 0;
+          if (cw <= 0 || ch <= 0) continue;
+          if (dropX >= cx && dropX <= cx + cw && dropY >= cy && dropY <= cy + ch) {
+            // Don't redundantly fire when the beat is already in this cluster
+            const beatObj = beats.find(b => b.id === n.id);
+            if (beatObj?.cluster !== cluster.id) {
+              onDropBeatToCluster(n.id, cluster.id);
+            }
+            break;
+          }
         }
       }
     },
@@ -1219,12 +1265,19 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
+        onSelectionChange={onSelectionChange}
+        multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
+        deleteKeyCode={null}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={closeContextMenu}
         onInit={(instance) => {
           // Set the instance for viewport controls
           setReactFlowInstance(instance);
+          // Dev-only hook so automated tests can drive selection/inspection
+          if (import.meta.env.DEV) {
+            (window as any).__graphEditorInstance = instance;
+          }
           console.log('🎯 ReactFlow ready');
         }}
         onDrop={onDrop}
@@ -1282,14 +1335,22 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           {contextMenu.beatId ? (
             // Beat context menu
             <>
-              <button
-                onClick={() => handleContextMenuAction('duplicate')}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                disabled={!onBeatDuplicate}
-              >
-                <span className="text-gray-500">⌘D</span>
-                <span>Duplicate</span>
-              </button>
+              {(() => {
+                const multiCount =
+                  multiSelectedIds.length > 1 && multiSelectedIds.includes(contextMenu.beatId)
+                    ? multiSelectedIds.length
+                    : 0;
+                return (
+                  <button
+                    onClick={() => handleContextMenuAction('duplicate')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                    disabled={multiCount > 0 ? !onBeatsDuplicate : !onBeatDuplicate}
+                  >
+                    <span className="text-gray-500">⌘D</span>
+                    <span>{multiCount > 0 ? `Duplicate ${multiCount} beats` : 'Duplicate'}</span>
+                  </button>
+                );
+              })()}
               <button
                 onClick={() => handleContextMenuAction('copy')}
                 className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
@@ -1350,14 +1411,22 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
                 </>
               )}
               <div className="h-px bg-gray-200 my-1" />
-              <button
-                onClick={() => handleContextMenuAction('delete')}
-                className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                disabled={!onBeatDelete}
-              >
-                <span className="text-red-400">⌫</span>
-                <span>Delete</span>
-              </button>
+              {(() => {
+                const multiCount =
+                  multiSelectedIds.length > 1 && multiSelectedIds.includes(contextMenu.beatId!)
+                    ? multiSelectedIds.length
+                    : 0;
+                return (
+                  <button
+                    onClick={() => handleContextMenuAction('delete')}
+                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                    disabled={multiCount > 0 ? !onBeatsDelete : !onBeatDelete}
+                  >
+                    <span className="text-red-400">⌫</span>
+                    <span>{multiCount > 0 ? `Delete ${multiCount} beats` : 'Delete'}</span>
+                  </button>
+                );
+              })()}
             </>
           ) : (
             // Pane context menu (empty space)
