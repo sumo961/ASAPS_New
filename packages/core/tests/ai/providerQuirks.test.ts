@@ -28,6 +28,9 @@ import {
   effectiveMaxTokens,
   stripThinkingBlocks,
   buildChatRequestBody,
+  supportsProReasoning,
+  buildResponsesRequestBody,
+  extractResponsesOutputText,
 } from '../../src/ai/providerQuirks';
 
 describe('requiresMaxCompletionTokens', () => {
@@ -324,5 +327,100 @@ describe('buildChatRequestBody', () => {
       expect(body.model).toBe('gpt-4');
       expect(body.messages).toBe(messages);
     });
+  });
+});
+
+describe('supportsProReasoning', () => {
+  it('accepts the gpt-5.6 family (tiers + bare alias)', () => {
+    expect(supportsProReasoning('gpt-5.6-sol')).toBe(true);
+    expect(supportsProReasoning('gpt-5.6-terra')).toBe(true);
+    expect(supportsProReasoning('gpt-5.6-luna')).toBe(true);
+    expect(supportsProReasoning('gpt-5.6')).toBe(true);
+    expect(supportsProReasoning('GPT-5.6-Sol')).toBe(true); // case-insensitive
+  });
+
+  it('rejects everything that is not gpt-5.6', () => {
+    expect(supportsProReasoning('gpt-5.5')).toBe(false);
+    expect(supportsProReasoning('gpt-4.1')).toBe(false);
+    expect(supportsProReasoning('o1')).toBe(false);
+    expect(supportsProReasoning('kimi-k2-thinking')).toBe(false);
+    expect(supportsProReasoning('llama3.2')).toBe(false);
+    expect(supportsProReasoning('')).toBe(false);
+  });
+});
+
+describe('buildResponsesRequestBody', () => {
+  const msgs = [
+    { role: 'system', content: 'be brief' },
+    { role: 'user', content: 'hi' },
+  ];
+
+  it('builds the Responses-API shape: input[], max_output_tokens, reasoning.mode pro', () => {
+    const body = buildResponsesRequestBody('gpt-5.6-sol', msgs, 2000);
+    expect(body.model).toBe('gpt-5.6-sol');
+    expect(body.input).toEqual([
+      { role: 'system', content: 'be brief' },
+      { role: 'user', content: 'hi' },
+    ]);
+    expect(body.max_output_tokens).toBe(2000);
+    expect(body.reasoning).toEqual({ mode: 'pro' });
+    // chat-completions keys must NOT leak in
+    expect((body as any).messages).toBeUndefined();
+    expect((body as any).max_tokens).toBeUndefined();
+    expect((body as any).max_completion_tokens).toBeUndefined();
+  });
+
+  it('passes pro-supported efforts through (medium/high/xhigh)', () => {
+    for (const effort of ['medium', 'high', 'xhigh'] as const) {
+      const body = buildResponsesRequestBody('gpt-5.6-sol', msgs, 1000, {
+        reasoningEffort: effort,
+      });
+      expect(body.reasoning).toEqual({ mode: 'pro', effort });
+    }
+  });
+
+  it("maps our 'max' alias to xhigh", () => {
+    const body = buildResponsesRequestBody('gpt-5.6-sol', msgs, 1000, {
+      reasoningEffort: 'max',
+    });
+    expect(body.reasoning).toEqual({ mode: 'pro', effort: 'xhigh' });
+  });
+
+  it('omits efforts pro mode does not accept (none/minimal/low) and unset', () => {
+    for (const effort of ['none', 'minimal', 'low', undefined] as const) {
+      const body = buildResponsesRequestBody('gpt-5.6-sol', msgs, 1000, {
+        reasoningEffort: effort,
+      });
+      expect(body.reasoning).toEqual({ mode: 'pro' });
+    }
+  });
+});
+
+describe('extractResponsesOutputText', () => {
+  it('prefers the output_text convenience field', () => {
+    expect(extractResponsesOutputText({ output_text: 'quick answer' })).toBe('quick answer');
+  });
+
+  it('walks output[] message items and joins their output_text parts', () => {
+    const json = {
+      output: [
+        { type: 'reasoning', summary: [] },
+        {
+          type: 'message',
+          content: [
+            { type: 'output_text', text: 'part one' },
+            { type: 'output_text', text: ' part two' },
+          ],
+        },
+      ],
+    };
+    expect(extractResponsesOutputText(json)).toBe('part one part two');
+  });
+
+  it('returns empty string for malformed/empty payloads', () => {
+    expect(extractResponsesOutputText({})).toBe('');
+    expect(extractResponsesOutputText(null)).toBe('');
+    expect(extractResponsesOutputText({ output: [] })).toBe('');
+    expect(extractResponsesOutputText({ output: [{ type: 'message', content: [] }] })).toBe('');
   });
 });

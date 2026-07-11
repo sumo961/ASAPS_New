@@ -17,4 +17,7 @@ export {
   effectiveMaxTokens,
   stripThinkingBlocks,
   buildChatRequestBody,
+  supportsProReasoning,
+  buildResponsesRequestBody,
+  extractResponsesOutputText,
 } from '@asaps/core';

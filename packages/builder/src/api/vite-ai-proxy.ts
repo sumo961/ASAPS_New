@@ -97,7 +97,7 @@ function streamingProxyRequest(
   headers: Record<string, string>,
   body: string,
   res: ServerResponse,
-  provider: 'openai' | 'claude',
+  provider: 'openai' | 'openai-responses' | 'claude',
   timeoutMs: number,
 ): Promise<{ totalChars: number; status: number }> {
   return new Promise((resolve, reject) => {
@@ -175,12 +175,15 @@ function streamingProxyRequest(
             if (!payload || payload === '[DONE]') continue;
             try {
               const json = JSON.parse(payload);
-              // OpenAI: { choices: [{ delta: { content: "..." } }] }
+              // OpenAI chat: { choices: [{ delta: { content: "..." } }] }
+              // OpenAI Responses API: { type: 'response.output_text.delta', delta: "..." }
               // Anthropic: { type: 'content_block_delta', delta: { text: "..." } }
               const content =
                 provider === 'openai'
                   ? json?.choices?.[0]?.delta?.content
-                  : json?.delta?.text || json?.delta?.partial_json;
+                  : provider === 'openai-responses'
+                    ? (json?.type === 'response.output_text.delta' ? json?.delta : undefined)
+                    : json?.delta?.text || json?.delta?.partial_json;
               if (content) {
                 res.write(content);
                 totalChars += (content as string).length;
@@ -303,7 +306,10 @@ export function viteAIProxyPlugin(): Plugin {
         try {
           const body = await readBody(req);
           const parsed = JSON.parse(body);
-          const { baseUrl, apiKey, ...requestBody } = parsed;
+          // _endpoint: 'responses' routes to OpenAI's Responses API
+          // (pro-mode reasoning, GPT-5.6). Stripped before forwarding —
+          // it is proxy metadata, not an upstream field.
+          const { baseUrl, apiKey, _endpoint, ...requestBody } = parsed;
 
           if (!apiKey) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -317,9 +323,11 @@ export function viteAIProxyPlugin(): Plugin {
 
           if (req.url === '/api/ai/openai') {
             const effectiveBaseUrl = baseUrl || 'https://api.openai.com/v1';
-            endpoint = effectiveBaseUrl.includes('/completions')
-              ? effectiveBaseUrl
-              : `${effectiveBaseUrl.replace(/\/$/, '')}/chat/completions`;
+            endpoint = _endpoint === 'responses'
+              ? `${effectiveBaseUrl.replace(/\/$/, '')}/responses`
+              : effectiveBaseUrl.includes('/completions')
+                ? effectiveBaseUrl
+                : `${effectiveBaseUrl.replace(/\/$/, '')}/chat/completions`;
             headers = {
               'Content-Type': 'application/json',
               Authorization: `Bearer ${apiKey}`,
@@ -341,7 +349,9 @@ export function viteAIProxyPlugin(): Plugin {
           console.log(`[Vite AI Proxy] ${req.url === '/api/ai/openai' ? 'OpenAI' : 'Claude'} → ${endpoint}${isStreaming ? ' (streaming)' : ''}`);
 
           if (isStreaming) {
-            const provider = req.url === '/api/ai/openai' ? 'openai' : 'claude';
+            const provider = req.url === '/api/ai/openai'
+              ? (_endpoint === 'responses' ? 'openai-responses' as const : 'openai' as const)
+              : 'claude' as const;
             const { totalChars, status } = await streamingProxyRequest(
               endpoint,
               headers,

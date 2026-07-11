@@ -25,7 +25,7 @@ import {
   buildEnhancedUserPrompt
 } from '../prompts/storyGenerationEnhanced';
 import { getAIValidator } from '../AIValidator';
-import { requiresMaxCompletionTokens, isReasoningModel } from './openai-utils';
+import { requiresMaxCompletionTokens, isReasoningModel, supportsProReasoning, buildResponsesRequestBody, extractResponsesOutputText } from './openai-utils';
 
 /**
  * OpenAI Provider Implementation
@@ -188,7 +188,17 @@ export class OpenAIProvider extends BaseAIProvider {
       };
     }
 
-    return response.json();
+    const json = await response.json();
+    // Pro reasoning (Responses API) returns { output: [...] } instead of
+    // { choices: [...] } — normalize so every caller keeps reading
+    // choices[0].message.content.
+    if (requestBody?._endpoint === 'responses' && !json?.choices) {
+      return {
+        choices: [{ message: { content: extractResponsesOutputText(json) } }],
+        _responsesApi: true,
+      };
+    }
+    return json;
   }
 
   /**
@@ -210,6 +220,24 @@ export class OpenAIProvider extends BaseAIProvider {
    * Build a chat completion request body with modern model support
    * Uses shared utilities for model detection (requiresMaxCompletionTokens, isReasoningModel)
    */
+  /**
+   * Whether this request should use OpenAI's pro reasoning mode via the
+   * Responses API. THREE gates, all required, so OpenAI-compatible servers
+   * are never sent a Responses-API body:
+   *   1. the author opted in (config.reasoningMode === 'pro')
+   *   2. the model supports it (gpt-5.6 family)
+   *   3. the target is the official OpenAI endpoint (no custom baseUrl,
+   *      or an explicit api.openai.com baseUrl) — Ollama/Kimi/custom
+   *      proxies only implement /chat/completions.
+   */
+  private proReasoningActive(): boolean {
+    if (this.config?.reasoningMode !== 'pro') return false;
+    if (!supportsProReasoning(this.model)) return false;
+    const baseUrl = this.config?.baseUrl;
+    if (baseUrl && !baseUrl.includes('api.openai.com')) return false;
+    return true;
+  }
+
   private buildChatRequest(
     messages: Array<{ role: 'system' | 'user'; content: string }>,
     defaultMaxTokens: number,
@@ -222,6 +250,20 @@ export class OpenAIProvider extends BaseAIProvider {
   ): ChatCompletionCreateParamsNonStreaming & Record<string, any> {
     const reasoningEffort = this.config?.reasoningEffort;
     const maxTokens = this.config?.maxTokens ?? defaultMaxTokens;
+
+    // Pro reasoning (GPT-5.6, official OpenAI only): Responses-API body.
+    // The _endpoint marker tells the proxy to target /responses; it is
+    // stripped there and never reaches the upstream API. jsonMode has no
+    // Responses-API equivalent wired here — callers already tolerate
+    // prose-wrapped JSON via extractJSON + repair.
+    if (this.proReasoningActive()) {
+      const proBody = buildResponsesRequestBody(this.model, messages, maxTokens, {
+        reasoningEffort,
+      }) as ChatCompletionCreateParamsNonStreaming & Record<string, any>;
+      proBody._endpoint = 'responses';
+      console.log('[OpenAIProvider] Pro reasoning active — using Responses API');
+      return proBody;
+    }
 
     const requestBody: ChatCompletionCreateParamsNonStreaming & Record<string, any> = {
       model: this.model,

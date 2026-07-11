@@ -140,3 +140,75 @@ export function buildChatRequestBody(
 
   return body;
 }
+
+/**
+ * Whether a model supports OpenAI's `reasoning.mode: "pro"` (deep reasoning
+ * via the Responses API). Introduced with the GPT-5.6 tier family
+ * (Sol/Terra/Luna, GA 2026-07-09); Sol is the documented pro-mode target.
+ * Pro mode is NOT available on Chat Completions — callers must route
+ * through POST /v1/responses, which only the official OpenAI endpoint
+ * serves. Third-party OpenAI-compatible servers (Ollama, Kimi, custom
+ * proxies) implement /chat/completions only, so pro must never change the
+ * request shape for them.
+ */
+export function supportsProReasoning(model: string): boolean {
+  return model.toLowerCase().startsWith('gpt-5.6');
+}
+
+/**
+ * Build an OpenAI Responses-API request body (POST /v1/responses) for
+ * pro-mode reasoning. Field shapes per developers.openai.com:
+ *   - `input` takes the same role/content message array
+ *   - the token cap is `max_output_tokens`
+ *   - `reasoning: { mode: "pro", effort? }` — pro mode accepts only the
+ *     medium/high/xhigh efforts, so lower tiers are omitted (API default)
+ *     and the Anthropic-only 'max' is capped to 'xhigh'
+ * Deliberately NO response_format equivalent: the JSON-forcing shape
+ * differs on the Responses API and our callers already tolerate prose-
+ * wrapped JSON via extractJSON + repair. Temperature is never sent
+ * (reasoning models reject it).
+ */
+export function buildResponsesRequestBody(
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number,
+  options?: {
+    reasoningEffort?: string;
+  }
+): Record<string, unknown> {
+  const reasoning: Record<string, unknown> = { mode: 'pro' };
+  const effort = options?.reasoningEffort === 'max' ? 'xhigh' : options?.reasoningEffort;
+  if (effort === 'medium' || effort === 'high' || effort === 'xhigh') {
+    reasoning.effort = effort;
+  }
+  return {
+    model,
+    input: messages.map(m => ({ role: m.role, content: m.content })),
+    max_output_tokens: maxTokens,
+    reasoning,
+  };
+}
+
+/**
+ * Extract the assistant text from a (non-streaming) Responses-API result.
+ * The raw REST shape is an `output` array whose message items carry
+ * content parts of type `output_text`; some servers also include the SDK
+ * convenience field `output_text`.
+ */
+export function extractResponsesOutputText(json: any): string {
+  if (typeof json?.output_text === 'string' && json.output_text.length > 0) {
+    return json.output_text;
+  }
+  const parts: string[] = [];
+  if (Array.isArray(json?.output)) {
+    for (const item of json.output) {
+      if (item?.type !== 'message' || !Array.isArray(item.content)) continue;
+      for (const part of item.content) {
+        if (part?.type === 'output_text' && typeof part.text === 'string') {
+          parts.push(part.text);
+        }
+      }
+    }
+  }
+  return parts.join('');
+}

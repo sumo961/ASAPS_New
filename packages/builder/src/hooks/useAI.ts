@@ -34,6 +34,8 @@ export interface SavedAIConfig {
   baseUrl?: string;
   maxTokens?: number;
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** OpenAI pro reasoning (GPT-5.6, Responses API). Ignored elsewhere. */
+  reasoningMode?: 'standard' | 'pro';
   // Track the original provider type for UI (local uses openai provider)
   providerType?: 'claude' | 'openai' | 'local';
 }
@@ -125,7 +127,8 @@ export function useAI() {
     baseUrl?: string,
     maxTokens?: number,
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max',
-    providerType?: 'claude' | 'openai' | 'local'
+    providerType?: 'claude' | 'openai' | 'local',
+    reasoningMode?: 'standard' | 'pro'
   ) => {
     // Create and register provider
     let providerInstance;
@@ -143,6 +146,7 @@ export function useAI() {
       baseUrl,
       maxTokens,
       reasoningEffort,
+      reasoningMode,
     });
 
     aiService.registerProvider(providerInstance);
@@ -186,7 +190,8 @@ export function useAI() {
             savedConfig.baseUrl,
             savedConfig.maxTokens,
             savedConfig.reasoningEffort,
-            savedConfig.providerType
+            savedConfig.providerType,
+            savedConfig.reasoningMode
           );
         } catch (error) {
           console.warn('[useAI] Failed to restore saved configuration:', error);
@@ -214,10 +219,11 @@ export function useAI() {
     baseUrl?: string,
     maxTokens?: number,
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max',
-    providerType?: 'claude' | 'openai' | 'local'
+    providerType?: 'claude' | 'openai' | 'local',
+    reasoningMode?: 'standard' | 'pro'
   ) => {
     try {
-      configureProvider(provider, apiKey, model, baseUrl, maxTokens, reasoningEffort, providerType);
+      configureProvider(provider, apiKey, model, baseUrl, maxTokens, reasoningEffort, providerType, reasoningMode);
 
       // Save configuration to localStorage for persistence
       saveConfig({
@@ -228,6 +234,7 @@ export function useAI() {
         maxTokens,
         reasoningEffort,
         providerType,
+        reasoningMode,
       });
     } catch (error) {
       setState(prev => ({

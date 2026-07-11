@@ -875,7 +875,9 @@ export class APIServer {
     // Proxy for OpenAI-compatible APIs
     router.post('/openai', async (req: Request, res: Response) => {
       try {
-        const { baseUrl: providedBaseUrl, apiKey, ...requestBody } = req.body;
+        // _endpoint: 'responses' routes to OpenAI's Responses API
+        // (pro-mode reasoning, GPT-5.6). Proxy metadata — stripped here.
+        const { baseUrl: providedBaseUrl, apiKey, _endpoint, ...requestBody } = req.body;
 
         if (!apiKey) {
           return res.status(400).json({
@@ -890,7 +892,9 @@ export class APIServer {
         // If baseUrl already contains '/completions', use it as-is
         // Otherwise, append '/chat/completions' (standard OpenAI path)
         let endpoint = baseUrl;
-        if (!baseUrl.includes('/completions')) {
+        if (_endpoint === 'responses') {
+          endpoint = `${baseUrl.replace(/\/$/, '')}/responses`;
+        } else if (!baseUrl.includes('/completions')) {
           endpoint = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
         }
 

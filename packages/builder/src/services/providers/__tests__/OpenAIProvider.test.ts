@@ -90,6 +90,58 @@ describe('isOllamaConnection', () => {
   });
 });
 
+describe('pro reasoning mode (Responses API)', () => {
+  const build = (over: Partial<AIProviderConfig>, max = 1000) => {
+    p.configure(cfg(over));
+    return (p as any).buildChatRequest([{ role: 'user', content: 'hi' }], max, 0.7);
+  };
+
+  it('builds a Responses-API body when pro + gpt-5.6 + official endpoint', () => {
+    const body = build({ model: 'gpt-5.6-sol', reasoningMode: 'pro' });
+    expect(body._endpoint).toBe('responses');
+    expect(body.reasoning).toEqual({ mode: 'pro' });
+    expect(body.input).toEqual([{ role: 'user', content: 'hi' }]);
+    expect(body.max_output_tokens).toBe(1000);
+    // chat-completions keys must not leak in
+    expect(body.messages).toBeUndefined();
+    expect(body.max_tokens).toBeUndefined();
+    expect(body.max_completion_tokens).toBeUndefined();
+    expect(body.temperature).toBeUndefined();
+  });
+
+  it('threads reasoningEffort into reasoning.effort', () => {
+    const body = build({ model: 'gpt-5.6-sol', reasoningMode: 'pro', reasoningEffort: 'high' });
+    expect(body.reasoning).toEqual({ mode: 'pro', effort: 'high' });
+  });
+
+  it('falls back to plain chat completions for non-5.6 models', () => {
+    const body = build({ model: 'gpt-5.5', reasoningMode: 'pro' });
+    expect(body._endpoint).toBeUndefined();
+    expect(body.messages).toEqual([{ role: 'user', content: 'hi' }]);
+    expect(body.max_completion_tokens).toBe(1000);
+    expect(body.input).toBeUndefined();
+    expect(body.reasoning).toBeUndefined();
+  });
+
+  it('falls back to plain chat completions on custom / local endpoints', () => {
+    for (const baseUrl of ['http://localhost:11434/v1', 'https://api.moonshot.ai/v1']) {
+      const body = build({ model: 'gpt-5.6-sol', reasoningMode: 'pro', baseUrl });
+      expect(body._endpoint).toBeUndefined();
+      expect(body.messages).toBeDefined();
+      expect(body.reasoning).toBeUndefined();
+    }
+  });
+
+  it('is inert when reasoningMode is standard or unset', () => {
+    for (const reasoningMode of ['standard', undefined] as const) {
+      const body = build({ model: 'gpt-5.6-sol', reasoningMode });
+      expect(body._endpoint).toBeUndefined();
+      expect(body.messages).toBeDefined();
+      expect(body.reasoning).toBeUndefined();
+    }
+  });
+});
+
 describe('buildChatRequest', () => {
   const build = (over: Partial<AIProviderConfig>, max = 1000, temp = 0.7) => {
     p.configure(cfg(over));

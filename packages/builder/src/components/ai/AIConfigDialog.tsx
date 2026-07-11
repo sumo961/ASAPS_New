@@ -99,6 +99,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   const [reasoningEffort, setReasoningEffort] = useState<
     '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   >('');
+  // OpenAI pro reasoning (GPT-5.6 via the Responses API). '' = standard.
+  const [reasoningMode, setReasoningMode] = useState<'' | 'pro'>('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [hasLoadedSaved, setHasLoadedSaved] = useState(false);
@@ -121,6 +123,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         setBaseUrl(savedConfig.baseUrl || '');
         setMaxTokens(savedConfig.maxTokens?.toString() || '');
         setReasoningEffort(savedConfig.reasoningEffort || '');
+        setReasoningMode(savedConfig.reasoningMode === 'pro' ? 'pro' : '');
         console.log('[AIConfigDialog] Loaded saved configuration for:', savedProviderType);
       }
       // Brave Search key (independent of provider).
@@ -177,7 +180,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         baseUrl || undefined,
         maxTokensNum,
         reasoningEffort || undefined,
-        provider // Pass the original provider type for UI display
+        provider, // Pass the original provider type for UI display
+        reasoningMode === 'pro' ? 'pro' : undefined
       );
 
       // Persist (or clear) the Brave Search key alongside the AI config.
@@ -194,6 +198,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           ...(baseUrl ? { baseUrl } : {}),
           ...(maxTokensNum ? { maxTokens: maxTokensNum } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
+          ...(reasoningMode === 'pro' ? { reasoningMode: 'pro' as const } : {}),
         });
       }
 
@@ -382,6 +387,31 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
                 : 'GPT-5.x reasoning uses max_completion_tokens and ignores temperature. Values none–xhigh apply to gpt-5.5 and the gpt-5.6 family (Sol/Terra/Luna). Leave blank to use the model default.'}
             </p>
           </div>
+
+          {/* Pro reasoning mode — OpenAI GPT-5.6 only (Responses API) */}
+          {provider === 'openai' && (
+            <div>
+              <label htmlFor="reasoningMode" className="block text-sm font-medium text-gray-700 mb-2">
+                Reasoning mode (GPT-5.6)
+              </label>
+              <select
+                id="reasoningMode"
+                value={reasoningMode}
+                onChange={(e) => setReasoningMode(e.target.value === 'pro' ? 'pro' : '')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Standard (default)</option>
+                <option value="pro">Pro — deepest reasoning (slow, expensive)</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Pro mode uses OpenAI's Responses API for the hardest problems.
+                Only takes effect with a GPT-5.6 model (Sol recommended) on the
+                official OpenAI endpoint — for any other model, or a custom /
+                local endpoint, it is safely ignored and the standard path is
+                used. Expect much longer generation times.
+              </p>
+            </div>
+          )}
 
           {/* Base URL */}
           <div>

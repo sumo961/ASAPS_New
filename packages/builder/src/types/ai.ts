@@ -34,6 +34,15 @@ export interface AIProviderConfig {
    */
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
+  /**
+   * OpenAI reasoning mode (GPT-5.6 family). 'pro' routes requests through
+   * the Responses API (POST /v1/responses) for OpenAI's deepest reasoning —
+   * only honored for gpt-5.6* models on the official endpoint; ignored for
+   * every other model / custom / local endpoint so OpenAI-compatible
+   * servers (Ollama, Kimi, proxies) keep the plain chat-completions shape.
+   */
+  reasoningMode?: 'standard' | 'pro';
+
   /** Custom base URL for API-compatible providers (e.g., ANTHROPIC_BASE_URL) */
   baseUrl?: string;
 
