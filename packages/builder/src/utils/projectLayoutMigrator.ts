@@ -531,7 +531,13 @@ export function migrateResponsiveToFixed(
     const next: any = { ...beat };
     next.locations = new Map<string, any>();
     for (const el of elements) {
-      if (el?.name) next.locations.set(el.name, el);
+      if (!el?.name) continue;
+      // The generator emits builder VisualElements (`type` field), but a
+      // baked location must be a canonical renderer Location (`kind`) —
+      // the VE's own save path does this conversion, and skipping it here
+      // made the corruption detector flag every freshly-converted project
+      // as "legacy format" on its next load.
+      next.locations.set(el.name, el.kind ? el : { ...el, kind: el.type });
     }
     summary.push({
       beatId: (beat as any).id,

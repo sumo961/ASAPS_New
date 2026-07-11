@@ -140,6 +140,37 @@ describe('migrateResponsiveToFixed', () => {
     expect(summary[0].detail).toMatch(/baked 2 schema-default positions/);
   });
 
+  it('bakes canonical locations: generator `type` elements gain `kind` so the corruption detector stays quiet', async () => {
+    const b = beat({ type: 'infoText', locations: new Map() });
+    const g = gen([
+      { name: 'text', type: 'dialog', x: 10, y: 20 },
+      { name: 'continueButton', type: 'button', x: 30, y: 40 },
+    ]);
+    const { applied } = migrateResponsiveToFixed([b], g, 800, 600);
+    const out: any = applied[0];
+    expect(out.locations.get('text').kind).toBe('dialog');
+    expect(out.locations.get('continueButton').kind).toBe('button');
+    // builder `type` stays for the VE; renderer `kind` added alongside
+    expect(out.locations.get('text').type).toBe('dialog');
+
+    // End-to-end guard: a just-converted project must NOT read as corrupted
+    // (regression: the "legacy format — upgraded" alert after every
+    // responsive→fixed conversion)
+    const { detectProjectCorruption } = await import('../projectRepair');
+    const report = detectProjectCorruption({
+      globalSettings: { colors: {}, fonts: {}, textbox: {}, textEffects: {}, hotspots: {} },
+      beats: [{ ...out, locations: Array.from(out.locations.values()) }],
+    });
+    expect(report.corrupted).toBe(false);
+  });
+
+  it('respects an element that already carries a kind', () => {
+    const b = beat({ type: 'infoText', locations: new Map() });
+    const g = gen([{ name: 'text', type: 'dialog', kind: 'text', x: 0, y: 0 }]);
+    const out: any = migrateResponsiveToFixed([b], g).applied[0];
+    expect(out.locations.get('text').kind).toBe('text');
+  });
+
   it('leaves the beat unchanged when the generator throws', () => {
     const b = beat({ type: 'infoText', locations: new Map() });
     const g = vi.fn(() => {
