@@ -4,7 +4,11 @@
  */
 
 import type { IAIService } from '@asaps/core';
-import { effectiveMaxTokens } from '@asaps/core';
+import {
+  createRuntimeAIService,
+  createDirectAnthropicTransport,
+  createDirectOpenAITransport,
+} from '@asaps/core';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
 
@@ -260,28 +264,52 @@ export class WebAIService implements IAIService {
     return this.configPromise;
   }
 
-  async generateContent(prompt: string, options?: {
-    maxTokens?: number;
-    enableWebSearch?: boolean;
-  }): Promise<string> {
+  /**
+   * Build (and memoize) the shared runtime AI service for the current
+   * config. All per-provider orchestration — request bodies with the
+   * correct token parameter per model, response parsing, thinking-block
+   * stripping, tolerant JSON extraction + repair, image analysis — lives
+   * in @asaps/core's runtime adapter, shared with the builder's preview
+   * runtimes. This file only owns config storage and the key-prompt UI.
+   */
+  private service: IAIService | null = null;
+  private serviceKey: string | null = null;
+
+  private getService(config: StoredConfig): IAIService {
+    const key = `${config.provider}|${config.apiKey}|${config.baseUrl || ''}|${config.model || ''}`;
+    if (this.service && this.serviceKey === key) {
+      return this.service;
+    }
+
+    const transport = config.provider === 'anthropic'
+      ? createDirectAnthropicTransport({ apiKey: config.apiKey, baseUrl: config.baseUrl })
+      // 'openai', 'custom', and 'local' all speak the OpenAI-compatible API.
+      : createDirectOpenAITransport({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+
+    this.service = createRuntimeAIService({
+      family: config.provider === 'anthropic' ? 'anthropic' : 'openai',
+      model: config.model,
+      transport,
+      logPrefix: '[WebAIService]',
+    });
+    this.serviceKey = key;
+    return this.service;
+  }
+
+  private async requireService(): Promise<IAIService> {
     const config = await this.ensureConfig();
     if (!config) {
       throw new Error('AI not configured - skipping AI content');
     }
+    return this.getService(config);
+  }
 
-    // Give reasoning models headroom — the caller's 250-token ask gets eaten
-    // by hidden reasoning_content, returning truncated/empty visible content.
-    const budget = effectiveMaxTokens(config.model, options?.maxTokens ?? 1024);
-
-    if (config.provider === 'anthropic') {
-      return this.callAnthropic(prompt, config.apiKey, budget, config.model, config.baseUrl);
-    } else if (config.provider === 'custom' || config.provider === 'local') {
-      // Custom and local both use OpenAI-compatible API
-      return this.callOpenAI(prompt, config.apiKey || '', budget, config.model, config.baseUrl);
-    } else {
-      // OpenAI - baseUrl is optional (for proxies/enterprise endpoints)
-      return this.callOpenAI(prompt, config.apiKey, budget, config.model, config.baseUrl);
-    }
+  async generateContent(prompt: string, options?: {
+    maxTokens?: number;
+    enableWebSearch?: boolean;
+  }): Promise<string> {
+    const service = await this.requireService();
+    return service.generateContent(prompt, options);
   }
 
   async generateDialog(request: {
@@ -290,59 +318,23 @@ export class WebAIService implements IAIService {
     maxTurns?: number;
   }): Promise<any> {
     // Pass the prompt directly - AIDialogTreeBeat provides detailed format instructions
-    // Using a minimal system prompt to avoid conflicting format requirements
-    const config = await this.ensureConfig();
-    if (!config) {
-      throw new Error('AI not configured - skipping AI content');
-    }
+    const service = await this.requireService();
+    return service.generateDialog(request);
+  }
 
-    let response: string;
-    const maxTokens = 8192; // Dialog trees with nested nodes need ample room
-
-    if (config.provider === 'anthropic') {
-      response = await this.callAnthropicWithSystem(
-        'You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.',
-        request.prompt,
-        maxTokens,
-        config.model,
-        config.baseUrl,
-        config.apiKey
-      );
-    } else {
-      response = await this.callOpenAIWithSystem(
-        'You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.',
-        request.prompt,
-        maxTokens,
-        config.model,
-        config.baseUrl,
-        config.apiKey
-      );
-    }
-
-    // Strip thinking blocks (e.g. <think>...</think>) that some models produce
-    response = response.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-    try {
-      const jsonStr = this.extractJSON(response);
-      return JSON.parse(jsonStr);
-    } catch (e) {
-      console.error('[WebAIService] Failed to parse dialog response:', e);
-      console.error('[WebAIService] Raw response:', response.substring(0, 500));
-      throw new Error('No valid JSON found in response');
-    }
+  async generateConversationTurn(request: {
+    systemPrompt: string;
+    messages: Array<{ role: string; content: string }>;
+  }): Promise<{ text: string }> {
+    const service = await this.requireService();
+    // The shared adapter always implements this; the IAIService type marks
+    // it optional, hence the assertion.
+    return service.generateConversationTurn!(request);
   }
 
   async classifyContent(prompt: string, categories: string[]): Promise<string> {
-    const systemPrompt = `Classify the following content into exactly one of these categories: ${categories.join(', ')}.
-Respond with ONLY the category name, nothing else.`;
-
-    const response = await this.generateContent(`${systemPrompt}\n\nContent: ${prompt}`, {
-      maxTokens: 50,
-    });
-
-    const trimmed = response.trim();
-    const match = categories.find(c => c.toLowerCase() === trimmed.toLowerCase());
-    return match || categories[0];
+    const service = await this.requireService();
+    return service.classifyContent(prompt, categories);
   }
 
   async analyzeImage(
@@ -350,281 +342,8 @@ Respond with ONLY the category name, nothing else.`;
     prompt: string,
     options?: { maxTokens?: number }
   ): Promise<string> {
-    const config = await this.ensureConfig();
-    if (!config) {
-      throw new Error('AI not configured - skipping AI content');
-    }
-
-    const maxTokens = effectiveMaxTokens(config.model, options?.maxTokens ?? 1024);
-
-    if (config.provider === 'anthropic') {
-      const url = config.baseUrl
-        ? `${config.baseUrl.replace(/\/$/, '')}/messages`
-        : 'https://api.anthropic.com/v1/messages';
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': config.apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: config.model || 'claude-sonnet-4-6',
-          max_tokens: maxTokens,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.base64 } },
-              { type: 'text', text: prompt },
-            ],
-          }],
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Anthropic API error: ${response.status} - ${error}`);
-      }
-
-      const data = await response.json();
-      return (data.content?.[0]?.text || '').trim();
-    }
-
-    // OpenAI-compatible (openai / custom / local) — vision via image_url
-    // content parts. Local models without vision support return an API
-    // error here, which the beat turns into its fallbackValue.
-    const url = config.baseUrl
-      ? `${config.baseUrl.replace(/\/$/, '')}/chat/completions`
-      : 'https://api.openai.com/v1/chat/completions';
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey || ''}`,
-      },
-      body: JSON.stringify({
-        model: config.model || 'gpt-5.6-sol',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.base64}` } },
-            { type: 'text', text: prompt },
-          ],
-        }],
-        max_completion_tokens: maxTokens,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || '';
-    return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  }
-
-  private async callOpenAI(
-    prompt: string,
-    apiKey: string,
-    maxTokens?: number,
-    model?: string,
-    baseUrl?: string
-  ): Promise<string> {
-    const url = baseUrl
-      ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
-      : 'https://api.openai.com/v1/chat/completions';
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || 'gpt-5.6-sol',
-        messages: [{ role: 'user', content: prompt }],
-        max_completion_tokens: maxTokens || 1000,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
-  }
-
-  private async callAnthropic(
-    prompt: string,
-    apiKey: string,
-    maxTokens?: number,
-    model?: string,
-    baseUrl?: string
-  ): Promise<string> {
-    const url = baseUrl
-      ? `${baseUrl.replace(/\/$/, '')}/messages`
-      : 'https://api.anthropic.com/v1/messages';
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: model || 'claude-sonnet-4-6',
-        max_tokens: maxTokens || 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Anthropic API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.content?.[0]?.text || '';
-  }
-
-  private async callOpenAIWithSystem(
-    systemPrompt: string,
-    userPrompt: string,
-    maxTokens: number,
-    model?: string,
-    baseUrl?: string,
-    apiKey?: string
-  ): Promise<string> {
-    const url = baseUrl
-      ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
-      : 'https://api.openai.com/v1/chat/completions';
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey || ''}`,
-      },
-      body: JSON.stringify({
-        model: model || 'gpt-5.6-sol',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        max_completion_tokens: maxTokens,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
-  }
-
-  private async callAnthropicWithSystem(
-    systemPrompt: string,
-    userPrompt: string,
-    maxTokens: number,
-    model?: string,
-    baseUrl?: string,
-    apiKey?: string
-  ): Promise<string> {
-    const url = baseUrl
-      ? `${baseUrl.replace(/\/$/, '')}/messages`
-      : 'https://api.anthropic.com/v1/messages';
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey || '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: model || 'claude-sonnet-4-6',
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Anthropic API error: ${response.status} - ${error}`);
-    }
-
-    const data = await response.json();
-    return data.content?.[0]?.text || '';
-  }
-
-  /**
-   * Extract JSON object from text, handling markdown code blocks and extra content
-   */
-  private extractJSON(text: string): string {
-    // Strip markdown code blocks
-    let cleaned = text.trim();
-    if (cleaned.startsWith('```')) {
-      const lines = cleaned.split('\n');
-      lines.shift(); // Remove opening ```json or ```
-      while (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
-        lines.pop();
-      }
-      cleaned = lines.join('\n').trim();
-    }
-
-    const jsonStart = cleaned.indexOf('{');
-    if (jsonStart === -1) {
-      throw new Error('No JSON object found in response');
-    }
-
-    let braceCount = 0;
-    let inString = false;
-    let escaped = false;
-
-    for (let i = jsonStart; i < cleaned.length; i++) {
-      const char = cleaned[i];
-
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escaped = true;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (!inString) {
-        if (char === '{') braceCount++;
-        if (char === '}') {
-          braceCount--;
-          if (braceCount === 0) {
-            return cleaned.substring(jsonStart, i + 1);
-          }
-        }
-      }
-    }
-
-    // If we didn't find a complete match, return from jsonStart to end
-    return cleaned.substring(jsonStart);
+    const service = await this.requireService();
+    return service.analyzeImage!(image, prompt, options);
   }
 }
 

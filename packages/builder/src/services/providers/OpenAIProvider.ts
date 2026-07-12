@@ -25,7 +25,16 @@ import {
   buildEnhancedUserPrompt
 } from '../prompts/storyGenerationEnhanced';
 import { getAIValidator } from '../AIValidator';
-import { requiresMaxCompletionTokens, isReasoningModel, supportsProReasoning, buildResponsesRequestBody, extractResponsesOutputText } from './openai-utils';
+import {
+  requiresMaxCompletionTokens,
+  isReasoningModel,
+  supportsProReasoning,
+  buildResponsesRequestBody,
+  extractResponsesOutputText,
+  stripThinkingBlocks,
+  extractJSON,
+  parseJSONWithRepair,
+} from './openai-utils';
 
 /**
  * OpenAI Provider Implementation
@@ -313,476 +322,6 @@ export class OpenAIProvider extends BaseAIProvider {
   }
 
   /**
-   * Try to repair malformed JSON from LLM output
-   * Handles: unquoted keys, single quotes, trailing commas, truncation, control chars
-   */
-  private tryRepairJson(json: string): string | null {
-    let repaired = json;
-    const repairs: string[] = [];
-
-    // Step 1: Escape unescaped control characters inside JSON strings
-    // This handles newlines, tabs, etc. that smaller models write literally inside string values
-    {
-      let result = '';
-      let inString = false;
-      let i = 0;
-
-      while (i < repaired.length) {
-        const char = repaired[i];
-        const charCode = char.charCodeAt(0);
-
-        // Handle escape sequences
-        if (char === '\\' && i + 1 < repaired.length) {
-          result += char + repaired[i + 1];
-          i += 2;
-          continue;
-        }
-
-        // Track string boundaries
-        if (char === '"') {
-          inString = !inString;
-          result += char;
-          i++;
-          continue;
-        }
-
-        // Inside a string, escape control characters
-        if (inString && charCode < 32) {
-          // Map common control characters to their escape sequences
-          switch (charCode) {
-            case 9:  result += '\\t'; break;  // Tab
-            case 10: result += '\\n'; break;  // Newline
-            case 13: result += '\\r'; break;  // Carriage return
-            case 8:  result += '\\b'; break;  // Backspace
-            case 12: result += '\\f'; break;  // Form feed
-            default: result += `\\u${charCode.toString(16).padStart(4, '0')}`; // Other control chars
-          }
-          i++;
-          continue;
-        }
-
-        // Outside strings, remove harmful control characters (but keep newlines for structure)
-        if (!inString && charCode < 32 && charCode !== 10 && charCode !== 13 && charCode !== 9) {
-          i++;
-          continue;
-        }
-
-        result += char;
-        i++;
-      }
-
-      if (result !== repaired) {
-        const escapeCount = result.length - repaired.length + (repaired.match(/[\x00-\x1f]/g) || []).length;
-        repairs.push(`escaped ${escapeCount} control characters in strings`);
-        repaired = result;
-      }
-    }
-
-    // Step 1b: Remove JavaScript-style comments (// and /* */) that smaller models add
-    // Must be done carefully to not remove // inside string values
-    {
-      let result = '';
-      let inString = false;
-      let i = 0;
-
-      while (i < repaired.length) {
-        const char = repaired[i];
-
-        // Handle escape sequences inside strings
-        if (char === '\\' && inString && i + 1 < repaired.length) {
-          result += char + repaired[i + 1];
-          i += 2;
-          continue;
-        }
-
-        // Track string boundaries
-        if (char === '"') {
-          inString = !inString;
-          result += char;
-          i++;
-          continue;
-        }
-
-        // Outside strings, check for comments
-        if (!inString) {
-          // Single-line comment: // until end of line
-          if (char === '/' && i + 1 < repaired.length && repaired[i + 1] === '/') {
-            // Skip until newline
-            while (i < repaired.length && repaired[i] !== '\n') {
-              i++;
-            }
-            continue;
-          }
-
-          // Multi-line comment: /* ... */
-          if (char === '/' && i + 1 < repaired.length && repaired[i + 1] === '*') {
-            i += 2; // Skip /*
-            while (i + 1 < repaired.length && !(repaired[i] === '*' && repaired[i + 1] === '/')) {
-              i++;
-            }
-            i += 2; // Skip */
-            continue;
-          }
-        }
-
-        result += char;
-        i++;
-      }
-
-      if (result !== repaired) {
-        repairs.push('removed JavaScript comments');
-        repaired = result;
-      }
-    }
-
-    // Step 1c: Fix unescaped double quotes inside string values (common with Kimi K2.5).
-    // Pattern: "text": "He said "something" and..." — the inner quotes break JSON parsing.
-    // Strategy: when inside a string value, a `"` that is NOT immediately followed by a JSON
-    // structural character (`,`, `}`, `]`, `\n`, `\r`, or end-of-input) is an interior quote
-    // and should be escaped.
-    {
-      let result = '';
-      let i = 0;
-      let fixCount = 0;
-
-      while (i < repaired.length) {
-        const char = repaired[i];
-
-        // Pass through already-escaped sequences unchanged
-        if (char === '\\' && i + 1 < repaired.length) {
-          result += char + repaired[i + 1];
-          i += 2;
-          continue;
-        }
-
-        // Opening quote of a string
-        if (char === '"') {
-          result += char;
-          i++;
-
-          // Read string content, deciding for each `"` whether it closes the string
-          while (i < repaired.length) {
-            const sc = repaired[i];
-
-            if (sc === '\\' && i + 1 < repaired.length) {
-              result += sc + repaired[i + 1];
-              i += 2;
-              continue;
-            }
-
-            if (sc === '"') {
-              // Peek at the first non-space/tab character after this quote
-              let j = i + 1;
-              while (j < repaired.length && (repaired[j] === ' ' || repaired[j] === '\t')) j++;
-              const next = j < repaired.length ? repaired[j] : '';
-
-              // These characters mean the string value is legitimately over
-              const isStructural = next === ',' || next === '}' || next === ']' ||
-                                   next === '\n' || next === '\r' || next === '';
-
-              if (isStructural) {
-                result += sc; // closing quote
-                i++;
-                break;
-              } else {
-                result += '\\"'; // interior quote — escape it
-                fixCount++;
-                i++;
-              }
-              continue;
-            }
-
-            result += sc;
-            i++;
-          }
-          continue;
-        }
-
-        result += char;
-        i++;
-      }
-
-      if (fixCount > 0) {
-        repairs.push(`escaped ${fixCount} unescaped interior quotes in strings`);
-        repaired = result;
-      }
-    }
-
-    // Step 2: Fix unquoted property names (common LLM error)
-    // Match: { key: or , key: where key is not quoted
-    // Be careful not to match inside strings
-    const unquotedKeyPattern = /([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g;
-    let hasUnquotedKeys = false;
-
-    // First pass: check if we have unquoted keys (outside of strings)
-    const testStr = repaired;
-    let inStr = false;
-    let escaped = false;
-    let cleanedForTest = '';
-    for (let i = 0; i < testStr.length; i++) {
-      const c = testStr[i];
-      if (escaped) { escaped = false; cleanedForTest += '_'; continue; }
-      if (c === '\\') { escaped = true; cleanedForTest += '_'; continue; }
-      if (c === '"') { inStr = !inStr; cleanedForTest += c; continue; }
-      cleanedForTest += inStr ? '_' : c;
-    }
-
-    if (unquotedKeyPattern.test(cleanedForTest)) {
-      hasUnquotedKeys = true;
-    }
-
-    if (hasUnquotedKeys) {
-      // Replace unquoted keys with quoted ones, being careful about string context
-      let result = '';
-      let inString = false;
-      let escape = false;
-      let i = 0;
-
-      while (i < repaired.length) {
-        const char = repaired[i];
-
-        if (escape) {
-          result += char;
-          escape = false;
-          i++;
-          continue;
-        }
-
-        if (char === '\\') {
-          result += char;
-          escape = true;
-          i++;
-          continue;
-        }
-
-        if (char === '"') {
-          inString = !inString;
-          result += char;
-          i++;
-          continue;
-        }
-
-        if (inString) {
-          result += char;
-          i++;
-          continue;
-        }
-
-        // Outside string - check for unquoted key
-        if ((char === '{' || char === ',')) {
-          const rest = repaired.slice(i);
-          const match = rest.match(/^([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/);
-          if (match) {
-            result += match[1] + '"' + match[2] + '":';
-            i += match[0].length;
-            continue;
-          }
-        }
-
-        result += char;
-        i++;
-      }
-
-      repaired = result;
-      repairs.push('quoted unquoted property names');
-    }
-
-    // Step 3: Convert single quotes to double quotes (outside of double-quoted strings)
-    let hasSingleQuotes = false;
-    inStr = false;
-    escaped = false;
-    for (const c of repaired) {
-      if (escaped) { escaped = false; continue; }
-      if (c === '\\') { escaped = true; continue; }
-      if (c === '"') { inStr = !inStr; continue; }
-      if (!inStr && c === "'") { hasSingleQuotes = true; break; }
-    }
-
-    if (hasSingleQuotes) {
-      let result = '';
-      let inDoubleString = false;
-      let inSingleString = false;
-      let escape = false;
-
-      for (let i = 0; i < repaired.length; i++) {
-        const char = repaired[i];
-
-        if (escape) {
-          result += char;
-          escape = false;
-          continue;
-        }
-
-        if (char === '\\') {
-          result += char;
-          escape = true;
-          continue;
-        }
-
-        if (char === '"' && !inSingleString) {
-          inDoubleString = !inDoubleString;
-          result += char;
-          continue;
-        }
-
-        if (char === "'" && !inDoubleString) {
-          inSingleString = !inSingleString;
-          result += '"'; // Convert to double quote
-          continue;
-        }
-
-        result += char;
-      }
-
-      repaired = result;
-      repairs.push('converted single quotes to double quotes');
-    }
-
-    // Step 4: Fix trailing commas before } or ]
-    const beforeTrailing = repaired;
-    repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
-    if (repaired !== beforeTrailing) {
-      repairs.push('removed trailing commas');
-    }
-
-    // Step 5: Fix missing commas between properties/elements
-    // Pattern: "value" "key" should be "value", "key"
-    const beforeMissingComma = repaired;
-    repaired = repaired.replace(/("\s*)(")(?=\s*"[^"]*"\s*:)/g, '$1,$2');
-    // Pattern: } { or ] [ without comma
-    repaired = repaired.replace(/(\})\s*(\{)/g, '$1,$2');
-    repaired = repaired.replace(/(\])\s*(\[)/g, '$1,$2');
-    // Pattern: "value" { or number {
-    repaired = repaired.replace(/("|\d)\s*(\{)/g, '$1,$2');
-    if (repaired !== beforeMissingComma) {
-      repairs.push('added missing commas');
-    }
-
-    // Step 5b: Fix missing closing brace before next beat in array
-    // Pattern: ], { "id": ... means beat object wasn't closed before next beat
-    // Should be: ]}, { "id": ...
-    const beforeMissingBrace = repaired;
-    // Look for connections array ending with ],{ followed by "id" - missing } to close beat
-    repaired = repaired.replace(/(\],)\s*(\{\s*"id"\s*:)/g, ']},\n    $2');
-    if (repaired !== beforeMissingBrace) {
-      repairs.push('added missing closing brace between beats');
-    }
-
-    // Step 6: Handle truncation - close open structures
-    let openBraces = 0;
-    let openBrackets = 0;
-    let inString = false;
-    let escape = false;
-
-    for (let i = 0; i < repaired.length; i++) {
-      const char = repaired[i];
-      if (escape) { escape = false; continue; }
-      if (char === '\\') { escape = true; continue; }
-      if (char === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (char === '{') openBraces++;
-      else if (char === '}') openBraces--;
-      else if (char === '[') openBrackets++;
-      else if (char === ']') openBrackets--;
-    }
-
-    // If in string, close it
-    if (inString) {
-      repaired += '"';
-      repairs.push('closed unclosed string');
-    }
-
-    // Remove trailing incomplete content
-    repaired = repaired.replace(/,\s*"[^"]*":\s*$/, '');
-    repaired = repaired.replace(/,\s*"[^"]*$/, '');
-    repaired = repaired.replace(/,\s*$/, '');
-
-    // Recount after cleanup
-    openBraces = 0;
-    openBrackets = 0;
-    inString = false;
-    escape = false;
-    for (const char of repaired) {
-      if (escape) { escape = false; continue; }
-      if (char === '\\') { escape = true; continue; }
-      if (char === '"') { inString = !inString; continue; }
-      if (inString) continue;
-      if (char === '{') openBraces++;
-      else if (char === '}') openBraces--;
-      else if (char === '[') openBrackets++;
-      else if (char === ']') openBrackets--;
-    }
-
-    // Close open structures (add missing closing brackets/braces)
-    if (openBrackets > 0 || openBraces > 0) {
-      for (let i = 0; i < openBrackets; i++) repaired += ']';
-      for (let i = 0; i < openBraces; i++) repaired += '}';
-      repairs.push(`closed ${openBrackets} brackets, ${openBraces} braces`);
-    }
-
-    // Remove extra closing braces (common smaller model error)
-    // Pattern: `] }` where the } is spurious (e.g., after beats array closes)
-    if (openBraces < 0) {
-      const extraBraces = Math.abs(openBraces);
-      // Find and remove extra } that appear after ] (array end followed by spurious brace)
-      // Common pattern: `]\n  }` or `]\n}\n,`
-      let removed = 0;
-      // Look for pattern: ] followed by whitespace and } followed by whitespace and , or "
-      // This catches the specific error where model adds extra } after array closes
-      const extraBracePattern = /(\])\s*(\})\s*(,|")/g;
-      const beforeRemove = repaired;
-      while (removed < extraBraces) {
-        const match = repaired.match(extraBracePattern);
-        if (match) {
-          repaired = repaired.replace(extraBracePattern, '$1$3');
-          removed++;
-        } else {
-          break;
-        }
-      }
-      // If pattern didn't catch all, try removing lone } before , (outside strings)
-      if (removed < extraBraces) {
-        // More aggressive: find any } that's followed by , and preceded by ] (possibly with whitespace)
-        const loneExtraBrace = /(\][\s\n]*)\}([\s\n]*,)/g;
-        while (removed < extraBraces && loneExtraBrace.test(repaired)) {
-          repaired = repaired.replace(loneExtraBrace, '$1$2');
-          removed++;
-        }
-      }
-      if (repaired !== beforeRemove) {
-        repairs.push(`removed ${removed} extra closing brace(s)`);
-      }
-    }
-
-    // Remove extra closing brackets
-    if (openBrackets < 0) {
-      const extraBrackets = Math.abs(openBrackets);
-      let removed = 0;
-      // Look for pattern: } followed by whitespace and ] followed by whitespace and , or "
-      const extraBracketPattern = /(\})\s*(\])\s*(,|")/g;
-      const beforeRemove = repaired;
-      while (removed < extraBrackets) {
-        const match = repaired.match(extraBracketPattern);
-        if (match) {
-          repaired = repaired.replace(extraBracketPattern, '$1$3');
-          removed++;
-        } else {
-          break;
-        }
-      }
-      if (repaired !== beforeRemove) {
-        repairs.push(`removed ${removed} extra closing bracket(s)`);
-      }
-    }
-
-    if (repairs.length > 0) {
-      console.log(`[OpenAIProvider] JSON repairs applied: ${repairs.join('; ')}`);
-    }
-
-    return repaired;
-  }
-
-  /**
    * Helper to collect all targets from a dialogTree recursively
    */
   private collectDialogTreeTargets(node: any, targets: string[]): void {
@@ -1043,15 +582,20 @@ export class OpenAIProvider extends BaseAIProvider {
         throw new Error('No response from OpenAI');
       }
 
-      // Extract JSON from response (handles both raw JSON and markdown-wrapped JSON)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
+      // Extract JSON from response via the shared tolerant extractor
+      // (handles raw JSON, markdown-wrapped JSON, and prose-wrapped JSON).
+      // Thinking blocks are stripped first so a reasoning draft inside
+      // <think>…</think> can't be mistaken for the real payload.
+      const cleanContent = stripThinkingBlocks(content);
+      let jsonString: string;
+      try {
+        jsonString = extractJSON(cleanContent);
+      } catch {
         console.error('[OpenAIProvider] No JSON found in response. Raw content:', content.substring(0, 500));
         throw new Error('Could not extract JSON from response. The AI may have returned plain text instead of JSON.');
       }
 
       let storyData;
-      const jsonString = jsonMatch[0];
 
       try {
         storyData = JSON.parse(jsonString);
@@ -1083,36 +627,15 @@ export class OpenAIProvider extends BaseAIProvider {
           console.error('[OpenAIProvider] ---END---');
         }
 
-        // Try to repair malformed JSON
-        const repaired = this.tryRepairJson(jsonString);
-        if (repaired) {
-          try {
-            storyData = JSON.parse(repaired);
-            console.log('[OpenAIProvider] Successfully repaired JSON');
-          } catch (repairError) {
-            // Log context around repair error too
-            const repairMsg = repairError instanceof Error ? repairError.message : '';
-            const repairPosMatch = repairMsg.match(/position (\d+)/);
-            if (repairPosMatch) {
-              const pos = parseInt(repairPosMatch[1], 10);
-              const start = Math.max(0, pos - 100);
-              const end = Math.min(repaired.length, pos + 100);
-              console.error(`[OpenAIProvider] Repaired JSON still failed at position ${pos}:`);
-              console.error('[OpenAIProvider] ---START---');
-              console.error(repaired.substring(start, pos) + '>>>ERROR HERE<<<' + repaired.substring(pos, end));
-              console.error('[OpenAIProvider] ---END---');
-            }
-            throw new Error(
-              `Invalid JSON in response after ${elapsedHuman} ` +
-                `(${content.length} chars produced, max_tokens=${effectiveMaxTokens}, repair failed): ` +
-                `${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. ` +
-                `If the JSON appears truncated, raise Max Tokens in AI settings (currently ${effectiveMaxTokens}).`,
-            );
-          }
-        } else {
+        // Try to repair malformed JSON via the shared escalating repair
+        // passes (control chars, comments, quotes, commas, truncation).
+        try {
+          storyData = parseJSONWithRepair(jsonString);
+          console.log('[OpenAIProvider] Successfully repaired JSON');
+        } catch {
           throw new Error(
             `Invalid JSON in response after ${elapsedHuman} ` +
-              `(${content.length} chars produced, max_tokens=${effectiveMaxTokens}): ` +
+              `(${content.length} chars produced, max_tokens=${effectiveMaxTokens}, repair failed): ` +
               `${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. ` +
               `If the JSON appears truncated, raise Max Tokens in AI settings (currently ${effectiveMaxTokens}).`,
           );
@@ -1243,13 +766,8 @@ export class OpenAIProvider extends BaseAIProvider {
         throw new Error('No response from OpenAI');
       }
 
-      // Extract JSON from response (handles both raw JSON and markdown-wrapped JSON)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from response');
-      }
-
-      const dialogData = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const dialogData = parseJSONWithRepair(stripThinkingBlocks(content));
 
       console.log('[OpenAIProvider] Dialog generated');
 
@@ -1301,13 +819,8 @@ export class OpenAIProvider extends BaseAIProvider {
         throw new Error('No response from OpenAI');
       }
 
-      // Extract JSON from response (handles both raw JSON and markdown-wrapped JSON)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from response');
-      }
-
-      const suggestions = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const suggestions = parseJSONWithRepair(stripThinkingBlocks(content));
 
       console.log('[OpenAIProvider] Generated', suggestions.suggestions?.length || 0, 'suggestions');
 
@@ -1378,13 +891,8 @@ Respond with JSON in this format:
         throw new Error('No response from OpenAI');
       }
 
-      // Extract JSON from response (handles both raw JSON and markdown-wrapped JSON)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from response');
-      }
-
-      const beatData = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const beatData = parseJSONWithRepair(stripThinkingBlocks(content));
 
       console.log('[OpenAIProvider] Beat created:', beatData.beat.type);
 

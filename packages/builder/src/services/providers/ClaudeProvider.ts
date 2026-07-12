@@ -24,6 +24,12 @@ import {
   buildEnhancedUserPrompt
 } from '../prompts/storyGenerationEnhanced';
 import { getAIValidator } from '../AIValidator';
+import {
+  stripThinkingBlocks,
+  extractJSON,
+  repairJsonAggressive,
+  parseJSONWithRepair,
+} from './openai-utils';
 
 /**
  * Claude Provider Implementation
@@ -175,83 +181,16 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   /**
-   * Attempt to repair malformed or truncated JSON
-   * Handles:
-   * - Missing quotes in property names (e.g., "description: → "description":)
-   * - Truncated strings and values
-   * - Unclosed brackets and braces
+   * Attempt to repair malformed or truncated JSON.
+   *
+   * Delegates to @asaps/core's shared repairJsonAggressive(), which is the
+   * union of this provider's historical repair pass (quoted-key heuristic —
+   * the Kimi `"description: "value"` case — plus truncation closing) and
+   * OpenAIProvider's more complete one (control chars, comments, interior
+   * quotes, single quotes, missing commas, spurious extra braces).
    */
   private repairTruncatedJson(json: string): string {
-    let repaired = json.trim();
-
-    // Fix 1: Fix malformed property names (missing closing quote before colon)
-    // Pattern: "propertyName: " → "propertyName": "
-    // This handles cases where Kimi outputs "description: "value" instead of "description": "value"
-    repaired = repaired.replace(/"([^"]+):\s*"/g, '"$1": "');
-
-    // Fix 2: Fix missing quotes around property names entirely
-    // Pattern: propertyName: → "propertyName":
-    repaired = repaired.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-
-    // Fix 3: Remove trailing incomplete property/value
-    // Find and remove incomplete content after last complete value
-    // Look for patterns like: ,"incomplete  or  : "incomplete string without closing
-    const lastCompleteMatch = repaired.match(
-      /^([\s\S]*(?:"[^"]*"\s*:\s*(?:"[^"]*"|true|false|null|-?\d+(?:\.\d+)?|\{[\s\S]*?\}|\[[\s\S]*?\]))\s*,?\s*)(?:"[^"]*"?\s*:?\s*"?[^"}\]]*)?$/
-    );
-    if (lastCompleteMatch && lastCompleteMatch[1]) {
-      repaired = lastCompleteMatch[1];
-    }
-
-    // Fix 4: Remove trailing incomplete string value
-    // If we end with an unclosed string, try to close or remove it
-    const unclosedStringMatch = repaired.match(/^([\s\S]*"[^"]*"\s*:\s*)"[^"]*$/);
-    if (unclosedStringMatch) {
-      // Remove the incomplete string value and its property
-      repaired = unclosedStringMatch[1].replace(/,\s*$/, '');
-    }
-
-    // Fix 5: Count and close brackets/braces
-    let openBraces = 0;
-    let openBrackets = 0;
-    let inString = false;
-    let escape = false;
-
-    for (const char of repaired) {
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      if (char === '\\') {
-        escape = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) continue;
-
-      if (char === '{') openBraces++;
-      else if (char === '}') openBraces--;
-      else if (char === '[') openBrackets++;
-      else if (char === ']') openBrackets--;
-    }
-
-    // Remove trailing comma if present
-    repaired = repaired.replace(/,\s*$/, '');
-
-    // Add closing brackets and braces
-    while (openBrackets > 0) {
-      repaired += ']';
-      openBrackets--;
-    }
-    while (openBraces > 0) {
-      repaired += '}';
-      openBraces--;
-    }
-
-    return repaired;
+    return repairJsonAggressive(json);
   }
 
   /**
@@ -399,39 +338,43 @@ export class ClaudeProvider extends BaseAIProvider {
         throw new Error('Unexpected response type from Claude');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
+      // Shared tolerant extractor: fences, prose-wrapped JSON, brace matching.
+      // Inline thinking tags are stripped first so a reasoning draft can't be
+      // mistaken for the real payload.
+      let jsonString: string;
+      try {
+        jsonString = extractJSON(stripThinkingBlocks(content.text));
+      } catch {
         console.error('[ClaudeProvider] Raw response:', content.text.substring(0, 500));
         throw new Error('Could not extract JSON from Claude response');
       }
 
       let storyData;
       try {
-        storyData = JSON.parse(jsonMatch[0]);
+        storyData = JSON.parse(jsonString);
       } catch (parseError) {
         // Log the problematic part of the JSON for debugging
         const errorPos = parseError instanceof SyntaxError ?
           parseInt(parseError.message.match(/position (\d+)/)?.[1] || '0') : 0;
         const start = Math.max(0, errorPos - 100);
-        const end = Math.min(jsonMatch[0].length, errorPos + 100);
+        const end = Math.min(jsonString.length, errorPos + 100);
         console.error('[ClaudeProvider] JSON parse error near position', errorPos);
-        console.error('[ClaudeProvider] Context:', jsonMatch[0].substring(start, end));
-        console.error('[ClaudeProvider] Full response length:', jsonMatch[0].length);
+        console.error('[ClaudeProvider] Context:', jsonString.substring(start, end));
+        console.error('[ClaudeProvider] Full response length:', jsonString.length);
 
-        // Try to repair truncated JSON by closing open brackets
+        // Try to repair truncated JSON via the shared escalating repair passes
         console.log('[ClaudeProvider] Attempting to repair truncated JSON...');
-        const repaired = this.repairTruncatedJson(jsonMatch[0]);
         try {
-          storyData = JSON.parse(repaired);
+          storyData = parseJSONWithRepair(jsonString);
           console.log('[ClaudeProvider] JSON repair successful!');
-        } catch (repairError) {
+        } catch {
           const effort = this.config?.reasoningEffort ?? 'unset';
           const thinkingHint =
             this.requiresAdaptiveThinking() && (effort === 'high' || effort === 'xhigh')
               ? ` Thinking tokens count against max_tokens on this model and ${effort} effort can consume a large share — raise Max Tokens in AI settings (currently ${maxTokens}) or lower reasoning effort.`
               : ` Raise Max Tokens in AI settings (currently ${maxTokens}).`;
           throw new Error(
-            `Failed to parse AI response (truncated at ${jsonMatch[0].length} chars).${thinkingHint}`,
+            `Failed to parse AI response (truncated at ${jsonString.length} chars).${thinkingHint}`,
           );
         }
       }
@@ -488,12 +431,8 @@ export class ClaudeProvider extends BaseAIProvider {
         throw new Error('Unexpected response type from Claude');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from Claude response');
-      }
-
-      const dialogData = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const dialogData = parseJSONWithRepair(stripThinkingBlocks(content.text));
 
       console.log('[ClaudeProvider] Dialog generated');
 
@@ -544,12 +483,8 @@ export class ClaudeProvider extends BaseAIProvider {
         throw new Error('Unexpected response type from Claude');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from Claude response');
-      }
-
-      const suggestions = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const suggestions = parseJSONWithRepair(stripThinkingBlocks(content.text));
 
       console.log('[ClaudeProvider] Generated', suggestions.suggestions?.length || 0, 'suggestions');
 
@@ -619,12 +554,8 @@ Respond with JSON in this format:
         throw new Error('Unexpected response type from Claude');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Could not extract JSON from Claude response');
-      }
-
-      const beatData = JSON.parse(jsonMatch[0]);
+      // Extract + parse JSON via the shared tolerant extractor with repair
+      const beatData = parseJSONWithRepair(stripThinkingBlocks(content.text));
 
       console.log('[ClaudeProvider] Beat created:', beatData.beat.type);
 

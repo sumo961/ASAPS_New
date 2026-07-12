@@ -12,119 +12,26 @@ import { StatePresetEditor } from '../debug/StatePresetEditor';
 import { initializeBeatLocations } from '../../utils/SchemaLocationInitializer';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
 import { getSavedAIConfig } from '../../hooks/useAI';
-import Anthropic from '@anthropic-ai/sdk';
-import OpenAI from 'openai';
-import { buildChatRequestBody } from '../../services/providers/openai-utils';
+import {
+  createRuntimeAIService,
+  createProxyTransport,
+  createDirectAnthropicTransport,
+  createDirectOpenAITransport,
+} from '@asaps/core';
 
 // Proxy endpoint for CORS-blocked requests (custom baseUrls)
 const CLAUDE_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/claude';
 const OPENAI_PROXY_ENDPOINT = 'http://localhost:3001/api/ai/openai';
 
 /**
- * Strip thinking/reasoning blocks from AI responses.
- * Some models (like Kimi, DeepSeek) include <think>...</think> or similar blocks
- * that contain internal reasoning which should not be shown to users.
- * Also handles plain-text thinking that some models output without XML tags.
- */
-function stripThinkingBlocks(text: string): string {
-  let result = text;
-
-  // Remove <think>...</think> blocks (Kimi, DeepSeek, etc.)
-  result = result.replace(/<think>[\s\S]*?<\/think>/gi, '');
-
-  // Remove <thinking>...</thinking> blocks
-  result = result.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-
-  // Remove <reasoning>...</reasoning> blocks
-  result = result.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
-
-  // Handle plain-text thinking that some models output without XML tags
-  // These patterns look for common thinking preambles and remove everything up to the actual content
-
-  // Pattern: "The user wants me to..." followed by analysis - remove until actual content
-  // This happens when Kimi outputs its entire thinking process as plain text
-  const thinkingPatterns = [
-    // Match "The user wants..." through lists/requirements to find where actual content starts
-    /^The user wants[^]*?(?=\n\n[A-Z][a-z])/i,
-    // Match "Let me analyze/think/consider..." sections
-    /^Let me (?:analyze|think|consider|carefully)[^]*?(?=\n\n[A-Z][a-z])/i,
-    // Match "I need to..." planning sections
-    /^I need to[^]*?(?=\n\n[A-Z][a-z])/i,
-    // Match markdown-style thinking with **bold** headers like "**Key data points:**"
-    /^\*\*[^*]+\*\*[^]*?(?=\n\n[A-Z][a-z])/,
-  ];
-
-  for (const pattern of thinkingPatterns) {
-    const match = result.match(pattern);
-    if (match && match[0].length < result.length * 0.9) {
-      // Only remove if it's not the entire response (safety check)
-      result = result.replace(pattern, '');
-    }
-  }
-
-  // If the response still starts with thinking patterns, try a simpler approach:
-  // Look for a clear separator like double newline followed by capitalized text
-  if (/^(The user wants|Let me|I need to|I'll|I will|First,)/i.test(result)) {
-    // Find the last occurrence of common "end of thinking" markers
-    const endMarkers = [
-      /\n\n(?=[A-Z][a-z]{2,}[^*\n:]*[.!])/g,  // Double newline before a sentence
-      /(?:Here'?s|Here is) (?:the|your|a) (?:summary|response|answer)[:\s]*/gi,
-      /(?:Output|Summary|Response)[:\s]*\n/gi,
-    ];
-
-    for (const marker of endMarkers) {
-      const matches = [...result.matchAll(marker)];
-      if (matches.length > 0) {
-        const lastMatch = matches[matches.length - 1];
-        const afterMatch = result.substring(lastMatch.index! + lastMatch[0].length);
-        // Only use this if there's substantial content after the marker
-        if (afterMatch.trim().length > 50) {
-          result = afterMatch;
-          break;
-        }
-      }
-    }
-  }
-
-  // Clean up any leading/trailing whitespace and multiple newlines
-  result = result.replace(/^\s+/, '').replace(/\s+$/, '');
-  result = result.replace(/\n{3,}/g, '\n\n');
-
-  return result;
-}
-
-/**
- * Make a proxied request to avoid CORS issues with custom API endpoints
- */
-async function makeProxyRequest(
-  endpoint: string,
-  baseUrl: string,
-  apiKey: string,
-  requestBody: any
-): Promise<any> {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      baseUrl,
-      apiKey,
-      ...requestBody,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Proxy request failed' }));
-    throw new Error(error.message || 'Proxy request failed');
-  }
-
-  return response.json();
-}
-
-/**
- * Create an AI service adapter that implements IAIService interface
- * This wraps the builder's AI configuration to provide runtime AI capabilities for AI beats
+ * Create an AI service adapter that implements IAIService interface.
+ * This wraps the builder's AI configuration to provide runtime AI capabilities for AI beats.
+ *
+ * NOTE: this component is DEPRECATED (PreviewWindow is the current preview
+ * system). The per-provider orchestration now lives in @asaps/core's shared
+ * runtime adapter; this function only maps the saved config to a provider
+ * family + transport, preserving this component's historical routing rule
+ * (any custom baseUrl → proxy).
  */
 function createAIServiceAdapter(): IAIService | null {
   const savedConfig = getSavedAIConfig();
@@ -142,230 +49,35 @@ function createAIServiceAdapter(): IAIService | null {
   }
 
   if (savedConfig.provider === 'claude') {
-    const model = savedConfig.model || 'claude-sonnet-4-6';
-
-    // Only create direct client if not using proxy
-    const client = !useProxy ? new Anthropic({
-      apiKey: savedConfig.apiKey,
-      dangerouslyAllowBrowser: true,
-    }) : null;
-
-    return {
-      async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
-        console.log(`[AIServiceAdapter] generateContent called (provider: claude, model: ${model})`);
-
-        const requestBody = {
-          model,
-          max_tokens: options?.maxTokens || 4096,
-          messages: [{ role: 'user' as const, content: prompt }],
-        };
-
-        let response;
-        if (useProxy) {
-          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-        } else {
-          const apiResponse = await client!.messages.create(requestBody);
-          response = { content: apiResponse.content };
-        }
-
-        const content = response.content[0];
-        if (content.type === 'text') {
-          return content.text;
-        }
-        throw new Error('Unexpected response type from Claude');
-      },
-
-      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        console.log(`[AIServiceAdapter] generateDialog called (provider: claude, model: ${model})`);
-        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
-{
-  "id": "unique_id",
-  "speaker": "Character Name",
-  "text": "What the character says",
-  "choices": [
-    {
-      "id": "choice_id",
-      "text": "Player's choice text",
-      "dialogNode": { ... nested dialog node ... } OR
-      "target": "exit_target_id"
-    }
-  ]
-}`;
-
-        const requestBody = {
-          model,
-          max_tokens: 4096,
-          system: systemPrompt,
-          messages: [{ role: 'user' as const, content: request.prompt }],
-        };
-
-        let response;
-        if (useProxy) {
-          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-        } else {
-          const apiResponse = await client!.messages.create(requestBody as any);
-          response = { content: apiResponse.content };
-        }
-
-        const content = response.content[0];
-        if (content.type !== 'text') {
-          throw new Error('Unexpected response type from Claude');
-        }
-
-        // Extract JSON from response
-        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('Could not extract JSON from response');
-        }
-
-        return JSON.parse(jsonMatch[0]);
-      },
-
-      async classifyContent(prompt: string, categories: string[]): Promise<string> {
-        console.log(`[AIServiceAdapter] classifyContent called (provider: claude, model: ${model}) with categories:`, categories);
-        const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
-
-        const requestBody = {
-          model,
-          max_tokens: 100,
-          system: systemPrompt,
-          messages: [{ role: 'user' as const, content: prompt }],
-        };
-
-        let response;
-        if (useProxy) {
-          response = await makeProxyRequest(CLAUDE_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-        } else {
-          const apiResponse = await client!.messages.create(requestBody as any);
-          response = { content: apiResponse.content };
-        }
-
-        const content = response.content[0];
-        if (content.type === 'text') {
-          // Clean up response to get just the category
-          const result = content.text.trim();
-          // Find matching category (case-insensitive)
-          const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
-          return match || categories[0];
-        }
-        return categories[0];
-      },
-    };
-  } else {
-    // OpenAI provider (also used for local/compatible APIs)
-    const model = savedConfig.model || 'gpt-5.6-sol';
-
-    // Only create direct client if not using proxy
-    const client = !useProxy ? new OpenAI({
-      apiKey: savedConfig.apiKey,
-      dangerouslyAllowBrowser: true,
-    }) : null;
-
-    return {
-      async generateContent(prompt: string, options?: { maxTokens?: number; enableWebSearch?: boolean }): Promise<string> {
-        console.log(`[AIServiceAdapter] generateContent called (provider: openai-compatible, model: ${model}, baseUrl: ${savedConfig.baseUrl || 'default'})`);
-
-        // Use shared utility to build request with correct token parameter
-        const requestBody = buildChatRequestBody(
-          model,
-          [{ role: 'user' as const, content: prompt }],
-          options?.maxTokens || 4096
-        );
-
-        let content: string;
-        if (useProxy) {
-          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-          content = response.choices?.[0]?.message?.content || '';
-        } else {
-          // Cast needed because buildChatRequestBody returns Record<string, any> for flexibility
-          const response = await client!.chat.completions.create(requestBody as any);
-          content = response.choices[0]?.message?.content || '';
-        }
-
-        // Strip thinking blocks from models like Kimi, DeepSeek that include <think> tags
-        return stripThinkingBlocks(content);
-      },
-
-      async generateDialog(request: { prompt: string; format: 'dialogTree'; maxTurns?: number }): Promise<any> {
-        console.log(`[AIServiceAdapter] generateDialog called (provider: openai-compatible, model: ${model})`);
-        const systemPrompt = `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format with the following structure:
-{
-  "id": "unique_id",
-  "speaker": "Character Name",
-  "text": "What the character says",
-  "choices": [
-    {
-      "id": "choice_id",
-      "text": "Player's choice text",
-      "dialogNode": { ... nested dialog node ... } OR
-      "target": "exit_target_id"
-    }
-  ]
-}`;
-
-        // Use shared utility to build request with correct token parameter
-        const requestBody = buildChatRequestBody(
-          model,
-          [
-            { role: 'system' as const, content: systemPrompt },
-            { role: 'user' as const, content: request.prompt },
-          ],
-          4096
-        );
-
-        let content: string;
-        if (useProxy) {
-          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-          content = response.choices?.[0]?.message?.content || '';
-        } else {
-          const response = await client!.chat.completions.create(requestBody as any);
-          content = response.choices[0]?.message?.content || '';
-        }
-
-        // Strip thinking blocks before extracting JSON
-        content = stripThinkingBlocks(content);
-
-        // Extract JSON from response
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('Could not extract JSON from response');
-        }
-
-        return JSON.parse(jsonMatch[0]);
-      },
-
-      async classifyContent(prompt: string, categories: string[]): Promise<string> {
-        console.log(`[AIServiceAdapter] classifyContent called (provider: openai-compatible, model: ${model}) with categories:`, categories);
-        const systemPrompt = `You are a classifier. Given a prompt, classify it into exactly ONE of these categories: ${categories.join(', ')}. Respond with ONLY the category name, nothing else.`;
-
-        // Use shared utility to build request with correct token parameter
-        const requestBody = buildChatRequestBody(
-          model,
-          [
-            { role: 'system' as const, content: systemPrompt },
-            { role: 'user' as const, content: prompt },
-          ],
-          100
-        );
-
-        let result: string;
-        if (useProxy) {
-          const response = await makeProxyRequest(OPENAI_PROXY_ENDPOINT, savedConfig.baseUrl!, savedConfig.apiKey, requestBody);
-          result = (response.choices?.[0]?.message?.content || '').trim();
-        } else {
-          const response = await client!.chat.completions.create(requestBody as any);
-          result = (response.choices[0]?.message?.content || '').trim();
-        }
-
-        // Strip thinking blocks before matching category
-        result = stripThinkingBlocks(result);
-
-        // Find matching category (case-insensitive)
-        const match = categories.find(c => c.toLowerCase() === result.toLowerCase());
-        return match || categories[0];
-      },
-    };
+    const transport = useProxy
+      ? createProxyTransport({
+          endpoint: CLAUDE_PROXY_ENDPOINT,
+          baseUrl: savedConfig.baseUrl!,
+          apiKey: savedConfig.apiKey,
+        })
+      : createDirectAnthropicTransport({ apiKey: savedConfig.apiKey });
+    return createRuntimeAIService({
+      family: 'anthropic',
+      model: savedConfig.model,
+      transport,
+      logPrefix: '[StoryPreview]',
+    });
   }
+
+  // OpenAI provider (also used for local/compatible APIs)
+  const transport = useProxy
+    ? createProxyTransport({
+        endpoint: OPENAI_PROXY_ENDPOINT,
+        baseUrl: savedConfig.baseUrl!,
+        apiKey: savedConfig.apiKey,
+      })
+    : createDirectOpenAITransport({ apiKey: savedConfig.apiKey });
+  return createRuntimeAIService({
+    family: 'openai',
+    model: savedConfig.model,
+    transport,
+    logPrefix: '[StoryPreview]',
+  });
 }
 
 // Stage dimensions

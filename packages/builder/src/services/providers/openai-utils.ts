@@ -20,4 +20,9 @@ export {
   supportsProReasoning,
   buildResponsesRequestBody,
   extractResponsesOutputText,
+  // Tolerant JSON extraction + repair (phase 2 of the adapter unification)
+  extractJSON,
+  repairJson,
+  repairJsonAggressive,
+  parseJSONWithRepair,
 } from '@asaps/core';
