@@ -1,5 +1,79 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-12: GPT-5.6 + pro reasoning, beat multi-selection, cluster fixes, one AI adapter (v0.9.73)
+
+### Overview
+
+A wide release. **AI provider support catches up with OpenAI's GPT-5.6 tier family (Sol/Terra/Luna) including the new pro reasoning mode**, and the long-planned adapter unification landed: all six drifted copies of the runtime AI orchestration now live once in `@asaps/core`. Authoring gets **beat multi-selection** (marquee/cmd-click, group drag into clusters, multi-duplicate with connections intact, multi-delete), a set of **cluster quality fixes** (autosize to members, no more overlap with outside beats, crash-free cluster deletion, beats can be taken back out), and several polish items: the preview mood tracker only appears when a story actually uses affect, the screen-docked counter HUD now renders in both layout modes, and freshly-converted static projects no longer trigger a false "corrupted project" repair alert.
+
+### OpenAI GPT-5.6 family + pro reasoning (Responses API)
+
+- Model tier support: `gpt-5.6-sol` (new default), `gpt-5.6-terra`, `gpt-5.6-luna`, bare `gpt-5.6` alias. Reasoning-model quirks (max_completion_tokens, temperature omission, effort tiers none–xhigh) extend to the whole family via the shared core quirk helpers.
+- **Pro reasoning mode**: an opt-in "Reasoning mode" select (Standard/Pro) in the OpenAI AI settings. Pro routes through OpenAI's Responses API (`reasoning: {mode: 'pro'}`) — the only way to reach GPT-5.6's deepest tier. Triple-gated so OpenAI-compatible endpoints never break: explicit opt-in AND a gpt-5.6 model AND the official api.openai.com endpoint; anything else takes the untouched chat-completions path. Responses are normalized back to chat shape internally; both AI proxies route `_endpoint: 'responses'` bodies to `/responses` (the vite proxy also parses its streaming SSE deltas).
+
+**Files modified:**
+- `packages/core/src/ai/providerQuirks.ts` (+ tests) — 5.6 family coverage; `supportsProReasoning`, `buildResponsesRequestBody`, `extractResponsesOutputText`
+- `packages/builder/src/services/providers/OpenAIProvider.ts` — `proReasoningActive()` gate, pro request branch, response normalization
+- `packages/builder/src/api/vite-ai-proxy.ts`, `packages/builder/src/api/server.ts` — `/responses` routing
+- `packages/builder/src/components/ai/AIConfigDialog.tsx`, `packages/builder/src/hooks/useAI.ts`, `packages/builder/src/types/ai.ts` — reasoningMode config plumbing + UI
+- `packages/player-web/src/WebAIProvider.ts` — gpt-5.6-sol defaults
+
+### One runtime AI adapter (phase 2 of the unification)
+
+- `@asaps/core/ai/runtimeAdapter.ts`: `createRuntimeAIService()` — the single IAIService powering runtime AI beats, with pluggable transports (direct Anthropic fetch, direct OpenAI-compatible fetch, or the builder's CORS proxy). PreviewWindow, the deprecated StoryPreview, and the exported player's WebAIProvider are now thin wiring (net −1,655 lines); the exported player inherits fixes it never had (thinking-block stripping, reasoning-token headroom, analyzeImage parity).
+- `@asaps/core/ai/jsonExtraction.ts`: the one blessed extractJSON/repair chain. Unification exposed two latent bugs in the historical copies, both fixed with pinning tests: the interior-quote repair corrupted JSON keys whenever it ran (missing `:` in its structural set), and truncation closing used counters instead of a LIFO stack so mixed nesting closed in the wrong order.
+
+**Files modified:**
+- `packages/core/src/ai/runtimeAdapter.ts`, `packages/core/src/ai/jsonExtraction.ts` (new, + tests)
+- `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/components/preview/StoryPreview.tsx`, `packages/builder/src/services/providers/{OpenAIProvider,ClaudeProvider,openai-utils}.ts`, `packages/player-web/src/WebAIProvider.ts`
+
+### Beat multi-selection (graph editor)
+
+- Shift+drag marquee on the canvas or cmd/ctrl/shift+click to select multiple beats (selection now survives node re-syncs — the sync effect used to wipe it, which is why multi-select never appeared to work).
+- Group drag moves the whole selection; members dropped inside an expanded cluster all join it in one gesture.
+- Right-click a selected beat → **Duplicate N beats** / **Delete N beats** (single confirm; one undo step per beat). Multi-duplicate clones the subgraph with fresh ids and deep-rewrites all internal references — connections, defaultTarget, choice/dialog targets inside parameters — so the copies are wired to each other; links to unselected beats keep pointing at the originals.
+- Backspace no longer ghost-deletes nodes (it only removed them from ReactFlow's local view; story state was untouched and they reappeared on the next sync). Deletion is explicit now.
+
+**Files modified:**
+- `packages/builder/src/components/graph/GraphEditor.tsx` — selection tracking/preservation, multi-drag, multi context menu
+- `packages/builder/src/utils/duplicateBeats.ts` (new, + tests), `packages/builder/src/utils/projectMerge.ts` — deepRewrite/uniqueId exported and reused
+- `packages/builder/src/App.tsx`, `packages/builder/src/components/{WorkspaceView,Canvas}.tsx` — handler plumbing
+
+### Cluster quality fixes
+
+- **Deleting a cluster no longer crashes the app** (`beat.getParameters is not a function`): removeCluster rest-spread its member Beats into plain objects, stripping the class prototype. Members now survive intact — delete-cluster-keep-beats works as intended.
+- **Beats can be taken back out of a cluster**: a hover ⏏ button on each contained beat, and the sidebar's "Unclustered Beats" section is a drop target (rendered with a hint whenever clusters exist).
+- **Clusters autosize to their members**: containers grow to fit the in-container member grid whenever a beat joins; story-merge clusters size to their member count (22-beat merges used to overflow the fixed 800×600 box); the AI pipeline sizes boxes for the member grid instead of the meaningless global-position bbox.
+- **AI-generated stories auto-arrange**: after AI story injection, the cluster-aware auto-arrange (sizes containers, resolves overlaps with outside beats) runs automatically via a signal-based deferred effect — previously it only ran from the toolbar button, which is why AI-generated clusters overlapped beats.
+
+**Files modified:**
+- `packages/builder/src/hooks/useStoryBuilder.ts` (+ tests) — removeCluster fix, removeBeatFromCluster, grow-on-add
+- `packages/builder/src/utils/clusterAutosize.ts` (new, + tests), `packages/core/src/normalize/normalizeStory.ts` (+ test)
+- `packages/builder/src/components/graph/ClusterContainerNode.tsx`, `packages/builder/src/components/Sidebar.tsx`, `packages/builder/src/App.tsx`
+
+### Layout-mode conversion: no more false "corrupted project" alert
+
+Converting responsive→fixed baked the schema-default locations in the builder's `type` format without the renderer's canonical `kind` — the corruption detector then flagged every freshly-converted project as "legacy format" on its next load. The migrator now writes canonical locations (kind alongside type); previously-converted projects are healed once by the existing repair-on-load. Also fixed the stale "Box Visibility (Editor & Preview)" settings label (the setting applies everywhere since v0.9.71).
+
+**Files modified:**
+- `packages/builder/src/utils/projectLayoutMigrator.ts` (+ tests incl. an end-to-end detectProjectCorruption guard)
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`
+
+### HUD + preview polish
+
+- **Counter HUD in both layout modes**: screen-docked meter frames hoisted to the top-level HUD overlay (same layer as the mood pad) in the Preview Window AND the exported player — they now render on every beat, in fixed and responsive mode, whether or not the character is on stage. This is also the first time HTML exports render the counter HUD at all (the meter resolver was never wired into the web player). Character-anchored frames unchanged.
+- **Mood tracker only when used**: the preview's Character Affect panel appears only when the story has authored affect signals (updateAffect beats, initial mood/sentiments, enabled mood pad) or affect actually moved at runtime — no more dead sidebar space in mood-free stories.
+
+**Files modified:**
+- `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/renderer/src/index.ts`
+- `packages/builder/src/utils/storyUsesAffect.ts` (new, + tests)
+
+### Docs
+
+- User Guide audited and updated for v0.9.70–0.9.72 features + pro reasoning (Input Image, story merge, GPT-5.6 tiers, setVariable calculations, text-box visibility, Responsive vs Static creation choice, translation coverage), with all control names verified against the UI.
+
+---
+
 ## 2026-07-10: Static projects get static VE options + clearer layout choice (v0.9.72)
 
 ### Overview

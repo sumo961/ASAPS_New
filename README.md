@@ -22,17 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.72** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.72 fixes static-project editing.**
-After switching a project to Static (fixed canvas), the Visual Editor now
-shows the static options — pixel-positioned element rows on a fixed stage —
-instead of keeping the responsive slot controls on screen. The New Project
-dialog also explains the Responsive vs Static choice in plain terms (with a
-note that you can switch later via the migrator in Settings). This follows
-v0.9.71's Story Merge (combine two stories without conflicts), setVariable
-arithmetic (`= (var1 + var2) / 100`), text-box visibility/opacity fixes,
-cross-machine character-image fix, and complete translation coverage. Users
-on v0.9.71 will auto-update. For what shipped when, see:
+Current release: **v0.9.73** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.73 brings GPT-5.6 support (incl.
+pro reasoning), beat multi-selection, and cluster fixes.** The AI settings
+know OpenAI's new GPT-5.6 tier family (Sol/Terra/Luna) and can opt into the
+Responses-API pro reasoning mode without breaking OpenAI-compatible local
+providers. The graph editor gains real multi-selection: marquee/cmd-click,
+group drag (into clusters too), duplicate-with-connections, multi-delete.
+Clusters autosize to their members, no longer overlap outside beats in
+AI-generated stories, can be deleted without crashing (beats survive), and
+beats can be taken back out (⏏ or drag to "Unclustered"). Also: screen-docked
+counter HUDs render in both layout modes (and in HTML exports for the first
+time), the preview mood tracker only appears when a story uses affect, the
+false "corrupted project" alert after responsive→static conversion is gone,
+and the six drifted AI runtime adapters became one shared core module. Users
+on v0.9.72 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
