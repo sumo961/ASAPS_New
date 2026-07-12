@@ -12,6 +12,11 @@ export {
   type MoodFrameConfig as RendererMoodFrameConfig,
   type MoodFrameEmotionMarker,
 } from './components/CharacterMoodFrame';
+export {
+  CharacterMeterFrame,
+  type MeterFrameConfig,
+  type MeterCounterData,
+} from './components/CharacterMeterFrame';
 
 // Export from components/index for cleaner resolution
 export {

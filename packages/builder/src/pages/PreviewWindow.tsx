@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, CharacterMeterFrame } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -827,6 +827,12 @@ export const PreviewWindow: React.FC = () => {
         const pd = previewDataRef.current;
         const character = pd?.characters?.find(c => c.id === characterId);
         if (!character || !character.meterFrame) {
+          return null;
+        }
+        // Screen-docked frames are rendered by the top-level HUD overlay
+        // (mode-independent); this resolver only feeds the
+        // character-anchored variant inside PositionedBeatView.
+        if ((character.meterFrame as any).dockMode === 'screen') {
           return null;
         }
 
@@ -2652,6 +2658,44 @@ export const PreviewWindow: React.FC = () => {
                           characterName={merged.displayName || merged.name || c.id}
                           characterPortraitUrl={portraitUrl}
                           characterColor={merged.color}
+                          characterPosition={{ x: 0, y: 0 }}
+                          characterDimensions={{ width: 0, height: 0 }}
+                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                        />
+                      );
+                    })}
+                    {/* Counter (meter-frame) HUD — same hoist as the mood
+                        pad above: screen-docked frames render here so they
+                        show in BOTH layout modes and on beats where the
+                        character isn't placed on stage. Character-anchored
+                        frames still come from PositionedBeatView. Values
+                        re-render via debugInfo (counterChanged events). */}
+                    {chars.map((c) => {
+                      const frame: any = (c as any).meterFrame;
+                      if (!frame || frame.dockMode !== 'screen') return null;
+                      const variants = (c as any).variants;
+                      if (variants && variants.length > 0) {
+                        const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+                        if (!explicit) return null;
+                      }
+                      const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
+                      if (visibleCounters.length === 0) return null;
+                      const counters = visibleCounters.map((counter: any) => ({
+                        name: counter.name,
+                        displayName: counter.displayName,
+                        value: countersRef.current[counter.name] ?? counter.value,
+                        min: counter.min ?? 0,
+                        max: counter.max ?? 100,
+                        color: counter.color || '#3B82F6',
+                        showNumericValue: counter.showNumericValue ?? false,
+                        numericFormat: counter.numericFormat || 'value',
+                        orientation: counter.levelMeterOrientation || 'horizontal',
+                      }));
+                      return (
+                        <CharacterMeterFrame
+                          key={`meter-hud-${c.id}`}
+                          counters={counters}
+                          config={frame}
                           characterPosition={{ x: 0, y: 0 }}
                           characterDimensions={{ width: 0, height: 0 }}
                           containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}

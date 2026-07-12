@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, CharacterMeterFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -368,6 +368,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const bumpHud = () => setHudTick((t) => t + 1);
           context.on('characterMoodChanged', bumpHud);
           context.on('characterVariantChanged', bumpHud);
+          // Counter HUD (screen-docked meter frames) lives in the same
+          // overlay — re-render it when counters move.
+          context.on('counterChanged', bumpHud);
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
@@ -754,6 +757,42 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
               characterName={merged.displayName || merged.name || c.id}
               characterPortraitUrl={portraitAsset?.url || merged.portrait?.image}
               characterColor={merged.color}
+              characterPosition={{ x: 0, y: 0 }}
+              characterDimensions={{ width: 0, height: 0 }}
+              containerDimensions={stageDims}
+            />
+          );
+        })}
+        {/* Counter (meter-frame) HUD — same hoist as the mood pad:
+            screen-docked frames render at the top level so they show in
+            both layout modes and regardless of whether the character is
+            placed on the current beat. Values update via the counterChanged
+            hudTick bump. */}
+        {chars.map((c: any) => {
+          const frame = c?.meterFrame;
+          if (!frame || frame.dockMode !== 'screen') return null;
+          if (c.variants && c.variants.length > 0) {
+            const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+            if (!explicit) return null;
+          }
+          const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
+          if (visibleCounters.length === 0) return null;
+          const counters = visibleCounters.map((counter: any) => ({
+            name: counter.name,
+            displayName: counter.displayName,
+            value: ctx.getCounter?.(counter.name) ?? counter.value ?? 0,
+            min: counter.min ?? 0,
+            max: counter.max ?? 100,
+            color: counter.color || '#3B82F6',
+            showNumericValue: counter.showNumericValue ?? false,
+            numericFormat: counter.numericFormat || 'value',
+            orientation: counter.levelMeterOrientation || 'horizontal',
+          }));
+          return (
+            <CharacterMeterFrame
+              key={`meter-hud-${c.id}`}
+              counters={counters}
+              config={frame}
               characterPosition={{ x: 0, y: 0 }}
               characterDimensions={{ width: 0, height: 0 }}
               containerDimensions={stageDims}
