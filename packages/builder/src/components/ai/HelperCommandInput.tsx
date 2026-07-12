@@ -19,6 +19,7 @@ import { getDeterministicParser } from '../../services/DeterministicCommandParse
 import type { BeatStateMutations } from '../../commands/BeatCommands';
 import type { Beat, Cluster, ContainerBeatPosition, BeatConfig } from '@asaps/core';
 import { getAllPresetSounds } from '@asaps/core';
+import { getVisibleBeatTypeIds, getInvisibleBeatTypeIds } from '../../services/beatSchemaVocabulary';
 import type {
   HelperCommandContext,
   StructuredAction,
@@ -187,16 +188,10 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
     const clusterNames = clusters.map(c => c.name);
     const sampleBeatNames = beats.slice(0, 20).map(b => b.name);
 
-    // Classify beat types as visible or invisible
-    const visibleBeatTypes = [
-      'titleScreen', 'infoText', 'dialogTree', 'movementChoice',
-      'pickProp', 'durScreen', 'endScreen', 'inputText', 'hyperText',
-      'videoBeat', 'aiDialogTree', 'aiSummary', 'onlineContent'
-    ];
-    const invisibleBeatTypes = [
-      'setVariable', 'conditionBeat', 'addRemoveInventory',
-      'randomTarget', 'setTimer', 'aiCondition'
-    ];
+    // Classify beat types as visible or invisible (schema-derived — the
+    // previous hand lists were missing every beat type added after ~v0.9.5x)
+    const visibleBeatTypes = getVisibleBeatTypeIds();
+    const invisibleBeatTypes = getInvisibleBeatTypeIds();
 
     // Get preset sounds for the AI context
     const presetSounds = getAllPresetSounds().map(s => ({

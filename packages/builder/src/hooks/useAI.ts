@@ -180,7 +180,11 @@ export function useAI() {
     if (!hasInitialized.current) {
       hasInitialized.current = true;
       const savedConfig = loadSavedConfig();
-      if (savedConfig && savedConfig.apiKey) {
+      // Local providers (Ollama etc.) have a baseUrl but no API key — the
+      // apiKey-only gate meant their saved config was never restored, so
+      // AI features (beat suggestions, helper commands) reported "AI Not
+      // Configured" even though the Preview Window worked.
+      if (savedConfig && (savedConfig.apiKey || savedConfig.baseUrl)) {
         console.log('[useAI] Restoring saved configuration for:', savedConfig.providerType || savedConfig.provider);
         try {
           configureProvider(

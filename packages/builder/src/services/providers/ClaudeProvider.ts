@@ -459,7 +459,9 @@ export class ClaudeProvider extends BaseAIProvider {
       // `temperature` omitted — newer Anthropic models reject it as deprecated.
       const requestBody = {
         model: this.model,
-        max_tokens: 3000,
+        // 8000: suggestion JSON for 3-5 beats plus thinking headroom on
+        // adaptive-thinking models (max_tokens is a cap, not a floor)
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [
           {

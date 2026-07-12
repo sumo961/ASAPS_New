@@ -90,6 +90,30 @@ describe('isOllamaConnection', () => {
   });
 });
 
+describe('default token budgets get reasoning headroom', () => {
+  const build = (over: Partial<AIProviderConfig>, defMax: number) => {
+    p.configure(cfg(over));
+    return (p as any).buildChatRequest([{ role: 'user', content: 'hi' }], defMax, 0.7);
+  };
+
+  it('floors an app-default budget for reasoning models (empty-content fix)', () => {
+    // 3000 default on gpt-5.x → reasoning tokens ate the whole budget and
+    // content came back empty (the "beat suggestions do nothing" bug)
+    const body = build({ model: 'gpt-5.5' }, 3000);
+    expect(body.max_completion_tokens).toBeGreaterThanOrEqual(4096);
+  });
+
+  it('leaves non-reasoning models at the requested default', () => {
+    const body = build({ model: 'gpt-4.1' }, 3000);
+    expect(body.max_tokens).toBe(3000);
+  });
+
+  it('respects an explicit user-configured maxTokens verbatim', () => {
+    const body = build({ model: 'gpt-5.5', maxTokens: 2000 }, 3000);
+    expect(body.max_completion_tokens).toBe(2000);
+  });
+});
+
 describe('pro reasoning mode (Responses API)', () => {
   const build = (over: Partial<AIProviderConfig>, max = 1000) => {
     p.configure(cfg(over));
@@ -101,7 +125,8 @@ describe('pro reasoning mode (Responses API)', () => {
     expect(body._endpoint).toBe('responses');
     expect(body.reasoning).toEqual({ mode: 'pro' });
     expect(body.input).toEqual([{ role: 'user', content: 'hi' }]);
-    expect(body.max_output_tokens).toBe(1000);
+    // default floored for the reasoning model before the pro branch
+    expect(body.max_output_tokens).toBe(4096);
     // chat-completions keys must not leak in
     expect(body.messages).toBeUndefined();
     expect(body.max_tokens).toBeUndefined();
@@ -118,7 +143,7 @@ describe('pro reasoning mode (Responses API)', () => {
     const body = build({ model: 'gpt-5.5', reasoningMode: 'pro' });
     expect(body._endpoint).toBeUndefined();
     expect(body.messages).toEqual([{ role: 'user', content: 'hi' }]);
-    expect(body.max_completion_tokens).toBe(1000);
+    expect(body.max_completion_tokens).toBe(4096);
     expect(body.input).toBeUndefined();
     expect(body.reasoning).toBeUndefined();
   });
@@ -157,7 +182,9 @@ describe('buildChatRequest', () => {
 
   it('uses max_completion_tokens and omits temperature for a reasoning model', () => {
     const body = build({ model: 'gpt-5.5' });
-    expect(body.max_completion_tokens).toBe(1000);
+    // 1000 default floored to the reasoning-model minimum (hidden reasoning
+    // tokens count against the cap)
+    expect(body.max_completion_tokens).toBe(4096);
     expect(body.max_tokens).toBeUndefined();
     expect(body.temperature).toBeUndefined();
   });

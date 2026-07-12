@@ -31,14 +31,18 @@ const beat = (over: Partial<BeatConfig> = {}): BeatConfig =>
   }) as BeatConfig;
 
 describe('buildBeatSuggestionsSystemPrompt (stable contract only)', () => {
-  it('returns a non-empty string that embeds the supplied schema', () => {
-    // Intentionally light: the prompt wording is about to be reworked,
-    // so we pin only that the schema is interpolated (the one piece of
-    // behavior a rewrite must preserve).
+  it('returns a non-empty string that carries the beat-type vocabulary', () => {
+    // The prompt now embeds the compact schema digest (not the raw JSON),
+    // so pin that the beat types the model needs to know are present —
+    // including ones the old hand lists missed.
     const prompt = buildBeatSuggestionsSystemPrompt(SCHEMA);
     expect(prompt.length).toBeGreaterThan(0);
-    expect(prompt).toContain('"titleScreen"');
-    expect(prompt).toContain('"pickProp"');
+    expect(prompt).toContain('titleScreen');
+    expect(prompt).toContain('pickProp');
+    expect(prompt).toContain('inputImage');
+    expect(prompt).toContain('multiChoice');
+    // and that it is NOT the 150KB raw schema dump
+    expect(prompt.length).toBeLessThan(30000);
   });
 });
 

@@ -92,6 +92,24 @@ describe('remove elements', () => {
   });
 });
 
+describe('schema-derived beat types (regression: hand list stopped at ~13 types)', () => {
+  it('parses commands targeting beat types added after the old hand list', () => {
+    const r = parser.parse('remove all buttons from keypad beats', ctx());
+    expect(r?.fullyUnderstood).toBe(true);
+    expect((r?.action.targetSelector.filters as any).beatTypes).toEqual(['keypad']);
+
+    const r2 = parser.parse('remove all meters from multichoice beats', ctx());
+    expect(r2?.fullyUnderstood).toBe(true);
+    expect((r2?.action.targetSelector.filters as any).beatTypes).toEqual(['multiChoice']);
+  });
+
+  it('still resolves the legacy shorthands', () => {
+    const r = parser.parse('remove all meters from timed beats', ctx());
+    expect(r?.fullyUnderstood).toBe(true);
+    expect((r?.action.targetSelector.filters as any).beatTypes).toEqual(['durScreen']);
+  });
+});
+
 describe('fallback + needsAI', () => {
   it('returns null for an unrecognized command (defers to AI)', () => {
     expect(parser.parse('please make the whole story spookier', ctx())).toBeNull();

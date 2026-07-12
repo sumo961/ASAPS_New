@@ -5,15 +5,21 @@
  */
 
 import type { BeatSuggestionRequest } from '../../types/ai';
+import { buildBeatTypeDigest } from '../beatSchemaVocabulary';
 
 /**
  * Build system prompt for beat suggestions
  */
 export function buildBeatSuggestionsSystemPrompt(schema: any): string {
+  // Compact per-type digest instead of serializing the entire ~150KB schema
+  // JSON into every request — the digest carries what the model needs
+  // (type ids, categories, connection models, parameter names) at ~2% of
+  // the tokens. `schema` stays in the signature for API compatibility.
+  void schema;
   return `You are an expert story structure advisor. You suggest logical next beats in an interactive story based on the current context.
 
-## Beat Schema
-${JSON.stringify(schema, null, 2)}
+## Available Beat Types
+${buildBeatTypeDigest()}
 
 ## Your Task
 Analyze the current beat and story context, then suggest 3-5 logical next beats that would:

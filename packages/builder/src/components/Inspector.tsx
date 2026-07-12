@@ -122,6 +122,8 @@ interface PropWithEffect {
 }
 
 interface InspectorProps {
+  /** Real story title for AI context (beat suggestions) */
+  storyTitle?: string;
   beat: Beat | null;
   onUpdate: (beatId: string, updates: Partial<Beat>) => void;
   onDelete: (beatId: string) => void;
@@ -160,6 +162,7 @@ const DEFAULT_INSPECTOR_WIDTH = 320;
 const INSPECTOR_WIDTH_STORAGE_KEY = 'asaps-inspector-width';
 
 export const Inspector: React.FC<InspectorProps> = ({
+  storyTitle,
   beat,
   onUpdate,
   onDelete,
@@ -5152,8 +5155,9 @@ export const Inspector: React.FC<InspectorProps> = ({
               currentBeat={beat as any}
               allBeats={allBeats as any}
               storyMetadata={{
-                title: 'Current Story',
-                genre: beatDef?.category || 'adventure',
+                // Real title (was hardcoded 'Current Story'); no genre —
+                // beatDef.category was 'visible'/'invisible', not a genre.
+                title: storyTitle || 'Untitled Story',
               }}
               onAddBeat={(suggestion) => {
                 if (!onBeatAdd) {

@@ -16,6 +16,7 @@ import type {
   HelperCommandContext,
   HelperCommandResponse,
 } from '../types/helperCommand';
+import { getVisibleBeatTypeIds, resolveBeatTypeAlias } from './beatSchemaVocabulary';
 
 // ============================================================================
 // Types
@@ -50,13 +51,10 @@ interface SoundMatch {
 // ============================================================================
 
 /**
- * Visible beat types for filtering
+ * Visible beat types for filtering — derived from the beat schema so new
+ * beat types are automatically known here (previously a stale hand list).
  */
-const VISIBLE_BEAT_TYPES = [
-  'titleScreen', 'infoText', 'dialogTree', 'movementChoice',
-  'pickProp', 'durScreen', 'endScreen', 'inputText', 'hyperText',
-  'videoBeat', 'aiDialogTree', 'aiSummary', 'onlineContent'
-];
+const VISIBLE_BEAT_TYPES = getVisibleBeatTypeIds();
 
 /**
  * Valid transition types
@@ -512,50 +510,9 @@ function parseRemoveCommand(elementType: string, beatType: string, context: Help
  * Normalize beat type name to match actual type
  */
 function normalizeBeatType(input: string): string | null {
-  const normalized = input.toLowerCase().replace(/[_\s-]/g, '');
-
-  const beatTypeMap: Record<string, string> = {
-    'dialog': 'dialogTree',
-    'dialogtree': 'dialogTree',
-    'title': 'titleScreen',
-    'titlescreen': 'titleScreen',
-    'intro': 'infoText',
-    'introtext': 'infoText',
-    'end': 'endScreen',
-    'endscreen': 'endScreen',
-    'movement': 'movementChoice',
-    'movementchoice': 'movementChoice',
-    'pickprop': 'pickProp',
-    'pick': 'pickProp',
-    'dur': 'durScreen',
-    'durscreen': 'durScreen',
-    'timed': 'durScreen',
-    'input': 'inputText',
-    'inputtext': 'inputText',
-    'hyper': 'hyperText',
-    'hypertext': 'hyperText',
-    'video': 'videoBeat',
-    'videobeat': 'videoBeat',
-    'aidialog': 'aiDialogTree',
-    'aidialogtree': 'aiDialogTree',
-    'aisummary': 'aiSummary',
-    'summary': 'aiSummary',
-    'onlinecontent': 'onlineContent',
-    'online': 'onlineContent',
-    'setvariable': 'setVariable',
-    'variable': 'setVariable',
-    'condition': 'conditionBeat',
-    'conditionbeat': 'conditionBeat',
-    'inventory': 'addRemoveInventory',
-    'addremoveinventory': 'addRemoveInventory',
-    'random': 'randomTarget',
-    'randomtarget': 'randomTarget',
-    'timer': 'setTimer',
-    'settimer': 'setTimer',
-    'aicondition': 'aiCondition',
-  };
-
-  return beatTypeMap[normalized] || null;
+  // Schema-derived: ids + display names + curated colloquial shorthands
+  // ("timed" → durScreen). Previously a hand map that stopped at ~13 types.
+  return resolveBeatTypeAlias(input);
 }
 
 // ============================================================================

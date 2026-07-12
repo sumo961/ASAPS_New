@@ -28,6 +28,7 @@ import { getAIValidator } from '../AIValidator';
 import {
   requiresMaxCompletionTokens,
   isReasoningModel,
+  effectiveMaxTokens,
   supportsProReasoning,
   buildResponsesRequestBody,
   extractResponsesOutputText,
@@ -258,7 +259,11 @@ export class OpenAIProvider extends BaseAIProvider {
     jsonMode: boolean = true
   ): ChatCompletionCreateParamsNonStreaming & Record<string, any> {
     const reasoningEffort = this.config?.reasoningEffort;
-    const maxTokens = this.config?.maxTokens ?? defaultMaxTokens;
+    // App-default budgets get reasoning-model headroom (hidden reasoning
+    // tokens count against the cap — a 3000-token default returns EMPTY
+    // content on gpt-5.x). An explicit user-configured maxTokens is
+    // respected verbatim.
+    const maxTokens = this.config?.maxTokens ?? effectiveMaxTokens(this.model, defaultMaxTokens);
 
     // Pro reasoning (GPT-5.6, official OpenAI only): Responses-API body.
     // The _endpoint marker tells the proxy to target /responses; it is
@@ -802,7 +807,7 @@ export class OpenAIProvider extends BaseAIProvider {
             content: userPrompt,
           },
         ],
-        3000,
+        8000,
         0.6
       );
 

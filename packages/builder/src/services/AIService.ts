@@ -28,6 +28,8 @@ import type {
   HelperCommandResponse,
   StructuredAction,
 } from '../types/helperCommand';
+import { buildBeatTypeDigest } from './beatSchemaVocabulary';
+import { normalizeBeat } from '@asaps/core';
 import { getAIValidator } from './AIValidator';
 import { normalizeStory } from '@asaps/core';
 
@@ -1775,6 +1777,23 @@ Return ONLY the corrected JSON, no explanation needed.
             }
             return true;
           });
+          // Run each suggestion's parameters through the same schema-driven
+          // normalize pass AI story generation uses, so pre-filled params
+          // land in the canonical shape (nested condition/connection forms
+          // flattened, wrong-typed values coerced, defaults applied) instead
+          // of silently mismatching the Inspector.
+          response.suggestions = response.suggestions.map(s => {
+            try {
+              const { beat } = normalizeBeat(
+                { id: 'suggestion', type: s.beatType, name: s.name, parameters: s.parameters || {} },
+                schema
+              );
+              return { ...s, parameters: beat.parameters ?? s.parameters };
+            } catch (err) {
+              console.warn(`[AIService] Suggestion normalize failed for ${s.beatType}:`, err);
+              return s;
+            }
+          });
         }
       }
 
@@ -2106,6 +2125,10 @@ Sample beat names: ${context.sampleBeatNames.slice(0, 10).join(', ')}
 Modifiable beat properties: ${context.modifiableProperties.beats.join(', ')}
 Modifiable location properties: ${context.modifiableProperties.locations.join(', ')}
 Transition properties: ${context.modifiableProperties.transitions.join(', ')}
+
+Beat-type reference (id, category, description, per-type parameters — any
+listed parameter can be targeted with setProperty on beats of that type):
+${buildBeatTypeDigest()}
 
 Your task:
 1. Parse the user's natural language command

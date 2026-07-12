@@ -6145,6 +6145,7 @@ function App() {
 
           {selectedBeat && (
             <Inspector
+              storyTitle={state.title}
               beat={selectedBeat}
               onUpdate={handleBeatUpdate}
               onDelete={handleBeatDelete}
