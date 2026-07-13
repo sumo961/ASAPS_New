@@ -98,6 +98,16 @@ const HTML_TEMPLATE = `<!DOCTYPE html>
     <div class="loading-screen">
       <div class="spinner"></div>
       <div>Loading story...</div>
+      <noscript>
+        <div style="max-width: 420px; text-align: center; line-height: 1.5; font-size: 14px; color: #c7c9e8; padding: 0 20px;">
+          <strong style="color: #fff;">This story needs JavaScript, which is turned off here.</strong><br><br>
+          If you opened this file from Messages, Mail, or the Files app on an
+          iPhone or iPad, you are seeing Apple's preview mode — it cannot run
+          interactive stories.<br><br>
+          To play: ask the author to put the story on the web and send you a
+          link, or open this file in a browser on a computer.
+        </div>
+      </noscript>
     </div>
   </div>
 
@@ -281,6 +291,16 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
     <div class="loading-screen">
       <div class="spinner"></div>
       <div>Loading story...</div>
+      <noscript>
+        <div style="max-width: 420px; text-align: center; line-height: 1.5; font-size: 14px; color: #c7c9e8; padding: 0 20px;">
+          <strong style="color: #fff;">This story needs JavaScript, which is turned off here.</strong><br><br>
+          If you opened this file from Messages, Mail, or the Files app on an
+          iPhone or iPad, you are seeing Apple's preview mode — it cannot run
+          interactive stories.<br><br>
+          To play: ask the author to put the story on the web and send you a
+          link, or open this file in a browser on a computer.
+        </div>
+      </noscript>
     </div>
   </div>
 
