@@ -1,5 +1,60 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-14: AI on existing stories — transformations + beat suggestions repaired (v0.9.74)
+
+### Overview
+
+First slice of the "AI works on your existing story" roadmap. **Transformation commands and beat suggestions now actually work on modern models** — live verification with a real Anthropic key exposed that the helper-command AI parse was broken on every current provider, and beat suggestions silently returned nothing on GPT-5.x. Both features are also now schema-driven: the beat-type vocabulary that the deterministic parser, the AI prompts, and the suggestions system share is derived from `beat-definitions/core-beats.json`, so new beat types are automatically known everywhere. Plus: exported stories opened in Apple's QuickLook preview (tapping the file in Messages/Mail/Files on iOS) now explain themselves instead of spinning forever, and 3 new undici Dependabot alerts were cleared.
+
+### Schema-driven transformation vocabulary (helper commands)
+
+New `services/beatSchemaVocabulary.ts` — beat-type ids, visible/invisible classification, per-type parameter names, alias resolution (schema ids + display names + curated shorthands like "timed" → durScreen), and a compact per-type prompt digest, all statically derived from the canonical schema JSON. Consumers rewired:
+
+- `DeterministicCommandParser`: the hardcoded 13-type list and hand alias map are gone — all 32 schema types parse (`multiChoice`, `inputImage`, `keypad`, `updateAffect`, `webView`, `panorama`, …)
+- `HelperCommandInput`'s AI context: visible/invisible lists schema-derived
+- the helper-command AI prompt now carries the per-type parameter digest, so `setProperty` can target any schema parameter (the executor always could — the vocabulary just never said so)
+
+**Files modified:**
+- `packages/builder/src/services/beatSchemaVocabulary.ts` (new, + tests)
+- `packages/builder/src/services/DeterministicCommandParser.ts` (+ tests), `packages/builder/src/components/ai/HelperCommandInput.tsx`, `packages/builder/src/services/AIService.ts`
+
+### Helper-command AI parse: broken on every modern model (fixed)
+
+`AIService.makeDirectAICall` hand-rolled raw-client request bodies that bypassed the provider layer: Claude received the deprecated `temperature` (Anthropic 400s), OpenAI received `max_tokens` + `temperature` (both rejected by gpt-5.x reasoning models) with no reasoning headroom — and neither branch worked behind the CORS proxy. This was the sixth deprecated-temperature Claude body; the v0.9.53 sweep removed five. Now routes through the provider's `generateConversationTurn` (correct per-provider bodies, token floors, proxy transport). Verified live with Claude Opus 4.8: "change the continue button text to 'Onward' on all info text beats" parsed at 95% confidence, previewed both infoText beats, applied cleanly.
+
+**Files modified:**
+- `packages/builder/src/services/AIService.ts` (+ regression test)
+
+### Beat suggestions: five stacked causes fixed
+
+1. **Reasoning-token starvation** — `OpenAIProvider.buildChatRequest` passed app-default budgets through verbatim; on gpt-5.x the hidden reasoning consumed the whole 3000-token suggestion budget and content came back empty. Defaults now get the `effectiveMaxTokens` floor (explicit user-configured maxTokens untouched) — this blanket-fixes every OpenAI-path feature with small defaults.
+2. **Local providers never restored** — `useAI` auto-restore required an apiKey, so Ollama-style configs (baseUrl, no key) reported "AI Not Configured" for suggestions/helper commands even while the Preview Window worked.
+3. The suggestions system prompt serialized the entire ~150KB schema JSON into every request; it now sends the ~10KB digest.
+4. Suggested parameters now run through core's `normalizeBeat` (same pipeline as AI story generation) so pre-filled params land in canonical shape.
+5. Metadata was fake (title "Current Story", genre = the string "visible") — real story title threaded through, bogus genre dropped.
+
+Suggestion budgets 3000 → 8000 in both providers. Verified live on BOTH provider families: Ollama (3 suggestions, Add auto-connected the new beat) and Claude Opus 4.8 (3 suggestions incl. a `multiChoice` — a type the old prompt never knew).
+
+**Files modified:**
+- `packages/builder/src/services/providers/{OpenAIProvider,ClaudeProvider}.ts` (+ tests), `packages/builder/src/services/prompts/beatSuggestions.ts` (+ tests), `packages/builder/src/hooks/useAI.ts`, `packages/builder/src/components/Inspector.tsx`, `packages/builder/src/App.tsx`
+
+### Export: iMessage/QuickLook "stuck at Loading story" explained
+
+Tapping an exported .html attachment in Messages/Mail/Files on iOS opens Apple's QuickLook preview, which renders HTML with JavaScript disabled — the splash (with its CSS-animated spinner) is the file's only static content, so recipients saw a convincing but permanent loading screen, with no way to open a local file in real Safari. Both export templates now carry a `<noscript>` block inside the splash (renders exactly when scripting is off) telling recipients what they're looking at and to ask for a hosted link or open the file in a desktop browser.
+
+**Files modified:**
+- `packages/builder/src/export/HtmlExporter.ts`
+
+### Maintenance
+
+- 17 pinning tests added for the consolidated runtime AI adapter (request/response behavior for both provider families across all six service methods + the three transports' wire contracts).
+- `undici` 6.26.0 → 6.27.0 (transitive dev dep via electron-builder) — clears the 3 Dependabot alerts that appeared 2026-06-23; the remaining 36 stay intentionally deferred (all dev tooling; every vite fix requires the deferred ≥6.4.2 major upgrade).
+
+**Files modified:**
+- `packages/core/tests/ai/runtimeAdapter.test.ts` (new), `package-lock.json`
+
+---
+
 ## 2026-07-12: GPT-5.6 + pro reasoning, beat multi-selection, cluster fixes, one AI adapter (v0.9.73)
 
 ### Overview

@@ -22,21 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.73** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.73 brings GPT-5.6 support (incl.
-pro reasoning), beat multi-selection, and cluster fixes.** The AI settings
-know OpenAI's new GPT-5.6 tier family (Sol/Terra/Luna) and can opt into the
-Responses-API pro reasoning mode without breaking OpenAI-compatible local
-providers. The graph editor gains real multi-selection: marquee/cmd-click,
-group drag (into clusters too), duplicate-with-connections, multi-delete.
-Clusters autosize to their members, no longer overlap outside beats in
-AI-generated stories, can be deleted without crashing (beats survive), and
-beats can be taken back out (⏏ or drag to "Unclustered"). Also: screen-docked
-counter HUDs render in both layout modes (and in HTML exports for the first
-time), the preview mood tracker only appears when a story uses affect, the
-false "corrupted project" alert after responsive→static conversion is gone,
-and the six drifted AI runtime adapters became one shared core module. Users
-on v0.9.72 will auto-update. For what shipped when, see:
+Current release: **v0.9.74** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.74 makes AI work on your existing
+story.** Transformation commands (Tools → Transformation Commands) and the
+Inspector's beat suggestions were repaired for modern models — the AI parse
+sent deprecated/rejected request fields to every current provider, and
+GPT-5.x reasoning silently consumed the suggestions' token budget. Both are
+now schema-driven: the beat-type vocabulary is derived from the canonical
+beat schema, so all 32 beat types (incl. Input Image, Multi Choice, Keypad,
+Update Affect) can be targeted by natural-language commands and suggested by
+the AI. Local (Ollama) configs are restored properly on app start. Exported
+stories opened in iOS QuickLook (file attachments in Messages/Mail) now
+explain that previews can't run JavaScript instead of spinning forever.
+This follows v0.9.73's GPT-5.6 + pro reasoning support, beat
+multi-selection, and cluster autosizing. Users on v0.9.73 will auto-update.
+For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
