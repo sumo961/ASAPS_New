@@ -417,6 +417,29 @@ describe('AIService', () => {
     });
   });
 
+  describe('makeDirectAICall (helper-command AI parse path)', () => {
+    it('routes through the provider generateConversationTurn (regression: hand-rolled bodies sent deprecated temperature to Claude and max_tokens to gpt-5.x)', async () => {
+      const turn = vi.fn(async () => ({ text: '{"action": null}' }));
+      (mockProvider as any).generateConversationTurn = turn;
+      service.registerProvider(mockProvider);
+      service.setProvider('test-provider');
+
+      const result = await (service as any).makeDirectAICall('sys', 'user prompt');
+      expect(result).toBe('{"action": null}');
+      expect(turn).toHaveBeenCalledWith({
+        systemPrompt: 'sys',
+        messages: [{ role: 'user', content: 'user prompt' }],
+        maxTokens: 8000,
+      });
+    });
+
+    it('throws a clear error when the provider has no conversation-turn support', async () => {
+      service.registerProvider(mockProvider); // no generateConversationTurn
+      service.setProvider('test-provider');
+      await expect((service as any).makeDirectAICall('s', 'u')).rejects.toThrow(/not supported/);
+    });
+  });
+
   describe('Natural Language Beat Creation', () => {
     const mockNLRequest: NaturalLanguageBeatRequest = {
       description: 'Create a dialog where a guard questions the player',

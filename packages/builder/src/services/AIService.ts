@@ -2212,46 +2212,34 @@ Always be helpful and try to interpret the user's intent, even if the command is
   }
 
   /**
-   * Make a direct AI call using the current provider
+   * Make a direct AI call using the current provider.
+   *
+   * Routes through the provider's generateConversationTurn so ALL provider
+   * quirks apply. The previous hand-rolled raw-client bodies here were
+   * broken on every modern model: Claude got the deprecated `temperature`
+   * (400 "temperature is deprecated"), OpenAI got `max_tokens` +
+   * `temperature` (both rejected by gpt-5.x reasoning models) with no
+   * reasoning-token headroom — and neither branch worked behind the proxy
+   * (provider.client is null there).
    */
   private async makeDirectAICall(systemPrompt: string, userPrompt: string): Promise<string> {
     if (!this.currentProvider) {
       throw new Error('No AI provider configured');
     }
 
-    // Get the provider's internal client for direct calls
     const provider = this.currentProvider as any;
-
-    // Claude provider
-    if (provider.name === 'claude' && provider.client) {
-      const response = await provider.client.messages.create({
-        model: provider.model || 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        temperature: 0.3, // Lower temperature for more consistent parsing
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
-
-      const textBlock = response.content.find((block: any) => block.type === 'text');
-      return textBlock?.text || '';
+    if (typeof provider.generateConversationTurn !== 'function') {
+      throw new Error(`Provider ${provider.name} not supported for direct calls`);
     }
 
-    // OpenAI provider
-    if (provider.name === 'openai' && provider.client) {
-      const response = await provider.client.chat.completions.create({
-        model: provider.model || 'gpt-5.6-sol',
-        max_tokens: 4096,
-        temperature: 0.3,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      });
-
-      return response.choices[0]?.message?.content || '';
-    }
-
-    throw new Error(`Provider ${provider.name} not supported for direct calls`);
+    const { text } = await provider.generateConversationTurn({
+      systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      // Structured-JSON replies (helper-command parse) need real room, and
+      // reasoning models spend hidden tokens on top.
+      maxTokens: 8000,
+    });
+    return text;
   }
 
   /**
