@@ -17,6 +17,8 @@ import {
   newSessionId,
   saveSession,
 } from './coDesignerSessionStore';
+import { extractProposalsFromReply, describeProposal } from './proposalParsing';
+import type { ChangeProposal, CoDesignerWireMessage, ProposalApplyResult } from './types';
 
 /**
  * localStorage key the main builder writes the story snapshot to right
@@ -54,10 +56,15 @@ export function useCoDesigner() {
     status,
     error,
     context,
+    pendingProposals,
+    applying,
     addMessage,
     setStatus,
     setError,
     setContext,
+    setPendingProposals,
+    setApplying,
+    setLastApplyResults,
     reset,
   } = useCoDesignerStore();
   const { isConfigured, generateConversationTurn } = useAI();
@@ -75,6 +82,40 @@ export function useCoDesigner() {
       setStatus('interviewing');
     }
   }, [addMessage, setContext, setStatus]);
+
+  // Listen for APPLY_RESULT from the main window (web postMessage and
+  // Electron bridge). Results land as a chat log line so the transcript
+  // records what was actually applied.
+  useEffect(() => {
+    const handleWire = (message: CoDesignerWireMessage | undefined) => {
+      if (!message || message.type !== 'APPLY_RESULT') return;
+      const results = message.payload?.results ?? [];
+      const store = useCoDesignerStore.getState();
+      store.setApplying(false);
+      store.setLastApplyResults(results);
+      store.setPendingProposals(null);
+      const okCount = results.filter(r => r.ok).length;
+      const lines = results.map(r => `${r.ok ? '✓' : '✗'} ${r.detail}`).join('\n');
+      addMessage({
+        role: 'assistant',
+        content: `(Applied ${okCount} of ${results.length} change${results.length === 1 ? '' : 's'} in the main window — every change is undoable there.)\n${lines}`,
+      });
+      setStatus('interviewing');
+    };
+
+    const onWindowMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      handleWire(event.data as CoDesignerWireMessage);
+    };
+    window.addEventListener('message', onWindowMessage);
+    const electronUnsub = (window as any).electronAPI?.onCoDesignerMessage?.(
+      (message: CoDesignerWireMessage) => handleWire(message)
+    );
+    return () => {
+      window.removeEventListener('message', onWindowMessage);
+      if (typeof electronUnsub === 'function') electronUnsub();
+    };
+  }, [addMessage, setStatus]);
 
   /** Re-read the snapshot (the main window rewrites it on demand). */
   const refreshContext = useCallback(() => {
@@ -174,20 +215,82 @@ export function useCoDesigner() {
         return;
       }
 
-      addMessage({ role: 'assistant', content: result.text.trim() });
+      const { cleanText, proposalSet, droppedCount } = extractProposalsFromReply(result.text);
+      addMessage({ role: 'assistant', content: cleanText || '(proposed changes below)' });
+      if (proposalSet) {
+        setPendingProposals(proposalSet);
+        setLastApplyResults(null);
+        if (droppedCount > 0) {
+          console.warn(`[CoDesigner] ${droppedCount} malformed proposal(s) dropped`);
+        }
+      }
       setStatus('interviewing');
       void persistCurrentSession();
     },
     [isConfigured, addMessage, setStatus, setError, generateConversationTurn, persistCurrentSession]
   );
 
+  /**
+   * Send the author-selected proposals to the main window for application.
+   * Two transports, same as the Ideator handoff: Electron IPC bridge when
+   * present (window.opener is null for BrowserWindows), else postMessage
+   * to the opener.
+   */
+  const applyProposals = useCallback((selected: ChangeProposal[]) => {
+    if (selected.length === 0) return;
+    const message: CoDesignerWireMessage = {
+      type: 'APPLY_PROPOSALS',
+      payload: {
+        proposals: selected,
+        title: useCoDesignerStore.getState().pendingProposals?.title,
+      },
+    };
+
+    const electronApi = (window as any).electronAPI?.codesigner;
+    if (electronApi?.sendToMain) {
+      try {
+        electronApi.sendToMain(message);
+        setApplying(true);
+        return;
+      } catch (err) {
+        setError(`Failed to send changes via Electron IPC: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
+    if (!window.opener) {
+      setError('Cannot apply: the main builder window is not available. Keep it open while using the Co-Designer.');
+      return;
+    }
+    try {
+      window.opener.postMessage(message, window.location.origin);
+      setApplying(true);
+    } catch (err) {
+      setError(`Failed to send changes: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [setApplying, setError]);
+
+  const dismissProposals = useCallback(() => {
+    const set_ = useCoDesignerStore.getState().pendingProposals;
+    setPendingProposals(null);
+    if (set_) {
+      addMessage({
+        role: 'assistant',
+        content: `(Proposal batch "${set_.title}" dismissed — nothing was changed: ${set_.proposals.map(describeProposal).join('; ')}.)`,
+      });
+    }
+  }, [setPendingProposals, addMessage]);
+
   return {
     messages,
     status,
     error,
     context,
+    pendingProposals,
+    applying,
     isConfigured,
     sendMessage,
+    applyProposals,
+    dismissProposals,
     refreshContext,
     loadSavedSession,
     startNewSession,

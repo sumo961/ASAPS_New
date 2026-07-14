@@ -17,6 +17,7 @@ import { debugWindowManager } from './services/DebugWindowManager';
 import { ideatorWindowManager } from './services/IdeatorWindowManager';
 import { coDesignerWindowManager } from './services/CoDesignerWindowManager';
 import { buildStoryDigest } from './utils/storyDigest';
+import { applyChangeProposals } from './utils/applyChangeProposals';
 import { CODESIGNER_CONTEXT_KEY } from './components/ai/codesigner/useCoDesigner';
 import { getAIService } from './services';
 import type { StoryGenerationRequest } from './types/ai';
@@ -5638,6 +5639,34 @@ function App() {
     }
     coDesignerWindowManager.open({ projectTitle: state.title || undefined });
   }, [state.title, state.beats, state.clusters, characters, globalSettings, currentProject?.id]);
+
+  /**
+   * Apply Co-Designer proposals against LIVE story state. Every change
+   * routes through the existing undoable handlers (UpdateBeatCommand /
+   * AddBeatCommand), so the author can undo each one; results go back to
+   * the pop-out's chat log.
+   */
+  const handleCoDesignerApply = useCallback((proposals: import('./components/ai/codesigner/types').ChangeProposal[]) => {
+    const results = applyChangeProposals(proposals, {
+      beats: state.beats as any,
+      updateBeat: (beatId, updates) => handleBeatUpdate(beatId, updates as any),
+      addBeat: (beatType, position, name) => {
+        const newBeat = actions.addBeat(beatType, position, { name });
+        if (!newBeat) return null;
+        const cmd = new AddBeatCommand(newBeat, stableMutations.current);
+        getCommandManager().pushWithoutExecute(cmd);
+        return newBeat;
+      },
+      connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
+    });
+    markChanged();
+    coDesignerWindowManager.notifyApplyResult(results);
+  }, [state.beats, actions, handleBeatUpdate, markChanged]);
+
+  useEffect(() => {
+    const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);
+    return unsubscribe;
+  }, [handleCoDesignerApply]);
 
   // Subscribe once so the Ideator pop-out's SUBMIT_REQUEST messages land
   // in handleIdeatorSubmit with its latest closure.

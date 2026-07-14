@@ -197,6 +197,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     close: () => ipcRenderer.invoke('codesigner:close'),
     isOpen: () => ipcRenderer.invoke('codesigner:is-open'),
     ping: () => ipcRenderer.send('codesigner:ping'),
+    sendMessage: (message: any) => ipcRenderer.invoke('codesigner:send-message', message),
+    sendToMain: (message: any) => ipcRenderer.send('codesigner:send-to-main', message),
+  },
+  onCoDesignerMessage: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('codesigner:message', handler);
+    return () => ipcRenderer.removeListener('codesigner:message', handler);
+  },
+  onCoDesignerMessageToMain: (callback: (message: any) => void) => {
+    const handler = (_: unknown, message: any) => callback(message);
+    ipcRenderer.on('codesigner:message-to-main', handler);
+    return () => ipcRenderer.removeListener('codesigner:message-to-main', handler);
   },
   onCoDesignerReady: (callback: () => void) => {
     const handler = () => callback();

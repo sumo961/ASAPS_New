@@ -16,6 +16,7 @@ import { IdeatorChat } from '../components/ai/ideator/IdeatorChat';
 import { CoDesignerComposer } from '../components/ai/codesigner/CoDesignerComposer';
 import { CoDesignerSessionsPanel } from '../components/ai/codesigner/CoDesignerSessionsPanel';
 import { useCoDesigner } from '../components/ai/codesigner/useCoDesigner';
+import { ProposalCard } from '../components/ai/codesigner/ProposalCard';
 import { useCoDesignerStore } from '../components/ai/codesigner/coDesignerStore';
 
 export const CoDesignerWindow: React.FC = () => {
@@ -24,8 +25,12 @@ export const CoDesignerWindow: React.FC = () => {
     status,
     error,
     context,
+    pendingProposals,
+    applying,
     isConfigured,
     sendMessage,
+    applyProposals,
+    dismissProposals,
     refreshContext,
     loadSavedSession,
     startNewSession,
@@ -74,6 +79,15 @@ export const CoDesignerWindow: React.FC = () => {
         <div className="px-4 py-2 text-sm text-red-800 bg-red-50 border-t border-red-200">
           {error}
         </div>
+      )}
+
+      {pendingProposals && (
+        <ProposalCard
+          proposalSet={pendingProposals}
+          applying={applying}
+          onApply={applyProposals}
+          onDismiss={dismissProposals}
+        />
       )}
 
       <CoDesignerComposer status={status} onSend={sendMessage} />

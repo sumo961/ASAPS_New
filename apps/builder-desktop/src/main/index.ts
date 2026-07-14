@@ -1339,6 +1339,22 @@ ipcMain.on('codesigner:ping', () => {
   }
 });
 
+// Main → pop-out (APPLY_RESULT)
+ipcMain.handle('codesigner:send-message', async (_, message: any) => {
+  if (codesignerWindow && !codesignerWindow.isDestroyed()) {
+    codesignerWindow.webContents.send('codesigner:message', message);
+    return true;
+  }
+  return false;
+});
+
+// Pop-out → main (APPLY_PROPOSALS)
+ipcMain.on('codesigner:send-to-main', (_, message: any) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('codesigner:message-to-main', message);
+  }
+});
+
 // ============================================================================
 // Start Window IPC handlers
 // ============================================================================

@@ -10,22 +10,34 @@
  * window.open.
  */
 
+import type {
+  ChangeProposal,
+  CoDesignerWireMessage,
+  ProposalApplyResult,
+} from '../components/ai/codesigner/types';
+
 export interface CoDesignerWindowState {
   isOpen: boolean;
 }
 
 type StateChangeCallback = (state: CoDesignerWindowState) => void;
+type ApplyCallback = (proposals: ChangeProposal[], title?: string) => void;
 
 class CoDesignerWindowManager {
   private popoutWindow: Window | null = null;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<StateChangeCallback>();
+  private applyListeners = new Set<ApplyCallback>();
   private isElectron: boolean = false;
   private electronWindowOpen: boolean = false;
 
   constructor() {
     this.isElectron = typeof window !== 'undefined'
       && !!(window as any).electronAPI?.codesigner?.open;
+
+    if (typeof window !== 'undefined' && !this.isElectron) {
+      window.addEventListener('message', this.handleMessage);
+    }
 
     if (this.isElectron) {
       const api = (window as any).electronAPI;
@@ -34,8 +46,71 @@ class CoDesignerWindowManager {
         this.electronWindowOpen = true;
         this.notifyListeners();
       });
+      // Pop-out → main messages (APPLY_PROPOSALS). Synthesized into a
+      // MessageEvent-shaped object so handleMessage works unchanged.
+      api.onCoDesignerMessageToMain?.((message: any) => {
+        this.handleMessage({
+          origin: typeof window !== 'undefined' ? window.location.origin : '',
+          data: message,
+          source: null,
+        } as MessageEvent);
+      });
     }
   }
+
+  /**
+   * App subscribes: selected proposals arriving from the pop-out land here
+   * for validation + undoable application against live story state.
+   */
+  onApply(callback: ApplyCallback): () => void {
+    this.applyListeners.add(callback);
+    return () => this.applyListeners.delete(callback);
+  }
+
+  /** Report per-proposal outcomes back to the pop-out's chat log. */
+  notifyApplyResult(results: ProposalApplyResult[]): void {
+    this.postToWindow({ type: 'APPLY_RESULT', payload: { results } });
+  }
+
+  private postToWindow(message: CoDesignerWireMessage): void {
+    if (!this.isWindowOpen()) return;
+    if (this.isElectron) {
+      try {
+        (window as any).electronAPI?.codesigner?.sendMessage?.(message);
+      } catch (err) {
+        console.warn('[CoDesignerWindowManager] Electron sendMessage failed:', err);
+      }
+      return;
+    }
+    try {
+      this.popoutWindow!.postMessage(message, window.location.origin);
+    } catch (err) {
+      console.warn('[CoDesignerWindowManager] postMessage to pop-out failed:', err);
+    }
+  }
+
+  private handleMessage = (event: MessageEvent): void => {
+    if (event.origin !== window.location.origin) return;
+    const message = event.data as CoDesignerWireMessage;
+    if (!message || typeof message.type !== 'string') return;
+
+    // Recover the pop-out reference from event.source (survives a main-
+    // window reload — same trick as the Ideator manager).
+    if (
+      event.source &&
+      event.source !== window &&
+      this.popoutWindow !== event.source
+    ) {
+      this.popoutWindow = event.source as Window;
+    }
+
+    if (message.type === 'APPLY_PROPOSALS') {
+      const proposals = message.payload?.proposals;
+      if (Array.isArray(proposals) && proposals.length > 0) {
+        this.applyListeners.forEach(cb => cb(proposals, message.payload?.title));
+      }
+    }
+  };
 
   subscribe(callback: StateChangeCallback): () => void {
     this.listeners.add(callback);
@@ -136,8 +211,12 @@ class CoDesignerWindowManager {
   }
 
   destroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('message', this.handleMessage);
+    }
     this.close();
     this.listeners.clear();
+    this.applyListeners.clear();
   }
 }
 

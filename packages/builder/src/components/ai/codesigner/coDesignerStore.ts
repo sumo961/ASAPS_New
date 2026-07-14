@@ -10,6 +10,7 @@
 
 import { create } from 'zustand';
 import type { IdeatorMessage, IdeatorStatus } from '../ideator/types';
+import type { ChangeProposalSet, ProposalApplyResult } from './types';
 
 /** The open-story context handed over from the main builder window. */
 export interface CoDesignerContext {
@@ -28,7 +29,16 @@ interface CoDesignerState {
   context: CoDesignerContext | null;
   sessionId: string | null;
   sessionCreatedAt: number | null;
+  /** Proposal set from the latest assistant reply, awaiting author review. */
+  pendingProposals: ChangeProposalSet | null;
+  /** True while the main window is applying a batch. */
+  applying: boolean;
+  /** Results of the last apply, for the chat log. */
+  lastApplyResults: ProposalApplyResult[] | null;
 
+  setPendingProposals: (set_: ChangeProposalSet | null) => void;
+  setApplying: (applying: boolean) => void;
+  setLastApplyResults: (results: ProposalApplyResult[] | null) => void;
   addMessage: (msg: Omit<IdeatorMessage, 'id' | 'timestamp'>) => void;
   setStatus: (status: IdeatorStatus) => void;
   setError: (error: string | null) => void;
@@ -55,7 +65,13 @@ export const useCoDesignerStore = create<CoDesignerState>((set) => ({
   context: null,
   sessionId: null,
   sessionCreatedAt: null,
+  pendingProposals: null,
+  applying: false,
+  lastApplyResults: null,
 
+  setPendingProposals: (set_) => set({ pendingProposals: set_ }),
+  setApplying: (applying) => set({ applying }),
+  setLastApplyResults: (results) => set({ lastApplyResults: results }),
   addMessage: (msg) =>
     set((state) => ({
       messages: [
@@ -83,5 +99,8 @@ export const useCoDesignerStore = create<CoDesignerState>((set) => ({
       error: null,
       sessionId: null,
       sessionCreatedAt: null,
+      pendingProposals: null,
+      applying: false,
+      lastApplyResults: null,
     }),
 }));
