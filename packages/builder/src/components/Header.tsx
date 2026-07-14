@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
+import { Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { NewProjectPicker } from './NewProjectPicker';
@@ -52,6 +52,7 @@ interface HeaderProps {
   onStoryGenerated?: (story: any) => void;
   onBeatCreated?: (beat: any) => void;
   onIdeator?: () => void;
+  onCoDesigner?: () => void;
   onSaveProject?: () => void;
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
   isUntitledProject?: boolean;
@@ -110,6 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
   onStoryGenerated,
   onBeatCreated,
   onIdeator,
+  onCoDesigner,
   onSaveProject,
   onRenameProject,
   isUntitledProject,
@@ -700,6 +702,19 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <Wand2 className="w-4 h-4" />
                       Ideate with Ideator
+                    </button>
+                  )}
+                  {onCoDesigner && (
+                    <button
+                      onClick={() => {
+                        onCoDesigner();
+                        setShowAIMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                      title="Open Co-Designer — a design-phase collaborator that works with you on the story currently open (deepen characters, sharpen choices, find where branches earn their keep)"
+                    >
+                      <Compass className="w-4 h-4" />
+                      Design with Co-Designer
                     </button>
                   )}
                   <button

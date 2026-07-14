@@ -271,6 +271,7 @@ let startWindow: BrowserWindow | null = null;
 let previewWindow: BrowserWindow | null = null;
 let debugWindow: BrowserWindow | null = null;
 let ideatorWindow: BrowserWindow | null = null;
+let codesignerWindow: BrowserWindow | null = null;
 let currentProjectPath: string | null = null;
 
 function createWindow(intent?: Record<string, string>): void {
@@ -1258,6 +1259,83 @@ ipcMain.handle('ideator:send-message', async (_, message: any) => {
 ipcMain.on('ideator:ping', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('ideator:ready');
+  }
+});
+
+// ============================================================================
+// Pop-out Co-Designer — design-phase collaborator on the OPEN story.
+// Counterpart to the Ideator window above. Story context travels via
+// localStorage (same-origin BrowserWindows share it), so only window
+// lifecycle needs IPC here.
+// ============================================================================
+
+function createCoDesignerWindow(options: { projectTitle?: string } = {}): void {
+  if (codesignerWindow && !codesignerWindow.isDestroyed()) {
+    codesignerWindow.focus();
+    return;
+  }
+
+  const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
+
+  codesignerWindow = new BrowserWindow({
+    width: 900,
+    height: 800,
+    x: mainBounds.x + 110,
+    y: mainBounds.y + 110,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    title: 'ASAPS Co-Designer',
+    show: false,
+  });
+
+  codesignerWindow.once('ready-to-show', () => {
+    codesignerWindow?.show();
+  });
+
+  const params = new URLSearchParams();
+  if (options.projectTitle) params.set('title', options.projectTitle);
+  const queryString = params.toString();
+  const hash = queryString ? `/co-designer-window?${queryString}` : '/co-designer-window';
+
+  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    codesignerWindow.loadURL(`${devUrl}#${hash}`);
+  } else {
+    codesignerWindow.loadFile(join(__dirname, '../../builder/index.html'), {
+      hash,
+    });
+  }
+
+  codesignerWindow.on('closed', () => {
+    codesignerWindow = null;
+    mainWindow?.webContents.send('codesigner:closed');
+  });
+}
+
+ipcMain.handle('codesigner:open', async (_, options: { projectTitle?: string } = {}) => {
+  createCoDesignerWindow(options);
+  return true;
+});
+
+ipcMain.handle('codesigner:close', async () => {
+  if (codesignerWindow && !codesignerWindow.isDestroyed()) {
+    codesignerWindow.close();
+  }
+  return true;
+});
+
+ipcMain.handle('codesigner:is-open', async () => {
+  return codesignerWindow !== null && !codesignerWindow.isDestroyed();
+});
+
+// Pop-out announces readiness so the manager can reflect open state.
+ipcMain.on('codesigner:ping', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('codesigner:ready');
   }
 });
 

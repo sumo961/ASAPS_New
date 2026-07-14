@@ -10,10 +10,14 @@ import { StoryPreview } from './components/preview/StoryPreview';
 import { PreviewWindow } from './pages/PreviewWindow';
 import { DebugWindow } from './pages/DebugWindow';
 import { IdeatorWindow } from './pages/IdeatorWindow';
+import { CoDesignerWindow } from './pages/CoDesignerWindow';
 import { StartWindow } from './pages/StartWindow';
 import { previewWindowManager, type PreviewWindowState } from './services/PreviewWindowManager';
 import { debugWindowManager } from './services/DebugWindowManager';
 import { ideatorWindowManager } from './services/IdeatorWindowManager';
+import { coDesignerWindowManager } from './services/CoDesignerWindowManager';
+import { buildStoryDigest } from './utils/storyDigest';
+import { CODESIGNER_CONTEXT_KEY } from './components/ai/codesigner/useCoDesigner';
 import { getAIService } from './services';
 import type { StoryGenerationRequest } from './types/ai';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
@@ -143,6 +147,11 @@ const isDebugWindowRoute = () => typeof window !== 'undefined' && window.locatio
 const isIdeatorWindowRoute = () =>
   typeof window !== 'undefined' && window.location.hash.startsWith('#/ideator-window');
 
+// Check if we're in the Co-Designer window route (pop-out design-phase
+// collaborator working on the OPEN story).
+const isCoDesignerWindowRoute = () =>
+  typeof window !== 'undefined' && window.location.hash.startsWith('#/co-designer-window');
+
 // Check if we're in the Start Window route — the Electron app's
 // launch screen, also reachable in web for visual dev / verification.
 const isStartWindowRoute = () =>
@@ -249,6 +258,11 @@ function App() {
   // Pop-out Ideator ideation window
   if (isIdeatorWindowRoute()) {
     return <IdeatorWindow />;
+  }
+
+  // Pop-out Co-Designer window (design-phase work on the open story)
+  if (isCoDesignerWindowRoute()) {
+    return <CoDesignerWindow />;
   }
 
   // Electron start window — launches first in Electron, picks
@@ -5594,6 +5608,37 @@ function App() {
     });
   }, [state.title, currentProject?.id]);
 
+  /**
+   * Open the Co-Designer pop-out. The story snapshot travels via
+   * localStorage (same-origin windows share it in web and Electron), so
+   * the digest is written synchronously right before the window opens —
+   * no handshake needed. Reopening (or the window's Refresh button after
+   * this handler runs again) picks up the latest story state.
+   */
+  const handleOpenCoDesigner = useCallback(() => {
+    try {
+      const digest = buildStoryDigest({
+        title: state.title,
+        beats: state.beats as any,
+        characters: characters as any,
+        variables: (globalSettings as any)?.variables,
+        clusters: state.clusters,
+      });
+      localStorage.setItem(
+        CODESIGNER_CONTEXT_KEY,
+        JSON.stringify({
+          projectId: currentProject?.id,
+          projectTitle: state.title || undefined,
+          digest,
+          capturedAt: Date.now(),
+        })
+      );
+    } catch (err) {
+      console.warn('[App] Failed to write Co-Designer context:', err);
+    }
+    coDesignerWindowManager.open({ projectTitle: state.title || undefined });
+  }, [state.title, state.beats, state.clusters, characters, globalSettings, currentProject?.id]);
+
   // Subscribe once so the Ideator pop-out's SUBMIT_REQUEST messages land
   // in handleIdeatorSubmit with its latest closure.
   useEffect(() => {
@@ -5920,6 +5965,7 @@ function App() {
         onStoryGenerated={handleStoryGenerated}
         onBeatCreated={handleBeatCreated}
         onIdeator={handleOpenIdeator}
+        onCoDesigner={handleOpenCoDesigner}
         onSaveProject={handleSaveProject}
         onRenameProject={handleRenameProject}
         isUntitledProject={isUntitledProject}

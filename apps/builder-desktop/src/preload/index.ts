@@ -191,6 +191,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // via IPC (since Electron's setWindowOpenHandler denies window.open),
   // exchanges JSON-shaped wire messages defined in
   // packages/builder/src/components/ai/ideator/types.ts.
+  codesigner: {
+    open: (options: { projectTitle?: string } = {}) =>
+      ipcRenderer.invoke('codesigner:open', options),
+    close: () => ipcRenderer.invoke('codesigner:close'),
+    isOpen: () => ipcRenderer.invoke('codesigner:is-open'),
+    ping: () => ipcRenderer.send('codesigner:ping'),
+  },
+  onCoDesignerReady: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on('codesigner:ready', handler);
+    return () => ipcRenderer.removeListener('codesigner:ready', handler);
+  },
+  onCoDesignerClosed: (callback: () => void) => {
+    ipcRenderer.on('codesigner:closed', callback);
+    return () => ipcRenderer.removeListener('codesigner:closed', callback);
+  },
   ideator: {
     open: (options: { projectTitle?: string; projectId?: string } = {}) =>
       ipcRenderer.invoke('ideator:open', options),
