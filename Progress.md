@@ -1,5 +1,38 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-14: The Co-Designer — an AI collaborator for your existing story (v0.9.75)
+
+### Overview
+
+This release introduces the **Co-Designer**, the design-phase counterpart to the Ideator: where the Ideator helps you shape a brand-new idea, the Co-Designer works WITH you on the story you have open. Ask it anything from "where does this story branch meaningfully?" to "I want the protagonist more sinister — what are my options?", and when you say "implement that", it produces **reviewable change proposals** you accept per item — never applied automatically, always undoable, with an automatic safety backup. Its understanding is grounded in a live snapshot of your story: full beat text, a knowledge-graph-derived structural summary (state dependencies, choice inventory, endings, flow warnings), and an on-demand full-content tool for very large stories.
+
+### Co-Designer: conversation grounded in YOUR story (AI menu → "Design with Co-Designer")
+
+- Pop-out chat (teal, next to the purple Ideator) scoped to the open project; per-project session history with resume.
+- Story snapshot captured on open; ↻ requests a fresh snapshot from live state at any time; menu-reopen and every apply refresh it automatically.
+- The digest carries FULL beat text by default (240k-char budget ≈ 60k tokens); genuinely huge stories degrade to marked snippets and the model gains a `get_beat_content` tool to fetch any beat's complete parameters/notes/connections mid-conversation (tool-calling providers; rendered as teal chips in the transcript).
+- **STORY STRUCTURE section** derived from the systemic knowledge graph: per-counter/variable owners, writers, and gates; choices per beat; narrative vectors (conditions + endings); FLOW WARNINGS for dead ends and unreachable beats. Computed, not summarized — the model treats it as ground truth and raises warnings proactively.
+
+**Files:** `packages/builder/src/components/ai/codesigner/*` (store, hook, prompt, session store, composer, header, sessions panel), `packages/builder/src/pages/CoDesignerWindow.tsx`, `packages/builder/src/services/CoDesignerWindowManager.ts`, `packages/builder/src/utils/{storyDigest,structuralSummary}.ts`, Electron IPC in `apps/builder-desktop/src/{main,preload}/index.ts`
+
+### Co-Designer: apply mode (structured change proposals)
+
+- On explicit request ("ok, implement both"), the model emits a machine-readable proposal batch; the pop-out renders a review card — per-proposal checkboxes, rationale, value previews. "Apply N selected" sends only your selection to the main window.
+- Proposal kinds: editText, updateParams, addBeat (with graph wiring, positioned beside its anchor), addNote (a "[Co-Designer]" note on the beat for changes too big to make mechanically).
+- Safety: proposals are validated against LIVE state per item (missing beats error without blocking the batch); a batch from a stale snapshot of a DIFFERENT project is refused outright; the first apply per project per day creates a library backup copy ("X (before Co-Designer …)", skipped under VCS); every applied change is one undo step.
+
+**Files:** `packages/builder/src/components/ai/codesigner/{types,proposalParsing,ProposalCard,beatContentTool}.ts(x)`, `packages/builder/src/utils/applyChangeProposals.ts`
+
+### Fixes surfaced by the Co-Designer work
+
+- **Cross-window reference poisoning** (pre-existing since v0.9.53): the Ideator manager captured the sender of ANY message reaching the main window, so an open Preview window (which pings constantly) could hijack its pop-out reference — after which "Ideate with Ideator" focused the Preview instead of opening. Capture is now gated to each manager's own message types (Co-Designer manager included).
+- **Preview dead-click made visible**: `startPreview` silently ignored clicks when an init race left the engine/renderer unready — the "Click to preview…" overlay looked alive but did nothing. A blocked start now shows a banner naming what's still initializing.
+- Same-document hash navigation on named pop-out windows (no reload on menu-reopen) handled explicitly via pushed snapshot refreshes.
+
+**Files:** `packages/builder/src/services/{IdeatorWindowManager,CoDesignerWindowManager}.ts`, `packages/builder/src/pages/PreviewWindow.tsx`
+
+---
+
 ## 2026-07-14: AI on existing stories — transformations + beat suggestions repaired (v0.9.74)
 
 ### Overview

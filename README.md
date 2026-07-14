@@ -22,21 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.74** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.74 makes AI work on your existing
-story.** Transformation commands (Tools → Transformation Commands) and the
-Inspector's beat suggestions were repaired for modern models — the AI parse
-sent deprecated/rejected request fields to every current provider, and
-GPT-5.x reasoning silently consumed the suggestions' token budget. Both are
-now schema-driven: the beat-type vocabulary is derived from the canonical
-beat schema, so all 32 beat types (incl. Input Image, Multi Choice, Keypad,
-Update Affect) can be targeted by natural-language commands and suggested by
-the AI. Local (Ollama) configs are restored properly on app start. Exported
-stories opened in iOS QuickLook (file attachments in Messages/Mail) now
-explain that previews can't run JavaScript instead of spinning forever.
-This follows v0.9.73's GPT-5.6 + pro reasoning support, beat
-multi-selection, and cluster autosizing. Users on v0.9.73 will auto-update.
-For what shipped when, see:
+Current release: **v0.9.75** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.75 introduces the Co-Designer**
+(AI menu → "Design with Co-Designer"): the Ideator's design-phase
+counterpart — a chat collaborator grounded in the story you have OPEN.
+It reads your full story (plus a knowledge-graph-derived structural summary
+with state dependencies and flow warnings), discusses concrete options, and
+on request produces reviewable change proposals you accept per item — never
+auto-applied, always undoable, with an automatic library backup before the
+first apply of the day. Also: cross-window fixes (an open Preview could
+hijack the Ideator/Co-Designer buttons) and preview start failures are now
+visible instead of silent. This follows v0.9.74's transformation-command and
+beat-suggestion repairs. Users on v0.9.74 will auto-update. For what shipped
+when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
