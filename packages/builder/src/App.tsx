@@ -18,6 +18,8 @@ import { ideatorWindowManager } from './services/IdeatorWindowManager';
 import { coDesignerWindowManager } from './services/CoDesignerWindowManager';
 import { buildStoryDigest } from './utils/storyDigest';
 import { applyChangeProposals } from './utils/applyChangeProposals';
+import { buildStructuralSummary } from './utils/structuralSummary';
+import { buildWorkspaceKG } from './components/knowledgeGraph/kgAdapter';
 import { CODESIGNER_CONTEXT_KEY } from './components/ai/codesigner/useCoDesigner';
 import { getAIService } from './services';
 import type { StoryGenerationRequest } from './types/ai';
@@ -5619,19 +5621,36 @@ function App() {
    */
   const writeCoDesignerContext = useCallback((): boolean => {
     try {
+      // Systemic KG → structural summary: state dependencies, choice
+      // inventory, narrative vectors, and flow warnings. Derived from the
+      // actual graph, so it stays accurate however tight the text budget
+      // gets; a few KB even for large stories.
+      let structure = '';
+      try {
+        const kg = buildWorkspaceKG(
+          state.beats as any,
+          state.connections as any,
+          characters as any,
+          ((globalSettings as any)?.variables ?? []) as any,
+          { projectId: currentProject?.id, projectName: state.title }
+        );
+        structure = buildStructuralSummary(kg);
+      } catch (err) {
+        console.warn('[App] Structural summary failed (digest continues without it):', err);
+      }
       const digest = buildStoryDigest({
         title: state.title,
         beats: state.beats as any,
         characters: characters as any,
         variables: (globalSettings as any)?.variables,
         clusters: state.clusters,
-      });
+      }, { maxChars: 240_000 - structure.length - 100 });
       localStorage.setItem(
         CODESIGNER_CONTEXT_KEY,
         JSON.stringify({
           projectId: currentProject?.id,
           projectTitle: state.title || undefined,
-          digest,
+          digest: structure ? `${digest}\n\n${structure}` : digest,
           capturedAt: Date.now(),
         })
       );
@@ -5640,7 +5659,7 @@ function App() {
       console.warn('[App] Failed to write Co-Designer context:', err);
       return false;
     }
-  }, [state.title, state.beats, state.clusters, characters, globalSettings, currentProject?.id]);
+  }, [state.title, state.beats, state.connections, state.clusters, characters, globalSettings, currentProject?.id]);
 
   const handleOpenCoDesigner = useCallback(() => {
     writeCoDesignerContext();
