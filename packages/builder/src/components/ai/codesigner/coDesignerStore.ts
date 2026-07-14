@@ -12,6 +12,8 @@ import { create } from 'zustand';
 import type { IdeatorMessage, IdeatorStatus } from '../ideator/types';
 import type { ChangeProposalSet, ProposalApplyResult } from './types';
 
+export type ProposalPreviewEntry = { index: number; current: string | null; error?: string };
+
 /** The open-story context handed over from the main builder window. */
 export interface CoDesignerContext {
   projectId?: string;
@@ -35,10 +37,13 @@ interface CoDesignerState {
   applying: boolean;
   /** Results of the last apply, for the chat log. */
   lastApplyResults: ProposalApplyResult[] | null;
+  /** Current values per proposal index (old→new diff), from the dry-run round-trip. */
+  proposalPreview: ProposalPreviewEntry[] | null;
 
   setPendingProposals: (set_: ChangeProposalSet | null) => void;
   setApplying: (applying: boolean) => void;
   setLastApplyResults: (results: ProposalApplyResult[] | null) => void;
+  setProposalPreview: (entries: ProposalPreviewEntry[] | null) => void;
   addMessage: (msg: Omit<IdeatorMessage, 'id' | 'timestamp'>) => void;
   setStatus: (status: IdeatorStatus) => void;
   setError: (error: string | null) => void;
@@ -68,8 +73,10 @@ export const useCoDesignerStore = create<CoDesignerState>((set) => ({
   pendingProposals: null,
   applying: false,
   lastApplyResults: null,
+  proposalPreview: null,
 
-  setPendingProposals: (set_) => set({ pendingProposals: set_ }),
+  setPendingProposals: (set_) => set({ pendingProposals: set_, proposalPreview: null }),
+  setProposalPreview: (entries) => set({ proposalPreview: entries }),
   setApplying: (applying) => set({ applying }),
   setLastApplyResults: (results) => set({ lastApplyResults: results }),
   addMessage: (msg) =>
@@ -102,5 +109,6 @@ export const useCoDesignerStore = create<CoDesignerState>((set) => ({
       pendingProposals: null,
       applying: false,
       lastApplyResults: null,
+      proposalPreview: null,
     }),
 }));

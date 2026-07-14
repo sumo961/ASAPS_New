@@ -11,14 +11,31 @@
 import React, { useMemo, useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 import type { ChangeProposalSet, ChangeProposal } from './types';
+import type { ProposalPreviewEntry } from './coDesignerStore';
 import { describeProposal } from './proposalParsing';
 
 interface ProposalCardProps {
   proposalSet: ChangeProposalSet;
   applying: boolean;
+  /** Current values from the dry-run round-trip (old→new diff); null until it lands. */
+  preview?: ProposalPreviewEntry[] | null;
   onApply: (selected: ChangeProposal[]) => void;
   onDismiss: () => void;
 }
+
+const clip = (s: string, n = 220) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+/** Compact old→new block shown when the dry-run supplied a current value. */
+const OldNew: React.FC<{ current: string; next: string }> = ({ current, next }) => (
+  <span className="block mt-1 space-y-0.5">
+    <span className="block text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-800 border border-red-100 line-through decoration-red-300 break-words">
+      {current.trim() ? clip(current) : '(empty)'}
+    </span>
+    <span className="block text-xs px-1.5 py-0.5 rounded bg-green-50 text-green-800 border border-green-100 break-words">
+      {clip(next)}
+    </span>
+  </span>
+);
 
 function proposalDetail(p: ChangeProposal): string | null {
   switch (p.kind) {
@@ -34,12 +51,17 @@ function proposalDetail(p: ChangeProposal): string | null {
     }
     case 'addNote':
       return `"${p.note.length > 160 ? p.note.slice(0, 157) + '…' : p.note}"`;
+    case 'updateCharacter':
+      return Object.entries(p.updates)
+        .map(([k, v]) => `${k}: ${JSON.stringify(v).slice(0, 80)}`)
+        .join(' · ');
   }
 }
 
 export const ProposalCard: React.FC<ProposalCardProps> = ({
   proposalSet,
   applying,
+  preview,
   onApply,
   onDismiss,
 }) => {
@@ -79,6 +101,15 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
       <div className="mt-2 space-y-1.5">
         {proposalSet.proposals.map((p, i) => {
           const detail = proposalDetail(p);
+          const pv = preview?.find(e => e.index === i);
+          // old→new when the dry-run gave a current value and the proposal
+          // carries a comparable new value.
+          const nextValue =
+            p.kind === 'editText' ? p.newValue :
+            p.kind === 'updateParams' ? JSON.stringify(p.params) :
+            p.kind === 'updateCharacter' ? JSON.stringify(p.updates) :
+            null;
+          const showDiff = pv && pv.current !== null && nextValue !== null;
           return (
             <label
               key={i}
@@ -98,8 +129,13 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
                 {p.kind !== 'addNote' && p.note && (
                   <span className="text-gray-500"> — {p.note}</span>
                 )}
-                {detail && (
+                {showDiff ? (
+                  <OldNew current={pv!.current as string} next={nextValue as string} />
+                ) : detail ? (
                   <span className="block text-xs text-gray-600 mt-0.5 break-words">{detail}</span>
+                ) : null}
+                {pv?.error && (
+                  <span className="block text-xs text-amber-700 mt-0.5">⚠ {pv.error}</span>
                 )}
               </span>
             </label>

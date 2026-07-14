@@ -78,7 +78,8 @@ block in EXACTLY this form:
     { "kind": "editText", "beatId": "beat_12", "param": "text", "newValue": "…", "note": "why" },
     { "kind": "updateParams", "beatId": "beat_7", "params": { "buttonText": "…" }, "note": "why" },
     { "kind": "addBeat", "beatType": "infoText", "name": "…", "parameters": { "text": "…" }, "connectFrom": "beat_3", "connectLabel": "…", "note": "why" },
-    { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" }
+    { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
+    { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" }
   ]
 }
 \`\`\`
@@ -89,6 +90,9 @@ Rules for proposals:
   single text-bearing parameter, 'updateParams' for several at once.
 - Prefer small, reviewable proposals over one giant rewrite. Each proposal
   should stand alone — the author can accept some and reject others.
+- 'updateCharacter' may change displayName, description, or color only —
+  reference the character by the id or name shown in the digest. Unlike beat
+  changes it is NOT undoable; prefer it only for clearly-agreed changes.
 - Use 'addNote' when a change is too big or too subjective to make directly
   (e.g. "rework this scene's tone") — the note lands on the beat for the
   author to act on.

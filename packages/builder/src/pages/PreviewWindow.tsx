@@ -279,6 +279,11 @@ export const PreviewWindow: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [isWaitingToStart, setIsWaitingToStart] = useState(false); // Ready to preview but waiting for user click
   const [startBlockedReason, setStartBlockedReason] = useState<string | null>(null);
+  // Set when the run loop ends on its own (not via Stop/Pause) — used to
+  // show a visible "story ended here" notice instead of a silent stop,
+  // which reads as a dead click on beats with no outgoing connection.
+  const [endedNotice, setEndedNotice] = useState<string | null>(null);
+  const stopRequestedRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -1382,6 +1387,8 @@ export const PreviewWindow: React.FC = () => {
       return;
     }
     setStartBlockedReason(null);
+    setEndedNotice(null);
+    stopRequestedRef.current = false;
 
     try {
       // Stop any previous run and clear renderer
@@ -1823,6 +1830,20 @@ export const PreviewWindow: React.FC = () => {
       console.error('[PreviewWindow] Preview error:', error);
     } finally {
       setIsRunning(false);
+      // The run loop resolving WITHOUT a Stop/Pause request means the story
+      // ended on its own. Ending anywhere but an endScreen is almost always
+      // a dead end the author should know about.
+      if (!stopRequestedRef.current && engineRef.current) {
+        try {
+          const lastId = engineRef.current.getContext().getCurrentBeatId();
+          const lastBeat = lastId ? story?.getBeat(lastId) : null;
+          if (lastBeat && lastBeat.type !== 'endScreen') {
+            setEndedNotice(
+              `Story ended at "${lastBeat.name || lastId}" — this beat has no outgoing connection. Wire it onward in the flowchart (or make it an End Screen).`
+            );
+          }
+        } catch { /* engine already torn down — nothing to report */ }
+      }
     }
   }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);
 
@@ -1867,6 +1888,7 @@ export const PreviewWindow: React.FC = () => {
     }
 
     if (engineRef.current) {
+      stopRequestedRef.current = true;
       const context = engineRef.current.getContext();
       context.getTimerManager().stopAllTimers();
       engineRef.current.stop();
@@ -1885,6 +1907,7 @@ export const PreviewWindow: React.FC = () => {
   // Pause preview
   const pausePreview = useCallback(() => {
     if (engineRef.current && isRunning && !isPaused) {
+      stopRequestedRef.current = true;
       engineRef.current.pause();
       setIsPaused(true);
       setIsRunning(false);
@@ -2725,6 +2748,16 @@ export const PreviewWindow: React.FC = () => {
               {startBlockedReason && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-red-600 text-white text-sm shadow-lg">
                   {startBlockedReason}
+                </div>
+              )}
+              {endedNotice && !isRunning && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-amber-500 text-white text-sm shadow-lg flex items-start gap-2">
+                  <span>{endedNotice}</span>
+                  <button
+                    onClick={() => setEndedNotice(null)}
+                    className="font-bold px-1 hover:opacity-70"
+                    title="Dismiss"
+                  >×</button>
                 </div>
               )}
               {/* Waiting to start overlay - shows when navigated to a beat but not yet started */}

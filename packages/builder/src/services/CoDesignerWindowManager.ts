@@ -24,6 +24,7 @@ type StateChangeCallback = (state: CoDesignerWindowState) => void;
 type ApplyCallback = (proposals: ChangeProposal[], title?: string, projectId?: string) => void;
 type ContextRequestCallback = () => void;
 type BeatContentRequestCallback = (requestId: string, beatId: string) => void;
+type PreviewRequestCallback = (requestId: string, proposals: ChangeProposal[], projectId?: string) => void;
 
 class CoDesignerWindowManager {
   private popoutWindow: Window | null = null;
@@ -32,6 +33,7 @@ class CoDesignerWindowManager {
   private applyListeners = new Set<ApplyCallback>();
   private contextRequestListeners = new Set<ContextRequestCallback>();
   private beatContentListeners = new Set<BeatContentRequestCallback>();
+  private previewListeners = new Set<PreviewRequestCallback>();
   private isElectron: boolean = false;
   private electronWindowOpen: boolean = false;
 
@@ -98,6 +100,17 @@ class CoDesignerWindowManager {
     this.postToWindow({ type: 'BEAT_CONTENT', payload });
   }
 
+  /** App subscribes: the pop-out wants CURRENT values for a proposal batch (old→new diff). */
+  onPreviewRequest(callback: PreviewRequestCallback): () => void {
+    this.previewListeners.add(callback);
+    return () => this.previewListeners.delete(callback);
+  }
+
+  /** Answer a proposal-preview round-trip. */
+  notifyProposalPreview(payload: { requestId: string; entries: Array<{ index: number; current: string | null; error?: string }> }): void {
+    this.postToWindow({ type: 'PROPOSAL_PREVIEW', payload });
+  }
+
   private postToWindow(message: CoDesignerWireMessage): void {
     if (!this.isWindowOpen()) return;
     if (this.isElectron) {
@@ -125,7 +138,7 @@ class CoDesignerWindowManager {
     // Other pop-outs (Preview, Ideator) post to the same main window;
     // capturing on any message poisoned this ref with foreign windows.
     if (
-      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT') &&
+      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT' || message.type === 'PREVIEW_PROPOSALS') &&
       event.source &&
       event.source !== window &&
       this.popoutWindow !== event.source
@@ -146,6 +159,11 @@ class CoDesignerWindowManager {
       const { requestId, beatId } = message.payload || ({} as any);
       if (requestId && beatId) {
         this.beatContentListeners.forEach(cb => cb(requestId, beatId));
+      }
+    } else if (message.type === 'PREVIEW_PROPOSALS') {
+      const { requestId, proposals, projectId } = message.payload || ({} as any);
+      if (requestId && Array.isArray(proposals)) {
+        this.previewListeners.forEach(cb => cb(requestId, proposals, projectId));
       }
     }
   };
@@ -257,6 +275,7 @@ class CoDesignerWindowManager {
     this.applyListeners.clear();
     this.contextRequestListeners.clear();
     this.beatContentListeners.clear();
+    this.previewListeners.clear();
   }
 }
 

@@ -44,6 +44,13 @@ export type ChangeProposal =
       beatId: string;
       /** Design note appended to the beat's notes field (visible in the Inspector). */
       note: string;
+    }
+  | {
+      kind: 'updateCharacter';
+      /** Character id, ref name, or display name as shown in the digest. */
+      characterId: string;
+      updates: { displayName?: string; description?: string; color?: string };
+      note?: string;
     };
 
 export interface ChangeProposalSet {
@@ -82,6 +89,10 @@ export type CoDesignerWireMessage =
   | { type: 'REQUEST_CONTEXT' }
   /** Main → pop-out: a fresh snapshot is in localStorage — re-read it. */
   | { type: 'CONTEXT_UPDATED' }
+  /** Pop-out → main: fetch CURRENT values for a proposal batch (old→new diff). */
+  | { type: 'PREVIEW_PROPOSALS'; payload: { requestId: string; proposals: ChangeProposal[]; projectId?: string } }
+  /** Main → pop-out: current values per proposal index (null = nothing to diff, e.g. addBeat). */
+  | { type: 'PROPOSAL_PREVIEW'; payload: { requestId: string; entries: Array<{ index: number; current: string | null; error?: string }> } }
   /** Pop-out → main: the model wants a beat's FULL content (digest was truncated). */
   | { type: 'GET_BEAT_CONTENT'; payload: { requestId: string; beatId: string } }
   /** Main → pop-out: full serialized content for the requested beat (or an error). */

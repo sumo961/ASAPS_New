@@ -70,6 +70,27 @@ describe('applyChangeProposals', () => {
     });
   });
 
+  it('updateCharacter resolves by id/name/displayName and applies via the callback', () => {
+    const c = ctx();
+    (c as any).characters = [{ id: 'ch1', name: 'elena', displayName: 'Elena' }];
+    (c as any).updateCharacter = vi.fn();
+    const results = applyChangeProposals(
+      [{ kind: 'updateCharacter', characterId: 'Elena', updates: { description: 'darker' } }], c as any);
+    expect((c as any).updateCharacter).toHaveBeenCalledWith('ch1', { description: 'darker' });
+    expect(results[0].ok).toBe(true);
+    expect(results[0].detail).toMatch(/not in undo history/);
+  });
+
+  it('updateCharacter reports unknown characters', () => {
+    const c = ctx();
+    (c as any).characters = [];
+    (c as any).updateCharacter = vi.fn();
+    const results = applyChangeProposals(
+      [{ kind: 'updateCharacter', characterId: 'ghost', updates: { color: '#fff' } }], c as any);
+    expect(results[0].ok).toBe(false);
+    expect(results[0].detail).toMatch(/not found/);
+  });
+
   it('one throwing proposal does not block the rest', () => {
     const c = ctx([{ id: 'b1' }, { id: 'b2', name: 'Ok' }]);
     c.updateBeat

@@ -58,6 +58,29 @@ describe('extractProposalsFromReply', () => {
   });
 });
 
+describe('updateCharacter kind', () => {
+  it('parses valid updates and drops disallowed keys', () => {
+    const r = extractProposalsFromReply(block(JSON.stringify({
+      title: 'Char',
+      proposals: [
+        { kind: 'updateCharacter', characterId: 'elena', updates: { description: 'darker now', id: 'hax', role: 'nope' } },
+      ],
+    })));
+    expect(r.proposalSet?.proposals).toEqual([
+      { kind: 'updateCharacter', characterId: 'elena', updates: { description: 'darker now' }, note: undefined },
+    ]);
+  });
+
+  it('drops updateCharacter with no allowed keys', () => {
+    const r = extractProposalsFromReply(block(JSON.stringify({
+      title: 'Char',
+      proposals: [{ kind: 'updateCharacter', characterId: 'elena', updates: { role: 'villain' } }],
+    })));
+    expect(r.proposalSet).toBe(null);
+    expect(r.droppedCount).toBe(1);
+  });
+});
+
 describe('describeProposal', () => {
   it('produces one-line human summaries', () => {
     expect(describeProposal({ kind: 'editText', beatId: 'b1', param: 'text', newValue: 'x' }))

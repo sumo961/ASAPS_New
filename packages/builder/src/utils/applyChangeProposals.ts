@@ -31,6 +31,10 @@ export interface ApplyContext {
   ) => { id: string } | null;
   /** Connect source → target with an optional label. */
   connectBeats: (sourceId: string, targetId: string, label?: string) => void;
+  /** Live characters for validation (id / ref name / display name). */
+  characters?: Array<{ id?: string; name?: string; displayName?: string }>;
+  /** Character field update (NOT in the undo history — noted in the result). */
+  updateCharacter?: (characterId: string, updates: Record<string, string>) => void;
 }
 
 export function applyChangeProposals(
@@ -103,6 +107,27 @@ export function applyChangeProposals(
             }
           }
           results.push({ index, ok: true, detail: `Added ${p.beatType} "${p.name}" (${newBeat.id})` });
+          return;
+        }
+
+        case 'updateCharacter': {
+          const chars = ctx.characters ?? [];
+          const target = chars.find(
+            c => c.id === p.characterId || c.name === p.characterId || c.displayName === p.characterId
+          );
+          if (!target || !target.id) {
+            results.push({ index, ok: false, detail: `Character "${p.characterId}" not found` });
+            return;
+          }
+          if (!ctx.updateCharacter) {
+            results.push({ index, ok: false, detail: 'Character updates are not available here' });
+            return;
+          }
+          ctx.updateCharacter(target.id, p.updates);
+          results.push({
+            index, ok: true,
+            detail: `Updated ${Object.keys(p.updates).join(', ')} on character ${target.displayName || target.name || target.id} (not in undo history — re-edit in the Character Manager to revert)`,
+          });
           return;
         }
 

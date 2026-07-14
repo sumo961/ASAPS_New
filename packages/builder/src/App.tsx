@@ -5680,6 +5680,54 @@ function App() {
     return unsubscribe;
   }, [writeCoDesignerContext]);
 
+  // Dry-run preview: answer with the CURRENT values of the fields each
+  // proposal touches, so the card can render old→new before Apply.
+  useEffect(() => {
+    const unsubscribe = coDesignerWindowManager.onPreviewRequest((requestId, proposals, snapshotProjectId) => {
+      const stale = !!(snapshotProjectId && currentProject?.id && snapshotProjectId !== currentProject.id);
+      const entries = proposals.map((p: any, index: number) => {
+        if (stale) return { index, current: null, error: 'stale project snapshot' };
+        try {
+          switch (p.kind) {
+            case 'editText': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+              const v = (params as any)[p.param];
+              return { index, current: typeof v === 'string' ? v : v === undefined ? '' : JSON.stringify(v) };
+            }
+            case 'updateParams': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+              const subset: Record<string, unknown> = {};
+              for (const k of Object.keys(p.params || {})) subset[k] = (params as any)[k];
+              return { index, current: JSON.stringify(subset) };
+            }
+            case 'addNote': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              return { index, current: (beat as any).notes || '' };
+            }
+            case 'updateCharacter': {
+              const c = characters.find(ch => ch.id === p.characterId || ch.name === p.characterId || (ch as any).displayName === p.characterId);
+              if (!c) return { index, current: null, error: 'character not found' };
+              const subset: Record<string, unknown> = {};
+              for (const k of Object.keys(p.updates || {})) subset[k] = (c as any)[k];
+              return { index, current: JSON.stringify(subset) };
+            }
+            default:
+              return { index, current: null }; // addBeat — nothing to diff
+          }
+        } catch {
+          return { index, current: null };
+        }
+      });
+      coDesignerWindowManager.notifyProposalPreview({ requestId, entries });
+    });
+    return unsubscribe;
+  }, [state.beats, characters, currentProject?.id]);
+
   // Pop-out's get_beat_content tool: answer with the beat's FULL current
   // content (parameters, notes, connections) so the model never has to
   // reason from a truncated digest entry.
@@ -5794,6 +5842,10 @@ function App() {
         return newBeat;
       },
       connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
+      characters: characters as any,
+      updateCharacter: (characterId, updates) => {
+        setCharacters(prev => prev.map(c => (c.id === characterId ? { ...c, ...updates } : c)));
+      },
     });
     markChanged();
     if (backupName) {
@@ -5804,7 +5856,7 @@ function App() {
     coDesignerWindowManager.notifyApplyResult(results);
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
-  }, [state.beats, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
+  }, [state.beats, characters, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
 
   useEffect(() => {
     const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);

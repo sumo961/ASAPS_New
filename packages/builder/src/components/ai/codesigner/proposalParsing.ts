@@ -17,7 +17,7 @@ import type { ChangeProposal, ChangeProposalSet } from './types';
 
 const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 
-const VALID_KINDS = new Set(['editText', 'updateParams', 'addBeat', 'addNote']);
+const VALID_KINDS = new Set(['editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter']);
 
 function normalizeProposal(raw: any): ChangeProposal | null {
   if (!raw || typeof raw !== 'object' || !VALID_KINDS.has(raw.kind)) return null;
@@ -43,6 +43,15 @@ function normalizeProposal(raw: any): ChangeProposal | null {
     case 'addNote':
       if (typeof raw.beatId !== 'string' || typeof raw.note !== 'string' || !raw.note.trim()) return null;
       return { kind: 'addNote', beatId: raw.beatId, note: raw.note };
+    case 'updateCharacter': {
+      if (typeof raw.characterId !== 'string' || !raw.updates || typeof raw.updates !== 'object') return null;
+      const updates: Record<string, string> = {};
+      for (const key of ['displayName', 'description', 'color'] as const) {
+        if (typeof raw.updates[key] === 'string') updates[key] = raw.updates[key];
+      }
+      if (Object.keys(updates).length === 0) return null;
+      return { kind: 'updateCharacter', characterId: raw.characterId, updates, note: typeof raw.note === 'string' ? raw.note : undefined };
+    }
   }
   return null;
 }
@@ -99,5 +108,7 @@ export function describeProposal(p: ChangeProposal): string {
     }
     case 'addNote':
       return `Add design note to ${p.beatId}`;
+    case 'updateCharacter':
+      return `Update character ${p.characterId} (${Object.keys(p.updates).join(', ')})`;
   }
 }

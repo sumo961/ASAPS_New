@@ -33,6 +33,18 @@ import type { ChangeProposal, CoDesignerWireMessage, ProposalApplyResult } from 
  */
 export const CODESIGNER_CONTEXT_KEY = 'asaps_codesigner_context';
 
+/** Post a wire message to the main builder window (Electron IPC or opener). */
+function postToMain(message: CoDesignerWireMessage): boolean {
+  const electronApi = (window as any).electronAPI?.codesigner;
+  if (electronApi?.sendToMain) {
+    try { electronApi.sendToMain(message); return true; } catch { /* fall through */ }
+  }
+  if (window.opener) {
+    try { window.opener.postMessage(message, window.location.origin); return true; } catch { /* fall through */ }
+  }
+  return false;
+}
+
 function readContextFromStorage(): CoDesignerContext | null {
   try {
     const raw = localStorage.getItem(CODESIGNER_CONTEXT_KEY);
@@ -64,6 +76,7 @@ export function useCoDesigner() {
     context,
     pendingProposals,
     applying,
+    proposalPreview,
     addMessage,
     setStatus,
     setError,
@@ -97,6 +110,10 @@ export function useCoDesigner() {
       if (!message) return;
       if (message.type === 'BEAT_CONTENT') {
         resolveBeatContentReply(message.payload);
+        return;
+      }
+      if (message.type === 'PROPOSAL_PREVIEW') {
+        useCoDesignerStore.getState().setProposalPreview(message.payload?.entries ?? null);
         return;
       }
       if (message.type === 'CONTEXT_UPDATED') {
@@ -151,17 +168,7 @@ export function useCoDesigner() {
    * snapshot when no main window is reachable.
    */
   const refreshContext = useCallback(() => {
-    const message: CoDesignerWireMessage = { type: 'REQUEST_CONTEXT' };
-    const electronApi = (window as any).electronAPI?.codesigner;
-    if (electronApi?.sendToMain) {
-      try { electronApi.sendToMain(message); return; } catch { /* fall through */ }
-    }
-    if (window.opener) {
-      try {
-        window.opener.postMessage(message, window.location.origin);
-        return;
-      } catch { /* fall through */ }
-    }
+    if (postToMain({ type: 'REQUEST_CONTEXT' })) return;
     // Fallback: re-read whatever snapshot is stored.
     const ctx = readContextFromStorage();
     setContext(ctx);
@@ -296,6 +303,17 @@ export function useCoDesigner() {
       if (proposalSet) {
         setPendingProposals(proposalSet);
         setLastApplyResults(null);
+        // Dry-run round-trip: ask the main window for the CURRENT values of
+        // the touched fields so the card can show old→new. Best-effort —
+        // the card renders without diffs until (unless) the reply lands.
+        postToMain({
+          type: 'PREVIEW_PROPOSALS',
+          payload: {
+            requestId: `pv_${Date.now()}`,
+            proposals: proposalSet.proposals,
+            projectId: useCoDesignerStore.getState().context?.projectId,
+          },
+        });
         // Discoverability: the review card sits between the chat and the
         // input box — point at it so the batch isn't overlooked.
         addMessage({
@@ -330,26 +348,10 @@ export function useCoDesigner() {
       },
     };
 
-    const electronApi = (window as any).electronAPI?.codesigner;
-    if (electronApi?.sendToMain) {
-      try {
-        electronApi.sendToMain(message);
-        setApplying(true);
-        return;
-      } catch (err) {
-        setError(`Failed to send changes via Electron IPC: ${err instanceof Error ? err.message : String(err)}`);
-        return;
-      }
-    }
-    if (!window.opener) {
-      setError('Cannot apply: the main builder window is not available. Keep it open while using the Co-Designer.');
-      return;
-    }
-    try {
-      window.opener.postMessage(message, window.location.origin);
+    if (postToMain(message)) {
       setApplying(true);
-    } catch (err) {
-      setError(`Failed to send changes: ${err instanceof Error ? err.message : String(err)}`);
+    } else {
+      setError('Cannot apply: the main builder window is not available. Keep it open while using the Co-Designer.');
     }
   }, [setApplying, setError]);
 
@@ -371,6 +373,7 @@ export function useCoDesigner() {
     context,
     pendingProposals,
     applying,
+    proposalPreview,
     isConfigured,
     sendMessage,
     applyProposals,

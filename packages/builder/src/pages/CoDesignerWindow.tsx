@@ -27,6 +27,7 @@ export const CoDesignerWindow: React.FC = () => {
     context,
     pendingProposals,
     applying,
+    proposalPreview,
     isConfigured,
     sendMessage,
     applyProposals,
@@ -85,6 +86,7 @@ export const CoDesignerWindow: React.FC = () => {
         <ProposalCard
           proposalSet={pendingProposals}
           applying={applying}
+          preview={proposalPreview}
           onApply={applyProposals}
           onDismiss={dismissProposals}
         />
