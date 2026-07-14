@@ -5616,7 +5616,7 @@ function App() {
    * no handshake needed. Reopening (or the window's Refresh button after
    * this handler runs again) picks up the latest story state.
    */
-  const handleOpenCoDesigner = useCallback(() => {
+  const writeCoDesignerContext = useCallback((): boolean => {
     try {
       const digest = buildStoryDigest({
         title: state.title,
@@ -5634,11 +5634,31 @@ function App() {
           capturedAt: Date.now(),
         })
       );
+      return true;
     } catch (err) {
       console.warn('[App] Failed to write Co-Designer context:', err);
+      return false;
     }
-    coDesignerWindowManager.open({ projectTitle: state.title || undefined });
   }, [state.title, state.beats, state.clusters, characters, globalSettings, currentProject?.id]);
+
+  const handleOpenCoDesigner = useCallback(() => {
+    writeCoDesignerContext();
+    const wasOpen = coDesignerWindowManager.isWindowOpen();
+    coDesignerWindowManager.open({ projectTitle: state.title || undefined });
+    // Reopening a named window only changes its hash — no reload happens —
+    // so an already-open pop-out keeps its old store. Push the fresh
+    // snapshot at it explicitly.
+    if (wasOpen) coDesignerWindowManager.notifyContextUpdated();
+  }, [writeCoDesignerContext, state.title]);
+
+  // Pop-out's Refresh button: rebuild the digest from live state and tell
+  // the pop-out to re-read it.
+  useEffect(() => {
+    const unsubscribe = coDesignerWindowManager.onContextRequest(() => {
+      if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
+    });
+    return unsubscribe;
+  }, [writeCoDesignerContext]);
 
   /**
    * Apply Co-Designer proposals against LIVE story state. Every change
@@ -5646,7 +5666,24 @@ function App() {
    * AddBeatCommand), so the author can undo each one; results go back to
    * the pop-out's chat log.
    */
-  const handleCoDesignerApply = useCallback((proposals: import('./components/ai/codesigner/types').ChangeProposal[]) => {
+  const handleCoDesignerApply = useCallback((
+    proposals: import('./components/ai/codesigner/types').ChangeProposal[],
+    _title?: string,
+    snapshotProjectId?: string
+  ) => {
+    // Stale-snapshot guard: the conversation may be grounded in a DIFFERENT
+    // project than the one now open (beat ids collide across projects, so
+    // per-beat validation alone cannot catch this). Refuse the whole batch.
+    if (snapshotProjectId && currentProject?.id && snapshotProjectId !== currentProject.id) {
+      coDesignerWindowManager.notifyApplyResult(
+        proposals.map((_, index) => ({
+          index,
+          ok: false,
+          detail: 'Snapshot is from a different project than the one open in the builder — press the refresh button (↻) and review the proposals again.',
+        }))
+      );
+      return;
+    }
     const results = applyChangeProposals(proposals, {
       beats: state.beats as any,
       updateBeat: (beatId, updates) => handleBeatUpdate(beatId, updates as any),
@@ -5661,7 +5698,9 @@ function App() {
     });
     markChanged();
     coDesignerWindowManager.notifyApplyResult(results);
-  }, [state.beats, actions, handleBeatUpdate, markChanged]);
+    // Keep the conversation's snapshot current with what was just applied.
+    if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
+  }, [state.beats, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext]);
 
   useEffect(() => {
     const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);

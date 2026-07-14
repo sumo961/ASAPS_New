@@ -66,5 +66,19 @@ export interface ProposalApplyResult {
 /** Cross-window messages between the main builder and the Co-Designer pop-out. */
 export type CoDesignerWireMessage =
   | { type: 'PING' }
-  | { type: 'APPLY_PROPOSALS'; payload: { proposals: ChangeProposal[]; title?: string } }
-  | { type: 'APPLY_RESULT'; payload: { results: ProposalApplyResult[] } };
+  | {
+      type: 'APPLY_PROPOSALS';
+      payload: {
+        proposals: ChangeProposal[];
+        title?: string;
+        /** Project the conversation's snapshot came from — the main window
+         *  REFUSES the batch when this doesn't match the open project
+         *  (stale-snapshot safety guard). */
+        projectId?: string;
+      };
+    }
+  | { type: 'APPLY_RESULT'; payload: { results: ProposalApplyResult[] } }
+  /** Pop-out → main: rebuild the digest and rewrite the localStorage snapshot. */
+  | { type: 'REQUEST_CONTEXT' }
+  /** Main → pop-out: a fresh snapshot is in localStorage — re-read it. */
+  | { type: 'CONTEXT_UPDATED' };

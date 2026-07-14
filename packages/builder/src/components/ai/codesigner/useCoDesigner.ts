@@ -88,7 +88,21 @@ export function useCoDesigner() {
   // records what was actually applied.
   useEffect(() => {
     const handleWire = (message: CoDesignerWireMessage | undefined) => {
-      if (!message || message.type !== 'APPLY_RESULT') return;
+      if (!message) return;
+      if (message.type === 'CONTEXT_UPDATED') {
+        // Main window wrote a fresh snapshot (refresh button, menu reopen,
+        // or post-apply) — re-read and tell the author.
+        const ctx = readContextFromStorage();
+        useCoDesignerStore.getState().setContext(ctx);
+        if (ctx) {
+          addMessage({
+            role: 'assistant',
+            content: `(Story snapshot refreshed — now looking at "${ctx.projectTitle || 'your story'}" as of ${new Date(ctx.capturedAt).toLocaleTimeString()}.)`,
+          });
+        }
+        return;
+      }
+      if (message.type !== 'APPLY_RESULT') return;
       const results = message.payload?.results ?? [];
       const store = useCoDesignerStore.getState();
       store.setApplying(false);
@@ -117,14 +131,31 @@ export function useCoDesigner() {
     };
   }, [addMessage, setStatus]);
 
-  /** Re-read the snapshot (the main window rewrites it on demand). */
+  /**
+   * Ask the main window for a FRESH snapshot (it rebuilds the digest from
+   * live state, rewrites localStorage, and answers CONTEXT_UPDATED — the
+   * wire listener above re-reads). Falls back to re-reading the stored
+   * snapshot when no main window is reachable.
+   */
   const refreshContext = useCallback(() => {
+    const message: CoDesignerWireMessage = { type: 'REQUEST_CONTEXT' };
+    const electronApi = (window as any).electronAPI?.codesigner;
+    if (electronApi?.sendToMain) {
+      try { electronApi.sendToMain(message); return; } catch { /* fall through */ }
+    }
+    if (window.opener) {
+      try {
+        window.opener.postMessage(message, window.location.origin);
+        return;
+      } catch { /* fall through */ }
+    }
+    // Fallback: re-read whatever snapshot is stored.
     const ctx = readContextFromStorage();
     setContext(ctx);
     if (ctx) {
       addMessage({
         role: 'assistant',
-        content: `(Story snapshot refreshed — I'm now looking at "${ctx.projectTitle || 'your story'}" as of ${new Date(ctx.capturedAt).toLocaleTimeString()}.)`,
+        content: `(Story snapshot re-read — "${ctx.projectTitle || 'your story'}" as of ${new Date(ctx.capturedAt).toLocaleTimeString()}. Main window not reachable for a live refresh.)`,
       });
     }
   }, [addMessage, setContext]);
@@ -238,11 +269,13 @@ export function useCoDesigner() {
    */
   const applyProposals = useCallback((selected: ChangeProposal[]) => {
     if (selected.length === 0) return;
+    const storeState = useCoDesignerStore.getState();
     const message: CoDesignerWireMessage = {
       type: 'APPLY_PROPOSALS',
       payload: {
         proposals: selected,
-        title: useCoDesignerStore.getState().pendingProposals?.title,
+        title: storeState.pendingProposals?.title,
+        projectId: storeState.context?.projectId,
       },
     };
 

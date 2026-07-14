@@ -21,13 +21,15 @@ export interface CoDesignerWindowState {
 }
 
 type StateChangeCallback = (state: CoDesignerWindowState) => void;
-type ApplyCallback = (proposals: ChangeProposal[], title?: string) => void;
+type ApplyCallback = (proposals: ChangeProposal[], title?: string, projectId?: string) => void;
+type ContextRequestCallback = () => void;
 
 class CoDesignerWindowManager {
   private popoutWindow: Window | null = null;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<StateChangeCallback>();
   private applyListeners = new Set<ApplyCallback>();
+  private contextRequestListeners = new Set<ContextRequestCallback>();
   private isElectron: boolean = false;
   private electronWindowOpen: boolean = false;
 
@@ -72,6 +74,17 @@ class CoDesignerWindowManager {
     this.postToWindow({ type: 'APPLY_RESULT', payload: { results } });
   }
 
+  /** App subscribes: the pop-out asked for a fresh story snapshot. */
+  onContextRequest(callback: ContextRequestCallback): () => void {
+    this.contextRequestListeners.add(callback);
+    return () => this.contextRequestListeners.delete(callback);
+  }
+
+  /** Tell the pop-out a fresh snapshot has been written to localStorage. */
+  notifyContextUpdated(): void {
+    this.postToWindow({ type: 'CONTEXT_UPDATED' });
+  }
+
   private postToWindow(message: CoDesignerWireMessage): void {
     if (!this.isWindowOpen()) return;
     if (this.isElectron) {
@@ -107,8 +120,12 @@ class CoDesignerWindowManager {
     if (message.type === 'APPLY_PROPOSALS') {
       const proposals = message.payload?.proposals;
       if (Array.isArray(proposals) && proposals.length > 0) {
-        this.applyListeners.forEach(cb => cb(proposals, message.payload?.title));
+        this.applyListeners.forEach(cb =>
+          cb(proposals, message.payload?.title, message.payload?.projectId)
+        );
       }
+    } else if (message.type === 'REQUEST_CONTEXT') {
+      this.contextRequestListeners.forEach(cb => cb());
     }
   };
 
@@ -217,6 +234,7 @@ class CoDesignerWindowManager {
     this.close();
     this.listeners.clear();
     this.applyListeners.clear();
+    this.contextRequestListeners.clear();
   }
 }
 

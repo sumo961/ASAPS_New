@@ -96,7 +96,13 @@ function connectionLines(beat: DigestBeat): string {
  */
 export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOptions = {}): string {
   const maxChars = options.maxChars ?? 36_000;
-  const snippetChars = options.snippetChars ?? 180;
+  // Size-aware default: small stories can afford (nearly) full beat text —
+  // truncated snippets made the model warn authors to "swap in your real
+  // text" even on 3-beat projects. Big stories keep tight snippets and the
+  // overall budget still applies either way.
+  const beatCount = input.beats.length;
+  const defaultSnippet = beatCount <= 20 ? 1500 : beatCount <= 60 ? 450 : 180;
+  const snippetChars = options.snippetChars ?? defaultSnippet;
 
   const lines: string[] = [];
   lines.push(`STORY: "${input.title || 'Untitled'}"`);
@@ -143,6 +149,9 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
 
   // Budgeting: if over, first shrink snippets, then truncate the beat list.
   let digest = [...lines, ...beatLines].join('\n');
+  if (digest.length > maxChars && snippetChars > 180) {
+    return buildStoryDigest(input, { ...options, snippetChars: 180 });
+  }
   if (digest.length > maxChars && snippetChars > 60) {
     return buildStoryDigest(input, { ...options, snippetChars: 60 });
   }
