@@ -70,22 +70,23 @@ describe('buildStoryDigest', () => {
     expect(digest).toMatch(/\+\d+ more beats omitted/);
   });
 
-  it('small stories carry (nearly) full beat text instead of tight snippets', () => {
-    const longText = 'A'.repeat(1200);
+  it('carries FULL beat text by default (recommendations must not rest on truncated snippets)', () => {
+    const longText = 'A'.repeat(3000);
     const digest = buildStoryDigest({
-      beats: [beat({ parameters: { text: longText } })], // 1 beat → generous snippet
+      beats: [beat({ parameters: { text: longText } })],
     });
-    expect(digest).toContain(longText); // not truncated at the old 180 default
+    expect(digest).toContain(longText);
   });
 
-  it('large stories keep tight snippets', () => {
-    const longText = 'B'.repeat(1200);
-    const beats = Array.from({ length: 80 }, (_, i) =>
+  it('degrades to tiered snippets only when the overall budget overflows', () => {
+    const longText = 'B'.repeat(3000);
+    const beats = Array.from({ length: 100 }, (_, i) =>
       beat({ id: `b${i}`, parameters: { text: longText } })
     );
-    const digest = buildStoryDigest({ beats }, { maxChars: 200000 });
+    const digest = buildStoryDigest({ beats }, { maxChars: 60000 });
+    expect(digest.length).toBeLessThanOrEqual(60000);
     expect(digest).not.toContain(longText);
-    expect(digest).toContain('B'.repeat(180) + '…');
+    expect(digest).toContain('…'); // truncation is marked for the model
   });
 
   it('never throws on hostile beats', () => {

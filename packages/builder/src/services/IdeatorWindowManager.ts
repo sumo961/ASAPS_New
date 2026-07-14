@@ -200,13 +200,13 @@ class IdeatorWindowManager {
     const message = event.data as IdeatorWireMessage;
     if (!message || typeof message.type !== 'string') return;
 
-    // Recover the pop-out reference from event.source whenever it arrives.
-    // Critical if the main builder was hard-reloaded between opening the
-    // Ideator and the pop-out posting back: our ideatorWindow ref was
-    // wiped during the reload, but the pop-out still holds window.opener
-    // and can reach us. Capturing event.source restores the back-channel
-    // so notifyGenerationComplete / notifyGenerationFailed can land.
+    // Recover the pop-out reference from event.source — but ONLY for
+    // messages that are unambiguously the Ideator's own. Several pop-outs
+    // (Preview, Co-Designer) post to the same main window and 'PING' is a
+    // shared type; capturing on any message poisoned this ref with the
+    // PREVIEW window, after which open() would focus the wrong window.
     if (
+      message.type === 'SUBMIT_REQUEST' &&
       event.source &&
       event.source !== window &&
       this.ideatorWindow !== event.source

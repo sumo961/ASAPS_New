@@ -34,6 +34,7 @@ import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from '
 import { deserializeBeats } from './utils/projectDeserializer';
 import { cloneBeatsForDuplicate } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
+import { v4 as uuidv4 } from 'uuid';
 import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, normalizeStory, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
@@ -5666,7 +5667,47 @@ function App() {
    * AddBeatCommand), so the author can undo each one; results go back to
    * the pop-out's chat log.
    */
-  const handleCoDesignerApply = useCallback((
+  /**
+   * Safety net for Co-Designer applies: once per project per day, snapshot
+   * the last-saved project state as a library copy before the first batch
+   * lands. Undo covers the live session; the copy covers everything undo
+   * doesn't (reloads, autosave overwriting history). Skipped when the
+   * project is under VCS — git/perforce history is strictly better.
+   * Failures never block the apply (the copy is best-effort).
+   */
+  const backupBeforeCoDesignerApply = useCallback(async (): Promise<string | null> => {
+    const projectId = currentProject?.id;
+    if (!projectId) return null;
+    if (vcsCtx && vcsCtx.type !== 'none') return null; // VCS covers this better
+    const today = new Date().toISOString().slice(0, 10);
+    const markerKey = `asaps_codesigner_backup_${projectId}`;
+    try {
+      if (localStorage.getItem(markerKey) === today) return null; // already backed up today
+    } catch { /* ignore */ }
+    try {
+      const storage = getStorageManager();
+      const res = await storage.getProject(projectId);
+      if (!res.success || !res.data) return null;
+      const src = res.data as any;
+      const copy = {
+        ...src,
+        id: uuidv4(),
+        name: `${src.name ?? 'Project'} (before Co-Designer ${today})`,
+        createdAt: new Date(),
+        modifiedAt: new Date(),
+      };
+      const save = await storage.createProject(copy);
+      if (!save.success) return null;
+      try { localStorage.setItem(markerKey, today); } catch { /* ignore */ }
+      console.log('[App] Co-Designer backup created:', copy.name);
+      return copy.name as string;
+    } catch (err) {
+      console.warn('[App] Co-Designer backup failed (apply continues):', err);
+      return null;
+    }
+  }, [currentProject?.id, vcsCtx]);
+
+  const handleCoDesignerApply = useCallback(async (
     proposals: import('./components/ai/codesigner/types').ChangeProposal[],
     _title?: string,
     snapshotProjectId?: string
@@ -5684,6 +5725,7 @@ function App() {
       );
       return;
     }
+    const backupName = await backupBeforeCoDesignerApply();
     const results = applyChangeProposals(proposals, {
       beats: state.beats as any,
       updateBeat: (beatId, updates) => handleBeatUpdate(beatId, updates as any),
@@ -5697,10 +5739,15 @@ function App() {
       connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
     });
     markChanged();
+    if (backupName) {
+      // Surface the backup in the pop-out's result log (the index isn't
+      // displayed, so -1 renders as an ordinary line).
+      results.unshift({ index: -1, ok: true, detail: `Backup copy saved to your library: "${backupName}"` });
+    }
     coDesignerWindowManager.notifyApplyResult(results);
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
-  }, [state.beats, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext]);
+  }, [state.beats, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
 
   useEffect(() => {
     const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);

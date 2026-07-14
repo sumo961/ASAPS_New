@@ -38,9 +38,9 @@ export interface StoryDigestInput {
 }
 
 export interface StoryDigestOptions {
-  /** Hard character budget for the digest text (default 36000 ≈ 9k tokens). */
+  /** Hard character budget for the digest text (default 240000 ≈ 60k tokens). */
   maxChars?: number;
-  /** Per-beat text snippet length (default 180 chars). */
+  /** Per-beat text snippet length (default 4000 — effectively full text). */
   snippetChars?: number;
 }
 
@@ -95,14 +95,15 @@ function connectionLines(beat: DigestBeat): string {
  * listed by id/type only.
  */
 export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOptions = {}): string {
-  const maxChars = options.maxChars ?? 36_000;
-  // Size-aware default: small stories can afford (nearly) full beat text —
-  // truncated snippets made the model warn authors to "swap in your real
-  // text" even on 3-beat projects. Big stories keep tight snippets and the
-  // overall budget still applies either way.
-  const beatCount = input.beats.length;
-  const defaultSnippet = beatCount <= 20 ? 1500 : beatCount <= 60 ? 450 : 180;
-  const snippetChars = options.snippetChars ?? defaultSnippet;
+  // Full text by default: recommendations grounded in truncated snippets
+  // are worse than paying input tokens, and modern models take 200k+ token
+  // contexts. The 240k-char budget (~60k tokens) accommodates virtually
+  // every real project at FULL text; only genuinely huge stories degrade
+  // through the tiered-snippet fallbacks below. Callers can still lower
+  // both knobs. The system prompt (and thus the digest) is resent each
+  // turn — provider prompt caching keeps repeat cost manageable.
+  const maxChars = options.maxChars ?? 240_000;
+  const snippetChars = options.snippetChars ?? 4000;
 
   const lines: string[] = [];
   lines.push(`STORY: "${input.title || 'Untitled'}"`);
@@ -149,11 +150,10 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
 
   // Budgeting: if over, first shrink snippets, then truncate the beat list.
   let digest = [...lines, ...beatLines].join('\n');
-  if (digest.length > maxChars && snippetChars > 180) {
-    return buildStoryDigest(input, { ...options, snippetChars: 180 });
-  }
-  if (digest.length > maxChars && snippetChars > 60) {
-    return buildStoryDigest(input, { ...options, snippetChars: 60 });
+  for (const tier of [1500, 450, 180, 60]) {
+    if (digest.length > maxChars && snippetChars > tier) {
+      return buildStoryDigest(input, { ...options, snippetChars: tier });
+    }
   }
   if (digest.length > maxChars) {
     const kept: string[] = [];

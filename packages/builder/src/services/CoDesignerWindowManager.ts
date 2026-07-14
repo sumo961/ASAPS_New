@@ -108,8 +108,11 @@ class CoDesignerWindowManager {
     if (!message || typeof message.type !== 'string') return;
 
     // Recover the pop-out reference from event.source (survives a main-
-    // window reload — same trick as the Ideator manager).
+    // window reload) — ONLY for the Co-Designer's own message types.
+    // Other pop-outs (Preview, Ideator) post to the same main window;
+    // capturing on any message poisoned this ref with foreign windows.
     if (
+      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT') &&
       event.source &&
       event.source !== window &&
       this.popoutWindow !== event.source

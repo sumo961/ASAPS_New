@@ -108,11 +108,14 @@ export function useCoDesigner() {
       store.setApplying(false);
       store.setLastApplyResults(results);
       store.setPendingProposals(null);
-      const okCount = results.filter(r => r.ok).length;
+      // index -1 entries are informational (e.g. the backup-copy line) and
+      // don't count toward the applied-changes tally.
+      const real = results.filter(r => r.index >= 0);
+      const okCount = real.filter(r => r.ok).length;
       const lines = results.map(r => `${r.ok ? '✓' : '✗'} ${r.detail}`).join('\n');
       addMessage({
         role: 'assistant',
-        content: `(Applied ${okCount} of ${results.length} change${results.length === 1 ? '' : 's'} in the main window — every change is undoable there.)\n${lines}`,
+        content: `(Applied ${okCount} of ${real.length} change${real.length === 1 ? '' : 's'} in the main window — every change is undoable there.)\n${lines}`,
       });
       setStatus('interviewing');
     };
@@ -251,6 +254,12 @@ export function useCoDesigner() {
       if (proposalSet) {
         setPendingProposals(proposalSet);
         setLastApplyResults(null);
+        // Discoverability: the review card sits between the chat and the
+        // input box — point at it so the batch isn't overlooked.
+        addMessage({
+          role: 'assistant',
+          content: `(${proposalSet.proposals.length} proposed change${proposalSet.proposals.length === 1 ? '' : 's'} waiting in the review card below ⬇ — tick the ones you want and press Apply. Nothing changes until you do.)`,
+        });
         if (droppedCount > 0) {
           console.warn(`[CoDesigner] ${droppedCount} malformed proposal(s) dropped`);
         }
