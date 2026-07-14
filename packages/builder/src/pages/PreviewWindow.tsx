@@ -278,6 +278,7 @@ export const PreviewWindow: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isWaitingToStart, setIsWaitingToStart] = useState(false); // Ready to preview but waiting for user click
+  const [startBlockedReason, setStartBlockedReason] = useState<string | null>(null);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -1364,7 +1365,23 @@ export const PreviewWindow: React.FC = () => {
   // Start preview (startPaused = true means pause after showing the first beat)
   // overridePreset allows passing a preset directly (bypasses React state timing issues)
   const startPreview = useCallback(async (overrideBeatId?: string, startPaused: boolean = true, overridePreset?: StatePreset | null) => {
-    if (!engineRef.current || !rendererRef.current || !story || !previewData) return;
+    if (!engineRef.current || !rendererRef.current || !story || !previewData) {
+      // Previously a SILENT early-return — clicking "Click to preview…"
+      // did nothing when an init race left the engine unready. Name the
+      // missing piece so the author sees why instead of a dead click.
+      const missing = [
+        !engineRef.current && 'engine',
+        !rendererRef.current && 'renderer',
+        !story && 'story',
+        !previewData && 'preview data',
+      ].filter(Boolean).join(', ');
+      console.error('[PreviewWindow] startPreview blocked — not ready:', missing);
+      setStartBlockedReason(
+        `Preview isn't ready yet (${missing} still initializing). Wait a moment and click again — if this persists, close and reopen the preview window.`
+      );
+      return;
+    }
+    setStartBlockedReason(null);
 
     try {
       // Stop any previous run and clear renderer
@@ -2705,6 +2722,11 @@ export const PreviewWindow: React.FC = () => {
                   </div>
                 );
               })()}
+              {startBlockedReason && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-red-600 text-white text-sm shadow-lg">
+                  {startBlockedReason}
+                </div>
+              )}
               {/* Waiting to start overlay - shows when navigated to a beat but not yet started */}
               {isWaitingToStart && (
                 <div

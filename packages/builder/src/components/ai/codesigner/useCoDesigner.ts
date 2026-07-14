@@ -18,6 +18,12 @@ import {
   saveSession,
 } from './coDesignerSessionStore';
 import { extractProposalsFromReply, describeProposal } from './proposalParsing';
+import {
+  GET_BEAT_CONTENT_TOOL_NAME,
+  fetchBeatContent,
+  getBeatContentToolSpec,
+  resolveBeatContentReply,
+} from './beatContentTool';
 import type { ChangeProposal, CoDesignerWireMessage, ProposalApplyResult } from './types';
 
 /**
@@ -67,7 +73,7 @@ export function useCoDesigner() {
     setLastApplyResults,
     reset,
   } = useCoDesignerStore();
-  const { isConfigured, generateConversationTurn } = useAI();
+  const { isConfigured, currentProvider, generateConversationTurn, generateChatWithTools } = useAI();
 
   const seededRef = useRef(false);
 
@@ -89,6 +95,10 @@ export function useCoDesigner() {
   useEffect(() => {
     const handleWire = (message: CoDesignerWireMessage | undefined) => {
       if (!message) return;
+      if (message.type === 'BEAT_CONTENT') {
+        resolveBeatContentReply(message.payload);
+        return;
+      }
       if (message.type === 'CONTEXT_UPDATED') {
         // Main window wrote a fresh snapshot (refresh button, menu reopen,
         // or post-apply) — re-read and tell the author.
@@ -234,15 +244,47 @@ export function useCoDesigner() {
         transcript.shift();
       }
 
-      const systemPrompt = buildCoDesignerSystemPrompt(state.context);
+      // Tool-calling providers get the get_beat_content tool so truncated
+      // digest entries can be expanded on demand (crucial for big stories
+      // where the digest could not carry full text). Others fall back to
+      // the plain conversation turn — the prompt then steers the model to
+      // ask the author instead of editing blind.
+      const useTools = currentProvider === 'claude' || currentProvider === 'openai';
+      const systemPrompt = buildCoDesignerSystemPrompt(state.context, { beatContentToolAvailable: useTools });
 
-      const result = await generateConversationTurn({
-        systemPrompt,
-        messages: transcript,
-        // Concrete design advice with options runs longer than interview
-        // turns; reasoning models also need headroom on top.
-        maxTokens: 4000,
-      });
+      let result: { text: string } | null = null;
+      if (useTools) {
+        try {
+          result = await generateChatWithTools({
+            systemPrompt,
+            messages: transcript,
+            tools: [getBeatContentToolSpec],
+            executeTool: async (name: string, input: any) => {
+              if (name !== GET_BEAT_CONTENT_TOOL_NAME) return `Unknown tool: ${name}`;
+              const beatId = String(input?.beatId ?? '');
+              addMessage({
+                role: 'assistant',
+                content: '',
+                kind: 'tool_use',
+                toolMeta: { type: 'get_beat_content', query: beatId, resultCount: 1 },
+              });
+              return fetchBeatContent(beatId);
+            },
+          });
+        } catch (err) {
+          console.warn('[CoDesigner] Tool path failed, falling back to plain turn:', err);
+          result = null;
+        }
+      }
+      if (result?.text == null) {
+        result = await generateConversationTurn({
+          systemPrompt,
+          messages: transcript,
+          // Concrete design advice with options runs longer than interview
+          // turns; reasoning models also need headroom on top.
+          maxTokens: 4000,
+        });
+      }
 
       if (result?.text == null) {
         setStatus('interviewing');

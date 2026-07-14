@@ -28,7 +28,7 @@ export type IdeatorRole = 'user' | 'assistant';
  * rendered inline as a chip; filtered out when building the LLM transcript.
  */
 export interface IdeatorToolMeta {
-  type: 'web_search';
+  type: 'web_search' | 'get_beat_content';
   query: string;
   resultCount: number;
 }

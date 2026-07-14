@@ -5661,6 +5661,44 @@ function App() {
     return unsubscribe;
   }, [writeCoDesignerContext]);
 
+  // Pop-out's get_beat_content tool: answer with the beat's FULL current
+  // content (parameters, notes, connections) so the model never has to
+  // reason from a truncated digest entry.
+  useEffect(() => {
+    const unsubscribe = coDesignerWindowManager.onBeatContentRequest((requestId, beatId) => {
+      const beat = state.beats.find(b => b.id === beatId);
+      if (!beat) {
+        coDesignerWindowManager.notifyBeatContent({
+          requestId, beatId,
+          error: 'beat not found in the open story (deleted or renamed?)',
+        });
+        return;
+      }
+      try {
+        const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+        const connections = typeof beat.getConnections === 'function'
+          ? beat.getConnections().map((c: any) => ({ targetId: c.targetId, label: c.label }))
+          : [];
+        const content = JSON.stringify({
+          id: beat.id,
+          type: beat.type,
+          name: beat.name,
+          parameters: params,
+          notes: (beat as any).notes || undefined,
+          connections,
+          defaultTarget: beat.defaultTarget || undefined,
+        }, null, 2);
+        coDesignerWindowManager.notifyBeatContent({ requestId, beatId, content });
+      } catch (err) {
+        coDesignerWindowManager.notifyBeatContent({
+          requestId, beatId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    });
+    return unsubscribe;
+  }, [state.beats]);
+
   /**
    * Apply Co-Designer proposals against LIVE story state. Every change
    * routes through the existing undoable handlers (UpdateBeatCommand /

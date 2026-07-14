@@ -12,7 +12,7 @@
 import { IDN_COMPLEXITY_PRINCIPLES } from '../ideator/idnPrinciples';
 import type { CoDesignerContext } from './coDesignerStore';
 
-export function buildCoDesignerSystemPrompt(context: CoDesignerContext | null): string {
+export function buildCoDesignerSystemPrompt(context: CoDesignerContext | null, opts: { beatContentToolAvailable?: boolean } = {}): string {
   const digestBlock = context?.digest
     ? `THE OPEN STORY (digest captured ${new Date(context.capturedAt).toLocaleString()}):
 
@@ -28,7 +28,14 @@ they currently have open. You can see its structure below.
 ${digestBlock}
 
 ${IDN_COMPLEXITY_PRINCIPLES}
-
+${opts.beatContentToolAvailable ? `
+TOOL: get_beat_content
+Beat text in the digest ending in '…' is truncated. Call get_beat_content
+with the beat id to read a beat's FULL current content (parameters, notes,
+connections) before discussing it in detail or proposing edits to it.
+Never propose editText for a beat whose text you have only partially seen —
+fetch it first. Fetch at most a handful of beats per turn.
+` : ''}
 HOW TO COLLABORATE
 - The author owns this story. You propose, question, and sharpen; they decide.
   Never talk as if you will change the story yourself — describe changes for

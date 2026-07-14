@@ -81,4 +81,8 @@ export type CoDesignerWireMessage =
   /** Pop-out → main: rebuild the digest and rewrite the localStorage snapshot. */
   | { type: 'REQUEST_CONTEXT' }
   /** Main → pop-out: a fresh snapshot is in localStorage — re-read it. */
-  | { type: 'CONTEXT_UPDATED' };
+  | { type: 'CONTEXT_UPDATED' }
+  /** Pop-out → main: the model wants a beat's FULL content (digest was truncated). */
+  | { type: 'GET_BEAT_CONTENT'; payload: { requestId: string; beatId: string } }
+  /** Main → pop-out: full serialized content for the requested beat (or an error). */
+  | { type: 'BEAT_CONTENT'; payload: { requestId: string; beatId: string; content?: string; error?: string } };

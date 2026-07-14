@@ -56,7 +56,19 @@ export const IdeatorChat: React.FC<IdeatorChatProps> = ({ messages, status }) =>
  */
 const ToolUseChip: React.FC<{ message: IdeatorMessage }> = ({ message }) => {
   const meta = message.toolMeta;
-  if (!meta || meta.type !== 'web_search') return null;
+  if (!meta) return null;
+  if (meta.type === 'get_beat_content') {
+    return (
+      <div className="flex items-center gap-2 pl-10 text-xs text-gray-600">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800">
+          <Search className="w-3 h-3" />
+          <span className="font-medium">Read full beat:</span>
+          <span className="italic">{meta.query}</span>
+        </div>
+      </div>
+    );
+  }
+  if (meta.type !== 'web_search') return null;
   return (
     <div className="flex items-center gap-2 pl-10 text-xs text-gray-600">
       <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-800">

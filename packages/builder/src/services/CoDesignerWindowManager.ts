@@ -23,6 +23,7 @@ export interface CoDesignerWindowState {
 type StateChangeCallback = (state: CoDesignerWindowState) => void;
 type ApplyCallback = (proposals: ChangeProposal[], title?: string, projectId?: string) => void;
 type ContextRequestCallback = () => void;
+type BeatContentRequestCallback = (requestId: string, beatId: string) => void;
 
 class CoDesignerWindowManager {
   private popoutWindow: Window | null = null;
@@ -30,6 +31,7 @@ class CoDesignerWindowManager {
   private listeners = new Set<StateChangeCallback>();
   private applyListeners = new Set<ApplyCallback>();
   private contextRequestListeners = new Set<ContextRequestCallback>();
+  private beatContentListeners = new Set<BeatContentRequestCallback>();
   private isElectron: boolean = false;
   private electronWindowOpen: boolean = false;
 
@@ -85,6 +87,17 @@ class CoDesignerWindowManager {
     this.postToWindow({ type: 'CONTEXT_UPDATED' });
   }
 
+  /** App subscribes: the pop-out's get_beat_content tool wants full beat data. */
+  onBeatContentRequest(callback: BeatContentRequestCallback): () => void {
+    this.beatContentListeners.add(callback);
+    return () => this.beatContentListeners.delete(callback);
+  }
+
+  /** Answer a get_beat_content round-trip. */
+  notifyBeatContent(payload: { requestId: string; beatId: string; content?: string; error?: string }): void {
+    this.postToWindow({ type: 'BEAT_CONTENT', payload });
+  }
+
   private postToWindow(message: CoDesignerWireMessage): void {
     if (!this.isWindowOpen()) return;
     if (this.isElectron) {
@@ -112,7 +125,7 @@ class CoDesignerWindowManager {
     // Other pop-outs (Preview, Ideator) post to the same main window;
     // capturing on any message poisoned this ref with foreign windows.
     if (
-      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT') &&
+      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT') &&
       event.source &&
       event.source !== window &&
       this.popoutWindow !== event.source
@@ -129,6 +142,11 @@ class CoDesignerWindowManager {
       }
     } else if (message.type === 'REQUEST_CONTEXT') {
       this.contextRequestListeners.forEach(cb => cb());
+    } else if (message.type === 'GET_BEAT_CONTENT') {
+      const { requestId, beatId } = message.payload || ({} as any);
+      if (requestId && beatId) {
+        this.beatContentListeners.forEach(cb => cb(requestId, beatId));
+      }
     }
   };
 
@@ -238,6 +256,7 @@ class CoDesignerWindowManager {
     this.listeners.clear();
     this.applyListeners.clear();
     this.contextRequestListeners.clear();
+    this.beatContentListeners.clear();
   }
 }
 
