@@ -22,19 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.75** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.75 introduces the Co-Designer**
-(AI menu → "Design with Co-Designer"): the Ideator's design-phase
-counterpart — a chat collaborator grounded in the story you have OPEN.
-It reads your full story (plus a knowledge-graph-derived structural summary
-with state dependencies and flow warnings), discusses concrete options, and
-on request produces reviewable change proposals you accept per item — never
-auto-applied, always undoable, with an automatic library backup before the
-first apply of the day. Also: cross-window fixes (an open Preview could
-hijack the Ideator/Co-Designer buttons) and preview start failures are now
-visible instead of silent. This follows v0.9.74's transformation-command and
-beat-suggestion repairs. Users on v0.9.74 will auto-update. For what shipped
-when, see:
+Current release: **v0.9.76** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.76 responds to the Södertörn
+University expert review**: the UI now states the scope and outcome of
+actions that used to be ambiguous — AI Suggestions is now "Suggest Next
+Beat" (it creates a new beat; it never edits the selected one), adding an
+emotion visibly focuses the new entry and the palette names its project-wide
+scope, translation actions are labeled AI vs Manual with the language search
+at the top, and deleting a character names it. Three reported HIGH bugs were
+resolved: loading an AI-generated story now asks before replacing a
+non-empty workspace (the old project always survived in the library — the
+swap just looked like deletion), the dead "+ Add" on AI-generated Movement
+Choice beats is fixed (duplicate choice ids), and deleted beats no longer
+leave orphaned spatial-cluster positions. This follows v0.9.75's
+Co-Designer. Users on v0.9.75 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

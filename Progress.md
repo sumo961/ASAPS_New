@@ -1,5 +1,51 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-15: Stakeholder-report response — scope clarity + three HIGH bugs resolved (v0.9.76)
+
+### Overview
+
+Direct response to the Södertörn University expert review (17 findings) and social-worker focus group. The review's best cross-cutting observation — *"the system does not always communicate the scope or outcome of an action"* — drives this release: five friction findings fixed (AI Suggestions scope, emotion-add feedback, character delete wording, AI-vs-manual translation paths, language search placement), plus a bounded reproduction pass on the review's three HIGH bugs: one confirmed and guarded (AI generation silently replacing the workspace), one root-caused and fixed (dead Add button on AI-generated Movement Choice beats — duplicate choice ids), one verified as already-solved with an adjacent leak fixed (ghost beats in Unclustered Beats). Several other findings were already addressed before the report arrived: multi-select shipped in v0.9.73, and the "Ideator can't see my project" request is the Co-Designer (v0.9.75).
+
+### Communicate scope and outcome (findings 4, 5, 6, 8, 13)
+
+- **AI Suggestions renamed to "Suggest Next Beat"** with an explicit hint ("Proposes new beats to follow ‹beat› — the selected beat itself is not changed") and button "Suggest Next Beats". Authors expected suggestions to rewrite the selected beat; the feature always created a *next* beat — now the UI says so.
+- **Emotion palette**: clicking "Add emotion" now scrolls to the new row, focuses it, and selects the placeholder name — visible even in a long, scrolled list. The header now states the palette is **project-wide** (available to all characters), which was the report's real confusion about "where emotions attach".
+- **Character delete confirmation names the character** ("Remove character \"Elena\"?…") and states the consequence for beats that reference it. (Card-body click-to-edit and delete confirmation already existed — the report evaluated a version predating them.)
+- **Translation actions labeled**: the sparkle/pen icon pair in "Add Translation" now reads **AI** / **Manual** with a legend ("AI translates for you" / "Manual — you write the text").
+- **Language search moved to the top** of the Add Translation menu, always visible, auto-focused on open; the full language list shows until you type.
+
+**Files modified:**
+- `packages/builder/src/components/ai/BeatSuggestions.tsx`, `packages/builder/src/components/Inspector.tsx`
+- `packages/builder/src/components/characters/{EmotionPaletteEditor,CharacterManager}.tsx`
+- `packages/builder/src/components/translation/LanguageSelector.tsx`
+
+### HIGH bug 1 (confirmed + fixed): generated stories replaced the workspace without warning
+
+`handleStoryGenerated` unconditionally cleared the workspace before loading a generated story. The old project survives in the Project Library — which is exactly why reporters observed "closing and reopening restores expected behaviour" — but mid-session the swap read as *"the AI deleted my manually added beats"*. Loading a generated story into a non-empty workspace now asks first, naming the beat count and where the current project remains.
+
+**Files modified:**
+- `packages/builder/src/App.tsx`
+
+### HIGH bug 3 (root-caused + fixed): dead Add button on AI-generated Movement Choice beats
+
+Not the suspected parameter-shape mismatch (AI and inspector both use `choices`). The real cause: AI normalization derived missing choice ids from choice *text*, so two choices with identical text got identical ids → duplicate React keys and id/index desync in the inspector, making Add/edit/remove appear to do nothing on precisely those beats. AI-normalized ids are now guaranteed unique per beat, and the inspector's row key is collision-proof.
+
+**Files modified:**
+- `packages/builder/src/services/AIService.ts`, `packages/builder/src/components/Inspector.tsx`
+
+### HIGH bug 2 (version-stale, adjacent leak fixed): ghost beats in Unclustered Beats
+
+The Unclustered Beats sidebar derives live from the beats store (`useMemo` over `beats`), so deleted beats cannot linger there in current builds. The investigation did surface a real orphan: `deleteBeat` never pruned spatial-cluster `containerBeatPositions`, leaving stale entries for deleted beats until reload — now cleaned up in the same state update.
+
+**Files modified:**
+- `packages/builder/src/hooks/useStoryBuilder.ts`
+
+### Verification
+
+All 2267 builder tests green (143 files); TypeScript clean. UI changes verified live against the running dev app via chrome-devtools (suggestion panel labels, emotion add focus/scroll, translation menu structure, search filter + auto-focus).
+
+---
+
 ## 2026-07-14: The Co-Designer — an AI collaborator for your existing story (v0.9.75)
 
 ### Overview
