@@ -9,7 +9,7 @@
  * CharacterAffectPanel.
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from '@asaps/core';
 
 export interface EmotionPaletteEditorProps {
@@ -34,11 +34,25 @@ export const EmotionPaletteEditor: React.FC<EmotionPaletteEditorProps> = ({
     onChange(next);
   };
 
+  /** Index of a just-added emotion: its name input grabs focus + scrolls into
+   *  view on mount so the addition is visible even in a long, scrolled list. */
+  const focusIndexRef = useRef<number | null>(null);
+
   const add = () => {
+    focusIndexRef.current = palette.length;
     onChange([
       ...palette,
       { name: 'newEmotion', weightToValence: 0, weightToArousal: 0, decayRate: 0.2 },
     ]);
+  };
+
+  const focusNewRow = (el: HTMLInputElement | null, index: number) => {
+    if (el && focusIndexRef.current === index) {
+      focusIndexRef.current = null;
+      el.focus();
+      el.select();
+      el.scrollIntoView?.({ block: 'nearest' });
+    }
   };
 
   const resetToDefault = () => {
@@ -54,7 +68,8 @@ export const EmotionPaletteEditor: React.FC<EmotionPaletteEditorProps> = ({
         <div>
           <h2 className="text-base font-semibold">Emotion palette</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Defines the emotions characters can feel and how each one nudges mood when fired.
+            Project-wide palette: defines the emotions available to <em>all</em> characters in this
+            project and how each one nudges mood when fired.
           </p>
         </div>
         {onClose && (
@@ -121,6 +136,7 @@ export const EmotionPaletteEditor: React.FC<EmotionPaletteEditorProps> = ({
                 {/* Name */}
                 <div>
                   <input
+                    ref={(el) => focusNewRow(el, i)}
                     type="text"
                     value={emotion.name}
                     onChange={(e) => update(i, { name: e.target.value })}

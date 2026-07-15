@@ -304,6 +304,9 @@ export function useStoryBuilder() {
       connections: prev.connections.filter(
         conn => conn.source !== beatId && conn.target !== beatId
       ),
+      containerBeatPositions: prev.containerBeatPositions.filter(
+        pos => pos.beatId !== beatId
+      ),
     }));
   }, []);
 

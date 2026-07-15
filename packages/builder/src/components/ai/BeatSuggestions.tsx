@@ -103,13 +103,14 @@ export const BeatSuggestions: React.FC<BeatSuggestionsProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-purple-600" />
-          <h3 className="font-semibold text-gray-900">AI Suggestions</h3>
+          <h3 className="font-semibold text-gray-900">Suggest Next Beat</h3>
         </div>
 
         {!isExpanded && (
           <button
             onClick={handleGenerateSuggestions}
             disabled={isGenerating}
+            title={`Suggest new beats to follow "${currentBeat.name || 'this beat'}"`}
             className="px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isGenerating ? (
@@ -120,12 +121,19 @@ export const BeatSuggestions: React.FC<BeatSuggestionsProps> = ({
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                Get Suggestions
+                Suggest Next Beats
               </>
             )}
           </button>
         )}
       </div>
+
+      {/* Scope hint — suggestions create NEW beats after this one */}
+      <p className="text-xs text-gray-500 -mt-1">
+        Proposes new beats to follow{' '}
+        <span className="font-medium text-gray-700">{currentBeat.name || 'this beat'}</span> — the
+        selected beat itself is not changed.
+      </p>
 
       {/* Error */}
       {error && (
@@ -229,6 +237,7 @@ const SuggestionCard: React.FC<{
 
         <button
           onClick={onAdd}
+          title="Creates a new beat after the selected one and connects them"
           className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-1.5 text-sm flex-shrink-0"
         >
           <Plus className="w-4 h-4" />

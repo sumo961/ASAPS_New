@@ -3919,7 +3919,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       
                       {localBeat.parameters?.choices?.map((choice: ChoiceWithCounter, index: number) => (
                         <div
-                          key={choice.id}
+                          key={`${choice.id ?? 'choice'}_${index}`}
                           onPointerEnter={() => dispatchChoiceHover(choice.id)}
                           onPointerLeave={() => dispatchChoiceHover(null)}
                           className={`p-3 rounded-lg space-y-2 mb-2 transition-colors ${

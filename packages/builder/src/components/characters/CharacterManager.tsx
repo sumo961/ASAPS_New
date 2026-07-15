@@ -270,8 +270,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   };
 
   const handleCharacterRemove = (id: string) => {
-    if (confirm('Are you sure you want to remove this character?')) {
-     // onCharactersChange(characters.filter(c => c.id !== id));
+    const target = characters.find((c: Character) => c.id === id);
+    const label = target ? `"${target.displayName || target.name}"` : 'this character';
+    if (confirm(`Remove character ${label}?\n\nBeats that reference it as a speaker keep the name but lose the character's settings.`)) {
       onCharactersChange(characters.filter((c: Character) => c.id !== id));
       if (selectedCharacter?.id === id) {
         selectCharacter(null);

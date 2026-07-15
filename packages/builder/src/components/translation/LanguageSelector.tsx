@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Type, Play, Trash2 } from 'lucide-react';
+import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Play, Trash2 } from 'lucide-react';
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
 
 /**
@@ -240,7 +240,6 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const [customSearch, setCustomSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const customSearchRef = useRef<HTMLInputElement>(null);
@@ -251,7 +250,6 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
         setShowAddMenu(false);
-        setShowCustomInput(false);
         setCustomSearch('');
       }
     };
@@ -386,7 +384,11 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           {/* Add translation */}
           <div className="border-t border-gray-100">
             <button
-              onClick={() => setShowAddMenu(!showAddMenu)}
+              onClick={() => {
+                const opening = !showAddMenu;
+                setShowAddMenu(opening);
+                if (opening) setTimeout(() => customSearchRef.current?.focus(), 50);
+              }}
               className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50"
             >
               <Plus className="w-4 h-4" />
@@ -397,7 +399,27 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           {/* Add translation sub-menu */}
           {showAddMenu && (
             <div className="border-t border-gray-100 max-h-60 overflow-y-auto">
-              {availableLanguages.map(lang => (
+              {/* Search first — the fastest path to a specific language */}
+              <div className="px-3 pt-2 pb-1 sticky top-0 bg-white">
+                <input
+                  ref={customSearchRef}
+                  type="text"
+                  value={customSearch}
+                  onChange={(e) => setCustomSearch(e.target.value)}
+                  placeholder="Search languages… e.g. Swahili, Dagaare (dga), dga"
+                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <div className="pt-1 text-[10px] text-gray-400 flex items-center gap-3">
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-blue-500" /> AI translates for you
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <PenLine className="w-3 h-3 text-green-600" /> Manual — you write the text
+                  </span>
+                </div>
+              </div>
+
+              {!customSearch.trim() && availableLanguages.map(lang => (
                 <div
                   key={lang.code}
                   className="px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-gray-50"
@@ -409,10 +431,11 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                       setShowAddMenu(false);
                       setShowDropdown(false);
                     }}
-                    className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                    className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
                     title="Generate AI translation"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
+                    AI
                   </button>
                   <button
                     onClick={() => {
@@ -420,132 +443,110 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                       setShowAddMenu(false);
                       setShowDropdown(false);
                     }}
-                    className="p-1 rounded hover:bg-green-100 text-green-600"
-                    title="Create for manual translation"
+                    className="px-1.5 py-0.5 rounded hover:bg-green-100 text-green-600 flex items-center gap-1 text-xs"
+                    title="Create an empty translation you fill in yourself"
                   >
                     <PenLine className="w-3.5 h-3.5" />
+                    Manual
                   </button>
                 </div>
               ))}
 
-              {/* Search / custom language option */}
-              <div className="border-t border-gray-100">
-                {!showCustomInput ? (
-                  <button
-                    onClick={() => {
-                      setShowCustomInput(true);
-                      setCustomSearch('');
-                      setTimeout(() => customSearchRef.current?.focus(), 50);
-                    }}
-                    className="w-full px-3 py-1.5 text-sm flex items-center gap-2 text-gray-500 hover:bg-gray-50"
-                  >
-                    <Type className="w-3.5 h-3.5" />
-                    <span>Search languages...</span>
-                  </button>
-                ) : (
-                  <div className="px-3 py-2 space-y-1">
-                    <input
-                      ref={customSearchRef}
-                      type="text"
-                      value={customSearch}
-                      onChange={(e) => setCustomSearch(e.target.value)}
-                      placeholder="e.g. Swahili, Dagaare (dga), dga"
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    />
-                    {/* Suggestions */}
-                    {customSearch.trim() && (() => {
-                      const suggestions = getLanguageSuggestions(customSearch, existingCodes, sourceLanguage);
-                      if (suggestions.length === 0) {
-                        // No match — offer custom code entry
-                        const trimmed = customSearch.trim();
-                        const custom = parseCustomLanguage(trimmed);
-                        return (
-                          <div className="py-1 space-y-1">
-                            <div className="text-xs text-gray-400 italic">
-                              No matching language in the built-in list.
-                            </div>
-                            {custom && !existingCodes.has(custom.code) ? (
-                              <div className="py-1 text-sm flex items-center gap-2 hover:bg-gray-50 rounded">
-                                <span className="flex-1 text-gray-700">
-                                  {custom.name}
-                                  <span className="text-xs text-gray-400 ml-1">({custom.code})</span>
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    onGenerateTranslation(custom.code, custom.name);
-                                    setShowAddMenu(false);
-                                    setShowDropdown(false);
-                                    setShowCustomInput(false);
-                                    setCustomSearch('');
-                                  }}
-                                  className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                                  title="Generate AI translation"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    onCreateManualTranslation(custom.code, custom.name);
-                                    setShowAddMenu(false);
-                                    setShowDropdown(false);
-                                    setShowCustomInput(false);
-                                    setCustomSearch('');
-                                  }}
-                                  className="p-1 rounded hover:bg-green-100 text-green-600"
-                                  title="Create for manual translation"
-                                >
-                                  <PenLine className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="text-xs text-gray-500">
-                                Type a name and code, e.g. "Dagaare (dga)" or "dga:Dagaare"
-                              </div>
-                            )}
+              {/* Search results / custom language code */}
+              {customSearch.trim() && (
+                <div className="px-3 py-2 space-y-1">
+                  {(() => {
+                    const suggestions = getLanguageSuggestions(customSearch, existingCodes, sourceLanguage);
+                    if (suggestions.length === 0) {
+                      // No match — offer custom code entry
+                      const trimmed = customSearch.trim();
+                      const custom = parseCustomLanguage(trimmed);
+                      return (
+                        <div className="py-1 space-y-1">
+                          <div className="text-xs text-gray-400 italic">
+                            No matching language in the built-in list.
                           </div>
-                        );
-                      }
-                      return suggestions.map(lang => (
-                        <div
-                          key={lang.code}
-                          className="py-1 text-sm flex items-center gap-2 hover:bg-gray-50 rounded"
-                        >
-                          <span className="flex-1 text-gray-700">
-                            {lang.name}
-                            <span className="text-xs text-gray-400 ml-1">({lang.code})</span>
-                          </span>
-                          <button
-                            onClick={() => {
-                              onGenerateTranslation(lang.code, lang.name);
-                              setShowAddMenu(false);
-                              setShowDropdown(false);
-                              setShowCustomInput(false);
-                              setCustomSearch('');
-                            }}
-                            className="p-1 rounded hover:bg-blue-100 text-blue-600"
-                            title="Generate AI translation"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              onCreateManualTranslation(lang.code, lang.name);
-                              setShowAddMenu(false);
-                              setShowDropdown(false);
-                              setShowCustomInput(false);
-                              setCustomSearch('');
-                            }}
-                            className="p-1 rounded hover:bg-green-100 text-green-600"
-                            title="Create for manual translation"
-                          >
-                            <PenLine className="w-3.5 h-3.5" />
-                          </button>
+                          {custom && !existingCodes.has(custom.code) ? (
+                            <div className="py-1 text-sm flex items-center gap-2 hover:bg-gray-50 rounded">
+                              <span className="flex-1 text-gray-700">
+                                {custom.name}
+                                <span className="text-xs text-gray-400 ml-1">({custom.code})</span>
+                              </span>
+                              <button
+                                onClick={() => {
+                                  onGenerateTranslation(custom.code, custom.name);
+                                  setShowAddMenu(false);
+                                  setShowDropdown(false);
+                                  setCustomSearch('');
+                                }}
+                                className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
+                                title="Generate AI translation"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                AI
+                              </button>
+                              <button
+                                onClick={() => {
+                                  onCreateManualTranslation(custom.code, custom.name);
+                                  setShowAddMenu(false);
+                                  setShowDropdown(false);
+                                  setCustomSearch('');
+                                }}
+                                className="px-1.5 py-0.5 rounded hover:bg-green-100 text-green-600 flex items-center gap-1 text-xs"
+                                title="Create an empty translation you fill in yourself"
+                              >
+                                <PenLine className="w-3.5 h-3.5" />
+                                Manual
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-500">
+                              Type a name and code, e.g. "Dagaare (dga)" or "dga:Dagaare"
+                            </div>
+                          )}
                         </div>
-                      ));
-                    })()}
-                  </div>
-                )}
-              </div>
+                      );
+                    }
+                    return suggestions.map(lang => (
+                      <div
+                        key={lang.code}
+                        className="py-1 text-sm flex items-center gap-2 hover:bg-gray-50 rounded"
+                      >
+                        <span className="flex-1 text-gray-700">
+                          {lang.name}
+                          <span className="text-xs text-gray-400 ml-1">({lang.code})</span>
+                        </span>
+                        <button
+                          onClick={() => {
+                            onGenerateTranslation(lang.code, lang.name);
+                            setShowAddMenu(false);
+                            setShowDropdown(false);
+                            setCustomSearch('');
+                          }}
+                          className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
+                          title="Generate AI translation"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          AI
+                        </button>
+                        <button
+                          onClick={() => {
+                            onCreateManualTranslation(lang.code, lang.name);
+                            setShowAddMenu(false);
+                            setShowDropdown(false);
+                            setCustomSearch('');
+                          }}
+                          className="px-1.5 py-0.5 rounded hover:bg-green-100 text-green-600 flex items-center gap-1 text-xs"
+                          title="Create an empty translation you fill in yourself"
+                        >
+                          <PenLine className="w-3.5 h-3.5" />
+                          Manual
+                        </button>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </div>

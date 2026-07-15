@@ -5156,6 +5156,24 @@ function App() {
     const storyTitle = story.metadata?.title || 'Generated Story';
     console.log('[App] Story generated:', storyTitle);
 
+    // Guard (stakeholder-report finding 1): loading a generated story swaps
+    // out the ENTIRE workspace. The old project stays in the library, but
+    // without warning authors read the swap as "the AI deleted my beats".
+    // Ask before replacing a non-empty workspace.
+    const existingBeatCount = beatsRef.current.length;
+    if (existingBeatCount > 0) {
+      const ok = window.confirm(
+        `Load the generated story "${storyTitle}" now?\n\n` +
+        `This replaces the current workspace (${existingBeatCount} beat${existingBeatCount === 1 ? '' : 's'}) ` +
+        `with the generated story as a new project.\n` +
+        `Your current project is kept in the Project Library.`
+      );
+      if (!ok) {
+        console.log('[App] Generated story discarded — user kept the current workspace');
+        return;
+      }
+    }
+
     // CRITICAL: Pause auto-save immediately to prevent the AI-generated beats
     // from being written to the current directory project. Auto-save will be
     // resumed after the new project is created (see createProject below).

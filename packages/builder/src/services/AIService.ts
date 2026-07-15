@@ -776,18 +776,29 @@ export class AIService {
       }
     }
 
-    // Normalize MovementChoice - ensure choices have id fields
+    // Normalize MovementChoice - ensure choices have UNIQUE id fields.
+    // Text-derived ids collide when two choices share the same text, which
+    // desyncs the inspector's id-keyed rendering from its index-based edits
+    // (duplicate React keys → edits/adds appear to not take).
     if (beat.type === 'movementChoice') {
       const params = transformed.parameters;
       if (params.choices && Array.isArray(params.choices)) {
+        const seenIds = new Set<string>();
         params.choices = params.choices.map((choice: any, index: number) => {
-          if (!choice.id) {
+          let id: string | undefined = choice.id;
+          if (!id) {
             // Generate id from text or use index
-            const generatedId = choice.text
+            id = choice.text
               ? `choice_${choice.text.toLowerCase().replace(/[^a-z0-9]+/g, '_').substring(0, 20)}`
               : `choice_${index}`;
-            console.log(`[AIService] Generated id "${generatedId}" for movementChoice choice in beat ${beat.id}`);
-            return { ...choice, id: generatedId };
+          }
+          if (seenIds.has(id)) {
+            id = `${id}_${index}`;
+          }
+          seenIds.add(id);
+          if (id !== choice.id) {
+            console.log(`[AIService] Assigned id "${id}" to movementChoice choice in beat ${beat.id}`);
+            return { ...choice, id };
           }
           return choice;
         });
