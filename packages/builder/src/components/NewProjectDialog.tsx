@@ -11,8 +11,10 @@
  */
 
 import React, { useState } from 'react';
-import { X, Folder } from 'lucide-react';
+import { X, Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import { useProject } from '../contexts/PersistenceContext';
+import { COMMON_LANGUAGES } from '../utils/languageCatalog';
+import { CultureSettingFields, cultureIsSet, type CultureValue } from './settings/CultureSettingFields';
 
 export interface NewProjectDialogProps {
   /** Called when dialog should close */
@@ -41,6 +43,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
   const [description, setDescription] = useState('');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('responsive');
   const [orientation, setOrientation] = useState<OrientationPolicy>('flexible');
+  const [language, setLanguage] = useState('en');
+  const [showCulture, setShowCulture] = useState(false);
+  const [culture, setCulture] = useState<CultureValue>({});
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +88,26 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
           // toggling back is non-destructive.
           orientation,
         },
+        // Story language (finding 14): drives translation source language
+        // and exported TTS. Also editable later in Settings → Translation.
+        translation: {
+          ...(existing.translation ?? {}),
+          sourceLanguage: language,
+        },
+        // Declaring a cultural setting IS the Knowledge-Graph opt-in: the
+        // culture object only has meaning through the KG pipeline, so filling
+        // it enables the per-project flag (resolves the "toggle lives inside
+        // the project you haven't created yet" catch-22). Left empty, both
+        // stay untouched.
+        ...(cultureIsSet(culture)
+          ? {
+              culture,
+              features: {
+                ...(existing.features ?? {}),
+                showKnowledgeGraph: true,
+              },
+            }
+          : {}),
       };
       await updateGlobalSettings(nextSettings as any);
 
@@ -165,6 +190,64 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
               disabled={creating}
               maxLength={500}
             />
+          </div>
+
+          {/* Story language (finding 14) — the field always existed in
+              Settings → Translation but was effectively invisible there.
+              Declaring it up front configures translation + exported TTS. */}
+          <div>
+            <label htmlFor="project-language" className="block text-sm font-medium text-gray-700 mb-1">
+              Story Language
+            </label>
+            <select
+              id="project-language"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              disabled={creating}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="en">English (en)</option>
+              {COMMON_LANGUAGES.map(lang => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name} ({lang.code})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">
+              The language you write the story in — used for translations and
+              text-to-speech. Change later in Settings → Translation.
+            </p>
+          </div>
+
+          {/* Cultural setting (optional, collapsed) — filling it opts the
+              project into the Knowledge Graph feature. */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowCulture(v => !v)}
+              disabled={creating}
+              className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+            >
+              {showCulture ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              Cultural setting
+              <span className="text-gray-400 text-xs font-normal">(optional)</span>
+              {!showCulture && cultureIsSet(culture) && (
+                <span className="text-xs font-normal text-rose-600 ml-1">
+                  {culture.label || culture.region || 'set'}
+                </span>
+              )}
+            </button>
+            {showCulture && (
+              <div className="mt-2 p-3 bg-rose-50 rounded-lg border border-rose-200">
+                <p className="text-[11px] text-gray-600 mb-2">
+                  The culture your story is set in — independent of its language
+                  (e.g. English language · New Zealand culture). Setting this
+                  enables the <strong>Knowledge Graph</strong> view for the
+                  project, which drives cultural extraction and adaptation.
+                </p>
+                <CultureSettingFields value={culture} onChange={setCulture} disabled={creating} />
+              </div>
+            )}
           </div>
 
           {/* Phase 2.5 — Layout mode picker. This is the one authoring

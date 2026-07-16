@@ -25,6 +25,9 @@ import type { TranslationAIConfig } from '../export/StoryTranslator';
 import { loadNotoFonts } from '../utils/fontRegistry';
 
 export interface TranslationState {
+  /** Source (authoring) language of the project — BCP-47, default 'en'.
+   *  Synced from globalSettings.translation.sourceLanguage by the App. */
+  sourceLanguage: string;
   /** Currently active language code, or null for source */
   activeLanguage: string | null;
   /** All loaded translation resources */
@@ -42,6 +45,8 @@ export interface TranslationState {
 }
 
 export interface TranslationActions {
+  /** Set the project's source (authoring) language — drives the manifest + selector label */
+  setSourceLanguage: (languageCode: string) => void;
   /** Switch active language */
   setActiveLanguage: (languageCode: string | null) => void;
   /** Generate an AI translation for a language */
@@ -84,6 +89,7 @@ export interface TranslationActions {
 }
 
 const TranslationStateContext = createContext<TranslationState>({
+  sourceLanguage: 'en',
   activeLanguage: null,
   translations: [],
   manifest: createEmptyTranslationManifest('en'),
@@ -94,6 +100,7 @@ const TranslationStateContext = createContext<TranslationState>({
 });
 
 const TranslationActionsContext = createContext<TranslationActions>({
+  setSourceLanguage: () => {},
   setActiveLanguage: () => {},
   generateTranslation: async () => {},
   createManualTranslation: () => {},
@@ -123,9 +130,12 @@ interface TranslationProviderProps {
 }
 
 export const TranslationProvider: React.FC<TranslationProviderProps> = ({
-  sourceLanguage = 'en',
+  sourceLanguage: sourceLanguageProp = 'en',
   children,
 }) => {
+  // Runtime-settable source language (the provider mounts above the App,
+  // which owns globalSettings — the App pushes the project's language in).
+  const [sourceLanguage, setSourceLanguage] = useState(sourceLanguageProp);
   const [activeLanguage, setActiveLanguageRaw] = useState<string | null>(null);
   const [translations, setTranslations] = useState<TranslationResource[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -506,6 +516,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   }, []);
 
   const state: TranslationState = {
+    sourceLanguage,
     activeLanguage,
     translations,
     manifest,
@@ -516,6 +527,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
   };
 
   const actions: TranslationActions = useMemo(() => ({
+    setSourceLanguage,
     setActiveLanguage,
     generateTranslation,
     createManualTranslation: handleCreateManualTranslation,

@@ -21,6 +21,7 @@ import { useTTS } from '../hooks/useTTS';
 import { getTTSService } from '../services/tts';
 import { useSTT } from '../hooks/useSTT';
 import { getSTTService } from '../services/stt';
+import { getLanguageDisplayName } from '../utils/languageCatalog';
 
 interface HeaderProps {
   title: string;
@@ -913,8 +914,8 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Language Selector */}
           <LanguageSelector
-            sourceLanguage="en"
-            sourceLanguageName="English"
+            sourceLanguage={translationState.sourceLanguage}
+            sourceLanguageName={getLanguageDisplayName(translationState.sourceLanguage)}
             activeLanguage={translationState.activeLanguage}
             translations={translationState.translations}
             manifest={translationState.manifest}

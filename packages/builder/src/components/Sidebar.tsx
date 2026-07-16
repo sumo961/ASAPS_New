@@ -37,7 +37,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [expandedClusters, setExpandedClusters] = React.useState<Set<string>>(new Set());
-  const [clusterRatio, setClusterRatio] = useState(50); // Percentage of space for clusters
+  // Percentage of space for clusters; persisted so the divider position
+  // survives reloads (finding 9: vertical resize felt broken when it reset).
+  const [clusterRatio, setClusterRatio] = useState(() => {
+    const stored = localStorage.getItem('asaps-sidebar-cluster-ratio');
+    const parsed = stored ? parseFloat(stored) : NaN;
+    return Number.isFinite(parsed) ? Math.min(80, Math.max(20, parsed)) : 50;
+  });
   const dividerContainerRef = useRef<HTMLDivElement>(null);
 
   // Resizable divider between clusters and unclustered beats
@@ -60,6 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      setClusterRatio(current => {
+        localStorage.setItem('asaps-sidebar-cluster-ratio', String(current));
+        return current;
+      });
     };
 
     document.addEventListener('mousemove', onMouseMove);

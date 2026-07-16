@@ -5,11 +5,12 @@ import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
 import RenpyThemeImporter from './RenpyThemeImporter';
 import type { RenpyConversionResult } from '@asaps/core';
-import { REFERENCE_CULTURE_PROFILES } from '@asaps/core';
+import { CultureSettingFields } from './CultureSettingFields';
 import { getThemeService } from '../../services/ThemeService';
 import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
 import { MissingAssetsDialog } from './MissingAssetsDialog';
 import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
+import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 
 interface GlobalSettings {
   project: {
@@ -3584,25 +3585,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     className="w-full px-3 py-2 border rounded"
                   >
                     <option value="en">English (en)</option>
-                    <option value="de">German (de)</option>
-                    <option value="fr">French (fr)</option>
-                    <option value="es">Spanish (es)</option>
-                    <option value="it">Italian (it)</option>
-                    <option value="pt">Portuguese (pt)</option>
-                    <option value="nl">Dutch (nl)</option>
-                    <option value="ja">Japanese (ja)</option>
-                    <option value="zh">Chinese (zh)</option>
-                    <option value="ko">Korean (ko)</option>
-                    <option value="ar">Arabic (ar)</option>
-                    <option value="he">Hebrew (he)</option>
-                    <option value="ru">Russian (ru)</option>
-                    <option value="pl">Polish (pl)</option>
-                    <option value="tr">Turkish (tr)</option>
-                    <option value="sv">Swedish (sv)</option>
-                    <option value="da">Danish (da)</option>
-                    <option value="fi">Finnish (fi)</option>
-                    <option value="nb">Norwegian (nb)</option>
-                    <option value="mt">Maltese (mt)</option>
+                    {COMMON_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name} ({lang.code})
+                      </option>
+                    ))}
+                    {/* Keep a legacy 'zh' selection readable even though the
+                        catalog uses zh-Hans/zh-Hant */}
+                    {settings.translation?.sourceLanguage === 'zh' && (
+                      <option value="zh">Chinese (zh)</option>
+                    )}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
                     The language your story is authored in. Translation resources will be
@@ -3618,52 +3610,13 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       (e.g. English language · New Zealand culture). Drives the Knowledge Graph's
                       cultural extraction and adaptation.
                     </p>
-                    <label className="block text-xs text-gray-600 mb-1">Reference profile</label>
-                    <select
-                      value={settings.culture?.profileId ?? 'custom'}
-                      onChange={(e) => {
-                        const ref = REFERENCE_CULTURE_PROFILES.find((p) => p.id === e.target.value);
-                        setSettings((prev) => ({
-                          ...prev,
-                          culture: ref
-                            ? { profileId: ref.id, label: ref.label, region: ref.region, language: prev.culture?.language }
-                            : { ...prev.culture, profileId: undefined },
-                        }));
+                    <CultureSettingFields
+                      value={settings.culture}
+                      onChange={(next) => {
+                        setSettings((prev) => ({ ...prev, culture: next }));
                         setHasChanges(true);
                       }}
-                      className="w-full px-3 py-2 border rounded mb-2 text-sm"
-                    >
-                      <option value="custom">Custom…</option>
-                      {REFERENCE_CULTURE_PROFILES.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="space-y-2">
-                      <input
-                        placeholder="Culture / country (e.g. Sweden, Sri Lanka, New Zealand)"
-                        value={settings.culture?.label ?? ''}
-                        onChange={(e) => handleChange('culture', 'label', e.target.value)}
-                        className="w-full px-3 py-2 border rounded text-sm"
-                      />
-                      <input
-                        placeholder="Region or ethnicity (e.g. Tamil, Karnataka, Bavaria)"
-                        value={settings.culture?.region ?? ''}
-                        onChange={(e) => handleChange('culture', 'region', e.target.value)}
-                        className="w-full px-3 py-2 border rounded text-sm"
-                      />
-                      <input
-                        placeholder="Associated language (informational, e.g. Tamil, Kannada)"
-                        value={settings.culture?.language ?? ''}
-                        onChange={(e) => handleChange('culture', 'language', e.target.value)}
-                        className="w-full px-3 py-2 border rounded text-sm"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Region or ethnicity refines the culture <em>within</em> it — a sub-national
-                      region or an ethnic group (e.g. Tamil within Sri Lanka), not a country.
-                    </p>
+                    />
                   </div>
                 )}
 

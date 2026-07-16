@@ -380,6 +380,11 @@ function App() {
   const translationActionsRef = useRef(translationActions);
   translationActionsRef.current = translationActions;
 
+  // Keep the TranslationProvider's source language in sync with the project
+  // setting (globalSettings.translation.sourceLanguage). The provider mounts
+  // above the App in main.tsx, so it can't read globalSettings itself.
+  // (Effect lives below globalSettings' declaration; see the useEffect near it.)
+
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -684,6 +689,14 @@ function App() {
   // Update globalSettingsRef whenever globalSettings changes
   useEffect(() => {
     globalSettingsRef.current = globalSettings;
+  }, [globalSettings]);
+
+  // Sync the project's source language into the TranslationProvider (it
+  // mounts above the App and can't read globalSettings itself). Drives the
+  // Header language-selector label and the translation manifest.
+  useEffect(() => {
+    const lang = (globalSettings as any).translation?.sourceLanguage || 'en';
+    translationActionsRef.current?.setSourceLanguage(lang);
   }, [globalSettings]);
 
   // Persistence hooks

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds } from '@asaps/core';
-import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck } from 'lucide-react';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
@@ -160,6 +160,10 @@ interface InspectorProps {
 const MIN_INSPECTOR_WIDTH = 280;
 const DEFAULT_INSPECTOR_WIDTH = 320;
 const INSPECTOR_WIDTH_STORAGE_KEY = 'asaps-inspector-width';
+// Vertical resize of the AI-suggestions footer (report finding 9: workspace
+// areas could not be resized vertically). null = natural (auto) height.
+const MIN_SUGGESTIONS_HEIGHT = 44;
+const SUGGESTIONS_HEIGHT_STORAGE_KEY = 'asaps-inspector-suggestions-height';
 
 export const Inspector: React.FC<InspectorProps> = ({
   storyTitle,
@@ -286,6 +290,54 @@ export const Inspector: React.FC<InspectorProps> = ({
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing, maxWidth, onWidthChange, externalWidth, internalWidth]);
+
+  // Vertical resize of the AI-suggestions area in the fixed footer: dragging
+  // the divider down reclaims space for the properties column, dragging up
+  // expands the suggestions. null = auto height; double-click resets.
+  const [suggestionsHeight, setSuggestionsHeight] = useState<number | null>(() => {
+    const stored = localStorage.getItem(SUGGESTIONS_HEIGHT_STORAGE_KEY);
+    return stored ? parseInt(stored, 10) : null;
+  });
+  const suggestionsAreaRef = useRef<HTMLDivElement>(null);
+  const suggestionsDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  const handleSuggestionsResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const area = suggestionsAreaRef.current;
+    if (!area) return;
+    suggestionsDragRef.current = { startY: e.clientY, startHeight: area.offsetHeight };
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      const drag = suggestionsDragRef.current;
+      if (!drag) return;
+      const maxHeight = Math.round(window.innerHeight * 0.6);
+      const next = Math.min(
+        maxHeight,
+        Math.max(MIN_SUGGESTIONS_HEIGHT, drag.startHeight + (drag.startY - ev.clientY))
+      );
+      setSuggestionsHeight(next);
+    };
+    const handleMouseUp = () => {
+      suggestionsDragRef.current = null;
+      setSuggestionsHeight(current => {
+        if (current != null) localStorage.setItem(SUGGESTIONS_HEIGHT_STORAGE_KEY, String(current));
+        return current;
+      });
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  const resetSuggestionsHeight = useCallback(() => {
+    setSuggestionsHeight(null);
+    localStorage.removeItem(SUGGESTIONS_HEIGHT_STORAGE_KEY);
+  }, []);
+
+  // Expanded dialog editor (finding 10): the same DialogTreeEditor rendered
+  // in a large modal instead of the narrow inspector column.
+  const [dialogEditorExpanded, setDialogEditorExpanded] = useState(false);
 
   // Get available counters, variables, and inventory items for dropdowns.
   // These are the declared sets (from characters + globalSettings).
@@ -1576,6 +1628,34 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Dynamic width for visual editor
   const useVisualEditorWidth = activeTab === 'visual' && supportsVisualEditor(beat.type);
+
+  // One render path for both dialog-editor placements (inspector column and
+  // the finding-10 expanded modal) so the prop list can't drift.
+  const renderDialogTreeEditor = (expanded: boolean) => (
+    <DialogTreeEditor
+      expanded={expanded}
+      dialogTree={localBeat.parameters?.dialogTree || {
+        id: 'root',
+        speaker: 'Character',
+        text: 'Hello...',
+        emotion: 'neutral'
+      }}
+      onChange={handleDialogTreeChange}
+      characters={getAvailableCharacters()}
+      characterObjects={characters}
+      allBeats={availableTargets}
+      beatHasAuthorLocations={beatHasAuthorLocations}
+      projectIsResponsive={projectIsResponsive}
+      counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
+      variables={availableVariables.map(v => v.name)}
+      availableCounters={availableCounters}
+      availableVariables={availableVariables}
+      speakerNameResolver={speakerNameResolver}
+      availableInventoryItems={availableInventoryItems}
+      onDefineAsCharacter={onDefineAsCharacter}
+      emotionPalette={emotionPalette}
+    />
+  );
 
   return (
     <>
@@ -3504,28 +3584,19 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {/* Dialog Tree Editor */}
                 {beat.type === 'dialogTree' && (
                   <div className="space-y-3">
-                    <DialogTreeEditor
-                      dialogTree={localBeat.parameters?.dialogTree || {
-                        id: 'root',
-                        speaker: 'Character',
-                        text: 'Hello...',
-                        emotion: 'neutral'
-                      }}
-                      onChange={handleDialogTreeChange}
-                      characters={getAvailableCharacters()}
-                      characterObjects={characters}
-                      allBeats={availableTargets}
-                      beatHasAuthorLocations={beatHasAuthorLocations}
-                      projectIsResponsive={projectIsResponsive}
-                      counters={availableCounters.map(c => ({ name: c.name, displayName: c.displayName, characterName: c.characterName }))}
-                      variables={availableVariables.map(v => v.name)}
-                      availableCounters={availableCounters}
-                      availableVariables={availableVariables}
-                      speakerNameResolver={speakerNameResolver}
-                      availableInventoryItems={availableInventoryItems}
-                      onDefineAsCharacter={onDefineAsCharacter}
-                      emotionPalette={emotionPalette}
-                    />
+                    {/* Finding 10: complex trees are cramped in this column —
+                        the Expand button opens the same editor in a large modal. */}
+                    <div className="flex justify-end -mb-2">
+                      <button
+                        onClick={() => setDialogEditorExpanded(true)}
+                        className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                        title="Open the dialog editor in a large window"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        Open large editor
+                      </button>
+                    </div>
+                    {renderDialogTreeEditor(false)}
 
                     {showAdvanced && (
                       <div className="border-t pt-3 space-y-3">
@@ -5149,8 +5220,20 @@ export const Inspector: React.FC<InspectorProps> = ({
 
         {/* Fixed Footer Actions - Delete button only (Save is handled by central Save button in header) */}
         <div className="flex-shrink-0 border-t border-gray-200 bg-white">
+          {/* Row-resize divider: drag to trade height between the properties
+              column above and the AI-suggestions area below (finding 9). */}
+          <div
+            onMouseDown={handleSuggestionsResizeStart}
+            onDoubleClick={resetSuggestionsHeight}
+            className="h-1.5 -mt-1 cursor-row-resize hover:bg-purple-300 transition-colors"
+            title="Drag to resize the suggestions area — double-click to reset"
+          />
           {/* AI Beat Suggestions */}
-          <div className="p-4 border-b border-gray-200">
+          <div
+            ref={suggestionsAreaRef}
+            className="p-4 border-b border-gray-200"
+            style={suggestionsHeight != null ? { height: suggestionsHeight, overflowY: 'auto' } : undefined}
+          >
             <BeatSuggestions
               currentBeat={beat as any}
               allBeats={allBeats as any}
@@ -5199,6 +5282,38 @@ export const Inspector: React.FC<InspectorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Expanded dialog editor (finding 10) — same DialogTreeEditor, same
+          onChange path, just room to work. Closing loses nothing: edits
+          flow through localBeat continuously. */}
+      {dialogEditorExpanded && beat.type === 'dialogTree' && (
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={() => setDialogEditorExpanded(false)}
+        >
+          <div
+            className="bg-white rounded-lg w-full max-w-6xl h-5/6 m-4 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">Dialog Editor</h2>
+                <div className="text-xs text-gray-500">{beat.name} • {beat.id}</div>
+              </div>
+              <button
+                onClick={() => setDialogEditorExpanded(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Close (edits are already applied)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {renderDialogTreeEditor(true)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Asset Selection Modal */}
       <AssetSelectionModal

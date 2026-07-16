@@ -522,7 +522,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
     const isCanvasFocused = nodeId === canvasFocusedNodeId;
     return (
-      <div key={nodeId} className={`${depth > 0 ? 'ml-4' : ''}`}>
+      <div key={nodeId} className={`${depth > 0 ? (expanded ? 'ml-8' : 'ml-4') : ''}`}>
         {/* Node Header */}
         <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
@@ -673,7 +673,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
         {/* Hide choices when NPC auto-exit is set (they are unreachable) */}
         {(shouldShowContent) && !node.target && (
-          <div className="ml-6 border-l-2 border-gray-200 pl-2">
+          <div className={`${expanded ? 'ml-10 pl-3' : 'ml-6 pl-2'} border-l-2 border-gray-200`}>
             {node.choices && node.choices.map((choice, index) => {
               const choiceId = `${nodeId}.choice_${index}`;
               const isChoiceExpanded = expandedChoices.has(choiceId);
@@ -1142,8 +1142,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         </div>
       </div>
       
-      {/* Dialog Tree */}
-      <div className="border rounded-lg p-3 bg-gray-50 max-h-[500px] overflow-y-auto">
+      {/* Dialog Tree — in expanded (modal) mode the box grows to the modal
+          body instead of the inspector's 500px cap (finding 10) */}
+      <div className={`border rounded-lg p-3 bg-gray-50 overflow-y-auto ${expanded ? 'max-h-[calc(83vh-140px)]' : 'max-h-[500px]'}`}>
         {renderDialogNode(dialogTree)}
       </div>
       
