@@ -1,5 +1,51 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-16: Workspace flexibility + project setup — vertical resize, large dialog editor, language & culture up front (v0.9.77)
+
+### Overview
+
+Second slice of the Södertörn-review response, tackling the three medium-effort findings deferred from v0.9.76: workspace areas that couldn't be resized vertically (finding 9), complex dialog editing cramped in the inspector column (finding 10), and the project language buried in settings (finding 14) — plus a new optional **Cultural setting** step in the New Project dialog that doubles as the Knowledge-Graph opt-in, resolving the "the KG toggle lives inside the project you haven't created yet" catch-22.
+
+### Vertical panel resize (finding 9)
+
+- The Inspector's fixed AI-suggestions footer gets a row-resize drag divider: pull down to reclaim height for the properties column, up to expand suggestions; double-click resets to natural height. Position persists (localStorage) like the inspector width.
+- The Sidebar's clusters/unclustered divider — which already existed but reset on every reload — now persists its position too. A drag handle that forgets is likely why reviewers read vertical resizing as absent.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx`, `packages/builder/src/components/Sidebar.tsx`
+
+### Expanded dialog editor (finding 10)
+
+- New "Open large editor" button on the dialog-tree section opens the same `DialogTreeEditor` in a large modal (max-w-6xl, 5/6 viewport height) — same component, same `onChange` path via a single shared render helper, so edits flow continuously and closing loses nothing.
+- The component's dormant `expanded` prop (present since its extraction, never wired) now controls the tree scroll-box height (500px cap → modal height) and widens nesting indentation for clearer hierarchy.
+
+**Files modified:**
+- `packages/builder/src/components/Inspector.tsx`, `packages/builder/src/editors/DialogTreeEditor.tsx`
+
+### Story language up front + one language catalog (finding 14)
+
+- New Project dialog gains a **Story Language** select (default English) writing the existing `translation.sourceLanguage` setting — the field always existed in Settings → Translation but was effectively invisible there.
+- The language list is extracted to a shared `languageCatalog.ts` (COMMON_LANGUAGES / ALL_LANGUAGES / getLanguageDisplayName); the translation LanguageSelector, the new dialog field, and the settings select (previously its own hardcoded 20-language list) all consume it.
+- Fixed en route: the Header's language selector hardcoded "Source (English)" and the translation manifest always assumed English — `TranslationContext` now carries `sourceLanguage` + `setSourceLanguage`, synced from `globalSettings` by the App (the provider mounts above the App and can't read settings itself).
+
+**Files modified:**
+- `packages/builder/src/utils/languageCatalog.ts` (new), `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/components/translation/LanguageSelector.tsx`, `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`, `packages/builder/src/contexts/TranslationContext.tsx`, `packages/builder/src/components/Header.tsx`, `packages/builder/src/App.tsx`
+
+### Cultural setting at project creation (KG opt-in)
+
+- Collapsed "Cultural setting (optional)" section in the New Project dialog: reference-profile dropdown (Sweden / Sri Lanka / Custom…) + culture/region/language fields. Filling anything writes `globalSettings.culture` **and** enables `features.showKnowledgeGraph` for the new project — declaring a culture only has meaning through the KG pipeline, so it IS the opt-in. Left empty, neither is written.
+- Collapsed-with-value shows a summary chip (e.g. "Sweden") so the choice stays visible; the expanded panel states explicitly that setting a culture enables the Knowledge Graph view.
+- Fields extracted to a shared `CultureSettingFields` component consumed by both the dialog and Settings → Translation (which keeps its KG-flag gating). Wording: "Region or community" replaces "Region or ethnicity".
+
+**Files modified:**
+- `packages/builder/src/components/settings/CultureSettingFields.tsx` (new), `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`
+
+### Verification
+
+All 2267 builder tests green; TypeScript clean. Every surface verified live via chrome-devtools: suggestions divider (drag 109→189px, persisted, double-click reset), dialog modal (opens 1152×788 with the full editor, closes cleanly), Story Language field (33 options, Swedish present), cultural section (collapsed by default, profile pick auto-fills, summary chip).
+
+---
+
 ## 2026-07-15: Stakeholder-report response — scope clarity + three HIGH bugs resolved (v0.9.76)
 
 ### Overview

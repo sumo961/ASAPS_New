@@ -22,20 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.76** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.76 responds to the Södertörn
-University expert review**: the UI now states the scope and outcome of
-actions that used to be ambiguous — AI Suggestions is now "Suggest Next
-Beat" (it creates a new beat; it never edits the selected one), adding an
-emotion visibly focuses the new entry and the palette names its project-wide
-scope, translation actions are labeled AI vs Manual with the language search
-at the top, and deleting a character names it. Three reported HIGH bugs were
-resolved: loading an AI-generated story now asks before replacing a
-non-empty workspace (the old project always survived in the library — the
-swap just looked like deletion), the dead "+ Add" on AI-generated Movement
-Choice beats is fixed (duplicate choice ids), and deleted beats no longer
-leave orphaned spatial-cluster positions. This follows v0.9.75's
-Co-Designer. Users on v0.9.75 will auto-update. For what shipped when, see:
+Current release: **v0.9.77** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.77 makes the workspace more
+flexible and project setup more explicit**: the Inspector's AI-suggestions
+area and the sidebar's cluster divider are now vertically resizable (and
+remember their position), complex dialog trees get an "Open large editor"
+button that opens the same editor in a spacious modal, and the New Project
+dialog now asks for the story language up front (previously buried in
+Settings → Translation — the toolbar language selector and translations now
+actually honor it) plus an optional collapsed "Cultural setting" section:
+declaring a culture stores the profile AND enables the Knowledge Graph view
+for that project in one step. This completes the medium-effort items from
+the Södertörn expert review that v0.9.76 began. Users on v0.9.76 will
+auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
