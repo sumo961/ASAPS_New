@@ -1,5 +1,46 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-18: AI character helper — disposition variants, adaptive interview, interpersonal stance model (v0.9.78)
+
+### Overview
+
+Third slice of the Södertörn-review response, building the two character ideas from the stakeholder discussion into one feature: the focus group asked for emotional unpredictability in rehearsal scenarios ("I never know how the client will show up today"), and the answer is **one character with N disposition variants** — not an ensemble cast — drawn at random each playthrough, plus an **AI character-development helper** that makes setting this up a two-minute task instead of a trait-sliders session. Disposition variants are theoretically grounded on the interpersonal circumplex (Leary/Wiggins), keeping AI-generated and manually-authored characters in ONE Big Five trait model — rationale and references in `docs/Interpersonal-Stance-Model.md`.
+
+### Variant selection policy (replay variety)
+
+- New per-character `variantSelectionPolicy: 'fixed' | 'random'`. With `random`, story start draws uniformly from the character's variants; `reset()` wipes the draw, so every restart/replay meets a different disposition. An authored `setCharacterVariant` effect still overrides — instructors keep controlled sessions ("today we practice hostile") while self-directed practice stays unpredictable.
+- Applied at the single story-start hook (`seedCharacterAffectFromStory`); the draw does not mark the variant as explicitly set.
+- CharacterEditor variants section gains an "At story start" dropdown (shown at 2+ variants): *Use default variant* / *Pick randomly each playthrough*.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`, `packages/core/src/types/index.ts`, `packages/builder/src/types/character.ts`, `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/core/tests/engine/CharacterVariants.test.ts`
+
+### AI character development helper
+
+- **CharacterDevelopmentDialog** — progressive disclosure over the existing Character/variant model: a seeded free-text brief ("Who is this person?") with disposition chips (Cooperative, Hostile, Avoidant, Ambivalent, + custom) → an **optional adaptive-questions stage** where the AI asks 2-3 behavior-focused follow-ups with tappable answers (always skippable) → **preview cards** refined by free-text direction ("more passive-aggressive"), never by sliders. Accept writes a real Character; nitty-gritty stays editable in CharacterEditor.
+- **Two entry points, one dialog**: "✨ Develop character with AI…" in the AI-conversation beat's NPC field (seeded from scenario + personality, generates immediately, links the accepted character back to the beat and fills `npcPersonality`) and "Generate with AI" in the Character Manager's template picker (blank brief, questions on by default).
+- Accept follows the editor's variant convention: with variants, personality lives per-variant and the base owns identity; 2+ variants default to the random policy (checkbox), a single variant becomes the default variant.
+- New prompt module `characterGeneration.ts` with pure, unit-tested normalizers (traits clamped to [0,1], mood to [-1,1], variant ids slugified + deduped); variant descriptions are prompted self-contained because a variant overlay *replaces* the base description at runtime.
+
+**Files modified:**
+- `packages/builder/src/components/characters/CharacterDevelopmentDialog.tsx` (new), `packages/builder/src/services/prompts/characterGeneration.ts` (new), `packages/builder/src/services/AIService.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/components/Inspector.tsx`, `packages/builder/src/components/SchemaFormGenerator.tsx`, `packages/builder/src/components/characters/CharacterManager.tsx`
+
+### Interpersonal stance model (one character model, not two)
+
+- Disposition variants are modeled as **interpersonal stances** on the Leary/Wiggins circumplex (warmth × dominance axes). Since the circumplex axes are ~30° rotations of Big Five extraversion/agreeableness (McCrae & Costa 1989), stances and trait presets provably live in one space — no model fork between AI-generated and manually-authored characters.
+- Each suggested disposition chip carries authored circumplex coordinates plus Brown-Levinson politeness *manifestation* hints for the prompt (hostile → bald-on-record face threats; avoidant → off-record withdrawal moves). Speech-act guidance shapes the generated prose; it is not a stored model dimension.
+- A variant's agreeableness + extraversion are **derived** from the base character's traits plus the stance rotation (weight 0.35, tunable) — a shy person turned hostile stays shy; the AI authors only openness/conscientiousness/neuroticism and the descriptions. Custom dispositions get AI-placed coordinates in the same space. The stance persists on `CharacterVariant.stance` for future stance-aware features (e.g. Leary complementarity feedback).
+- Theory, precedent (TARDIS job-interview trainer), and full references: `docs/Interpersonal-Stance-Model.md`.
+
+**Files modified:**
+- `packages/builder/src/services/prompts/interpersonalStance.ts` (new), `docs/Interpersonal-Stance-Model.md` (new), `packages/builder/src/services/prompts/characterGeneration.ts`, `packages/core/src/types/index.ts`
+
+### Verification
+
+40 new tests (7 core variant-policy, 33 prompt/normalizer/stance/dialog); 2300 builder + 2531 core tests green; TypeScript clean. Verified live via chrome-devtools including two real end-to-end generations: the adaptive questions were sharp and behavior-focused, generated variants restated identity correctly per the overlay semantics, the accepted character carried `variantSelectionPolicy: 'random'` + 4 slugified variants, and every derived trait value matched the circumplex rotation exactly (base E 0.15 → hostile 0.10, cooperative 0.27, avoidant 0.00 clamped — the shy character stayed shy in every disposition).
+
+---
+
 ## 2026-07-16: Workspace flexibility + project setup — vertical resize, large dialog editor, language & culture up front (v0.9.77)
 
 ### Overview

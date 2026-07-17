@@ -22,19 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.77** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.77 makes the workspace more
-flexible and project setup more explicit**: the Inspector's AI-suggestions
-area and the sidebar's cluster divider are now vertically resizable (and
-remember their position), complex dialog trees get an "Open large editor"
-button that opens the same editor in a spacious modal, and the New Project
-dialog now asks for the story language up front (previously buried in
-Settings → Translation — the toolbar language selector and translations now
-actually honor it) plus an optional collapsed "Cultural setting" section:
-declaring a culture stores the profile AND enables the Knowledge Graph view
-for that project in one step. This completes the medium-effort items from
-the Södertörn expert review that v0.9.76 began. Users on v0.9.76 will
-auto-update. For what shipped when, see:
+Current release: **v0.9.78** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.78 brings the AI character
+helper with disposition variants**: describe a person in plain language and
+the AI drafts a full character profile — optionally as several *disposition
+variants* (cooperative, hostile, avoidant, …) of the same person that the
+story can draw from at random each playthrough, so rehearsal scenarios stay
+unpredictable (the training focus group's core ask). The helper opens from
+the AI conversation beat (seeded from the scenario) or the Character
+Manager, asks a few optional behavior questions, and previews everything as
+cards you refine with plain-language directions. Variants are grounded on
+the interpersonal circumplex (Leary/Wiggins) so AI-generated and
+hand-authored characters share one Big Five model — theory and references
+in `docs/Interpersonal-Stance-Model.md`. Users on v0.9.77 will auto-update.
+For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
