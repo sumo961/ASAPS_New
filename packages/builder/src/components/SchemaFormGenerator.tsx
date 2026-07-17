@@ -95,6 +95,12 @@ interface SchemaFormGeneratorProps {
   /** Called when the user clicks "Define '<name>' as a Character" in the
    * speaker combobox. Parent typically opens the Character Manager prefilled. */
   onDefineAsCharacter?: (name: string) => void;
+  /** Opens the AI "Develop character" dialog (rendered by the host app).
+   * The npc-character control seeds it from the beat's scenario +
+   * npcPersonality and links the accepted character back into the beat. */
+  onDevelopCharacter?: (
+    session: import('./characters/CharacterDevelopmentDialog').CharacterDevelopmentSession,
+  ) => void;
 }
 
 // Map alias beat types to their canonical schema types
@@ -239,6 +245,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   onBeatPropertyChange,
   usedNames = [],
   onDefineAsCharacter,
+  onDevelopCharacter,
 }) => {
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
@@ -671,6 +678,38 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 onDefineAsCharacter={onDefineAsCharacter}
                 placeholder="Pick or name an NPC…"
               />
+              {onDevelopCharacter && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onDevelopCharacter({
+                      seed: {
+                        name: matched
+                          ? matchedChar.displayName || matchedChar.name
+                          : stringValue || undefined,
+                        brief: parameters.npcPersonality || '',
+                        scenario: parameters.scenario || undefined,
+                      },
+                      existingCharacterId: matchedChar?.id,
+                      // Beat entry: rich context already — generate right away,
+                      // "Refine with questions first" stays available inside.
+                      askFirst: false,
+                      onAccepted: (character) => {
+                        // Link the beat to the accepted character and load the
+                        // generated personality into the beat's context field.
+                        handleChange(character.id);
+                        if (character.description) {
+                          onParameterChange('npcPersonality', character.description);
+                        }
+                      },
+                    })
+                  }
+                  className="mt-1 text-xs text-purple-600 hover:bg-purple-50 px-1.5 py-1 rounded flex items-center gap-1"
+                  title="AI drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and personality text"
+                >
+                  ✨ Develop character with AI…
+                </button>
+              )}
               {paramDef.description && (
                 <p className="mt-1 text-xs text-gray-500">{paramDef.description}</p>
               )}

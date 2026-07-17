@@ -2383,7 +2383,12 @@ export class StoryContext extends EventEmitter {
     const story = this.story;
     if (!story) return;
     const characters = (story as any).getCharacters?.() as
-      Array<{ id: string; defaultVariantId?: string }> | undefined;
+      Array<{
+        id: string;
+        defaultVariantId?: string;
+        variantSelectionPolicy?: 'fixed' | 'random';
+        variants?: Array<{ id: string }>;
+      }> | undefined;
     if (!characters) return;
     for (const char of characters) {
       if (!char?.id) continue;
@@ -2392,8 +2397,22 @@ export class StoryContext extends EventEmitter {
       // introvert mood/sentiments without an explicit setCharacterVariant
       // call. Author can still override via a setCharacterVariant effect
       // before the first beat fires.
-      if (char.defaultVariantId && !this.state.activeCharacterVariants[char.id]) {
-        this.state.activeCharacterVariants[char.id] = char.defaultVariantId;
+      //
+      // With variantSelectionPolicy 'random', a variant is drawn uniformly
+      // instead — reset() wipes activeCharacterVariants, so every restart
+      // re-draws (rehearsal variety). Like the default path, the draw does
+      // not mark explicitVariantSet, so an authored setCharacterVariant
+      // effect still wins.
+      if (!this.state.activeCharacterVariants[char.id]) {
+        const variants = Array.isArray(char.variants)
+          ? char.variants.filter((v) => v?.id)
+          : [];
+        if (char.variantSelectionPolicy === 'random' && variants.length > 0) {
+          const pick = variants[Math.floor(Math.random() * variants.length)];
+          this.state.activeCharacterVariants[char.id] = pick.id;
+        } else if (char.defaultVariantId) {
+          this.state.activeCharacterVariants[char.id] = char.defaultVariantId;
+        }
       }
       this.seedCharacterAffectFor(char.id);
     }

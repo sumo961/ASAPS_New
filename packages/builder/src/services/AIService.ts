@@ -32,6 +32,17 @@ import { buildBeatTypeDigest } from './beatSchemaVocabulary';
 import { normalizeBeat } from '@asaps/core';
 import { getAIValidator } from './AIValidator';
 import { normalizeStory } from '@asaps/core';
+import {
+  buildCharacterQuestionsPrompt,
+  buildCharacterProfilePrompt,
+  buildCharacterCardRevisionPrompt,
+  normalizeGeneratedQuestions,
+  normalizeGeneratedProfile,
+  applyRevisedCard,
+  type CharacterGenerationSeed,
+  type GeneratedCharacterQuestion,
+  type GeneratedCharacterProfile,
+} from './prompts/characterGeneration';
 
 /**
  * AI Service
@@ -2280,6 +2291,53 @@ Always be helpful and try to interpret the user's intent, even if the command is
       }
       throw new Error('Failed to parse AI response as JSON');
     }
+  }
+
+  /**
+   * Character development helper — stage 2: adaptive follow-up questions.
+   * Reads the author's brief and returns 2-3 behavior-focused questions
+   * with tappable suggested answers. Answering is always optional.
+   */
+  async generateCharacterQuestions(
+    seed: CharacterGenerationSeed,
+  ): Promise<GeneratedCharacterQuestion[]> {
+    const { systemPrompt, userPrompt } = buildCharacterQuestionsPrompt(seed);
+    const response = await this.makeDirectAICall(systemPrompt, userPrompt);
+    return normalizeGeneratedQuestions(this.parseJsonResponse(response));
+  }
+
+  /**
+   * Character development helper — stage 3: full profile generation,
+   * optionally with one disposition variant per requested disposition.
+   * Output is normalized (traits clamped to [0,1], mood to [-1,1],
+   * variant ids slugified + deduped) and writes cleanly into the
+   * Character / CharacterVariant model.
+   */
+  async generateCharacterProfile(
+    seed: CharacterGenerationSeed,
+  ): Promise<GeneratedCharacterProfile> {
+    const { systemPrompt, userPrompt } = buildCharacterProfilePrompt(seed);
+    const response = await this.makeDirectAICall(systemPrompt, userPrompt);
+    return normalizeGeneratedProfile(this.parseJsonResponse(response), seed);
+  }
+
+  /**
+   * Character development helper — preview refinement: regenerate ONE card
+   * (base profile or a single variant) following a free-text direction,
+   * returning the whole profile with that card replaced.
+   */
+  async reviseCharacterCard(
+    profile: GeneratedCharacterProfile,
+    target: 'base' | string,
+    direction: string,
+  ): Promise<GeneratedCharacterProfile> {
+    const { systemPrompt, userPrompt } = buildCharacterCardRevisionPrompt(
+      profile,
+      target,
+      direction,
+    );
+    const response = await this.makeDirectAICall(systemPrompt, userPrompt);
+    return applyRevisedCard(profile, target, this.parseJsonResponse(response));
   }
 
   /**

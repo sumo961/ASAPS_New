@@ -300,6 +300,13 @@ export interface CharacterVariant {
   displayName?: string;
   portrait?: { image?: string; assetId?: string };
   traits?: Record<string, number>;
+  /**
+   * Interpersonal-circumplex position of this disposition (Leary/Wiggins:
+   * warmth = affiliation, dominance = control, each [-1, 1]). Written by
+   * the builder's AI character helper; informational for the runtime
+   * today, reserved for stance-aware features.
+   */
+  stance?: { warmth: number; dominance: number };
   dossierPolicy?: 'reAnchor' | 'reflection';
   initialMood?: { valence: number; arousal: number };
   initialSentiments?: Array<{ toEntityRef: string; emotion: string; strength: number }>;

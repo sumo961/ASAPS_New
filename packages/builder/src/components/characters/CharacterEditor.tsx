@@ -2612,6 +2612,30 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               + Add variant
             </button>
           </div>
+          {variants.length >= 2 && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[11px] text-gray-600">At story start:</span>
+              <select
+                value={editedCharacter.variantSelectionPolicy === 'random' ? 'random' : 'fixed'}
+                onChange={(e) =>
+                  setEditedCharacter({
+                    ...editedCharacter,
+                    variantSelectionPolicy: e.target.value === 'random' ? 'random' : undefined,
+                  })
+                }
+                className="px-2 py-1 text-xs border rounded"
+                title="How the active variant is chosen at story start. A setCharacterVariant effect always overrides."
+              >
+                <option value="fixed">Use default variant</option>
+                <option value="random">Pick randomly each playthrough</option>
+              </select>
+              {editedCharacter.variantSelectionPolicy === 'random' && (
+                <span className="text-[11px] text-gray-400 italic">
+                  Every restart draws a new variant — the "default" radio is ignored.
+                </span>
+              )}
+            </div>
+          )}
           {variants.length === 0 ? (
             <div className="text-xs text-gray-400 italic py-3">
               No variants. Add one to give the player a persona choice, or to ship a single character in two flavors.

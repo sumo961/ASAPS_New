@@ -141,6 +141,9 @@ interface InspectorProps {
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
   /** Sync NPC name/personality back to character definitions. Creates new NPC if not found. */
   onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
+  /** Opens the AI "Develop character" dialog (host renders it). Seeded from
+   *  the beat's scenario + npcPersonality by the npc-character control. */
+  onDevelopCharacter?: (session: import('./characters/CharacterDevelopmentDialog').CharacterDevelopmentSession) => void;
   // For counter/variable dropdowns
   characters?: Character[];
   /** Project emotion palette — passed down to ChoiceEffectsEditor so the
@@ -183,6 +186,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onAssetSelect,
   onOpenCharacterManager,
   onCharacterSync,
+  onDevelopCharacter,
   characters = [],
   emotionPalette,
   globalSettings,
@@ -1831,6 +1835,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     availableVariables={availableVariables}
                     characterObjects={characters}
                     onCharacterSync={onCharacterSync}
+                    onDevelopCharacter={onDevelopCharacter}
                     translationSourceHints={
                       translationState.activeLanguage ? sourceParametersRef.current : undefined
                     }

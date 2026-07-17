@@ -119,6 +119,17 @@ export interface Character {
    * the base character (no overlay) is used until a variant is chosen.
    */
   defaultVariantId?: string;
+  /**
+   * How the story-start variant is chosen when no `setCharacterVariant`
+   * effect has fired yet:
+   *   - 'fixed' (default / omitted): use `defaultVariantId`, or the base
+   *     character when that is unset.
+   *   - 'random': draw uniformly from `variants` on every story start —
+   *     restarts re-draw, so replays meet a different disposition
+   *     (rehearsal variety). An authored setCharacterVariant effect
+   *     still overrides the draw.
+   */
+  variantSelectionPolicy?: 'fixed' | 'random';
 
   // Metadata
   description?: string;
@@ -200,6 +211,15 @@ export interface CharacterVariant {
   portrait?: { image?: string; assetId?: string };
   /** Personality traits override (Big Five, [0, 1]). */
   traits?: Record<string, number>;
+  /**
+   * Interpersonal-circumplex position of this disposition (Leary/Wiggins:
+   * warmth = affiliation axis, dominance = control axis, each [-1, 1]).
+   * Written by the AI character helper, which derives the variant's
+   * agreeableness/extraversion from the base traits + this stance
+   * (McCrae & Costa 1989 rotation). Informational for the runtime today;
+   * reserved for stance-aware features (e.g. complementarity feedback).
+   */
+  stance?: { warmth: number; dominance: number };
   /** Dossier-policy override (Mode A vs Mode B). */
   dossierPolicy?: 'reAnchor' | 'reflection';
   /** Initial 2D mood at story start, when this variant is active. */

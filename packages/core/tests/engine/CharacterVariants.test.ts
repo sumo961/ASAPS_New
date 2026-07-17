@@ -229,6 +229,77 @@ describe('defaultVariantId auto-applies at story start', () => {
   });
 });
 
+describe('variantSelectionPolicy — story-start selection', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const makeContext = (character: any) => {
+    const story = new Story();
+    story.setCharacters([character]);
+    return new StoryContext(undefined, story);
+  };
+
+  it("'random' draws a variant at story start and seeds its mood", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // → first variant (introvert)
+    const ctx = makeContext({ ...baseAlex, variantSelectionPolicy: 'random' });
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('introvert');
+    expect(ctx.getCharacterMood('char_alex').valence).toBeCloseTo(-0.3);
+  });
+
+  it("'random' wins over defaultVariantId", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // → last variant (extrovert)
+    const ctx = makeContext({
+      ...baseAlex, variantSelectionPolicy: 'random', defaultVariantId: 'introvert',
+    });
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('extrovert');
+  });
+
+  it('reset() re-draws, so every restart can meet a different variant', () => {
+    const rand = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const ctx = makeContext({ ...baseAlex, variantSelectionPolicy: 'random' });
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('introvert');
+    rand.mockReturnValue(0.99);
+    ctx.reset();
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('extrovert');
+  });
+
+  it('re-seeding without a reset does not re-draw', () => {
+    const rand = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const ctx = makeContext({ ...baseAlex, variantSelectionPolicy: 'random' });
+    rand.mockReturnValue(0.99);
+    ctx.seedCharacterAffectFromStory();
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('introvert');
+  });
+
+  it('the draw does not count as explicitly set, so an authored effect still wins', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const ctx = makeContext({ ...baseAlex, variantSelectionPolicy: 'random' });
+    expect(ctx.hasExplicitlySetVariant('char_alex')).toBe(false);
+    ctx.applyEffect({ type: 'setCharacterVariant', target: 'char_alex', variantId: 'extrovert' } as any);
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('extrovert');
+  });
+
+  it("'random' with no variants falls back to defaultVariantId", () => {
+    const ctx = makeContext({
+      ...baseAlex, variants: undefined, variantSelectionPolicy: 'random', defaultVariantId: 'introvert',
+    });
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('introvert');
+  });
+
+  it("omitted / 'fixed' policy keeps the default-variant behavior", () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const ctx = makeContext({
+      ...baseAlex, variantSelectionPolicy: 'fixed', defaultVariantId: 'introvert',
+    });
+    expect(ctx.getActiveCharacterVariant('char_alex')).toBe('introvert');
+  });
+});
+
 describe('Variant serialization', () => {
   it('round-trips activeCharacterVariants', () => {
     vi.stubGlobal('window', { setInterval: vi.fn().mockReturnValue(1), clearInterval: vi.fn() });

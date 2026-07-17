@@ -69,6 +69,9 @@ interface CharacterManagerProps {
    */
   emotionPalette?: EmotionDefinition[];
   onEmotionPaletteChange?: (palette: EmotionDefinition[]) => void;
+  /** Opens the AI "Develop character" dialog (rendered by the host app).
+   * Shown as a card in the template picker when provided. */
+  onGenerateWithAI?: () => void;
 }
 
 
@@ -82,6 +85,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onCharacterCreated,
   emotionPalette: emotionPaletteProp,
   onEmotionPaletteChange,
+  onGenerateWithAI,
 }) => {
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
@@ -657,6 +661,19 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
             <h3 className="text-xl font-semibold mb-4">Choose a Template</h3>
             <div className="grid grid-cols-3 gap-4">
+              {onGenerateWithAI && (
+                <div
+                  onClick={() => {
+                    setShowTemplates(false);
+                    onGenerateWithAI();
+                  }}
+                  className="p-4 border border-purple-300 rounded-lg hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all"
+                >
+                  <div className="text-2xl mb-2">✨</div>
+                  <div className="font-medium">Generate with AI</div>
+                  <div className="text-xs text-gray-500">Describe the person; AI drafts the profile</div>
+                </div>
+              )}
               {CHARACTER_TEMPLATES.map((template, index) => (
                 <div
                   key={index}

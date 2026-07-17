@@ -26,6 +26,10 @@ import type { StoryGenerationRequest } from './types/ai';
 import { GlobalSettingsInspector } from './components/settings/GlobalSettingsInspector';
 import { useStoryBuilder } from './hooks/useStoryBuilder';
 import { CharacterManager } from './components/characters/CharacterManager';
+import {
+  CharacterDevelopmentDialog,
+  type CharacterDevelopmentSession,
+} from './components/characters/CharacterDevelopmentDialog';
 import { BulkRelinkDialog } from './components/characters/BulkRelinkDialog';
 import { findReferencesByName, relinkReferences } from './components/characters/relinkReferences';
 import { AssetManager } from './components/assets/AssetManager';
@@ -388,6 +392,10 @@ function App() {
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  // AI "Develop character" helper dialog. Non-null = open. Sessions carry
+  // their seed + accept callback, so both entry points (beat inspector,
+  // Character Manager) share this single instance.
+  const [developCharSession, setDevelopCharSession] = useState<CharacterDevelopmentSession | null>(null);
   // Step 5 — project-level emotion palette. Defaults to Ekman 6 + pride /
   // shame / interest until the project explicitly overrides it. Persisted
   // through the project's story payload (see updateStory() callsites).
@@ -6494,6 +6502,7 @@ function App() {
                   handleCharactersChange([...characters, newChar]);
                 }
               }}
+              onDevelopCharacter={setDevelopCharSession}
               characters={characters}
               emotionPalette={emotionPalette}
               globalSettings={globalSettings}
@@ -6580,11 +6589,21 @@ function App() {
                 onCharacterCreated={handleCharacterCreated}
                 emotionPalette={emotionPalette}
                 onEmotionPaletteChange={setEmotionPalette}
+                onGenerateWithAI={() => setDevelopCharSession({ seed: {}, askFirst: true })}
               />
             </div>
           </div>
         </div>
       )}
+
+      {/* AI "Develop character" helper — shared by the Character Manager and
+          the beat inspector's npc-character control. */}
+      <CharacterDevelopmentDialog
+        session={developCharSession}
+        onClose={() => setDevelopCharSession(null)}
+        characters={characters}
+        onCharactersChange={handleCharactersChange}
+      />
 
       {/* Asset Manager Modal */}
       {showAssetManager && (
