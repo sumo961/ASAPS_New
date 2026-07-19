@@ -111,7 +111,7 @@ This is intentional: the first time you sit down at ASAPS each session, we want 
 > **Under the hood.** The session boundary is tracked by a `sessionStorage` flag (`asaps:session-started`) that lives only as long as the browser session is open. Closing the browser/tab and reopening = fresh session = Browser overlay reappears.
 
 ![The Project Browser overlay with the Continue-editing banner](images/45-project-browser.png)
-*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), then the template row (added after this screenshot was taken — see [Templates](#templates)), and below that the searchable, sortable list of every project saved on this machine. Project cards are compact: a title, a one-line badge row (beat count · layout mode · character count, dot-separated), an optional description, and a modified date — fields drop out gracefully when they're not meaningful (an untouched project just reads "empty project" in italics).*
+*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), then the slim **TEMPLATES** row (expandable via **browse →** — see [Templates](#templates)), and below that the searchable, sortable list of every project saved on this machine. Project cards are compact: a title, a one-line badge row (beat count · layout mode · character count, dot-separated), an optional description, and a modified date — fields drop out gracefully when they're not meaningful (an untouched project just reads "empty project" in italics).*
 
 ### Electron start window vs web modal Browser
 
@@ -173,6 +173,9 @@ You'll find them in two places:
 - **The "Start from a template" card** in the **+ New** picker, which opens the same gallery as a dialog.
 
 Either way, clicking **Use template** creates *your own copy* of the template as a brand-new project in your library. This is the golden rule of templates: **the template itself is never edited.** Experiment freely, gut it, rebuild it — the original stays pristine, and you can instantiate a fresh copy any time.
+
+![The template gallery opened from the + New picker](images/48-template-gallery.png)
+*The template gallery. Each entry carries a description, a "What this shows" note explaining the techniques it demonstrates, and feature tags; the purple **AI** badge marks templates that need an AI provider to play. **Use template** always creates your own copy.*
 
 **The `.asapst` file format.** Under the hood a template is a normal `.asaps` project zip flagged as a template — think of Word's `.dotx` document templates. Importing or double-clicking a `.asapst` file never opens it directly; it always instantiates a fresh copy as a new project. That makes templates safe to distribute: a lecturer can export a rehearsal scenario as a `.asapst`, share it with a class, and every student who imports it gets their own independent copy to work in.
 
@@ -1272,7 +1275,7 @@ A variant is an alternate persona slice that shares the same character id. Use t
 Click **+ Add variant** in the Variants section. The first time you add one, ASAPS migrates the base character's personality, mood, sentiments, and dossier policy onto the new variant so you don't lose work — and the parent's Personality / Initial mood / Initial sentiments / Dossier policy cards collapse into a banner reading *"This character has N variants. Personality, initial mood, and sentiments are authored per variant below…"* Subsequent variants clone from the first variant so you can copy-and-tweak.
 
 ![Affect tab with variants and a goal](images/21-affect-with-variants-goals.png)
-*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start. (This screenshot predates the interpersonal stance pad and the "At story start" policy dropdown described below.)*
+*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start. (This overview screenshot predates the interpersonal stance pad and the "At story start" policy dropdown — both are shown in the next figure and described below.)*
 
 Each variant card carries:
 
@@ -1282,6 +1285,9 @@ Each variant card carries:
 - An optional description, surfaced in the dossier when the variant is active.
 - A **trait preset** dropdown — the same ten archetypes as the base, but applied to *this variant only*. Variant traits can be cleared to fall back to base character traits.
 - An **interpersonal stance pad** — the same Leary's Rose as the base Personality card, here answering *"how does this disposition meet the other person?"* Dragging the dot writes the variant's stance **and** re-derives its extraversion and agreeableness from the base character's traits plus the stance — so a shy character turned hostile stays recognizably shy. When the variant's hand-tuned trait sliders drift away from the authored stance, a small hollow *traits* marker appears on the pad so the drift is visible instead of silent.
+
+![A variant card's stance pad — the hostile disposition of a rehearsal client](images/49-stance-pad-variant.png)
+*A variant's stance pad in action: the hostile disposition sits cold-dominant on the rose (readout "cold-dominant (hostile)", w −0.70 · d +0.50), the hollow "traits" marker shows where the current sliders sit, and the agreeableness slider above reflects the stance-derived value. The variant's MoodPad follows below — two circumplexes, one for how the character meets people, one for how they feel.*
 - A 2D MoodPad and sentiment list specific to this variant.
 - A **portrait override** (optional) — leave empty to inherit the base portrait. Variants share the base character's sprite sheet, states, and animations; only the affect/persona slice and the portrait swap.
 
@@ -1880,9 +1886,15 @@ Building a rich character by hand means trait sliders, mood pads, and sentiment 
 
 2. **Optionally, ask for disposition variants.** Tick **Generate disposition variants** and pick from the suggested chips — **Cooperative**, **Hostile**, **Avoidant**, **Ambivalent** — or add your own (*"passive-aggressive"*, *"desperate to please"*). Each disposition becomes a [character variant](#character-affect); combined with the *Pick randomly each playthrough* policy, this is how you build a rehearsal character who "shows up differently every session."
 
+![The helper's brief stage — plain-language description plus disposition chips](images/50-ai-character-helper-brief.png)
+*The brief stage: describe the person the way you'd describe them to a colleague, tick **Generate disposition variants**, and pick or add disposition chips. **Skip — just generate** goes straight to the draft; **Continue** offers the follow-up questions first.*
+
 3. **Optionally, refine with questions.** Click **Refine with questions first** (or **Continue**, from the Character Manager entry) and the AI asks 2–3 short, behavior-focused follow-ups — each with tappable suggested answers plus a free-text field. This stage is *always* skippable: leave any answer empty, or hit **Skip — just generate** and go straight to the draft.
 
 4. **Review the preview cards.** The draft appears as cards — a base profile (the shared identity) plus one card per disposition variant, each showing the description, a compact Big Five readout, the starting mood, and an interpersonal **stance pad** you can drag directly on the card. Don't like a card? Type a direction into its *Adjust* field — *"more passive-aggressive"*, *"less articulate"* — and regenerate just that card. You refine with words, never with sliders. Untick any variant you don't want to keep.
+
+![The helper's preview stage — base profile card plus disposition variant cards](images/51-ai-character-helper-preview.png)
+*The preview: a base profile (the shared identity) followed by one card per disposition. Every card carries the full behavioral description, a compact Big Five readout, the starting mood, a draggable stance pad, and an Adjust field for word-based refinement. Variant cards have an include checkbox.*
 
 5. **Accept.** With two or more variants included, a **"Pick a disposition at random each playthrough"** checkbox (on by default) sets the [variant selection policy](#character-affect) for you. Click **Add character** — or **Apply to [name]**, if you launched the helper on an existing character, which enriches that character in place and appends the new variants.
 
