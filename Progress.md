@@ -1,5 +1,51 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-19: Project templates (.asapst) + stance visualization + file-open and AI-conversation fixes (v0.9.79)
+
+### Overview
+
+Completes the Södertörn character-work arc that v0.9.78 began: the rehearsal scenario the focus group asked for now ships as the first entry of a **project template system** — worked example projects instantiated as copies, with a distributable `.asapst` file format modeled on Word's `.dotx` so a lecturer can hand a scenario to thirty students and every double-click creates that student's own project. The interpersonal stance model from v0.9.78 becomes **visible and manipulable** (an interactive Leary's Rose in the character editor and the AI helper). Plus three fixes from field testing: Windows/cold-start double-click-to-open, misleading "visited" beats in the preview debug panel, and case-sensitive AI-conversation keywords.
+
+### Template system + .asapst format
+
+- **`.asapst` templates**: same zip as `.asaps`, but project.json carries `projectType: 'template'`. The flag — not the extension — is the source of truth (a renamed file keeps its behavior); importing a template ALWAYS instantiates a fresh copy (forced new project id, overwrite impossible, flag stripped) so a distributed master can never be edited in place. Electron gains the `.asapst` file association; all import accept-lists and the drag-drop guard take the new extension.
+- **Template gallery**: "Start from a template" as the 4th card in the Start-a-new-project picker → gallery modal with description, "What this shows" blurb, feature tags, and an AI badge for templates that need a provider. The Project Browser gains an **adaptive template shelf** under the create row: full cards while the library is small (the first-run audience that needs the showcase), a slim "TEMPLATES … browse →" line once it's established.
+- **"Export as Template (.asapst)"** in the Export menu — build a scenario, export, distribute; every import creates the recipient's own copy.
+- **First bundled template — "Rehearsal: The Difficult Client"**: a social-work training scenario (caseworker briefing → AI conversation with client Karin Lindqvist → debrief with reflection prompts). Karin has four stance-grounded disposition variants (cooperative / hostile / avoidant / ambivalent) on the random selection policy — every restart meets a different Karin. CI tests keep the registry, the source JSON, the zipped `.asapst`, and the circumplex-derived trait values consistent.
+
+**Files modified:**
+- `packages/builder/src/utils/projectZipManager.ts`, `packages/builder/src/components/TemplateGallery.tsx` (new), `packages/builder/src/components/NewProjectPicker.tsx`, `packages/builder/src/components/ProjectLibrary.tsx`, `packages/builder/src/components/Header.tsx`, `packages/builder/src/App.tsx`, `packages/builder/src/components/MergeStoryDialog.tsx`, `packages/builder/public/templates/*` (new), `apps/builder-desktop/package.json`, `packages/builder/src/utils/__tests__/bundledTemplates.test.ts` (new)
+
+### Interpersonal stance visualization (StancePad)
+
+- New **StancePad** — an interactive Leary's Rose (warmth × dominance, octant labels hostile / leading / withdrawn / cooperative), the visual sibling of the MoodPad. Three surfaces:
+  - **Variant cards** (Character Editor, Affect tab): dragging writes the variant's stance AND re-derives its extraversion + agreeableness via the circumplex rotation — the trait sliders follow the dot, making the coupling visible. Variants without an authored stance show a dashed trait-derived dot; a hollow "traits" ghost marker appears when hand-tuned sliders drift from the authored stance.
+  - **Base personality section**: a pure two-way lens — the dot mirrors the E/A sliders, dragging sets both at once via the full-scale inverse rotation (new `stanceToBigFive`).
+  - **AI helper preview cards**: per-variant pads plus a base-card lens whose drag re-derives every stance-bearing variant from the new base, keeping the disposition family consistent before accepting.
+- `describeStance()` supplies qualitative readouts ("cold-dominant (hostile)"). Theory documentation extended (`docs/Interpersonal-Stance-Model.md`).
+
+**Files modified:**
+- `packages/builder/src/components/characters/StancePad.tsx` (new), `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/builder/src/components/characters/CharacterDevelopmentDialog.tsx`, `packages/builder/src/services/prompts/interpersonalStance.ts`, `docs/Interpersonal-Stance-Model.md`
+
+### Fixes
+
+- **Windows / cold-start file open**: double-clicking a `.asaps`/`.asapst` file now works on every platform and timing. The Electron main process parses `second-instance` argv (Windows/Linux, app running) and `process.argv` (cold start), and no longer drops macOS `open-file` events that arrive before the window exists; a pending file is stashed and collected by the renderer via a signal-based `project:get-pending-open` IPC handshake after its listener registers — no load-timing race. The renderer also splits paths on both separators so Windows filenames keep the `.asapst` template detection.
+- **Preview debug panel — seeded beats**: starting preview from a mid-story beat injects the simulated path's visited beats (so visited-beat conditions behave correctly) — but the debug panel presented them as actually visited. Injected beats are now badged **seeded** with an explanatory header ("3 seeded by start state") and tooltips; the start beat itself is not badged.
+- **AI Conversation keyword matching**: "Topic Mentioned" direction triggers are judged by the LLM, and the evaluation prompt gave no matching guidance — capitalized keywords ("Goddess") read as proper nouns and lowercase mentions were missed. The prompt now carries explicit MATCHING RULES: case-insensitive, singular/plural/inflected forms count, clear paraphrases count, NOT-conditions invert after matching.
+
+**Files modified:**
+- `apps/builder-desktop/src/main/index.ts`, `apps/builder-desktop/src/preload/index.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/core/src/utils/ConversationPromptBuilder.ts`
+
+### Documentation
+
+- **User Guide** audited and updated (+91/−16) for everything above plus v0.9.78's character helper — every claim verified against the actual components (button labels, card counts, visibility conditions). New Templates and AI Character Development sections, stance-pad and variant-policy coverage, seeded-badge explanation, FAQ entry on sharing projects with students, glossary entries.
+
+### Verification
+
+54 new tests (template semantics incl. flag-forces-copy and renamed-extension fallback, bundled-template consistency incl. circumplex-derivation check, StancePad interaction, stance round-trips, prompt matching rules); 2323 builder + 2532 core tests green; TypeScript clean. Template flow verified live end-to-end (picker → gallery → instantiate → 5 beats + Karin's 4 variants intact); both editor stance pads verified against the rotation math exactly. Windows file-open verified by review only — needs one real double-click test on a Windows build.
+
+---
+
 ## 2026-07-18: AI character helper — disposition variants, adaptive interview, interpersonal stance model (v0.9.78)
 
 ### Overview

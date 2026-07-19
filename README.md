@@ -22,20 +22,22 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.78** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.78 brings the AI character
-helper with disposition variants**: describe a person in plain language and
-the AI drafts a full character profile — optionally as several *disposition
-variants* (cooperative, hostile, avoidant, …) of the same person that the
-story can draw from at random each playthrough, so rehearsal scenarios stay
-unpredictable (the training focus group's core ask). The helper opens from
-the AI conversation beat (seeded from the scenario) or the Character
-Manager, asks a few optional behavior questions, and previews everything as
-cards you refine with plain-language directions. Variants are grounded on
-the interpersonal circumplex (Leary/Wiggins) so AI-generated and
-hand-authored characters share one Big Five model — theory and references
-in `docs/Interpersonal-Stance-Model.md`. Users on v0.9.77 will auto-update.
-For what shipped when, see:
+Current release: **v0.9.79** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.79 brings project templates and
+the stance pad**: a "Start from a template" gallery of worked example
+projects that always instantiate as your own copy, a distributable
+`.asapst` template format (like Word's `.dotx` — hand a scenario file to
+thirty students and every double-click creates that student's own project,
+the master is never edited) with "Export as Template" for authoring your
+own, and a first bundled template: *Rehearsal: The Difficult Client*, an
+AI-conversation training scenario whose client arrives in a different
+disposition every session. Character dispositions are now also *visible*:
+an interactive Leary's-Rose stance pad in the character editor and AI
+helper couples warmth×dominance to the personality sliders. Plus fixes:
+double-click-to-open now works on Windows and at cold start, mid-story
+preview starts mark injected beats as "seeded" in the debug panel, and
+AI-conversation topic keywords match case-insensitively. Users on v0.9.78
+will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
