@@ -22,22 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.79** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.79 brings project templates and
-the stance pad**: a "Start from a template" gallery of worked example
-projects that always instantiate as your own copy, a distributable
-`.asapst` template format (like Word's `.dotx` — hand a scenario file to
-thirty students and every double-click creates that student's own project,
-the master is never edited) with "Export as Template" for authoring your
-own, and a first bundled template: *Rehearsal: The Difficult Client*, an
-AI-conversation training scenario whose client arrives in a different
-disposition every session. Character dispositions are now also *visible*:
-an interactive Leary's-Rose stance pad in the character editor and AI
-helper couples warmth×dominance to the personality sliders. Plus fixes:
-double-click-to-open now works on Windows and at cold start, mid-story
-preview starts mark injected beats as "seeded" in the debug panel, and
-AI-conversation topic keywords match case-insensitively. Users on v0.9.78
-will auto-update. For what shipped when, see:
+Current release: **v0.9.80** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.80 is a consistency release
+from live authoring sessions**: a **Background fit** control (Cover — fill
+and crop, or Contain — letterbox) now sits next to "Change Background" for
+every beat type, honored identically in the Visual Editor, the Preview
+Window, and HTML exports; the Visual Editor and Preview now render
+slot-mode backgrounds identically (a three-layer divergence ending at a
+subtle React style-diffing hazard, root-caused and fixed); renaming a
+project in the main window's title box now renames it *everywhere* —
+library card, banner, window title — and the Browser-card rename no longer
+gets clobbered by auto-save (one-name model); and the interpersonal stance
+pad is bigger with properly legible labels. The User Guide gained fresh
+screenshots for the template gallery, stance pad, and AI character helper.
+Users on v0.9.79 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

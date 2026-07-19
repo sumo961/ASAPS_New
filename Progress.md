@@ -1,5 +1,52 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-20: Background fit for all beats, one-name project rename, VE/Preview parity + docs screenshots (v0.9.80)
+
+### Overview
+
+Field-testing release: everything in it came from live authoring sessions on real projects. Two long-standing inconsistencies fell — renaming a project from the main window now actually renames it everywhere (one-name model), and the Visual Editor now renders slot-mode backgrounds identically to the Preview Window, closing a three-layer divergence that ended at a subtle React style-diffing hazard. On top: a **Background fit** control (cover / letterbox) for every beat type, a legibility pass on the stance pad, and the User Guide screenshot session for the v0.9.78/79 features.
+
+### Background fit control (cover / letterbox) for all beats
+
+- The **Background fit** select (next to "Change Background") was gated to the four spatial beats; endScreen and every other slot-mode beat had no sizing control and always cropped (cover). It now appears for **every beat type except panorama** — *Contain — show whole image (letterbox)* vs *Cover — fill stage, crop edges* — with the default label reflecting each render path's true default (spatial: contain, slot: cover).
+- `spatialFit` became a base `Beat` field: parsed generically, pushed into renderer state on every execute (which also clears stale values so one beat's fit can't leak into the next — a latent bug), and persisted via base `toJSON` — no per-class plumbing for the ~15 slot-mode types. SlotFlowView gained the `backgroundFit` prop (contain letterboxes with theme-colored bars); ReactRenderer's slot branch and the VE preview pass the per-beat value. Preview, VE, and HTML exports (player bundle rebuilt) all honor it.
+
+**Files modified:**
+- `packages/core/src/beats/Beat.ts`, `packages/renderer/src/components/SlotFlowView.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/src/components/visual/VisualWorkspace.tsx`, `packages/builder/src/components/visual/VisualPropertiesPanel.tsx`
+
+### VE ↔ Preview parity: the background divergence, root-caused
+
+Reported as "the endScreen has a background image but it doesn't show in the VE" — three stacked causes:
+
+1. **Unresolved asset URL**: the VE's responsive slot preview passed the raw ASML-only `backgroundUrl` state to SlotFlowView/ChatDialogView without the `backgroundAssetId → asset URL` resolution the fixed and spatial paths already perform — asset-backed backgrounds were invisible in the responsive VE for every slot-mode beat type. Both call sites now resolve the asset first.
+2. **Stale compiled renderer**: the builder was running a week-old renderer dist (the monorepo's compiled-dist import). Rebuilt; a reminder that renderer changes need `npm run build`.
+3. **React shorthand/longhand wipe** (the deep one): SlotFlowView's root mixed the `background` shorthand (gradient themes) with `background-size/repeat/position` longhands. The VE mounts the component before the background URL resolves and re-renders when it arrives; React removes the then-undefined shorthand, the browser clears EVERY background longhand, and React's diff doesn't re-set the ones whose values "didn't change" — size/repeat/position vanished while background-image survived, leaving the image at natural size with the sky row repeating (the phantom "band" under the stage). The Preview mounts with the URL present and never transitioned. Fix: longhands only — gradients go through `backgroundImage`, plain colors through `backgroundColor`; the renderer was swept for the same hazard elsewhere (clean). House rule now documented in the code: never mix a conditional CSS shorthand with its longhands in a React style object.
+
+**Files modified:**
+- `packages/builder/src/components/visual/VisualWorkspace.tsx`, `packages/renderer/src/components/SlotFlowView.tsx`, `packages/builder/public/player-web.js` (rebuilt)
+
+### One-name project rename
+
+- Renaming in the main window's title box silently didn't rename the project: the header edits the STORY title, but the project NAME is what the library cards, Currently-Editing banner, and window title show — and it never followed. Worse, the Browser card's rename-in-place had the mirror bug: renaming the OPEN project there was clobbered by the next auto-save writing the old in-memory name back.
+- Now a **one-name model**: both edit points write both fields. `updateProjectStory` makes the project name follow the story title on save; `handleRenameProject` writes the story title (metadata + plain) and updates the in-memory title when renaming the open project. Verified live with a full round-trip into the library card and banner.
+
+**Files modified:**
+- `packages/builder/src/contexts/PersistenceContext.tsx`, `packages/builder/src/App.tsx`
+
+### Stance pad legibility + User Guide screenshots
+
+- **StancePad enlarged** after a legibility report: default 180→220px (Character Editor pads 240px, AI-helper preview pads 130→180px), axis words ~2× with medium weight, octant labels +35% at higher opacity, bigger dots and readouts.
+- **User Guide screenshot session** (flagged by the user-guide-qa pass): new captures for the template gallery (48), a variant card's stance pad with the hostile disposition (49), and the AI character helper's brief + preview stages (50, 51); the Project Browser shot (45) re-captured to include the template shelf. Captions wired in; stale "predates this feature" annotations updated. Screenshots 49/51 re-taken after the pad enlargement.
+
+**Files modified:**
+- `packages/builder/src/components/characters/StancePad.tsx`, `CharacterEditor.tsx`, `CharacterDevelopmentDialog.tsx`, `docs/USER_GUIDE.md`, `docs/images/45,48-51`
+
+### Verification
+
+All three suites green after every change (2532 core / 2323 builder / 483 renderer); every fix verified live in the running app against the reporting project — rename round-trip through the library, endScreen background cover/contain/default in the VE matching the Preview, stance pad readability confirmed via re-captured screenshots.
+
+---
+
 ## 2026-07-19: Project templates (.asapst) + stance visualization + file-open and AI-conversation fixes (v0.9.79)
 
 ### Overview
