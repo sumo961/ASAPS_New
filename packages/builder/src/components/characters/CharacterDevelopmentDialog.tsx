@@ -24,6 +24,14 @@ import type {
   GeneratedCharacterProfile,
   GeneratedCharacterQuestion,
 } from '../../services/prompts/characterGeneration';
+import { StancePad } from './StancePad';
+import {
+  bigFiveToStance,
+  stanceToBigFive,
+  applyStanceToTraits,
+  describeStance,
+  type InterpersonalStance,
+} from '../../services/prompts/interpersonalStance';
 
 export interface CharacterDevelopmentSession {
   seed: { name?: string; brief?: string; scenario?: string };
@@ -268,6 +276,35 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
     onClose();
   };
 
+  // Stance-pad handlers for the preview cards. The base pad is a direct
+  // lens on the profile's E/A (full-scale inverse rotation) and re-derives
+  // every stance-bearing variant from the new base, keeping the whole
+  // family consistent; a variant pad moves only that variant (stance +
+  // derived E/A, same math the generator used).
+  const handleBaseStanceDrag = (stance: InterpersonalStance) => {
+    if (!profile || busy !== null) return;
+    const newBaseTraits = { ...profile.traits, ...stanceToBigFive(stance) };
+    setProfile({
+      ...profile,
+      traits: newBaseTraits,
+      variants: profile.variants?.map((v) =>
+        v.stance ? { ...v, traits: { ...v.traits, ...applyStanceToTraits(newBaseTraits, v.stance) } } : v,
+      ),
+    });
+  };
+
+  const handleVariantStanceDrag = (variantId: string, stance: InterpersonalStance) => {
+    if (!profile || busy !== null) return;
+    setProfile({
+      ...profile,
+      variants: profile.variants?.map((v) =>
+        v.id === variantId
+          ? { ...v, stance, traits: { ...v.traits, ...applyStanceToTraits(profile.traits, stance) } }
+          : v,
+      ),
+    });
+  };
+
   const renderCard = (opts: {
     target: 'base' | string;
     title: string;
@@ -276,6 +313,7 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
     traits: Record<string, number>;
     mood: { valence: number; arousal: number };
     includeToggle?: { checked: boolean; onChange: (v: boolean) => void };
+    stance?: { value: InterpersonalStance; derived: boolean; onChange: (s: InterpersonalStance) => void };
   }) => (
     <div
       key={opts.target}
@@ -300,6 +338,18 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
       </div>
       <p className="text-sm text-gray-700 whitespace-pre-wrap">{opts.description}</p>
       <TraitRow traits={opts.traits} />
+      {opts.stance && (
+        <div className="flex justify-center">
+          <StancePad
+            warmth={opts.stance.value.warmth}
+            dominance={opts.stance.value.dominance}
+            derived={opts.stance.derived}
+            size={130}
+            onChange={busy === null ? opts.stance.onChange : undefined}
+            subtitle={describeStance(opts.stance.value)}
+          />
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <input
           type="text"
@@ -512,6 +562,11 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
                 description: profile.description,
                 traits: profile.traits,
                 mood: profile.initialMood,
+                stance: {
+                  value: bigFiveToStance(profile.traits),
+                  derived: false,
+                  onChange: handleBaseStanceDrag,
+                },
               })}
               {(profile.variants || []).map((v) =>
                 renderCard({
@@ -521,6 +576,11 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
                   description: v.characterDescription,
                   traits: v.traits,
                   mood: v.initialMood,
+                  stance: {
+                    value: v.stance ?? bigFiveToStance(v.traits),
+                    derived: !v.stance,
+                    onChange: (s) => handleVariantStanceDrag(v.id, s),
+                  },
                   includeToggle: {
                     checked: includedVariantIds.has(v.id),
                     onChange: (checked) =>

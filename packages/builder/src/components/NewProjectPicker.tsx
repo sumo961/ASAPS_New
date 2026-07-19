@@ -13,7 +13,7 @@
  * parallel state machine for the same destinations.
  */
 import React from 'react';
-import { FileText, Wand2, Sparkles, X } from 'lucide-react';
+import { FileText, Wand2, Sparkles, LayoutTemplate, X } from 'lucide-react';
 
 export interface NewProjectPickerProps {
   isOpen: boolean;
@@ -23,6 +23,8 @@ export interface NewProjectPickerProps {
   onPickPrompt?: () => void;
   /** Undefined when no Ideator handler is wired; card renders disabled. */
   onPickIdeator?: () => void;
+  /** Opens the template gallery (worked examples instantiated as copies). */
+  onPickTemplate?: () => void;
 }
 
 export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
@@ -31,6 +33,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
   onPickEmpty,
   onPickPrompt,
   onPickIdeator,
+  onPickTemplate,
 }) => {
   if (!isOpen) return null;
 
@@ -45,7 +48,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-3xl"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -60,7 +63,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             type="button"
             onClick={() => pick(onPickEmpty)}
@@ -110,6 +113,21 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
               <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
             )}
           </button>
+
+          {onPickTemplate && (
+            <button
+              type="button"
+              onClick={() => pick(onPickTemplate)}
+              className="flex flex-col items-start gap-2 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-amber-400 hover:bg-amber-50 transition text-left group"
+              title="Worked example projects you adapt — using one always creates your own copy"
+            >
+              <LayoutTemplate className="w-7 h-7 text-amber-500 group-hover:scale-110 transition-transform" />
+              <div className="text-base font-semibold text-gray-900">Start from a template</div>
+              <div className="text-sm text-gray-600 leading-snug">
+                Worked examples you adapt
+              </div>
+            </button>
+          )}
         </div>
       </div>
     </div>

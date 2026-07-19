@@ -22,8 +22,10 @@ import {
 import {
   stanceToTraitDeltas,
   bigFiveToStance,
+  stanceToBigFive,
   applyStanceToTraits,
   normalizeStance,
+  describeStance,
 } from '../interpersonalStance';
 
 const seed: CharacterGenerationSeed = {
@@ -205,6 +207,32 @@ describe('interpersonal stance grounding', () => {
     expect(hostile.agreeableness).toBeCloseTo(0.6 + 0.35 * (-1.2 / Math.SQRT2), 5);
     const extreme = applyStanceToTraits({ extraversion: 0.05, agreeableness: 0.05 }, { warmth: -1, dominance: -1 });
     expect(extreme.extraversion).toBe(0); // clamped
+  });
+
+  it('stanceToBigFive is the full-scale inverse of bigFiveToStance', () => {
+    // Round-trip: any E/A inside the unit disc survives both rotations.
+    for (const [e, a] of [[0.5, 0.5], [0.7, 0.3], [0.2, 0.8], [0.5, 0.9]]) {
+      const back = stanceToBigFive(bigFiveToStance({ extraversion: e, agreeableness: a }));
+      expect(back.extraversion).toBeCloseTo(e, 5);
+      expect(back.agreeableness).toBeCloseTo(a, 5);
+    }
+    // The origin is neutral E/A.
+    expect(stanceToBigFive({ warmth: 0, dominance: 0 })).toEqual({ extraversion: 0.5, agreeableness: 0.5 });
+    // Full warm-dominant clamps into [0, 1].
+    const extreme = stanceToBigFive({ warmth: 1, dominance: 1 });
+    expect(extreme.extraversion).toBe(1);
+    expect(extreme.agreeableness).toBeCloseTo(0.5, 5);
+  });
+
+  it('describeStance names octants, pure axes, and the neutral center', () => {
+    expect(describeStance({ warmth: 0, dominance: 0 })).toBe('neutral');
+    expect(describeStance({ warmth: 0.05, dominance: -0.1 })).toBe('neutral');
+    expect(describeStance({ warmth: 0.8, dominance: 0.05 })).toBe('warm');
+    expect(describeStance({ warmth: 0.05, dominance: -0.8 })).toBe('submissive');
+    expect(describeStance({ warmth: -0.7, dominance: 0.5 })).toBe('cold-dominant (hostile)');
+    expect(describeStance({ warmth: 0.7, dominance: -0.2 })).toBe('warm-submissive (cooperative)');
+    expect(describeStance({ warmth: -0.4, dominance: -0.6 })).toBe('cold-submissive (withdrawn)');
+    expect(describeStance({ warmth: 0.6, dominance: 0.6 })).toBe('warm-dominant (leading)');
   });
 
   it('normalizeStance clamps axes and rejects garbage', () => {

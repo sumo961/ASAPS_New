@@ -206,6 +206,21 @@ describe('projectZipManager', () => {
       }
     });
 
+    it('writes the template flag only when asTemplate is requested', async () => {
+      mockStorage.getProject.mockResolvedValue({ success: true, data: testProject });
+      mockStorage.getProjectAssets.mockResolvedValue({ success: true, data: [] });
+
+      const templateBlob = await exportProjectAsZip('test-project-id', { asTemplate: true });
+      const templateZip = await JSZip.loadAsync(templateBlob);
+      const templateJson = JSON.parse(await templateZip.file('project.json')!.async('text'));
+      expect(templateJson.project.projectType).toBe('template');
+
+      const normalBlob = await exportProjectAsZip('test-project-id');
+      const normalZip = await JSZip.loadAsync(normalBlob);
+      const normalJson = JSON.parse(await normalZip.file('project.json')!.async('text'));
+      expect(normalJson.project.projectType).toBeUndefined();
+    });
+
     it('should throw error if project not found', async () => {
       mockStorage.getProject.mockResolvedValue({
         success: false,
@@ -310,6 +325,78 @@ describe('projectZipManager', () => {
 
       expect(result.success).toBe(true);
       expect(result.projectId).not.toBe('original-id');
+    });
+
+    // --- Template semantics (.asapst / projectType flag) ------------------
+
+    const makeZipFile = async (projectPatch: Record<string, any>, fileName: string) => {
+      const zip = new JSZip();
+      zip.file('project.json', JSON.stringify({
+        metadata: {
+          exportVersion: '1.1.0',
+          exportedAt: new Date().toISOString(),
+          projectId: 'template-master-id',
+          projectName: 'Template Master',
+        },
+        project: {
+          id: 'template-master-id',
+          name: 'Template Master',
+          settings: {},
+          story: { beats: [], metadata: { title: 'Template Master' } },
+          ...projectPatch,
+        },
+      }));
+      const blob = await zip.generateAsync({ type: 'blob' });
+      return new File([blob], fileName, { type: 'application/zip' });
+    };
+
+    it('projectType flag forces a fresh copy even when the caller asked to keep the id', async () => {
+      const zipFile = await makeZipFile({ projectType: 'template' }, 'master.asaps.zip');
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: false });
+
+      expect(result.success).toBe(true);
+      expect(result.projectId).not.toBe('template-master-id');
+      // The instantiated copy is a NORMAL project — the flag must not persist.
+      const created = mockStorage.createProject.mock.calls[0][0];
+      expect(created.projectType).toBeUndefined();
+    });
+
+    it('.asapst extension alone triggers template semantics (renamed-flag fallback)', async () => {
+      const zipFile = await makeZipFile({}, 'shared-by-teacher.asapst');
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: false });
+
+      expect(result.success).toBe(true);
+      expect(result.projectId).not.toBe('template-master-id');
+    });
+
+    it('template import can never hit the overwrite path even if requested', async () => {
+      const zipFile = await makeZipFile({ projectType: 'template' }, 'master.asapst');
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { overwrite: true, generateNewId: false });
+
+      expect(result.success).toBe(true);
+      expect(result.projectId).not.toBe('template-master-id');
+      expect(mockStorage.updateProject).not.toHaveBeenCalled();
+      expect(mockStorage.createProject).toHaveBeenCalled();
+    });
+
+    it('plain .asaps files without the flag keep the ordinary import behavior', async () => {
+      const zipFile = await makeZipFile({}, 'normal.asaps.zip');
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: false });
+
+      expect(result.success).toBe(true);
+      expect(result.projectId).toBe('template-master-id');
     });
 
     it('should import assets from ZIP', async () => {

@@ -130,6 +130,24 @@ export function bigFiveToStance(traits: {
 }
 
 /**
+ * Full-scale inverse of bigFiveToStance: place a stance and get the
+ * extraversion/agreeableness (in [0, 1]) that sit exactly there on the
+ * circumplex. Used by the BASE-personality StancePad, where the pad is a
+ * direct lens on the trait sliders (no weighting — dragging the dot IS
+ * setting E/A). Variant pads instead use applyStanceToTraits, which
+ * displaces from the base by STANCE_TRAIT_WEIGHT.
+ */
+export function stanceToBigFive(stance: InterpersonalStance): {
+  extraversion: number;
+  agreeableness: number;
+} {
+  const e = (stance.warmth + stance.dominance) / Math.SQRT2;
+  const a = (stance.warmth - stance.dominance) / Math.SQRT2;
+  const to01 = (n: number) => Math.min(1, Math.max(0, (n + 1) / 2));
+  return { extraversion: to01(e), agreeableness: to01(a) };
+}
+
+/**
  * How strongly a stance displaces the base character's A/E. 0.35 keeps
  * the person recognizable across dispositions (a shy hostile stays shy)
  * while making the stance clearly legible in the traits. Tunable.
@@ -157,6 +175,27 @@ export function applyStanceToTraits(
 }
 
 const clampAxis = (n: number) => Math.min(1, Math.max(-1, n));
+
+/**
+ * Qualitative octant description for UI readouts ("cold-dominant (hostile)").
+ * Near the origin the stance is neutral; on a near-pure axis only that axis
+ * is named; otherwise the diagonal octant plus its Leary-tradition label.
+ */
+export function describeStance(stance: InterpersonalStance): string {
+  const { warmth: w, dominance: d } = stance;
+  const NEAR = 0.18;
+  if (Math.abs(w) < NEAR && Math.abs(d) < NEAR) return 'neutral';
+  const warmWord = w >= 0 ? 'warm' : 'cold';
+  const domWord = d >= 0 ? 'dominant' : 'submissive';
+  if (Math.abs(d) < NEAR) return warmWord;
+  if (Math.abs(w) < NEAR) return domWord;
+  const octant =
+    w >= 0 && d >= 0 ? 'leading'
+    : w < 0 && d >= 0 ? 'hostile'
+    : w < 0 ? 'withdrawn'
+    : 'cooperative';
+  return `${warmWord}-${domWord} (${octant})`;
+}
 
 /** Normalize an AI-returned stance object; null when unusable. */
 export function normalizeStance(raw: unknown): InterpersonalStance | null {

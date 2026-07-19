@@ -33,19 +33,58 @@ try {
   // electron-squirrel-startup not installed, ignore (only needed for Windows installers)
 }
 
+// File-open plumbing shared by all three entry routes:
+//   - macOS `open-file` event (double-click while running OR cold start)
+//   - Windows/Linux second launch (`second-instance` passes argv)
+//   - Windows/Linux cold start (file path arrives in process.argv)
+// A file that arrives before the renderer is listening is stashed in
+// `pendingOpenFile`; the renderer collects it via the
+// 'project:get-pending-open' handshake once its listener is registered
+// (signal-based — no load/mount timing races).
+let pendingOpenFile: string | null = null;
+
+function extractProjectFileFromArgv(argv: string[]): string | null {
+  // Skip the executable (and in dev, the app path); associations only
+  // cover our own extensions, so match those rather than any .zip.
+  for (const arg of argv.slice(1)) {
+    if (arg.startsWith('-')) continue;
+    if (/\.(asaps|asapst)(\.zip)?$/i.test(arg)) return arg;
+  }
+  return null;
+}
+
+function openProjectFile(path: string): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    currentProjectPath = path;
+    mainWindow.webContents.send('project:open', path);
+  } else {
+    pendingOpenFile = path;
+  }
+}
+
 // Enforce single instance — prevent duplicate windows on install/update
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   // Another instance is already running — quit this one
   app.quit();
 } else {
-  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+  app.on('second-instance', (_event, commandLine, _workingDirectory) => {
+    // Windows/Linux route a double-clicked file at the running instance
+    // through a second launch — the path rides in its argv.
+    const file = extractProjectFileFromArgv(commandLine);
+    if (file) openProjectFile(file);
     // Someone tried to launch a second instance — focus the existing window
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
   });
+
+  // Cold start by double-clicking an associated file (Windows/Linux):
+  // the path is in our own argv. Stash it; the renderer collects it via
+  // the pending-open handshake when ready.
+  const coldStartFile = extractProjectFileFromArgv(process.argv);
+  if (coldStartFile) pendingOpenFile = coldStartFile;
 }
 
 // App settings management
@@ -695,6 +734,16 @@ async function handleSaveAs(): Promise<void> {
 }
 
 // IPC handlers for filesystem operations
+// Pending-open handshake: the renderer calls this right after it registers
+// its 'project:open' listener, collecting any file that arrived before the
+// listener existed (cold-start double-click on any platform).
+ipcMain.handle('project:get-pending-open', () => {
+  const path = pendingOpenFile;
+  pendingOpenFile = null;
+  if (path) currentProjectPath = path;
+  return path;
+});
+
 ipcMain.handle('fs:read-file', async (_, path: string) => {
   console.log('[IPC:fs] read-file:', path);
   try {
@@ -1479,11 +1528,10 @@ app.on('before-quit', (event) => {
     .catch((error) => console.error('[Main] Error stopping API server:', error));
 });
 
-// Handle file open on macOS (when double-clicking a file)
+// Handle file open on macOS (when double-clicking a file). Cold-start
+// opens (event fires before any window exists) are stashed and collected
+// by the renderer's pending-open handshake instead of being dropped.
 app.on('open-file', (event, path) => {
   event.preventDefault();
-  if (mainWindow) {
-    currentProjectPath = path;
-    mainWindow.webContents.send('project:open', path);
-  }
+  openProjectFile(path);
 });

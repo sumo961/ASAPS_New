@@ -1,0 +1,153 @@
+{
+  "metadata": {
+    "exportVersion": "1.1.0",
+    "exportedAt": "2026-07-19T12:00:00.000Z",
+    "exportedBy": "ASAPS Builder",
+    "projectId": "template-rehearsal-difficult-client",
+    "projectName": "Rehearsal: The Difficult Client"
+  },
+  "project": {
+    "id": "template-rehearsal-difficult-client",
+    "name": "Rehearsal: The Difficult Client",
+    "description": "Training template: practice a difficult client conversation with an AI-played character who arrives in a different disposition every session. Built for social-work rehearsal; adapt the scenario, the client, and the dispositions to your own case material.",
+    "createdAt": "2026-07-19T12:00:00.000Z",
+    "modifiedAt": "2026-07-19T12:00:00.000Z",
+    "version": "1.0.0",
+    "projectType": "template",
+    "settings": {},
+    "globalSettings": {},
+    "themeId": null,
+    "themeOverrides": null,
+    "story": {
+      "metadata": {
+        "title": "Rehearsal: The Difficult Client",
+        "author": "ASAPS template",
+        "firstBeatId": "beat_title"
+      },
+      "beats": [
+        {
+          "id": "beat_title",
+          "name": "Title",
+          "type": "titleScreen",
+          "locations": [],
+          "connections": [{ "targetId": "beat_brief", "label": "Start" }],
+          "x": 80,
+          "y": 220,
+          "parameters": {
+            "title": "Rehearsal: The Difficult Client",
+            "author": "A replayable training conversation",
+            "buttonText": "Begin"
+          }
+        },
+        {
+          "id": "beat_brief",
+          "name": "Your Briefing",
+          "type": "infoText",
+          "locations": [],
+          "connections": [{ "targetId": "beat_conversation", "label": "Meet Karin" }],
+          "x": 320,
+          "y": 220,
+          "parameters": {
+            "text": "You are a caseworker at a municipal social services office.\n\nYour 14:00 appointment is Karin Lindqvist, 48. She missed two payments on her rent support plan and was called in to discuss it. Her file notes a recent divorce and a part-time cleaning job with irregular hours.\n\nYour goals for this session:\n• Find out what happened with the payments.\n• Keep the working relationship intact.\n• Agree on one concrete next step.\n\nOne more thing: you don't know which Karin will walk in today. Each time you restart this scenario, she arrives in a different frame of mind — just like real practice. Rehearse, restart, compare.",
+            "buttonText": "She's here"
+          }
+        },
+        {
+          "id": "beat_conversation",
+          "name": "The Session",
+          "type": "aiConversation",
+          "locations": [],
+          "connections": [{ "targetId": "beat_debrief", "label": "Session over" }],
+          "x": 560,
+          "y": 220,
+          "parameters": {
+            "scenario": "A scheduled appointment at a municipal social services office. The caseworker (the player) must address two missed payments on Karin's rent support plan, understand what happened, keep the working relationship intact, and agree on one concrete next step. Karin needs the support to keep her flat but finds the situation humiliating.",
+            "npcName": "karin",
+            "npcPersonality": "",
+            "maxTurns": 12
+          }
+        },
+        {
+          "id": "beat_debrief",
+          "name": "Debrief",
+          "type": "infoText",
+          "locations": [],
+          "connections": [{ "targetId": "beat_end", "label": "Finish" }],
+          "x": 800,
+          "y": 220,
+          "parameters": {
+            "text": "The session is over. Before you restart, take two minutes:\n\n• Which disposition did Karin arrive in today — and when did you first notice?\n• What did you say that opened her up? What shut her down?\n• Did you leave with a concrete next step, or only with an atmosphere?\n\nRestart the story to meet a different Karin. The scenario stays the same; she doesn't.\n\nFor instructors: this project is a template. Open the character editor to see how Karin's dispositions are built (four variants on one character, drawn at random each playthrough), then adapt the scenario, the client, and the dispositions to your own case material.",
+            "buttonText": "Continue"
+          }
+        },
+        {
+          "id": "beat_end",
+          "name": "End",
+          "type": "endScreen",
+          "locations": [],
+          "connections": [],
+          "x": 1040,
+          "y": 220,
+          "parameters": {
+            "text": "Session complete.\n\nRestart to rehearse with a different Karin."
+          }
+        }
+      ],
+      "characters": [
+        {
+          "id": "karin",
+          "name": "karin",
+          "displayName": "Karin Lindqvist",
+          "role": "npc",
+          "visual": { "type": "static" },
+          "states": [
+            { "id": "default", "name": "default", "displayName": "Default", "visual": {} }
+          ],
+          "defaultState": "default",
+          "counters": [],
+          "inventory": [],
+          "description": "Karin Lindqvist, 48, recently divorced, works irregular part-time hours as a cleaner. She missed two payments on her rent support plan and was called in to discuss it. She needs the support to keep her flat and finds the whole situation humiliating. She speaks in short, concrete sentences, references dates and letters precisely when she feels safe, and goes vague when she doesn't. She never uses bureaucratic language herself and mistrusts people who do.",
+          "tags": ["template", "client"],
+          "variantSelectionPolicy": "random",
+          "variants": [
+            {
+              "id": "cooperative",
+              "name": "Cooperative",
+              "characterDescription": "Karin Lindqvist, 48, recently divorced, cleaning job with irregular hours; missed two rent-support payments and needs the support to keep her flat. Today she has decided to give the process a chance: she answers directly, brings up the second missed payment herself, and offers dates without being asked. She thanks the caseworker for small things, hedges softly ('I think it was the week after…'), and accepts reframing. The shame is still there — visible when she rushes past the divorce — but today it makes her diligent rather than defensive.",
+              "stance": { "warmth": 0.7, "dominance": -0.2 },
+              "traits": { "openness": 0.5, "conscientiousness": 0.6, "extraversion": 0.62, "agreeableness": 0.72, "neuroticism": 0.45 },
+              "initialMood": { "valence": 0.2, "arousal": 0.1 }
+            },
+            {
+              "id": "hostile",
+              "name": "Hostile",
+              "characterDescription": "Karin Lindqvist, 48, recently divorced, cleaning job with irregular hours; missed two rent-support payments and needs the support to keep her flat. Today the humiliation comes out as attack: the letters were confusing, the office changed her contact person twice, nobody answers the phone. She interrupts, demands to know who is responsible, refuses the first two suggestions on principle, and treats sympathy as condescension. Short, sharp sentences; 'that's not my problem' is a favorite. Under the anger she is terrified of losing the flat — reachable only through concrete, verifiable commitments, never through soothing.",
+              "stance": { "warmth": -0.7, "dominance": 0.5 },
+              "traits": { "openness": 0.45, "conscientiousness": 0.55, "extraversion": 0.45, "agreeableness": 0.2, "neuroticism": 0.75 },
+              "initialMood": { "valence": -0.5, "arousal": 0.6 }
+            },
+            {
+              "id": "avoidant",
+              "name": "Avoidant",
+              "characterDescription": "Karin Lindqvist, 48, recently divorced, cleaning job with irregular hours; missed two rent-support payments and needs the support to keep her flat. Today she wants to be anywhere else: minimal answers, long pauses, sudden topic changes to her work schedule or the weather. Direct questions about the payments get 'it's complicated' or 'I'd have to check.' She agrees vaguely to things to end the topic, without meaning them. The shame drives withdrawal — she opens up slightly only when the caseworker names something concrete without judgment and leaves silence for her to fill.",
+              "stance": { "warmth": -0.4, "dominance": -0.6 },
+              "traits": { "openness": 0.45, "conscientiousness": 0.5, "extraversion": 0.25, "agreeableness": 0.55, "neuroticism": 0.7 },
+              "initialMood": { "valence": -0.3, "arousal": -0.4 }
+            },
+            {
+              "id": "ambivalent",
+              "name": "Ambivalent",
+              "characterDescription": "Karin Lindqvist, 48, recently divorced, cleaning job with irregular hours; missed two rent-support payments and needs the support to keep her flat. Today she oscillates: she asks for help and then retracts ('forget it, I'll manage'), agrees to a plan and doubts it in the next sentence, starts explaining the missed payments and breaks off mid-story. Warmth and withdrawal alternate within single turns. She is testing whether the caseworker will stay steady — consistency and patience move her; pushing for a quick decision tips her into retreat.",
+              "stance": { "warmth": 0.1, "dominance": -0.1 },
+              "traits": { "openness": 0.55, "conscientiousness": 0.45, "extraversion": 0.5, "agreeableness": 0.55, "neuroticism": 0.65 },
+              "initialMood": { "valence": -0.15, "arousal": 0.3 }
+            }
+          ]
+        }
+      ],
+      "settings": {},
+      "environment": { "nodes": [], "props": [] },
+      "clusters": []
+    }
+  }
+}

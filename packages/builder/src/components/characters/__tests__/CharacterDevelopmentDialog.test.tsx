@@ -235,6 +235,24 @@ describe('CharacterDevelopmentDialog', () => {
     ]);
   });
 
+  it('preview cards render interactive stance pads (base lens + per-variant)', async () => {
+    generateCharacterProfile.mockResolvedValue({
+      ...profileWithVariants,
+      variants: profileWithVariants.variants!.map((v, i) =>
+        i === 0 ? { ...v, stance: { warmth: -0.7, dominance: 0.5 } } : v,
+      ),
+    });
+    renderDialog({ seed: { brief: 'a mother' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate$/i }));
+    await waitFor(() => expect(screen.getByText('Hostile Iris, self-contained.')).toBeInTheDocument());
+
+    // One pad per card (base + 2 variants) — each shows the w/d readout.
+    const body = document.body.textContent!;
+    expect((body.match(/w [+-]\d\.\d\d/g) || []).length).toBe(3);
+    // The authored hostile stance gets its octant subtitle.
+    expect(body).toContain('cold-dominant (hostile)');
+  });
+
   it('surfaces generation errors without leaving the brief stage', async () => {
     generateCharacterProfile.mockRejectedValue(new Error('provider exploded'));
     renderDialog({ seed: { brief: 'a mother' } });

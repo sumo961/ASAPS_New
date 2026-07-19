@@ -141,6 +141,12 @@ CURRENT TURN: ${turnNumber}
 DIRECTIONS TO EVALUATE:
 ${directionDescriptions.join('\n')}
 
+MATCHING RULES:
+- Keyword matching is CASE-INSENSITIVE: "goddess" counts as a mention of "Goddess" and vice versa.
+- Singular/plural and inflected forms count ("spirit" matches "Spirits").
+- A clear paraphrase of a keyword's topic counts as mentioning it; an unrelated word that merely shares letters does not.
+- For NOT conditions, apply the same rules first, then invert.
+
 Return a JSON array of triggered direction indices. Example: [0, 2]
 If none are triggered, return: []
 Only return the JSON array, nothing else.`;

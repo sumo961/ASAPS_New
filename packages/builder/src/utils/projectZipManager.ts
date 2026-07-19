@@ -21,7 +21,17 @@ import type { Project, StoredAsset, AssetType } from '../storage/types';
  */
 export async function exportProjectAsZip(
   projectId: string,
-  options?: { overrideFirstBeatId?: string },
+  options?: {
+    overrideFirstBeatId?: string;
+    /**
+     * Template export (.asapst): writes `project.projectType = 'template'`
+     * into project.json. The flag — not the file extension — is the source
+     * of truth: importing any file carrying it always instantiates a COPY
+     * (fresh project id) and never opens/overwrites in place, so a
+     * distributed template master can't be edited by accident.
+     */
+    asTemplate?: boolean;
+  },
 ): Promise<Blob> {
   const storage = getStorageManager();
 
@@ -102,6 +112,10 @@ export async function exportProjectAsZip(
       createdAt: project.createdAt,
       modifiedAt: project.modifiedAt,
       version: project.version,
+      // Template flag (see options.asTemplate). Never inherited from the
+      // stored project — instantiated copies are normal projects, so only
+      // an explicit template export writes it.
+      ...(options?.asTemplate ? { projectType: 'template' as const } : {}),
       settings: project.settings,
       globalSettings: project.globalSettings,  // Full global settings
       themeId: project.themeId,                // Theme reference
@@ -396,6 +410,20 @@ export async function importProjectFromZip(
       version: projectData.metadata.exportVersion
     });
 
+    // Template semantics (.asapst): a file carrying the template flag (or
+    // extension — the flag is the source of truth, the extension the
+    // affordance, so a renamed file keeps its behavior) always
+    // instantiates a fresh COPY. Forcing generateNewId means the master
+    // can never be opened/overwritten in place — the .dotx guarantee.
+    // The flag is stripped so the instantiated copy is a normal project.
+    const isTemplate = projectData.project.projectType === 'template'
+      || /\.asapst(\.zip)?$/i.test(zipFile.name);
+    if (isTemplate) {
+      options = { ...options, generateNewId: true, overwrite: false };
+      delete projectData.project.projectType;
+      console.log('[importProjectFromZip] Template detected — instantiating as a new project');
+    }
+
     // Generate new ID if requested
     const projectId = options.generateNewId ? uuidv4() : projectData.project.id;
 
@@ -545,12 +573,20 @@ export async function importProjectFromZip(
 }
 
 /**
- * Download project as ZIP file
+ * Download project as ZIP file. With `asTemplate`, saves a `.asapst`
+ * template instead — same zip, but project.json carries the template flag
+ * so any future import instantiates a copy (never edits the master).
  */
-export async function downloadProjectAsZip(projectId: string, projectName: string): Promise<void> {
+export async function downloadProjectAsZip(
+  projectId: string,
+  projectName: string,
+  options?: { asTemplate?: boolean },
+): Promise<void> {
   try {
-    const blob = await exportProjectAsZip(projectId);
-    const filename = `${projectName.replace(/[^a-z0-9]/gi, '_')}.asaps.zip`;
+    const asTemplate = options?.asTemplate === true;
+    const blob = await exportProjectAsZip(projectId, asTemplate ? { asTemplate: true } : undefined);
+    const safeName = projectName.replace(/[^a-z0-9]/gi, '_');
+    const filename = asTemplate ? `${safeName}.asapst` : `${safeName}.asaps.zip`;
 
     // Check if we're in Electron
     if (window.electronAPI?.dialog?.save) {
@@ -558,7 +594,9 @@ export async function downloadProjectAsZip(projectId: string, projectName: strin
       const result = await window.electronAPI.dialog.save({
         defaultPath: filename,
         filters: [
-          { name: 'ASAPS Project', extensions: ['asaps.zip'] },
+          asTemplate
+            ? { name: 'ASAPS Template', extensions: ['asapst'] }
+            : { name: 'ASAPS Project', extensions: ['asaps.zip'] },
         ],
       });
 

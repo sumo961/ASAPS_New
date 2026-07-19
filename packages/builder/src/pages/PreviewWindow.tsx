@@ -322,6 +322,9 @@ export const PreviewWindow: React.FC = () => {
   const [showDebugPanel, setShowDebugPanel] = useState(true);
   const [debugInfo, setDebugInfo] = useState<{
     visitedBeats?: string[];
+    /** Beats injected by the start-state preset (mid-story start), NOT
+     *  actually visited in this run — the debug panel badges them. */
+    seededBeats?: string[];
     variables?: Record<string, any>;
     counters?: Record<string, number>;
     inventory?: Array<{ name: string; quantity: number }>;
@@ -334,6 +337,10 @@ export const PreviewWindow: React.FC = () => {
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
+  // Beat ids marked visited by the applied start-state preset rather than by
+  // actual playthrough — lets the debug panel distinguish "seeded" from
+  // "visited in this run". Reset on every (re)start.
+  const seededBeatsRef = useRef<Set<string>>(new Set());
   const previewDataRef = useRef<PreviewData | null>(null);
   const loadingTranslationsRef = useRef<Map<string, string>>(new Map());
   const isElectronRef = useRef<boolean>(false);
@@ -1451,6 +1458,14 @@ export const PreviewWindow: React.FC = () => {
         Object.entries(presetToApply.state.counters).forEach(([key, value]) => context.setCounter(key, value));
         presetToApply.state.inventory.forEach(item => context.addToInventory(item));
         presetToApply.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
+        // The start beat itself IS genuinely visited in this run — only the
+        // simulated path leading up to it counts as seeded.
+        const runStartBeat = overrideBeatId || startBeatId;
+        seededBeatsRef.current = new Set(
+          presetToApply.state.visitedBeats.filter(id => id !== runStartBeat),
+        );
+      } else {
+        seededBeatsRef.current = new Set();
       }
 
       // Set up beat tracking and debug info updates
@@ -1479,6 +1494,7 @@ export const PreviewWindow: React.FC = () => {
 
         setDebugInfo({
           visitedBeats,
+          seededBeats: Array.from(seededBeatsRef.current),
           variables,
           counters,
           inventory: ctx.getInventoryEntries(),
@@ -2847,25 +2863,48 @@ export const PreviewWindow: React.FC = () => {
                   );
                 })()}
 
-                {/* Visited Beats */}
-                {debugInfo.visitedBeats && debugInfo.visitedBeats.length > 0 && (
-                  <div className="bg-white p-3 rounded-lg">
-                    <div className="text-sm font-medium text-gray-600 mb-2">
-                      Visited Beats ({debugInfo.visitedBeats.length})
+                {/* Visited Beats — beats injected by a mid-story start preset are
+                    badged "seeded": visited-beat conditions treat them as visited,
+                    but the player never saw them in this run. */}
+                {debugInfo.visitedBeats && debugInfo.visitedBeats.length > 0 && (() => {
+                  const seededSet = new Set(debugInfo.seededBeats || []);
+                  const seededCount = debugInfo.visitedBeats.filter((b: string) => seededSet.has(b)).length;
+                  return (
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="text-sm font-medium text-gray-600 mb-2">
+                        Visited Beats ({debugInfo.visitedBeats.length})
+                        {seededCount > 0 && (
+                          <span
+                            className="ml-1 font-normal text-xs text-amber-600"
+                            title="Seeded beats were injected by the start-from-beat state, not visited in this run"
+                          >
+                            — {seededCount} seeded by start state
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {debugInfo.visitedBeats.map((beatId: string, idx: number) => {
+                          const beat = story?.getBeat(beatId);
+                          const seeded = seededSet.has(beatId);
+                          return (
+                            <div key={`${beatId}-${idx}`} className="text-xs text-gray-600 flex items-center gap-1">
+                              <ChevronRight className="w-3 h-3" />
+                              {beat?.name || beatId}
+                              {seeded && (
+                                <span
+                                  className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded"
+                                  title="Not visited in this run — injected by the start-from-beat state so visited-beat conditions behave as if the player took this path"
+                                >
+                                  seeded
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
-                      {debugInfo.visitedBeats.map((beatId: string, idx: number) => {
-                        const beat = story?.getBeat(beatId);
-                        return (
-                          <div key={`${beatId}-${idx}`} className="text-xs text-gray-600 flex items-center gap-1">
-                            <ChevronRight className="w-3 h-3" />
-                            {beat?.name || beatId}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Variables */}
                 {debugInfo.variables && Object.keys(debugInfo.variables).length > 0 && (

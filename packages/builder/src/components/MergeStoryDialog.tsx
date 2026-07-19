@@ -117,7 +117,7 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".asaps,.zip"
+                accept=".asaps,.zip,.asapst"
                 className="hidden"
                 onChange={e => {
                   handleFile(e.target.files?.[0]);

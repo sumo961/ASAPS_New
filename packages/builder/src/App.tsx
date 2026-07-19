@@ -123,6 +123,8 @@ declare global {
       onMenuAutoArrange: (callback: () => void) => () => void;
       onMcpSettingChanged?: (callback: (enabled: boolean) => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;
+      /** Collects a file double-clicked before the listener existed (cold start). */
+      getPendingProjectOpen?: () => Promise<string | null>;
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       onProjectOpenFolder?: (callback: (path: string) => void) => () => void;
       onProjectSaveAsFolder?: (callback: (path: string) => void) => () => void;
@@ -731,13 +733,15 @@ function App() {
 
     console.log('[Electron] Setting up menu event listeners');
 
-    // Handle opening a project from File menu
-    const unsubscribeOpen = window.electronAPI.onProjectOpen(async (filePath: string) => {
+    // Handle opening a project from File menu / double-clicked file
+    const handleProjectOpenPath = async (filePath: string) => {
       console.log('[Electron] Opening project:', filePath);
       try {
         const buffer = await window.electronAPI!.fs.readFile(filePath);
         const blob = new Blob([buffer]);
-        const fileName = filePath.split('/').pop() || 'project.zip';
+        // Split on both separators — Windows paths use backslashes, and the
+        // filename must survive so the .asapst template detection sees it.
+        const fileName = filePath.split(/[\\/]/).pop() || 'project.zip';
         const file = new File([blob], fileName, { type: 'application/zip' });
 
         // Helper function to handle import with conflict resolution
@@ -779,7 +783,18 @@ function App() {
         console.error('[Electron] Failed to open project:', error);
         alert(`Failed to open project: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    });
+    };
+
+    const unsubscribeOpen = window.electronAPI.onProjectOpen(handleProjectOpenPath);
+
+    // Cold-start handshake: collect a file that was double-clicked before
+    // this listener existed (main stashes it and clears the slot on read).
+    // Signal-based — asks main once the listener is actually registered.
+    window.electronAPI.getPendingProjectOpen?.()
+      .then((path) => {
+        if (path) handleProjectOpenPath(path);
+      })
+      .catch(() => {});
 
     // Handle Save from File menu
     const unsubscribeSave = window.electronAPI.onMenuSave(() => {
@@ -809,6 +824,7 @@ function App() {
         const projectName = fileName
           .replace(/\.asaps\.zip$/i, '')
           .replace(/\.zip$/i, '')
+          .replace(/\.asapst$/i, '')
           .replace(/\.asaps$/i, '') || 'Project';
 
         console.log('[Electron] Saving project as:', projectName);
@@ -4180,6 +4196,24 @@ function App() {
     }
   }, [currentProject, saveNow]);
 
+  // Template export (.asapst): same zip with the template flag — anyone
+  // importing the file gets their own copy; the master is never edited.
+  const handleExportTemplate = useCallback(async () => {
+    if (!currentProject) {
+      alert('No project loaded. Please save or create a project first.');
+      return;
+    }
+
+    try {
+      await saveNow();
+      await downloadProjectAsZip(currentProject.id, currentProject.name, { asTemplate: true });
+      alert('Template exported. Anyone who imports this .asapst file gets their own copy of the project — the file itself is never edited.');
+    } catch (error) {
+      console.error('Template export failed:', error);
+      alert('Failed to export template. See console for details.');
+    }
+  }, [currentProject, saveNow]);
+
   const handleExportAsmlWithAssets = useCallback(async () => {
     try {
       // Generate ASML XML
@@ -4255,7 +4289,7 @@ function App() {
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps.zip';
+    input.accept = '.zip,.asaps.zip,.asapst';
 
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
@@ -6209,6 +6243,7 @@ function App() {
         onExport={handleExport}
         onImport={handleImport}
         onExportZip={handleExportZip}
+        onExportTemplate={handleExportTemplate}
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
         onMergeStory={() => setShowMergeDialog(true)}

@@ -85,6 +85,14 @@ The AI authors only O/C/N and the prose. Deriving from the **base** character's 
 
 Preview refinement is stance-aware: a revision direction like "more dominant" moves the stance, and A/E are re-derived.
 
+### Editor visualization (StancePad)
+
+`packages/builder/src/components/characters/StancePad.tsx` renders the stance as an interactive Leary's Rose — the sibling of the MoodPad (Russell's circumplex for mood). Warmth runs left→right, dominance bottom→top, with the four octant labels (hostile / leading / withdrawn / cooperative) in the corners. `describeStance()` provides the qualitative readout ("cold-dominant (hostile)"). It appears in three places:
+
+1. **CharacterEditor variant cards** (Affect tab): dragging writes the variant's `stance` **and re-derives its extraversion + agreeableness** via the weighted rotation, so the trait sliders follow the dot — the coupling is visible, not hidden. A variant without an authored stance shows a dashed dot at its trait-derived position (`bigFiveToStance`); once a stance exists, a hollow "traits" ghost marker appears whenever hand-tuned sliders drift away from the authored stance.
+2. **CharacterEditor base personality section** (shown when the character has no variants): here the pad is a pure two-way *lens* — the dot mirrors the E/A sliders via `bigFiveToStance`, and dragging sets both at once via the full-scale inverse rotation (`stanceToBigFive`, no weighting). Corners of the E×A square map slightly outside the unit disc; the pad clamps the dot at the rim.
+3. **AI helper preview cards** (CharacterDevelopmentDialog): each variant card carries its stance pad (dragging moves that variant: stance + derived E/A, same math the generator used), and the base card carries the lens — dragging the base re-derives every stance-bearing variant from the new base traits, keeping the whole family consistent before accepting.
+
 ### Two documented simplifications (tunable)
 
 1. **Rotation angle**: the literature's angle is ~30°; the implementation uses 45° for symmetric math. 

@@ -198,6 +198,17 @@ describe('ConversationPromptBuilder', () => {
       expect(prompt).toContain('NPC: Welcome!');
       expect(prompt).toContain('Player: Hello');
     });
+
+    it('instructs the evaluator that keyword matching is case-insensitive', () => {
+      // Field report 2026-07-18: capitalized keywords ("Goddess") read as
+      // proper nouns and lowercase player mentions were not matched. The
+      // eval prompt must state the matching rules explicitly.
+      const prompt = buildDirectionEvaluationPrompt('test', [], [], 1);
+
+      expect(prompt).toContain('CASE-INSENSITIVE');
+      expect(prompt).toContain('Singular/plural');
+      expect(prompt).toContain('NOT conditions');
+    });
   });
 
   // -------------------------------------------------------------------------

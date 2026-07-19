@@ -3,6 +3,7 @@ import { Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, U
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { NewProjectPicker } from './NewProjectPicker';
+import { TemplateGalleryModal } from './TemplateGallery';
 import { ProjectLibrary } from './ProjectLibrary';
 import { UndoRedoToolbar } from './UndoRedoToolbar';
 import { SaveStatus } from './SaveStatus';
@@ -30,6 +31,9 @@ interface HeaderProps {
   onExport: () => void;
   onImport: () => void;
   onExportZip?: () => void;
+  /** Export the open project as a .asapst template (importing one always
+   *  instantiates a copy — the distributable-master workflow). */
+  onExportTemplate?: () => void;
   onExportAsmlWithAssets?: () => void;
   onImportZip?: () => void;
   /** Merge another story (.asaps) into the open project. */
@@ -94,6 +98,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExport,
   onImport,
   onExportZip,
+  onExportTemplate,
   onExportAsmlWithAssets,
   onImportZip,
   onMergeStory,
@@ -143,6 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
   const [showProjectLibrary, setShowProjectLibrary] = useState(false);
   const [showNewProjectPicker, setShowNewProjectPicker] = useState(false);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
   const [showBeatCreator, setShowBeatCreator] = useState(false);
@@ -510,6 +516,19 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <Download className="w-4 h-4" />
                       Export Project (ZIP)
+                    </button>
+                  )}
+                  {onExportTemplate && (
+                    <button
+                      onClick={() => {
+                        onExportTemplate();
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Export as a distributable template (.asapst) — anyone importing it gets their own copy; your master file is never edited"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export as Template (.asapst)
                     </button>
                   )}
                   {onExportHtml && (
@@ -1114,6 +1133,19 @@ export const Header: React.FC<HeaderProps> = ({
         }}
         onPickPrompt={onStoryGenerated ? () => setShowStoryGenerator(true) : undefined}
         onPickIdeator={onIdeator ? () => onIdeator() : undefined}
+        onPickTemplate={onImportZipFile ? () => setShowTemplateGallery(true) : undefined}
+      />
+
+      {/* Template gallery — the "Start from a template" destination. Using
+          a template routes through the ordinary zip-import pipeline, whose
+          template branch instantiates a fresh copy. */}
+      <TemplateGalleryModal
+        isOpen={showTemplateGallery}
+        onClose={() => setShowTemplateGallery(false)}
+        onUseTemplate={async (file) => {
+          await onImportZipFile?.(file);
+          setShowTemplateGallery(false);
+        }}
       />
 
       {/* AI Configuration Dialog */}

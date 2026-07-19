@@ -1,0 +1,15 @@
+{
+  "templates": [
+    {
+      "id": "rehearsal-difficult-client",
+      "file": "rehearsal-difficult-client.asapst",
+      "title": "Rehearsal: The Difficult Client",
+      "description": "Practice a difficult client conversation with an AI-played character who arrives in a different disposition every session.",
+      "whatItShows": "One client, four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough — the AI conversation beat plus character variants doing rehearsal variety. Play it twice and compare.",
+      "tags": ["AI conversation", "disposition variants", "training"],
+      "beats": 5,
+      "characters": 1,
+      "requiresAI": true
+    }
+  ]
+}

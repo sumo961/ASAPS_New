@@ -12,6 +12,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square, FileText, Sparkles, Wand2, Download } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
+import { TemplateShelf } from './TemplateGallery';
 import type { Project } from '../storage/types';
 import { getProjectMeta } from '../utils/projectMeta';
 
@@ -495,8 +496,8 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     // surface a friendly error for non-zip payloads, but we filter
     // obvious mismatches here to fail fast.
     const name = file.name.toLowerCase();
-    if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip')) {
-      alert(`Only .zip / .asaps files are supported for drag-drop import.\nReceived: ${file.name}`);
+    if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip') && !name.endsWith('.asapst')) {
+      alert(`Only .zip / .asaps / .asapst files are supported for drag-drop import.\nReceived: ${file.name}`);
       return;
     }
     await onImportZipFile!(file);
@@ -829,6 +830,22 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Template shelf — worked examples instantiated as copies via the
+              zip-import pipeline. Full cards while the library is small (the
+              first-run audience that needs the showcase), a slim line once
+              it's established. */}
+          {onImportZipFile && (
+            <TemplateShelf
+              projectCount={projects.length}
+              onUseTemplate={async (file) => {
+                await onImportZipFile(file);
+                // Same nudge as the drag-drop path: the import switched the
+                // editor behind the modal to the new project.
+                if (isModal) onClose?.();
+              }}
+            />
+          )}
 
           {/* Search and controls */}
           <div className="flex items-center gap-4">

@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.72*
+*Last revised against v0.9.78*
 
 ---
 
@@ -69,7 +69,7 @@ This means:
 
 ## Your First 5 Minutes
 
-Let's get you building right away. When you launch ASAPS Modern, you'll see a template system with three connected beats:
+Let's get you building right away. When you launch ASAPS Modern for the very first time, you'll see a starter system with three connected beats:
 
 ```
 [Title Screen] → [Introduction] → [The End]
@@ -111,7 +111,7 @@ This is intentional: the first time you sit down at ASAPS each session, we want 
 > **Under the hood.** The session boundary is tracked by a `sessionStorage` flag (`asaps:session-started`) that lives only as long as the browser session is open. Closing the browser/tab and reopening = fresh session = Browser overlay reappears.
 
 ![The Project Browser overlay with the Continue-editing banner](images/45-project-browser.png)
-*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), and below that the searchable, sortable list of every project saved on this machine. Project cards are compact: a title, a one-line badge row (beat count · layout mode · character count, dot-separated), an optional description, and a modified date — fields drop out gracefully when they're not meaningful (an untouched project just reads "empty project" in italics).*
+*The Project Browser. The blue **CURRENTLY EDITING** banner at the top shows the project you have loaded; click **Continue editing →** to return to it. Below sits the **START A NEW PROJECT** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), then the template row (added after this screenshot was taken — see [Templates](#templates)), and below that the searchable, sortable list of every project saved on this machine. Project cards are compact: a title, a one-line badge row (beat count · layout mode · character count, dot-separated), an optional description, and a modified date — fields drop out gracefully when they're not meaningful (an untouched project just reads "empty project" in italics).*
 
 ### Electron start window vs web modal Browser
 
@@ -121,7 +121,7 @@ Depending on how you're running ASAPS, the Project Browser appears in one of two
 - **In the Electron desktop app**, app launch opens a *dedicated start window* — its own native window (1100×800, with macOS traffic-light buttons) titled **📁 ASAPS Builder** with the tagline *"Start a new project or continue where you left off"*. It's a full-page version of the same Browser, with a **LAST PROJECT** banner pointing at the project from your previous session. When you pick something (open a project, start an empty project, kick off Build from a prompt or Co-write with AI), the main process opens the editor with your intent and closes the start window. **Browse all projects…** inside the editor (Electron) reopens the same start window again — picks apply mid-session via IPC, the editor isn't recreated.
 
 ![The Electron start window — full-page Browser with the Last Project banner](images/47-start-window.png)
-*The Electron start window. Same four create paths and project grid as the in-editor Browser, just full-page in a window of its own. (Web build: this surface is reachable in dev at `/#/start-window` for visual reference, but the production web flow keeps the modal Browser.)*
+*The Electron start window. Same create paths, template row, and project grid as the in-editor Browser, just full-page in a window of its own. (Web build: this surface is reachable in dev at `/#/start-window` for visual reference, but the production web flow keeps the modal Browser.)*
 
 ### The 📁 Projects button
 
@@ -136,19 +136,20 @@ The Projects button always reads "Projects" — your project's own name lives in
 
 ### The + New toolbar button
 
-The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in the top toolbar. Click it to open a compact picker titled *"Start a new project"* with three cards:
+The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in the top toolbar. Click it to open a compact picker titled *"Start a new project"* with four cards:
 
 - **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Static) and orientation, then drops you into a genuinely empty project ready for you to add beats from the palette.
 - **⚡ Build from a prompt** — *"Your prompt → AI drafts the rest."* Opens the Story Generator dialog. Disabled with a SOON badge when no AI provider is wired — set one up under **AI → Configure AI**.
 - **✨ Co-write with AI** — *"Develop your idea in conversation."* Opens the Ideator pop-out so you can talk through your idea before the AI drafts anything. Also gated on having an AI provider configured.
+- **🗂 Start from a template** — *"Worked examples you adapt."* Opens the template gallery. Using a template **always creates your own copy** as a new project — the template itself is never edited. See [Templates](#templates) below.
 
 The picker deliberately does *not* include an Import card — importing a zip isn't a "new project" flow conceptually; it lives on the Browser and in the toolbar's **Import** dropdown.
 
 If the current project has unsaved changes when you click **+ New** (or any create-path in the Browser, or any project-load from the dropdown), ASAPS pauses and asks: *"You have unsaved changes in the current project. Save them before continuing?"* — OK saves and continues, Cancel keeps you where you are.
 
-### Starting a new project — four paths in
+### Starting a new project — five ways in
 
-The full Project Browser opens with a **START A NEW PROJECT** row offering four cards, each tuned to a different starting point:
+The full Project Browser opens with a **START A NEW PROJECT** row offering four cards, each tuned to a different starting point — plus a template row just below them:
 
 | Card | When to pick it |
 |------|-----------------|
@@ -159,9 +160,29 @@ The full Project Browser opens with a **START A NEW PROJECT** row offering four 
 
 If any of the AI-powered cards reads SOON, that just means no AI provider is configured yet — open **AI → Configure AI** to set one up and the cards light up.
 
+Directly **below the create cards** sits a fifth way in: the **template row** (see next section).
+
+<a id="templates"></a>
+### Templates — worked examples you adapt
+
+Sometimes the fastest way to learn a technique is to open a project where it's already working. **Templates** are exactly that: complete, working example projects you instantiate and make your own.
+
+You'll find them in two places:
+
+- **The template row in the Project Browser**, right under the create cards. While your project library is small, templates show as full cards — title, description, a *"What this shows"* note, and tags. Once your library grows past a few projects, the row collapses to a slim one-liner (**TEMPLATES** · template names · **browse →**) so it stays out of your way; click **browse →** to expand it again.
+- **The "Start from a template" card** in the **+ New** picker, which opens the same gallery as a dialog.
+
+Either way, clicking **Use template** creates *your own copy* of the template as a brand-new project in your library. This is the golden rule of templates: **the template itself is never edited.** Experiment freely, gut it, rebuild it — the original stays pristine, and you can instantiate a fresh copy any time.
+
+**The `.asapst` file format.** Under the hood a template is a normal `.asaps` project zip flagged as a template — think of Word's `.dotx` document templates. Importing or double-clicking a `.asapst` file never opens it directly; it always instantiates a fresh copy as a new project. That makes templates safe to distribute: a lecturer can export a rehearsal scenario as a `.asapst`, share it with a class, and every student who imports it gets their own independent copy to work in.
+
+**Make your own templates.** Use **Export → Export as Template (.asapst)** to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
+
+**Bundled templates.** ASAPS ships with **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
+
 ### Drag-drop import
 
-The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project.
+The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project. Dropping a `.asapst` template file works too — following template rules, it instantiates a fresh copy rather than importing the file in place.
 
 This is the fastest way to bring in a backup, a project a collaborator emailed you, or one of the sample projects shipped with ASAPS.
 
@@ -232,11 +253,11 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | Left Side | What it Does |
 |-----------|--------------|
 | **📁 Projects** | Single button (folder icon). Click to drop down the current project, your most recent projects, and **Browse all projects…** (which opens the full Project Browser). Dropdown is for *switching* — creation lives on the + New button next door. |
-| **+ New** | Direct create-project entry. Opens a compact picker with three cards (Empty project / Build from a prompt / Co-write with AI). Guarded by an unsaved-changes prompt so you don't lose work in flight. |
+| **+ New** | Direct create-project entry. Opens a compact picker with four cards (Empty project / Build from a prompt / Co-write with AI / Start from a template). Guarded by an unsaved-changes prompt so you don't lose work in flight. |
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
 | **Import** | Dropdown: import ASML, ZIP, or Twine files |
-| **Export** | Dropdown: export as ASML, ZIP, or standalone HTML |
+| **Export** | Dropdown: export as ASML, ZIP, template (.asapst), or standalone HTML |
 | **Tools** | Dropdown: Transformations, Merge DialogTrees |
 
 | Right Side | What it Does |
@@ -954,7 +975,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 
 **Key Settings:**
 - **Scenario** - Scene description
-- **NPC Name** - The NPC the player is conversing with. Same [Character combobox](#character-combobox) as AI Dialog Tree — link to a defined Character to keep the identity stable, or type a free-text name. Linking a Character with a description auto-fills **NPC Personality** when that field is empty.
+- **NPC Name** - The NPC the player is conversing with. Same [Character combobox](#character-combobox) as AI Dialog Tree — link to a defined Character to keep the identity stable, or type a free-text name. Linking a Character with a description auto-fills **NPC Personality** when that field is empty. Right under the field sits **✨ Develop character with AI…** — a shortcut that drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and personality text, then links the accepted character back to the beat. See [AI Character Development](#ai-character-development).
 - **NPC Personality** - Character traits and behaviour the AI should embody
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
@@ -1055,6 +1076,8 @@ You can ignore all of this and ship a perfectly good story with just names and p
    - **Display Name** - What interactors see (e.g., "Elena Blackwood")
    - **Role** - Player, NPC, or Companion
    - **Description** - Notes for yourself
+
+Prefer to *describe* the person instead of filling in fields? The template picker that opens on **Add Character** includes a **✨ Generate with AI** card — write a plain-language brief and the AI drafts the whole profile for you. See [AI Character Development](#ai-character-development).
 
 ### Character Appearances
 
@@ -1170,6 +1193,8 @@ Start faster with pre-made templates:
 
 Select a template, customize to fit your story.
 
+The same picker also offers **✨ Generate with AI** — describe the person in a sentence or two and the AI drafts the whole profile, optionally with disposition variants. See [AI Character Development](#ai-character-development).
+
 <a id="character-affect"></a>
 ### The Affect Tab — Personality, Mood, Sentiments, Goals & Variants
 
@@ -1194,6 +1219,8 @@ You have two ways to fill in this card:
 **2. Tune by hand.** Click **+ Add Big Five** to seed Openness, Conscientiousness, Extraversion, Agreeableness, and Neuroticism at neutral 0.5. Each trait has its own slider and a one-line description so you don't need to remember which way the axis points. Click **+ Add custom trait** to invent your own (e.g. *bravery*, *curiosity_about_tech*) for story-specific use.
 
 You can mix the two — pick an archetype to get 80% of the way there, then nudge individual sliders to taste. Custom (author-named) traits are preserved when you switch archetypes.
+
+**3. Drag the interpersonal stance pad.** Once the character has traits (from an archetype or **+ Add Big Five**), a small square pad appears below the sliders — a "Leary's Rose" plotting **warmth** (cold ↔ warm, left to right) against **dominance** (submissive ↔ dominant, bottom to top), with the four classic corner labels *hostile*, *leading*, *withdrawn*, and *cooperative*. It's a lens on the same personality you're already editing: the dot mirrors where the character's extraversion and agreeableness sit, and **dragging the dot sets both sliders at once**. If "how does this person meet other people?" is a more natural question for you than "how extraverted are they, 0 to 1?", author from the pad and let the sliders follow. (Curious about the psychology behind the pad? See `docs/Interpersonal-Stance-Model.md` in the repository.)
 
 > **Why traits don't gate choices.** Locking a choice behind *"requires Extraversion ≥ 0.7"* would make the character feel deterministic in a way real personalities aren't. Traits modulate; they don't decide. If you want to branch on personality, branch on what the personality has *led the character to do* (mood, sentiment, visited beats) — that's more reactive and more readable.
 
@@ -1245,7 +1272,7 @@ A variant is an alternate persona slice that shares the same character id. Use t
 Click **+ Add variant** in the Variants section. The first time you add one, ASAPS migrates the base character's personality, mood, sentiments, and dossier policy onto the new variant so you don't lose work — and the parent's Personality / Initial mood / Initial sentiments / Dossier policy cards collapse into a banner reading *"This character has N variants. Personality, initial mood, and sentiments are authored per variant below…"* Subsequent variants clone from the first variant so you can copy-and-tweak.
 
 ![Affect tab with variants and a goal](images/21-affect-with-variants-goals.png)
-*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start.*
+*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start. (This screenshot predates the interpersonal stance pad and the "At story start" policy dropdown described below.)*
 
 Each variant card carries:
 
@@ -1254,8 +1281,16 @@ Each variant card carries:
 - A **variant label** (e.g. *Anxious introvert*) and an optional **display name** override (the user-facing name when this variant is active).
 - An optional description, surfaced in the dossier when the variant is active.
 - A **trait preset** dropdown — the same ten archetypes as the base, but applied to *this variant only*. Variant traits can be cleared to fall back to base character traits.
+- An **interpersonal stance pad** — the same Leary's Rose as the base Personality card, here answering *"how does this disposition meet the other person?"* Dragging the dot writes the variant's stance **and** re-derives its extraversion and agreeableness from the base character's traits plus the stance — so a shy character turned hostile stays recognizably shy. When the variant's hand-tuned trait sliders drift away from the authored stance, a small hollow *traits* marker appears on the pad so the drift is visible instead of silent.
 - A 2D MoodPad and sentiment list specific to this variant.
 - A **portrait override** (optional) — leave empty to inherit the base portrait. Variants share the base character's sprite sheet, states, and animations; only the affect/persona slice and the portrait swap.
+
+**Choosing the variant at story start.** Once a character has two or more variants, an **"At story start"** dropdown appears at the top of the Variants section with two policies:
+
+- **Use default variant** — the variant marked with the *default* radio auto-applies, same as before.
+- **Pick randomly each playthrough** — every story start (and every preview restart) draws one of the character's variants at random. This is the "I never know how the client will show up today" switch: the same rehearsal scenario plays differently every session. With this policy active the *default* radio is ignored — a small note in the editor reminds you.
+
+Either way, an authored **`setCharacterVariant`** effect still overrides the policy — so an instructor can pin a specific disposition for a controlled session ("today we practice hostile") while self-directed practice stays unpredictable.
 
 To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id). To branch on the active variant, drop a Condition Check beat and pick **Active variant** from the **Character affect** group in the Condition Type dropdown — the editor will then ask you for the character and the variant id to compare against (cascading from the character's authored variants, with a free-text fallback when none have been authored yet). The runtime evaluates this branch the same way it evaluates "player has lantern" — it just checks a different slice of state.
 
@@ -1829,6 +1864,30 @@ Describe what you want in plain English:
 2. Type: "A tense conversation where the detective accuses the butler"
 3. AI creates the appropriate beat type with content filled in
 
+<a id="ai-character-development"></a>
+## AI Character Development
+
+Building a rich character by hand means trait sliders, mood pads, and sentiment rows. The **character development helper** turns that into a two-minute conversation: describe the person in plain language, answer a couple of optional questions, review the draft, accept. The result is a *real* character — everything the AI writes lands in the ordinary Character Editor, where every detail stays editable.
+
+**Two doors into the same dialog:**
+
+- **From the Character Manager** — click **Add Character**, then the **✨ Generate with AI** card in the template picker. You start from a blank brief, and the helper offers its follow-up questions by default.
+- **From an AI Conversation beat** — click **✨ Develop character with AI…** right under the NPC field in the Inspector. The helper is pre-seeded from the beat's scenario and personality text, so it generates immediately (the questions stage stays one click away). When you accept, the character is linked back to the beat and its description fills the beat's **NPC Personality** field.
+
+**The flow:**
+
+1. **Describe the person.** A free-text brief — *"A 45-year-old client who recently lost custody of her son. Polite on the surface, deflects every direct question, blames the system."* No sliders, no jargon; write the way you'd describe them to a colleague.
+
+2. **Optionally, ask for disposition variants.** Tick **Generate disposition variants** and pick from the suggested chips — **Cooperative**, **Hostile**, **Avoidant**, **Ambivalent** — or add your own (*"passive-aggressive"*, *"desperate to please"*). Each disposition becomes a [character variant](#character-affect); combined with the *Pick randomly each playthrough* policy, this is how you build a rehearsal character who "shows up differently every session."
+
+3. **Optionally, refine with questions.** Click **Refine with questions first** (or **Continue**, from the Character Manager entry) and the AI asks 2–3 short, behavior-focused follow-ups — each with tappable suggested answers plus a free-text field. This stage is *always* skippable: leave any answer empty, or hit **Skip — just generate** and go straight to the draft.
+
+4. **Review the preview cards.** The draft appears as cards — a base profile (the shared identity) plus one card per disposition variant, each showing the description, a compact Big Five readout, the starting mood, and an interpersonal **stance pad** you can drag directly on the card. Don't like a card? Type a direction into its *Adjust* field — *"more passive-aggressive"*, *"less articulate"* — and regenerate just that card. You refine with words, never with sliders. Untick any variant you don't want to keep.
+
+5. **Accept.** With two or more variants included, a **"Pick a disposition at random each playthrough"** checkbox (on by default) sets the [variant selection policy](#character-affect) for you. Click **Add character** — or **Apply to [name]**, if you launched the helper on an existing character, which enriches that character in place and appends the new variants.
+
+Like all AI features, the helper needs an AI provider configured (**AI → Configure AI**). And if you'd rather see the end result before building your own: the bundled template **Rehearsal: The Difficult Client** is exactly this feature in action — one client, four dispositions, drawn at random.
+
 ## AI Dialog Generation (Runtime)
 
 The AI Dialog Tree beat generates conversations on the fly during play:
@@ -2043,6 +2102,8 @@ When a path includes **inputText** beats (where the interactor types input), ASA
 
 This ensures variables like `playerName` or `playerGender` have realistic values when testing later parts of your story.
 
+**Seeded beats in the debug panel.** A path preset injects the simulated path into the story's visited-beat history — that's what makes "has the player been to the crypt?" conditions behave as if the run really started at the beginning. To keep the record honest, the debug panel's **Visited Beats** list marks those injected beats with an amber **seeded** badge (and a *"seeded by start state"* count in the heading): they count as visited for conditions, but the player never actually saw them in this run. Beats you walk through after the mid-story start appear without the badge.
+
 ### Session Timeline
 
 As the interactor plays through your story, ASAPS Modern records a timeline of significant events: beat transitions, player choices, AI-generated content, branching decisions, and exit reasons. This session log is particularly useful for debugging AI beats, where you can see the AI's routing plan, which directions triggered, and what variables were set during a conversation.
@@ -2069,9 +2130,10 @@ The debug panel (toggle with the bug icon) shows real-time state information:
 - Items held by each character
 - Quantity of stackable items
 
-**History:**
-- List of visited beat IDs
+**Visited Beats (History):**
+- List of visited beats, in order
 - Useful for debugging conditions based on beat history
+- When you start preview from a mid-story beat, path-injected beats carry an amber **seeded** badge — they satisfy visited-beat conditions but weren't actually played this run
 
 **Active Timers:**
 - Running timers with remaining time
@@ -2230,8 +2292,11 @@ This creates a natural voice-driven conversation flow, especially when combined 
 | Format | Description | Use Case |
 |--------|-------------|----------|
 | ASAPS Project (.zip) | Complete project + all assets | Backups, sharing with collaborators |
+| ASAPS Template (.asapst) | Same zip, flagged as a template — anyone importing it gets their own fresh copy; the file itself is never edited | Distributing worked examples: classroom scenarios, reusable starting points |
 | ASML (.asml) | XML narrative structure only | Version control, lightweight sharing |
 | HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |
+
+**Export as Template (.asapst).** Pick **Export → Export as Template (.asapst)** to turn the open project into a distributable template — like Word's `.dotx`. A lecturer can share a rehearsal scenario with a class this way: every student who imports (or double-clicks) the file gets their own independent copy to work in, and the master file stays pristine. See [Templates](#templates) in Part 1 for how templates behave on the receiving end.
 
 ### HTML Export
 
@@ -2266,7 +2331,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Export Steps
 
 1. Click **Export** in the header to open the dropdown
-2. Choose format: ASML (XML only), ASML with Assets, Project (ZIP), or HTML
+2. Choose format: ASML (XML only), ASML with Assets, Project (ZIP), Template (.asapst), or HTML
 3. Configure options if prompted
 4. Download the file
 
@@ -2275,6 +2340,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Supported Formats
 
 - **ASAPS Project (.zip)** - Full project restore
+- **ASAPS Template (.asapst)** - Always instantiates a *fresh copy* as a new project — the template file itself is never opened or modified. Double-clicking a `.asapst` in the desktop app does the same. See [Templates](#templates).
 - **ASML (.asml)** - Story structure (may need asset re-linking)
 - **Twine/Twee** - Import from Twine (SugarCube format)
 
@@ -3129,7 +3195,13 @@ Quick reference for all beat types.
 
 **Goal** - An authored objective on a character (id, name, optional description, optional priority). The runtime tracks status; goals flipped to `met` or `failed` auto-fire pride/joy or shame/sadness scaled by priority (GAMYGDALA-style).
 
-**Variant** - An alternate persona overlay on a character that shares the character's stable id but carries its own personality, mood, sentiments, dossier policy, portrait, and (optional) display name. Switched at runtime via the `setCharacterVariant` effect.
+**Variant** - An alternate persona overlay on a character that shares the character's stable id but carries its own personality, mood, sentiments, dossier policy, portrait, and (optional) display name. Switched at runtime via the `setCharacterVariant` effect, or drawn at random each playthrough when the character's story-start policy is *Pick randomly each playthrough*.
+
+**Variant Selection Policy** - The per-character "At story start" setting (shown when a character has 2+ variants): *Use default variant* applies the variant marked default; *Pick randomly each playthrough* draws a fresh variant on every story start and preview restart. An authored `setCharacterVariant` effect always overrides the policy.
+
+**Interpersonal Stance / Stance Pad** - A character's or variant's way of meeting other people, plotted on a 2D "Leary's Rose" pad: warmth (cold ↔ warm) × dominance (submissive ↔ dominant), with corner labels *hostile*, *leading*, *withdrawn*, *cooperative*. The pad is a lens on Big Five extraversion and agreeableness — dragging the dot updates both. Appears on the base Personality card, on each variant card, and on the AI character helper's preview cards.
+
+**Project Template (.asapst)** - A project exported as a distributable template (like Word's `.dotx`). Importing or double-clicking one always instantiates a fresh copy as a new project; the template file itself is never edited. Bundled templates appear in the template gallery and the Project Browser's template row.
 
 **Dossier Policy** - How the LLM sees a character in AI beats. *Mode A (re-anchor)* rebuilds the dossier from structured state every turn. *Mode B (accumulate reflections)* appends short narrative notes the character has made about themselves over the session.
 
@@ -3210,6 +3282,9 @@ Yes! Configure TTS for voice output and STT for voice input. In AI Conversation 
 
 ### How do I share my story with others?
 Use **Export → Export as HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
+
+### How do I share a project for others to *build on* (e.g., with students)?
+Use **Export → Export as Template (.asapst)**. Unlike a normal project zip, importing a `.asapst` always creates the recipient's own fresh copy — the template file is never edited, so everyone starts from the same clean scenario. Perfect for classroom exercises and reusable starting points. See [Templates](#templates).
 
 ### How do I collaborate with a team?
 The fastest path: one author uses **File → New Project on GitHub…** to create the project and publish it to GitHub in one step, then invites collaborators on github.com. Each collaborator uses **File → Open Project from GitHub…** to clone the repo and start working. Commit, push, and pull all happen from the **VCS panel** at the bottom of the app. Advisory editing locks (purple dots on beats someone else is editing) help you avoid stepping on each other's toes. See [Part 9: Version Control & Collaboration](#part-9-version-control--collaboration) for the full walkthrough.

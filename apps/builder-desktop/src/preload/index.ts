@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('project:open', handler);
     return () => ipcRenderer.removeListener('project:open', handler);
   },
+  /** Collect a file that was double-clicked before the renderer was
+   *  listening (cold start on any platform). Call once, right after
+   *  registering onProjectOpen; main clears the slot on read. */
+  getPendingProjectOpen: (): Promise<string | null> =>
+    ipcRenderer.invoke('project:get-pending-open'),
   onProjectSaveAs: (callback: (path: string) => void) => {
     const handler = (_: unknown, path: string) => callback(path);
     ipcRenderer.on('project:save-as', handler);

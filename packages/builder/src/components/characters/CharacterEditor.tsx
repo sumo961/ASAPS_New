@@ -32,6 +32,13 @@ import {
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG, MoodFrameConfig, DEFAULT_MOOD_FRAME_CONFIG } from '../../types/character';
 import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS, DEFAULT_PERSONALITY_ARCHETYPES, findPersonalityArchetype } from '@asaps/core';
 import { MoodPad } from './MoodPad';
+import { StancePad } from './StancePad';
+import {
+  bigFiveToStance,
+  stanceToBigFive,
+  applyStanceToTraits,
+  describeStance,
+} from '../../services/prompts/interpersonalStance';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
@@ -2289,6 +2296,42 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   Non-neutral traits will scale emotion deltas at runtime. Authors can branch on traits via the <span className="font-mono">trait</span> condition operator.
                 </div>
               )}
+              {/* Interpersonal-stance lens on the base personality: the
+                  circumplex plane IS extraversion × agreeableness rotated
+                  ~45° (docs/Interpersonal-Stance-Model.md), so this pad is
+                  a direct two-way lens — the dot mirrors the E/A sliders,
+                  and dragging it sets both at once (full-scale inverse
+                  rotation, no weighting). E/A square corners map slightly
+                  outside the unit disc; the pad clamps the dot at the rim. */}
+              <div className="border-t pt-2">
+                <div className="text-[11px] text-gray-600 mb-1.5">
+                  Interpersonal stance (a lens on extraversion × agreeableness — drag to set both):
+                </div>
+                <div className="flex justify-center">
+                  {(() => {
+                    const pos = bigFiveToStance(traits);
+                    return (
+                      <StancePad
+                        warmth={pos.warmth}
+                        dominance={pos.dominance}
+                        size={180}
+                        onChange={(stance) => {
+                          const ea = stanceToBigFive(stance);
+                          setEditedCharacter({
+                            ...editedCharacter,
+                            traits: {
+                              ...traits,
+                              extraversion: ea.extraversion,
+                              agreeableness: ea.agreeableness,
+                            },
+                          });
+                        }}
+                        subtitle={describeStance(pos)}
+                      />
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -2752,6 +2795,55 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                           })}
                         </div>
                       )}
+
+                      {/* Interpersonal stance per variant — Leary's rose
+                          (warmth × dominance). Dragging writes the stance
+                          AND re-derives the variant's extraversion +
+                          agreeableness via the circumplex rotation, so the
+                          sliders above follow the dot. A hollow "traits"
+                          marker shows where the current traits actually sit
+                          when they've drifted from the authored stance
+                          (docs/Interpersonal-Stance-Model.md). */}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="text-[11px] text-gray-600 mb-1.5">
+                          Interpersonal stance (how this disposition meets the other person):
+                        </div>
+                        <div className="flex justify-center">
+                          {(() => {
+                            const explicit = variant.stance;
+                            const traitsPos = variant.traits ? bigFiveToStance(variant.traits) : null;
+                            const shown = explicit ?? traitsPos ?? { warmth: 0, dominance: 0 };
+                            return (
+                              <StancePad
+                                warmth={shown.warmth}
+                                dominance={shown.dominance}
+                                derived={!explicit}
+                                traitsPosition={explicit ? traitsPos : null}
+                                size={180}
+                                onChange={(stance) => {
+                                  const derivedEA = applyStanceToTraits(
+                                    editedCharacter.traits || {},
+                                    stance,
+                                  );
+                                  updateVariant(i, {
+                                    stance,
+                                    traits: {
+                                      ...DEFAULT_TRAIT_VALUES,
+                                      ...(variant.traits || {}),
+                                      extraversion: derivedEA.extraversion,
+                                      agreeableness: derivedEA.agreeableness,
+                                    },
+                                  });
+                                }}
+                                subtitle={
+                                  describeStance(shown) +
+                                  (explicit ? '' : ' — derived from traits, drag to set')
+                                }
+                              />
+                            );
+                          })()}
+                        </div>
+                      </div>
 
                       {/* Inline initial mood per variant — Russell's
                           circumplex pad, sized down for the inline form. */}
