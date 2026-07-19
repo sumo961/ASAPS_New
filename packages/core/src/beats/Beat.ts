@@ -36,6 +36,16 @@ export abstract class Beat {
    */
   public slotIntent?: Record<string, any>;
   /**
+   * Background fit for the beat's background image: 'cover' (fill, crop
+   * edges) or 'contain' (show whole image, letterbox). Lives on the BASE
+   * class because every visible beat can carry a background; the spatial
+   * beat classes (titleScreen, movementChoice, pickProp, dialogTree)
+   * re-declare and re-parse it themselves for their SpatialFlowView path,
+   * while slot-mode beats rely on this base field + the base execute()
+   * pushing it into renderer state.
+   */
+  public spatialFit?: 'contain' | 'cover';
+  /**
    * Responsive motion intent (P3-anim). Per-slot enter/exit/emphasis (and
    * later spatial pan/zoom + hotspot reveal). DELIBERATELY a separate
    * field from `animations` (the legacy AnimationPath[] of pixel-keyframe
@@ -89,6 +99,10 @@ export abstract class Beat {
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
     this.slotIntent = (config.parameters as any)?.slotIntent ?? (config as any).slotIntent;
+    {
+      const fit = (config as any).spatialFit ?? (config.parameters as any)?.spatialFit;
+      this.spatialFit = fit === 'contain' || fit === 'cover' ? fit : undefined;
+    }
     this.slotAnimations = (config.parameters as any)?.slotAnimations ?? (config as any).slotAnimations;
     this.spatialAnimations = (config.parameters as any)?.spatialAnimations ?? (config as any).spatialAnimations;
     this.animations = (config as any).animations || (config.parameters as any)?.animations;
@@ -150,6 +164,12 @@ export abstract class Beat {
       // Set speaker info in renderer state for TTS routing and display
       renderer.setState('beatSpeaker', this.speaker || '');
       renderer.setState('showSpeaker', this.showSpeaker);
+
+      // Background fit for this beat's background image. Always set —
+      // including undefined — so a fit chosen on one beat can't leak into
+      // the next (the spatial beat classes also set it in their own
+      // performAction; same value, harmless).
+      renderer.setState('spatialFit', this.spatialFit);
 
       // Set animations in renderer state for path animations
       if (this.animations && this.animations.length > 0) {
@@ -600,7 +620,12 @@ export abstract class Beat {
     const parameters = {
       ...this.getParameters(),
       // Include animations in parameters so they're preserved during serialization
-      ...(this.animations && this.animations.length > 0 ? { animations: this.animations } : {})
+      ...(this.animations && this.animations.length > 0 ? { animations: this.animations } : {}),
+      // Background fit is a base-class field (slot beats' getParameters
+      // don't know it) — persist it here so it round-trips for every type.
+      ...(this.spatialFit === 'contain' || this.spatialFit === 'cover'
+        ? { spatialFit: this.spatialFit }
+        : {})
     };
 
     const json = {

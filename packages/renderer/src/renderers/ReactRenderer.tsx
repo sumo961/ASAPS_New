@@ -2171,6 +2171,12 @@ export class ReactRenderer extends BaseRenderer {
             content={content}
             theme={this.theme}
             backgroundUrl={this.backgroundImageUrl}
+            backgroundFit={(() => {
+              // Per-beat fit, pushed into renderer state by Beat.execute —
+              // the same source the spatial path reads for its spec.fit.
+              const fit = this.getState('spatialFit');
+              return fit === 'contain' || fit === 'cover' ? fit : undefined;
+            })()}
             backgroundColor={slotBg}
             videoUrl={typeof (content as any).videoUrl === 'string' ? (content as any).videoUrl : undefined}
             videoAutoplay={(content as any).autoplay !== false}

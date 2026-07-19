@@ -5407,18 +5407,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   if (next) setSelectedElementIds([]);
                 }}
                 spatialFit={
-                  beat.type === 'titleScreen' ||
-                  beat.type === 'movementChoice' ||
-                  beat.type === 'pickProp' ||
-                  beat.type === 'dialogTree'
+                  // Background fit applies wherever a background image can
+                  // render behind the beat — spatial beats (SpatialFlowView)
+                  // AND slot-mode beats (SlotFlowView). Panorama has its own
+                  // stretch semantics and stays excluded.
+                  beat.type !== 'panorama'
                     ? ((beat as any).spatialFit as 'contain' | 'cover' | undefined)
                     : undefined
                 }
                 onSpatialFitChange={
-                  (beat.type === 'titleScreen' ||
-                    beat.type === 'movementChoice' ||
-                    beat.type === 'pickProp' ||
-                    beat.type === 'dialogTree') && onBeatUpdate
+                  beat.type !== 'panorama' && onBeatUpdate
                     ? (fit) => {
                         (beat as any).spatialFit = fit;
                         onBeatUpdate(beat.id, { spatialFit: fit } as any);
@@ -6233,6 +6231,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                         ? assets.find(a => a.id === backgroundAssetId)?.url
                         : undefined) || backgroundUrl) || null
                     }
+                    backgroundFit={(beat as any)?.spatialFit === 'contain' ? 'contain' : 'cover'}
                     backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                     slotIntent={previewSlotIntent}
                     slotAnimations={

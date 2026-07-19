@@ -657,37 +657,42 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                 </div>
               )}
 
-              {/* Bug 26 follow-up — Background fit (spatial beats only).
-                  Moved here from the Inspector at author request: fit is
-                  a background-asset concern, so it belongs next to the
-                  "Change Background" button. Only shown for beat types
-                  that compose through SpatialFlowView (the schema has
-                  a spatialLayer). */}
-              {onSpatialFitChange &&
-                (beatType === 'titleScreen' ||
+              {/* Bug 26 follow-up — Background fit. Sits next to "Change
+                  Background" because fit is a background-asset concern.
+                  Spatial beats (SpatialFlowView) default to CONTAIN; every
+                  other beat type renders its background through
+                  SlotFlowView / PositionedBeatView, which default to COVER
+                  — the default option's label reflects whichever applies.
+                  Panorama keeps its own stretch semantics and is excluded. */}
+              {onSpatialFitChange && beatType !== 'panorama' && (() => {
+                const isSpatialType =
+                  beatType === 'titleScreen' ||
                   beatType === 'movementChoice' ||
                   beatType === 'pickProp' ||
-                  beatType === 'dialogTree') && (
-                <div className="mt-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Background fit
-                  </label>
-                  <select
-                    value={spatialFit || ''}
-                    onChange={(e) => onSpatialFitChange((e.target.value || undefined) as 'contain' | 'cover' | undefined)}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                  >
-                    <option value="">Default (contain)</option>
-                    <option value="contain">Contain — show whole image</option>
-                    <option value="cover">Cover — fill stage, crop edges</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {spatialFit === 'cover'
-                      ? 'Image fills the stage; edges may be cropped on narrow viewports.'
-                      : 'Image is shown whole with letterboxed bars when aspect ratios differ.'}
-                  </p>
-                </div>
-              )}
+                  beatType === 'dialogTree';
+                const effectiveFit = spatialFit || (isSpatialType ? 'contain' : 'cover');
+                return (
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Background fit
+                    </label>
+                    <select
+                      value={spatialFit || ''}
+                      onChange={(e) => onSpatialFitChange((e.target.value || undefined) as 'contain' | 'cover' | undefined)}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value="">{isSpatialType ? 'Default (contain)' : 'Default (cover)'}</option>
+                      <option value="contain">Contain — show whole image (letterbox)</option>
+                      <option value="cover">Cover — fill stage, crop edges</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {effectiveFit === 'cover'
+                        ? 'Image fills the stage; edges may be cropped when aspect ratios differ.'
+                        : 'Image is shown whole with letterboxed bars when aspect ratios differ.'}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Panorama Settings - inline under panorama image */}
               {beatType === 'panorama' && panoramaSettings && (

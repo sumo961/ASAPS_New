@@ -46,6 +46,9 @@ interface SlotFlowViewProps {
   /** May be undefined (no theme set); falls back to DEFAULT_THEME like the absolute path. */
   theme?: RenderThemeSettings;
   backgroundUrl?: string | null;
+  /** How the background image fills the stage: 'cover' (fill, crop edges —
+   *  default) or 'contain' (show the whole image, letterboxed). */
+  backgroundFit?: 'cover' | 'contain';
   backgroundColor: string;
   /**
    * Video that fills the stage behind the slot composition (videoBeat).
@@ -258,6 +261,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   content,
   theme: themeProp,
   backgroundUrl,
+  backgroundFit = 'cover',
   backgroundColor,
   videoUrl,
   videoAutoplay,
@@ -680,6 +684,26 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // the live box; if scrollHeight grows when content arrives, the
   // gate stays unearned until the player actually scrolls to the end.
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Background sizing is applied imperatively as well as via rootStyle:
+  // in the builder's Visual Editor host, React's style diffing was
+  // observed dropping the background-size/repeat/position longhands from
+  // the root element (backgroundImage survived, its siblings didn't —
+  // leaving the image at natural size with repeat). Setting them on the
+  // ref after every render makes the fit deterministic in every host;
+  // in hosts where the inline style works, this is a no-op re-set.
+  React.useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (backgroundUrl) {
+      el.style.backgroundSize = backgroundFit === 'contain' ? 'contain' : 'cover';
+      el.style.backgroundRepeat = 'no-repeat';
+      el.style.backgroundPosition = 'center';
+      if (backgroundFit === 'contain' && backgroundColor && !backgroundColor.includes('gradient')) {
+        el.style.backgroundColor = backgroundColor;
+      }
+    }
+  });
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
     if (gateEarned) return;
@@ -768,8 +792,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     gap: isConversation ? 'clamp(20px, 4vw, 64px)' : undefined,
     overflow: 'hidden',
     background: backgroundUrl ? undefined : backgroundColor,
+    // Letterbox bars for 'contain' pick up the theme background color so
+    // they don't read as dead black unless the theme wants that.
+    backgroundColor: backgroundUrl && backgroundFit === 'contain' ? backgroundColor : undefined,
     backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
-    backgroundSize: 'cover',
+    backgroundSize: backgroundFit === 'contain' ? 'contain' : 'cover',
+    backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
     paddingTop: 'env(safe-area-inset-top, 0px)',
     paddingRight: isConversation
