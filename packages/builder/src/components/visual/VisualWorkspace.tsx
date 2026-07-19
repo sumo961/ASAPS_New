@@ -6190,7 +6190,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           choices={previewChoices}
                           mode={lt as 'chat-scroll' | 'chat-bubble'}
                           theme={renderTheme ?? undefined}
-                          backgroundUrl={backgroundUrl || null}
+                          backgroundUrl={
+                            // Resolve assetId → fresh URL first (same as the
+                            // absolute + spatial paths); the backgroundUrl
+                            // state only holds ASML-import direct URLs, so
+                            // asset-backed backgrounds were invisible here.
+                            ((backgroundAssetId && assets
+                              ? assets.find(a => a.id === backgroundAssetId)?.url
+                              : undefined) || backgroundUrl) || null
+                          }
                           backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                           onChoiceSelect={() => { /* preview is read-only */ }}
                           responsive
@@ -6215,7 +6223,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     // post-step-in dialogTree levels un-draggable.
                     requireFullRead={false}
                     theme={renderTheme ?? undefined}
-                    backgroundUrl={backgroundUrl || null}
+                    backgroundUrl={
+                      // Resolve assetId → fresh URL first (same as the
+                      // absolute path at PositionedBeatView and the spatial
+                      // path); the backgroundUrl state only holds
+                      // ASML-import direct URLs, so asset-backed
+                      // backgrounds never showed in the slot preview.
+                      ((backgroundAssetId && assets
+                        ? assets.find(a => a.id === backgroundAssetId)?.url
+                        : undefined) || backgroundUrl) || null
+                    }
                     backgroundColor={renderTheme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)'}
                     slotIntent={previewSlotIntent}
                     slotAnimations={

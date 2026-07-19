@@ -5186,9 +5186,22 @@ function App() {
         throw new Error('Failed to load project for renaming');
       }
 
-      // Update the project
+      // Update the project — ONE-NAME MODEL: the story title is the same
+      // concept as the project name, so a card rename writes both. Without
+      // this, renaming the OPEN project here was silently clobbered by the
+      // next auto-save (which writes the in-memory project, old name and
+      // all), and renaming a closed one left its title-screen text stale.
       const project = getResult.data;
       project.name = newName;
+      const story: any = project.story;
+      if (story && typeof story === 'object') {
+        if (story.metadata && typeof story.metadata === 'object') {
+          story.metadata.title = newName;
+        } else {
+          story.metadata = { title: newName };
+        }
+        story.title = newName;
+      }
       project.modifiedAt = new Date();
 
       // Save to storage immediately
@@ -5197,12 +5210,19 @@ function App() {
         throw new Error('Failed to update project name in storage');
       }
 
+      // If the renamed project is the one open in the editor, update the
+      // in-memory title too — otherwise the next auto-save would write the
+      // old in-memory name/title straight back over the rename.
+      if (currentProject?.id === projectId) {
+        actions.setTitle(newName);
+      }
+
       console.log('[App] Project renamed successfully in storage');
     } catch (error) {
       console.error('[App] Failed to rename project:', error);
       throw error;
     }
-  }, [storage]);
+  }, [storage, currentProject, actions]);
 
   /**
    * Handle AI-generated story

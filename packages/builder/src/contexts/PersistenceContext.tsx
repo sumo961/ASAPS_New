@@ -725,11 +725,28 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       };
     }
 
+    // ONE-NAME MODEL: the project name and the story title are the same
+    // concept to authors ("renaming the project"), so the name always
+    // follows the title on save. The Browser card's rename-in-place writes
+    // both fields too (App.handleRenameProject), so the two edit points
+    // converge instead of silently diverging — divergence was the bug:
+    // header renames persisted in the story while every project-name
+    // surface (library card, banner, window title) kept the old name.
+    const nextTitle = (storyData as any)?.title ?? (storyData as any)?.metadata?.title;
+    const nameFollowsTitle =
+      typeof nextTitle === 'string' &&
+      nextTitle.trim().length > 0 &&
+      nextTitle !== projectToUpdate.name;
+
     const updatedProject = {
       ...projectToUpdate,
+      ...(nameFollowsTitle ? { name: nextTitle } : {}),
       story: newStory as any,
       modifiedAt: new Date(),
     };
+    if (nameFollowsTitle) {
+      console.log('[PersistenceContext] Project name follows story title:', nextTitle);
+    }
 
     // DEBUG: Log the updated project
     console.log('[PersistenceContext] updateProjectStory - AFTER:', {
