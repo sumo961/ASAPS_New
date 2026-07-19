@@ -295,7 +295,23 @@ same beats, only the affect slice swaps. Use for "play as introvert /
 extrovert" branches, or for character development arcs that need an
 atomic before/after switch (an awakening, a revelation, a death of
 innocence). Switch via \`setCharacterVariant\` Effect; check with
-\`characterVariant\` Condition.`;
+\`characterVariant\` Condition.
+A variant whose identity is interpersonal (hostile, cooperative,
+withdrawn, leading…) should also carry a \`stance\` — its position on the
+interpersonal circumplex: \`"stance": { "warmth": -1..1, "dominance": -1..1 }\`
+(cold↔warm, submissive↔dominant). Keep the variant's Big Five consistent
+with its stance: extraversion tracks friendly dominance and agreeableness
+tracks warm submissiveness — shift the BASE character's values by roughly
+0.35 × (dominance+warmth)/1.41 for extraversion and
+0.35 × (warmth−dominance)/1.41 for agreeableness, so a hostile variant of
+a shy character stays recognizably shy.
+Characters whose variants are dispositions for REPLAY VARIETY (the
+"different client every session" training/rehearsal pattern) should set
+\`"variantSelectionPolicy": "random"\` on the character — the runtime then
+draws a variant at random at every story start, and each restart can meet
+a different disposition. Narrative variants picked by the player or by an
+authored \`setCharacterVariant\` Effect keep the default fixed behavior
+(set \`defaultVariantId\` instead).`;
 
 const EFFECTS_CONDITIONS_REFERENCE = `## Affect-Aware Effects & Conditions
 
@@ -597,7 +613,12 @@ Keep \`dossierPolicy\` at default \`reAnchor\` for everyone.
   one shifted initialSentiment — and a \`setCharacterVariant\` Effect at
   the transition. The bookmark is the runtime snapshot; the variant is
   the authorial shift the player sees. Other variants (multiple
-  personas, archetype switches) remain optional.
+  personas, archetype switches) remain optional. When a variant's
+  identity is interpersonal, give it a \`stance\` (see the Variants
+  catalog entry) and keep its extraversion/agreeableness consistent
+  with it; for rehearsal/training stories where the character should
+  show up differently every playthrough, author 3-4 disposition
+  variants and set \`variantSelectionPolicy: "random"\` on the character.
 - **\`dossierPolicy: 'reflection'\`** on characters meant to evolve,
   paired with \`addReflection\` Effects on important moments.
 - **Effect templates** (empathetic-max, boundary-respecting, etc.) as

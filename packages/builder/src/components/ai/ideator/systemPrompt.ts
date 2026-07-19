@@ -148,7 +148,16 @@ markdown fences):
     //                character development/growth, interactive drama,
     //                explorable-story framing. Pick "rich" whenever the
     //                conversation centred on inner life, emotional arcs,
-    //                guilt/grief/love, or characters who change.
+    //                guilt/grief/love, or characters who change. Rich
+    //                stories can also carry character VARIANTS — several
+    //                dispositions of one character (each with an
+    //                interpersonal stance). If the conversation implied
+    //                rehearsal/training or "the character should show up
+    //                differently every playthrough", say so explicitly in
+    //                the prompt field (e.g. "give the client 3-4
+    //                disposition variants — cooperative, hostile,
+    //                avoidant — drawn at random each playthrough") so the
+    //                generator authors the variants and random selection.
     //   "auto"     — let the downstream generator pick from the prompt.
     // Choose explicitly when the conversation gives you signal — don't
     // reflexively pick "auto" when "rich" or "sparse" would be more

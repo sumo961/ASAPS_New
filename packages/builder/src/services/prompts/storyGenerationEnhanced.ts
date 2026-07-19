@@ -897,6 +897,29 @@ Include characters in the "characters" array of your output:
 }
 \`\`\`
 
+Characters may also carry \`variants\` — alternate persona overlays of the SAME
+character (see the affect guidance for when they are required). Variant shape:
+\`\`\`json
+{
+  "id": "wolf_charming",
+  "displayName": "Wolf (the gentleman)",
+  "initialMood": { "valence": 0.3, "arousal": 0.2 },
+  "traits": { "extraversion": 0.7, "agreeableness": 0.6 },
+  "stance": { "warmth": 0.5, "dominance": 0.3 }
+}
+\`\`\`
+\`stance\` is the variant's interpersonal-circumplex position (warmth: cold −1 ↔ warm +1;
+dominance: submissive −1 ↔ dominant +1). Include it whenever the variant's identity is
+interpersonal (hostile, cooperative, withdrawn, charming…), and keep extraversion /
+agreeableness consistent with it: E tracks friendly dominance, A tracks warm
+submissiveness, shifted moderately from the BASE character's values — a hostile variant
+of a shy character stays recognizably shy. For rehearsal/training stories where the
+character should arrive in a DIFFERENT disposition every playthrough, author 3-4
+disposition variants and set \`"variantSelectionPolicy": "random"\` on the character —
+the runtime draws one at random at each story start. Player-chosen or plot-driven
+variants instead keep fixed selection: \`defaultVariantId\` on the character plus
+\`setCharacterVariant\` Effects at the transition points.
+
 ### Speaker System on Beats
 Visible beats (titleScreen, infoText, durScreen, dialogTree, movementChoice, pickProp, endScreen, videoBeat, inputText, hyperText) have a **speaker** property that controls who is "speaking" the beat's text.
 
@@ -1300,6 +1323,7 @@ If you emit a bookmarkAffectState Effect whose name describes a character's stat
   Example: Theo's "after_depressive" bookmark pairs with:
     variants: [ { "id": "theo_after_disclosure", "displayName": "Theo (after the silence)", "initialMood": { "valence": -0.3, "arousal": -0.1 }, "initialSentiments": [ { "target": "frances", "emotion": "gratitude", "strength": 0.4 } ] } ]
     A setCharacterVariant Effect (target "theo", variantId "theo_after_disclosure") on the choice that elicits the disclosure.
+    If the shift is interpersonal (colder, warmer, more withdrawn or dominant toward others), also give the variant a "stance" ({ "warmth", "dominance" }, each -1..1) as described in the Characters section, with extraversion/agreeableness kept consistent.
 
 ## ⚠️ CRITICAL: Counter Threshold Reachability
 
