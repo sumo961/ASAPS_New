@@ -29,7 +29,7 @@ export interface StancePadProps {
   /** True when the dot merely mirrors the traits (no authored stance yet) —
    *  rendered hollow so "derived" reads differently from "authored". */
   derived?: boolean;
-  /** Pixel size (square). Default 180. */
+  /** Pixel size (square). Default 220. */
   size?: number;
   title?: string;
   subtitle?: string;
@@ -40,7 +40,7 @@ export interface StancePadProps {
 
 export const StancePad: React.FC<StancePadProps> = ({
   warmth, dominance, onChange, traitsPosition, derived = false,
-  size = 180, title, subtitle, showLabels = true, testId,
+  size = 220, title, subtitle, showLabels = true, testId,
 }) => {
   const interactive = typeof onChange === 'function';
   const padRef = useRef<SVGSVGElement | null>(null);
@@ -123,31 +123,31 @@ export const StancePad: React.FC<StancePadProps> = ({
         {showLabels && (
           <>
             {/* Axis words at the cardinals */}
-            <text x={50} y={6.5} textAnchor="middle" fontSize={4.5} fill="#6b7280">dominant</text>
-            <text x={50} y={97}  textAnchor="middle" fontSize={4.5} fill="#6b7280">submissive</text>
-            <text x={3}  y={51.5} textAnchor="start" fontSize={4.5} fill="#6b7280">cold</text>
-            <text x={97} y={51.5} textAnchor="end"   fontSize={4.5} fill="#6b7280">warm</text>
+            <text x={50} y={8}   textAnchor="middle" fontSize={6.2} fontWeight={500} fill="#4b5563">dominant</text>
+            <text x={50} y={97}  textAnchor="middle" fontSize={6.2} fontWeight={500} fill="#4b5563">submissive</text>
+            <text x={2.5} y={52} textAnchor="start"  fontSize={6.2} fontWeight={500} fill="#4b5563">cold</text>
+            <text x={97.5} y={52} textAnchor="end"   fontSize={6.2} fontWeight={500} fill="#4b5563">warm</text>
             {/* Leary octant labels in the quadrant corners */}
-            <text x={14} y={16} textAnchor="start" fontSize={3.8} fill="#b91c1c" opacity={0.7} fontStyle="italic">hostile</text>
-            <text x={86} y={16} textAnchor="end"   fontSize={3.8} fill="#b45309" opacity={0.7} fontStyle="italic">leading</text>
-            <text x={14} y={88} textAnchor="start" fontSize={3.8} fill="#1d4ed8" opacity={0.7} fontStyle="italic">withdrawn</text>
-            <text x={86} y={88} textAnchor="end"   fontSize={3.8} fill="#15803d" opacity={0.7} fontStyle="italic">cooperative</text>
+            <text x={13} y={19} textAnchor="start" fontSize={5.2} fill="#b91c1c" opacity={0.85} fontStyle="italic">hostile</text>
+            <text x={87} y={19} textAnchor="end"   fontSize={5.2} fill="#b45309" opacity={0.85} fontStyle="italic">leading</text>
+            <text x={13} y={87} textAnchor="start" fontSize={5.2} fill="#1d4ed8" opacity={0.85} fontStyle="italic">withdrawn</text>
+            <text x={87} y={87} textAnchor="end"   fontSize={5.2} fill="#15803d" opacity={0.85} fontStyle="italic">cooperative</text>
           </>
         )}
 
         {/* Trait-derived ghost marker (hollow) */}
         {showTraitsDot && traitsDot && (
           <g>
-            <circle cx={traitsDot.x} cy={traitsDot.y} r={2.2} fill="none" stroke="#9ca3af" strokeWidth={0.9} strokeDasharray="1.5 1" />
-            <text x={traitsDot.x + 3} y={traitsDot.y + 1.4} fontSize={3.6} fill="#9ca3af" style={{ pointerEvents: 'none' }}>traits</text>
+            <circle cx={traitsDot.x} cy={traitsDot.y} r={2.4} fill="none" stroke="#9ca3af" strokeWidth={1} strokeDasharray="1.5 1" />
+            <text x={traitsDot.x + 3.4} y={traitsDot.y + 1.7} fontSize={4.8} fill="#6b7280" style={{ pointerEvents: 'none' }}>traits</text>
           </g>
         )}
 
         {/* Stance dot — hollow when merely derived from traits, solid when authored */}
         {derived ? (
-          <circle cx={dot.x} cy={dot.y} r={2.6} fill="#ffffff" stroke="#111827" strokeWidth={1} strokeDasharray="2 1" />
+          <circle cx={dot.x} cy={dot.y} r={3} fill="#ffffff" stroke="#111827" strokeWidth={1.1} strokeDasharray="2 1" />
         ) : (
-          <circle cx={dot.x} cy={dot.y} r={2.6} fill="#111827" stroke="#ffffff" strokeWidth={0.8} />
+          <circle cx={dot.x} cy={dot.y} r={3} fill="#111827" stroke="#ffffff" strokeWidth={0.9} />
         )}
       </svg>
       {subtitle && <div style={subtitleStyle}>{subtitle}</div>}
@@ -166,6 +166,6 @@ function clampUnit(v: number): number {
   return v === 0 ? 0 : v;
 }
 
-const titleStyle: React.CSSProperties = { fontSize: 11, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
-const subtitleStyle: React.CSSProperties = { fontSize: 11, color: '#6b7280', marginTop: 4, fontStyle: 'italic', textAlign: 'center' };
-const readoutStyle: React.CSSProperties = { fontSize: 10, fontFamily: 'monospace', color: '#374151', marginTop: 2 };
+const titleStyle: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
+const subtitleStyle: React.CSSProperties = { fontSize: 13, color: '#4b5563', marginTop: 5, fontStyle: 'italic', textAlign: 'center' };
+const readoutStyle: React.CSSProperties = { fontSize: 12, fontFamily: 'monospace', color: '#374151', marginTop: 3 };

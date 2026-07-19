@@ -344,7 +344,7 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
             warmth={opts.stance.value.warmth}
             dominance={opts.stance.value.dominance}
             derived={opts.stance.derived}
-            size={130}
+            size={180}
             onChange={busy === null ? opts.stance.onChange : undefined}
             subtitle={describeStance(opts.stance.value)}
           />

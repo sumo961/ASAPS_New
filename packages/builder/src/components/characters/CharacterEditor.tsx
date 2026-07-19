@@ -2314,7 +2314,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       <StancePad
                         warmth={pos.warmth}
                         dominance={pos.dominance}
-                        size={180}
+                        size={240}
                         onChange={(stance) => {
                           const ea = stanceToBigFive(stance);
                           setEditedCharacter({
@@ -2819,7 +2819,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                                 dominance={shown.dominance}
                                 derived={!explicit}
                                 traitsPosition={explicit ? traitsPos : null}
-                                size={180}
+                                size={240}
                                 onChange={(stance) => {
                                   const derivedEA = applyStanceToTraits(
                                     editedCharacter.traits || {},
