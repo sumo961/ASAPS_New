@@ -684,26 +684,6 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // the live box; if scrollHeight grows when content arrives, the
   // gate stays unearned until the player actually scrolls to the end.
   const rootRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Background sizing is applied imperatively as well as via rootStyle:
-  // in the builder's Visual Editor host, React's style diffing was
-  // observed dropping the background-size/repeat/position longhands from
-  // the root element (backgroundImage survived, its siblings didn't —
-  // leaving the image at natural size with repeat). Setting them on the
-  // ref after every render makes the fit deterministic in every host;
-  // in hosts where the inline style works, this is a no-op re-set.
-  React.useLayoutEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    if (backgroundUrl) {
-      el.style.backgroundSize = backgroundFit === 'contain' ? 'contain' : 'cover';
-      el.style.backgroundRepeat = 'no-repeat';
-      el.style.backgroundPosition = 'center';
-      if (backgroundFit === 'contain' && backgroundColor && !backgroundColor.includes('gradient')) {
-        el.style.backgroundColor = backgroundColor;
-      }
-    }
-  });
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
     if (gateEarned) return;
@@ -791,11 +771,23 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     justifyContent: isConversation ? 'space-between' : undefined,
     gap: isConversation ? 'clamp(20px, 4vw, 64px)' : undefined,
     overflow: 'hidden',
-    background: backgroundUrl ? undefined : backgroundColor,
-    // Letterbox bars for 'contain' pick up the theme background color so
-    // they don't read as dead black unless the theme wants that.
-    backgroundColor: backgroundUrl && backgroundFit === 'contain' ? backgroundColor : undefined,
-    backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
+    // NEVER the `background` SHORTHAND here. The VE renders this component
+    // first without the background URL (asset still resolving) and then
+    // with it; removing a shorthand between renders makes the browser clear
+    // EVERY background longhand, and React's style diff does not re-set the
+    // ones whose values "didn't change" — background-size/repeat/position
+    // silently vanished while background-image survived. Longhands only:
+    // gradients are images, plain colors are colors.
+    backgroundColor: backgroundUrl
+      ? (backgroundFit === 'contain' && !String(backgroundColor).includes('gradient')
+          // Letterbox bars for 'contain' pick up the theme background color
+          // so they don't read as dead black unless the theme wants that.
+          ? backgroundColor
+          : undefined)
+      : (String(backgroundColor).includes('gradient') ? undefined : backgroundColor),
+    backgroundImage: backgroundUrl
+      ? `url(${backgroundUrl})`
+      : (String(backgroundColor).includes('gradient') ? backgroundColor : undefined),
     backgroundSize: backgroundFit === 'contain' ? 'contain' : 'cover',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
