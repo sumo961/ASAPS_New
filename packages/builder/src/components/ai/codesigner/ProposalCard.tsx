@@ -51,10 +51,23 @@ function proposalDetail(p: ChangeProposal): string | null {
     }
     case 'addNote':
       return `"${p.note.length > 160 ? p.note.slice(0, 157) + '…' : p.note}"`;
-    case 'updateCharacter':
-      return Object.entries(p.updates)
-        .map(([k, v]) => `${k}: ${JSON.stringify(v).slice(0, 80)}`)
-        .join(' · ');
+    case 'updateCharacter': {
+      const u = p.updates as any;
+      const parts: string[] = [];
+      for (const k of ['displayName', 'color'] as const) if (typeof u[k] === 'string') parts.push(`${k}: ${u[k]}`);
+      if (typeof u.description === 'string') parts.push(`description: "${u.description.slice(0, 60)}${u.description.length > 60 ? '…' : ''}"`);
+      if (u.traits && typeof u.traits === 'object') {
+        parts.push('traits: ' + Object.entries(u.traits).map(([t, val]) => `${t.slice(0, 4)} ${Number(val).toFixed(2)}`).join(' '));
+      }
+      if (u.variantSelectionPolicy) parts.push(`selection: ${u.variantSelectionPolicy} each playthrough`);
+      if (Array.isArray(u.variants)) {
+        parts.push('variants: ' + u.variants.map((v: any) => {
+          const s = v.stance;
+          return s ? `${v.name || v.id} [w${s.warmth >= 0 ? '+' : ''}${s.warmth.toFixed(1)} d${s.dominance >= 0 ? '+' : ''}${s.dominance.toFixed(1)}]` : (v.name || v.id);
+        }).join(', '));
+      }
+      return parts.join(' · ') || null;
+    }
   }
 }
 

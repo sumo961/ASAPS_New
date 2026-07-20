@@ -81,6 +81,27 @@ describe('applyChangeProposals', () => {
     expect(results[0].detail).toMatch(/not in undo history/);
   });
 
+  it('updateCharacter derives a stance-bearing variant\'s E/A from the base traits', () => {
+    const c = ctx();
+    // a shy base character (low extraversion)
+    (c as any).characters = [{ id: 'ch1', name: 'karin', displayName: 'Karin', traits: { extraversion: 0.2, agreeableness: 0.6 } }];
+    const applied: any[] = [];
+    (c as any).updateCharacter = vi.fn((_id: string, updates: any) => applied.push(updates));
+    const results = applyChangeProposals([{
+      kind: 'updateCharacter', characterId: 'karin',
+      updates: { variantSelectionPolicy: 'random', variants: [
+        { id: 'hostile', name: 'Hostile', stance: { warmth: -0.7, dominance: 0.5 } },
+      ] } as any,
+    }], c as any);
+    expect(results[0].ok).toBe(true);
+    const v = applied[0].variants[0];
+    expect(v.stance).toEqual({ warmth: -0.7, dominance: 0.5 });
+    // hostile stance lowers agreeableness; shy base keeps extraversion low
+    expect(v.traits.agreeableness).toBeLessThan(0.6);
+    expect(v.traits.extraversion).toBeLessThan(0.35);
+    expect(results[0].detail).toMatch(/1 variants/);
+  });
+
   it('updateCharacter reports unknown characters', () => {
     const c = ctx();
     (c as any).characters = [];

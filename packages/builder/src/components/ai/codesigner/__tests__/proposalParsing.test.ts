@@ -79,6 +79,43 @@ describe('updateCharacter kind', () => {
     expect(r.proposalSet).toBe(null);
     expect(r.droppedCount).toBe(1);
   });
+
+  it('accepts + clamps affect fields: traits, selection policy, and stance-bearing variants', () => {
+    const r = extractProposalsFromReply(block(JSON.stringify({
+      title: 'Affect',
+      proposals: [{
+        kind: 'updateCharacter', characterId: 'karin',
+        updates: {
+          traits: { openness: 1.7, neuroticism: -0.3, bogus: 5 },
+          variantSelectionPolicy: 'random',
+          variants: [
+            { id: 'Hostile!', name: 'Hostile', characterDescription: 'v', stance: { warmth: -3, dominance: 0.5 }, initialMood: { valence: -2, arousal: 0.6 } },
+            { name: 'Cooperative', stance: { warmth: 0.7, dominance: -0.2 } },
+          ],
+        },
+      }],
+    })));
+    const u = (r.proposalSet!.proposals[0] as any).updates;
+    expect(u.traits.openness).toBe(1);           // clamped to [0,1]
+    expect(u.traits.neuroticism).toBe(0);
+    expect(u.traits).not.toHaveProperty('bogus'); // unknown trait dropped
+    expect(u.variantSelectionPolicy).toBe('random');
+    expect(u.variants).toHaveLength(2);
+    expect(u.variants[0].id).toBe('hostile');    // slugified
+    expect(u.variants[0].stance).toEqual({ warmth: -1, dominance: 0.5 }); // clamped
+    expect(u.variants[0].initialMood.valence).toBe(-1);
+    expect(u.variants[1].id).toBe('cooperative'); // id from name
+  });
+
+  it('ignores an invalid variantSelectionPolicy value', () => {
+    const r = extractProposalsFromReply(block(JSON.stringify({
+      title: 'X',
+      proposals: [{ kind: 'updateCharacter', characterId: 'k', updates: { description: 'ok', variantSelectionPolicy: 'sometimes' } }],
+    })));
+    const u = (r.proposalSet!.proposals[0] as any).updates;
+    expect(u).not.toHaveProperty('variantSelectionPolicy');
+    expect(u.description).toBe('ok');
+  });
 });
 
 describe('describeProposal', () => {

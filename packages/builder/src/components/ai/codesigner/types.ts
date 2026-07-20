@@ -49,9 +49,33 @@ export type ChangeProposal =
       kind: 'updateCharacter';
       /** Character id, ref name, or display name as shown in the digest. */
       characterId: string;
-      updates: { displayName?: string; description?: string; color?: string };
+      updates: {
+        displayName?: string;
+        description?: string;
+        color?: string;
+        /** Base Big Five personality ([0,1] per axis) — replaces the bag. */
+        traits?: Record<string, number>;
+        /** Draw a disposition variant at each playthrough vs. use the default. */
+        variantSelectionPolicy?: 'fixed' | 'random';
+        /** FULL replacement of the character's disposition/persona variants.
+         *  A variant carrying a `stance` has its extraversion/agreeableness
+         *  re-derived from the base traits + stance at apply time, keeping
+         *  the interpersonal-circumplex model consistent. */
+        variants?: CoDesignerVariant[];
+      };
       note?: string;
     };
+
+/** Variant shape the Co-Designer may propose (subset of CharacterVariant). */
+export interface CoDesignerVariant {
+  id: string;
+  name?: string;
+  characterDescription?: string;
+  traits?: Record<string, number>;
+  initialMood?: { valence: number; arousal: number };
+  /** Interpersonal-circumplex position, each axis [-1, 1]. */
+  stance?: { warmth: number; dominance: number };
+}
 
 export interface ChangeProposalSet {
   /** Short title for the batch, e.g. "Make Marcus more sinister". */

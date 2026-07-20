@@ -33,10 +33,28 @@ describe('buildStoryDigest', () => {
 
     expect(digest).toContain('STORY: "Test Story"');
     expect(digest).toContain('2 beats, 1 characters');
-    expect(digest).toContain('- Elena (ref: elena; 3 traits; counters: trust)');
+    expect(digest).toContain('- Elena (id: c1; ref: elena; 3 traits; counters: trust)');
     expect(digest).toContain('VARIABLES: score');
     expect(digest).toContain('- b1 [infoText] "Opening" — It was a dark and stormy night. → b2 ("Continue")');
     expect(digest).toContain('- b2 [endScreen] "The End" — Fin');
+  });
+
+  it('names variants with their stances + selection policy so affect is visible', () => {
+    const digest = buildStoryDigest({
+      beats: [beat({})],
+      characters: [{
+        id: 'karin', name: 'karin', displayName: 'Karin',
+        traits: { openness: 0.5, extraversion: 0.3 },
+        variantSelectionPolicy: 'random',
+        variants: [
+          { id: 'hostile', name: 'Hostile', stance: { warmth: -0.7, dominance: 0.5 } },
+          { id: 'cooperative', name: 'Cooperative', stance: { warmth: 0.7, dominance: -0.2 } },
+        ],
+      }],
+    });
+    expect(digest).toContain('2 traits');
+    expect(digest).toContain('variants: Hostile [stance w-0.7 d+0.5], Cooperative [stance w+0.7 d-0.2]');
+    expect(digest).toContain('selection: random each playthrough');
   });
 
   it('reads text from getParameters() on live Beat instances', () => {

@@ -24,9 +24,18 @@ export interface DigestCharacter {
   name?: string;
   displayName?: string;
   description?: string;
-  traits?: unknown[];
+  /** Big Five bag ([0,1]) or legacy array — both are summarised. */
+  traits?: unknown;
   counters?: Array<{ name?: string; displayName?: string; min?: number; max?: number; value?: number }>;
-  variants?: unknown[];
+  /** Disposition/persona overlays. Named + stance-summarised so the
+   *  Co-Designer can reason about affect, not just count them. */
+  variants?: Array<{
+    id?: string;
+    name?: string;
+    stance?: { warmth?: number; dominance?: number };
+  }> | unknown[];
+  variantSelectionPolicy?: 'fixed' | 'random';
+  defaultVariantId?: string;
 }
 
 export interface StoryDigestInput {
@@ -114,10 +123,29 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
     for (const c of input.characters) {
       const label = c.displayName || c.name || c.id || '?';
       const bits: string[] = [];
+      if (c.id && c.id !== label) bits.push(`id: ${c.id}`);
       if (c.name && c.displayName && c.name !== c.displayName) bits.push(`ref: ${c.name}`);
       if (c.description) bits.push(c.description.slice(0, 140));
-      if (c.traits && c.traits.length > 0) bits.push(`${c.traits.length} traits`);
-      if (c.variants && c.variants.length > 0) bits.push(`${c.variants.length} variants`);
+      const traitCount = Array.isArray(c.traits)
+        ? c.traits.length
+        : (c.traits && typeof c.traits === 'object' ? Object.keys(c.traits).length : 0);
+      if (traitCount > 0) bits.push(`${traitCount} traits`);
+      // Name the variants + summarise their interpersonal stance so the
+      // Co-Designer can reason about disposition/affect, not just count.
+      const variants = Array.isArray(c.variants) ? (c.variants as any[]) : [];
+      if (variants.length > 0) {
+        const named = variants.map((v: any) => {
+          const nm = v?.name || v?.id || '?';
+          const s = v?.stance;
+          if (s && (typeof s.warmth === 'number' || typeof s.dominance === 'number')) {
+            return `${nm} [stance w${(s.warmth ?? 0) >= 0 ? '+' : ''}${(s.warmth ?? 0).toFixed(1)} d${(s.dominance ?? 0) >= 0 ? '+' : ''}${(s.dominance ?? 0).toFixed(1)}]`;
+          }
+          return nm;
+        });
+        bits.push(`variants: ${named.join(', ')}`);
+        if (c.variantSelectionPolicy === 'random') bits.push('selection: random each playthrough');
+        else if (c.defaultVariantId) bits.push(`default variant: ${c.defaultVariantId}`);
+      }
       if (c.counters && c.counters.length > 0) {
         bits.push(`counters: ${c.counters.map(k => k.displayName || k.name).join(', ')}`);
       }

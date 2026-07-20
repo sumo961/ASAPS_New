@@ -10,6 +10,7 @@
 
 import type { ChangeProposal, ProposalApplyResult } from '../components/ai/codesigner/types';
 import { getAllBeatTypeIds } from '../services/beatSchemaVocabulary';
+import { applyStanceToTraits } from '../services/prompts/interpersonalStance';
 
 export interface ApplyContext {
   /** Live beats (id, name, getParameters for validation + positioning). */
@@ -31,10 +32,11 @@ export interface ApplyContext {
   ) => { id: string } | null;
   /** Connect source → target with an optional label. */
   connectBeats: (sourceId: string, targetId: string, label?: string) => void;
-  /** Live characters for validation (id / ref name / display name). */
-  characters?: Array<{ id?: string; name?: string; displayName?: string }>;
+  /** Live characters for validation (id / ref name / display name) plus
+   *  base traits — needed to derive a variant's E/A from its stance. */
+  characters?: Array<{ id?: string; name?: string; displayName?: string; traits?: Record<string, number> }>;
   /** Character field update (NOT in the undo history — noted in the result). */
-  updateCharacter?: (characterId: string, updates: Record<string, string>) => void;
+  updateCharacter?: (characterId: string, updates: Record<string, unknown>) => void;
 }
 
 export function applyChangeProposals(
@@ -123,10 +125,27 @@ export function applyChangeProposals(
             results.push({ index, ok: false, detail: 'Character updates are not available here' });
             return;
           }
-          ctx.updateCharacter(target.id, p.updates);
+          const updates: Record<string, unknown> = { ...(p.updates as any) };
+          // Keep the circumplex model consistent: a proposed variant that
+          // carries a stance has its extraversion/agreeableness re-derived
+          // from the (possibly also-updated) base traits + stance, the same
+          // rule the character helper uses — so a stance change actually
+          // moves the traits it implies.
+          const baseTraits = (updates.traits as Record<string, number>) || target.traits || {};
+          if (Array.isArray(updates.variants)) {
+            updates.variants = (updates.variants as any[]).map((v) => {
+              if (!v?.stance) return v;
+              const ea = applyStanceToTraits(baseTraits, v.stance);
+              return { ...v, traits: { ...(v.traits || {}), extraversion: ea.extraversion, agreeableness: ea.agreeableness } };
+            });
+          }
+          ctx.updateCharacter(target.id, updates);
+          const summary = Object.keys(updates).map(k =>
+            k === 'variants' ? `${(updates.variants as any[]).length} variants` : k,
+          ).join(', ');
           results.push({
             index, ok: true,
-            detail: `Updated ${Object.keys(p.updates).join(', ')} on character ${target.displayName || target.name || target.id} (not in undo history — re-edit in the Character Manager to revert)`,
+            detail: `Updated ${summary} on character ${target.displayName || target.name || target.id} (not in undo history — re-edit in the Character Manager to revert)`,
           });
           return;
         }

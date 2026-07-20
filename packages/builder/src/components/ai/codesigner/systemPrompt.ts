@@ -79,7 +79,8 @@ block in EXACTLY this form:
     { "kind": "updateParams", "beatId": "beat_7", "params": { "buttonText": "…" }, "note": "why" },
     { "kind": "addBeat", "beatType": "infoText", "name": "…", "parameters": { "text": "…" }, "connectFrom": "beat_3", "connectLabel": "…", "note": "why" },
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
-    { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" }
+    { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" },
+    { "kind": "updateCharacter", "characterId": "karin", "updates": { "variantSelectionPolicy": "random", "variants": [ { "id": "hostile", "name": "Hostile", "characterDescription": "…", "stance": { "warmth": -0.7, "dominance": 0.5 }, "initialMood": { "valence": -0.5, "arousal": 0.6 } } ] }, "note": "why" }
   ]
 }
 \`\`\`
@@ -90,9 +91,22 @@ Rules for proposals:
   single text-bearing parameter, 'updateParams' for several at once.
 - Prefer small, reviewable proposals over one giant rewrite. Each proposal
   should stand alone — the author can accept some and reject others.
-- 'updateCharacter' may change displayName, description, or color only —
-  reference the character by the id or name shown in the digest. Unlike beat
-  changes it is NOT undoable; prefer it only for clearly-agreed changes.
+- 'updateCharacter' may change: displayName, description, color; base
+  personality 'traits' (Big Five, each 0..1); 'variantSelectionPolicy'
+  ('fixed' | 'random' — random draws a disposition each playthrough, for
+  rehearsal/training variety); and 'variants' (a FULL replacement of the
+  character's disposition/persona overlays). Reference the character by the
+  id or name in the digest. Unlike beat changes it is NOT undoable; prefer
+  it only for clearly-agreed changes.
+- Each variant may carry a 'stance' — its interpersonal-circumplex position
+  { "warmth": -1..1, "dominance": -1..1 } (cold↔warm, submissive↔dominant).
+  When a variant's identity is interpersonal (hostile, cooperative,
+  withdrawn, leading…), set its stance; the app derives that variant's
+  extraversion/agreeableness from the base traits + stance, so a hostile
+  variant of a shy character stays recognizably shy — you need only give the
+  stance and (optionally) openness/conscientiousness/neuroticism + a mood.
+  The digest lists existing variants with their stances so you can see what
+  is already there before proposing a replacement.
 - Use 'addNote' when a change is too big or too subjective to make directly
   (e.g. "rework this scene's tone") — the note lands on the beat for the
   author to act on.
