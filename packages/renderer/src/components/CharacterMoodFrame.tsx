@@ -48,6 +48,14 @@ export interface MoodFrameConfig {
   dotColor?: string;
   /** Background opacity (0 = transparent, 1 = opaque). */
   backgroundOpacity: number;
+  /**
+   * Glance-tier vs detail-tier display (v0.9.81). `'token'` (default) shows
+   * the compact glanceable mood token — a coloured blob sitting in the
+   * mood's circumplex quadrant, readable at HUD/mobile size and collected
+   * into a rail when several characters are on screen. `'disc'` keeps the
+   * full Russell's-circumplex card (precise, but the old hard-to-read HUD).
+   */
+  displayStyle?: 'token' | 'disc';
 }
 
 export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
@@ -61,6 +69,7 @@ export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
   showLabels: false,
   showQualitativeLabel: true,
   backgroundOpacity: 0.95,
+  displayStyle: 'token',
 };
 
 export interface MoodFrameEmotionMarker {
@@ -96,7 +105,7 @@ export interface CharacterMoodFrameProps {
 // Positioning math — mirrors CharacterMeterFrame.
 // ---------------------------------------------------------------------------
 
-function calculateCharacterAnchorPosition(
+export function calculateCharacterAnchorPosition(
   anchor: MoodFrameAnchor,
   charPos: { x: number; y: number },
   charDims: { width: number; height: number },
@@ -121,7 +130,7 @@ function calculateCharacterAnchorPosition(
   return { x: x + offset.x, y: y + offset.y };
 }
 
-function calculateScreenPosition(
+export function calculateScreenPosition(
   pos: MoodFrameScreenPosition,
   containerDims: { width: number; height: number },
   offset: { x: number; y: number },

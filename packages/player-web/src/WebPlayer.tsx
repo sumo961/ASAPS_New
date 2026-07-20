@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, CharacterMeterFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -734,35 +734,55 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           zIndex: 40,
         }}
       >
-        {chars.map((c: any) => {
-          const mf = c?.moodFrame;
-          if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
-          // Hide HUD until variant explicitly picked.
-          if (c.variants && c.variants.length > 0) {
-            const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-            if (!explicit) return null;
-          }
-          const merged = (ctx as any).getMergedCharacter?.(c.id) || c;
-          const mood = ctx.getCharacterMood(c.id);
-          const portraitAsset = merged.portrait?.assetId
-            ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
-            : undefined;
+        {(() => {
+          // Collect screen-docked, enabled mood frames (variant-gated) into
+          // a shared list, then: token-style ones are grouped by corner into
+          // a MoodRail (no overlap), disc-style ones stay individual cards.
+          const railGroups: Record<string, MoodRailEntry[]> = {};
+          const discFrames: React.ReactNode[] = [];
+          chars.forEach((c: any) => {
+            const mf = c?.moodFrame;
+            if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
+            if (c.variants && c.variants.length > 0) {
+              const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+              if (!explicit) return;
+            }
+            const merged = (ctx as any).getMergedCharacter?.(c.id) || c;
+            const mood = ctx.getCharacterMood(c.id);
+            const portraitAsset = merged.portrait?.assetId
+              ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+              : undefined;
+            const name = merged.displayName || merged.name || c.id;
+            const portraitUrl = portraitAsset?.url || merged.portrait?.image;
+            if ((mf.displayStyle ?? 'token') === 'disc') {
+              discFrames.push(
+                <CharacterMoodFrame
+                  key={`mood-hud-${c.id}`}
+                  valence={mood.valence} arousal={mood.arousal} config={mf} palette={palette}
+                  characterName={name} characterPortraitUrl={portraitUrl} characterColor={merged.color}
+                  characterPosition={{ x: 0, y: 0 }} characterDimensions={{ width: 0, height: 0 }}
+                  containerDimensions={stageDims}
+                />,
+              );
+            } else {
+              const corner = mf.screenPosition || 'screen-top-right';
+              (railGroups[corner] ||= []).push({
+                key: c.id, valence: mood.valence, arousal: mood.arousal,
+                characterName: name, characterPortraitUrl: portraitUrl, characterColor: merged.color,
+                showLabel: mf.showQualitativeLabel !== false,
+              });
+            }
+          });
           return (
-            <CharacterMoodFrame
-              key={`mood-hud-${c.id}`}
-              valence={mood.valence}
-              arousal={mood.arousal}
-              config={mf}
-              palette={palette}
-              characterName={merged.displayName || merged.name || c.id}
-              characterPortraitUrl={portraitAsset?.url || merged.portrait?.image}
-              characterColor={merged.color}
-              characterPosition={{ x: 0, y: 0 }}
-              characterDimensions={{ width: 0, height: 0 }}
-              containerDimensions={stageDims}
-            />
+            <>
+              {Object.entries(railGroups).map(([corner, entries]) => (
+                <MoodRail key={`mood-rail-${corner}`} entries={entries}
+                  screenPosition={corner as any} containerDimensions={stageDims} />
+              ))}
+              {discFrames}
+            </>
           );
-        })}
+        })()}
         {/* Counter (meter-frame) HUD — same hoist as the mood pad:
             screen-docked frames render at the top level so they show in
             both layout modes and regardless of whether the character is

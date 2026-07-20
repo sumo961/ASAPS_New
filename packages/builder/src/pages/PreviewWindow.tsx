@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, CharacterMeterFrame } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -2675,51 +2675,53 @@ export const PreviewWindow: React.FC = () => {
                 // Just touch debugInfo so the linter / React knows we
                 // depend on it for re-renders. Read is cheap.
                 void debugInfo;
+                const stageDim = { width: STAGE_WIDTH, height: STAGE_HEIGHT };
+                // Token-style screen HUDs group into a per-corner MoodRail
+                // (no overlap when several characters are on screen); disc-
+                // style ones stay individual cards.
+                const railGroups: Record<string, MoodRailEntry[]> = {};
+                const discFrames: React.ReactNode[] = [];
+                chars.forEach((c) => {
+                  const mf: any = (c as any).moodFrame;
+                  if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
+                  const variants = (c as any).variants;
+                  if (variants && variants.length > 0) {
+                    const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+                    if (!explicit) return;
+                  }
+                  const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
+                  const mood = ctx.getCharacterMood(c.id);
+                  const portraitAsset = merged.portrait?.assetId
+                    ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+                    : undefined;
+                  const portraitUrl = portraitAsset?.url || merged.portrait?.image;
+                  const name = merged.displayName || merged.name || c.id;
+                  if ((mf.displayStyle ?? 'token') === 'disc') {
+                    discFrames.push(
+                      <CharacterMoodFrame
+                        key={`mood-hud-${c.id}`}
+                        valence={mood.valence} arousal={mood.arousal} config={mf} palette={palette}
+                        characterName={name} characterPortraitUrl={portraitUrl} characterColor={merged.color}
+                        characterPosition={{ x: 0, y: 0 }} characterDimensions={{ width: 0, height: 0 }}
+                        containerDimensions={stageDim}
+                      />,
+                    );
+                  } else {
+                    const corner = mf.screenPosition || 'screen-top-right';
+                    (railGroups[corner] ||= []).push({
+                      key: c.id, valence: mood.valence, arousal: mood.arousal,
+                      characterName: name, characterPortraitUrl: portraitUrl, characterColor: merged.color,
+                      showLabel: mf.showQualitativeLabel !== false,
+                    });
+                  }
+                });
                 return (
                   <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
-                    {chars.map((c) => {
-                      const mf: any = (c as any).moodFrame;
-                      if (!mf || !mf.enabled || mf.dockMode !== 'screen') return null;
-                      // If the character has variants, hide the HUD until
-                      // an active variant has been chosen — this keeps the
-                      // pre-picker title screens clean and signals to the
-                      // player that the persona hasn't been settled yet.
-                      // Gate on EXPLICIT pick (not engine-applied default
-                      // from Character.defaultVariantId), so the HUD stays
-                      // hidden until the player actually picks via the
-                      // picker beat. Even with a defaultVariantId set,
-                      // the flag is only true after a setCharacterVariant
-                      // Effect fires.
-                      const variants = (c as any).variants;
-                      if (variants && variants.length > 0) {
-                        const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-                        if (!explicit) return null;
-                      }
-                      // Use the merged character (variant overlay applied)
-                      // so the HUD shows the variant-specific name /
-                      // portrait when a variant is active.
-                      const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
-                      const mood = ctx.getCharacterMood(c.id);
-                      const portraitAsset = merged.portrait?.assetId
-                        ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
-                        : undefined;
-                      const portraitUrl = portraitAsset?.url || merged.portrait?.image;
-                      return (
-                        <CharacterMoodFrame
-                          key={`mood-hud-${c.id}`}
-                          valence={mood.valence}
-                          arousal={mood.arousal}
-                          config={mf}
-                          palette={palette}
-                          characterName={merged.displayName || merged.name || c.id}
-                          characterPortraitUrl={portraitUrl}
-                          characterColor={merged.color}
-                          characterPosition={{ x: 0, y: 0 }}
-                          characterDimensions={{ width: 0, height: 0 }}
-                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-                        />
-                      );
-                    })}
+                    {Object.entries(railGroups).map(([corner, entries]) => (
+                      <MoodRail key={`mood-rail-${corner}`} entries={entries}
+                        screenPosition={corner as any} containerDimensions={stageDim} />
+                    ))}
+                    {discFrames}
                     {/* Counter (meter-frame) HUD — same hoist as the mood
                         pad above: screen-docked frames render here so they
                         show in BOTH layout modes and on beats where the

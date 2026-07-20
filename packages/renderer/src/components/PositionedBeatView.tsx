@@ -7,6 +7,7 @@ import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
 import { CharacterMoodFrame } from './CharacterMoodFrame';
+import { CharacterMoodToken } from './CharacterMoodToken';
 import { TimerProgressBar } from './TimerProgressBar';
 import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
@@ -2690,18 +2691,33 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             />
           )}
           {moodFrameData && moodFrameData.config.enabled && (
-            <CharacterMoodFrame
-              valence={moodFrameData.valence}
-              arousal={moodFrameData.arousal}
-              config={moodFrameData.config}
-              palette={moodFrameData.palette}
-              characterName={moodFrameData.characterName}
-              characterPortraitUrl={moodFrameData.characterPortraitUrl}
-              characterColor={moodFrameData.characterColor}
-              characterPosition={{ x: effectiveX, y: effectiveY }}
-              characterDimensions={{ width: location.width, height: location.height }}
-              containerDimensions={containerDimensions}
-            />
+            (moodFrameData.config.displayStyle ?? 'token') === 'disc' ? (
+              <CharacterMoodFrame
+                valence={moodFrameData.valence}
+                arousal={moodFrameData.arousal}
+                config={moodFrameData.config}
+                palette={moodFrameData.palette}
+                characterName={moodFrameData.characterName}
+                characterPortraitUrl={moodFrameData.characterPortraitUrl}
+                characterColor={moodFrameData.characterColor}
+                characterPosition={{ x: effectiveX, y: effectiveY }}
+                characterDimensions={{ width: location.width, height: location.height }}
+                containerDimensions={containerDimensions}
+              />
+            ) : (
+              <CharacterMoodToken
+                valence={moodFrameData.valence}
+                arousal={moodFrameData.arousal}
+                config={moodFrameData.config}
+                characterName={moodFrameData.characterName}
+                characterPortraitUrl={moodFrameData.characterPortraitUrl}
+                characterColor={moodFrameData.characterColor}
+                characterPosition={{ x: effectiveX, y: effectiveY }}
+                characterDimensions={{ width: location.width, height: location.height }}
+                containerDimensions={containerDimensions}
+                fontScale={mobileFontScale}
+              />
+            )
           )}
         </>
       );

@@ -178,6 +178,14 @@ export interface MoodFrameConfig {
   dotColor?: string;
   /** Background opacity (0 = transparent, 1 = opaque). */
   backgroundOpacity: number;
+  /**
+   * Glance-tier vs detail-tier display (v0.9.81). `'token'` (default) shows
+   * the compact mood token — a coloured blob in the mood's circumplex
+   * quadrant, readable at HUD/mobile size and collected into a rail when
+   * several characters share a screen corner. `'disc'` keeps the full
+   * Russell's-circumplex card (precise, but the old hard-to-read HUD).
+   */
+  displayStyle?: 'token' | 'disc';
 }
 
 export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
@@ -191,6 +199,7 @@ export const DEFAULT_MOOD_FRAME_CONFIG: MoodFrameConfig = {
   showLabels: false,
   showQualitativeLabel: true,
   backgroundOpacity: 0.95,
+  displayStyle: 'token',
 };
 
 /**

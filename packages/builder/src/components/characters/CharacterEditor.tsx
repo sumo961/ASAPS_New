@@ -3049,6 +3049,18 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               {mf.enabled && (
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center gap-2">
+                    <label className="w-24 text-gray-600">Display:</label>
+                    <select
+                      value={mf.displayStyle ?? 'token'}
+                      onChange={(e) => updateMoodFrame({ displayStyle: e.target.value as any })}
+                      className="border rounded px-2 py-1"
+                      title="Token: a compact glanceable mood glyph (recommended, reads on mobile and stacks into a rail for several characters). Disc: the full circumplex card."
+                    >
+                      <option value="token">Token (glanceable)</option>
+                      <option value="disc">Disc (full circumplex)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <label className="w-24 text-gray-600">Dock mode:</label>
                     <select
                       value={mf.dockMode}

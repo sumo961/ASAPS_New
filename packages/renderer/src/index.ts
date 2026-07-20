@@ -13,6 +13,13 @@ export {
   type MoodFrameEmotionMarker,
 } from './components/CharacterMoodFrame';
 export {
+  MoodToken,
+  CharacterMoodToken,
+  MoodRail,
+  moodWord,
+  type MoodRailEntry,
+} from './components/CharacterMoodToken';
+export {
   CharacterMeterFrame,
   type MeterFrameConfig,
   type MeterCounterData,
