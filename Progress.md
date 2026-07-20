@@ -1,5 +1,35 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-20: Glanceable mood HUD + AI generation learns the stance model (v0.9.81)
+
+### Overview
+
+Two threads, both closing gaps the character work opened. The runtime **mood display is redesigned** — the on-stage HUD was a shrunk copy of the editor's circumplex disc (a dot to hunt, no mobile scaling, and overlapping cards for several characters); it becomes a glanceable coloured **mood token** with a self-teaching label and a **rail** that lays several characters out without collision. And the **AI story-generation paths** (Build-from-a-prompt, Ideator, both MCP servers) are taught the interpersonal-stance model and variant selection policy shipped in v0.9.78–79 — so generated characters can carry stances and rehearsal-variety dispositions, which the import path already preserved.
+
+### Glanceable mood HUD (token + rail)
+
+- New **CharacterMoodToken** (SVG — no canvas, no devicePixelRatio scaling bugs): a coloured gradient blob that sits IN the mood's circumplex quadrant over a dark ground, so position AND hue name the mood; neutral is a clean grey (never the muddy four-way tint blend the disc produced small); four vivid corner ticks are an always-on quadrant legend. A one-word self-teaching label (`moodWord`) rides alongside so the code is learned continuously, not from a tutorial screen.
+- **MoodRail**: several screen-docked characters now lay out in a wrapping row per corner instead of stacking on the same spot — the "several characters with moods" fix. The token clamps into the stage box (fixing the mobile off-screen clip) and takes the `mobileFontScale` the sibling meter/inventory frames already receive.
+- New per-character `moodFrame.displayStyle: 'token' | 'disc'` (default `'token'`); existing enabled HUDs auto-upgrade to the token, authors can opt back to the full disc (kept as the detail tier). CharacterEditor gains a Display select.
+- Wired into all three render paths (PositionedBeatView character-dock, WebPlayer + PreviewWindow screen-dock overlays). Design explored as an interactive artifact first; tap-to-expand disc popover and the first-encounter reveal animation are a documented phase-2 follow-up.
+
+**Files modified:**
+- `packages/renderer/src/components/CharacterMoodToken.tsx` (new), `CharacterMoodFrame.tsx`, `PositionedBeatView.tsx`, `packages/renderer/src/index.ts`, `packages/player-web/src/WebPlayer.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/types/character.ts`, `packages/builder/src/components/characters/CharacterEditor.tsx`
+
+### AI generation paths learn the stance model + selection policy
+
+- Audit finding: `stance`, `variantSelectionPolicy`, and the rehearsal-variety pattern were implemented in the runtime/types but mentioned in ZERO generation prompts — while the import pipeline (`normalizeCharacter` is additive, `handleStoryGenerated` forwards characters as-is) already passes both through untouched. So the only gap was the prompts.
+- Fixed at the canonical source (`affectPrompt.ts` — Variants catalog entry gains the `stance` circumplex field, the E/A-consistency rule of thumb, and `variantSelectionPolicy: 'random'` for replay-variety dispositions) and mirrored everywhere it's duplicated: `storyGenerationEnhanced.ts` (now carries the first-ever variant JSON shape example), both MCP servers (exact-match replacement confirmed the copies hadn't drifted), and the Ideator synthesis prompt (its `rich` affectDepth description now carries variant/rehearsal vocabulary). The legacy compact `storyGeneration.ts` stays affect-free by design; the Co-Designer's `updateCharacter` proposal remains displayName/description/color only (variant proposals are a future schema change).
+
+**Files modified:**
+- `packages/core/src/prompts/affectPrompt.ts`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/components/ai/ideator/systemPrompt.ts`, `mcp-server/src/utils/aiHelper.ts`, `mcp-server-desktop/src/index.ts`
+
+### Verification
+
+12 new mood-token tests (glyph quadrant placement, mood-word vocabulary, rail no-overlap); renderer 492 + builder 2323 + core 2532 green; build and type-check clean. The mood rail verified live: two screen-docked characters render as a non-overlapping rail (Agatha red/hostile, Emmanuel green/content) with self-labels; test project fully reverted afterward.
+
+---
+
 ## 2026-07-20: Background fit for all beats, one-name project rename, VE/Preview parity + docs screenshots (v0.9.80)
 
 ### Overview
