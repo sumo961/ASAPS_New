@@ -289,6 +289,11 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     // fixed projects look like they were still responsive. Slot rows are
     // responsive/spatial-mode UI only.
     if (layoutMode === 'absolute') return [];
+    // AI Conversation in 'dialog' presentation is a positioned beat — its
+    // stage content is the baked text/input elements listed below, not the
+    // chat slots (which only drive the 'chat' scrolling panel). Suppress the
+    // slot rows so the panel doesn't double-list speaker/openingLine.
+    if (beatType === 'aiConversation' && ((beatParams?.presentation ?? 'chat') === 'dialog')) return [];
     const spec = getSlotSpec(beatType) ?? getSpatialSpec(beatType)?.slots ?? null;
     if (!spec) return [];
     const p = beatParams || {};
