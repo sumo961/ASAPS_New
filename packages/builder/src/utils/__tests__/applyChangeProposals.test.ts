@@ -78,7 +78,7 @@ describe('applyChangeProposals', () => {
       [{ kind: 'updateCharacter', characterId: 'Elena', updates: { description: 'darker' } }], c as any);
     expect((c as any).updateCharacter).toHaveBeenCalledWith('ch1', { description: 'darker' });
     expect(results[0].ok).toBe(true);
-    expect(results[0].detail).toMatch(/not in undo history/);
+    expect(results[0].detail).toMatch(/Updated description on character Elena/);
   });
 
   it('updateCharacter derives a stance-bearing variant\'s E/A from the base traits', () => {

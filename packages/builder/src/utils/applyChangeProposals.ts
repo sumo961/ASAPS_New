@@ -145,7 +145,7 @@ export function applyChangeProposals(
           ).join(', ');
           results.push({
             index, ok: true,
-            detail: `Updated ${summary} on character ${target.displayName || target.name || target.id} (not in undo history — re-edit in the Character Manager to revert)`,
+            detail: `Updated ${summary} on character ${target.displayName || target.name || target.id}`,
           });
           return;
         }

@@ -5924,6 +5924,13 @@ function App() {
       return;
     }
     const backupName = await backupBeforeCoDesignerApply();
+    // Character edits accumulate into a working copy and apply as ONE
+    // undoable UpdateCharactersCommand (via handleCharactersChange) after
+    // the batch — so Co-Designer character changes are undoable, consistent
+    // with its beat edits. Applying per-proposal would fight React's async
+    // state and lose earlier edits in the same batch.
+    let workingChars = characters;
+    let charsChanged = false;
     const results = applyChangeProposals(proposals, {
       beats: state.beats as any,
       updateBeat: (beatId, updates) => handleBeatUpdate(beatId, updates as any),
@@ -5937,9 +5944,14 @@ function App() {
       connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
       characters: characters as any,
       updateCharacter: (characterId, updates) => {
-        setCharacters(prev => prev.map(c => (c.id === characterId ? { ...c, ...updates } : c)));
+        workingChars = workingChars.map(c => (c.id === characterId ? { ...c, ...updates } as Character : c));
+        charsChanged = true;
       },
     });
+    if (charsChanged) {
+      // One undo step for all character edits in this batch.
+      handleCharactersChange(workingChars);
+    }
     markChanged();
     if (backupName) {
       // Surface the backup in the pop-out's result log (the index isn't
@@ -5949,7 +5961,7 @@ function App() {
     coDesignerWindowManager.notifyApplyResult(results);
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
-  }, [state.beats, characters, actions, handleBeatUpdate, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
+  }, [state.beats, characters, actions, handleBeatUpdate, handleCharactersChange, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
 
   useEffect(() => {
     const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);
