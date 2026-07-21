@@ -55,6 +55,26 @@ describe('initializeLocationsFromSchema', () => {
     expect(title!.x).toBeCloseTo(1024 / 2 - title!.width / 2);
   });
 
+  it('aiConversation: bakes text + input positions only in dialog mode', () => {
+    const dialog = initializeLocationsFromSchema(
+      beat('aiConversation'), { presentation: 'dialog', openingLine: 'Hi.' }, { width: 1024, height: 768 });
+    const text = byLoc(dialog, 'text');
+    const input = byLoc(dialog, 'input');
+    expect(text).toBeDefined();
+    expect(input).toBeDefined();
+    // input bar sits below the NPC dialog box
+    expect(input!.y).toBeGreaterThan(text!.y);
+
+    // chat mode is the responsive scrolling panel — no baked positions
+    const chat = initializeLocationsFromSchema(
+      beat('aiConversation'), { presentation: 'chat' }, { width: 1024, height: 768 });
+    expect(chat).toEqual([]);
+    // default (unspecified) presentation is chat
+    const dflt = initializeLocationsFromSchema(
+      beat('aiConversation'), {}, { width: 1024, height: 768 });
+    expect(dflt).toEqual([]);
+  });
+
   it('skips restartButton when showRestart is false and creditsButton unless showCredits is true', () => {
     const hidden = initializeLocationsFromSchema(beat('endScreen'), { showRestart: false, showCredits: false });
     expect(byLoc(hidden, 'restartButton')).toBeUndefined();

@@ -1564,9 +1564,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // projects the schema declaration is only suggestive; baked author
   // positions still win (the editor stays on the absolute path).
   const beatLayoutTemplate = beat ? ((beat as any).layoutTemplate as string | undefined) : undefined;
+  // AI Conversation carries a `presentation` choice: 'chat' uses the slot
+  // (scrolling-panel) preview; 'dialog' is a positioned back-and-forth box +
+  // input, so it must take the absolute-positioned editor even though the
+  // schema declares layoutMode:'slot' (that slot spec only serves chat mode).
+  const aiConvDialogMode =
+    beat?.type === 'aiConversation'
+    && (((beat.getParameters?.() ?? {}).presentation ?? 'chat') === 'dialog');
   const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type)
     && (projectIsResponsive || !beatHasAuthorLocations);
   const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type)
+    && !aiConvDialogMode
     && (projectIsResponsive || !beatHasAuthorLocations);
   // DialogTree opts into slot mode template-by-template (the schema
   // doesn't declare layoutMode:'slot' on its own). When the author has

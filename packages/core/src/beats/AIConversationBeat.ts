@@ -76,6 +76,9 @@ export interface AIConversationBeatParams {
 
   /** Language for STT (BCP 47) */
   language?: string;
+
+  /** Presentation style: 'chat' scrolling panel (default) or 'dialog' positioned back-and-forth */
+  presentation?: 'chat' | 'dialog';
 }
 
 export class AIConversationBeat extends Beat {
@@ -93,6 +96,10 @@ export class AIConversationBeat extends Beat {
   public openingLine?: string;
   public enableVoiceInput: boolean;
   public language?: string;
+  /** 'chat' = scrolling messaging panel (responsive); 'dialog' = positioned
+   *  back-and-forth NPC dialog box + text input, one exchange at a time
+   *  (fixed-canvas capable). Defaults to 'chat' for backward compatibility. */
+  public presentation: 'chat' | 'dialog';
 
   constructor(config: BeatConfig & {
     parameters?: Partial<AIConversationBeatParams>;
@@ -118,6 +125,7 @@ export class AIConversationBeat extends Beat {
     this.openingLine = params.openingLine || config.openingLine;
     this.enableVoiceInput = params.enableVoiceInput ?? config.enableVoiceInput ?? true;
     this.language = params.language || config.language;
+    this.presentation = params.presentation ?? config.presentation ?? 'chat';
   }
 
   getParameters(): Record<string, any> {
@@ -137,6 +145,7 @@ export class AIConversationBeat extends Beat {
       openingLine: this.openingLine,
       enableVoiceInput: this.enableVoiceInput,
       language: this.language,
+      presentation: this.presentation,
     };
   }
 
@@ -161,6 +170,7 @@ export class AIConversationBeat extends Beat {
     if (params.openingLine !== undefined) this.openingLine = params.openingLine;
     if (params.enableVoiceInput !== undefined) this.enableVoiceInput = params.enableVoiceInput;
     if (params.language !== undefined) this.language = params.language;
+    if (params.presentation !== undefined) this.presentation = params.presentation;
   }
 
   /**
@@ -399,8 +409,12 @@ export class AIConversationBeat extends Beat {
       }
     }
 
-    // Set up chat presentation mode
-    renderer.setState('presentationMode', 'chat-scroll');
+    // Set up presentation mode. 'dialog' drives the positioned back-and-forth
+    // layout (author-placed NPC box + text input, one exchange at a time, like
+    // a DialogTree with a free-text reply); 'chat' (default) drives the
+    // scrolling messaging panel.
+    const positioned = this.presentation === 'dialog';
+    renderer.setState('presentationMode', positioned ? 'positioned' : 'chat-scroll');
     renderer.setState('showAvatars', true);
     renderer.setState('currentBeatType', 'aiConversation');
     renderer.setState('responseDelay', 1.0);
@@ -819,10 +833,21 @@ export class AIConversationBeat extends Beat {
    */
   private async getPlayerInput(renderer: IRenderer): Promise<string> {
     if (renderer.renderConversationInput) {
+      // In 'dialog' presentation the input composes with the positioned NPC
+      // dialog box: pass the current speaker/line + baked locations so the
+      // renderer draws a positioned box + input bar instead of the chat panel.
+      const positioned = this.presentation === 'dialog';
+      const dialogContext = positioned
+        ? (renderer.getState('dialogContext') as { speaker?: string; text?: string } | undefined)
+        : undefined;
       return renderer.renderConversationInput({
         placeholder: 'Type your response...',
         showMic: this.enableVoiceInput,
         language: this.language,
+        positioned,
+        speaker: dialogContext?.speaker,
+        npcText: dialogContext?.text,
+        locations: positioned ? Array.from(this.locations.values()) : undefined,
       });
     }
 

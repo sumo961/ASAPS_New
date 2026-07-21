@@ -263,6 +263,37 @@ export function initializeLocationsFromSchema(
   const centerX = stageWidth / 2;
   const centerY = stageHeight / 2;
 
+  // AI Conversation: only the 'dialog' presentation is positioned. In 'chat'
+  // mode the runtime uses the responsive scrolling panel, so baking pixel
+  // positions would be wrong (and would flip the beat out of its slot/chat
+  // preview in the editor). Dialog mode gets a bottom NPC dialog box + an
+  // input bar beneath it — the same default rects the runtime falls back to.
+  if (beat.type === 'aiConversation') {
+    if ((params.presentation ?? 'chat') !== 'dialog') {
+      return elements; // chat mode — no baked positions
+    }
+    const mk = (
+      name: string,
+      text: string,
+      type: VisualElement['type'],
+      left: number, top: number, w: number, h: number,
+      z: number
+    ): VisualElement => ({
+      id: `element_${name}_${Date.now()}_${z}`,
+      type,
+      name: name.charAt(0).toUpperCase() + name.slice(1),
+      text,
+      x: left * stageWidth, y: top * stageHeight,
+      z, width: w * stageWidth, height: h * stageHeight,
+      rotation: 0, scale: 1, visible: true, locked: false,
+      font: undefined, fontSize: 18, textAlign: 'center',
+      initialAutoSized: false,
+    });
+    elements.push(mk('text', params.openingLine || '[ NPC dialog appears here ]', 'dialog', 0.06, 0.58, 0.88, 0.24, 0));
+    elements.push(mk('input', '[ Player types their reply here ]', 'text', 0.06, 0.84, 0.88, 0.10, 1));
+    return elements;
+  }
+
   console.log(`[SchemaLocationInitializer] Initializing ${beatDef.locations.length} locations for ${beat.type}`);
 
   // Track vertical position for stacking elements

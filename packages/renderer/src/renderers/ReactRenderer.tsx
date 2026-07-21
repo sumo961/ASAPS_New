@@ -1368,6 +1368,10 @@ export class ReactRenderer extends BaseRenderer {
     placeholder?: string;
     showMic?: boolean;
     language?: string;
+    positioned?: boolean;
+    speaker?: string;
+    npcText?: string;
+    locations?: Location[];
   }): Promise<string> {
     return new Promise<string>(resolve => {
       // Render the chat view with an inline text input instead of choice buttons
@@ -1744,11 +1748,84 @@ export class ReactRenderer extends BaseRenderer {
         );
       };
 
+      // --- Positioned (dialog) presentation -----------------------------
+      // A single author-placeable NPC dialog box + a text-input bar, one
+      // exchange visible at a time (DialogTree look, free-text reply). Used
+      // when the AIConversation beat's presentation === 'dialog'.
+      const findLoc = (name: string): Location | undefined =>
+        (options.locations || []).find(l => String((l as any)?.name ?? '').toLowerCase() === name);
+      // Percent-rect helper: honor an author-baked location, else a default.
+      const rectPct = (
+        loc: Location | undefined,
+        fallback: { left: number; top: number; width: number; height: number }
+      ) => {
+        if (loc && typeof (loc as any).x === 'number' && typeof (loc as any).width === 'number' && (loc as any).width > 0) {
+          return {
+            left: ((loc as any).x / stageWidth) * 100,
+            top: ((loc as any).y / stageHeight) * 100,
+            width: ((loc as any).width / stageWidth) * 100,
+            height: ((loc as any).height / stageHeight) * 100,
+          };
+        }
+        return fallback;
+      };
+      const paintPositioned = (opts: { showInput: boolean; typing: boolean }) => {
+        const boxRect = rectPct(findLoc('text'), { left: 6, top: 60, width: 88, height: 22 });
+        const inputRect = rectPct(findLoc('input'), { left: 6, top: 84, width: 88, height: 10 });
+        const panelBg = this.theme?.textBox?.backgroundColor || 'rgba(15,23,42,0.82)';
+        const textColor = this.theme?.colors?.textColor || '#f8fafc';
+        this.renderComponent(
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <ScaledStage
+              width={stageWidth}
+              height={stageHeight}
+              disableScaling={disableScaling}
+              scalingMode={scalingMode}
+              backgroundUrl={useMobileBg ? this.backgroundImageUrl : undefined}
+              backgroundColor={useMobileBg ? backgroundColor : undefined}
+            >
+              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                {/* NPC dialog box */}
+                <div style={{
+                  position: 'absolute',
+                  left: `${boxRect.left}%`, top: `${boxRect.top}%`,
+                  width: `${boxRect.width}%`, minHeight: `${boxRect.height}%`,
+                  boxSizing: 'border-box',
+                  background: panelBg, color: textColor,
+                  borderRadius: 12, padding: '16px 20px',
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+                }}>
+                  {options.speaker && (
+                    <div style={{ fontWeight: 700, fontSize: 15, opacity: 0.9 }}>{options.speaker}</div>
+                  )}
+                  <div style={{ fontSize: 17, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                    {opts.typing ? '…' : (options.npcText || '')}
+                  </div>
+                </div>
+                {/* Positioned input bar */}
+                {opts.showInput && (
+                  <div style={{
+                    position: 'absolute',
+                    left: `${inputRect.left}%`, top: `${inputRect.top}%`,
+                    width: `${inputRect.width}%`,
+                    boxSizing: 'border-box',
+                  }}>
+                    <ConversationInput />
+                  </div>
+                )}
+              </div>
+            </ScaledStage>
+          </div>
+        );
+      };
+
       // Paint the chat view. `showInput` toggles the text input (hidden the
       // moment the player sends); `typing` shows the NPC "…" indicator while
       // the response is generated. Called once up front, then again from
       // handleSubmit so the player's bubble appears immediately on Send.
       const paint = (opts: { showInput: boolean; typing: boolean }) => {
+        if (options.positioned) { paintPositioned(opts); return; }
         this.renderComponent(
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <ScaledStage

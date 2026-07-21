@@ -154,6 +154,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'aiSummary',
       'aiInfoText',
       'aiDurScreen',
+      'aiConversation',
       'keypad',
       'panorama',
       'gpsLocation',

@@ -877,12 +877,22 @@ export interface IRenderer {
   // Chat mode support
   clearChatHistory?(): void;
 
-  // AI Conversation input (text + mic for real-time conversation beats)
+  // AI Conversation input (text + mic for real-time conversation beats).
+  // In 'positioned' presentation the input composes with an author-placed NPC
+  // dialog box (speaker/npcText at the given locations) instead of the chat panel.
   renderConversationInput?(options: {
     prompt?: string;
     placeholder?: string;
     showMic?: boolean;
     language?: string;
+    /** When true, render the positioned dialog-box + input layout (dialog mode). */
+    positioned?: boolean;
+    /** Current NPC speaker name (positioned mode). */
+    speaker?: string;
+    /** Current NPC line to show above the input (positioned mode). */
+    npcText?: string;
+    /** Baked positioned element locations (positioned mode). */
+    locations?: Location[];
   }): Promise<string>;
 
   // Per-choice visited tracking for recursive dialogs

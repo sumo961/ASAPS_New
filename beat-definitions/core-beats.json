@@ -3573,6 +3573,20 @@
       "description": "Real-time AI conversation with author-defined steering rules. Each NPC response is generated fresh based on full conversation history and active directions.",
       "connectionType": "multiple",
       "parameters": {
+        "presentation": {
+          "type": "string",
+          "required": false,
+          "default": "chat",
+          "description": "How the conversation is shown. 'Chat' = a scrolling messaging-app panel (reflows, best for responsive/mobile). 'Dialog' = one exchange at a time in a positioned NPC dialog box with a text input below it, like a Dialog Tree — supports fixed-canvas placement.",
+          "ui": {
+            "control": "select",
+            "label": "Presentation",
+            "options": [
+              { "value": "chat", "label": "Chat (scrolling panel)" },
+              { "value": "dialog", "label": "Dialog (back-and-forth, positionable)" }
+            ]
+          }
+        },
         "scenario": {
           "type": "string",
           "required": true,
@@ -3877,10 +3891,11 @@
           }
         }
       },
-      "locations": ["text"],
+      "locations": ["text", "input"],
       "locationMapping": {
         "text": "openingLine"
       },
+      "layoutModeNote": "Dual-presentation beat. presentation:'chat' (default) drives the runtime into 'chat-scroll' mode (ChatDialogView, responsive) and the VE shows the faithful slot preview below. presentation:'dialog' drives the runtime into 'positioned' mode: the NPC line (with the speaker name inside it) renders in an author-positioned dialog box (the 'text' location) with a text input at the 'input' location, one exchange at a time — like DialogTree with a free-text reply. The slot spec is only consulted for the chat preview; the positioned 'input'-bearing locations[] serve dialog mode + fixed canvases.",
       "layoutMode": "slot",
       "slots": [
         {

@@ -225,6 +225,15 @@ describe('AIConversationBeat', () => {
       expect(done.directions[0].triggerKeywords).toBe('religion, war');
       expect(beat.directions[0].trigger.keywords).toEqual(['religion', 'war']);
     });
+
+    it('defaults presentation to chat and round-trips a dialog override', () => {
+      const beat = new AIConversationBeat({ id: 'conv1', type: 'aiConversation' });
+      expect(beat.getParameters().presentation).toBe('chat');
+
+      beat.updateParameters({ presentation: 'dialog' });
+      expect(beat.presentation).toBe('dialog');
+      expect(beat.getParameters().presentation).toBe('dialog');
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -422,6 +431,40 @@ describe('AIConversationBeat', () => {
 
       expect(renderer.setState).toHaveBeenCalledWith('presentationMode', 'chat-scroll');
       expect(renderer.setState).toHaveBeenCalledWith('currentBeatType', 'aiConversation');
+    });
+
+    it('drives positioned presentation mode when presentation is dialog', async () => {
+      const aiService = createMockAIService(
+        ['Opening line'],
+        ['[0]'],
+      );
+      const renderer = createMockRenderer(aiService);
+
+      const beat = new AIConversationBeat({
+        id: 'conv1',
+        type: 'aiConversation',
+        parameters: {
+          scenario: 'test',
+          npcName: 'NPC',
+          presentation: 'dialog',
+          maxTurns: 1,
+          directions: [
+            {
+              id: 'd1',
+              trigger: { type: 'topic-mention', keywords: ['anything'] },
+              action: { type: 'exit', exitTarget: 'exit_beat' },
+            },
+          ],
+        },
+      });
+
+      await beat.execute(context, renderer);
+
+      expect(renderer.setState).toHaveBeenCalledWith('presentationMode', 'positioned');
+      // The player-input call composes with the positioned dialog box.
+      expect(renderer.renderConversationInput).toHaveBeenCalledWith(
+        expect.objectContaining({ positioned: true }),
+      );
     });
 
     it('should use openingLine when provided', async () => {

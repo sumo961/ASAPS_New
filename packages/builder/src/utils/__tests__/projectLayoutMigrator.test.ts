@@ -185,4 +185,23 @@ describe('migrateResponsiveToFixed', () => {
     expect(applied[0]).toBe(b);
     expect(summary).toHaveLength(0);
   });
+
+  // AI Conversation is now a recognized visible type. In dialog mode the real
+  // generator (SchemaLocationInitializer) yields text/input positions; in chat
+  // mode it yields [] so the beat is left untouched (verified there).
+  it('bakes positions for a dialog-mode aiConversation', () => {
+    const b = beat({ type: 'aiConversation', locations: new Map(), parameters: { presentation: 'dialog' } });
+    const g = gen([{ name: 'text', type: 'dialog', x: 60, y: 440 }, { name: 'input', type: 'text', x: 60, y: 640 }]);
+    const out: any = migrateResponsiveToFixed([b], g, 1024, 768).applied[0];
+    expect(g).toHaveBeenCalled();
+    expect(out.locations.get('text')).toMatchObject({ x: 60, y: 440 });
+    expect(out.locations.get('input')).toMatchObject({ x: 60, y: 640 });
+  });
+
+  it('leaves a chat-mode aiConversation untouched (generator returns nothing)', () => {
+    const b = beat({ type: 'aiConversation', locations: new Map(), parameters: { presentation: 'chat' } });
+    // mirrors SchemaLocationInitializer returning [] for chat mode
+    const { applied } = migrateResponsiveToFixed([b], gen([]));
+    expect(applied[0]).toBe(b);
+  });
 });

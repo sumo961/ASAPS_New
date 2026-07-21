@@ -55,6 +55,11 @@ const VISIBLE_BEAT_TYPES = new Set([
   'movementChoice', 'pickProp', 'dialogTree',
   'videoBeat', 'panorama', 'hyperText', 'keypad', 'inputText',
   'aiInfoText', 'aiDialogTree', 'aiSummary', 'aiDurScreen', 'onlineContent',
+  // AI Conversation participates only in its 'dialog' presentation — the
+  // Responsive→Fixed baker's generateDefaultLocations returns [] for chat
+  // mode (SchemaLocationInitializer short-circuits), so chat-mode beats are
+  // left untouched while dialog-mode beats get their text/input positions.
+  'aiConversation',
 ]);
 
 function beatDef(beatType: string): any {

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-20T16:45:11.239Z
+ * Generated: 2026-07-21T07:10:11.910Z
  */
 
 // ============================================
@@ -1018,6 +1018,8 @@ export interface AiDurScreenParameters {
  * Connection Type: multiple
  */
 export interface AiConversationParameters {
+  /** How the conversation is shown. 'Chat' = a scrolling messaging-app panel (reflows, best for responsive/mobile). 'Dialog' = one exchange at a time in a positioned NPC dialog box with a text input below it, like a Dialog Tree — supports fixed-canvas placement. */
+  presentation?: string | undefined;
   /** Scene description for the conversation */
   scenario: string;
   /** Name of the NPC the player is talking to */
