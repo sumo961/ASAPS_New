@@ -1564,17 +1564,17 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // projects the schema declaration is only suggestive; baked author
   // positions still win (the editor stays on the absolute path).
   const beatLayoutTemplate = beat ? ((beat as any).layoutTemplate as string | undefined) : undefined;
-  // AI Conversation carries a `presentation` choice: 'chat' uses the slot
-  // (scrolling-panel) preview; 'dialog' is a positioned back-and-forth box +
-  // input, so it must take the absolute-positioned editor even though the
-  // schema declares layoutMode:'slot' (that slot spec only serves chat mode).
-  const aiConvDialogMode =
-    beat?.type === 'aiConversation'
-    && (((beat.getParameters?.() ?? {}).presentation ?? 'chat') === 'dialog');
+  // AI Conversation never uses the SlotFlowView slot preview even though its
+  // schema declares layoutMode:'slot'. It has its own two-mode rendering:
+  //   'dialog' → positioned editor (baked text/input elements)
+  //   'chat'   → the VBE ChatDialogView preview (like dialogTree chat modes)
+  // The slot spec only seeds chat's speaker/body; the canvas is driven by the
+  // VBE's presentationMode below, consistently across fixed AND responsive.
+  const isAiConversation = beat?.type === 'aiConversation';
   const schemaSpatial = !!beat && !isPanoramaBeat && isSpatialModeBeatType(beat.type)
     && (projectIsResponsive || !beatHasAuthorLocations);
   const schemaSlot = !!beat && !isPanoramaBeat && isSlotModeBeatType(beat.type)
-    && !aiConvDialogMode
+    && !isAiConversation
     && (projectIsResponsive || !beatHasAuthorLocations);
   // DialogTree opts into slot mode template-by-template (the schema
   // doesn't declare layoutMode:'slot' on its own). When the author has
@@ -4361,6 +4361,16 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           text: `[${params.npcName || 'Character'} will respond based on scenario]`,
           choices: []
         };
+      case 'aiConversation':
+        return {
+          // Chat preview keys off content.text; positioned (dialog) mode reads
+          // the baked 'text' element. The opening line seeds both; fall back to
+          // a placeholder so the stage is never blank.
+          text: t('openingLine', params.openingLine)
+            || `[${params.npcName || 'Character'} starts the conversation]`,
+          speaker: params.npcName || '',
+          choices: []
+        };
       case 'aiSummary':
         return {
           title: params.title || 'Your Journey',
@@ -4858,7 +4868,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // to fixed" bug). Responsive projects use the slot/spatial
                   // panel even with lingering baked locations; fixed projects
                   // use it only while the beat has no author positions yet.
-                  beat && (projectIsResponsive || !beatHasAuthorLocations)
+                  // aiConversation is never slot-mode in the editor (dialog =
+                  // positioned elements, chat = ChatDialogView preview) — force
+                  // absolute so no slot rows appear next to either.
+                  isAiConversation
+                    ? 'absolute'
+                  : beat && (projectIsResponsive || !beatHasAuthorLocations)
                     ? isSpatialModeBeatType(beat.type)
                       ? 'spatial'
                       : isSlotModeBeatType(beat.type)
@@ -5345,6 +5360,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 presentation={beat.type === 'aiConversation' ? (((beat.getParameters?.() ?? {}).presentation) || 'chat') : undefined}
                 onPresentationChange={beat.type === 'aiConversation' && onBeatUpdate ? (p) => {
                   beat.updateParameters?.({ presentation: p });
+                  // Switching mode changes what's on the stage: dialog needs its
+                  // positioned text/input elements baked; chat is responsive and
+                  // must drop any baked positions (else the stage stays empty on
+                  // switch, or stale dialog boxes linger). Do it eagerly here so
+                  // the canvas updates immediately, not only on re-selection.
+                  if (p === 'dialog') {
+                    const els = initializeLocationsFromSchema(beat, beat.getParameters(), projectSettings);
+                    setVisualElements(els);
+                    syncElementsToBeatLocations(els, beat);
+                  } else {
+                    setVisualElements([]);
+                    syncElementsToBeatLocations([], beat);
+                  }
                   onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), presentation: p } } as any);
                   setHasChanges(true);
                 } : undefined}
@@ -6625,6 +6653,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // field that VBE's chat-preview branch keys on.
               if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
                 return (beat as any).presentationMode || 'positioned';
+              }
+              // aiConversation: chat → ChatDialogView preview; dialog →
+              // positioned (the baked text/input elements).
+              if (beat.type === 'aiConversation') {
+                const pres = ((beat.getParameters?.() ?? {}).presentation ?? 'chat') as string;
+                return pres === 'dialog' ? 'positioned' : 'chat-scroll';
               }
               // multiChoice: map layoutTemplate → presentationMode so VBE's
               // ChatDialogView preview fires for chat-scroll/chat-bubble.
