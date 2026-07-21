@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-21T08:34:27.339Z
+ * Generated: 2026-07-21T13:11:38.896Z
  */
 
 // ============================================
@@ -874,6 +874,8 @@ export interface AiDialogTreeParameters {
   includeChoiceHistory?: boolean | undefined;
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
+  /** How the dialog renders. 'stacked' keeps the NPC text on top with choices below (visual-novel). 'conversation' lays text on one side and choices on the other. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors. Lives in the LEFT-side VE settings panel. */
+  layoutTemplate?: string | undefined;
   /** Exit targets for conversation outcomes */
   exitTargets: Object[];
   /** Delay before showing choices */

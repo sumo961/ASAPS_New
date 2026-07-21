@@ -94,6 +94,52 @@ describe('AIDialogTreeBeat', () => {
     mockRenderer = createMockRenderer();
   });
 
+  describe('layoutTemplate migration (v0.9.62 parity with DialogTreeBeat)', () => {
+    it('migrates legacy presentationMode to layoutTemplate', () => {
+      const positioned = new AIDialogTreeBeat({ id: 'a', type: 'aiDialogTree', parameters: { presentationMode: 'positioned' } as any });
+      expect(positioned.layoutTemplate).toBe('stacked');
+      const chat = new AIDialogTreeBeat({ id: 'b', type: 'aiDialogTree', parameters: { presentationMode: 'chat-bubble' } as any });
+      expect(chat.layoutTemplate).toBe('chat-bubble');
+    });
+
+    it('defaults to stacked and round-trips layoutTemplate through getParameters', () => {
+      const beat = new AIDialogTreeBeat({ id: 'a', type: 'aiDialogTree' });
+      expect(beat.layoutTemplate).toBe('stacked');
+      beat.updateParameters({ layoutTemplate: 'chat-scroll' });
+      expect(beat.layoutTemplate).toBe('chat-scroll');
+      expect(beat.getParameters().layoutTemplate).toBe('chat-scroll');
+    });
+
+    const simpleTree = {
+      id: 'root', speaker: 'NPC', text: 'Hello.',
+      choices: [{ id: 'bye', text: 'Bye', target: 'beat_end' }],
+    };
+
+    it('drives the renderer from layoutTemplate (chat-bubble → chat presentation)', async () => {
+      mockRenderer.setAIService(createMockAIService(simpleTree));
+      const beat = new AIDialogTreeBeat({
+        id: 'a', type: 'aiDialogTree',
+        parameters: { scenario: 's', npcName: 'NPC', layoutTemplate: 'chat-bubble', exitTargets: [{ id: 'beat_end', description: 'end' }] } as any,
+      });
+      mockRenderer.queueChoices(['bye']);
+      await beat.execute(context, mockRenderer.renderer);
+      expect(mockRenderer.renderer.setState).toHaveBeenCalledWith('layoutTemplate', 'chat-bubble');
+      expect(mockRenderer.renderer.setState).toHaveBeenCalledWith('presentationMode', 'chat-bubble');
+    });
+
+    it('stacked layoutTemplate renders positioned (not chat)', async () => {
+      mockRenderer.setAIService(createMockAIService(simpleTree));
+      const beat = new AIDialogTreeBeat({
+        id: 'a', type: 'aiDialogTree',
+        parameters: { scenario: 's', npcName: 'NPC', layoutTemplate: 'stacked', exitTargets: [{ id: 'beat_end', description: 'end' }] } as any,
+      });
+      mockRenderer.queueChoices(['bye']);
+      await beat.execute(context, mockRenderer.renderer);
+      expect(mockRenderer.renderer.setState).toHaveBeenCalledWith('layoutTemplate', 'stacked');
+      expect(mockRenderer.renderer.setState).toHaveBeenCalledWith('presentationMode', 'positioned');
+    });
+  });
+
   describe('NPC Exit Messages', () => {
     it('should generate and render NPC farewell when exit target has npcExitMessage', async () => {
       const dialogTree = {

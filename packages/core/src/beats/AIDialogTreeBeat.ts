@@ -6,6 +6,11 @@ import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 import { buildDossierForRef, resolveCharacterDisplayName } from '../utils/dossier';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
+import {
+  type DialogTreeLayoutTemplate,
+  normalizeDialogTreeLayoutTemplate,
+  isChatLayoutTemplate,
+} from './DialogTreeBeat';
 
 export interface AIDialogExitTarget {
   /** Target beat ID */
@@ -41,7 +46,10 @@ export interface AIDialogTreeBeatParams {
   /** Maximum conversation turns */
   maxTurns?: number;
 
-  /** Dialog presentation style */
+  /** Authoritative layout template (matches DialogTreeBeat). */
+  layoutTemplate?: DialogTreeLayoutTemplate;
+
+  /** @deprecated legacy dialog presentation style — migrated to layoutTemplate. */
   presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
 
   /** Show character avatars in chat mode */
@@ -82,6 +90,11 @@ export class AIDialogTreeBeat extends Beat {
   public includeVisitedBeats: boolean;
   public includeChoiceHistory: boolean;
   public maxTurns: number;
+  /** Authoritative layout field, matching DialogTreeBeat (v0.9.62). The legacy
+   *  presentationMode is migrated forward in the constructor / updateParameters
+   *  and surfaced in getParameters for one release for round-trip compat. */
+  public layoutTemplate: DialogTreeLayoutTemplate;
+  /** @deprecated read from layoutTemplate. Kept for legacy round-trip. */
   public presentationMode: 'positioned' | 'chat-scroll' | 'chat-bubble';
   public showAvatars: boolean;
   public exitTargets: AIDialogExitTarget[];
@@ -107,7 +120,23 @@ export class AIDialogTreeBeat extends Beat {
     this.includeVisitedBeats = params.includeVisitedBeats ?? config.includeVisitedBeats ?? true;
     this.includeChoiceHistory = params.includeChoiceHistory ?? config.includeChoiceHistory ?? true;
     this.maxTurns = params.maxTurns || config.maxTurns || 3;
-    this.presentationMode = params.presentationMode || config.presentationMode || 'positioned';
+    // v0.9.62-style layout unification (was missing on aiDialogTree — the VE
+    // dropdown read a non-existent layoutTemplate and always showed 'stacked'
+    // while the beat rendered from the legacy presentationMode, so a chat-mode
+    // beat looked stacked in the picker but ran as chat). Migrate:
+    //   'positioned' → 'stacked'; 'chat-scroll'/'chat-bubble' kept verbatim.
+    const legacyPM = (params.presentationMode ?? config.presentationMode) as
+      | 'positioned' | 'chat-scroll' | 'chat-bubble' | undefined;
+    const legacyMigrated: DialogTreeLayoutTemplate | undefined =
+      legacyPM === 'positioned' ? 'stacked'
+      : legacyPM === 'chat-scroll' ? 'chat-scroll'
+      : legacyPM === 'chat-bubble' ? 'chat-bubble'
+      : undefined;
+    const rawTemplate = (config as any).layoutTemplate
+      ?? (params as any).layoutTemplate
+      ?? legacyMigrated;
+    this.layoutTemplate = normalizeDialogTreeLayoutTemplate(rawTemplate);
+    this.presentationMode = legacyPM ?? 'positioned';
     this.showAvatars = params.showAvatars ?? config.showAvatars ?? true;
     this.exitTargets = params.exitTargets || config.exitTargets || [];
     this.systemInstructions = params.systemInstructions || config.systemInstructions;
@@ -124,6 +153,7 @@ export class AIDialogTreeBeat extends Beat {
       includeVisitedBeats: this.includeVisitedBeats,
       includeChoiceHistory: this.includeChoiceHistory,
       maxTurns: this.maxTurns,
+      layoutTemplate: this.layoutTemplate,
       presentationMode: this.presentationMode,
       showAvatars: this.showAvatars,
       exitTargets: this.exitTargets,
@@ -141,7 +171,19 @@ export class AIDialogTreeBeat extends Beat {
     if (params.includeVisitedBeats !== undefined) this.includeVisitedBeats = params.includeVisitedBeats;
     if (params.includeChoiceHistory !== undefined) this.includeChoiceHistory = params.includeChoiceHistory;
     if (params.maxTurns !== undefined) this.maxTurns = params.maxTurns;
-    if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
+    // layoutTemplate is authoritative; a stale presentationMode-only write
+    // (legacy readers) still migrates forward. layoutTemplate wins if both set.
+    if (params.layoutTemplate !== undefined) {
+      this.layoutTemplate = normalizeDialogTreeLayoutTemplate(params.layoutTemplate);
+      if (params.presentationMode !== undefined) this.presentationMode = params.presentationMode;
+    } else if (params.presentationMode !== undefined) {
+      this.presentationMode = params.presentationMode;
+      this.layoutTemplate = params.presentationMode === 'chat-scroll'
+        ? 'chat-scroll'
+        : params.presentationMode === 'chat-bubble'
+          ? 'chat-bubble'
+          : 'stacked';
+    }
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
     if (params.exitTargets !== undefined) {
       this.exitTargets = params.exitTargets;
@@ -223,13 +265,16 @@ export class AIDialogTreeBeat extends Beat {
       return this.exitTargets[0]?.id || this.getNextBeat(context);
     }
 
-    // Set presentation mode for consistent styling with regular DialogTreeBeat
-    renderer.setState('presentationMode', this.presentationMode || 'positioned');
+    // Set presentation for consistent styling with regular DialogTreeBeat.
+    // layoutTemplate is authoritative; presentationMode is derived for any
+    // renderer reader still on the legacy field.
+    const isChatMode = isChatLayoutTemplate(this.layoutTemplate);
+    renderer.setState('layoutTemplate', this.layoutTemplate);
+    renderer.setState('presentationMode', isChatMode ? this.layoutTemplate : 'positioned');
     renderer.setState('showAvatars', this.showAvatars ?? true);
     // Mark this as an AI dialog tree for centering in PositionedBeatView
     renderer.setState('currentBeatType', 'aiDialogTree');
     // Default responseDelay to 1.5s for chat modes if not explicitly set
-    const isChatMode = this.presentationMode && this.presentationMode !== 'positioned';
     const defaultDelay = isChatMode ? 1.5 : 0;
     renderer.setState('responseDelay', defaultDelay);
 
@@ -246,7 +291,7 @@ export class AIDialogTreeBeat extends Beat {
       || 'the character';
 
     // Clear chat history when starting a new dialog in chat mode
-    if (this.presentationMode && this.presentationMode !== 'positioned') {
+    if (isChatMode) {
       if (renderer.clearChatHistory) {
         renderer.clearChatHistory();
       }

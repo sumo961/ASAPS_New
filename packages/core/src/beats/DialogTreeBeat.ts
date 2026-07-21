@@ -33,7 +33,7 @@ export type DialogTreeLayoutTemplate =
   | 'chat-bubble'
   | 'custom';
 
-function normalizeDialogTreeLayoutTemplate(v: unknown): DialogTreeLayoutTemplate {
+export function normalizeDialogTreeLayoutTemplate(v: unknown): DialogTreeLayoutTemplate {
   if (
     v === 'stacked' ||
     v === 'conversation' ||

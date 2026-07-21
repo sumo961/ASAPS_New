@@ -2974,6 +2974,18 @@
           "default": 3,
           "description": "Maximum conversation turns"
         },
+        "layoutTemplate": {
+          "type": "string",
+          "required": false,
+          "default": "stacked",
+          "description": "How the dialog renders. 'stacked' keeps the NPC text on top with choices below (visual-novel). 'conversation' lays text on one side and choices on the other. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors. Lives in the LEFT-side VE settings panel.",
+          "ui": {
+            "control": "select",
+            "options": ["stacked", "conversation", "chat-scroll", "chat-bubble", "custom"],
+            "label": "Layout",
+            "scope": "ve-left"
+          }
+        },
         "exitTargets": {
           "type": "array<object>",
           "required": true,
