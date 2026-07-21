@@ -287,10 +287,13 @@ export function initializeLocationsFromSchema(
       z, width: w * stageWidth, height: h * stageHeight,
       rotation: 0, scale: 1, visible: true, locked: false,
       font: undefined, fontSize: 18, textAlign: 'center',
-      initialAutoSized: false,
+      // Autosize the dialog box to its content (AI lines vary in length);
+      // the input bar keeps a fixed control height.
+      initialAutoSized: name === 'text',
     });
-    elements.push(mk('text', params.openingLine || '[ NPC dialog appears here ]', 'dialog', 0.06, 0.58, 0.88, 0.24, 0));
-    elements.push(mk('input', '[ Player types their reply here ]', 'text', 0.06, 0.84, 0.88, 0.10, 1));
+    // A dialog band (~2 lines) that autosizes, with the input control below it.
+    elements.push(mk('text', params.openingLine || '[ NPC dialog appears here ]', 'dialog', 0.06, 0.64, 0.88, 0.12, 0));
+    elements.push(mk('input', '[ Player types their reply here ]', 'text', 0.06, 0.84, 0.88, 0.09, 1));
     return elements;
   }
 

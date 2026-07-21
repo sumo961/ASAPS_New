@@ -1770,10 +1770,20 @@ export class ReactRenderer extends BaseRenderer {
         return fallback;
       };
       const paintPositioned = (opts: { showInput: boolean; typing: boolean }) => {
-        const boxRect = rectPct(findLoc('text'), { left: 6, top: 60, width: 88, height: 22 });
-        const inputRect = rectPct(findLoc('input'), { left: 6, top: 84, width: 88, height: 10 });
-        const panelBg = this.theme?.textBox?.backgroundColor || 'rgba(15,23,42,0.82)';
+        const boxRect = rectPct(findLoc('text'), { left: 6, top: 62, width: 88, height: 14 });
+        const inputRect = rectPct(findLoc('input'), { left: 6, top: 84, width: 88, height: 9 });
+        // Match the VE's dialog-box styling (PositionedBeatView reads the same
+        // theme.textBox). No drop shadow — the VE has none.
+        const tb = this.theme?.textBox;
+        const panelBg = tb?.backgroundColor || 'rgba(15,23,42,0.82)';
+        const borderW = typeof tb?.borderWidth === 'number' ? tb.borderWidth : 0;
+        const borderRadius = typeof tb?.borderRadius === 'number' ? tb.borderRadius : 12;
+        const pad = typeof tb?.padding === 'number' ? tb.padding : 18;
         const textColor = this.theme?.colors?.textColor || '#f8fafc';
+        // Faithful background: in fit mode ScaledStage does NOT paint a
+        // background (PositionedBeatView normally does), so render our own
+        // stage-filling background layer — image (cover) or theme color.
+        const stageBg = this.backgroundImageUrl ? undefined : (this.theme?.backgroundColor || defaultGradient);
         this.renderComponent(
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <ScaledStage
@@ -1785,6 +1795,15 @@ export class ReactRenderer extends BaseRenderer {
               backgroundColor={useMobileBg ? backgroundColor : undefined}
             >
               <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                {/* Background layer (fit mode) — faithful to the VE stage. */}
+                {!useMobileBg && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    backgroundImage: this.backgroundImageUrl ? `url(${this.backgroundImageUrl})` : undefined,
+                    background: this.backgroundImageUrl ? undefined : stageBg,
+                    backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
+                  }} />
+                )}
                 {/* NPC dialog box */}
                 <div style={{
                   position: 'absolute',
@@ -1792,18 +1811,15 @@ export class ReactRenderer extends BaseRenderer {
                   width: `${boxRect.width}%`, minHeight: `${boxRect.height}%`,
                   boxSizing: 'border-box',
                   background: panelBg, color: textColor,
-                  borderRadius: 12, padding: '16px 20px',
-                  display: 'flex', flexDirection: 'column', gap: 8,
-                  boxShadow: '0 8px 30px rgba(0,0,0,0.35)',
+                  border: borderW > 0 ? `${borderW}px solid ${tb?.borderColor || 'transparent'}` : undefined,
+                  borderRadius, padding: pad,
+                  display: 'flex', flexDirection: 'column', justifyContent: 'center',
                 }}>
-                  {options.speaker && (
-                    <div style={{ fontWeight: 700, fontSize: 15, opacity: 0.9 }}>{options.speaker}</div>
-                  )}
-                  <div style={{ fontSize: 17, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: 18, lineHeight: 1.45, whiteSpace: 'pre-wrap', textAlign: 'center' }}>
                     {opts.typing ? '…' : (options.npcText || '')}
                   </div>
                 </div>
-                {/* Positioned input bar */}
+                {/* Positioned input bar (live ConversationInput — keeps mic/STT). */}
                 {opts.showInput && (
                   <div style={{
                     position: 'absolute',

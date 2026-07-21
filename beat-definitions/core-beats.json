@@ -3581,6 +3581,7 @@
           "ui": {
             "control": "select",
             "label": "Presentation",
+            "scope": "ve-left",
             "options": [
               { "value": "chat", "label": "Chat (scrolling panel)" },
               { "value": "dialog", "label": "Dialog (back-and-forth, positionable)" }

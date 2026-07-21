@@ -78,6 +78,10 @@ interface VisualPropertiesPanelProps {
   // Values vary by beat type — multiChoice has no chat-scroll, dialogTree does.
   layoutTemplate?: string;
   onLayoutTemplateChange?: (template: string) => void;
+  // AI Conversation presentation ('chat' | 'dialog') — VE-owned, mirrors the
+  // dialogTree Layout Template control (Inspector skips the schema param).
+  presentation?: string;
+  onPresentationChange?: (presentation: string) => void;
   // Per-slot author intent (anchor h/v per slot name, preferredLines, gap,
   // buttonAnchors, etc.). The panel reads and writes the whole map so it
   // can render per-slot controls inline with each slot row.
@@ -169,6 +173,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onResponseDelayChange,
   layoutTemplate,
   onLayoutTemplateChange,
+  presentation,
+  onPresentationChange,
   slotIntent,
   onSlotIntentChange,
   slotResolutions,
@@ -1142,6 +1148,48 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
             </div>
           );
         })()}
+
+        {beatType === 'aiConversation' && onPresentationChange && (
+          <div className="border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('dialogSettings')}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="font-medium text-sm">Conversation Settings</span>
+              </div>
+              {expandedSections.dialogSettings ? (
+                <ChevronUp className="w-4 h-4 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-gray-400" />
+              )}
+            </button>
+
+            {expandedSections.dialogSettings && (
+              <div className="px-4 pb-4 space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">
+                    Presentation
+                  </label>
+                  <select
+                    value={presentation || 'chat'}
+                    onChange={(e) => onPresentationChange(e.target.value)}
+                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                  >
+                    <option value="chat">Chat (scrolling panel)</option>
+                    <option value="dialog">Dialog (back-and-forth, positionable)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {(!presentation || presentation === 'chat')
+                      ? 'A scrolling messaging-app panel that reflows — best for responsive/mobile.'
+                      : 'One exchange at a time in a positioned NPC dialog box with a text input below it, like a Dialog Tree — supports fixed-canvas placement.'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {(beatType === 'dialogTree' || beatType === 'aiDialogTree') && onLayoutTemplateChange && (
           <div className="border-b border-gray-200">

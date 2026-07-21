@@ -5342,6 +5342,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
                   setHasChanges(true);
                 } : undefined}
+                presentation={beat.type === 'aiConversation' ? (((beat.getParameters?.() ?? {}).presentation) || 'chat') : undefined}
+                onPresentationChange={beat.type === 'aiConversation' && onBeatUpdate ? (p) => {
+                  beat.updateParameters?.({ presentation: p });
+                  onBeatUpdate(beat.id, { parameters: { ...beat.getParameters(), presentation: p } } as any);
+                  setHasChanges(true);
+                } : undefined}
                 layoutTemplate={(() => {
                   // multiChoice: only when project is responsive (the picker
                   // doesn't apply in fixed mode). dialogTree/aiDialogTree:
