@@ -1,5 +1,42 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-21: AI Conversation first-class fixed mode + stance-aware Co-Designer (v0.9.82)
+
+### Overview
+
+Two threads. The **AI Conversation** beat gets a **first-class fixed mode**: a *Chat vs Dialog* presentation choice that lets a live AI conversation render either as today's scrolling messaging panel or, new, as a positioned back-and-forth NPC dialog box with a free-text reply — like a Dialog Tree, and placeable on a fixed canvas. Bringing it to parity surfaced (and fixed) a set of Visual-Editor faithfulness gaps, and a latent **AI Dialog Tree** bug where its layout picker lied about the runtime. Separately, the **Co-Designer** AI collaborator learns the interpersonal-stance model — it can now see, propose, and validate stance/trait/variant/policy changes on characters — and its character edits became undoable.
+
+### AI Conversation — first-class fixed mode (chat vs dialog)
+
+- New author choice on the beat: **presentation `'chat' | 'dialog'`** (default `chat`, so existing conversations are unchanged). `chat` drives the runtime's `chat-scroll` (responsive `ChatDialogView`); `dialog` drives the existing `positioned` presentation mode — one exchange at a time in an author-placed NPC dialog box with a text input below it. The live `renderConversationInput` (with optional mic/STT) is reused verbatim, now composed with the positioned box.
+- Gave the beat a **Visual Editor tab** (it was missing from `WorkspaceView.visualBeatTypes`, so the tab never appeared on direct flowchart selection even though the VE could already draw it), and wired dialog mode into the **layout migrator** and **SchemaLocationInitializer** so fixed-canvas conversion bakes the `text`/`input` positions (chat mode short-circuits — no bogus bake).
+- The **presentation toggle lives in the VE**, not the Inspector — a "Conversation Settings" section mirroring the Dialog Tree Layout control (schema param marked `ui.scope: 've-left'`; the Inspector skips it).
+- **Faithful rendering, both modes.** Dialog mode's positioned paint lost the background (in fit mode `ScaledStage` doesn't paint one) and carried a drop shadow the VE never shows — now it renders a stage-filling background layer and styles the box from `theme.textBox`. Chat mode showed slot rows next to a blank stage — aiConversation no longer uses the SlotFlowView slot preview at all; chat renders the VBE `ChatDialogView` preview (seeded with the opening line + NPC name) and dialog renders the positioned editor, consistently across fixed and responsive projects. Switching Chat↔Dialog now re-bakes / clears the positioned elements eagerly, so the stage updates instantly instead of on re-selection.
+
+**Files modified:**
+- `packages/core/src/beats/AIConversationBeat.ts`, `packages/core/src/types/index.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/src/components/WorkspaceView.tsx`, `packages/builder/src/components/visual/VisualWorkspace.tsx`, `packages/builder/src/components/visual/VisualPropertiesPanel.tsx`, `packages/builder/src/utils/SchemaLocationInitializer.ts`, `packages/builder/src/utils/projectLayoutMigrator.ts`, `beat-definitions/core-beats.json`
+
+### AI Dialog Tree — layout picker now matches the runtime
+
+- `AIDialogTreeBeat` never received the v0.9.62 `layoutTemplate` unification that `DialogTreeBeat` has — it only had the legacy `presentationMode`. So the VE's Layout picker read a non-existent `beat.layoutTemplate` and always displayed "Stacked", while the beat actually rendered from `presentationMode`. A beat stored with `presentationMode: 'chat-scroll'` (the Environmental Choices projects) showed "Stacked" in the picker but ran as a scrolling chat — "ignores the setting". Brought it to parity: an authoritative `layoutTemplate` field, legacy migration in the constructor / `updateParameters`, runtime driven from it via `isChatLayoutTemplate`, and the schema param added. Verified live: the picker now honestly shows "Chat — Scrollable History".
+
+**Files modified:**
+- `packages/core/src/beats/AIDialogTreeBeat.ts`, `packages/core/src/beats/DialogTreeBeat.ts` (export the normalizer), `beat-definitions/core-beats.json`
+
+### Co-Designer learns the stance model + undoable character edits
+
+- The Co-Designer's `updateCharacter` proposal was displayName/description/color only. It now understands the full affect model: it **sees** each character's traits, variants, stances, and selection policy in the story digest; **proposes** trait/stance/variant/`variantSelectionPolicy` changes; and at apply time **derives** each stance-bearing variant's extraversion/agreeableness from the base traits + stance (the same rule the character helper uses), so a proposed stance actually moves the traits it implies.
+- Co-Designer **character edits are now undoable** — they routed through `setCharacters` directly and could only be reverted in the Character Manager; they now go through the same `UpdateCharactersCommand` path the Character Manager uses (one undo step per proposal batch).
+
+**Files modified:**
+- `packages/builder/src/components/ai/codesigner/{types,proposalParsing,systemPrompt,ProposalCard}.ts(x)`, `packages/builder/src/utils/{storyDigest,applyChangeProposals}.ts`, `packages/builder/src/App.tsx`
+
+### Verification
+
+New tests across the beat, initializer, migrator, aiDialogTree migration/runtime, and Co-Designer parsing/digest. Core 2538 + builder 2330 green; type-check and all package builds clean. Verified live in the Visual Editor: AI Conversation VE tab + Presentation control; dialog mode shows a positioned box + input with a faithful dark background and no shadow in Preview; chat mode shows the opening line as a chat bubble with no slot rows; the AI Dialog Tree picker now reflects the real runtime. All test-project mutations reverted.
+
+---
+
 ## 2026-07-20: Glanceable mood HUD + AI generation learns the stance model (v0.9.81)
 
 ### Overview

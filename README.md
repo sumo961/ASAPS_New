@@ -22,19 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.81** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.81 redesigns the on-stage mood
-display**: instead of a small circumplex disc with a dot to hunt for
-(unreadable on mobile, and overlapping when several characters had moods),
-a character's mood now shows as a glanceable coloured **mood token** — a
-blob that sits in the mood's quadrant, with a one-word label that teaches
-the colours as you play — and several characters lay out in a tidy **mood
-rail** instead of stacking on top of each other. The AI story generators
-(Build-from-a-prompt, Co-write, both MCP servers) also learned the
-interpersonal-stance model and random-disposition selection from the
-recent character work, so AI-generated characters can carry stances and
-rehearsal-variety personas. Users on v0.9.80 will auto-update. For what
-shipped when, see:
+Current release: **v0.9.82** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.82 gives the AI Conversation beat
+a first-class fixed mode**: a *Chat vs Dialog* choice that renders a live AI
+conversation either as today's scrolling messaging panel or, new, as a
+positioned **back-and-forth NPC dialog box** with a free-text reply — like a
+Dialog Tree, and placeable on a fixed canvas — with the toggle now living in
+the Visual Editor and both modes previewing faithfully. It also fixes the
+**AI Dialog Tree** layout picker, which showed "Stacked" while the beat
+actually ran as chat, and teaches the **Co-Designer** the interpersonal-stance
+model (it can now propose stance/trait/variant changes) with those edits made
+undoable. Users on v0.9.81 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
