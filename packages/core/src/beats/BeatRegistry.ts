@@ -12,6 +12,7 @@ import { SetVariableBeat } from './SetVariableBeat';
 import { ConditionBeat } from './ConditionBeat';
 import { DurScreenBeat } from './DurScreenBeat';
 import { RandomTargetBeat } from './RandomTargetBeat';
+import { SetGpsLocationBeat } from './SetGpsLocationBeat';
 import { SetTimerBeat } from './SetTimerBeat';
 import { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 import { UpdateAffectBeat } from './UpdateAffectBeat';
@@ -98,6 +99,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('conditionCheck', ConditionBeat); // Legacy alias
     this.registerBeatType('condition', ConditionBeat); // Common AI variation
     this.registerBeatType('randomTarget', RandomTargetBeat);
+    this.registerBeatType('setGpsLocation', SetGpsLocationBeat);
     this.registerBeatType('setTimer', SetTimerBeat);
     this.registerBeatType('addRemoveInventory', AddRemoveInventoryBeat);
     this.registerBeatType('updateAffect', UpdateAffectBeat);

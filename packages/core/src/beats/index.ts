@@ -8,6 +8,7 @@ export { ConditionBeat } from './ConditionBeat';
 export { EndScreenBeat } from './EndScreenBeat';
 export { SetVariableBeat } from './SetVariableBeat';
 export { RandomTargetBeat } from './RandomTargetBeat';
+export { SetGpsLocationBeat } from './SetGpsLocationBeat';
 export { SetTimerBeat } from './SetTimerBeat';
 export { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 //export { DialogTreeBeat, DialogNode, DialogChoice } from './DialogTreeBeat';

@@ -134,18 +134,39 @@ export class GpsLocationBeat extends Beat {
    * single-element array from legacy targetLat/targetLng for
    * backward compat with v0.9.48 stories.
    */
-  private getEffectiveLocations(): XRLocationEntry[] {
-    if (this.xrLocations && this.xrLocations.length > 0) return this.xrLocations;
-    if (this.targetLat !== undefined && this.targetLng !== undefined) {
-      return [{
-        id: 'legacy',
-        lat: this.targetLat,
-        lng: this.targetLng,
-        radiusMeters: this.radiusMeters,
-        target: '', // legacy beats use the regular connection — set below
-      }];
+  private getEffectiveLocations(context?: StoryContext): XRLocationEntry[] {
+    const base = (this.xrLocations && this.xrLocations.length > 0)
+      ? this.xrLocations
+      : (this.targetLat !== undefined && this.targetLng !== undefined)
+        ? [{
+            id: 'legacy',
+            lat: this.targetLat,
+            lng: this.targetLng,
+            radiusMeters: this.radiusMeters,
+            target: '', // legacy beats use the regular connection — set below
+          } as XRLocationEntry]
+        : [];
+
+    // Dynamic binding: an entry with `pointName` expands into one concrete
+    // geofence per point stored under that name (by a Set GPS Location beat),
+    // each inheriting the entry's target / radius / effects. Entries with a
+    // literal lat/lng pass through unchanged. Empty store ⇒ no geofences.
+    if (!context || !base.some(e => e.pointName)) return base;
+    const expanded: XRLocationEntry[] = [];
+    for (const entry of base) {
+      if (!entry.pointName) { expanded.push(entry); continue; }
+      const points = context.getGeoPoints(entry.pointName);
+      points.forEach((pt, i) => {
+        expanded.push({
+          ...entry,
+          id: `${entry.id}#${i}`,
+          lat: pt.lat,
+          lng: pt.lng,
+          radiusMeters: pt.radiusMeters ?? entry.radiusMeters,
+        });
+      });
     }
-    return [];
+    return expanded;
   }
 
   /**
@@ -201,7 +222,7 @@ export class GpsLocationBeat extends Beat {
       }
     }
 
-    const effective = this.getEffectiveLocations();
+    const effective = this.getEffectiveLocations(context);
     if (effective.length === 0) {
       console.warn(`[GpsLocationBeat ${this.id}] no locations configured — skipping`);
       return this.getNextBeat(context);

@@ -363,6 +363,26 @@ export interface XRLocationEntry {
   target: string;
   /** Effects to apply on resolution (counters, mood, sentiment, etc). */
   effects?: Effect[];
+  /**
+   * Dynamic binding: instead of a literal lat/lng, resolve this entry to the
+   * runtime geo-points stored under this name (by a Set GPS Location beat).
+   * Each stored point becomes a concrete geofence inheriting this entry's
+   * target/radius/effects. Empty store ⇒ the entry contributes no geofences.
+   */
+  pointName?: string;
+}
+
+/**
+ * A geographic point in runtime story state (WGS84). Written by the
+ * Set GPS Location beat (capture current position / explicit coords / random
+ * scatter) and read by GpsLocation entries bound via `pointName`. Distinct
+ * from the visual-positioning `Location` and the sensor's `GpsReading`.
+ */
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+  /** Optional per-point proximity radius in metres. */
+  radiusMeters?: number;
 }
 
 export interface Effect {

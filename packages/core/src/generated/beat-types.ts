@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-22T07:30:58.114Z
+ * Generated: 2026-07-22T20:50:39.922Z
  */
 
 // ============================================
@@ -418,6 +418,38 @@ export interface SetVariableParameters {
   timeMinute?: number | undefined;
   /** type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'. */
   timeUnit?: string | undefined;
+}
+
+/**
+ * Set GPS Location - Write a named GPS point set into story state — capture the player's current position, set explicit coordinates, or randomly scatter points around a center. A GpsLocation beat can then geofence the named set dynamically (bind an entry to the same name), and a Condition beat can react to it.
+ * Category: invisible
+ * Connection Type: single
+ */
+export interface SetGpsLocationParameters {
+  /** 'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center. */
+  mode: string;
+  /** Name of the GPS point set to write. Reference this name from a GpsLocation entry (its 'pointName') to geofence these points. */
+  pointName: string;
+  /** Latitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates. */
+  lat?: number | undefined;
+  /** Longitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates. */
+  lng?: number | undefined;
+  /** Optional geofence radius (metres) stamped on each stored point; falls back to the GpsLocation beat's radius when omitted. */
+  pointRadiusMeters?: number | undefined;
+  /** scatter mode: how many points to generate. */
+  count?: number | undefined;
+  /** scatter mode: maximum distance (metres) from the center to scatter points. */
+  scatterRadiusMeters?: number | undefined;
+  /** scatter mode: where the scatter is centered. */
+  centerSource?: string | undefined;
+  /** scatter mode with center source 'point': the name of the point set to center on (uses its first point). */
+  centerPointName?: string | undefined;
+  /** Fallback latitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current). */
+  fallbackLat?: number | undefined;
+  /** Fallback longitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current). */
+  fallbackLng?: number | undefined;
+  /** Next beat after the points are stored */
+  connection: Connection;
 }
 
 /**
@@ -1076,6 +1108,7 @@ export type BeatType =
   | 'endScreen'
   | 'panorama'
   | 'setVariable'
+  | 'setGpsLocation'
   | 'conditionBeat'
   | 'durScreen'
   | 'randomTarget'
@@ -1113,6 +1146,7 @@ export interface BeatParameterMap {
   'endScreen': EndScreenParameters;
   'panorama': PanoramaParameters;
   'setVariable': SetVariableParameters;
+  'setGpsLocation': SetGpsLocationParameters;
   'conditionBeat': ConditionBeatParameters;
   'durScreen': DurScreenParameters;
   'randomTarget': RandomTargetParameters;

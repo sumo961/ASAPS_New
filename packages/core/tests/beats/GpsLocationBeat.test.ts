@@ -269,4 +269,46 @@ describe('GpsLocationBeat', () => {
       expect(warn).toHaveBeenCalled();
     });
   });
+
+  describe('dynamic geo-point binding (pointName)', () => {
+    it('expands a pointName entry into one geofence per stored point', async () => {
+      const renderer = makeRenderer({ path: 'continue' });
+      context.setGeoPoints('caches', [
+        { lat: 10, lng: 20 },
+        { lat: 11, lng: 21, radiusMeters: 15 },
+        { lat: 12, lng: 22 },
+      ]);
+      const beat = new GpsLocationBeat({
+        id: 'b1', name: 'Map', type: 'gpsLocation',
+        parameters: {
+          mode: 'display',
+          xrLocations: [{ id: 'c', name: 'Cache', pointName: 'caches', target: 'won', radiusMeters: 30 }],
+          defaultTarget: 'skip',
+        },
+      } as any);
+
+      await (beat as any).performAction(context, renderer);
+
+      const rendered = renderer.calls[0].locations;
+      expect(rendered).toHaveLength(3);
+      expect(rendered.map((l: any) => ({ lat: l.lat, lng: l.lng }))).toEqual([
+        { lat: 10, lng: 20 }, { lat: 11, lng: 21 }, { lat: 12, lng: 22 },
+      ]);
+      // per-point radius wins, else the entry radius
+      expect(rendered[0].radiusMeters).toBe(30);
+      expect(rendered[1].radiusMeters).toBe(15);
+      // expanded ids are unique
+      expect(new Set(rendered.map((l: any) => l.id)).size).toBe(3);
+    });
+
+    it('an empty stored set yields no geofences (beat skips)', async () => {
+      const renderer = makeRenderer({ path: 'continue' });
+      const beat = new GpsLocationBeat({
+        id: 'b1', name: 'Map', type: 'gpsLocation',
+        parameters: { mode: 'display', xrLocations: [{ id: 'c', pointName: 'empty', target: 'won' }] },
+      } as any);
+      await (beat as any).performAction(context, renderer);
+      expect(renderer.renderMap).not.toHaveBeenCalled();
+    });
+  });
 });

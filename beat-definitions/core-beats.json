@@ -1339,6 +1339,111 @@
       "renderer": "none"
     },
 
+    "setGpsLocation": {
+      "category": "invisible",
+      "displayName": "Set GPS Location",
+      "icon": "📍",
+      "description": "Write a named GPS point set into story state — capture the player's current position, set explicit coordinates, or randomly scatter points around a center. A GpsLocation beat can then geofence the named set dynamically (bind an entry to the same name), and a Condition beat can react to it.",
+      "connectionType": "single",
+      "parameters": {
+        "mode": {
+          "type": "string",
+          "required": true,
+          "default": "capture",
+          "description": "'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center.",
+          "ui": {
+            "control": "select",
+            "label": "Mode",
+            "options": [
+              { "value": "capture", "label": "Capture current position" },
+              { "value": "explicit", "label": "Set explicit coordinates" },
+              { "value": "scatter", "label": "Randomly scatter points" }
+            ]
+          }
+        },
+        "pointName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the GPS point set to write. Reference this name from a GpsLocation entry (its 'pointName') to geofence these points.",
+          "ui": { "label": "Point set name" }
+        },
+        "lat": {
+          "type": "number",
+          "required": false,
+          "description": "Latitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
+          "ui": { "label": "Latitude" }
+        },
+        "lng": {
+          "type": "number",
+          "required": false,
+          "description": "Longitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
+          "ui": { "label": "Longitude" }
+        },
+        "pointRadiusMeters": {
+          "type": "number",
+          "required": false,
+          "description": "Optional geofence radius (metres) stamped on each stored point; falls back to the GpsLocation beat's radius when omitted.",
+          "ui": { "label": "Point radius (m)" }
+        },
+        "count": {
+          "type": "number",
+          "required": false,
+          "default": 3,
+          "description": "scatter mode: how many points to generate.",
+          "ui": { "label": "Number of points", "dependsOn": { "field": "mode", "value": "scatter" } }
+        },
+        "scatterRadiusMeters": {
+          "type": "number",
+          "required": false,
+          "default": 100,
+          "description": "scatter mode: maximum distance (metres) from the center to scatter points.",
+          "ui": { "label": "Scatter radius (m)", "dependsOn": { "field": "mode", "value": "scatter" } }
+        },
+        "centerSource": {
+          "type": "string",
+          "required": false,
+          "default": "current",
+          "description": "scatter mode: where the scatter is centered.",
+          "ui": {
+            "control": "select",
+            "label": "Scatter around",
+            "options": [
+              { "value": "current", "label": "The player's current position" },
+              { "value": "point", "label": "Another point set" },
+              { "value": "explicit", "label": "Explicit coordinates" }
+            ],
+            "dependsOn": { "field": "mode", "value": "scatter" }
+          }
+        },
+        "centerPointName": {
+          "type": "string",
+          "required": false,
+          "description": "scatter mode with center source 'point': the name of the point set to center on (uses its first point).",
+          "ui": { "label": "Center point set" }
+        },
+        "fallbackLat": {
+          "type": "number",
+          "required": false,
+          "description": "Fallback latitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
+          "ui": { "label": "Fallback latitude" }
+        },
+        "fallbackLng": {
+          "type": "number",
+          "required": false,
+          "description": "Fallback longitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
+          "ui": { "label": "Fallback longitude" }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Next beat after the points are stored"
+        }
+      },
+      "transitions": false,
+      "sound": false,
+      "renderer": "none"
+    },
+
     "conditionBeat": {
       "category": "invisible",
       "displayName": "Condition Check",

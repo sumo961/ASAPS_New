@@ -1,5 +1,5 @@
 import  { EventEmitter } from 'eventemitter3';
-import type { Condition, Effect, FictionalTime } from '../types';
+import type { Condition, Effect, FictionalTime, GeoPoint } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 import { resolveCharacterKey } from '../utils/characterRef';
@@ -178,6 +178,11 @@ interface StoryState {
   visitedChoices: Set<string>; // Per-choice visited tracking, composite keys: "beatId:choiceId"
   timers: Record<string, { value: number; target?: string }>; // Enhanced timer structure
   fictionalTime?: FictionalTime; // Fictional time for in-story time progression
+  // Named geographic point sets written by the Set GPS Location beat
+  // (capture current position / explicit coords / random scatter) and read by
+  // GpsLocation entries bound via `pointName`. A name maps to one or more
+  // points; single-point modes store a 1-element array.
+  geoPoints: Record<string, GeoPoint[]>;
 }
 
 /**
@@ -279,6 +284,7 @@ export interface SerializedStoryState {
   history: string[]; // Include beat history for proper restoration
   choiceHistory?: ChoiceRecord[]; // Rich choice tracking for AI context
   fictionalTime?: FictionalTime; // Fictional time state
+  geoPoints?: Record<string, GeoPoint[]>; // Named GPS point sets (optional for older saves)
 }
 
 /**
@@ -420,6 +426,7 @@ export class StoryContext extends EventEmitter {
       visitedBeats: new Set(),
       visitedChoices: new Set(),
       timers: {},
+      geoPoints: {},
       ...initialState
     };
     this.story = story;
@@ -491,6 +498,19 @@ export class StoryContext extends EventEmitter {
   setVariable(name: string, value: any): void {
     this.state.variables[name] = value;
     this.emit('variableChanged', { name, value });
+  }
+
+  /** Named GPS point set (empty array when unset). */
+  getGeoPoints(name: string): GeoPoint[] {
+    if (!this.state.geoPoints) this.state.geoPoints = {};
+    return this.state.geoPoints[name] ? this.state.geoPoints[name].map(p => ({ ...p })) : [];
+  }
+
+  /** Store a named GPS point set (Set GPS Location beat). Empty array clears it. */
+  setGeoPoints(name: string, points: GeoPoint[]): void {
+    if (!this.state.geoPoints) this.state.geoPoints = {};
+    this.state.geoPoints[name] = (points || []).map(p => ({ ...p }));
+    this.emit('geoPointsChanged', { name, points: this.state.geoPoints[name] });
   }
 
   getCounter(name: string): number {
@@ -2292,7 +2312,8 @@ export class StoryContext extends EventEmitter {
       affectBookmarks: {},
       visitedBeats: new Set(),
       visitedChoices: new Set(),
-      timers: {}
+      timers: {},
+      geoPoints: {}
     };
     this.explicitVariantSet = {};
     this.history = [];
@@ -2810,6 +2831,9 @@ export class StoryContext extends EventEmitter {
       history: [...this.history],
       choiceHistory: this.choiceHistory.map(c => ({ ...c })),
       fictionalTime: this.state.fictionalTime ? { ...this.state.fictionalTime } : undefined,
+      geoPoints: Object.fromEntries(
+        Object.entries(this.state.geoPoints || {}).map(([k, v]) => [k, v.map(p => ({ ...p }))])
+      ),
     };
   }
 
@@ -2894,6 +2918,9 @@ export class StoryContext extends EventEmitter {
       visitedChoices: new Set((serialized as any).visitedChoices || []),
       timers: { ...serialized.timers },
       fictionalTime: serialized.fictionalTime ? { ...serialized.fictionalTime } : undefined,
+      geoPoints: serialized.geoPoints
+        ? Object.fromEntries(Object.entries(serialized.geoPoints).map(([k, v]) => [k, (v as any[]).map((p: any) => ({ ...p }))]))
+        : {},
     };
 
     // Restore history
