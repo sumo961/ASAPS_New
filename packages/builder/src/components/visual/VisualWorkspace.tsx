@@ -5584,6 +5584,40 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   }
                   setHasChanges(true);
                 } : undefined}
+                videoCaptions={beat?.type === 'videoBeat' ? (beat.getParameters().captions || []) : undefined}
+                videoCaptionsEnabled={beat?.type === 'videoBeat' ? (beat.getParameters().captionsEnabled !== false) : undefined}
+                onVideoCaptionsChange={beat?.type === 'videoBeat' ? (captions) => {
+                  beat.updateParameters({ captions });
+                  if (onBeatUpdate) onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                  setHasChanges(true);
+                } : undefined}
+                onVideoCaptionsEnabledChange={beat?.type === 'videoBeat' ? (captionsEnabled) => {
+                  beat.updateParameters({ captionsEnabled });
+                  if (onBeatUpdate) onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                  setHasChanges(true);
+                } : undefined}
+                videoTranslations={beat?.type === 'videoBeat' ? (beat.getParameters().videoTranslations || {}) : undefined}
+                videoLanguages={beat?.type === 'videoBeat'
+                  ? translationState.translations
+                      .filter(t => t.languageCode !== translationState.sourceLanguage)
+                      .map(t => ({ code: t.languageCode, name: t.languageName }))
+                  : undefined}
+                onSelectVideoForLanguage={beat?.type === 'videoBeat' ? (langCode) => {
+                  handleAssetSelection('video', (asset) => {
+                    const cur = { ...(beat.getParameters().videoTranslations || {}) };
+                    cur[langCode] = { videoAssetId: asset.id };
+                    beat.updateParameters({ videoTranslations: cur });
+                    if (onBeatUpdate) onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                    setHasChanges(true);
+                  });
+                } : undefined}
+                onClearVideoForLanguage={beat?.type === 'videoBeat' ? (langCode) => {
+                  const cur = { ...(beat.getParameters().videoTranslations || {}) };
+                  delete cur[langCode];
+                  beat.updateParameters({ videoTranslations: cur });
+                  if (onBeatUpdate) onBeatUpdate(beat.id, { parameters: beat.getParameters() } as any);
+                  setHasChanges(true);
+                } : undefined}
                 onProjectionTypeChange={isPanoramaBeat ? (type) => {
                   beat.updateParameters({ projectionType: type });
                   setHasChanges(true);

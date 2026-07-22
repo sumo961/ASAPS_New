@@ -126,6 +126,17 @@ interface VisualPropertiesPanelProps {
   videoSettings?: { autoplay: boolean; controls: boolean; skipButton: boolean };
   onSelectVideo?: () => void;
   onVideoSettingsChange?: (settings: { autoplay?: boolean; controls?: boolean; skipButton?: boolean }) => void;
+  // VideoBeat multi-language + captions
+  videoCaptions?: Array<{ start: number; end: number; text: string; displayText?: string }>;
+  videoCaptionsEnabled?: boolean;
+  onVideoCaptionsChange?: (captions: Array<{ start: number; end: number; text: string }>) => void;
+  onVideoCaptionsEnabledChange?: (enabled: boolean) => void;
+  /** Per-language video override map: { [lang]: { videoAssetId } }. */
+  videoTranslations?: Record<string, { videoAssetId?: string }>;
+  /** Target languages for per-language video rows (excludes the source language). */
+  videoLanguages?: Array<{ code: string; name: string }>;
+  onSelectVideoForLanguage?: (langCode: string) => void;
+  onClearVideoForLanguage?: (langCode: string) => void;
   // Bug 26 follow-up — per-beat background fit (contain | cover).
   // Lives under the Background section in the VE properties panel,
   // not the inspector — feedback was that fit is a background-asset
@@ -189,6 +200,14 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   onProjectionTypeChange,
   videoAssetId,
   videoSettings,
+  videoCaptions,
+  videoCaptionsEnabled,
+  onVideoCaptionsChange,
+  onVideoCaptionsEnabledChange,
+  videoTranslations,
+  videoLanguages,
+  onSelectVideoForLanguage,
+  onClearVideoForLanguage,
   onSelectVideo,
   onVideoSettingsChange,
   spatialFit,
@@ -1356,6 +1375,112 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     </label>
                   </div>
                 )}
+
+                {/* Per-language video (a): one alternate video per project language. */}
+                {videoLanguages && videoLanguages.length > 0 && onSelectVideoForLanguage && (
+                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                    <div className="text-xs font-medium text-gray-700">Language versions</div>
+                    <p className="text-xs text-gray-500 -mt-1">Play a different video in each language. Languages without one use the video above.</p>
+                    {videoLanguages.map(lang => {
+                      const overrideId = videoTranslations?.[lang.code]?.videoAssetId;
+                      const overrideAsset = overrideId ? assets.find(a => a.id === overrideId) : null;
+                      return (
+                        <div key={lang.code} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 w-20 flex-shrink-0 truncate" title={lang.name}>{lang.name}</span>
+                          <button
+                            onClick={() => onSelectVideoForLanguage(lang.code)}
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 truncate text-left"
+                            title={overrideAsset?.name || 'Select a video for this language'}
+                          >
+                            {overrideAsset ? `🎬 ${overrideAsset.name}` : 'Select video…'}
+                          </button>
+                          {overrideId && onClearVideoForLanguage && (
+                            <button
+                              onClick={() => onClearVideoForLanguage(lang.code)}
+                              className="text-gray-400 hover:text-red-500 text-xs px-1"
+                              title="Use the default video for this language"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Captions (c): translatable cues → auto WebVTT per language. */}
+                {onVideoCaptionsChange && (() => {
+                  const cues = videoCaptions || [];
+                  const enabled = videoCaptionsEnabled !== false;
+                  const commit = (next: Array<{ start: number; end: number; text: string }>) =>
+                    onVideoCaptionsChange(next.map(c => ({ start: c.start, end: c.end, text: c.text })));
+                  const patch = (i: number, field: 'start' | 'end' | 'text', value: number | string) =>
+                    commit(cues.map((c, j) => (j === i ? { ...c, [field]: value } as any : c)));
+                  return (
+                    <div className="space-y-2 pt-2 border-t border-gray-200">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        {onVideoCaptionsEnabledChange && (
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            onChange={(e) => onVideoCaptionsEnabledChange(e.target.checked)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                          />
+                        )}
+                        <span className="text-xs font-medium text-gray-700">Captions</span>
+                      </label>
+                      <p className="text-xs text-gray-500 -mt-1">Cue text is translated automatically — subtitles appear in every language.</p>
+                      {enabled && (
+                        <div className="space-y-1">
+                          {cues.map((cue, i) => (
+                            <div key={i} className="flex items-center gap-1">
+                              <input
+                                type="number" min="0" step="0.1"
+                                value={cue.start}
+                                onChange={(e) => patch(i, 'start', parseFloat(e.target.value) || 0)}
+                                className="w-12 px-1 py-0.5 text-xs border border-gray-300 rounded tabular-nums"
+                                title="Start (seconds)"
+                              />
+                              <span className="text-gray-400 text-xs">→</span>
+                              <input
+                                type="number" min="0" step="0.1"
+                                value={cue.end}
+                                onChange={(e) => patch(i, 'end', parseFloat(e.target.value) || 0)}
+                                className="w-12 px-1 py-0.5 text-xs border border-gray-300 rounded tabular-nums"
+                                title="End (seconds)"
+                              />
+                              <input
+                                type="text"
+                                value={cue.text}
+                                onChange={(e) => patch(i, 'text', e.target.value)}
+                                placeholder="Caption text"
+                                className="flex-1 min-w-0 px-2 py-0.5 text-xs border border-gray-300 rounded"
+                              />
+                              <button
+                                onClick={() => commit(cues.filter((_, j) => j !== i))}
+                                className="text-gray-400 hover:text-red-500 text-xs px-1"
+                                title="Remove cue"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const last = cues[cues.length - 1];
+                              const start = last ? last.end : 0;
+                              commit([...cues, { start, end: start + 2, text: '' }]);
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-dashed border-gray-300 rounded text-gray-500 hover:border-blue-400 hover:text-blue-500"
+                          >
+                            + Add caption
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
