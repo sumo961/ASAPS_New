@@ -258,6 +258,19 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       }
       break;
 
+    case 'videoBeat':
+      // Caption/subtitle cues. Translate cue text into displayText; `text`
+      // stays the source-language matching key (same pattern as choices), and
+      // the runtime builds a per-language WebVTT <track> from displayText||text.
+      if (Array.isArray(params.captions)) {
+        for (let j = 0; j < params.captions.length; j++) {
+          const cue = params.captions[j];
+          const cueText = cue.displayText || cue.text;
+          if (cueText) strings[`${prefix}.parameters.captions.${j}.displayText`] = cueText;
+        }
+      }
+      break;
+
     case 'endScreen':
       if (params.restartText) strings[`${prefix}.parameters.restartText`] = params.restartText;
       if (params.creditsText) strings[`${prefix}.parameters.creditsText`] = params.creditsText;
@@ -1228,6 +1241,34 @@ export function applyTranslationResource(
 
   const positional = idBasedToPositional(translatedValues, projectData);
   return applyTranslations(projectData, positional);
+}
+
+/**
+ * Per-language ASSET swap for Video beats (the non-text side of translation).
+ * A VideoBeat may carry `videoTranslations: { [lang]: { videoAssetId } }`;
+ * for the active language we rewrite `parameters.videoAssetId` to the override
+ * so the runtime plays the localized video — languages without an override
+ * keep the base video. Asset IDs are NOT routed through the text/AI resource
+ * (they aren't translatable); this is a small structured pass instead, run
+ * alongside `applyTranslationResource` in both preview and export.
+ * Returns a clone; `null`/source language is a no-op.
+ */
+export function applyVideoTranslations(projectData: any, lang: string | null): any {
+  if (!lang) return projectData;
+  const beats = projectData?.project?.story?.beats;
+  if (!Array.isArray(beats)) return projectData;
+  const hasAny = beats.some((b: any) =>
+    b?.type === 'videoBeat' && (b.parameters?.videoTranslations || b.videoTranslations)?.[lang]?.videoAssetId
+  );
+  if (!hasAny) return projectData;
+  const cloned = JSON.parse(JSON.stringify(projectData));
+  for (const beat of cloned.project.story.beats) {
+    if (beat?.type !== 'videoBeat') continue;
+    const params = beat.parameters || beat;
+    const override = (params.videoTranslations || beat.videoTranslations)?.[lang]?.videoAssetId;
+    if (override) params.videoAssetId = override;
+  }
+  return cloned;
 }
 
 /**

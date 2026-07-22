@@ -838,6 +838,54 @@
           "description": "Allow skipping video",
           "ui": { "hidden": true }
         },
+        "captionsEnabled": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show captions/subtitles when cues are present",
+          "ui": { "hidden": true }
+        },
+        "captions": {
+          "type": "array<object>",
+          "required": false,
+          "default": [],
+          "description": "Caption/subtitle cues (start/end in seconds + text). Cue text is translated by the normal translation system, so subtitles come free in every language.",
+          "ui": {
+            "control": "video-captions",
+            "label": "Captions",
+            "hidden": true
+          },
+          "itemSchema": {
+            "start": {
+              "type": "number",
+              "required": true,
+              "default": 0,
+              "description": "Cue start time in seconds"
+            },
+            "end": {
+              "type": "number",
+              "required": true,
+              "default": 0,
+              "description": "Cue end time in seconds"
+            },
+            "text": {
+              "type": "string",
+              "required": true,
+              "description": "Cue text (source language; translated into displayText)"
+            },
+            "displayText": {
+              "type": "string",
+              "required": false,
+              "description": "Translated cue text for the active language (filled by the translation system)"
+            }
+          }
+        },
+        "videoTranslations": {
+          "type": "object",
+          "required": false,
+          "description": "Per-language alternate video: { langCode: { videoAssetId } }. Applied at export/preview time; falls back to the base video for languages without an override.",
+          "ui": { "hidden": true }
+        },
         "speaker": {
           "type": "string",
           "default": "",

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractTranslatableStrings } from '../StoryTranslator';
+import { extractTranslatableStrings, applyVideoTranslations } from '../StoryTranslator';
 
 // Helper to create minimal project data
 function createProjectData(overrides: any = {}): any {
@@ -163,6 +163,30 @@ describe('StoryTranslator', () => {
 
         expect(strings['project.story.beats.0.parameters.text']).toBe('You arrive at the mansion.');
         expect(strings['project.story.beats.0.parameters.buttonText']).toBe('Continue');
+      });
+
+      it('extracts video caption cues into displayText (text stays the source key)', () => {
+        const data = createProjectData({
+          story: {
+            beats: [
+              {
+                type: 'videoBeat',
+                parameters: {
+                  videoAssetId: 'asset_vid',
+                  captions: [
+                    { start: 0, end: 3, text: 'Welcome to Valletta.' },
+                    { start: 3, end: 7, text: 'Founded in 1566.' },
+                  ],
+                },
+              },
+            ],
+          },
+        });
+        const strings = extractTranslatableStrings(data);
+        expect(strings['project.story.beats.0.parameters.captions.0.displayText']).toBe('Welcome to Valletta.');
+        expect(strings['project.story.beats.0.parameters.captions.1.displayText']).toBe('Founded in 1566.');
+        // asset id is NOT extracted for translation
+        expect(strings['project.story.beats.0.parameters.videoAssetId']).toBeUndefined();
       });
 
       it('should extract text variations', () => {
@@ -601,6 +625,39 @@ describe('StoryTranslator', () => {
         expect(keys.length).toBeGreaterThan(0);
         expect(keys.every(k => k.startsWith('project.globalSettings.uiStrings.'))).toBe(true);
       });
+    });
+  });
+
+  describe('applyVideoTranslations', () => {
+    const withVideo = (videoTranslations: any) => createProjectData({
+      story: {
+        beats: [{ type: 'videoBeat', parameters: { videoAssetId: 'asset_base', videoTranslations } }],
+      },
+    });
+
+    it('swaps videoAssetId to the per-language override', () => {
+      const out = applyVideoTranslations(withVideo({ sv: { videoAssetId: 'asset_sv' } }), 'sv');
+      expect(out.project.story.beats[0].parameters.videoAssetId).toBe('asset_sv');
+    });
+
+    it('keeps the base video for languages without an override', () => {
+      const out = applyVideoTranslations(withVideo({ sv: { videoAssetId: 'asset_sv' } }), 'mt');
+      expect(out.project.story.beats[0].parameters.videoAssetId).toBe('asset_base');
+    });
+
+    it('is a no-op for the source language (null) and does not mutate the input', () => {
+      const input = withVideo({ sv: { videoAssetId: 'asset_sv' } });
+      const out = applyVideoTranslations(input, null);
+      expect(out).toBe(input);
+      expect(input.project.story.beats[0].parameters.videoAssetId).toBe('asset_base');
+    });
+
+    it('does not mutate the input when it does swap (returns a clone)', () => {
+      const input = withVideo({ sv: { videoAssetId: 'asset_sv' } });
+      const out = applyVideoTranslations(input, 'sv');
+      expect(out).not.toBe(input);
+      expect(input.project.story.beats[0].parameters.videoAssetId).toBe('asset_base');
+      expect(out.project.story.beats[0].parameters.videoAssetId).toBe('asset_sv');
     });
   });
 });

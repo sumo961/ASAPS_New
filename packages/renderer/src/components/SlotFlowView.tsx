@@ -59,6 +59,8 @@ interface SlotFlowViewProps {
   videoUrl?: string | null;
   videoAutoplay?: boolean;
   videoControls?: boolean;
+  /** WebVTT blob URL for the video's captions/subtitles (already language-resolved). */
+  captionsVttUrl?: string;
   /**
    * Soft author layout preferences. Currently consumed: `preferredLines`
    * (title). Anchors are carried but their repositioning is applied with
@@ -266,6 +268,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   videoUrl,
   videoAutoplay,
   videoControls,
+  captionsVttUrl,
   slotIntent,
   slotAnimations,
   onResolve,
@@ -1047,6 +1050,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           a skip button (if shown in the action slot) fires the same id. */}
       {videoUrl && (
         <video
+          key={videoUrl}
           src={videoUrl}
           autoPlay={videoAutoplay !== false}
           controls={videoControls === true}
@@ -1060,7 +1064,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             background: 'black',
             zIndex: 0,
           }}
-        />
+        >
+          {captionsVttUrl && (
+            <track kind="captions" src={captionsVttUrl} default />
+          )}
+        </video>
       )}
       {/* Default-target countdown bar — pinned to the top of the
           stage. Mirrors the same TimerProgressBar PositionedBeatView

@@ -4,6 +4,19 @@ export * from './theme';
 export * from './animation';
 import type { AnimationPath } from './animation';
 
+/**
+ * A caption/subtitle cue on a Video beat. `text` is the source-language cue
+ * (the translation matching key); `displayText` holds the translated cue for
+ * the active language (filled by the translation system, mirroring how choice
+ * labels use displayText). Times are in seconds.
+ */
+export interface VideoCaption {
+  start: number;
+  end: number;
+  text: string;
+  displayText?: string;
+}
+
 export interface Location {
   kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'input' | 'meter' | 'keypad' | 'webview' | 'camera';
   name: string;
@@ -633,7 +646,7 @@ export interface IRenderer {
   renderChoices(choices: { id: string; text: string; isExit?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
-  renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void>;
+  renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean, captions?: Array<{ start: number; end: number; text: string }>): Promise<void>;
   renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string>;
   renderAISummary?(data: {
     title: string;

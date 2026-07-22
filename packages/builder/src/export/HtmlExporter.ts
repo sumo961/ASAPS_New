@@ -14,7 +14,7 @@ import JSZip from 'jszip';
 import { getStorageManager } from '../storage/StorageManager';
 import type { TranslationResource } from '@asaps/core';
 import { UI_STRING_DEFAULTS } from '@asaps/core';
-import { applyTranslationResource } from './StoryTranslator';
+import { applyTranslationResource, applyVideoTranslations } from './StoryTranslator';
 import { downloadAndInlineFonts } from './fontBundler';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
@@ -1344,8 +1344,13 @@ export async function downloadHtmlExport(
     for (const resource of options.existingTranslations!) {
       console.log(`[HtmlExporter] Processing translation: ${resource.languageName} (${resource.languageCode})`);
 
-      // Apply the translation to get translated project data
-      const translatedData = applyTranslationResource(projectData, resource);
+      // Apply the translation to get translated project data (text), then the
+      // per-language Video asset swap (all languages share one asset pool, so
+      // the localized video already lives in the ZIP — only project.json differs).
+      const translatedData = applyVideoTranslations(
+        applyTranslationResource(projectData, resource),
+        resource.languageCode
+      );
 
       // Create translated ZIP
       const translatedZip = await createStoryZipFromData(originalZipBlob, translatedData);

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-21T13:11:38.896Z
+ * Generated: 2026-07-22T07:30:58.114Z
  */
 
 // ============================================
@@ -288,6 +288,12 @@ export interface VideoBeatParameters {
   controls?: boolean | undefined;
   /** Allow skipping video */
   skipButton?: boolean | undefined;
+  /** Show captions/subtitles when cues are present */
+  captionsEnabled?: boolean | undefined;
+  /** Caption/subtitle cues (start/end in seconds + text). Cue text is translated by the normal translation system, so subtitles come free in every language. */
+  captions?: Object[] | undefined;
+  /** Per-language alternate video: { langCode: { videoAssetId } }. Applied at export/preview time; falls back to the base video for languages without an override. */
+  videoTranslations?: Object | undefined;
   /** Who speaks this beat's text (for TTS voice and optional display) */
   speaker?: string | undefined;
   /** Show speaker name to the interactor */

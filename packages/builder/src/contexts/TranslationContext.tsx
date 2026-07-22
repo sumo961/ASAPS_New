@@ -16,6 +16,7 @@ import {
   createManualTranslationResource,
   updateTranslationResource,
   applyTranslationResource,
+  applyVideoTranslations,
   buildTranslationManifest,
   extractTranslatableStrings,
   positionalToIdBased,
@@ -240,9 +241,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     if (!activeLanguage) return projectData;
 
     const resource = translations.find(t => t.languageCode === activeLanguage);
-    if (!resource) return projectData;
-
-    return applyTranslationResource(projectData, resource);
+    // Text translations need a resource; the per-language video swap does not
+    // (it reads videoTranslations off the beat), so apply it either way.
+    const textApplied = resource ? applyTranslationResource(projectData, resource) : projectData;
+    return applyVideoTranslations(textApplied, activeLanguage);
   }, [activeLanguage, translations]);
 
   const loadTranslations = useCallback((

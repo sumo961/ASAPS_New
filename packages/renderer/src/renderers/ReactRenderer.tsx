@@ -2274,6 +2274,7 @@ export class ReactRenderer extends BaseRenderer {
             videoUrl={typeof (content as any).videoUrl === 'string' ? (content as any).videoUrl : undefined}
             videoAutoplay={(content as any).autoplay !== false}
             videoControls={(content as any).controls === true}
+            captionsVttUrl={typeof (content as any).captionsVttUrl === 'string' ? (content as any).captionsVttUrl : undefined}
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
             autoExitMs={slotAutoExitMs}
@@ -3219,7 +3220,7 @@ export class ReactRenderer extends BaseRenderer {
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
-  async renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean): Promise<void> {
+  async renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean, captions?: Array<{ start: number; end: number; text: string }>): Promise<void> {
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
     this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
@@ -3231,7 +3232,13 @@ export class ReactRenderer extends BaseRenderer {
       const freshUrl = this.resolveAssetUrl(videoAssetId);
       if (freshUrl) resolvedVideoUrl = freshUrl;
     }
-    console.log(`[ReactRenderer] renderVideo: resolved="${resolvedVideoUrl?.substring(0, 80)}", autoplay=${autoplay}, controls=${controls}, skipButton=${skipButton}`);
+    console.log(`[ReactRenderer] renderVideo: resolved="${resolvedVideoUrl?.substring(0, 80)}", autoplay=${autoplay}, controls=${controls}, skipButton=${skipButton}, captions=${captions?.length ?? 0}`);
+
+    // Build a WebVTT <track> source from the (already language-resolved) cues.
+    // Revoke any prior track URL first so repeated video beats don't leak.
+    if (this._captionsVttUrl) { try { URL.revokeObjectURL(this._captionsVttUrl); } catch { /* ignore */ } this._captionsVttUrl = undefined; }
+    const captionsVttUrl = captions && captions.length > 0 ? this.buildCaptionsVttUrl(captions) : undefined;
+    this._captionsVttUrl = captionsVttUrl;
 
     // Route through the slot path: SlotFlowView renders the <video>
     // element fluidly as the stage background (via the videoUrl prop),
@@ -3242,6 +3249,7 @@ export class ReactRenderer extends BaseRenderer {
       autoplay,
       controls,
       skipButton,
+      captionsVttUrl,
       speaker: this.resolveSpeakerForSlot(),
       buttonText: 'Skip',
     };
@@ -3260,6 +3268,31 @@ export class ReactRenderer extends BaseRenderer {
       };
       this.renderPositionedBeat('videoBeat', content, effectiveLocations, true, undefined, authorPositioned);
     });
+  }
+
+  /** Track URL for the current video beat's captions (revoked on the next video). */
+  private _captionsVttUrl?: string;
+
+  /** Build a WebVTT blob URL from language-resolved cues. */
+  private buildCaptionsVttUrl(cues: Array<{ start: number; end: number; text: string }>): string | undefined {
+    const fmt = (s: number): string => {
+      const ms = Math.max(0, Math.round((Number(s) || 0) * 1000));
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const sec = Math.floor((ms % 60000) / 1000);
+      const milli = ms % 1000;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(milli).padStart(3, '0')}`;
+    };
+    const body = cues
+      .filter(c => c.text && Number.isFinite(c.start) && Number.isFinite(c.end) && c.end > c.start)
+      .map((c, i) => `${i + 1}\n${fmt(c.start)} --> ${fmt(c.end)}\n${c.text}`)
+      .join('\n\n');
+    if (!body) return undefined;
+    try {
+      return URL.createObjectURL(new Blob([`WEBVTT\n\n${body}\n`], { type: 'text/vtt' }));
+    } catch {
+      return undefined;
+    }
   }
 
   async renderEndScreen(message: string, showRestart: boolean, showCredits: boolean, locations?: Location[]): Promise<string> {

@@ -889,6 +889,17 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
         if (beat.parameters.node && assetIdMap.has(beat.parameters.node)) {
           beat.parameters.node = assetIdMap.get(beat.parameters.node);
         }
+        // Video beat: base video + per-language override videos
+        if (beat.parameters.videoAssetId && assetIdMap.has(beat.parameters.videoAssetId)) {
+          beat.parameters.videoAssetId = assetIdMap.get(beat.parameters.videoAssetId);
+        }
+        const vt = beat.parameters.videoTranslations;
+        if (vt && typeof vt === 'object') {
+          for (const k of Object.keys(vt)) {
+            const id = vt[k]?.videoAssetId;
+            if (id && assetIdMap.has(id)) vt[k].videoAssetId = assetIdMap.get(id);
+          }
+        }
       }
     }
   }
@@ -1037,6 +1048,13 @@ function extractAssetIdsFromStory(story: any): string[] {
       // Beat parameters
       if (beat.parameters) {
         addIfUuid(beat.parameters.node);
+        // Video beat: base video + every per-language override video, so a
+        // localized video that isn't in the linked-asset list still ships.
+        addIfUuid(beat.parameters.videoAssetId);
+        const vt = beat.parameters.videoTranslations;
+        if (vt && typeof vt === 'object') {
+          for (const k of Object.keys(vt)) addIfUuid(vt[k]?.videoAssetId);
+        }
       }
     }
   }

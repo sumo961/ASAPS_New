@@ -119,6 +119,62 @@ describe('VideoBeat', () => {
       expect(beat.controls).toBe(true);
       expect(beat.skipButton).toBe(false);
     });
+
+    it('round-trips captions + videoTranslations', () => {
+      const beat = new VideoBeat({
+        id: 'video_1', name: 'V', type: 'videoBeat',
+        parameters: {
+          captions: [{ start: 0, end: 3, text: 'Hi' }],
+          videoTranslations: { sv: { videoAssetId: 'asset_sv' } },
+        } as any,
+      });
+      expect(beat.captions).toEqual([{ start: 0, end: 3, text: 'Hi' }]);
+      expect(beat.captionsEnabled).toBe(true);
+      expect(beat.videoTranslations).toEqual({ sv: { videoAssetId: 'asset_sv' } });
+      const p = beat.getParameters();
+      expect(p.captions).toEqual([{ start: 0, end: 3, text: 'Hi' }]);
+      expect(p.videoTranslations).toEqual({ sv: { videoAssetId: 'asset_sv' } });
+    });
+  });
+
+  describe('captions', () => {
+    it('passes language-resolved cues (displayText over text) to renderVideo, dropping invalid ones', async () => {
+      const { renderer } = createMockRenderer();
+      const beat = new VideoBeat({
+        id: 'v', name: 'V', type: 'videoBeat',
+        parameters: {
+          videoFile: 'clip.mp4',
+          captions: [
+            { start: 0, end: 3, text: 'Welcome', displayText: 'Välkommen' }, // translated wins
+            { start: 3, end: 6, text: 'Founded 1566' },                       // source (no translation)
+            { start: 6, end: 6, text: 'zero-length' },                        // dropped (end<=start)
+            { start: 9, end: 12, text: '   ' },                               // dropped (blank)
+          ],
+        } as any,
+      });
+      await beat.execute(context, renderer);
+      expect(renderer.renderVideo).toHaveBeenCalledWith(
+        'clip.mp4', true, true, [], true,
+        [
+          { start: 0, end: 3, text: 'Välkommen' },
+          { start: 3, end: 6, text: 'Founded 1566' },
+        ],
+      );
+    });
+
+    it('captionsEnabled=false yields no cues', async () => {
+      const { renderer } = createMockRenderer();
+      const beat = new VideoBeat({
+        id: 'v', name: 'V', type: 'videoBeat',
+        parameters: {
+          videoFile: 'clip.mp4',
+          captionsEnabled: false,
+          captions: [{ start: 0, end: 3, text: 'Hidden' }],
+        } as any,
+      });
+      await beat.execute(context, renderer);
+      expect(renderer.renderVideo).toHaveBeenCalledWith('clip.mp4', true, true, [], true, []);
+    });
   });
 
   describe('performAction', () => {
@@ -144,6 +200,7 @@ describe('VideoBeat', () => {
         false,  // controls
         [],     // locations (empty — no VE elements)
         true,   // skipButton
+        [],     // captions (none)
       );
     });
 
@@ -191,7 +248,7 @@ describe('VideoBeat', () => {
 
       expect(renderer.renderVideo).toHaveBeenCalledWith(
         'legacy_video.mp4',
-        true, true, [], true,
+        true, true, [], true, [],
       );
     });
 
