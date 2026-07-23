@@ -5,6 +5,7 @@ import { describeMoodAxis } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
 import { CharacterRefField, type UsedName } from './characters/CharacterRefField';
 import { CounterOwnerPicker } from './CounterOwnerPicker';
+import { GpsPointCurator } from './visual/GpsPointCurator';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -18,7 +19,7 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner' | 'gps-point-curator';
     /** For 'affect-slider' control: end-cap labels — [low, high]. */
     axisLabels?: [string, string];
     /** For 'affect-slider' control: optional axis hint passed through to the
@@ -309,6 +310,19 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           {paramDef.description && (
             <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
           )}
+        </div>
+      );
+    }
+
+    // Custom map-curation control — overrides the default array<object> editor
+    // for the Set GPS Location beat's presetPoints. Placed before the type
+    // switch so the array type doesn't claim it first.
+    if (paramDef.ui?.control === 'gps-point-curator') {
+      const pts = Array.isArray(parameters.presetPoints) ? parameters.presetPoints : [];
+      return (
+        <div key={paramName} className="space-y-1">
+          <label className="block text-xs font-medium text-gray-700">{paramDef.ui.label || 'Points'}</label>
+          <GpsPointCurator points={pts} onChange={(next) => onParameterChange('presetPoints', next)} />
         </div>
       );
     }

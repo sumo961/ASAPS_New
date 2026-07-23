@@ -1350,15 +1350,28 @@
           "type": "string",
           "required": true,
           "default": "capture",
-          "description": "'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center.",
+          "description": "'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center at play time; 'preset' writes a set of points you place and review on a map at authoring time (optionally auto-generated onto streets/parks).",
           "ui": {
             "control": "select",
             "label": "Mode",
             "options": [
               { "value": "capture", "label": "Capture current position" },
               { "value": "explicit", "label": "Set explicit coordinates" },
-              { "value": "scatter", "label": "Randomly scatter points" }
+              { "value": "scatter", "label": "Randomly scatter points (at play time)" },
+              { "value": "preset", "label": "Place points on a map (authoring)" }
             ]
+          }
+        },
+        "presetPoints": {
+          "type": "array<object>",
+          "required": false,
+          "default": [],
+          "description": "preset mode: author-curated GPS points ({ lat, lng, radiusMeters? }) placed and reviewed on a map, optionally auto-generated onto walkable streets/parks. Written verbatim at play time — no network or sensor needed.",
+          "ui": { "control": "gps-point-curator", "label": "Points", "dependsOn": { "field": "mode", "value": "preset" } },
+          "itemSchema": {
+            "lat": { "type": "number", "required": true, "description": "Latitude (WGS84)" },
+            "lng": { "type": "number", "required": true, "description": "Longitude (WGS84)" },
+            "radiusMeters": { "type": "number", "required": false, "description": "Optional per-point geofence radius" }
           }
         },
         "pointName": {

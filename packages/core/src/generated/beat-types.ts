@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-23T06:46:09.531Z
+ * Generated: 2026-07-23T07:17:49.533Z
  */
 
 // ============================================
@@ -426,8 +426,10 @@ export interface SetVariableParameters {
  * Connection Type: single
  */
 export interface SetGpsLocationParameters {
-  /** 'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center. */
+  /** 'capture' pins the player's current position; 'explicit' stores author-entered coordinates; 'scatter' randomly distributes points within a radius of a center at play time; 'preset' writes a set of points you place and review on a map at authoring time (optionally auto-generated onto streets/parks). */
   mode: string;
+  /** preset mode: author-curated GPS points ({ lat, lng, radiusMeters? }) placed and reviewed on a map, optionally auto-generated onto walkable streets/parks. Written verbatim at play time — no network or sensor needed. */
+  presetPoints?: Object[] | undefined;
   /** Name of the GPS point set to write. Reference this name from a GpsLocation entry (its 'pointName') to geofence these points. */
   pointName: string;
   /** Latitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates. */

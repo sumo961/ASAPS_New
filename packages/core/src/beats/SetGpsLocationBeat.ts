@@ -23,7 +23,7 @@ import { StoryContext } from '../engine/StoryContext';
 import { scatterPointsAround } from '../utils/geo';
 import { sampleWalkablePoints } from '../utils/overpass';
 
-export type SetGpsLocationMode = 'capture' | 'explicit' | 'scatter';
+export type SetGpsLocationMode = 'capture' | 'explicit' | 'scatter' | 'preset';
 export type ScatterCenterSource = 'current' | 'point' | 'explicit';
 /** 'uniform' = pure math (offline); 'walkable' = snap onto OSM streets/parks. */
 export type ScatterPlacement = 'uniform' | 'walkable';
@@ -48,6 +48,8 @@ export interface SetGpsLocationBeatParameters {
   centerPointName?: string;
   /** 'uniform' (default, offline) or 'walkable' (snap to OSM streets/parks). */
   placement?: ScatterPlacement;
+  /** preset mode: author-curated points (generated + reviewed on a map, baked). */
+  presetPoints?: GeoPoint[];
 }
 
 export class SetGpsLocationBeat extends Beat {
@@ -63,6 +65,7 @@ export class SetGpsLocationBeat extends Beat {
   public centerSource: ScatterCenterSource;
   public centerPointName?: string;
   public placement: ScatterPlacement;
+  public presetPoints: GeoPoint[];
 
   constructor(config: BeatConfig & {
     parameters?: Partial<SetGpsLocationBeatParameters>;
@@ -83,6 +86,8 @@ export class SetGpsLocationBeat extends Beat {
     this.centerSource = pick('centerSource') ?? 'current';
     this.centerPointName = pick('centerPointName');
     this.placement = pick('placement') ?? 'uniform';
+    const rawPreset = pick('presetPoints');
+    this.presetPoints = Array.isArray(rawPreset) ? (rawPreset as GeoPoint[]) : [];
   }
 
   getParameters(): Record<string, any> {
@@ -99,6 +104,7 @@ export class SetGpsLocationBeat extends Beat {
       centerSource: this.centerSource,
       centerPointName: this.centerPointName,
       placement: this.placement,
+      presetPoints: this.presetPoints,
     };
   }
 
@@ -115,6 +121,7 @@ export class SetGpsLocationBeat extends Beat {
     if (params.centerSource !== undefined) this.centerSource = params.centerSource;
     if (params.centerPointName !== undefined) this.centerPointName = params.centerPointName;
     if (params.placement !== undefined) this.placement = params.placement;
+    if (params.presetPoints !== undefined) this.presetPoints = Array.isArray(params.presetPoints) ? params.presetPoints : [];
   }
 
   /** Read the current sensor position, or null if unavailable. Never throws. */
@@ -150,7 +157,13 @@ export class SetGpsLocationBeat extends Beat {
     try {
       let points: GeoPoint[] = [];
 
-      if (this.gpsMode === 'explicit') {
+      if (this.gpsMode === 'preset') {
+        // Author-curated points (generated + reviewed on the map, baked into
+        // the beat) — written verbatim, no network / sensor at play time.
+        points = this.presetPoints
+          .filter(p => typeof p?.lat === 'number' && typeof p?.lng === 'number')
+          .map(p => ({ lat: p.lat, lng: p.lng, ...(p.radiusMeters != null ? { radiusMeters: p.radiusMeters } : (this.pointRadiusMeters != null ? { radiusMeters: this.pointRadiusMeters } : {})) }));
+      } else if (this.gpsMode === 'explicit') {
         if (typeof this.lat === 'number' && typeof this.lng === 'number') {
           points = [{ lat: this.lat, lng: this.lng, ...(this.pointRadiusMeters != null ? { radiusMeters: this.pointRadiusMeters } : {}) }];
         } else {

@@ -78,6 +78,27 @@ describe('SetGpsLocationBeat', () => {
     for (const p of pts) expect(distM({ lat: 10, lng: 20 }, p)).toBeLessThanOrEqual(50 + 0.5);
   });
 
+  it('preset mode writes the author-curated points verbatim', async () => {
+    const beat = new SetGpsLocationBeat({
+      id: 'g', type: 'setGpsLocation',
+      parameters: {
+        mode: 'preset', pointName: 'trail',
+        presetPoints: [{ lat: 1, lng: 2, radiusMeters: 8 }, { lat: 3, lng: 4 }],
+      } as any,
+    });
+    await beat.execute(context, noopRenderer);
+    expect(context.getGeoPoints('trail')).toEqual([{ lat: 1, lng: 2, radiusMeters: 8 }, { lat: 3, lng: 4 }]);
+  });
+
+  it('preset mode applies the beat point-radius to points without their own', async () => {
+    const beat = new SetGpsLocationBeat({
+      id: 'g', type: 'setGpsLocation',
+      parameters: { mode: 'preset', pointName: 'trail', pointRadiusMeters: 20, presetPoints: [{ lat: 1, lng: 2 }] } as any,
+    });
+    await beat.execute(context, noopRenderer);
+    expect(context.getGeoPoints('trail')).toEqual([{ lat: 1, lng: 2, radiusMeters: 20 }]);
+  });
+
   it('skips (no write) when pointName is missing, but still advances', async () => {
     const beat = new SetGpsLocationBeat({
       id: 'g', type: 'setGpsLocation',

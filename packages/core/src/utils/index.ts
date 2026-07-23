@@ -102,3 +102,10 @@ export {
   type NumericRefResolver,
   type NumericScope,
 } from './expression';
+export { offsetMeters, scatterPointsAround } from './geo';
+export {
+  buildWalkableQuery,
+  fetchWalkableWays,
+  sampleWalkablePoints,
+  type WalkableSampleOptions,
+} from './overpass';
