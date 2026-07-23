@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SetGpsLocationBeat } from '../../src/beats/SetGpsLocationBeat';
 import { StoryContext } from '../../src/engine/StoryContext';
 import type { IRenderer } from '../../src/types';
@@ -91,13 +91,51 @@ describe('SetGpsLocationBeat', () => {
 
   it('round-trips params through get/updateParameters', () => {
     const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation' });
-    beat.updateParameters({ mode: 'scatter', pointName: 'x', count: 12, scatterRadiusMeters: 300, centerSource: 'explicit', lat: 5, lng: 6 });
+    beat.updateParameters({ mode: 'scatter', pointName: 'x', count: 12, scatterRadiusMeters: 300, centerSource: 'explicit', lat: 5, lng: 6, placement: 'walkable' });
     const p = beat.getParameters();
     expect(p.mode).toBe('scatter');
     expect(p.pointName).toBe('x');
     expect(p.count).toBe(12);
     expect(p.scatterRadiusMeters).toBe(300);
     expect(p.centerSource).toBe('explicit');
+    expect(p.placement).toBe('walkable');
+  });
+});
+
+describe('SetGpsLocationBeat — walkable placement (OSM)', () => {
+  let context: StoryContext;
+  beforeEach(() => { context = new StoryContext(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  const walkableResponse = {
+    elements: [
+      { type: 'way', id: 1, tags: { highway: 'footway' }, geometry: [{ lat: 0, lon: -0.0005 }, { lat: 0, lon: 0.0005 }] },
+    ],
+  };
+
+  it('snaps scattered points onto walkable geometry when placement=walkable', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: true, status: 200, json: async () => walkableResponse } as any));
+    const beat = new SetGpsLocationBeat({
+      id: 'g', type: 'setGpsLocation',
+      parameters: { mode: 'scatter', pointName: 'caches', count: 6, scatterRadiusMeters: 200, centerSource: 'explicit', lat: 0, lng: 0, placement: 'walkable' } as any,
+    });
+    await beat.execute(context, noopRenderer);
+    const pts = context.getGeoPoints('caches');
+    expect(pts).toHaveLength(6);
+    // the footway is at lat=0 — on-network points share that latitude
+    expect(pts.every(p => Math.abs(p.lat) < 1e-9)).toBe(true);
+  });
+
+  it('falls back to uniform scatter (count still met) when the OSM lookup fails', async () => {
+    vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
+    const beat = new SetGpsLocationBeat({
+      id: 'g', type: 'setGpsLocation',
+      parameters: { mode: 'scatter', pointName: 'caches', count: 8, scatterRadiusMeters: 150, centerSource: 'explicit', lat: 0, lng: 0, placement: 'walkable' } as any,
+    });
+    await beat.execute(context, noopRenderer);
+    const pts = context.getGeoPoints('caches');
+    expect(pts).toHaveLength(8); // topped up uniformly — story never stalls
+    for (const p of pts) expect(distM({ lat: 0, lng: 0 }, p)).toBeLessThanOrEqual(150 + 0.5);
   });
 });
 

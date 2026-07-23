@@ -1421,6 +1421,21 @@
           "description": "scatter mode with center source 'point': the name of the point set to center on (uses its first point).",
           "ui": { "label": "Center point set" }
         },
+        "placement": {
+          "type": "string",
+          "required": false,
+          "default": "uniform",
+          "description": "scatter mode: 'uniform' places points by pure math (offline, may land inside buildings/water); 'walkable' snaps points onto real streets, paths, and parks via OpenStreetMap (needs a network connection at play time; falls back to uniform when coverage is thin or the lookup fails).",
+          "ui": {
+            "control": "select",
+            "label": "Placement",
+            "options": [
+              { "value": "uniform", "label": "Uniform (offline, anywhere)" },
+              { "value": "walkable", "label": "Walkable (streets & parks, via OpenStreetMap)" }
+            ],
+            "dependsOn": { "field": "mode", "value": "scatter" }
+          }
+        },
         "fallbackLat": {
           "type": "number",
           "required": false,

@@ -21,9 +21,12 @@ import { Beat } from './Beat';
 import type { BeatConfig, IRenderer, GeoPoint } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { scatterPointsAround } from '../utils/geo';
+import { sampleWalkablePoints } from '../utils/overpass';
 
 export type SetGpsLocationMode = 'capture' | 'explicit' | 'scatter';
 export type ScatterCenterSource = 'current' | 'point' | 'explicit';
+/** 'uniform' = pure math (offline); 'walkable' = snap onto OSM streets/parks. */
+export type ScatterPlacement = 'uniform' | 'walkable';
 
 export interface SetGpsLocationBeatParameters {
   mode?: SetGpsLocationMode;
@@ -43,6 +46,8 @@ export interface SetGpsLocationBeatParameters {
   centerSource?: ScatterCenterSource;
   /** Name of a previously-stored point set to center on (centerSource='point'). */
   centerPointName?: string;
+  /** 'uniform' (default, offline) or 'walkable' (snap to OSM streets/parks). */
+  placement?: ScatterPlacement;
 }
 
 export class SetGpsLocationBeat extends Beat {
@@ -57,6 +62,7 @@ export class SetGpsLocationBeat extends Beat {
   public scatterRadiusMeters: number;
   public centerSource: ScatterCenterSource;
   public centerPointName?: string;
+  public placement: ScatterPlacement;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<SetGpsLocationBeatParameters>;
@@ -76,6 +82,7 @@ export class SetGpsLocationBeat extends Beat {
     this.scatterRadiusMeters = Number(pick('scatterRadiusMeters') ?? 100);
     this.centerSource = pick('centerSource') ?? 'current';
     this.centerPointName = pick('centerPointName');
+    this.placement = pick('placement') ?? 'uniform';
   }
 
   getParameters(): Record<string, any> {
@@ -91,6 +98,7 @@ export class SetGpsLocationBeat extends Beat {
       scatterRadiusMeters: this.scatterRadiusMeters,
       centerSource: this.centerSource,
       centerPointName: this.centerPointName,
+      placement: this.placement,
     };
   }
 
@@ -106,6 +114,7 @@ export class SetGpsLocationBeat extends Beat {
     if (params.scatterRadiusMeters !== undefined) this.scatterRadiusMeters = Number(params.scatterRadiusMeters);
     if (params.centerSource !== undefined) this.centerSource = params.centerSource;
     if (params.centerPointName !== undefined) this.centerPointName = params.centerPointName;
+    if (params.placement !== undefined) this.placement = params.placement;
   }
 
   /** Read the current sensor position, or null if unavailable. Never throws. */
@@ -167,9 +176,32 @@ export class SetGpsLocationBeat extends Beat {
         }
         center = center ?? this.fallback();
         if (center) {
-          points = scatterPointsAround(center, this.scatterRadiusMeters, this.count, {
-            perPointRadius: this.pointRadiusMeters,
-          });
+          if (this.placement === 'walkable') {
+            // Snap onto real streets/parks via OSM. Thin coverage or a failed
+            // query returns fewer than requested — top up with uniform scatter
+            // so the count is always met and the story never stalls.
+            let walk: GeoPoint[] = [];
+            try {
+              walk = await sampleWalkablePoints(center, this.scatterRadiusMeters, this.count, {
+                perPointRadius: this.pointRadiusMeters,
+              });
+            } catch (err) {
+              console.warn(`[SetGpsLocationBeat ${this.id}] walkable sampling failed:`, err);
+            }
+            if (walk.length >= this.count) {
+              points = walk.slice(0, this.count);
+            } else {
+              const fill = scatterPointsAround(center, this.scatterRadiusMeters, this.count - walk.length, {
+                perPointRadius: this.pointRadiusMeters,
+              });
+              points = [...walk, ...fill];
+              console.warn(`[SetGpsLocationBeat ${this.id}] walkable: ${walk.length}/${this.count} on-network, ${fill.length} filled uniformly`);
+            }
+          } else {
+            points = scatterPointsAround(center, this.scatterRadiusMeters, this.count, {
+              perPointRadius: this.pointRadiusMeters,
+            });
+          }
         } else {
           console.warn(`[SetGpsLocationBeat ${this.id}] scatter mode: no resolvable center — storing empty`);
         }

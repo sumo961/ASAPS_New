@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.16.0
- * Generated: 2026-07-22T20:50:39.922Z
+ * Generated: 2026-07-23T06:46:09.531Z
  */
 
 // ============================================
@@ -444,6 +444,8 @@ export interface SetGpsLocationParameters {
   centerSource?: string | undefined;
   /** scatter mode with center source 'point': the name of the point set to center on (uses its first point). */
   centerPointName?: string | undefined;
+  /** scatter mode: 'uniform' places points by pure math (offline, may land inside buildings/water); 'walkable' snaps points onto real streets, paths, and parks via OpenStreetMap (needs a network connection at play time; falls back to uniform when coverage is thin or the lookup fails). */
+  placement?: string | undefined;
   /** Fallback latitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current). */
   fallbackLat?: number | undefined;
   /** Fallback longitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current). */
