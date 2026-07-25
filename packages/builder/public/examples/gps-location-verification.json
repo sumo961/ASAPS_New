@@ -1,0 +1,325 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "title": "GPS Location — Verification",
+    "author": "ASAPS QA",
+    "description": "Manual verification story for the Set GPS Location beat (capture/explicit/scatter/preset), walkable placement (OSM), and the GpsLocation pointName geofence binding. Runs with Mock Sensors on desktop; Test C needs internet.",
+    "createdAt": "2026-07-24T00:00:00.000Z",
+    "modifiedAt": "2026-07-24T00:00:00.000Z"
+  },
+  "beats": [
+    {
+      "id": "t",
+      "type": "titleScreen",
+      "name": "Title",
+      "order": 0,
+      "parameters": {
+        "title": "GPS Location — Verification",
+        "author": "ASAPS QA",
+        "buttonText": "Start",
+        "connection": {
+          "targetId": "intro"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "intro",
+      "type": "infoText",
+      "name": "intro",
+      "order": 1,
+      "parameters": {
+        "text": "Verifies the Set GPS Location beat (capture / explicit / scatter / preset), the walkable-placement option, and the dynamic geofence binding (a GpsLocation entry bound to a named point set via 'pointName').\n\nHOW TO RUN:\n• Desktop: open Tools → Mock Sensors so you can set/inject a GPS position without walking.\n• Test C (walkable) needs an internet connection at play time; offline it falls back to uniform.\n• All coordinates are around Trafalgar Square, London.",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "A_set"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "A_set",
+      "type": "setGpsLocation",
+      "name": "A: Preset points",
+      "order": 2,
+      "parameters": {
+        "mode": "preset",
+        "pointName": "trailA",
+        "presetPoints": [
+          {
+            "lat": 51.508,
+            "lng": -0.1281,
+            "radiusMeters": 20
+          },
+          {
+            "lat": 51.5086,
+            "lng": -0.1273
+          }
+        ],
+        "connection": {
+          "targetId": "A_gps"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "A_gps",
+      "type": "gpsLocation",
+      "name": "A: Geofence trailA",
+      "order": 3,
+      "parameters": {
+        "mode": "trigger-on-arrival",
+        "xrLocations": [
+          {
+            "id": "A_gps_e",
+            "name": "A: Geofence trailA",
+            "pointName": "trailA",
+            "target": "A_pass",
+            "radiusMeters": 20
+          }
+        ],
+        "defaultTarget": "A_fail",
+        "text": "Map: points bound to 'trailA'. Tap a point / walk to it (trigger mode), or Continue (display mode).",
+        "buttonText": "Continue"
+      },
+      "locations": []
+    },
+    {
+      "id": "A_pass",
+      "type": "infoText",
+      "name": "A_pass",
+      "order": 4,
+      "parameters": {
+        "text": "✓ PASS A — arrived at a preset point. The full loop works: preset write → pointName bind → geofence → arrival routes forward.\n\n(With Mock Sensors, set the position to 51.5080, -0.1281 to trigger this.)",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "B_set"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "A_fail",
+      "type": "infoText",
+      "name": "A_fail",
+      "order": 5,
+      "parameters": {
+        "text": "✗ A — fallback / no arrival. Open Tools → Mock Sensors and set the GPS position to 51.5080, -0.1281, then re-run. Grant location permission on a phone.",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "B_set"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "B_set",
+      "type": "setGpsLocation",
+      "name": "B: Scatter (uniform)",
+      "order": 6,
+      "parameters": {
+        "mode": "scatter",
+        "pointName": "scatterB",
+        "count": 5,
+        "scatterRadiusMeters": 150,
+        "centerSource": "explicit",
+        "lat": 51.508,
+        "lng": -0.1281,
+        "placement": "uniform",
+        "pointRadiusMeters": 20,
+        "connection": {
+          "targetId": "B_gps"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "B_gps",
+      "type": "gpsLocation",
+      "name": "B: Geofence scatterB",
+      "order": 7,
+      "parameters": {
+        "mode": "display",
+        "xrLocations": [
+          {
+            "id": "B_gps_e",
+            "name": "B: Geofence scatterB",
+            "pointName": "scatterB",
+            "target": "",
+            "radiusMeters": 20
+          }
+        ],
+        "defaultTarget": "B_check",
+        "text": "Map: points bound to 'scatterB'. Tap a point / walk to it (trigger mode), or Continue (display mode).",
+        "buttonText": "Continue"
+      },
+      "locations": []
+    },
+    {
+      "id": "B_check",
+      "type": "infoText",
+      "name": "B_check",
+      "order": 8,
+      "parameters": {
+        "text": "✓ PASS B — did FIVE points appear scattered evenly around the center on the map? (Uniform placement can land points anywhere, including inside blocks — that's expected here; Test C fixes that.)",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "C_set"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "C_set",
+      "type": "setGpsLocation",
+      "name": "C: Scatter (walkable/OSM)",
+      "order": 9,
+      "parameters": {
+        "mode": "scatter",
+        "pointName": "streetsC",
+        "count": 6,
+        "scatterRadiusMeters": 200,
+        "centerSource": "explicit",
+        "lat": 51.508,
+        "lng": -0.1281,
+        "placement": "walkable",
+        "pointRadiusMeters": 20,
+        "connection": {
+          "targetId": "C_gps"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "C_gps",
+      "type": "gpsLocation",
+      "name": "C: Geofence streetsC",
+      "order": 10,
+      "parameters": {
+        "mode": "display",
+        "xrLocations": [
+          {
+            "id": "C_gps_e",
+            "name": "C: Geofence streetsC",
+            "pointName": "streetsC",
+            "target": "",
+            "radiusMeters": 20
+          }
+        ],
+        "defaultTarget": "C_check",
+        "text": "Map: points bound to 'streetsC'. Tap a point / walk to it (trigger mode), or Continue (display mode).",
+        "buttonText": "Continue"
+      },
+      "locations": []
+    },
+    {
+      "id": "C_check",
+      "type": "infoText",
+      "name": "C_check",
+      "order": 11,
+      "parameters": {
+        "text": "✓ PASS C (needs internet) — did the SIX points land ON streets, paths, and parks (not inside buildings/water)? If offline or OSM coverage is thin, it tops up with uniform scatter (still six points) — that graceful fallback is also a pass.",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "D_set"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "D_set",
+      "type": "setGpsLocation",
+      "name": "D: Capture current position",
+      "order": 12,
+      "parameters": {
+        "mode": "capture",
+        "pointName": "hereD",
+        "fallbackLat": 51.508,
+        "fallbackLng": -0.1281,
+        "pointRadiusMeters": 25,
+        "connection": {
+          "targetId": "D_gps"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "D_gps",
+      "type": "gpsLocation",
+      "name": "D: Geofence hereD",
+      "order": 13,
+      "parameters": {
+        "mode": "display",
+        "xrLocations": [
+          {
+            "id": "D_gps_e",
+            "name": "D: Geofence hereD",
+            "pointName": "hereD",
+            "target": "",
+            "radiusMeters": 20
+          }
+        ],
+        "defaultTarget": "D_check",
+        "text": "Map: points bound to 'hereD'. Tap a point / walk to it (trigger mode), or Continue (display mode).",
+        "buttonText": "Continue"
+      },
+      "locations": []
+    },
+    {
+      "id": "D_check",
+      "type": "infoText",
+      "name": "D_check",
+      "order": 14,
+      "parameters": {
+        "text": "✓ PASS D — did ONE point appear at your current position (mock or real GPS), or at the fallback (51.5080, -0.1281) when no fix is available?",
+        "buttonText": "Continue",
+        "connection": {
+          "targetId": "end"
+        }
+      },
+      "locations": []
+    },
+    {
+      "id": "end",
+      "type": "endScreen",
+      "name": "The End",
+      "order": 15,
+      "parameters": {
+        "message": "GPS verification complete — log results in TESTING_EXPERIMENTAL_BEATS.md.",
+        "showRestart": true,
+        "showCredits": false
+      },
+      "locations": []
+    }
+  ],
+  "characters": [],
+  "assets": [],
+  "variables": [],
+  "counters": [],
+  "globalSettings": {
+    "colors": {
+      "bgColor": "#1e3a8a",
+      "pcolor": "#ffffff",
+      "palpha": 100,
+      "ccolor": "#ffcc00",
+      "calpha": 100,
+      "textBoxBg": "#ffffff",
+      "textBoxBorder": "#cccccc"
+    },
+    "fonts": {
+      "textFont": "Arial",
+      "btnFont": "Arial"
+    },
+    "textbox": {
+      "borderWidth": 1,
+      "radius": 8,
+      "padding": 16,
+      "opacity": 95
+    },
+    "textEffects": {
+      "animation": "none",
+      "typewriterSpeed": 50,
+      "fadeInDuration": 300
+    }
+  }
+}

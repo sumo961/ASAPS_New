@@ -1,0 +1,91 @@
+# Example Stories
+
+This directory contains example interactive narratives that demonstrate various features of the ASAPS Builder.
+
+## Available Examples
+
+### RED: A Modern Tale
+**File:** `red-riding-hood-modern.json`
+
+A modern retelling of Little Red Riding Hood where the player is Riley, a 16-year-old girl navigating identity, peer pressure, and self-discovery.
+
+**Features Demonstrated:**
+- Multiple branching paths (3 major routes)
+- DialogTree conversations with emotional depth
+- MovementChoice beats for path selection
+- Timing features (choiceDelay for dramatic tension)
+- Multiple endings based on player choices
+- Modern themes: social media pressure, toxic friendships, authenticity
+
+**Story Statistics:**
+- 23 interactive beats
+- 3 major endings
+- 6 dialog tree interactions
+- Beat types used: TitleScreen, IntroText, MovementChoice, DialogTree, EndScreen
+
+**Themes:**
+- Identity vs. Performance
+- True Connection vs. Superficial Relationships
+- Recognizing Modern "Red Flags" (gossip, exclusion, conditional acceptance)
+- Generational Wisdom
+
+**How to Import:**
+1. In the ASAPS Builder, go to File → Import ZIP
+2. Select `red-riding-hood-modern.asaps.zip` from this directory
+3. The story will load into the visual editor with all 23 beats
+
+**For More Information:**
+See `/RED-STORY-GUIDE.md` in the project root for a comprehensive guide including:
+- How to enhance the story with AI features
+- Story flow map and key moments
+- Extension ideas
+- Teaching points
+
+### GPS Location — Verification
+**File:** `gps-location-verification.json`
+
+A manual **verification** story (not narrative) for the GPS beats. Import the
+`.asaps.zip` (**Import → Project (ZIP)**), open **Tools → Mock Sensors**, and
+run it in Preview to exercise the **Set GPS Location** beat (capture, scatter in
+both placements, preset) plus the **GpsLocation** geofence binding in one pass.
+The flat `.json` beside it is the human-readable source, not the import target.
+
+**What it covers:**
+- **A** — `preset` points + a `trigger-on-arrival` geofence bound by `pointName` (set the mock position to 51.5080, -0.1281 to trigger the PASS branch)
+- **B** — `scatter` (uniform placement) shown on a `display` map
+- **C** — `scatter` with **walkable** placement (snaps onto OpenStreetMap streets/parks; needs internet; falls back to uniform offline)
+- **D** — `capture` the current position, with an authored fallback
+
+All coordinates are around Trafalgar Square, London (dense OSM coverage). Full
+per-step pass/fail criteria live in `docs/TESTING_EXPERIMENTAL_BEATS.md` →
+*Set GPS Location*.
+
+### GPS Field Test (your location)
+**File:** `gps-field-test.asaps.zip`
+
+The **live outdoor** companion to the verification story above — fully
+**location-agnostic** (zero authored coordinates; everything centers on
+wherever the player is standing, so it works anywhere without editing).
+
+- **Test A** — captures your position and geofences it (should trigger on the
+  spot within seconds; proves live GPS + the capture → geofence loop)
+- **Test B** — scatters 3 points onto nearby streets/parks (OpenStreetMap),
+  shows them on a map, then asks you to walk to any one — arrival triggers
+  the geofence. The geocaching mechanic, live.
+
+**Deploy to a phone:** Import → **Export → HTML → Single File** → drop the file
+on any HTTPS host (Netlify Drop is ~30 s) → open in iPhone Safari → allow
+location. Local `file://` or plain `http://<lan-ip>` will NOT work on iOS
+(no JS in QuickLook; geolocation needs a secure context). Details in
+`docs/TESTING_EXPERIMENTAL_BEATS.md` → *Outdoor walking test*.
+
+## Creating Your Own Examples
+
+To add new example stories to this directory:
+
+1. Create your story in the ASAPS Builder
+2. Export the project as JSON
+3. Place the JSON file in this directory
+4. Add an entry to this README describing the example
+
+Example stories should demonstrate specific features or storytelling techniques to help new users learn the system.
