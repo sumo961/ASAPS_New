@@ -311,4 +311,43 @@ describe('GpsLocationBeat', () => {
       expect(renderer.renderMap).not.toHaveBeenCalled();
     });
   });
+
+  // Regression — the iOS field-test false-PASS bug: every "couldn't run the
+  // geofence" exit used getNextBeat(), whose FIRST connection is typically the
+  // ARRIVAL target on trigger-mode beats. A denial / empty point store then
+  // routed to the arrival branch, masquerading as a successful arrival.
+  // Skip exits must prefer defaultTarget (the "didn't arrive" path).
+  describe('skip exits prefer defaultTarget over the first (arrival) connection', () => {
+    it('permission denied + no project fallback → defaultTarget, NOT the arrival target', async () => {
+      context = new StoryContext(undefined, makeStoryStub(), { mockMode: true });
+      const sensor = context.getSensorService() as MockSensorService;
+      sensor.setMockPermissionState('gps', 'denied');
+      const renderer = makeRenderer();
+      const beat = new GpsLocationBeat({
+        id: 'b1', name: 'Map', type: 'gpsLocation',
+        parameters: {
+          mode: 'trigger-on-arrival',
+          xrLocations: [{ id: 'e', lat: 1, lng: 2, target: 'arrival_beat' }],
+          defaultTarget: 'fail_beat',
+        },
+      } as any);
+      const result = await (beat as any).performAction(context, renderer);
+      expect(result).toBe('fail_beat');
+      expect(renderer.renderMap).not.toHaveBeenCalled();
+    });
+
+    it('empty dynamic point store → defaultTarget, NOT the arrival target', async () => {
+      const renderer = makeRenderer();
+      const beat = new GpsLocationBeat({
+        id: 'b1', name: 'Map', type: 'gpsLocation',
+        parameters: {
+          mode: 'display',
+          xrLocations: [{ id: 'e', pointName: 'never_written', target: 'arrival_beat' }],
+          defaultTarget: 'fail_beat',
+        },
+      } as any);
+      const result = await (beat as any).performAction(context, renderer);
+      expect(result).toBe('fail_beat');
+    });
+  });
 });

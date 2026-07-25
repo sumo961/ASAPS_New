@@ -199,6 +199,20 @@ export class GpsLocationBeat extends Beat {
     return connections;
   }
 
+  /**
+   * Exit path for every "couldn't run the geofence" case (permission denied
+   * with no project fallback, empty/invalid location set, renderer without a
+   * map). MUST prefer `defaultTarget`: `getNextBeat()` returns the beat's
+   * FIRST connection, which for trigger-mode beats is typically an ARRIVAL
+   * target — falling through to it made a silent skip look like a successful
+   * arrival (the iOS field-test false-PASS bug: geolocation already denied →
+   * no prompt → empty geofence → "arrived").
+   */
+  private skipExit(context: StoryContext): string | null {
+    if (this.defaultTarget) return this.defaultTarget;
+    return this.getNextBeat(context);
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer,
@@ -215,24 +229,24 @@ export class GpsLocationBeat extends Beat {
       if (verdict === 'fallback') {
         const fallback = locationSettings?.fallbackBeatId;
         if (fallback) return fallback;
-        return this.getNextBeat(context);
+        return this.skipExit(context);
       }
       if (verdict === 'skip') {
-        return this.getNextBeat(context);
+        return this.skipExit(context);
       }
     }
 
     const effective = this.getEffectiveLocations(context);
     if (effective.length === 0) {
       console.warn(`[GpsLocationBeat ${this.id}] no locations configured — skipping`);
-      return this.getNextBeat(context);
+      return this.skipExit(context);
     }
 
     // Validate every entry has lat/lng. Drop entries that don't.
     const valid = effective.filter((loc) => loc.lat !== undefined && loc.lng !== undefined);
     if (valid.length === 0) {
       console.warn(`[GpsLocationBeat ${this.id}] no valid lat/lng on any location — skipping`);
-      return this.getNextBeat(context);
+      return this.skipExit(context);
     }
 
     // Resolve effective radius per location. Per-location wins, then beat-level,
@@ -253,7 +267,7 @@ export class GpsLocationBeat extends Beat {
     try {
       if (!renderer.renderMap) {
         console.warn(`[GpsLocationBeat ${this.id}] renderer doesn't implement renderMap — advancing`);
-        return this.getNextBeat(context);
+        return this.skipExit(context);
       }
       result = await renderer.renderMap({
         mode: this.mode,

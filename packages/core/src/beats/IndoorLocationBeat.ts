@@ -146,6 +146,18 @@ export class IndoorLocationBeat extends Beat {
     return connections;
   }
 
+  /**
+   * Exit path for every "couldn't run the geofence" case. Prefers
+   * `defaultTarget` over `getNextBeat()` — the latter returns the FIRST
+   * connection, which for trigger-mode beats is typically an arrival target,
+   * so a silent skip would masquerade as a successful arrival. Mirrors the
+   * same fix in GpsLocationBeat (the iOS field-test false-PASS bug).
+   */
+  private skipExit(context: StoryContext): string | null {
+    if (this.defaultTarget) return this.defaultTarget;
+    return this.getNextBeat(context);
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer,
@@ -173,20 +185,20 @@ export class IndoorLocationBeat extends Beat {
       if (verdict === 'fallback') {
         const fallback = locationSettings?.fallbackBeatId;
         if (fallback) return fallback;
-        return this.getNextBeat(context);
+        return this.skipExit(context);
       }
-      if (verdict === 'skip') return this.getNextBeat(context);
+      if (verdict === 'skip') return this.skipExit(context);
     }
 
     const effective = this.getEffectiveLocations();
     if (effective.length === 0) {
       console.warn(`[IndoorLocationBeat ${this.id}] no locations configured — skipping`);
-      return this.getNextBeat(context);
+      return this.skipExit(context);
     }
     const valid = effective.filter((l) => !!l.beaconUuid);
     if (valid.length === 0) {
       console.warn(`[IndoorLocationBeat ${this.id}] no valid beaconUuid on any location — skipping`);
-      return this.getNextBeat(context);
+      return this.skipExit(context);
     }
 
     const projectDefault = locationSettings?.defaultProximityRadiusM ?? 5;
@@ -215,7 +227,7 @@ export class IndoorLocationBeat extends Beat {
     try {
       if (!renderer.renderIndoorMap) {
         console.warn(`[IndoorLocationBeat ${this.id}] renderer doesn't implement renderIndoorMap — advancing`);
-        return this.getNextBeat(context);
+        return this.skipExit(context);
       }
       // Beat-level venue wins; project venue is the fallback so existing
       // single-venue stories keep working without per-beat reconfiguration.
