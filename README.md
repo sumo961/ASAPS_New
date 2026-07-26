@@ -22,17 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.82** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.82 gives the AI Conversation beat
-a first-class fixed mode**: a *Chat vs Dialog* choice that renders a live AI
-conversation either as today's scrolling messaging panel or, new, as a
-positioned **back-and-forth NPC dialog box** with a free-text reply — like a
-Dialog Tree, and placeable on a fixed canvas — with the toggle now living in
-the Visual Editor and both modes previewing faithfully. It also fixes the
-**AI Dialog Tree** layout picker, which showed "Stacked" while the beat
-actually ran as chat, and teaches the **Co-Designer** the interpersonal-stance
-model (it can now propose stance/trait/variant changes) with those edits made
-undoable. Users on v0.9.81 will auto-update. For what shipped when, see:
+Current release: **v0.9.83** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.83 brings location-based
+storytelling's logic layer**: a new **Set GPS Location** beat writes named GPS
+point sets into story state — capture the player's live position, set
+coordinates, randomly **scatter points around the player** (optionally snapped
+onto real streets, paths, and parks via OpenStreetMap), or curate points on a
+map at authoring time — and the GPS Location beat geofences those dynamic
+sets. The full loop (scatter → geofence → walk-to-a-point) was **verified in
+the field on iOS and Android**. The **Video beat also goes multi-language**:
+a different video per language, plus author-written caption cues that the
+translation system turns into per-language subtitles automatically. Users on
+v0.9.82 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

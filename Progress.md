@@ -1,5 +1,42 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-26: Location-based storytelling + multi-language video (v0.9.83)
+
+### Overview
+
+Two feature arcs. **Location-based storytelling gets its logic layer**: a new invisible **Set GPS Location** beat writes named GPS point sets into story state — capture the player's live position, set explicit coordinates, randomly **scatter** points around a center, or bake author-curated points from a map — and the GpsLocation beat can now geofence those dynamic sets. Scatter can snap points **onto real streets, paths, and parks** via OpenStreetMap, both at play time and in a new authoring-time map curator. The whole arc was **verified in the field on iOS and Android** (walk-to-a-scattered-point, live), which surfaced and fixed a real routing bug. Separately, the **Video beat goes multi-language**: a different video per language and author-written caption cues that the translation system localizes automatically into per-language subtitles.
+
+### Set GPS Location beat + dynamic geofencing
+
+- New invisible logic beat (Logic group, 📍) with four modes: **capture** (pin the player's current position; authored fallback when no fix), **explicit** (one lat/lng), **scatter** (N points uniformly by area within a radius of the current position / another point set / explicit coords), and **preset** (author-curated list). Writes `geoPoints` — a new named point-set primitive in StoryState, serialized with saves.
+- **GpsLocation entries can bind to a point set** (`pointName`): one entry expands at runtime into a geofence per stored point, inheriting target/radius/effects. The loop — Set GPS Location (scatter) → GpsLocation (geofence) → Condition (`gpsProximity`) — is the geocaching mechanic.
+- **Walkable placement (OpenStreetMap)**: scatter's `placement: 'walkable'` fetches walkable geometry (footways/paths/pedestrian & residential streets, parks) from the Overpass API and samples points ALONG lines / INSIDE polygons — accessible-on-foot by construction, weighted by length/area, no API key. Thin coverage or a failed lookup **tops up with uniform scatter** so the count is always met. Same sampler powers the authoring-time **map curator** in preset mode: set center + radius on a Leaflet map, "Generate on streets & parks", then drag/click-remove/click-add pins before baking — human review is the "walkable ≠ safe" filter.
+
+**Files modified:**
+- `packages/core/src/beats/SetGpsLocationBeat.ts` (new), `GpsLocationBeat.ts`, `packages/core/src/utils/geo.ts` (new), `overpass.ts` (new), `packages/core/src/engine/StoryContext.ts`, `packages/core/src/types/index.ts`, `packages/builder/src/components/visual/GpsPointCurator.tsx` (new), `packages/builder/src/components/SchemaFormGenerator.tsx`, `packages/builder/src/components/graph/BeatPalette.tsx`, `beat-definitions/core-beats.json`
+
+### Field verification + the false-PASS fix
+
+- Built two importable verification fixtures (`public/examples/`): a Mock-Sensors story (Trafalgar Square, all modes + trigger/display geofences) and a **location-agnostic field kit** (zero authored coordinates — capture + walkable scatter around wherever the player stands), with single-file-HTML → HTTPS-host → phone deployment documented (incl. what does NOT work on iOS: local `file://` and plain LAN http).
+- The field round passed macOS + Android outright; **iOS first produced false "PASS" screens with no permission prompt** — two findings: (1) iOS shows no prompt when location is pre-denied for Safari/the site (remedy documented on the kit's fail screen); (2) a real bug — every "couldn't run the geofence" exit in GpsLocationBeat/IndoorLocationBeat returned `getNextBeat()` = the FIRST connection, typically the ARRIVAL target on trigger beats, so a denial/empty point store masqueraded as a successful arrival. **Skip exits now prefer `defaultTarget`** (the "didn't arrive" path). After the fix + unblocking location, iOS passed the full loop. Fixture-validity tests keep both kits honest in CI.
+
+**Files modified:**
+- `packages/core/src/beats/GpsLocationBeat.ts`, `IndoorLocationBeat.ts`, `packages/builder/public/examples/gps-*.{asaps.zip,json}` (new), `packages/builder/src/utils/__tests__/gpsVerificationFixture.test.ts` (new)
+
+### Multi-language Video beat
+
+- **Different video per language**: VideoBeat gains `videoTranslations` (`{lang: {videoAssetId}}`), applied at the data layer during export's per-language pass and preview language switching — languages without an override keep the base video; export asset-collection and import ID-remapping ship the localized videos. VE gains a "Language versions" row per configured target language.
+- **Auto-translated captions**: author writes cue rows (start/end seconds + text) once in the VE's new captions editor; cue text rides the existing translation pipeline (`captions.N.displayText`, like choice labels), so **subtitles come free in every language**. The runtime builds a WebVTT blob from the language-resolved cues and mounts it as a `<track>` on the video — same path in preview, exported player, and HTML export.
+
+**Files modified:**
+- `packages/core/src/beats/VideoBeat.ts`, `packages/core/src/types/index.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/renderer/src/components/SlotFlowView.tsx`, `packages/builder/src/export/StoryTranslator.ts`, `HtmlExporter.ts`, `packages/builder/src/contexts/TranslationContext.tsx`, `packages/builder/src/utils/projectZipManager.ts`, `packages/builder/src/components/visual/VisualPropertiesPanel.tsx`, `VisualWorkspace.tsx`, `beat-definitions/core-beats.json`
+
+### Verification
+
+~90 new tests across the GPS beat modes, geo scatter math (deterministic RNG), the Overpass sampler (mocked network, failure-empty fallback), skip-exit regressions, fixture validity, video caption resolution/extraction, and per-language video apply. Core 2570 + builder 2344 + renderer 492 green. GPS verified live in the field (iOS + Android + macOS); video captions/language UI verified live in the VE.
+
+---
+
 ## 2026-07-21: AI Conversation first-class fixed mode + stance-aware Co-Designer (v0.9.82)
 
 ### Overview
