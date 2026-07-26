@@ -128,3 +128,48 @@ describe('GPS field-test fixture (location-agnostic)', () => {
     }
   });
 });
+
+describe('QR Scan fixture', () => {
+  const QR_ZIP = join(__dirname, '../../../public/examples/qr-scan-verification.asaps.zip');
+  let qrBeats: any[];
+  beforeAll(async () => {
+    qrBeats = await loadBeats(QR_ZIP);
+  });
+
+  it('is a connected graph including condition true/false targets', () => {
+    const ids = new Set(qrBeats.map(b => b.id));
+    for (const b of qrBeats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+      if (b.type === 'conditionBeat') {
+        expect(ids.has(b.parameters.trueTarget), `${b.id} trueTarget dangles`).toBe(true);
+        expect(ids.has(b.parameters.falseTarget), `${b.id} falseTarget dangles`).toBe(true);
+      }
+    }
+  });
+
+  it('the printed CODE A payload (asaps://beat/A_pass) targets a real beat + is drawn as a jump edge', () => {
+    const ids = new Set(qrBeats.map(b => b.id));
+    expect(ids.has('A_pass')).toBe(true); // must match the QR sheet payload
+    const aScan = qrBeats.find(b => b.id === 'A_scan');
+    expect(aScan.parameters.qrJumpTargets).toContain('A_pass');
+  });
+
+  it('covers the protocol axes: asaps-interpretation on, raw+pattern station, variable + inventory checks', () => {
+    const scanners = qrBeats.filter(b => b.type === 'qrScan');
+    expect(scanners.length).toBe(4);
+    const d = qrBeats.find(b => b.id === 'D_scan');
+    expect(d.parameters.interpretAsapsUri).toBe(false);
+    expect(d.parameters.matchPatterns).toEqual(['^WORLD\\d+$']);
+    const condTypes = qrBeats.filter(b => b.type === 'conditionBeat').map(b => b.parameters.condition.type);
+    expect(condTypes).toEqual(expect.arrayContaining(['variable', 'inventory']));
+  });
+
+  it('the QR sheet exists and carries exactly the four payloads the story expects', () => {
+    const html = readFileSync(join(__dirname, '../../../public/examples/qr-scan-verification-codes.html'), 'utf-8');
+    for (const payload of ['asaps://beat/A_pass', 'asaps://variable/scanned/red', 'asaps://inventory/add/badge', 'WORLD42']) {
+      expect(html).toContain(payload);
+    }
+  });
+});

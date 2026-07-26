@@ -79,6 +79,22 @@ location. Local `file://` or plain `http://<lan-ip>` will NOT work on iOS
 (no JS in QuickLook; geolocation needs a secure context). Details in
 `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Outdoor walking test*.
 
+### QR Scan — Verification
+**Files:** `qr-scan-verification.asaps.zip` + `qr-scan-verification-codes.html`
+
+Manual verification kit for the **QR Scan** beat (EXP). Import the zip
+(**Import → Project (ZIP)**), open the codes HTML in any browser and **print
+it** (or show it on a second screen), then run the story in Preview or an
+HTML export on a phone and scan the code each station asks for:
+
+- **A** — `asaps://beat/…` direct beat jump (also the rejection probe at station D)
+- **B** — `asaps://variable/scanned/red`, verified by a Condition beat
+- **C** — `asaps://inventory/add/badge`, verified by a Condition beat
+- **D** — plain payload `WORLD42` with a `^WORLD\d+$` accept pattern (code A must be rejected here)
+
+Cancel at any station routes to that station's fail screen. Pass/fail criteria:
+`docs/TESTING_EXPERIMENTAL_BEATS.md` → *QR Scan*.
+
 ## Creating Your Own Examples
 
 To add new example stories to this directory:
