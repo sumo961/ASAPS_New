@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>ASAPS AR Scene Verification — Marker</title>
+<style>
+  body{font-family:system-ui;margin:28px;color:#111;text-align:center}
+  h1{font-size:20px} .hint{color:#555;font-size:13px;max-width:680px;margin:8px auto}
+  canvas{width:min(90vw,480px);height:auto;border:1px solid #ddd;image-rendering:pixelated}
+  button{font-size:15px;padding:10px 22px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer;margin:12px 6px}
+  #status{font-size:13px;color:#444;min-height:20px}
+  @media print { button,#status,.no-print{display:none} canvas{width:15cm;border:none} }
+</style></head><body>
+<h1>ASAPS AR Scene — Tracking Marker</h1>
+<p class="hint no-print">This marker pairs with the <strong>AR Scene — Verification</strong> story (its bundled
+<code>.mind</code> file was compiled from THIS exact image). <strong>Print this page</strong> (A5 or larger,
+matte paper, tape it flat) or show it full-screen on a second display. The marker is generated
+deterministically — reloading always produces the identical image.</p>
+<canvas id="m" width="1000" height="1000"></canvas>
+<div class="no-print">
+  <div id="status"></div>
+  <button id="dl">Download marker.png</button>
+  <button id="compile">Compile .mind (MindAR 1.2.5)</button>
+</div>
+<script>
+// Deterministic seeded RNG — reload-stable marker.
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rng = mulberry32(20260727);
+const cv = document.getElementById('m'), ctx = cv.getContext('2d');
+// White ground + thick asymmetric frame (strong outer corners).
+ctx.fillStyle='#fff'; ctx.fillRect(0,0,1000,1000);
+ctx.fillStyle='#000';
+ctx.fillRect(0,0,1000,26); ctx.fillRect(0,974,1000,26); ctx.fillRect(0,0,26,1000); ctx.fillRect(974,0,26,1000);
+ctx.fillRect(0,0,140,140); // one solid corner breaks rotational symmetry
+// Dense, multi-scale, high-contrast features.
+for(let i=0;i<170;i++){
+  const x=60+rng()*880, y=60+rng()*880, s=8+rng()*95, kind=rng();
+  const grey=rng()<0.18; ctx.fillStyle = grey ? '#7a7a7a' : (rng()<0.5?'#000':'#fff');
+  if(ctx.fillStyle==='#fff'){ ctx.strokeStyle='#000'; ctx.lineWidth=3+rng()*4; }
+  if(kind<0.4){ ctx.fillRect(x,y,s,s*(0.4+rng())); if(ctx.fillStyle==='#fff') ctx.strokeRect(x,y,s,s*(0.4+rng())); }
+  else if(kind<0.7){ ctx.beginPath(); ctx.arc(x,y,s/2,0,7); ctx.fill(); if(ctx.fillStyle==='#fff') ctx.stroke(); }
+  else { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+s,y+s*0.3*(rng()>0.5?1:-1)); ctx.lineTo(x+s*0.3,y+s); ctx.closePath(); ctx.fill(); if(ctx.fillStyle==='#fff') ctx.stroke(); }
+}
+// Big anchor glyphs (also human orientation cues).
+ctx.fillStyle='#000'; ctx.font='bold 130px system-ui'; ctx.fillText('◀',180,560); ctx.fillText('▶',680,560);
+ctx.font='bold 54px system-ui'; ctx.fillText('ASAPS AR',360,930);
+
+const status = (t)=>{ document.getElementById('status').textContent = t; };
+document.getElementById('dl').onclick = () => cv.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='ar-marker.png'; a.click(); });
+document.getElementById('compile').onclick = async () => {
+  try {
+    status('Loading MindAR compiler…');
+    // mind-ar 1.2.x ships as an ES module — no window.MINDAR global.
+    const mod = await import('https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js');
+    const Compiler = mod.Compiler;
+    const img = new Image();
+    await new Promise(res=>{ img.onload=res; img.src=cv.toDataURL('image/png'); });
+    status('Compiling (30–60 s)…');
+    const compiler = new Compiler();
+    await compiler.compileImageTargets([img], p => status('Compiling… ' + p.toFixed(0) + '%'));
+    const buf = await compiler.exportData();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([buf],{type:'application/octet-stream'}));
+    a.download='ar-marker.mind'; a.click();
+    status('Done — ar-marker.mind downloaded.');
+    window.__mindDone = true;
+  } catch(e){ status('Compile failed: ' + e.message); window.__mindError = String(e); }
+};
+</script></body></html>

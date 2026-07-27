@@ -111,6 +111,28 @@ nothing is hardcoded. Four stations:
 
 Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Web View*.
 
+### AR Scene — Verification
+**Files:** `ar-scene-verification.asaps.zip` + `ar-scene-marker.html` (+ `ar-marker.png` / `ar-marker.mind`)
+
+Manual verification kit for the **AR Scene** beat (EXP) — with the compiled
+MindAR tracker **already bundled in the zip**, so no external compile step.
+
+1. Import the zip (**Import → Project (ZIP)** — the `.mind` asset rides along).
+2. Open `ar-scene-marker.html` in a browser and **print it** (A5 or larger,
+   matte, taped flat) or show it on a second screen. The marker is generated
+   deterministically, and the bundled tracker was compiled from that exact
+   image (MindAR 1.2.5, matching the renderer's pinned version).
+3. Run the story (Preview with a webcam, or an HTTPS-hosted HTML export on a
+   phone), allow camera:
+   - **A** — both anchor cards appear pinned to the marker (tilt away → they
+     vanish); tapping the LEFT card jumps the story (bare-beat-id `onTap`)
+   - **B** — tapping the RIGHT card fires `asaps://variable/picked/right`,
+     verified by a Condition beat
+   - **C (optional)** — reload offline: the "simple overlay" fallback's flat
+     cards must still route
+
+Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *AR Scene*.
+
 ## Creating Your Own Examples
 
 To add new example stories to this directory:

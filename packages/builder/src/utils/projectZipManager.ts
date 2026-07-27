@@ -900,6 +900,17 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
             if (id && assetIdMap.has(id)) vt[k].videoAssetId = assetIdMap.get(id);
           }
         }
+        // AR beat: the compiled .mind marker + optional per-anchor billboard images
+        if (beat.parameters.markerAssetId && assetIdMap.has(beat.parameters.markerAssetId)) {
+          beat.parameters.markerAssetId = assetIdMap.get(beat.parameters.markerAssetId);
+        }
+        if (Array.isArray(beat.parameters.anchors)) {
+          for (const anchor of beat.parameters.anchors) {
+            if (anchor?.assetId && assetIdMap.has(anchor.assetId)) {
+              anchor.assetId = assetIdMap.get(anchor.assetId);
+            }
+          }
+        }
       }
     }
   }
@@ -1054,6 +1065,11 @@ function extractAssetIdsFromStory(story: any): string[] {
         const vt = beat.parameters.videoTranslations;
         if (vt && typeof vt === 'object') {
           for (const k of Object.keys(vt)) addIfUuid(vt[k]?.videoAssetId);
+        }
+        // AR beat: the compiled .mind marker + per-anchor billboard images
+        addIfUuid(beat.parameters.markerAssetId);
+        if (Array.isArray(beat.parameters.anchors)) {
+          for (const anchor of beat.parameters.anchors) addIfUuid(anchor?.assetId);
         }
       }
     }

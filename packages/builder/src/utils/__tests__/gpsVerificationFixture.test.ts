@@ -230,3 +230,67 @@ describe('Web View fixture', () => {
     readFileSync(join(dir, 'index.html'));
   });
 });
+
+describe('AR Scene fixture', () => {
+  const AR_ZIP = join(__dirname, '../../../public/examples/ar-scene-verification.asaps.zip');
+  let arBeats: any[];
+  let arZip: JSZip;
+  beforeAll(async () => {
+    arZip = await JSZip.loadAsync(readFileSync(AR_ZIP));
+    const data = JSON.parse(await arZip.file('project.json')!.async('string'));
+    arBeats = data.project.story.beats;
+  });
+
+  it('is a connected graph, closes the replay loop, and condition targets resolve', () => {
+    const ids = new Set(arBeats.map(b => b.id));
+    for (const b of arBeats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+      if (b.type === 'conditionBeat') {
+        expect(ids.has(b.parameters.trueTarget)).toBe(true);
+        expect(ids.has(b.parameters.falseTarget)).toBe(true);
+      }
+    }
+    const end = arBeats.find(b => b.type === 'endScreen');
+    expect(end.connections.some((c: any) => c.targetId === 't')).toBe(true);
+  });
+
+  it('the bundled .mind asset exists and every arBeat references it', async () => {
+    const arStations = arBeats.filter(b => b.type === 'arBeat');
+    expect(arStations.length).toBe(2);
+    const markerId = arStations[0].parameters.markerAssetId;
+    expect(markerId).toBeTruthy();
+    // asset payload + metadata must ride in the zip under other/
+    const assetFile = arZip.file(`other/${markerId}_ar-marker.mind`);
+    expect(assetFile, 'compiled .mind missing from zip').toBeTruthy();
+    const mindBytes = await assetFile!.async('uint8array');
+    expect(mindBytes.length).toBeGreaterThan(100_000); // real compiled tracker, not a stub
+    const meta = JSON.parse(await arZip.file(`other/${markerId}.json`)!.async('string'));
+    expect(meta.id).toBe(markerId);
+    expect(meta.type).toBe('other');
+    for (const b of arStations) expect(b.parameters.markerAssetId).toBe(markerId);
+  });
+
+  it('covers the protocol axes: bare-beat-id tap route + asaps://variable anchor + condition check', () => {
+    const ids = new Set(arBeats.map(b => b.id));
+    const a = arBeats.find(b => b.id === 'A_ar');
+    const left = a.parameters.anchors.find((x: any) => x.id === 'left');
+    const right = a.parameters.anchors.find((x: any) => x.id === 'right');
+    expect(ids.has(left.onTap)).toBe(true); // bare beat id resolves
+    expect(right.onTap).toBe('asaps://variable/picked/right');
+    const check = arBeats.find(b => b.id === 'B_check');
+    expect(check.parameters.condition).toMatchObject({ type: 'variable', variableName: 'picked', value: 'right' });
+    // fallbacks route honestly (never to a PASS screen)
+    expect(a.parameters.fallbackTarget).toBe('A_fail');
+    expect(arBeats.find(b => b.id === 'B_ar').parameters.fallbackTarget).toBe('B_check');
+  });
+
+  it('the marker sheet exists and generates deterministically (seeded)', () => {
+    const html = readFileSync(join(__dirname, '../../../public/examples/ar-scene-marker.html'), 'utf-8');
+    expect(html).toContain('mulberry32(20260727)'); // fixed seed — print & .mind stay in sync
+    expect(html).toContain('mind-ar@1.2.5');        // must match the renderer's pinned version
+    readFileSync(join(__dirname, '../../../public/examples/ar-marker.png'));
+    readFileSync(join(__dirname, '../../../public/examples/ar-marker.mind'));
+  });
+});
