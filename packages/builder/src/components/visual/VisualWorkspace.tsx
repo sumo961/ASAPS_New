@@ -1841,6 +1841,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               buttonText: slotPreviewParams.buttonText ?? 'Continue',
               speaker: slotPreviewSpeaker,
             }
+          : beat.type === 'webView' || beat.type === 'qrScan' || beat.type === 'arBeat'
+          ? {
+              // Embedded-surface beats: body slot reads `prompt` (the old
+              // generic fallback emitted `text`, leaving the prompt slot
+              // empty + the sample chip up). The surface slot renders an
+              // editor placeholder; url feeds the webview placeholder line.
+              prompt: slotPreviewParams.prompt ?? '',
+              url: slotPreviewParams.url,
+              doneButtonText: slotPreviewParams.doneButtonText,
+              cancelButtonText: slotPreviewParams.cancelButtonText,
+              helperText: slotPreviewParams.helperText,
+              speaker: slotPreviewSpeaker,
+            }
           : {
               // onlineContent / aiInfoText / infoText / durScreen —
               // runtime fetches/generates the body for AI beats; preview
@@ -1862,7 +1875,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // not text/summary, and never use the sample-body fallback — skip them.
   const slotPreviewUsesSample =
     isSlotPreview && !!beat && !!slotPreviewParams &&
-    beat.type !== 'endScreen' && beat.type !== 'titleScreen' && beat.type !== 'inputText'
+    beat.type !== 'endScreen' && beat.type !== 'titleScreen' && beat.type !== 'inputText' &&
+    // Embedded-surface beats preview their real (possibly empty) prompt —
+    // never the sample-body filler, so no misleading chip.
+    beat.type !== 'webView' && beat.type !== 'qrScan' && beat.type !== 'arBeat'
       ? !(
           (beat.type === 'aiSummary'
             ? (slotPreviewParams.summary ?? slotPreviewParams.fallbackText)

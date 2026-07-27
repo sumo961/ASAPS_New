@@ -666,7 +666,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     ? dynamicChoices!.length
     : isContinueAction
       ? 1
-      : (showCredits ? 1 : 0) + (showRestart ? 1 : 0);
+      : (actionButtons.includes('creditsButton') && showCredits ? 1 : 0)
+        + (actionButtons.includes('restartButton') && showRestart ? 1 : 0);
   const isMultiAction = visibleActionCount > 1 || forceMultiActionGate;
 
   // Sticky once true — earned by either the content fitting on its
@@ -1838,8 +1839,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           : isContinueAction
             ? [{ id: 'continueButton', text: continueText, onClick: handleContinue, show: true }]
             : [
-                { id: 'creditsButton', text: creditsText, onClick: handleCredits, show: showCredits },
-                { id: 'restartButton', text: restartText, onClick: handleRestart, show: showRestart },
+                // Only render the endScreen-style buttons when the schema
+                // actually declares them. Beats with embedded-surface slots
+                // (webView/qrScan/arBeat: buttons like doneButton /
+                // cancelButton) own their exit buttons INSIDE the surface
+                // element — the old unconditional fallback rendered a
+                // phantom "Play Again" for them.
+                ...(actionButtons.includes('creditsButton')
+                  ? [{ id: 'creditsButton', text: creditsText, onClick: handleCredits, show: showCredits }]
+                  : []),
+                ...(actionButtons.includes('restartButton')
+                  ? [{ id: 'restartButton', text: restartText, onClick: handleRestart, show: showRestart }]
+                  : []),
               ];
         const buttonAnchors = (actionSlot
           ? slotIntentFor(slotIntent, actionSlot.name)?.buttonAnchors

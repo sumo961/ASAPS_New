@@ -279,7 +279,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
     label: string;
     preview: string;
     tooltip: string;
-    role: 'title' | 'body' | 'action' | 'speaker' | 'input' | 'hotspot';
+    role: 'title' | 'body' | 'action' | 'speaker' | 'input' | 'hotspot' | 'webview' | 'camera' | 'ar';
     slotName: string;
     // For action rows: which button this row represents.
     buttonId?: string;
@@ -351,11 +351,36 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
         const label = titleCase(s.name);
         const preview = ellipsize(p[s.source ?? s.name]) || '(empty)';
         rows.push({ key: `slot:${s.name}`, icon: <MessageSquare className="w-4 h-4 text-blue-600" />, label, preview, tooltip: `Slot "${s.name}" — edit in the right inspector under ${label}.`, role: 'body', slotName: s.name });
+      } else if (s.role === 'webview' || s.role === 'camera' || s.role === 'ar') {
+        // Embedded-surface slots (Web View page frame / QR camera / AR
+        // scene). The surface fills the stage below the prompt and owns its
+        // exit button inside the element at runtime. Listed so the author
+        // sees it as on-stage content — it was invisible in this panel
+        // before (found during the Web View verification round).
+        const label = s.role === 'webview' ? 'Web page frame' : s.role === 'camera' ? 'Camera view' : 'AR scene';
+        const preview = s.role === 'webview'
+          ? (ellipsize(p.url) || '(no URL set)')
+          : 'Live at runtime — placeholder in the editor';
+        rows.push({
+          key: `slot:${s.name}`,
+          icon: <ImageIcon className="w-4 h-4 text-blue-600" />,
+          label,
+          preview,
+          tooltip: s.role === 'webview'
+            ? `Slot "${s.name}" — fills the stage below the prompt; edit the URL in the right inspector.`
+            : `Slot "${s.name}" — fills the stage below the prompt; shows the live surface at runtime.`,
+          role: s.role,
+          slotName: s.name,
+        });
       } else if (s.role === 'action') {
         for (const bid of (s as any).buttons ?? []) {
           // Skip restart/credits if the author chose to hide them on endScreen.
           if (bid === 'restartButton' && p.showRestart === false) continue;
           if (bid === 'creditsButton' && p.showCredits !== true) continue;
+          // Embedded-surface beats own their Done/Skip INSIDE the surface
+          // element — the action row renders nothing for them (matching
+          // SlotFlowView), so don't list phantom buttons here either.
+          if (bid === 'doneButton' || bid === 'cancelButton') continue;
           rows.push({
             key: `slot:${s.name}:${bid}`,
             icon: <Square className="w-4 h-4 text-blue-600" />,
