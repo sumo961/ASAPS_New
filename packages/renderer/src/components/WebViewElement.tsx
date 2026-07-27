@@ -28,6 +28,13 @@ export interface WebViewElementProps {
   /** Pre-resolved hash fragment (URL-encoded key=value pairs). */
   contextHash?: string;
   doneButtonText?: string;
+  /**
+   * Fill the parent's height instead of forcing a 16:10 aspect frame.
+   * The slot-flow path sets this so the frame takes the REMAINING stage
+   * height after the prompt — the fixed aspect used to overflow the stage
+   * and visually clip the prompt above it.
+   */
+  fill?: boolean;
   onExit: (value: string) => void;
   theme?: {
     buttonBg?: string;
@@ -58,6 +65,7 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
   exitUrlPattern,
   contextHash,
   doneButtonText = 'Done',
+  fill = false,
   onExit,
   theme,
 }) => {
@@ -89,12 +97,12 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
     onExit(value);
   };
 
-  // postMessage listener — works in both iframe and Electron webview
-  // modes. The host listens on the window; the embedded page calls
-  // window.parent.postMessage(...) (iframe) or sends via the
-  // ipc-message channel (Electron). For simplicity here we only handle
-  // the standard postMessage shape; Electron-only signaling can be
-  // layered later if needed.
+  // postMessage listener — the browser-iframe exit path. The embedded page
+  // calls parent.postMessage({asaps:'result', value}) and the host window
+  // receives it. NOTE: this can NEVER fire in Electron <webview> mode — the
+  // guest is its own top-level document, so window.parent === window and the
+  // message stays inside the guest. The webview path instead relies on the
+  // guest preload bridge relaying the same protocol via sendToHost (below).
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const data = event.data;
@@ -107,6 +115,28 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
     return () => window.removeEventListener('message', onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Electron webview postMessage relay — the guest preload bridge
+  // (webview-bridge.js, injected via the preload attribute) catches the
+  // page's parent.postMessage({asaps:'result'}) inside the guest and
+  // forwards it with ipcRenderer.sendToHost('asaps-result', value), which
+  // surfaces here as an 'ipc-message' event. Found during the Web View
+  // verification round: without this, station-B-style exits silently did
+  // nothing in the desktop app.
+  useEffect(() => {
+    if (!usingElectron) return;
+    const wv = containerRef.current?.querySelector('webview') as any;
+    if (!wv) return;
+    const handler = (e: any) => {
+      if (e?.channel === 'asaps-result') {
+        const raw = Array.isArray(e.args) ? e.args[0] : undefined;
+        exitOnce(typeof raw === 'string' ? raw : JSON.stringify(raw));
+      }
+    };
+    wv.addEventListener('ipc-message', handler);
+    return () => wv.removeEventListener('ipc-message', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usingElectron]);
 
   // Electron webview navigation observer — fires onExit when the URL
   // matches exitUrlPattern. The <webview> tag dispatches
@@ -128,6 +158,13 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usingElectron, exitRegex]);
 
+  // Guest preload bridge (Electron only): exposed by the desktop app's main
+  // preload as an absolute file:// URL. Absent in browsers / older builds —
+  // the webview still works, only the postMessage exit falls back to Done.
+  const webviewPreload = usingElectron
+    ? (window as any).electronAPI?.webviewPreloadUrl as string | undefined
+    : undefined;
+
   return (
     <div
       ref={containerRef}
@@ -136,13 +173,17 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         width: '100%',
+        ...(fill ? { height: '100%', minHeight: 0 } : null),
       }}
     >
       <div
         style={{
           position: 'relative',
           width: 'min(95%, 1200px)',
-          aspectRatio: '16 / 10',
+          // fill: take the remaining column height (prompt keeps its own
+          // space above); default: legacy fixed aspect for author-positioned
+          // rect layouts.
+          ...(fill ? { flex: '1 1 0', minHeight: 0 } : { aspectRatio: '16 / 10' }),
           borderRadius: 12,
           overflow: 'hidden',
           background: '#fff',
@@ -159,6 +200,7 @@ export const WebViewElement: React.FC<WebViewElementProps> = ({
             src: finalUrl,
             style: { width: '100%', height: '100%', border: 'none' },
             allowpopups: 'true',
+            ...(webviewPreload ? { preload: webviewPreload } : {}),
           })
         ) : (
           <iframe

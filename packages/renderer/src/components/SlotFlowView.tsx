@@ -1690,6 +1690,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
+              // Grow to the REMAINING stage height (after speaker/prompt).
+              // The old fixed 16:10 frame could exceed the stage and clip
+              // the prompt above it — found during the Web View round.
+              flex: '1 1 0',
+              minHeight: 0,
               padding: 'clamp(8px, 2vh, 16px) 16px',
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
@@ -1699,7 +1704,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               <div
                 style={{
                   width: 'min(95%, 1200px)',
-                  aspectRatio: '16 / 10',
+                  height: '100%',
+                  minHeight: 120,
                   borderRadius: 12,
                   border: '2px dashed rgba(255,255,255,0.35)',
                   background: 'rgba(0,0,0,0.4)',
@@ -1724,6 +1730,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 exitUrlPattern={typeof content.exitUrlPattern === 'string' ? content.exitUrlPattern : undefined}
                 contextHash={typeof content.contextHash === 'string' ? content.contextHash : undefined}
                 doneButtonText={typeof content.doneButtonText === 'string' ? content.doneButtonText : 'Done'}
+                fill
                 onExit={(value) => dispatchAction(value)}
                 theme={{
                   buttonBg: theme.button?.backgroundColor,

@@ -36,6 +36,20 @@ export default defineConfig({
           },
         },
       },
+      {
+        // WebView-guest bridge: injected into <webview> guests via the
+        // preload attribute so pages' parent.postMessage({asaps:'result'})
+        // exit protocol works in the desktop app too (sendToHost relay).
+        entry: 'src/preload/webview-bridge.ts',
+        vite: {
+          build: {
+            outDir: 'dist-electron/preload',
+            rollupOptions: {
+              external: ['electron'],
+            },
+          },
+        },
+      },
     ]),
   ],
 

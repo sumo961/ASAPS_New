@@ -1,8 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { join } from 'path';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Absolute file:// URL of the <webview> guest preload (webview-bridge.js,
+  // built alongside this preload). WebViewElement sets it as the webview's
+  // preload attribute so embedded pages' postMessage exit protocol reaches
+  // the host (sendToHost relay) — without it, station-B-style exits only
+  // work in browser iframes.
+  webviewPreloadUrl: `file://${join(__dirname, 'webview-bridge.js')}`,
   // Filesystem operations
   fs: {
     readFile: (path: string) => ipcRenderer.invoke('fs:read-file', path),
