@@ -331,6 +331,11 @@ function createWindow(intent?: Record<string, string>): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      // WebView beat: the renderer embeds third-party pages via Electron's
+      // <webview> tag (bypasses X-Frame-Options, exposes did-navigate for
+      // exitUrlPattern). Off by default since Electron 5 — without this the
+      // beat silently fell back to a browser iframe in the desktop app.
+      webviewTag: true,
     },
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 16 },
@@ -1061,6 +1066,8 @@ function createPreviewWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      // WebView beat plays here — see mainWindow's webviewTag note.
+      webviewTag: true,
     },
     title: 'ASAPS Preview',
     show: false,

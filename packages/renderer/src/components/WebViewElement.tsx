@@ -37,9 +37,16 @@ export interface WebViewElementProps {
 }
 
 function isElectron(): boolean {
-  // window.process.versions.electron only exists in the Electron
-  // renderer process. The check guards against undefined paths so it
-  // doesn't throw in the browser.
+  // Two probes, because the environment differs by security config:
+  //  1. userAgent contains "Electron" in every Electron renderer,
+  //     INCLUDING sandboxed/contextIsolation:true windows — this is the
+  //     one that actually fires in the desktop app (found during the
+  //     Web View verification round: the old process.versions check
+  //     never matched under contextIsolation, so the <webview> path was
+  //     dead code and Electron behaved exactly like a browser iframe).
+  //  2. window.process.versions.electron as a fallback for legacy
+  //     nodeIntegration setups.
+  if (typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent)) return true;
   const proc = (typeof window !== 'undefined' && (window as any).process) as
     | { versions?: { electron?: string } }
     | undefined;
