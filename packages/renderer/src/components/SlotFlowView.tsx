@@ -1239,14 +1239,17 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           // height so the action row follows right below it (not pinned
           // to the stage bottom with a void in between). Long content
           // still scrolls internally via the maxHeight cap.
-          flex: (belowBody || (hasDynamicChoices && !isConversation)) ? '0 1 auto' : 1,
+          // With an embedded-surface slot (webView) the body also hugs its
+          // natural height — the SURFACE is the star and takes the rest
+          // (the old 1:1 grow split gave the frame only half the stage).
+          flex: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot) ? '0 1 auto' : 1,
           // Conversation: cap the body scroller so the NPC card hugs the
           // left half of the stage (with the action panel on the right).
           // Without a cap, flex:1 lets the scroller fill all leftover
           // width, dragging the card mid-stage and leaving an oversized
           // left margin next to a too-tight right margin.
           maxWidth: isConversation ? 'clamp(280px, 50%, 560px)' : undefined,
-          maxHeight: (belowBody || (hasDynamicChoices && !isConversation)) ? '100%' : undefined,
+          maxHeight: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot) ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
@@ -1684,6 +1687,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const editorClick = editorMode && onSlotSelect
           ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(webViewSlot.name, undefined); }
           : undefined;
+        // Author-sized frame: slotIntent[webview].heightPercent (percent of
+        // the stage) pins the frame height; unset = grow into the remaining
+        // space after speaker/prompt.
+        const wvIntent = slotIntentFor(slotIntent, webViewSlot.name) as { heightPercent?: number } | undefined;
+        const wvHeightPercent = typeof wvIntent?.heightPercent === 'number' ? wvIntent.heightPercent : undefined;
         return (
           <div
             data-slotflow-slot={webViewSlot.name}
@@ -1694,7 +1702,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               // Grow to the REMAINING stage height (after speaker/prompt).
               // The old fixed 16:10 frame could exceed the stage and clip
               // the prompt above it — found during the Web View round.
-              flex: '1 1 0',
+              flex: wvHeightPercent != null ? `0 0 ${wvHeightPercent}%` : '1 1 0',
               minHeight: 0,
               padding: 'clamp(8px, 2vh, 16px) 16px',
               ...(editorMode ? { cursor: 'pointer' } : null),

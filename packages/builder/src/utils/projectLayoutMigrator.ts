@@ -60,6 +60,9 @@ const VISIBLE_BEAT_TYPES = new Set([
   // mode (SchemaLocationInitializer short-circuits), so chat-mode beats are
   // left untouched while dialog-mode beats get their text/input positions.
   'aiConversation',
+  // Web View: fixed-mode support (prompt + webview frame rect baked via
+  // LOCATION_TYPE_MAP.webview; PositionedBeatView renders kind:'webview').
+  'webView',
 ]);
 
 function beatDef(beatType: string): any {

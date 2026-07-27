@@ -2785,13 +2785,40 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       // the slot-mode full-bleed default — useful when an author wants
       // the page in a specific frame alongside other positioned text.
       // onExit routes through onAction the same way as the slot path.
+      // Non-interactive (the Visual Editor passes interactive={false}):
+      // render a placeholder instead of the live element so the URL is
+      // never loaded while authoring — matching the slot-mode editor
+      // placeholder.
+      if (!interactive) {
+        return (
+          <div
+            style={{
+              ...baseStyle,
+              pointerEvents: 'none',
+              borderRadius: 12,
+              border: '2px dashed rgba(255,255,255,0.35)',
+              background: 'rgba(0,0,0,0.4)',
+              color: 'rgba(255,255,255,0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              fontSize: 14,
+              padding: 12,
+            }}
+          >
+            🌐 Web view (runtime) {(element as any).webViewUrl || ''}
+          </div>
+        );
+      }
       return (
-        <div style={{ ...baseStyle, pointerEvents: interactive ? 'auto' : 'none' }}>
+        <div style={{ ...baseStyle, pointerEvents: 'auto' }}>
           <WebViewElement
             url={(element as any).webViewUrl || ''}
             exitUrlPattern={(element as any).webViewExitUrlPattern}
             contextHash={(element as any).webViewContextHash}
             doneButtonText={(element as any).webViewDoneButtonText || 'Done'}
+            fill
             onExit={(value) => onAction?.(value)}
           />
         </div>

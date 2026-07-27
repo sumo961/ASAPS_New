@@ -75,6 +75,20 @@ describe('initializeLocationsFromSchema', () => {
     expect(dflt).toEqual([]);
   });
 
+  it('webView: bakes a prompt band + a webview frame element for fixed layouts', () => {
+    const els = initializeLocationsFromSchema(
+      beat('webView'), { prompt: 'Look at this page', url: 'https://example.com' }, { width: 1024, height: 768 });
+    const prompt = byLoc(els, 'prompt');
+    const frame = byLoc(els, 'webview');
+    expect(prompt).toBeDefined();
+    expect(prompt!.text).toBe('Look at this page');
+    expect(frame).toBeDefined();
+    expect((frame as any).type).toBe('webview');
+    // a usable default frame size, not a text sliver
+    expect(frame!.width).toBeGreaterThanOrEqual(600);
+    expect(frame!.height).toBeGreaterThanOrEqual(300);
+  });
+
   it('skips restartButton when showRestart is false and creditsButton unless showCredits is true', () => {
     const hidden = initializeLocationsFromSchema(beat('endScreen'), { showRestart: false, showCredits: false });
     expect(byLoc(hidden, 'restartButton')).toBeUndefined();

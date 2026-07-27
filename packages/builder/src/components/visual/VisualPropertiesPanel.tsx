@@ -1706,6 +1706,39 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             {(row.role === 'title' || row.role === 'body' || row.role === 'speaker' || row.role === 'input') && (
                               renderSlotTypeTransform(row.slotName)
                             )}
+                            {/* Web page frame: author-sized height. Auto =
+                                take the remaining stage after the prompt;
+                                a percent pins the frame's share of the
+                                stage (slotIntent.heightPercent). */}
+                            {row.role === 'webview' && (() => {
+                              const hp: number | undefined =
+                                typeof slotEntry.heightPercent === 'number' ? slotEntry.heightPercent : undefined;
+                              return (
+                                <div className="flex items-center gap-2 text-xs text-gray-700">
+                                  <span className="opacity-70 w-14 flex-shrink-0">Height</span>
+                                  <input
+                                    type="range"
+                                    min={20}
+                                    max={95}
+                                    step={5}
+                                    value={hp ?? 95}
+                                    onChange={(e) => writeSlotIntent(row.slotName, { heightPercent: parseInt(e.target.value) })}
+                                    className="flex-1"
+                                  />
+                                  <span className="w-12 text-right tabular-nums">{hp != null ? `${hp}%` : 'auto'}</span>
+                                  {hp != null && (
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded border border-gray-300 bg-white hover:bg-gray-50 opacity-70"
+                                      title="Clear (auto — fill the space below the prompt)"
+                                      onClick={() => writeSlotIntent(row.slotName, { heightPercent: null })}
+                                    >
+                                      auto
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {/* Action button rows: per-button Pin presets
                                 (row / four corners / bottom-center) + gap. */}
                             {row.role === 'action' && row.buttonId && (() => {

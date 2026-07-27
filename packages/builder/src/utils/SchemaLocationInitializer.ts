@@ -96,6 +96,11 @@ const LOCATION_TYPE_MAP: Record<string, Partial<LocationDefinition>> = {
   // Keypad
   'keypadGrid': { type: 'keypad' as any, defaultWidth: 240, defaultHeight: 360 },
   'display': { type: 'text', defaultWidth: 240, defaultHeight: 50 },
+
+  // Web View embedded page frame (fixed-layout mode). Rendered by
+  // PositionedBeatView's 'webview' case inside the authored rect; the VE
+  // shows a placeholder (no live URL load while authoring).
+  'webview': { type: 'webview' as any, defaultWidth: 900, defaultHeight: 480 },
 };
 
 /**
@@ -207,6 +212,11 @@ function getDefaultTextForLocation(
   if (beatType === 'inputText') {
     if (nameLower.includes('prompt')) return params.prompt || 'Please enter your response:';
     if (nameLower.includes('submit')) return params.buttonText || 'Continue';
+  }
+
+  if (beatType === 'webView') {
+    if (nameLower.includes('prompt')) return params.prompt || '';
+    if (nameLower.includes('webview')) return params.url || '[web page]';
   }
 
   // HyperText

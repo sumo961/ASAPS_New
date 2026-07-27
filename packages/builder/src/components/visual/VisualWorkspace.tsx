@@ -2126,7 +2126,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       // Skip credits-phase elements — they are persisted via phaseOverrides, not beat.locations
       if (el.id === 'credits_title' || el.id === 'credits_body' || el.id === 'credits_close') return;
 
-      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
+      let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad' | 'webview';
       if (el.type === 'character') kind = 'character';
       else if (el.type === 'prop') kind = 'prop';
       else if (el.type === 'dialog') kind = 'dialog';
@@ -2134,6 +2134,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       else if (el.type === 'hotspot') kind = 'hotspot';
       else if (el.type === 'meter') kind = 'meter';
       else if (el.type === 'keypad') kind = 'keypad';
+      else if ((el.type as any) === 'webview') kind = 'webview' as any;
       else kind = 'text';
 
       // Use consistent key for both Map key and location.name to avoid
@@ -2484,7 +2485,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           return;
         }
 
-        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad';
+        let kind: 'text' | 'hotspot' | 'prop' | 'character' | 'button' | 'dialog' | 'meter' | 'keypad' | 'webview';
         if (el.type === 'character') kind = 'character';
         else if (el.type === 'prop') kind = 'prop';
         else if (el.type === 'dialog') kind = 'dialog';
@@ -2492,6 +2493,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         else if (el.type === 'hotspot') kind = 'hotspot';
         else if (el.type === 'meter') kind = 'meter';
         else if (el.type === 'keypad') kind = 'keypad';
+        else if ((el.type as any) === 'webview') kind = 'webview';
         else kind = 'text';
 
         // Use consistent key for both Map key and location.name
