@@ -1,0 +1,13 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Static test page</title>
+<style>body{font-family:system-ui;margin:32px;text-align:center;color:#111}
+h1{color:#16a34a}#ctx{font-size:20px;background:#f3f4f6;border-radius:8px;padding:12px;display:inline-block;min-width:280px}</style></head><body>
+<h1>Hello from the embedded page ✓</h1>
+<p>If you can read this inside the story, the embed works.</p>
+<h2>passContext check</h2>
+<div id="ctx">reading hash…</div>
+<script>
+  const h = location.hash.replace(/^#/, '');
+  document.getElementById('ctx').textContent = h
+    ? decodeURIComponent(h)
+    : 'NO CONTEXT RECEIVED (hash is empty)';
+</script></body></html>

@@ -95,6 +95,22 @@ HTML export on a phone and scan the code each station asks for:
 Cancel at any station routes to that station's fail screen. Pass/fail criteria:
 `docs/TESTING_EXPERIMENTAL_BEATS.md` → *QR Scan*.
 
+### Web View — Verification
+**Files:** `web-view-verification.asaps.zip` + `web-view-test-pages/` (folder)
+
+Manual verification kit for the **Web View** beat (EXP). Deploy the
+`web-view-test-pages/` folder to any HTTPS host (drag it onto
+<https://app.netlify.com/drop>), import the zip, and enter the deployed base
+URL when the story asks — the page URLs are `${baseUrl}`-substituted, so
+nothing is hardcoded. Four stations:
+
+- **A** — embed + Done button, with `passContext` displayed by the page (playerName=Verifier)
+- **B** — postMessage exit (`{asaps:'result', value:…}`), condition-verified via `saveTo`
+- **C** — `exitUrlPattern` auto-advance — **desktop app only** (browser iframes can't report navigation; Done there is expected)
+- **D** — blocked-site probe (google.com): browser shows a blank/refused frame and must stay stable; the desktop app may load it
+
+Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Web View*.
+
 ## Creating Your Own Examples
 
 To add new example stories to this directory:

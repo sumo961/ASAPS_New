@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>postMessage test page</title>
+<style>body{font-family:system-ui;margin:32px;text-align:center;color:#111}
+button{font-size:20px;padding:14px 28px;border-radius:8px;border:0;background:#2563eb;color:#fff;cursor:pointer}</style></head><body>
+<h1>postMessage exit test</h1>
+<p>Click the button — the story should advance <em>immediately</em> (no Done needed) and record the value.</p>
+<button onclick="parent.postMessage({asaps:'result', value:'done-via-message'}, '*')">Finish via postMessage</button>
+</body></html>

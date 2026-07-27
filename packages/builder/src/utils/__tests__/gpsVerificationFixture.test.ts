@@ -173,3 +173,60 @@ describe('QR Scan fixture', () => {
     }
   });
 });
+
+describe('Web View fixture', () => {
+  const WV_ZIP = join(__dirname, '../../../public/examples/web-view-verification.asaps.zip');
+  let wvBeats: any[];
+  beforeAll(async () => {
+    wvBeats = await loadBeats(WV_ZIP);
+  });
+
+  it('is a connected graph and closes the replay loop back to the start', () => {
+    const ids = new Set(wvBeats.map(b => b.id));
+    for (const b of wvBeats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+      if (b.type === 'conditionBeat') {
+        expect(ids.has(b.parameters.trueTarget)).toBe(true);
+        expect(ids.has(b.parameters.falseTarget)).toBe(true);
+      }
+    }
+    // the QR-round lesson: session-resume strands finished runs without this
+    const end = wvBeats.find(b => b.type === 'endScreen');
+    expect(end.connections.some((c: any) => c.targetId === 't')).toBe(true);
+  });
+
+  it('hosted-page URLs are ${baseUrl}-substituted and the base URL is collected first', () => {
+    const setup = wvBeats.find(b => b.id === 'setup');
+    expect(setup.parameters.variable).toBe('baseUrl');
+    const views = wvBeats.filter(b => b.type === 'webView');
+    expect(views.length).toBe(4);
+    const hosted = views.filter(b => b.parameters.url.startsWith('${baseUrl}/'));
+    expect(hosted.length).toBe(3); // static / postmessage / exit — D uses a real blocked site
+  });
+
+  it('covers the protocol axes: passContext, postMessage+saveTo (condition-verified), exitUrlPattern, blocked site', () => {
+    const a = wvBeats.find(b => b.id === 'A_view');
+    expect(a.parameters.passContext).toEqual(['playerName']);
+    const bv = wvBeats.find(b => b.id === 'B_view');
+    expect(bv.parameters.saveTo).toBe('webResult');
+    const check = wvBeats.find(b => b.id === 'B_check');
+    expect(check.parameters.condition.value).toBe('done-via-message');
+    const cv = wvBeats.find(b => b.id === 'C_view');
+    expect(cv.parameters.exitUrlPattern).toBe('exit-done');
+    const dv = wvBeats.find(b => b.id === 'D_view');
+    expect(dv.parameters.url).toMatch(/^https:\/\//);
+  });
+
+  it('the test pages exist and carry the exact postMessage protocol + exit-URL target', () => {
+    const dir = join(__dirname, '../../../public/examples/web-view-test-pages');
+    const pm = readFileSync(join(dir, 'page-postmessage.html'), 'utf-8');
+    expect(pm).toContain("parent.postMessage({asaps:'result', value:'done-via-message'}, '*')");
+    const ex = readFileSync(join(dir, 'page-exit.html'), 'utf-8');
+    expect(ex).toContain('exit-done.html'); // must match C_view's exitUrlPattern
+    readFileSync(join(dir, 'page-static.html'));
+    readFileSync(join(dir, 'exit-done.html'));
+    readFileSync(join(dir, 'index.html'));
+  });
+});

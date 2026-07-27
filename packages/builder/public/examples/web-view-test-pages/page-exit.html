@@ -1,0 +1,12 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Exit-URL test page</title>
+<style>body{font-family:system-ui;margin:32px;text-align:center;color:#111}#n{font-size:40px}</style></head><body>
+<h1>Exit-URL test</h1>
+<p>Navigating to <code>exit-done.html</code> in <span id="n">3</span>…</p>
+<p><strong>Desktop app:</strong> the story should advance automatically on navigation.<br>
+<strong>Browser:</strong> auto-detection is not possible in an iframe — use the Done button after the page changes.</p>
+<script>
+  let n = 3;
+  const el = document.getElementById('n');
+  const t = setInterval(() => { n--; el.textContent = n;
+    if (n <= 0) { clearInterval(t); location.href = 'exit-done.html'; } }, 1000);
+</script></body></html>
