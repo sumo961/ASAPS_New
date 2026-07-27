@@ -22,18 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.83** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.83 brings location-based
-storytelling's logic layer**: a new **Set GPS Location** beat writes named GPS
-point sets into story state — capture the player's live position, set
-coordinates, randomly **scatter points around the player** (optionally snapped
-onto real streets, paths, and parks via OpenStreetMap), or curate points on a
-map at authoring time — and the GPS Location beat geofences those dynamic
-sets. The full loop (scatter → geofence → walk-to-a-point) was **verified in
-the field on iOS and Android**. The **Video beat also goes multi-language**:
-a different video per language, plus author-written caption cues that the
-translation system turns into per-language subtitles automatically. Users on
-v0.9.82 will auto-update. For what shipped when, see:
+Current release: **v0.9.84** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.84 graduates the camera & embed
+beats**: **QR Scan** and **Web View** passed full manual verification rounds
+(desktop, iOS, and the Electron desktop app) and **lose their experimental
+badge**. The Web View round uncovered and fixed real desktop-app bugs — the
+Electron embedded-browser path had never actually activated, and pages'
+postMessage exits now work in the desktop app via a new bridge — and Web View
+became fully first-class in the editor: Visual Editor tab, an author-sizable
+page frame (with a smarter default that gives the page most of the stage),
+and fixed-canvas layout support. Both verification kits (printable QR code
+sheet + deployable web test pages) ship as importable examples. Users on
+v0.9.83 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

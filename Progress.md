@@ -1,5 +1,46 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-27: Camera & embed beats graduate — QR Scan + Web View verified, EXP dropped (v0.9.84)
+
+### Overview
+
+A verification-driven release: the manual test protocol got two full rounds — **QR Scan** and **Web View** — each with a bundled, importable verification kit, and both beats **passed across the platform matrix and lost their EXP pill**. The Web View round earned its keep: it exposed that the **Electron `<webview>` path had never actually run** (the desktop app silently behaved like a browser), that the **postMessage exit protocol couldn't work in real webviews**, and a stack of Visual-Editor gaps — all fixed. Web View also became fully first-class: VE tab, panel slot rows, author-sized frame, and fixed-layout support.
+
+### QR Scan — verified, EXP dropped
+
+- New verification kit (`public/examples/`): `qr-scan-verification.asaps.zip` — four stations, each verified **on-screen** by Condition beats rather than inferred: A) `asaps://beat` direct jump (with `qrJumpTargets` so the flowchart draws the dashed jump edge), B) `asaps://variable/scanned/red`, C) `asaps://inventory/add/badge`, D) raw payload `WORLD42` with `interpretAsapsUri:false` + a `^WORLD\d+$` accept pattern (station D doubles as the rejection probe — code A must be refused). Plus `qr-scan-verification-codes.html`: a printable sheet with the four codes generated via the repo's own `qrcode` lib; a CI fixture test pins the printed payloads to the story's beat ids so they can never drift.
+- Field result: desktop + iOS pass → `experimental: true` removed from `qrScan`. One fixture finding baked into all kits since: session-resume reopens a finished run on its last beat, so **verification fixtures must close the loop back to the start** (end screen → Title "Replay").
+
+**Files modified:**
+- `packages/builder/public/examples/qr-scan-verification.{asaps.zip,codes → -codes.html}`, `packages/builder/src/utils/__tests__/gpsVerificationFixture.test.ts`, `beat-definitions/core-beats.json`
+
+### Web View — three real bugs found, verified, EXP dropped
+
+- Verification kit: `web-view-verification.asaps.zip` + a deployable `web-view-test-pages/` folder (static / postMessage / exit-URL pages; the story collects the host's base URL via inputText and `${baseUrl}`-substitutes the page URLs, so nothing is hardcoded).
+- **Bug 1 — the Electron `<webview>` path was dead code.** `isElectron()` probed `window.process.versions.electron` (absent under `contextIsolation: true`) and no BrowserWindow enabled `webviewTag` — so the desktop app always fell back to the browser iframe: no `did-navigate` exit-URL matching, no X-Frame-Options bypass. Fixed with userAgent-based detection + `webviewTag: true` on the main/preview windows.
+- **Bug 2 — postMessage exits can't work in webviews.** A webview guest is its own top-level document (`window.parent === window`), so `parent.postMessage({asaps:'result'})` never leaves the guest. Fixed with a **guest preload bridge** (`webview-bridge.js`, new vite entry; path exposed as `electronAPI.webviewPreloadUrl`; injected via the webview `preload` attribute) relaying the same message shape via `ipcRenderer.sendToHost` → host `ipc-message` → beat exit. One page protocol now works in browser iframes AND the desktop app.
+- **Bug 3 — layout.** The fixed 16:10 frame could exceed the stage and clip the prompt; and action slots with unknown buttons fell into the endScreen fallback, rendering a phantom "Play Again". The frame now flex-grows into the remaining stage height, and the action row honors the schema's declared buttons (surface beats' Done/Skip live inside the element).
+- Full matrix pass (browser + Electron, with the iframe-vs-webview divergence documented) → EXP dropped.
+
+**Files modified:**
+- `packages/renderer/src/components/WebViewElement.tsx`, `SlotFlowView.tsx`, `apps/builder-desktop/src/main/index.ts`, `src/preload/{index,webview-bridge}.ts`, `vite.config.ts`, `packages/builder/public/examples/web-view-*`
+
+### Web View becomes first-class in the editor
+
+- **VE tab** for webView / qrScan / arBeat (all were missing from `WorkspaceView.visualBeatTypes` despite full slot-mode editor support — same gap class as aiConversation before v0.9.82).
+- **Panel slot rows** for the surface slots ("Web page frame" with URL preview / "Camera view" / "AR scene"); the VE preview now renders the real prompt (was a blank band + misleading sample chip) and no phantom buttons.
+- **Author-sized frame**: better default (prompt hugs natural height, frame takes the rest — ~71% vs the old 50/50 split) plus a "Height" slider (20–95% / auto) on the frame's slot row via `slotIntent.heightPercent`.
+- **Fixed-layout support**: runtime could already render positioned webviews; the authoring chain now exists — SchemaLocationInitializer bakes a prompt + 900×480 frame, the layout migrator converts webView beats, element-type↔kind sync mapping added, and the fixed-mode VE shows a placeholder instead of loading the live URL while authoring.
+
+**Files modified:**
+- `packages/builder/src/components/WorkspaceView.tsx`, `visual/VisualPropertiesPanel.tsx`, `visual/VisualWorkspace.tsx`, `packages/builder/src/utils/{SchemaLocationInitializer,projectLayoutMigrator}.ts`, `packages/renderer/src/components/{SlotFlowView,PositionedBeatView}.tsx`
+
+### Verification
+
+Both kits carry CI fixture tests (graph connectivity, replay-loop invariant, payload↔story pinning, `${baseUrl}` substitution, protocol-axes coverage). Live-verified throughout: QR on desktop + iOS; Web View on browser + dev Electron (C auto-advance, D X-Frame-Options bypass, B postMessage bridge); frame sizing 40%→40%, 90%→90%, auto→fill. Renderer 492 + builder 2353 + core 2570 green.
+
+---
+
 ## 2026-07-26: Location-based storytelling + multi-language video (v0.9.83)
 
 ### Overview
