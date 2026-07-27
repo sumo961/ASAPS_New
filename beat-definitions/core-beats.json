@@ -2357,7 +2357,6 @@
       "icon": "📷",
       "description": "Opens the camera and waits for the player to scan a QR code. The decoded string is saved to a variable, then the beat branches.",
       "connectionType": "single",
-      "experimental": true,
       "parameters": {
         "prompt": {
           "type": "string",
