@@ -158,7 +158,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
       'keypad',
       'panorama',
       'gpsLocation',
-      'indoorLocation'
+      'indoorLocation',
+      // Camera/embed slot-mode beats — the VE renders editor placeholders
+      // for their webview/camera/AR slots; they were missing from this gate
+      // (found during the Web View verification round, same gap class as
+      // aiConversation before v0.9.82).
+      'webView',
+      'qrScan',
+      'arBeat'
     ];
     return visualBeatTypes.includes(beat.type);
   };

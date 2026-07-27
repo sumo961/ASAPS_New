@@ -2680,7 +2680,6 @@
       "icon": "🌐",
       "description": "Embed a live external web page. The player interacts until they hit the Done button, navigate to an exit URL pattern, or post a result back from the page.",
       "connectionType": "single",
-      "experimental": true,
       "parameters": {
         "url": {
           "type": "string",
