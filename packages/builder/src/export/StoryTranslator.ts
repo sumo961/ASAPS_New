@@ -673,7 +673,7 @@ async function callAnthropic(
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model: model || 'claude-sonnet-4-6',
+      model: model || 'claude-sonnet-5',
       // 32K (was 8192) for Brahmic / CJK / RTL targets where one source
       // word can expand to 5-10 output tokens. Sonnet 4 supports up to
       // 64K. Hindi / Gujarati / Sinhala / Bengali / Thai / Burmese / etc

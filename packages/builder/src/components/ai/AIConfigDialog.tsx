@@ -32,7 +32,7 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
     name: 'Claude',
     description: 'Anthropic',
     defaultBaseUrl: '',
-    defaultModel: 'claude-sonnet-4-6',
+    defaultModel: 'claude-sonnet-5',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your Anthropic API key',
     apiKeyHelp: 'Get your API key from console.anthropic.com',

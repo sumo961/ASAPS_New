@@ -41,13 +41,13 @@ describe('configure', () => {
   it('is not ready and keeps defaults when the api key is missing', () => {
     p.configure(cfg({ apiKey: '' }));
     expect(p.isReady()).toBe(false);
-    expect((p as any).model).toBe('claude-sonnet-4-6'); // unchanged default
+    expect((p as any).model).toBe('claude-sonnet-5'); // unchanged default
   });
 
   it('becomes ready and defaults the model when none is supplied', () => {
     p.configure(cfg());
     expect(p.isReady()).toBe(true);
-    expect((p as any).model).toBe('claude-sonnet-4-6');
+    expect((p as any).model).toBe('claude-sonnet-5');
     expect((p as any).useProxy).toBe(false);
   });
 
@@ -82,6 +82,23 @@ describe('requiresAdaptiveThinking (model detection)', () => {
   it('is true for any Opus/Sonnet major >= 5', () => {
     expect(detect('claude-opus-5-0')).toBe(true);
     expect(detect('claude-sonnet-5-1')).toBe(true);
+  });
+
+  it('handles the Claude 5 family SINGLE-segment ids (the real v5 naming)', () => {
+    // Regression: the regex required a minor segment, so claude-sonnet-5 /
+    // claude-opus-5 / claude-fable-5 were classed as legacy → the API 400'd
+    // every reasoningEffort request against a v5 model.
+    expect(detect('claude-sonnet-5')).toBe(true);
+    expect(detect('claude-opus-5')).toBe(true);
+    expect(detect('claude-fable-5')).toBe(true);
+    expect(detect('claude-haiku-5')).toBe(true);
+    // and single-segment 4th-gen ids stay legacy (no minor → not >= 4.6)
+    expect(detect('claude-opus-4')).toBe(false);
+  });
+
+  it('date-suffixed v5 snapshots are adaptive by major (unlike dated v4)', () => {
+    expect(detect('claude-opus-5-20260101')).toBe(true);
+    expect(detect('claude-sonnet-5-20260101')).toBe(true);
   });
 
   it('is false for Opus/Sonnet 4.5-and-earlier (legacy budget_tokens)', () => {
@@ -121,7 +138,7 @@ describe('requiresAdaptiveThinking (model detection)', () => {
 
 describe('thinking shape end-to-end (applyThinkingConfig)', () => {
   it('default model (Sonnet 4.6) emits the adaptive shape', () => {
-    p.configure(cfg({ reasoningEffort: 'high' })); // no model → default claude-sonnet-4-6
+    p.configure(cfg({ reasoningEffort: 'high' })); // no model → default claude-sonnet-5
     const body: any = {};
     (p as any).applyThinkingConfig(body);
     expect(body.thinking).toEqual({ type: 'adaptive' });

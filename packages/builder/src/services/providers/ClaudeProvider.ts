@@ -37,7 +37,7 @@ import {
 export class ClaudeProvider extends BaseAIProvider {
   readonly name = 'claude';
   private client: Anthropic | null = null;
-  private model: string = 'claude-sonnet-4-6';
+  private model: string = 'claude-sonnet-5';
   private useProxy: boolean = false;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
   private proxyEndpoint: string = typeof window !== 'undefined' && window.location?.port === '5173'
@@ -62,7 +62,7 @@ export class ClaudeProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'claude-sonnet-4-6';
+      this.model = config.model || 'claude-sonnet-5';
 
       console.log(`[ClaudeProvider] Configured with model: ${this.model}${config.baseUrl ? ` using proxy for baseURL: ${config.baseUrl}` : ' (direct API)'}`);
     }
@@ -111,27 +111,30 @@ export class ClaudeProvider extends BaseAIProvider {
   private requiresAdaptiveThinking(): boolean {
     const m = this.model.toLowerCase();
     // Adaptive thinking (thinking.type='adaptive' + output_config.effort) is
-    // supported only from the X.6 generation onward — Opus 4.6+, Sonnet 4.6+,
-    // and any Opus/Sonnet major >= 5. Verified against the Anthropic API
-    // reference. Two family-specific exclusions:
-    //   - NO Haiku model supports it yet (Haiku 4.5 rejects the effort param).
+    // supported from the X.6 generation onward — Opus 4.6+, Sonnet 4.6+, and
+    // the whole Claude 5 family (Sonnet 5 / Opus 5 / Fable 5 / Haiku 5+).
+    // Verified against the Anthropic API reference. Exclusions:
+    //   - Haiku 4.x rejects the effort param (no adaptive variant below 5).
     //   - Opus/Sonnet 4.5-and-earlier use the legacy enabled+budget_tokens
-    //     shape, so the cutoff is minor >= 6, not >= 5.
-    const match = m.match(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)/);
+    //     shape, so the 4.x cutoff is minor >= 6, not >= 5.
+    // NAMING: the Claude 5 family uses SINGLE-segment ids (claude-sonnet-5,
+    // claude-opus-5, claude-fable-5) — the minor segment is optional here.
+    // The old two-segment-required regex classed all of them as legacy,
+    // which 400'd every reasoningEffort request against a v5 model.
+    const match = m.match(/^claude-(opus|sonnet|haiku|fable)-(\d+)(?:-(\d+))?/);
     if (!match) return false;
     const [, family, majorStr, minorStr] = match;
-    // A 3rd segment longer than 2 digits is a YYYYMMDD snapshot of the
-    // original (undated) generation — e.g. claude-sonnet-4-20250514 — which
-    // predates adaptive thinking and uses the legacy shape. Without this the
-    // regex would read the date as the minor version (20250514 >= 6).
-    if (minorStr.length > 2) return false;
     const major = parseInt(majorStr, 10);
-    const minor = parseInt(minorStr, 10);
+    // A trailing segment longer than 2 digits is a YYYYMMDD snapshot, not a
+    // minor version — claude-sonnet-4-20250514 is the legacy May-2025 Sonnet
+    // 4, while claude-opus-5-20xxxxxx would be adaptive by major. Treat a
+    // date as "no minor" and decide on the major alone.
+    const minor = minorStr && minorStr.length <= 2 ? parseInt(minorStr, 10) : undefined;
     // Haiku has no adaptive variant below major 5.
     if (family === 'haiku') return major >= 5;
-    // Opus / Sonnet: adaptive arrived with the X.6 generation.
+    // Opus / Sonnet / Fable: the whole 5+ generation is adaptive.
     if (major >= 5) return true;
-    if (major === 4 && minor >= 6) return true;
+    if (major === 4 && minor !== undefined && minor >= 6) return true;
     return false;
   }
 
