@@ -112,6 +112,28 @@ describe('MultiChoiceBeat', () => {
       expect(targets).toEqual(['new_target_1', 'new_target_2']);
     });
 
+    it('purges a stale stored connection when choices are saved again', () => {
+      // Regression: the inspector used to re-seed multiChoice connections
+      // from a stale snapshot after a choice's target was replaced, leaving
+      // an orphan connection that rendered as an extra flowchart edge. Any
+      // beat corrupted that way must self-heal on the next choices save,
+      // because updateParameters does a full clear + rebuild.
+      const beat = new MultiChoiceBeat({
+        id: 'mc1',
+        name: 'Pick a color',
+        type: 'multiChoice',
+        choices: [
+          { id: 'a', text: 'Blue', target: 'beat_10' },
+          { id: 'b', text: 'Red', target: 'beat_11' },
+        ],
+      });
+      beat.addConnection({ targetId: 'beat_old', label: 'Red' }); // the orphan
+      expect(beat.getConnections()).toHaveLength(3);
+
+      beat.updateParameters({ choices: beat.choices });
+      expect(beat.getConnections().map(c => c.targetId).sort()).toEqual(['beat_10', 'beat_11']);
+    });
+
     it('skips __self__ in connections (loop-back is internal, not graph-visible)', () => {
       const beat = new MultiChoiceBeat({
         id: 'mc1',

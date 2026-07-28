@@ -160,6 +160,17 @@ interface InspectorProps {
 }
 
 // Constants for resizable panel
+// Beat types whose connections are rebuilt from parameters by
+// updateParameters() / derived by getConnections(). For these, the inspector
+// must never re-seed connections from its local snapshot — doing so resurrects
+// stale connections (e.g. a replaced multiChoice target kept rendering as a
+// third edge because multiChoice was missing from this list while its sibling
+// movementChoice was in it). Single source for both save paths.
+const PARAMETER_DERIVED_TYPES = new Set([
+  'dialogTree', 'pickProp', 'movementChoice', 'multiChoice',
+  'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
+]);
+
 const MIN_INSPECTOR_WIDTH = 280;
 const DEFAULT_INSPECTOR_WIDTH = 320;
 const INSPECTOR_WIDTH_STORAGE_KEY = 'asaps-inspector-width';
@@ -1478,10 +1489,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     // Handle connections
     // Most beat types rebuild connections from parameters in updateParameters().
     // For simple beats (single target, conditional), we set connections from local state.
-    const parameterDerivedTypes = new Set([
-      'dialogTree', 'pickProp', 'movementChoice',
-      'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
-    ]);
+    const parameterDerivedTypes = PARAMETER_DERIVED_TYPES;
 
     if (!parameterDerivedTypes.has(beat.type)) {
       const beatAny = beat as any;
@@ -1577,10 +1585,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       // Handle connections
       // Most beat types rebuild connections from parameters in updateParameters().
       // For simple beats (single target, conditional), we set connections from local state.
-      const parameterDerivedTypes = new Set([
-        'dialogTree', 'pickProp', 'movementChoice',
-        'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
-      ]);
+      const parameterDerivedTypes = PARAMETER_DERIVED_TYPES;
 
       if (!parameterDerivedTypes.has(beat.type)) {
         const beatAny = beat as any;
