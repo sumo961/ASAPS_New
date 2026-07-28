@@ -167,7 +167,15 @@ function anthropicText(response: any): string {
   if (content?.type === 'text' && typeof content.text === 'string') {
     return content.text;
   }
-  throw new Error('Unexpected response type from Claude');
+  // Keep the 'Unexpected response type from Claude' prefix — classifyContent
+  // prefix-matches it for its first-category fallback.
+  const stop = response?.stop_reason ?? 'unknown';
+  const types = Array.isArray(response?.content)
+    ? response.content.map((c: any) => c?.type ?? '?').join(', ') || 'none'
+    : 'none';
+  throw new Error(
+    `Unexpected response type from Claude (stop_reason=${stop}, blocks=[${types}])`
+  );
 }
 
 /** Extract the assistant text from an OpenAI chat-completions response. */
@@ -309,7 +317,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
           maxTokens: 100,
         });
       } catch (e) {
-        if (e instanceof Error && e.message === 'Unexpected response type from Claude') {
+        if (e instanceof Error && e.message.startsWith('Unexpected response type from Claude')) {
           // Historical behavior: a non-text Claude response classifies as
           // the first category instead of failing the beat.
           return categories[0];

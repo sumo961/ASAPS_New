@@ -119,6 +119,13 @@ export abstract class BaseAIProvider implements IAIProvider {
           throw error;
         }
 
+        // Providers flag deterministic failures (e.g. a content refusal —
+        // replaying the identical prompt cannot succeed) so we surface them
+        // immediately instead of burning two more multi-minute attempts.
+        if (error instanceof Error && (error as Error & { nonRetryable?: boolean }).nonRetryable) {
+          throw error;
+        }
+
         // Don't retry when the user cancelled. AbortError comes through fetch
         // when the signal fires; rethrow immediately so the caller can show
         // "cancelled" instead of waiting two more 10-minute retries.

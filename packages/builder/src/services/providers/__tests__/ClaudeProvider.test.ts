@@ -319,3 +319,42 @@ describe('generateStory streams the direct-API response', () => {
     expect(onProgress).toHaveBeenCalledWith('accumulated snapshot'.length);
   });
 });
+
+describe('no-text-block responses', () => {
+  // Classroom incident 2026-07-28: several students got a bare "Unexpected
+  // response type from Claude" replayed across 3 retries (55 min of console
+  // log) with zero diagnostics. A response legitimately arrives without a
+  // text block on a refusal (deterministic — retrying is useless) or when
+  // adaptive thinking eats the whole max_tokens budget (retry may help, but
+  // the message must say what to change). These pin the tailored handling.
+  function readyWith(finalMessage: any) {
+    const stream = vi.fn().mockReturnValue({
+      on: vi.fn(),
+      finalMessage: vi.fn().mockResolvedValue(finalMessage),
+    });
+    p.configure(cfg());
+    (p as any).client = { messages: { stream, create: vi.fn() } };
+    return stream;
+  }
+
+  it('a refusal fails fast with an actionable message — no blind retries', async () => {
+    const stream = readyWith({ content: [], stop_reason: 'refusal' });
+    await expect(p.generateStory({ prompt: 'x' } as any)).rejects.toThrow(/declined/i);
+    expect(stream).toHaveBeenCalledOnce();
+  });
+
+  it('thinking-only + max_tokens explains the exhausted budget', () => {
+    expect(() =>
+      (p as any).extractTextBlock(
+        { content: [{ type: 'thinking', thinking: '…' }], stop_reason: 'max_tokens' },
+        64000,
+      ),
+    ).toThrow(/token budget \(64000\) on thinking/);
+  });
+
+  it('other no-text shapes carry stop_reason and block types for diagnosis', () => {
+    expect(() =>
+      (p as any).extractTextBlock({ content: [{ type: 'tool_use' }], stop_reason: 'end_turn' }),
+    ).toThrow(/stop_reason=end_turn.*tool_use/);
+  });
+});

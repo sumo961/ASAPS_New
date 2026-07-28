@@ -184,6 +184,62 @@ export class ClaudeProvider extends BaseAIProvider {
   }
 
   /**
+   * Pull the text block out of a Claude response, with diagnostics when
+   * there is none. A response can legitimately arrive without a text
+   * block in two ways, and they need opposite handling:
+   *
+   * - stop_reason 'refusal': deterministic — replaying the identical
+   *   prompt cannot succeed, so the error is flagged nonRetryable and
+   *   withRetry surfaces it immediately instead of burning two more
+   *   multi-minute attempts.
+   * - stop_reason 'max_tokens' with only thinking blocks: adaptive
+   *   thinking consumed the entire max_tokens budget before any output
+   *   was emitted. Retrying may succeed (thinking length varies), but
+   *   the user-facing message must say what to change if it doesn't.
+   *
+   * Everything else gets the block types + stop_reason in the message so
+   * a console log from the field is diagnosable.
+   */
+  private extractTextBlock(
+    response: { content?: unknown; stop_reason?: string | null },
+    maxTokens?: number,
+  ): string {
+    const blocks = (Array.isArray(response.content) ? response.content : []) as Array<{
+      type?: string;
+      text?: string;
+    }>;
+    const textBlock = blocks.find(b => b?.type === 'text' && typeof b.text === 'string');
+    if (textBlock) return textBlock.text as string;
+
+    const stop = response.stop_reason ?? 'unknown';
+    const types = blocks.map(b => b?.type ?? '?').join(', ') || 'none';
+    console.error(
+      `[ClaudeProvider] No text block in response: stop_reason=${stop}, content blocks=[${types}]`,
+    );
+
+    if (stop === 'refusal') {
+      const err = new Error(
+        'Claude declined to generate this content (stop_reason: refusal). ' +
+          'Rephrase the request — retrying the same prompt will not help.',
+      );
+      (err as Error & { nonRetryable?: boolean }).nonRetryable = true;
+      throw err;
+    }
+    if (
+      stop === 'max_tokens' &&
+      blocks.some(b => b?.type === 'thinking' || b?.type === 'redacted_thinking')
+    ) {
+      throw new Error(
+        `Claude spent the entire token budget${maxTokens ? ` (${maxTokens})` : ''} on thinking ` +
+          'and produced no output. Raise Max Tokens in AI settings or lower the reasoning effort.',
+      );
+    }
+    throw new Error(
+      `Unexpected response from Claude: no text content (stop_reason=${stop}, blocks=[${types}])`,
+    );
+  }
+
+  /**
    * Attempt to repair malformed or truncated JSON.
    *
    * Delegates to @asaps/core's shared repairJsonAggressive(), which is the
@@ -330,25 +386,25 @@ export class ClaudeProvider extends BaseAIProvider {
           });
         }
         const apiResponse = await stream.finalMessage();
-        response = { content: apiResponse.content };
+        console.log(
+          `[ClaudeProvider] generateStory response: stop=${apiResponse.stop_reason}, ` +
+            `output_tokens=${apiResponse.usage?.output_tokens ?? '?'}`,
+        );
+        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
       }
 
-      // Extract and parse JSON response. With extended thinking enabled, the
-      // response may contain a leading `thinking` block before the `text` block.
-      const content = (response.content as Array<{ type: string; text?: string }>)
-        .find(c => c.type === 'text');
-      if (!content || typeof content.text !== 'string') {
-        throw new Error('Unexpected response type from Claude');
-      }
+      // Extract the text block. With extended thinking enabled, the response
+      // may contain a leading `thinking` block before the `text` block.
+      const contentText = this.extractTextBlock(response, maxTokens);
 
       // Shared tolerant extractor: fences, prose-wrapped JSON, brace matching.
       // Inline thinking tags are stripped first so a reasoning draft can't be
       // mistaken for the real payload.
       let jsonString: string;
       try {
-        jsonString = extractJSON(stripThinkingBlocks(content.text));
+        jsonString = extractJSON(stripThinkingBlocks(contentText));
       } catch {
-        console.error('[ClaudeProvider] Raw response:', content.text.substring(0, 500));
+        console.error('[ClaudeProvider] Raw response:', contentText.substring(0, 500));
         throw new Error('Could not extract JSON from Claude response');
       }
 
@@ -426,16 +482,13 @@ export class ClaudeProvider extends BaseAIProvider {
         response = await this.makeProxyRequest(requestBody);
       } else {
         const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content };
+        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
       }
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from Claude');
-      }
+      const contentText = this.extractTextBlock(response, maxTokens);
 
       // Extract + parse JSON via the shared tolerant extractor with repair
-      const dialogData = parseJSONWithRepair(stripThinkingBlocks(content.text));
+      const dialogData = parseJSONWithRepair(stripThinkingBlocks(contentText));
 
       console.log('[ClaudeProvider] Dialog generated');
 
@@ -480,16 +533,13 @@ export class ClaudeProvider extends BaseAIProvider {
         response = await this.makeProxyRequest(requestBody);
       } else {
         const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content };
+        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
       }
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from Claude');
-      }
+      const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
       // Extract + parse JSON via the shared tolerant extractor with repair
-      const suggestions = parseJSONWithRepair(stripThinkingBlocks(content.text));
+      const suggestions = parseJSONWithRepair(stripThinkingBlocks(contentText));
 
       console.log('[ClaudeProvider] Generated', suggestions.suggestions?.length || 0, 'suggestions');
 
@@ -551,16 +601,13 @@ Respond with JSON in this format:
         response = await this.makeProxyRequest(requestBody);
       } else {
         const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content };
+        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
       }
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type from Claude');
-      }
+      const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
       // Extract + parse JSON via the shared tolerant extractor with repair
-      const beatData = parseJSONWithRepair(stripThinkingBlocks(content.text));
+      const beatData = parseJSONWithRepair(stripThinkingBlocks(contentText));
 
       console.log('[ClaudeProvider] Beat created:', beatData.beat.type);
 
@@ -599,15 +646,10 @@ Respond with JSON in this format:
       response = await this.makeProxyRequest(requestBody);
     } else {
       const apiResponse = await this.client!.messages.create(requestBody as any);
-      response = { content: apiResponse.content };
+      response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
     }
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    return { text: content.text.trim() };
+    return { text: this.extractTextBlock(response, requestBody.max_tokens).trim() };
   }
 
   /**
