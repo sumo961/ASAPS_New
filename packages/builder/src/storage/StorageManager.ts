@@ -97,6 +97,25 @@ export class StorageManager {
   }
 
   /**
+   * IndexedDB's structured clone preserves Date objects, but records that
+   * went through a JSON round-trip before being stored (imports, dev
+   * tooling, external writers) carry ISO strings instead — and one such
+   * record crashes every date consumer (ProjectSelector's formatTimeAgo
+   * took down the whole header). Coerce at the read boundary; an
+   * unparseable value degrades to epoch rather than throwing.
+   */
+  private coerceProjectDates(project: Project): Project {
+    const coerce = (v: unknown): Date => {
+      if (v instanceof Date) return v;
+      const d = new Date(v as string | number);
+      return isNaN(d.getTime()) ? new Date(0) : d;
+    };
+    project.createdAt = coerce(project.createdAt);
+    project.modifiedAt = coerce(project.modifiedAt);
+    return project;
+  }
+
+  /**
    * Get a project by ID
    */
   async getProject(projectId: string): Promise<StorageResult<Project>> {
@@ -109,7 +128,7 @@ export class StorageManager {
       }
 
       this.log('Project retrieved:', projectId);
-      return { success: true, data: project };
+      return { success: true, data: this.coerceProjectDates(project) };
     } catch (error) {
       this.logError('Failed to get project', error);
       return { success: false, error: error as Error };
@@ -211,7 +230,7 @@ export class StorageManager {
       projects = projects.slice(start, end);
 
       this.log('Projects listed:', projects.length);
-      return { success: true, data: projects };
+      return { success: true, data: projects.map((p) => this.coerceProjectDates(p)) };
     } catch (error) {
       this.logError('Failed to list projects', error);
       return { success: false, error: error as Error };

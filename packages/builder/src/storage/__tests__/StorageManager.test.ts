@@ -233,6 +233,35 @@ describe('Project operations', () => {
       const res = await mgr.listProjects({ sortBy: 'name', offset: 1, limit: 1 });
       expect(res.data?.map((p) => p.name)).toEqual(['Beta']);
     });
+
+    it('coerces string dates from JSON-round-tripped records to Date', async () => {
+      // Regression: a record stored with ISO-string dates (imports, dev
+      // tooling) crashed every date consumer — ProjectSelector's
+      // formatTimeAgo threw "date.getTime is not a function" and took
+      // down the whole header. Reads must always yield real Dates.
+      await mgr.createProject(makeProject({
+        name: 'JsonInjected',
+        createdAt: '2026-07-28T15:16:06.826Z' as unknown as Date,
+        modifiedAt: '2026-07-28T15:16:06.826Z' as unknown as Date,
+      }));
+
+      const list = await mgr.listProjects();
+      const injected = list.data?.find((p) => p.name === 'JsonInjected');
+      expect(injected?.modifiedAt).toBeInstanceOf(Date);
+      expect(injected?.createdAt).toBeInstanceOf(Date);
+      expect(injected?.modifiedAt.getTime()).toBe(new Date('2026-07-28T15:16:06.826Z').getTime());
+
+      const single = await mgr.getProject(injected!.id);
+      expect(single.data?.modifiedAt).toBeInstanceOf(Date);
+
+      // Unparseable garbage degrades to epoch instead of throwing.
+      await mgr.createProject(makeProject({
+        name: 'GarbageDates',
+        modifiedAt: 'not-a-date' as unknown as Date,
+      }));
+      const garbage = (await mgr.listProjects()).data?.find((p) => p.name === 'GarbageDates');
+      expect(garbage?.modifiedAt.getTime()).toBe(0);
+    });
   });
 });
 
