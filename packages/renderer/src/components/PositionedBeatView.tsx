@@ -674,8 +674,20 @@ export function adjustElementsForCollisions(
 
   // Calculate actual bounds for text elements
   // Use SMART-SIZED dimensions to account for text box expansion
+  //
+  // Processed top-to-bottom so each box can be stacked below the previous
+  // one's estimated bottom — text must never overlap text. (Field case: an
+  // AI-baked layout put the content box at titleY + a title height that had
+  // been estimated with the body font size; the title actually renders with
+  // the larger titleFontSize, so the content box started inside it.)
+  // Manually resized boxes are authorial intent: they are never shifted, but
+  // they DO contribute their bounds so auto-placed boxes stack below them.
+  const TEXT_STACK_GAP = 12;
   const textBoxBounds: { bottom: number; left: number; right: number; name: string }[] = [];
-  const adjustedTextElements = textElements.map(el => {
+  const shiftedYByElement = new Map<PositionedElementData, number>();
+  let prevTextBottom = -Infinity;
+
+  for (const el of [...textElements].sort((a, b) => a.location.y - b.location.y)) {
     const width = el.location.width;
     const originalHeight = el.location.height || 50;
 
@@ -690,8 +702,11 @@ export function adjustElementsForCollisions(
       effectiveX = el.location.x;
       effectiveWidth = width;
     } else {
-      // Calculate smart dimensions to get the actual rendered height
-      const fontSize = el.location.fontSize ?? theme.fonts.textFontSize ?? 16;
+      // Calculate smart dimensions to get the actual rendered height.
+      // Resolve the font size the way the renderer does — titles render with
+      // titleFontSize; estimating them with the body size undershoots their
+      // real height by ~30% and everything placed below lands too high.
+      const fontSize = computeRenderedFontSize(el.location, el.content || '', theme);
       const effectiveButtonHeight = calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT;
       const smartDims = calculateSmartTextBoxDimensions(
         el.content || '',
@@ -714,34 +729,37 @@ export function adjustElementsForCollisions(
       yOffset = isDynamic ? 0 : (smartDims.yOffset || 0);
     }
 
-    // Calculate bounds using smart-sized dimensions (account for upward growth via yOffset)
-    const effectiveY = el.location.y - yOffset;
-    const bottom = effectiveY + height;
-    const left = effectiveX;
-    const right = effectiveX + effectiveWidth;
-    textBoxBounds.push({ bottom, left, right, name: el.location.name });
-
-    console.log(`[CollisionDetect] Text "${el.location.name}": original(${el.location.x},${el.location.y},${el.location.width}x${originalHeight}) → smart(${effectiveX},${el.location.y},${effectiveWidth}x${height}), bottom=${bottom}, hudBottomY=${hudBottomY}`);
-
-    // Shift text down if it overlaps with HUD overlays at the top
-    if (hudBottomY > 0 && el.location.y < hudBottomY) {
-      const shiftedY = hudBottomY;
-      const shiftedBottom = shiftedY + height;
-      // Update bounds with shifted position
-      textBoxBounds[textBoxBounds.length - 1].bottom = shiftedBottom;
-      console.log(`[CollisionDetect] Text "${el.location.name}": shifted down from y=${el.location.y} to y=${shiftedY} to avoid HUD overlap`);
-      return {
-        ...el,
-        location: {
-          ...el.location,
-          y: shiftedY,
-        },
-      };
+    // Shift text down if it overlaps HUD overlays at the top, then stack it
+    // below the previous text box if the two would overlap.
+    let newY = el.location.y;
+    if (hudBottomY > 0 && newY < hudBottomY) {
+      newY = hudBottomY;
+      console.log(`[CollisionDetect] Text "${el.location.name}": shifted down from y=${el.location.y} to y=${newY} to avoid HUD overlap`);
+    }
+    if (!el.location.manuallyResized && newY - yOffset < prevTextBottom + TEXT_STACK_GAP) {
+      newY = prevTextBottom + TEXT_STACK_GAP + yOffset;
+      console.log(`[CollisionDetect] Text "${el.location.name}": stacked below previous text box → y=${newY}`);
     }
 
-    // Return element unchanged - respect user positions
-    return el;
-  });
+    // Calculate bounds using smart-sized dimensions (account for upward growth via yOffset)
+    const effectiveY = newY - yOffset;
+    const bottom = effectiveY + height;
+    textBoxBounds.push({ bottom, left: effectiveX, right: effectiveX + effectiveWidth, name: el.location.name });
+    prevTextBottom = Math.max(prevTextBottom, bottom);
+
+    console.log(`[CollisionDetect] Text "${el.location.name}": original(${el.location.x},${el.location.y},${el.location.width}x${originalHeight}) → smart(${effectiveX},${newY},${effectiveWidth}x${height}), bottom=${bottom}, hudBottomY=${hudBottomY}`);
+
+    if (newY !== el.location.y) {
+      shiftedYByElement.set(el, newY);
+    }
+  }
+
+  // Preserve the original element order (z-order falls back to array index)
+  const adjustedTextElements = textElements.map(el =>
+    shiftedYByElement.has(el)
+      ? { ...el, location: { ...el.location, y: shiftedYByElement.get(el)! } }
+      : el
+  );
 
   if (buttonElements.length === 0) {
     return [...otherElements, ...adjustedTextElements];
@@ -2394,7 +2412,11 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         stageWidth,
         stageHeight
       );
-      // If stored dimensions exist, keep stored width but ensure height fits content
+      // If stored dimensions exist, keep stored width but size height to the
+      // text. A manually resized button keeps its authored height as the
+      // minimum; otherwise the stored height is just a baked estimate (AI
+      // generation, schema defaults) and the button shrinks to fit — a 75px
+      // box around one line of text reads as an empty extra line.
       if (location.width && location.height) {
         smartBtnDims.width = location.width;
         // Recompute height for the stored width (account for border-box: padding + border inside height)
@@ -2405,9 +2427,18 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         const cpl = Math.floor(availW / charWidth);
         const lines = cpl > 0 ? Math.ceil(content.length / cpl) : 1;
         // border-box: total height = content + padding + border
-        const neededH = lines * lineHeight + btnPaddingV * 2 + borderWidth * 2;
-        smartBtnDims.height = Math.max(location.height, Math.ceil(neededH));
+        const neededH = Math.ceil(lines * lineHeight + btnPaddingV * 2 + borderWidth * 2);
+        smartBtnDims.height = location.manuallyResized
+          ? Math.max(location.height, neededH)
+          : neededH;
       }
+
+      // The button must be FULLY visible: clamp so its bottom never passes the
+      // stage edge (baked layouts have put buttons at y + height > stage).
+      const btnTop = Math.max(
+        4,
+        Math.min(location.y, stageHeight - smartBtnDims.height - 8)
+      );
 
       // Debug logging for button overflow issues
       if (content && content.length > 30) {
@@ -2434,6 +2465,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         <div
           style={{
             ...baseStyle,
+            // Keep animated positions intact; only clamp static placement
+            ...(animatedPosition ? {} : { top: `${btnTop}px` }),
             width: `${smartBtnDims.width}px`,
             height: `${smartBtnDims.height}px`,
             opacity: buttonOpacity,
@@ -3079,24 +3112,39 @@ const TextElement: React.FC<{
     : {};
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
+  //
+  // Every branch caps the box with maxHeight: height:'auto' alone let a box
+  // with more content than estimated grow past the button area and the stage
+  // bottom (runtime AI content is arbitrary-length). With a real cap the
+  // existing overflowY:'auto' + ScrollIndicator machinery engages instead —
+  // the box respects its boundaries and scrolls.
+  const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
+  const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
+  const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
+    ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
+    : 0;
+  const reservedBelow = effectiveButtonHeight > 0
+    ? effectiveButtonHeight + stageHeight * BUTTON_PADDING_PERCENT
+    : stageHeight * 0.05;
+  const maxHeightBelow = (top: number) =>
+    Math.max(60, stageHeight - top - reservedBelow - stageHeight * 0.02);
+
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
   if (location.manuallyResized) {
-    // User manually resized: use stored dimensions as minimum, allow growth for content
+    // User manually resized: use stored dimensions as minimum, allow growth
+    // for content — but never below the authored height, and never past the
+    // button area / stage bottom.
     dimensionStyle = {
       left: `${location.x}px`,
       width: `${location.width}px`,
       height: 'auto',
       minHeight: `${location.height}px`,
+      maxHeight: `${Math.max(location.height, maxHeightBelow(location.y))}px`,
       overflowY: 'auto',
     };
   } else {
     // Smart sizing: compute dimensions at render time (identical in editor + preview)
-    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
-    const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
-    const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
-      ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
-      : 0;
 
     // Calculate portrait inline width for smart sizing
     const hasInlinePortrait = speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right');
@@ -3130,6 +3178,7 @@ const TextElement: React.FC<{
       width: `${smartDims.width}px`,
       height: 'auto',
       minHeight: skipMinHeight ? undefined : `${smartDims.height}px`,
+      maxHeight: `${maxHeightBelow(adjustedTop)}px`,
       overflowY: 'auto',
     };
   }
@@ -3171,12 +3220,14 @@ const TextElement: React.FC<{
           // Don't set overflow here - let dimensionStyle handle it
           lineHeight: isLongContent ? '1.5' : '1.4',
           boxSizing: 'border-box',
-          // Use flexbox for centering when content fits without scrolling
-          // Only switch to block display when actually needing to scroll
-          display: needsScroll ? 'block' : 'flex',
+          // Use flexbox for centering when content fits without scrolling.
+          // Switch to block when scrolling is predicted (estimate) OR actually
+          // measured (maxHeight cap engaged) — flex-centering an overflowing
+          // box makes the clipped top unreachable.
+          display: needsScroll || hasOverflow ? 'block' : 'flex',
           // Flexbox centering when content fits (vertical centering for non-scrollable content)
-          alignItems: needsScroll ? undefined : 'center',
-          justifyContent: needsScroll ? undefined : 'center',
+          alignItems: needsScroll || hasOverflow ? undefined : 'center',
+          justifyContent: needsScroll || hasOverflow ? undefined : 'center',
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
         }}
       >
@@ -3185,7 +3236,7 @@ const TextElement: React.FC<{
           position: 'relative',
           width: '100%',
           // Only set height for scrollable content; for centered content, let it be natural
-          height: needsScroll ? '100%' : undefined,
+          height: needsScroll || hasOverflow ? '100%' : undefined,
         }}>
           {/* Speaker portrait inside text box (floated) */}
           {speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right') && (() => {
@@ -3240,11 +3291,13 @@ const TextElement: React.FC<{
               <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
             )}
           </span>
-          {/* Scroll indicators - only show when scrolling is enabled, hide once user starts scrolling */}
+          {/* Scroll indicators — driven by MEASURED overflow (the estimate can
+              miss; the maxHeight cap is what actually forces the scroll), hide
+              once the user starts scrolling */}
           {editorMode ? (
             <ScrollBadge visible={hasOverflow} fontScale={mobileFontScale} />
           ) : (
-            needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
+            hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
           )}
         </div>
       </div>
@@ -3963,24 +4016,36 @@ const DialogElement: React.FC<{
   const totalPadding = Math.max(paddingHorizontal, paddingVertical);
 
   // Smart text box sizing: grow horizontally first, then vertically, scroll only as last resort
+  // Same maxHeight cap as TextElement: without it, height:'auto' lets a box
+  // with more content than estimated overlap the button area / stage bottom.
+  const dlgHasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
+  const dlgIsNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
+  const dlgButtonHeight = (dlgHasButton && !dlgIsNoButtonBeat)
+    ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
+    : 0;
+  const dlgReservedBelow = dlgButtonHeight > 0
+    ? dlgButtonHeight + stageHeight * BUTTON_PADDING_PERCENT
+    : stageHeight * 0.05;
+  const dlgMaxHeightBelow = (top: number) =>
+    Math.max(60, stageHeight - top - dlgReservedBelow - stageHeight * 0.02);
+
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
   if (location.manuallyResized) {
-    // User manually resized: use stored dimensions as minimum, allow growth for content
+    // User manually resized: use stored dimensions as minimum, allow growth
+    // for content — but never below the authored height, and never past the
+    // button area / stage bottom.
     dimensionStyle = {
       left: `${location.x}px`,
       width: `${location.width}px`,
       height: 'auto',
       minHeight: `${location.height}px`,
+      maxHeight: `${Math.max(location.height, dlgMaxHeightBelow(location.y))}px`,
       overflowY: 'auto',
     };
   } else {
     // Smart sizing: compute dimensions at render time (identical in editor + preview)
-    const hasButton = beatType ? BUTTON_BEAT_TYPES.includes(beatType) : true;
-    const isNoButtonBeat = beatType ? NO_BUTTON_BEAT_TYPES.includes(beatType) : false;
-    const effectiveButtonHeight = (hasButton && !isNoButtonBeat)
-      ? (calculatedButtonHeight > 0 ? calculatedButtonHeight : DEFAULT_BUTTON_HEIGHT)
-      : 0;
+    const effectiveButtonHeight = dlgButtonHeight;
 
     // Calculate portrait inline width for smart sizing
     const hasDialogInlinePortrait = speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right');
@@ -4014,6 +4079,7 @@ const DialogElement: React.FC<{
       width: `${smartDims.width}px`,
       height: 'auto',
       minHeight: skipMinHeight ? undefined : `${smartDims.height}px`,
+      maxHeight: `${dlgMaxHeightBelow(adjustedTop)}px`,
       overflowY: 'auto',
     };
   }
@@ -4069,7 +4135,7 @@ const DialogElement: React.FC<{
         position: 'relative',
         width: '100%',
         // Only set height for scrollable content
-        height: needsScroll ? '100%' : undefined,
+        height: needsScroll || hasOverflow ? '100%' : undefined,
       }}>
         {/* Speaker portrait inside dialog box (floated) */}
         {speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'inside-left' || theme.speakerDisplay?.graphicPosition === 'inside-right') && (() => {
@@ -4132,11 +4198,13 @@ const DialogElement: React.FC<{
             )
           )}
         </span>
-        {/* Scroll indicators - only show when scrolling is enabled, hide once user starts scrolling */}
+        {/* Scroll indicators — driven by MEASURED overflow (the estimate can
+            miss; the maxHeight cap is what actually forces the scroll), hide
+            once the user starts scrolling */}
         {editorMode ? (
           <ScrollBadge visible={hasOverflow} fontScale={mobileFontScale} />
         ) : (
-          needsScroll && hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
+          hasOverflow && !hasScrolled && <ScrollIndicator position="bottom" fontScale={mobileFontScale} />
         )}
       </div>
     </div>
