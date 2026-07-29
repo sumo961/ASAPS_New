@@ -166,3 +166,54 @@ describe('fixed-layout overflow containment', () => {
     expect(parseFloat(wrapper.style.height)).toBe(75);
   });
 });
+
+describe('AI-beat overflow containment across beat types', () => {
+  const LONG_AI = 'The assistant elaborates at considerable length here. '.repeat(30);
+
+  it('keeps the whole choice stack on stage for aiDialogTree with long AI text', async () => {
+    const els: PositionedElementData[] = [
+      { location: { kind: 'dialog', name: 'Dialog Text', x: 112, y: 120, width: 800, height: 200 } as any, content: LONG_AI } as any,
+      ...[1, 2, 3, 4].map(n => ({
+        location: { kind: 'button', name: `choice_${n}`, x: 362, y: 460 + n * 60, width: 300, height: 50 } as any,
+        content: `Choice option number ${n}`,
+        actionId: `c${n}`,
+      }) as any),
+    ];
+    const { getByText } = render(
+      <PositionedBeatView stageWidth={1024} stageHeight={768} interactive beatType="aiDialogTree" elements={els} />,
+    );
+    await waitFor(() => expect(getByText('Choice option number 4')).toBeTruthy());
+
+    const rects = [1, 2, 3, 4].map(n => {
+      const w = getByText(`Choice option number ${n}`).closest('div[style]') as HTMLDivElement;
+      return { top: parseFloat(w.style.top), h: parseFloat(w.style.height) };
+    });
+    // Every choice fully on stage…
+    for (const r of rects) expect(r.top + r.h).toBeLessThanOrEqual(768);
+    // …and none piled on top of another (stack order with gaps preserved)
+    const sorted = [...rects].sort((a, b) => a.top - b.top);
+    for (let i = 1; i < sorted.length; i++) {
+      expect(sorted[i].top).toBeGreaterThanOrEqual(sorted[i - 1].top + sorted[i - 1].h - 1);
+    }
+  });
+
+  // aiInfoText shares onlineContent's single-button shape; aiDurScreen has no
+  // button at all. Both must cap their text so it cannot run off stage.
+  for (const bt of ['aiInfoText', 'aiDurScreen']) {
+    it(`caps ${bt} runtime text with maxHeight inside the stage`, async () => {
+      const { container } = render(
+        <PositionedBeatView
+          stageWidth={1024}
+          stageHeight={768}
+          beatType={bt}
+          elements={[{ location: { kind: 'text', name: 'Content Text', x: 112, y: 124, width: 800, height: 300 } as any, content: LONG_AI } as any]}
+        />,
+      );
+      await waitFor(() => expect(container.textContent).toContain('assistant elaborates'));
+      const box = Array.from(container.querySelectorAll('div')).find(d => d.style.maxHeight);
+      expect(box, `${bt} text box should carry a maxHeight cap`).toBeTruthy();
+      const top = parseFloat(box!.style.top || '124');
+      expect(top + parseFloat(box!.style.maxHeight)).toBeLessThanOrEqual(768);
+    });
+  }
+});

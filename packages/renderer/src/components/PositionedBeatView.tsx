@@ -866,6 +866,21 @@ export function adjustElementsForCollisions(
       }
     }
 
+    // Keep the whole group on stage: push-below-text and the stacked reflow
+    // can both run past the bottom edge when text is long.
+    {
+      const H = (el: PositionedElementData) => el.location.height || 44;
+      const groupBottom = Math.max(...adjustedButtonElements.map(el => el.location.y + H(el)));
+      const overflow = groupBottom - (stageHeight - 8);
+      if (overflow > 0) {
+        adjustedButtonElements = adjustedButtonElements.map(el => ({
+          ...el,
+          location: { ...el.location, y: Math.max(4, el.location.y - overflow) },
+        }));
+        console.log(`[CollisionDetect] ${beatType}: button group overflowed stage by ${Math.round(overflow)}px → shifted up`);
+      }
+    }
+
     return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
   }
 
@@ -873,6 +888,7 @@ export function adjustElementsForCollisions(
   // Dialog choices should form a clean column, not be scattered across the stage
   const sortedButtons = [...buttonElements].sort((a, b) => a.location.y - b.location.y);
   const adjustedButtonElements: PositionedElementData[] = [];
+  const stackedButtonHeights: number[] = [];
 
   // For multiple buttons (dialog choices), align them all to a consistent position
   // Use the rightmost button's X position, or center if very different positions
@@ -978,9 +994,71 @@ export function adjustElementsForCollisions(
     } else {
       adjustedButtonElements.push(el);
     }
+    stackedButtonHeights.push(buttonHeight);
+  }
+
+  // The WHOLE button stack must stay on stage. Long AI text (aiDialogTree
+  // etc.) can push the stack so far down that choices 2..N land past the
+  // stage bottom — and clamping each button individually would pile them on
+  // top of each other. Shift the entire stack up by the overflow instead,
+  // preserving gaps; the text box scrolls behind it (it has a maxHeight cap),
+  // so buttons win the space contest. Locked buttons are authorial intent
+  // and stay put.
+  if (adjustedButtonElements.length > 0) {
+    const stackBottom = Math.max(
+      ...adjustedButtonElements.map((el, i) => el.location.y + stackedButtonHeights[i])
+    );
+    const overflow = stackBottom - (stageHeight - 8);
+    if (overflow > 0) {
+      console.log(`[CollisionDetect] Button stack overflows stage by ${Math.round(overflow)}px → shifting stack up`);
+      for (let i = 0; i < adjustedButtonElements.length; i++) {
+        const el = adjustedButtonElements[i];
+        if ((el.location as any).lockPosition === true) continue;
+        adjustedButtonElements[i] = {
+          ...el,
+          location: { ...el.location, y: Math.max(4, el.location.y - overflow) },
+        };
+      }
+    }
   }
 
   return [...otherElements, ...adjustedTextElements, ...adjustedButtonElements];
+}
+
+/**
+ * Space to reserve below the text for the beat's buttons. For beats whose
+ * buttons STACK vertically below the text (dialog trees, pickProp — the
+ * collision pass's default flow) this must be the full stack height + gaps:
+ * reserving only the tallest button let long AI dialog text push choices
+ * 2..N past the stage bottom. Beats that keep authored button layouts
+ * (endScreen/aiSummary rows, multiChoice free placement) reserve the
+ * tallest button as before.
+ */
+function computeButtonSpaceReserve(
+  buttonElements: PositionedElementData[],
+  beatType: string | undefined,
+  theme: RenderThemeSettings,
+  stageWidth: number,
+  stageHeight: number,
+): number {
+  if (buttonElements.length === 0) return DEFAULT_BUTTON_HEIGHT;
+  const heights = buttonElements.map(btnEl => {
+    const btnFontSize = btnEl.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
+    return calculateSmartButtonDimensions(
+      btnEl.content || '',
+      btnFontSize,
+      { x: btnEl.location.x, y: btnEl.location.y, width: btnEl.location.width, height: btnEl.location.height },
+      16,
+      10,
+      stageWidth,
+      stageHeight
+    ).height;
+  });
+  const keepsAuthoredLayout =
+    beatType === 'endScreen' || beatType === 'endScreenCredits' ||
+    beatType === 'aiSummary' || beatType === 'multiChoice';
+  if (keepsAuthoredLayout || heights.length === 1) return Math.max(...heights);
+  return heights.reduce((sum, h) => sum + h, 0) + 15 * (heights.length - 1);
 }
 
 /**
@@ -1540,26 +1618,11 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
       el.location.kind !== 'text' && el.location.kind !== 'dialog' && el.location.kind !== 'button'
     );
 
-    // Calculate button heights first (so text elements know how much space to reserve)
-    let previewMaxButtonHeight = 0;
-    for (const btnEl of buttonElements) {
-      const btnFontSize = btnEl.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
-      const btnPaddingH = 16;
-      const btnPaddingV = 10;
-      const btnDims = calculateSmartButtonDimensions(
-        btnEl.content || '',
-        btnFontSize,
-        { x: btnEl.location.x, y: btnEl.location.y, width: btnEl.location.width, height: btnEl.location.height },
-        btnPaddingH,
-        btnPaddingV,
-        stageWidth,
-        stageHeight
-      );
-      if (btnDims.height > previewMaxButtonHeight) {
-        previewMaxButtonHeight = btnDims.height;
-      }
-    }
-    const previewCalculatedButtonHeight = previewMaxButtonHeight > 0 ? previewMaxButtonHeight : DEFAULT_BUTTON_HEIGHT;
+    // Calculate button space first (so text elements know how much to reserve
+    // — the full stack for stacked-choice beats, tallest button otherwise)
+    const previewCalculatedButtonHeight = computeButtonSpaceReserve(
+      buttonElements, beatType, theme, stageWidth, stageHeight
+    );
 
     // Sort text elements for animation sequencing: title first, then author, then others
     const sortedTextElements = [...textElements].sort((a, b) => {
@@ -1817,26 +1880,11 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
 
   // Calculate button heights FIRST (needed for collision detection to know how much space buttons need)
   const buttonElements = elements.filter(el => el.location.kind === 'button');
-  let maxButtonHeight = 0;
-  for (const btnEl of buttonElements) {
-    const btnFontSize = btnEl.location.fontSize ?? theme.fonts.buttonFontSize ?? 16;
-    const btnPaddingH = 16;
-    const btnPaddingV = 10;
-    const btnDims = calculateSmartButtonDimensions(
-      btnEl.content || '',
-      btnFontSize,
-      { x: btnEl.location.x, y: btnEl.location.y, width: btnEl.location.width, height: btnEl.location.height },
-      btnPaddingH,
-      btnPaddingV,
-      stageWidth,
-      stageHeight
-    );
-    if (btnDims.height > maxButtonHeight) {
-      maxButtonHeight = btnDims.height;
-    }
-  }
-  // Use calculated max or default if no buttons found
-  const calculatedButtonHeight = maxButtonHeight > 0 ? maxButtonHeight : DEFAULT_BUTTON_HEIGHT;
+  // Space to reserve below text — the full stack for stacked-choice beats,
+  // tallest button otherwise; default if no buttons found
+  const calculatedButtonHeight = computeButtonSpaceReserve(
+    buttonElements, beatType, theme, stageWidth, stageHeight
+  );
 
   // Calculate HUD bottom Y to prevent content from overlapping wide HUD overlays
   // Only applies to top-center HUDs (countdown meter) that span the center of the stage
