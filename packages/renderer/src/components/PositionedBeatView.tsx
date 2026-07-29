@@ -2420,12 +2420,28 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
       if (location.width && location.height) {
         smartBtnDims.width = location.width;
         // Recompute height for the stored width (account for border-box: padding + border inside height)
-        const charWidth = btnFontSize * 0.6;
         const lineHeight = btnFontSize * 1.4;
         const borderWidth = theme.button.borderWidth ?? 2;
         const availW = location.width - btnPaddingH * 2 - borderWidth * 2;
-        const cpl = Math.floor(availW / charWidth);
-        const lines = cpl > 0 ? Math.ceil(content.length / cpl) : 1;
+        // MEASURE the label instead of estimating with 0.6×fontSize per char —
+        // the estimate over-predicts wrapping ("Learn More" in a 136px box
+        // reads as 2 lines when it renders as 1), which is exactly the
+        // phantom empty line users see. Canvas measureText is unavailable in
+        // jsdom; fall back to the char estimate there.
+        const btnFontFamily = location.font ? getFontFamily(location.font) : theme.fonts.buttonFont;
+        let textWidth = content.length * btnFontSize * 0.6;
+        try {
+          const ctx = document.createElement('canvas').getContext('2d');
+          if (ctx) {
+            // No safety factor: the canvas measures with the same font the
+            // button renders with, so the width is exact — a margin here
+            // re-creates the phantom second line on just-fits labels
+            // ("Learn More" measures 97px in a 100px slot).
+            ctx.font = `600 ${btnFontSize}px ${btnFontFamily || 'sans-serif'}`;
+            textWidth = ctx.measureText(content).width;
+          }
+        } catch { /* keep estimate */ }
+        const lines = availW > 0 ? Math.max(1, Math.ceil(textWidth / availW)) : 1;
         // border-box: total height = content + padding + border
         const neededH = Math.ceil(lines * lineHeight + btnPaddingV * 2 + borderWidth * 2);
         smartBtnDims.height = location.manuallyResized
