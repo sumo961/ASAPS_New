@@ -2500,7 +2500,6 @@
       "icon": "🥽",
       "description": "Augmented-reality scene with marker tracking. The player aims the camera at a printed marker; overlay anchors (text, image, tappable cards) attach to the marker. Each anchor's tap routes through an asaps:// URI or target beat id, so authors get treasure-hunt / pick-the-clue mechanics without scripting.",
       "connectionType": "multiple",
-      "experimental": true,
       "parameters": {
         "prompt": {
           "type": "string",
