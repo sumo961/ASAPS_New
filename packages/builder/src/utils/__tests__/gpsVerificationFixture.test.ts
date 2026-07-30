@@ -286,6 +286,18 @@ describe('AR Scene fixture', () => {
     expect(arBeats.find(b => b.id === 'B_ar').parameters.fallbackTarget).toBe('B_check');
   });
 
+  it("orders each station's honest/check exit FIRST in connections", () => {
+    // getNextBeat() takes the first unconditional connection, and that is
+    // where asaps://variable taps and skips land. Field failure 2026-07-29:
+    // B_ar had [A_pass, B_check], so the Station B variable tap advanced
+    // into Station A's PASS flow ("returns to the beginning"). Rule (same
+    // as the QR fixtures): the check/fail exit is connections[0]; PASS
+    // screens are only reachable via bare-beat-id anchor taps.
+    const first = (id: string) => arBeats.find(b => b.id === id).connections[0].targetId;
+    expect(first('A_ar')).toBe('A_fail');
+    expect(first('B_ar')).toBe('B_check');
+  });
+
   it('the marker sheet exists and generates deterministically (seeded)', () => {
     const html = readFileSync(join(__dirname, '../../../public/examples/ar-scene-marker.html'), 'utf-8');
     expect(html).toContain('mulberry32(20260727)'); // fixed seed — print & .mind stay in sync

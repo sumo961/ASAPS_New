@@ -79,7 +79,12 @@ export class AssetResolver {
   private async buildAssetManifest(): Promise<void> {
     if (!this.zip) return;
 
-    const assetFolders = ['assets', 'backgrounds', 'characters', 'props', 'audio', 'sounds', 'fonts', 'nodes'];
+    // Must cover every folder projectZipManager writes. 'videos' slipped
+    // through unnoticed because video files also pass isMediaFile(); 'other'
+    // had no such luck — a .mind AR tracker in other/ has no media extension,
+    // so it never entered the manifest and exported AR beats silently fell
+    // back to screen-space anchors ("No marker asset configured").
+    const assetFolders = ['assets', 'backgrounds', 'characters', 'props', 'audio', 'sounds', 'videos', 'fonts', 'nodes', 'other'];
 
     for (const [path, file] of Object.entries(this.zip.files)) {
       if (file.dir) continue;
