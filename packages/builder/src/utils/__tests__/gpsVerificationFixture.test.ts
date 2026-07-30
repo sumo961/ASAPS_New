@@ -306,3 +306,62 @@ describe('AR Scene fixture', () => {
     readFileSync(join(__dirname, '../../../public/examples/ar-marker.mind'));
   });
 });
+
+describe('Indoor Location fixture', () => {
+  const INDOOR_ZIP = join(__dirname, '../../../public/examples/indoor-location-verification.asaps.zip');
+  let inBeats: any[];
+  let inZip: JSZip;
+  let inProject: any;
+  beforeAll(async () => {
+    inZip = await JSZip.loadAsync(readFileSync(INDOOR_ZIP));
+    inProject = JSON.parse(await inZip.file('project.json')!.async('string'));
+    inBeats = inProject.project.story.beats;
+  });
+
+  it('is a connected graph and closes the replay loop back to the start', () => {
+    const ids = new Set(inBeats.map(b => b.id));
+    for (const b of inBeats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+    }
+    const end = inBeats.find(b => b.type === 'endScreen');
+    expect(end.connections.some((c: any) => c.targetId === 't')).toBe(true);
+  });
+
+  it('covers the protocol axes: 3 beacon zones, per-zone targets, honest skip exit first', () => {
+    const beat = inBeats.find(b => b.type === 'indoorLocation');
+    expect(beat.parameters.mode).toBe('trigger-on-arrival');
+    const locs = beat.parameters.xrLocations;
+    expect(locs.map((l: any) => l.beaconUuid)).toEqual(['beacon-a', 'beacon-b', 'beacon-c']);
+    const ids = new Set(inBeats.map(b => b.id));
+    for (const l of locs) expect(ids.has(l.target), `${l.id} target dangles`).toBe(true);
+    // honest-fail rules: skips must never masquerade as arrival
+    expect(beat.parameters.defaultTarget).toBe('fail');
+    expect(beat.connections[0].targetId).toBe('fail'); // honest exit FIRST
+    // equidistant determinism is declaration order — zone A must be first
+    expect(locs[0].id).toBe('zone_a');
+  });
+
+  it('the venue config drives the Mock Sensors sliders (beacons + floor plan asset)', async () => {
+    const venue = inProject.project.globalSettings.location.venue;
+    expect(venue.beacons.map((b: any) => b.uuid)).toEqual(['beacon-a', 'beacon-b', 'beacon-c']);
+    expect(venue.floorWidth).toBe(16);
+    // the floor-plan asset rides in the zip with matching metadata
+    const assetId = venue.floorPlan;
+    const png = inZip.file(`backgrounds/${assetId}_indoor-floorplan.png`);
+    expect(png, 'floor plan PNG missing from zip').toBeTruthy();
+    const bytes = await png!.async('uint8array');
+    expect(bytes.length).toBeGreaterThan(1000);
+    expect([...bytes.slice(1, 4)].map(c => String.fromCharCode(c)).join('')).toBe('PNG');
+    const meta = JSON.parse(await inZip.file(`backgrounds/${assetId}.json`)!.async('string'));
+    expect(meta.id).toBe(assetId);
+    expect(meta.type).toBe('image');
+    // beacon positions match the zones (same physical spot ⇒ slider maps 1:1)
+    const beat = inBeats.find(b => b.type === 'indoorLocation');
+    for (const l of beat.parameters.xrLocations) {
+      const b = venue.beacons.find((v: any) => v.uuid === l.beaconUuid);
+      expect({ x: b.x, y: b.y }).toEqual({ x: l.x, y: l.y });
+    }
+  });
+});

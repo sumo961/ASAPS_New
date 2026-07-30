@@ -2233,13 +2233,17 @@ export const PreviewWindow: React.FC = () => {
   // Hidden by default to keep the preview chrome clean; toggle button
   // sits in the bottom-right.
   const locationSettings = (previewData?.settings as any)?.location as
-    | { originLat?: number; originLng?: number; mockLocation?: { lat: number; lng: number } }
+    | { originLat?: number; originLng?: number; mockLocation?: { lat: number; lng: number }; venue?: unknown }
     | undefined;
   const hasLocationSettings = !!(
     locationSettings &&
     (locationSettings.originLat !== undefined ||
       locationSettings.originLng !== undefined ||
-      locationSettings.mockLocation)
+      locationSettings.mockLocation ||
+      // Indoor-only projects (venue + beacons, no GPS origin) need the
+      // panel too — its beacon distance sliders are the ONLY way to
+      // exercise indoorLocation beats without hardware.
+      locationSettings.venue)
   );
   const sensorService = engineRef.current?.getContext()?.getSensorService();
   // Player-position semantics: mockLocation is "where the simulated player

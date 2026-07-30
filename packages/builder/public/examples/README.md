@@ -133,6 +133,26 @@ MindAR tracker **already bundled in the zip**, so no external compile step.
 
 Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *AR Scene*.
 
+### Indoor Location — Verification
+**File:** `indoor-location-verification.asaps.zip`
+
+Mock-pass verification kit for the **Indoor Location** beat — no Bluetooth
+hardware needed. Import the zip (**Import → Project (ZIP)**), run in
+Preview, and open the **📍 Mock Sensors** panel (bottom-right of the
+preview window): the venue's three beacons each get a distance slider.
+
+- Floor plan (16×16 m, generated deterministically) with three zones:
+  **Café** (beacon-a) · **Gallery** (beacon-b) · **Workshop** (beacon-c),
+  radius 5 m each
+- Slide any beacon to 1 m → its zone fires and routes to that zone's PASS
+  screen; sliders persist across replays, so reset to 99 m between rounds
+- **Equidistant probe**: set beacon-a AND beacon-b to 1 m in one change —
+  zone A must win (declaration order is the documented tie-break)
+- **Skip** routes to the honest fail screen (never a PASS); the end screen
+  loops back to the title for replay
+
+Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Indoor Location*.
+
 ## Creating Your Own Examples
 
 To add new example stories to this directory:
