@@ -22,18 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.84** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.84 graduates the camera & embed
-beats**: **QR Scan** and **Web View** passed full manual verification rounds
-(desktop, iOS, and the Electron desktop app) and **lose their experimental
-badge**. The Web View round uncovered and fixed real desktop-app bugs — the
-Electron embedded-browser path had never actually activated, and pages'
-postMessage exits now work in the desktop app via a new bridge — and Web View
-became fully first-class in the editor: Visual Editor tab, an author-sizable
-page frame (with a smarter default that gives the page most of the stage),
-and fixed-canvas layout support. Both verification kits (printable QR code
-sheet + deployable web test pages) ship as importable examples. Users on
-v0.9.83 will auto-update. For what shipped when, see:
+Current release: **v0.9.85** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.85 closes the experimental-beats
+verification protocol**: **AR Scene** passed three field rounds on iPhone
+(each round exposing and fixing a real export/import bug — the AR tracker
+never loaded in exports, and importing any project silently destroyed
+arBeat's authored connections) and **Indoor Location** passed a full
+beacon-zone mock pass — **no beat carries the experimental badge anymore**.
+Both verification kits (self-compiled AR marker + floor-plan beacon venue)
+ship as importable examples. The AI stack now supports the **Claude 5
+family** model ids (the old classifier 400'd on them with reasoning effort),
+AI generation failures diagnose themselves (refusals fail fast with an
+actionable message instead of three blind retries), and the fixed-canvas
+renderer finally **contains overflow**: long AI text scrolls inside its box
+instead of overlapping the title or pushing buttons off-stage. Users on
+v0.9.84 will auto-update. For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)

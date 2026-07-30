@@ -1,5 +1,55 @@
 # ASAPS Modern - Progress Log
 
+## 2026-07-31: Verification protocol closed — AR Scene + Indoor Location pass, Claude 5 support, fixed-layout overflow containment (v0.9.85)
+
+### Overview
+
+Three arcs. **The experimental-beats verification protocol is fully closed**: the **AR Scene** kit went through three field rounds on iPhone (each round exposing a real export/import bug — all fixed) and lost its EXP pill, and a new **Indoor Location** mock-pass kit verified beacon-zone routing end-to-end with the Mock Sensors sliders — **no beat carries the EXP badge anymore**. **AI infrastructure caught up with the Claude 5 family**: single-segment model ids (claude-sonnet-5 / claude-opus-5 / claude-fable-5) were misclassified into the legacy thinking shape (guaranteed 400 with reasoning effort), and the classroom Ideator failures ("Unexpected response type") now diagnose themselves — refusals fail fast with an actionable message instead of burning three blind retries. And the **fixed-layout renderer finally contains overflow**: runtime AI text can no longer overlap the title, run past its box, or push the action button off-stage.
+
+### AR Scene — three field rounds, three real bugs, EXP dropped
+
+- New kit (`ar-scene-verification.asaps.zip` + printable `ar-scene-marker.html`): deterministic seeded canvas marker, the MindAR `.mind` tracker **compiled at kit-build time and bundled as a zip asset** — zero manual compile steps for the tester.
+- **Round 1 (iPhone/Netlify): the tracker never loaded.** The player's `AssetResolver.buildAssetManifest` scanned a folder list predating projectZipManager — `other/` (and `videos/`) were missing, and `.mind` has no media extension to rescue it, so every exported AR beat silently fell back to screen-space anchors. Folder list completed; pinned by a new `packages/player` test.
+- **Round 2: Station B's `asaps://variable` tap landed on Station A's PASS screen.** Root cause upstream of the kit: `ARBeat.updateParameters` answered any `anchors` update with `clearConnections()` — and the project importer funnels every beat through `updateParameters`, so **importing any project destroyed arBeat's authored exits** (skip fallthrough, post-variable continue). The rebuild now only swaps edges pointing at an old anchor's target; authored exits and their order survive. Also codified the fixture rule from the GPS rounds: the honest/check exit is `connections[0]`.
+- **Round 3: full pass** — real tracking with loss/reacquire, bare-beat-id tap (A), variable tap → condition check (B). Offline reload keeps tracking because Safari caches the story + pinned jsdelivr MindAR module — resilience, not a gap; the fallback path itself was field-verified in round 1 via the missing-marker trigger. `experimental: true` removed from `arBeat`.
+
+**Files modified:**
+- `packages/player/src/AssetResolver.ts`, `packages/player/tests/AssetResolver.test.ts` (new), `packages/core/src/beats/ARBeat.ts`, `packages/core/tests/beats/ARBeat.test.ts`, `packages/builder/public/examples/ar-scene-*`, `beat-definitions/core-beats.json`
+
+### Indoor Location — mock pass, protocol complete
+
+- New kit (`indoor-location-verification.asaps.zip`): deterministic 16×16 m floor-plan PNG (generated in pure Python), three beacon zones (Café/Gallery/Workshop on beacon-a/b/c, 5 m radius) with per-zone PASS screens, venue beacons preconfigured for the **Mock Sensors** distance sliders, honest Skip exit + replay loop, complete display settings (no corruption-repair alert on import).
+- Full mock pass driven live: render (floor plan + radius rings + labels), each beacon fires its zone, **equidistant probe pins declaration-order determinism** (a+b at 1 m → zone A), Skip → honest fail, five replay rounds.
+- **Real bug found + fixed:** the Mock Sensors toggle was gated on GPS-only settings (`originLat`/`mockLocation`) — an **indoor-only** project (venue + beacons, no GPS origin) never got the panel, making indoorLocation beats untestable without hardware. Gate now includes `location.venue`.
+
+**Files modified:**
+- `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/public/examples/indoor-location-verification.asaps.zip` (new), `packages/builder/src/utils/__tests__/gpsVerificationFixture.test.ts`
+
+### Claude 5 family support + AI failure diagnostics
+
+- **Single-segment model ids work now.** The adaptive-thinking classifier required a minor-version segment (`claude-opus-4-8` style), so the Claude 5 family's real ids (`claude-sonnet-5`, `claude-opus-5`, `claude-fable-5`) fell through to the legacy `enabled+budget_tokens` shape → API 400 whenever reasoning effort was set. Regex fixed (minor optional, `fable` added, date-suffixed snapshots decide on the major); default model bumped `claude-sonnet-4-6` → `claude-sonnet-5` across all seven sites.
+- **No-text responses diagnose themselves.** The classroom Ideator failures surfaced as a bare "Unexpected response type from Claude" replayed across three retries (55-minute console log). A shared `extractTextBlock()` now reads `stop_reason`: a **refusal** fails fast (flagged nonRetryable — replaying an identical prompt can't succeed) with "rephrase the request"; **thinking-ate-the-budget** says exactly what to change (raise Max Tokens / lower effort); everything else carries stop_reason + block types in the error. `generateStory` logs `stop`/`output_tokens` per response.
+- Storage hardening from the same debugging session: `StorageManager` now coerces JSON-round-tripped string dates to real `Date`s at the read boundary — one corrupted record was crashing the whole Projects menu (`date.getTime is not a function`).
+
+**Files modified:**
+- `packages/builder/src/services/providers/{ClaudeProvider,IProvider}.ts`, `__tests__/ClaudeProvider.test.ts`, `packages/core/src/ai/runtimeAdapter.ts`, `packages/builder/src/components/ai/AIConfigDialog.tsx`, `export/{HtmlExporter,StoryTranslator}.ts`, `packages/builder/src/storage/StorageManager.ts`, `__tests__/StorageManager.test.ts`
+
+### Fixed-layout overflow containment (field case: onlineContent)
+
+- Text boxes never overlap: the collision pass estimated titles with the body font size (~30% undershoot), so AI-baked "below the title" positions started inside the rendered title. The pass now resolves fonts like the renderer and stacks boxes top-to-bottom; manually resized boxes are authorial intent (never shifted, still contribute bounds).
+- Text respects its boundaries: every text/dialog box carries a `maxHeight` capped at the button area / stage bottom, so overlong runtime content **scrolls with the indicator** instead of running over the button; scroll state is driven by measured overflow.
+- Buttons are always fully visible and fit their label: baked heights only act as a minimum when `manuallyResized` (labels are measured with canvas `measureText` — the char-width estimate over-predicted wrapping and produced the phantom empty line); the whole choice stack shifts up as a unit when it would cross the stage edge, and button-space reservation accounts for the **full stack** on stacked-choice beats (aiDialogTree with long AI text pushed choices 2..N off-stage).
+- Bonus fix from the same sweep: multiChoice was missing from the inspector's parameter-derived list (its sibling movementChoice was in it), so replacing a choice target resurrected the stale connection as a ghost flowchart edge; list now shared as a single constant.
+
+**Files modified:**
+- `packages/renderer/src/components/PositionedBeatView.tsx`, `packages/renderer/tests/components/PositionedBeatView.test.tsx`, `packages/builder/src/components/Inspector.tsx`, `packages/core/tests/beats/MultiChoiceBeat.test.ts`
+
+### Verification
+
+Every fix carries regression tests: renderer 500, builder 2367, core 2574, player 1 (new suite) — all green. Field-verified: AR on iPhone/Netlify across three rounds; Indoor Location mock pass in the live preview; fixed-layout containment on the failing onlineContent beat; multiChoice ghost edge + Projects-menu crash live in the running app.
+
+---
+
 ## 2026-07-27: Camera & embed beats graduate — QR Scan + Web View verified, EXP dropped (v0.9.84)
 
 ### Overview
