@@ -54,6 +54,61 @@ describe('ARBeat', () => {
     });
   });
 
+  describe('updateParameters connection preservation', () => {
+    // Field case 2026-07-30 (AR verification round 2): the project importer
+    // funnels every beat through updateParameters(parameters), and the old
+    // anchors handler did clearConnections() — wiping the AUTHORED exits
+    // (skip fallthrough, post-asaps://variable continue). Station B's
+    // variable tap then advanced into Station A's PASS flow because
+    // getNextBeat takes the first remaining connection. Anchors may only
+    // replace their own derived edges; authored edges and order survive.
+    const importLike = () => {
+      const beat = new ARBeat({
+        id: 'B_ar',
+        connections: [
+          { targetId: 'B_check', label: '\u25b6 / skip' },
+          { targetId: 'A_pass', label: '\u25c0 tapped (wrong one)' },
+        ],
+        parameters: {
+          anchors: [
+            { id: 'left', label: '\u25c0 PASS A', onTap: 'A_pass' },
+            { id: 'right', label: '\u25b6 Test B', onTap: 'asaps://variable/picked/right' },
+          ],
+        },
+      } as any);
+      // The importer's post-construction call — this used to wipe B_check
+      beat.updateParameters(beat.getParameters());
+      return beat;
+    };
+
+    it('keeps authored exits (and their order) when anchors pass through updateParameters', () => {
+      const beat = importLike();
+      const targets = beat.connections.map((c: any) => c.targetId);
+      expect(targets[0]).toBe('B_check'); // continue exit stays FIRST
+      expect(targets).toContain('A_pass');
+    });
+
+    it('an asaps://variable tap advances to the authored continue exit, not an anchor target', async () => {
+      const beat = importLike();
+      const { renderer } = makeRenderer({ renderAR: 'asaps://variable/picked/right' });
+      const ctx = makeContext();
+      const next = await beat.execute(ctx, renderer);
+      expect(ctx.getVariable('picked')).toBe('right');
+      expect(next).toBe('B_check');
+    });
+
+    it('still swaps anchor-derived edges when an anchor target changes', () => {
+      const beat = importLike();
+      beat.updateParameters({
+        anchors: [{ id: 'left', label: 'L', onTap: 'NEW_target' }],
+      });
+      const targets = beat.connections.map((c: any) => c.targetId);
+      expect(targets[0]).toBe('B_check');       // authored exit untouched
+      expect(targets).toContain('NEW_target');  // new anchor edge added
+      expect(targets).not.toContain('A_pass');  // old anchor edge replaced
+    });
+  });
+
   describe('renderer-missing fallthrough', () => {
     it('routes to fallbackTarget when renderAR is unavailable', async () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

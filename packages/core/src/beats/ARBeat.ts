@@ -77,15 +77,25 @@ export class ARBeat extends Beat {
     }
     if (params.markerAssetId !== undefined) this.markerAssetId = params.markerAssetId;
     if (params.anchors !== undefined) {
+      // Refresh anchor-derived edges WITHOUT destroying authored ones.
+      // Unlike movementChoice/pickProp, arBeat's connections are a hybrid:
+      // anchors derive some edges, but the skip-fallthrough and
+      // post-asaps://variable continue exits are STORED connections. The
+      // old clearConnections() rebuild wiped those — and since the project
+      // importer funnels every beat through updateParameters, importing a
+      // project silently reduced each arBeat to its anchor edges (field
+      // case 2026-07-30: the Station B variable tap then advanced into
+      // Station A's PASS flow via getNextBeat's first-connection rule).
+      // Only edges pointing at an OLD anchor's bare onTap are replaced;
+      // authored exits and their order (first = continue/skip) survive.
+      const isBare = (t?: string): t is string => !!t && !t.startsWith('asaps://');
+      const oldAnchorTargets = new Set(
+        this.anchors.filter(a => isBare(a.onTap)).map(a => a.onTap as string)
+      );
       this.anchors = Array.isArray(params.anchors) ? params.anchors : [];
-      // Rebuild connections from anchors so the graph wiring stays in
-      // sync — same pattern as movementChoice/pickProp. An anchor's
-      // onTap can be either a bare beat id or an asaps:// URI; only
-      // bare beat ids create graph edges (URIs are resolved at
-      // runtime by parseAsapsUri).
-      this.clearConnections();
+      this.connections = this.connections.filter(c => !oldAnchorTargets.has(c.targetId));
       for (const a of this.anchors) {
-        if (a.onTap && !a.onTap.startsWith('asaps://')) {
+        if (isBare(a.onTap) && !this.connections.some(c => c.targetId === a.onTap)) {
           this.addConnection({ targetId: a.onTap, label: a.label || a.id });
         }
       }
