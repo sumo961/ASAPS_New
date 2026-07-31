@@ -82,7 +82,7 @@ location. Local `file://` or plain `http://<lan-ip>` will NOT work on iOS
 ### QR Scan — Verification
 **Files:** `qr-scan-verification.asaps.zip` + `qr-scan-verification-codes.html`
 
-Manual verification kit for the **QR Scan** beat (EXP). Import the zip
+Manual verification kit for the **QR Scan** beat. Import the zip
 (**Import → Project (ZIP)**), open the codes HTML in any browser and **print
 it** (or show it on a second screen), then run the story in Preview or an
 HTML export on a phone and scan the code each station asks for:
@@ -98,7 +98,7 @@ Cancel at any station routes to that station's fail screen. Pass/fail criteria:
 ### Web View — Verification
 **Files:** `web-view-verification.asaps.zip` + `web-view-test-pages/` (folder)
 
-Manual verification kit for the **Web View** beat (EXP). Deploy the
+Manual verification kit for the **Web View** beat. Deploy the
 `web-view-test-pages/` folder to any HTTPS host (drag it onto
 <https://app.netlify.com/drop>), import the zip, and enter the deployed base
 URL when the story asks — the page URLs are `${baseUrl}`-substituted, so
@@ -114,7 +114,7 @@ Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Web View*.
 ### AR Scene — Verification
 **Files:** `ar-scene-verification.asaps.zip` + `ar-scene-marker.html` (+ `ar-marker.png` / `ar-marker.mind`)
 
-Manual verification kit for the **AR Scene** beat (EXP) — with the compiled
+Manual verification kit for the **AR Scene** beat — with the compiled
 MindAR tracker **already bundled in the zip**, so no external compile step.
 
 1. Import the zip (**Import → Project (ZIP)** — the `.mind` asset rides along).

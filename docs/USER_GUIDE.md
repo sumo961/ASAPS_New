@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.78*
+*Last revised against v0.9.85*
 
 ---
 
@@ -344,9 +344,9 @@ The palette is organized into four top-level groups, each split into smaller sub
 - **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**).
 - **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
-- **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, Set Timer, Update Affect).
+- **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, **Set GPS Location**, Set Timer, Update Affect).
 
-AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The three device-aware beats — **QR Scan**, **AR Scene**, and **Web View** — carry an amber `EXP` pill on the palette flagging them as experimental: working but not yet hardware-verified across the device matrix. They're documented in detail in [Part 3](#part-3-understanding-beats).
+AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The device-aware beats — **QR Scan**, **AR Scene**, and **Web View** — are regular, fully supported beats: each one has been through a full hands-on verification round on real hardware (they graduated from their earlier experimental phase in v0.9.84–v0.9.85, and no beat on the palette carries an experimental flag anymore). They're documented in detail in [Part 3](#part-3-understanding-beats).
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -500,6 +500,12 @@ Embed videos in your story—cutscenes, tutorials, animations, or any video cont
 - **Controls** - Show playback controls
 - **Skip Button** - Let interactors skip the video
 
+**Captions (v0.9.83).** Open the beat in the Visual Editor and find the **Captions** section in the video settings (left properties panel). Each caption is a cue row — start time, end time, text — added with **+ Add caption**. You author the cues once, in your source language; the cue text rides through the standard translation pipeline like any other story text, and at play time the captions render as subtitles in whatever language the interactor has active, in the Preview Window and in HTML exports alike. A checkbox on the section turns captions off without deleting the cues.
+
+**A different video per language (v0.9.83).** When your project has translation languages configured, the same video settings panel shows a **Language versions** section with one row per target language. Pick an alternate video asset for any language — say, a version with burned-in German narration — and that video plays when the interactor switches to that language. *"Languages without one use the video above"* — the default video is always the fallback, so you only override where you have localized footage. Language overrides ship in HTML exports and survive project import/export.
+
+<!-- TODO screenshot session: Video Beat visual-editor settings showing the Language versions rows and the Captions cue editor -->
+
 **When to Use:** Cutscenes, intro sequences, tutorial segments.
 
 ---
@@ -583,7 +589,7 @@ Fail: "Alarm Triggered" beat
 <a id="qr-scan-beat"></a>
 ### QR Scan
 
-> **EXP** — QR Scan ships with an amber `EXP` pill on the palette. The beat is fully implemented and works on real phone hardware, but it hasn't yet been through the full hardware-verification pass we want before calling it stable across the device matrix. Author with confidence on devices you can test; expect refinements over the next few releases.
+> **Fully verified (v0.9.84).** QR Scan has been through the complete manual verification protocol on desktop and iOS and is a regular, fully supported beat — the old experimental badge is gone. If you want to smoke-test scanning on your own hardware, a ready-to-import kit (`qr-scan-verification.asaps.zip` plus a printable code sheet) ships with ASAPS — see [Verification example kits](#verification-kits).
 
 **Purpose:** Scan a real-world QR code and either route the story based on what's encoded, or store the decoded value in a variable.
 
@@ -616,7 +622,7 @@ This is your bridge into the physical world. Print stickers, hide codes around a
 <a id="web-view-beat"></a>
 ### Web View
 
-> **EXP** — Web View ships with an amber `EXP` pill on the palette. Embedding works end-to-end, but the cross-browser and cross-iframe-policy matrix is broad; expect surprises with specific host sites until we've worked through more real-world cases. Test on the platform you intend to ship to (web vs Electron) before committing to it for a critical scene.
+> **Fully verified (v0.9.84).** Web View has been through the complete manual verification protocol in both the browser and the desktop app and is a regular, fully supported beat — the old experimental badge is gone. Specific host sites can still refuse to be embedded (see the iframe-restrictions note below), so it's still smart to test your exact target page on the platform you plan to ship to. A ready-to-import kit (`web-view-verification.asaps.zip` plus deployable test pages) ships with ASAPS — see [Verification example kits](#verification-kits).
 
 **Purpose:** Embed a live external web page inside your story.
 
@@ -625,9 +631,9 @@ Drop a real website into your narrative — a news article, a research paper, an
 **Key Settings:**
 - **URL** — The page to embed (e.g., `https://example.com`)
 - **Prompt** — Optional instruction shown above the embedded page
-- **Auto-exit URL pattern (regex)** — When the embedded page navigates to a URL matching this pattern, the beat advances automatically. Useful for "the player must navigate to the contact form" flows.
+- **Auto-exit URL pattern (regex)** — When the embedded page navigates to a URL matching this pattern, the beat advances automatically. Useful for "the player must navigate to the contact form" flows. Heads-up: for cross-origin pages this only works in the **desktop app** (its native webview reports navigation events; browser iframes hide cross-origin navigation for security reasons — there, the player exits via the Done button instead).
 - **Pass variables** — A list of story variable names; their current values are injected into the URL as a hash fragment (e.g., `#userName=Alice&playerAge=16`), so the embedded page can read story state without an API call.
-- **Save To** — Variable that receives a value the embedded page sends back via `postMessage({ asaps: 'result', value: ... })`. Leave empty to ignore postMessage.
+- **Save To** — Variable that receives a value the embedded page sends back via `postMessage({ asaps: 'result', value: ... })`. Leave empty to ignore postMessage. Since v0.9.84 this one page protocol works everywhere — in browser iframes *and* in the desktop app's native webview — so a page you instrument once exits correctly on both platforms.
 - **Done button text** — Label for the manual exit button (default: *"Done"*)
 - **Speaker / Show Speaker Name** — Standard speaker controls
 
@@ -637,14 +643,18 @@ Drop a real website into your narrative — a news article, a research paper, an
 
 **When to Use:** Citing real sources mid-story, embedded research material, real surveys, integrations with external tools (a calendar booking page, a payment flow, a research consent form), educational stories that incorporate live websites.
 
-**Responsive and Fixed both supported.** Web View renders through ASAPS's slot system in Responsive projects (the iframe fills a dedicated `webview` slot) and respects baked locations in Fixed-canvas projects. Either way, the Done button sits in the action slot at the bottom of the stage.
+**Authoring in the Visual Editor (v0.9.84).** Web View is a first-class Visual Editor citizen: select the beat in the flowchart and open the **Visual Editor** tab to see the prompt and the page frame laid out exactly as the runtime will render them. In Responsive projects, the left panel's slot rows include a **"Web page frame"** row with a **Height** slider (20–95% of the stage in 5% steps, or **auto** — the default, where the prompt hugs its natural height and the frame takes the rest of the stage). While authoring, the frame shows a placeholder rather than loading the live URL.
+
+<!-- TODO screenshot session: Web View beat in the Visual Editor — "Web page frame" slot row with the Height slider -->
+
+**Responsive and Fixed both supported.** Web View renders through ASAPS's slot system in Responsive projects (the iframe fills a dedicated `webview` slot) and respects baked pixel locations in Fixed-canvas projects — since v0.9.84 the fixed-canvas authoring chain is complete too: adding a Web View beat to a fixed project bakes a prompt plus a 900×480 page frame you can reposition and resize like any other element, and the layout migrator converts Web View beats when you switch modes. Either way, the Done button sits with the other action buttons at the bottom of the stage.
 
 ---
 
 <a id="ar-scene-beat"></a>
 ### AR Scene
 
-> **EXP** — AR Scene ships with an amber `EXP` pill on the palette. Marker tracking via MindAR is solid, but hardware-verification across phones, tablets, and lighting conditions is ongoing — and as noted further down, world-tracking and face-tracking are placeholder Phase 2 dropdown entries. Author marker-based scenes today and treat the rest as roadmap.
+> **Fully verified (v0.9.85).** AR Scene has been through three field-verification rounds on real phone hardware and is a regular, fully supported beat — the old experimental badge is gone. As noted further down, world-tracking and face-tracking remain placeholder Phase 2 dropdown entries: author marker-based scenes today and treat the rest as roadmap. A ready-to-import kit (`ar-scene-verification.asaps.zip` with a printable marker and the compiled tracker already bundled) ships with ASAPS — see [Verification example kits](#verification-kits).
 
 **Purpose:** An augmented-reality scene with image-marker tracking. The interactor aims their device camera at a printed marker; tappable anchors anchored to that marker appear when it's in view.
 
@@ -895,6 +905,38 @@ Start a countdown. When it expires, the story can jump to a specific beat.
 
 ---
 
+<a id="set-gps-location-beat"></a>
+### Set GPS Location
+
+**Purpose:** Write a named set of GPS points into story state — the foundation of dynamic, location-based storytelling.
+
+This invisible beat (📍, Logic group, added in v0.9.83) stores geographic points under a **point set name**. On its own it changes nothing on screen; its power comes from binding: a **GPS Location** beat (the map beat in the Multi Choice → Spatial palette group) can reference the same name from one of its location entries (the entry's `pointName` property), and that single entry expands at play time into one geofence per stored point — each inheriting the entry's target beat, radius, and effects. Scatter points around the player, geofence them, react on arrival: that's the geocaching mechanic in three beats.
+
+> **Binding is currently a project-file feature.** The runtime fully supports `pointName` binding (the bundled GPS verification kit runs on it), but the Inspector's location-entry editor doesn't yet offer a "bind to point set" field — today the property is set in the project data (e.g. AI-generated or imported stories, or the verification kits). Explicit-coordinate location entries, and everything else on this page, are fully authorable from the UI.
+
+**Mode** (dropdown) — four ways to produce the points:
+
+- **Capture current position** — pins the player's live GPS position when the beat runs. Set a **Fallback latitude / longitude** for when the sensor is unavailable or permission is denied.
+- **Set explicit coordinates** — stores author-entered **Latitude** / **Longitude** (WGS84).
+- **Randomly scatter points (at play time)** — generates **Number of points** points within **Scatter radius (m)** of a center. **Scatter around** picks the center: *The player's current position*, *Another point set*, or *Explicit coordinates*. The **Placement** dropdown decides where points may land:
+  - *Uniform (offline, anywhere)* — pure math; works offline but points may land inside buildings or water.
+  - *Walkable (streets & parks, via OpenStreetMap)* — snaps points onto real streets, footpaths, and parks using OpenStreetMap data (no API key). Needs a network connection at play time; falls back to uniform placement when coverage is thin or the lookup fails.
+- **Place points on a map (authoring)** — preset mode. The **Points** editor in the Inspector is an embedded map (OpenStreetMap tiles): drag the blue center marker, set the radius, click **📍 Generate on streets & parks** to auto-place points on walkable ground, then curate by hand — drag a pin to nudge it, click a pin to remove it, click the map to add one. The curated points are baked into the beat and written verbatim at play time — no network or sensor needed, and you (a human) have reviewed every spot. *Walkable isn't automatically safe — that final check is yours.*
+
+<!-- TODO screenshot session: Set GPS Location beat in preset mode — the embedded map curator with center marker, radius ring, and generated pins -->
+
+**Other Key Settings:**
+- **Point set name** — The name a GPS Location entry references (its *pointName*) to geofence these points
+- **Point radius (m)** — Optional geofence radius stamped on each stored point; falls back to the GPS Location beat's radius when omitted
+
+**Flow:** Executes instantly (capture and walkable-scatter may take a moment for the sensor/network), stores the points, then moves to the target beat. Point sets live in story state and ride through save/resume; any GPS Location beat later in the flow can geofence them by name.
+
+**When to Use:** Geocaching-style hunts ("three clues are hidden on streets near you — find one"), stories anchored to wherever the player happens to be standing, museum or campus routes you curate on a map in advance, dynamic meeting points.
+
+**Testing without leaving your desk:** the Preview window's [Mock Sensors panel](#mock-sensors) lets you type or nudge a simulated player position and watch the geofences fire.
+
+---
+
 ### Inventory Management
 
 **Purpose:** Manage items.
@@ -986,6 +1028,15 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 - **Enable Voice Input** - Show a microphone button for speech-to-text input
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
 - **System Instructions** - Additional rules for the AI
+
+**Presentation: Chat vs Dialog (v0.9.82).** AI Conversation can look like a messaging app *or* like a classic dialog scene — your pick, per beat. Select the beat in the flowchart and open its **Visual Editor** tab; the choice lives in the left panel's **Conversation Settings** section (deliberately *not* in the Inspector, because it's a visual-presentation decision):
+
+- **Chat (scrolling panel)** — the default. A responsive, messaging-style scrolling conversation panel. Existing conversations keep this look unchanged.
+- **Dialog (back-and-forth, positionable)** — a positioned NPC dialog box plus a free-text reply field (with the same microphone button when voice input is on), styled like a Dialog Tree. Because the dialog box and input are positioned elements, this mode is fully at home in **Fixed-canvas** projects — place them exactly where you want on the stage, with your theme's text-box styling and the beat's background behind them.
+
+The Visual Editor preview is faithful in both modes: chat mode shows the real scrolling panel seeded with your opening line, dialog mode shows the positioned boxes, and switching between the two re-bakes or clears the positioned elements live.
+
+<!-- TODO screenshot session: AI Conversation in the Visual Editor — Conversation Settings section with the Chat/Dialog presentation choice, one shot per mode -->
 
 **Conversation Directions:**
 
@@ -1694,7 +1745,7 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 1. Click **AI** in the header (bottom-left, purple gradient button)
 2. Select **Configure AI** from the dropdown
 3. Choose your provider:
-   - **Claude** - Anthropic's AI (recommended)
+   - **Claude** - Anthropic's AI (recommended; default model: **claude-sonnet-5**). The whole Claude 5 family works — type `claude-opus-5` or `claude-fable-5` into the Model field if you prefer; older Claude 4.x models keep working when named explicitly.
    - **OpenAI** - GPT models (default model: **gpt-5.6-sol**)
    - **Ollama** - Local models (free, no API key needed)
 4. Enter your API key (for cloud providers)
@@ -2083,6 +2134,21 @@ Picking a preset locks the preview container to that exact pixel size and orient
 
 This is particularly useful for **responsive-mode projects**, where the same story renders differently depending on viewport width and orientation — flipping between presets is how you sanity-check that your slot intents land the way you want on a phone, a tablet, and a desktop. Fixed-canvas projects also respect the preset, but since their layout is pixel-baked, the viewport switcher just changes how much of the stage you see at once.
 
+<a id="mock-sensors"></a>
+### Testing Location Beats: the Mock Sensors Panel
+
+Location-driven beats — GPS Location, Indoor Location, and the Set GPS Location logic beat — need sensor input that a desktop simply doesn't have. The **Mock Sensors** panel is how you test them without leaving your chair.
+
+When your project has any location settings configured (**Settings → Location & XR** — a story origin, a mock location, or an indoor venue with beacons), the Preview window shows a purple **📍 Mock Sensors** button in its bottom-right corner. Click it to open the **Mock Sensors (XR)** panel:
+
+- **Position** — latitude/longitude inputs plus N/S/E/W "walk" nudge buttons, so you can type a coordinate or stroll the simulated player around in small steps. GPS Location geofences react immediately, exactly as they would to a real fix. A **Snap to story origin** button jumps back to the project's configured origin.
+- **Orientation** — three sliders (alpha/beta/gamma) for beats that care which way the device is facing.
+- **Beacons (simulated distance)** — when the project has venue beacons configured, one distance slider per beacon. Every beacon starts at 99 m ("out of range"); slide one down to ~1 m to simulate walking up to it, and the matching Indoor Location zone fires. This is the *only* way to exercise Indoor Location beats without real Bluetooth hardware.
+
+Since v0.9.85 the panel also appears for **indoor-only projects** — a venue with beacons but no GPS origin — which previously had no way in.
+
+<!-- TODO screenshot session: Preview window with the Mock Sensors (XR) panel open, showing position nudge buttons and per-beacon distance sliders (use the Indoor Location verification kit) -->
+
 ### Path-Based State Presets
 
 When previewing from a beat other than the start, ASAPS Modern intelligently analyzes all paths to that beat and generates **state presets** representing different ways the interactor could have arrived there.
@@ -2206,6 +2272,22 @@ Pattern-based validation that runs on the project's structure:
 - **Warnings / Info** — undefined variables, missing connections, unused counters, and similar logic issues.
 
 > Story Logic uses keyword pattern matching for now. AI-powered semantic analysis (where an LLM reads each hub beat in context and flags continuity issues) is on the roadmap — when an AI provider is configured, the panel offers richer warnings.
+
+<a id="verification-kits"></a>
+## Verification Example Kits
+
+ASAPS ships a set of small, importable **verification kits** for the device-facing beats — the same fixtures we run before every release. They're QA checklists, not tutorial stories: each one walks a handful of stations with explicit on-screen PASS/fail outcomes, so you can confirm a beat works on *your* hardware in a few minutes.
+
+| Kit | What it exercises |
+|-----|-------------------|
+| **GPS Location — Verification** | Set GPS Location in all four modes (capture, scatter uniform + walkable, preset) plus the point-set geofence binding, drivable entirely from the Mock Sensors panel |
+| **GPS Field Test** | The live outdoor companion — location-agnostic (zero authored coordinates), for a real walk with a phone |
+| **QR Scan — Verification** | Four scan stations plus a printable code sheet (`asaps://` jumps, variable/inventory codes, raw payload with an accept pattern) |
+| **Web View — Verification** | Embed, postMessage exit, auto-exit URL pattern, and a blocked-site probe, with deployable test pages |
+| **AR Scene — Verification** | Marker tracking with a printable marker page and the compiled `.mind` tracker already bundled — no external compile step |
+| **Indoor Location — Verification** | A generated floor plan with a three-beacon venue, driven by the Mock Sensors beacon sliders — no Bluetooth hardware needed |
+
+The kits live in the `examples/` folder of the ASAPS distribution (in the repository: `packages/builder/public/examples/`, with a README and per-kit pass/fail criteria in `docs/TESTING_EXPERIMENTAL_BEATS.md`). Import any kit via **Import → Project (ZIP)** and run it in Preview or an HTML export on the target device.
 
 ## Text-to-Speech (TTS)
 
@@ -2437,6 +2519,11 @@ The Condition Type dropdown groups the available checks into two families:
 - **Sentiment toward target ≷ value** — branch on how one character feels about another (optionally summed across all emotions, or scoped to a single emotion like *trust*)
 - **Goal status** — branch on whether a character's named goal is `open`, `met`, `failed`, or `abandoned`
 - **Active variant** — branch on which authored variant of a character is currently in play (e.g. anxious-introvert vs. free-spirit)
+
+**XR / sensors** (for location-aware stories, exposed under the *XR / sensors* optgroup):
+- **GPS proximity (within / outside radius)** — is the player within (or outside) a radius of a target coordinate? (For geofencing a whole *named point set* from [Set GPS Location](#set-gps-location-beat), bind a GPS Location beat entry to the set instead — that's where dynamic points live.)
+- **Indoor proximity (beacon RSSI)** — is the player near a configured venue beacon?
+- **Permission granted** — has the player granted a device permission (location, camera, …)? Useful for routing around denied sensors gracefully.
 
 ![Condition Type dropdown showing the Character affect group](images/26-condition-type-dropdown-affect.png)
 *The Condition Type dropdown. Classic checks at the top, the new Character affect group at the bottom. The runtime evaluates these the same way it evaluates "player has lantern" — it just checks a different slice of state.*
@@ -3080,7 +3167,7 @@ Quick reference for all beat types.
 | Movement Choice | Navigation | description, destinations |
 | Pick Prop | Item selection | prompt, props, display mode |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
-| Video Beat | Video playback | video asset, autoplay, controls, skip |
+| Video Beat | Video playback | video asset, autoplay, controls, skip, captions (cue rows: start/end/text, auto-translated into per-language subtitles), captionsEnabled, videoTranslations (per-language video override) |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
 | Input Image | Photo submission + AI vision analysis | prompt, analysisPrompt (AI instruction, stays in source language), saveTo, imageSource (camera/upload/both), buttonText, cancelButtonText, fallbackValue (stored on skip/failure/timeout), timeout, speaker |
 | Keypad | Numeric input | prompt, layout (phone/numeric/pin), correct code, max attempts, min/max digits, mask input, save to |
@@ -3089,6 +3176,8 @@ Quick reference for all beat types.
 | AR Scene | AR with image-marker tracking | prompt, trackingMode (marker), markerAssetId (`.mind` file), anchors[] (id, label, assetId, offsetX/Y, scale, onTap as beat id or `asaps://` URI), cancelButtonText, fallbackTarget, speaker |
 | Hyper Text | Clickable text | text with links, link targets |
 | 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
+| GPS Location | Map + geofenced locations | mode (display / trigger-on-arrival / trigger-on-departure), location entries (name, lat/lng, radius, target, effects), radius (m), instructional text, button/skip text, timeout, map style, show player marker; entries also support a project-file-level `pointName` binding to a Set GPS Location point set |
+| Indoor Location | Floor plan + beacon zones | mode (display / trigger-on-arrival / trigger-on-departure), target beacon UUID (from Settings → Location & XR → Indoor venue), radius (m), instructional text, button/skip text, timeout |
 | End Screen | Story ending | message, show restart, show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
@@ -3097,7 +3186,8 @@ Quick reference for all beat types.
 | Beat | Purpose | Key Settings |
 |------|---------|--------------|
 | Set Variable/Counter | Change state | variable name, value (true/false, or `=`-prefixed arithmetic expression), counter operations, or fictional time |
-| Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
+| Set GPS Location | Write a named GPS point set into story state | mode (capture / explicit / scatter / preset), point set name, point radius (m), lat/lng, fallback lat/lng, scatter: count + radius + center source + placement (uniform / walkable via OpenStreetMap), preset: map point curator |
+| Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant, gpsProximity, indoorProximity, permissionGranted), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
 | Random Target | Randomization | targets with optional weights |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
@@ -3111,7 +3201,7 @@ Quick reference for all beat types.
 | AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
 | AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, presentationMode, prefetch support |
-| AI Conversation | Real-time AI conversation | scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
+| AI Conversation | Real-time AI conversation | presentation (chat / dialog — set in the Visual Editor's Conversation Settings), scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
 | AI Summary | Journey recap | style, length, include options |
 
 ---
@@ -3244,6 +3334,12 @@ Quick reference for all beat types.
 **Web View Beat** - Visible beat that embeds an external URL via iframe (web/PW) or `<webview>` (Electron). Player exits via Done button, an auto-exit URL regex match, or a `postMessage({asaps:'result', value:...})` from the embedded page. Story variables can be injected into the URL as a hash fragment via the **Pass variables** field.
 
 **AR Scene Beat** - Visible beat that runs an augmented-reality scene with image-marker tracking (via MindAR, lazy-loaded from CDN). The player aims the camera at a printed marker; tappable anchors attached to the marker route through their `onTap` value (a beat id or `asaps://` URI). Phase 1 supports image-marker tracking only; world / face tracking are reserved.
+
+**GPS Point Set** - A named collection of geographic points written into story state by the *Set GPS Location* logic beat (captured, explicit, scattered, or author-curated on a map). A GPS Location beat entry can geofence the whole set by name at play time. Persists through save/resume.
+
+**Mock Sensors Panel** - The **📍 Mock Sensors** overlay in the Preview window (bottom-right, shown when the project has location settings — a GPS origin, mock location, or indoor venue). Simulates GPS position (typed coordinates + walk-nudge buttons), device orientation, and — when venue beacons are configured — per-beacon distances via sliders, so location beats can be tested without leaving the desk.
+
+**Verification Kit** - A small importable example project that exercises one device-facing beat end-to-end with explicit on-screen pass/fail stations. Kits ship for GPS, QR Scan, Web View, AR Scene, and Indoor Location in the `examples/` folder of the distribution.
 
 **Project Browser** - The project list surface opened via **📁 Projects → Browse all projects…** (web build: in-editor modal; Electron: dedicated start window). Also auto-opens once on the first cold load of each browser/Electron session so authors can pick where to start before diving into the editor. Shows a *Currently editing* (modal) or *Last project* (start window) banner for the loaded project, a **Start a new project** row with four create paths (Empty project / Build from a prompt / Co-write with AI / Import), and the searchable / sortable list of every project saved on this machine. Cards are compact: title, dot-separated badges (beat count · layout mode · character count, with fields dropping out when empty and an italic "empty project" fallback for never-edited entries), optional description, modified date. Also accepts drag-and-drop `.asaps` zip imports anywhere on its surface, and dismisses on successful import.
 
