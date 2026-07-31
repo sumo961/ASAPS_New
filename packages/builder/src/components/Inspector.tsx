@@ -1626,6 +1626,14 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const availableTargets = allBeats.filter(b => b.id !== beat.id);
+  // Point-set names written by the story's Set GPS Location beats —
+  // suggestions for GpsLocation entries' dynamic `pointName` binding.
+  const availablePointSets = [...new Set(
+    allBeats
+      .filter((b: any) => b.type === 'setGpsLocation')
+      .map((b: any) => b.parameters?.pointName ?? (b as any).pointName)
+      .filter((n: any): n is string => typeof n === 'string' && n.length > 0)
+  )];
   // Lightweight beat list for the QR generator panel. Includes self so
   // an author can build a "scan this to come back here" loop in
   // playtesting; the generator's UI is otherwise generic.
@@ -4419,6 +4427,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         onChange={(next) => handleParameterChange('xrLocations', next)}
                         availableTargets={availableTargets}
                         venueBeacons={venueBeacons}
+                        availablePointSets={availablePointSets}
                         storyOrigin={(() => {
                           const loc = (globalSettings as any)?.location;
                           if (loc?.originLat !== undefined && loc?.originLng !== undefined) {

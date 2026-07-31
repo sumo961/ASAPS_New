@@ -504,7 +504,9 @@ Embed videos in your story—cutscenes, tutorials, animations, or any video cont
 
 **A different video per language (v0.9.83).** When your project has translation languages configured, the same video settings panel shows a **Language versions** section with one row per target language. Pick an alternate video asset for any language — say, a version with burned-in German narration — and that video plays when the interactor switches to that language. *"Languages without one use the video above"* — the default video is always the fallback, so you only override where you have localized footage. Language overrides ship in HTML exports and survive project import/export.
 
-<!-- TODO screenshot session: Video Beat visual-editor settings showing the Language versions rows and the Captions cue editor -->
+![Video Beat in the Visual Editor — the Captions checkbox with cue rows (start → end → text) and + Add caption](images/52-video-captions-editor.png)
+
+<!-- TODO screenshot: the "Language versions" rows additionally appear here in projects with target languages configured (Settings → Translation) -->
 
 **When to Use:** Cutscenes, intro sequences, tutorial segments.
 
@@ -645,7 +647,7 @@ Drop a real website into your narrative — a news article, a research paper, an
 
 **Authoring in the Visual Editor (v0.9.84).** Web View is a first-class Visual Editor citizen: select the beat in the flowchart and open the **Visual Editor** tab to see the prompt and the page frame laid out exactly as the runtime will render them. In Responsive projects, the left panel's slot rows include a **"Web page frame"** row with a **Height** slider (20–95% of the stage in 5% steps, or **auto** — the default, where the prompt hugs its natural height and the frame takes the rest of the stage). While authoring, the frame shows a placeholder rather than loading the live URL.
 
-<!-- TODO screenshot session: Web View beat in the Visual Editor — "Web page frame" slot row with the Height slider -->
+![Web View beat in the Visual Editor — the "Web page frame" slot row expanded, with the Height slider set to auto](images/53-webview-frame-slot.png)
 
 **Responsive and Fixed both supported.** Web View renders through ASAPS's slot system in Responsive projects (the iframe fills a dedicated `webview` slot) and respects baked pixel locations in Fixed-canvas projects — since v0.9.84 the fixed-canvas authoring chain is complete too: adding a Web View beat to a fixed project bakes a prompt plus a 900×480 page frame you can reposition and resize like any other element, and the layout migrator converts Web View beats when you switch modes. Either way, the Done button sits with the other action buttons at the bottom of the stage.
 
@@ -912,7 +914,7 @@ Start a countdown. When it expires, the story can jump to a specific beat.
 
 This invisible beat (📍, Logic group, added in v0.9.83) stores geographic points under a **point set name**. On its own it changes nothing on screen; its power comes from binding: a **GPS Location** beat (the map beat in the Multi Choice → Spatial palette group) can reference the same name from one of its location entries (the entry's `pointName` property), and that single entry expands at play time into one geofence per stored point — each inheriting the entry's target beat, radius, and effects. Scatter points around the player, geofence them, react on arrival: that's the geocaching mechanic in three beats.
 
-> **Binding is currently a project-file feature.** The runtime fully supports `pointName` binding (the bundled GPS verification kit runs on it), but the Inspector's location-entry editor doesn't yet offer a "bind to point set" field — today the property is set in the project data (e.g. AI-generated or imported stories, or the verification kits). Explicit-coordinate location entries, and everything else on this page, are fully authorable from the UI.
+**Binding a GPS Location entry to a point set:** in the GPS Location beat's Inspector, each location entry has a **position source** toggle — **Fixed coordinates** (the usual latitude/longitude fields) or **Point set (dynamic)**. Choose *Point set (dynamic)* and enter the point set name; names written by the story's Set GPS Location beats are suggested as you type. The entry then expands at play time as described above. (Bound entries have no fixed coordinate, so they don't show a marker on the authoring map — the points only exist at play time.)
 
 **Mode** (dropdown) — four ways to produce the points:
 
@@ -923,7 +925,7 @@ This invisible beat (📍, Logic group, added in v0.9.83) stores geographic poin
   - *Walkable (streets & parks, via OpenStreetMap)* — snaps points onto real streets, footpaths, and parks using OpenStreetMap data (no API key). Needs a network connection at play time; falls back to uniform placement when coverage is thin or the lookup fails.
 - **Place points on a map (authoring)** — preset mode. The **Points** editor in the Inspector is an embedded map (OpenStreetMap tiles): drag the blue center marker, set the radius, click **📍 Generate on streets & parks** to auto-place points on walkable ground, then curate by hand — drag a pin to nudge it, click a pin to remove it, click the map to add one. The curated points are baked into the beat and written verbatim at play time — no network or sensor needed, and you (a human) have reviewed every spot. *Walkable isn't automatically safe — that final check is yours.*
 
-<!-- TODO screenshot session: Set GPS Location beat in preset mode — the embedded map curator with center marker, radius ring, and generated pins -->
+![Set GPS Location in preset mode — the embedded map curator with the dashed radius ring, center marker, generated points, and the Generate on streets & parks button](images/54-gps-point-curator.png)
 
 **Other Key Settings:**
 - **Point set name** — The name a GPS Location entry references (its *pointName*) to geofence these points
@@ -1036,7 +1038,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 
 The Visual Editor preview is faithful in both modes: chat mode shows the real scrolling panel seeded with your opening line, dialog mode shows the positioned boxes, and switching between the two re-bakes or clears the positioned elements live.
 
-<!-- TODO screenshot session: AI Conversation in the Visual Editor — Conversation Settings section with the Chat/Dialog presentation choice, one shot per mode -->
+![AI Conversation in the Visual Editor — the Conversation Settings section with the Presentation choice (Chat mode shown)](images/55-aiconversation-presentation.png)
 
 **Conversation Directions:**
 
@@ -2147,7 +2149,7 @@ When your project has any location settings configured (**Settings → Location 
 
 Since v0.9.85 the panel also appears for **indoor-only projects** — a venue with beacons but no GPS origin — which previously had no way in.
 
-<!-- TODO screenshot session: Preview window with the Mock Sensors (XR) panel open, showing position nudge buttons and per-beacon distance sliders (use the Indoor Location verification kit) -->
+![The Preview window on the Indoor Location kit with the Mock Sensors (XR) panel open — per-beacon distance sliders below the position and orientation controls](images/56-mock-sensors-panel.png)
 
 ### Path-Based State Presets
 

@@ -29,6 +29,13 @@ export interface XRLocationEntry {
   radiusMeters?: number;
   target: string;
   effects?: Effect[];
+  /**
+   * Dynamic binding (GPS flavour): instead of a literal lat/lng, resolve
+   * this entry at runtime to the geo-points stored under this name by a
+   * Set GPS Location beat. Each stored point becomes a geofence
+   * inheriting this entry's target/radius/effects.
+   */
+  pointName?: string;
 }
 
 interface XRLocationsEditorProps {
@@ -46,6 +53,13 @@ interface XRLocationsEditorProps {
    * newly-created locations so authors don't start at (0,0) in the ocean.
    */
   storyOrigin?: { lat: number; lng: number };
+  /**
+   * Point-set names written by the story's Set GPS Location beats (GPS
+   * flavour only) — offered as suggestions for dynamic binding. Free
+   * text is still allowed: a set may be created later or named
+   * indirectly.
+   */
+  availablePointSets?: string[];
   // ChoiceEffectsEditor dependencies — pass through verbatim.
   availableCounters?: any[];
   availableVariables?: any[];
@@ -80,6 +94,7 @@ export const XRLocationsEditor: React.FC<XRLocationsEditorProps> = ({
   availableTargets,
   venueBeacons,
   storyOrigin,
+  availablePointSets,
   availableCounters,
   availableVariables,
   availableInventoryItems,
@@ -219,35 +234,99 @@ export const XRLocationsEditor: React.FC<XRLocationsEditorProps> = ({
             />
           </div>
 
-          {/* Per-flavour position picker */}
+          {/* Per-flavour position picker. GPS entries can either carry a
+              fixed coordinate or bind to a runtime point set (written by a
+              Set GPS Location beat) — one geofence per stored point,
+              inheriting this entry's target/radius/effects. `pointName`
+              defined (even '') marks dynamic mode so the choice survives
+              while the name field is still empty. */}
           {flavour === 'gps' ? (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block text-[11px] text-gray-600">
-                Latitude
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={loc.lat ?? ''}
-                  onChange={(e) => updateLocation(index, {
-                    lat: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
-                  })}
-                  placeholder="51.5074"
-                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                />
-              </label>
-              <label className="block text-[11px] text-gray-600">
-                Longitude
-                <input
-                  type="number"
-                  step="0.000001"
-                  value={loc.lng ?? ''}
-                  onChange={(e) => updateLocation(index, {
-                    lng: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
-                  })}
-                  placeholder="-0.1278"
-                  className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
-                />
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex gap-1 text-[11px]" role="radiogroup" aria-label="Position source">
+                {([
+                  ['fixed', 'Fixed coordinates'],
+                  ['pointSet', 'Point set (dynamic)'],
+                ] as const).map(([kind, label]) => {
+                  const active = kind === 'pointSet' ? loc.pointName !== undefined : loc.pointName === undefined;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (kind === 'pointSet' && loc.pointName === undefined) {
+                          updateLocation(index, { pointName: '' });
+                        } else if (kind === 'fixed' && loc.pointName !== undefined) {
+                          updateLocation(index, { pointName: undefined });
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded border ${
+                        active
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {loc.pointName === undefined ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-[11px] text-gray-600">
+                    Latitude
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={loc.lat ?? ''}
+                      onChange={(e) => updateLocation(index, {
+                        lat: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
+                      })}
+                      placeholder="51.5074"
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                    />
+                  </label>
+                  <label className="block text-[11px] text-gray-600">
+                    Longitude
+                    <input
+                      type="number"
+                      step="0.000001"
+                      value={loc.lng ?? ''}
+                      onChange={(e) => updateLocation(index, {
+                        lng: e.target.value === '' ? undefined : parseFloat(e.target.value.replace(',', '.')),
+                      })}
+                      placeholder="-0.1278"
+                      className="mt-0.5 w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                    Point set name (written by a Set GPS Location beat)
+                  </label>
+                  <input
+                    type="text"
+                    list={`xr-point-sets-${loc.id}`}
+                    value={loc.pointName}
+                    onChange={(e) => updateLocation(index, { pointName: e.target.value })}
+                    placeholder="e.g. treasure_spots"
+                    className="w-full px-2 py-1 border border-gray-300 rounded text-xs font-mono"
+                  />
+                  <datalist id={`xr-point-sets-${loc.id}`}>
+                    {(availablePointSets || []).map((n) => (
+                      <option key={n} value={n} />
+                    ))}
+                  </datalist>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    At play time this entry becomes one geofence per stored point,
+                    each inheriting the target, radius, and effects below.
+                    {availablePointSets && availablePointSets.length > 0
+                      ? '' : ' No Set GPS Location beat writes a point set yet — add one, or type the name it will use.'}
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div>
