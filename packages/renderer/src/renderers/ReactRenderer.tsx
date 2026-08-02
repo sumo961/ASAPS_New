@@ -1,7 +1,8 @@
-import { uiString } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound } from '@asaps/core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
+import { getAudioManager } from '../audio/AudioManager';
 import type { Location, AnimationPath, SlotIntent } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
@@ -1895,6 +1896,41 @@ export class ReactRenderer extends BaseRenderer {
    */
   getSoundBlobResolver(): ((assetId: string) => Promise<Blob | null>) | null {
     return this.soundBlobResolver;
+  }
+
+  /**
+   * Fire-and-forget playback for the `playSound` Effect. Hosts bridge
+   * StoryContext's 'playSound' event here so effect hosts (location
+   * entries, dialog choices, dialog nodes) can trigger audio without
+   * core knowing about the audio pipeline. Resolution order mirrors
+   * ButtonElement's click-sound path: preset id → sound asset (via the
+   * host-wired blob resolver) → direct URL.
+   */
+  async playEffectSound(soundRef: string, volume?: number): Promise<void> {
+    if (!soundRef || soundRef === 'undefined') return;
+    try {
+      const audio = getAudioManager();
+      if (isPresetSound(soundRef)) {
+        const preset = getPresetSound(soundRef);
+        if (preset) await audio.playSound(preset.url, volume ?? preset.volume ?? 1.0);
+        return;
+      }
+      if (this.soundBlobResolver) {
+        const blob = await this.soundBlobResolver(soundRef);
+        if (blob) {
+          await audio.playSoundFromBlob(blob, volume ?? 1.0, false, soundRef);
+          return;
+        }
+      }
+      if (/^(https?:|blob:|data:)/.test(soundRef)) {
+        await audio.playSound(soundRef, volume ?? 1.0);
+        return;
+      }
+      console.warn(`[ReactRenderer] playEffectSound: could not resolve "${soundRef}"`);
+    } catch (err) {
+      // Audio failures must never break story flow.
+      console.warn('[ReactRenderer] playEffectSound failed:', err);
+    }
   }
 
   /**

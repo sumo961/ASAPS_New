@@ -1156,6 +1156,12 @@ export const PreviewWindow: React.FC = () => {
       rendererRef.current = reactRenderer;
       engineRef.current = engine;
 
+      // playSound Effect bridge: core emits the signal, the renderer owns
+      // the audio pipeline (preset/asset/URL resolution + mute state).
+      engine.getContext().on('playSound', ({ sound, volume }: { sound: string; volume?: number }) => {
+        void (reactRenderer as any).playEffectSound?.(sound, volume);
+      });
+
       // Push the SensorService into renderer state right after engine
       // construction so spatial sounds, the GPS beat's renderMap, and
       // anything else that needs sensor access can read from

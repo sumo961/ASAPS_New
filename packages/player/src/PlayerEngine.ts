@@ -933,6 +933,14 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           return null;
         }
       });
+
+      // playSound Effect bridge: StoryContext emits the decoupled signal;
+      // the renderer resolves preset/asset/URL and plays through its audio
+      // manager (which honors mute). Attach once — the context instance
+      // survives reset()/replay.
+      this.engine?.getContext()?.on('playSound', ({ sound, volume }: { sound: string; volume?: number }) => {
+        void (renderer as any).playEffectSound?.(sound, volume);
+      });
     }
 
     // Character inventory resolver - provides inventory HUD data for characters

@@ -417,7 +417,14 @@ export interface Effect {
     // bookmark" reads as `(current trust) - (bookmarked trust) >= …`.
     // The bookmark name is the canonical handle: writing the same name
     // again overwrites the prior snapshot.
-    | 'bookmarkAffectState';
+    | 'bookmarkAffectState'
+    // Play a one-shot sound. `target` is a sound asset id, preset sound id,
+    // or URL; `value` optionally carries a 0..1 volume. Applied as a
+    // decoupled signal: StoryContext emits 'playSound' and the host bridges
+    // it to the renderer's audio pipeline (core stays audio-free). The
+    // roadmap's location-triggered-sound gap: effect hosts (GPS/indoor
+    // location entries, dialog choices, dialog nodes) all gain it at once.
+    | 'playSound';
   target: string;
   value?: any;
   /**

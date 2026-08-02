@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { Effect, EmotionDefinition } from '@asaps/core';
+import { getAllPresetSounds } from '@asaps/core';
 import { SmartNameDropdown, type DropdownOption } from './SmartNameDropdown';
 import { CounterOwnerPicker } from '../components/CounterOwnerPicker';
 import type { AvailableCounter } from '../hooks/useAvailableCountersAndVariables';
@@ -30,6 +31,9 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // Switch which variant is active for a character (player picks "play
   // as introvert / extrovert" etc., or author wires a default).
   setCharacterVariant: 'Set Character Variant',
+  // Play a one-shot sound (asset id, preset id, or URL) — the
+  // location-triggered-sound mechanic, available on every effect host.
+  playSound: 'Play Sound',
   // v0.9.45 — snapshot mood / emotion / sentiment state under a name so
   // future condition baselines can compare against it.
   bookmarkAffectState: 'Bookmark Affect State',
@@ -47,6 +51,10 @@ interface ChoiceEffectsEditorProps {
    *  hosts that don't have characters in scope can still use the
    *  editor; the field falls back to a free-text input. */
   availableCharacters?: ReadonlyArray<{ id: string; name?: string; displayName?: string }>;
+  /** Project sound assets (audio type) for the `playSound` effect's
+   *  target dropdown. Optional — built-in preset sounds are always
+   *  offered, and free text still accepts an asset id or URL. */
+  availableSounds?: ReadonlyArray<{ id: string; name?: string }>;
   /** Project emotion palette — when supplied, the `fireEmotion` and
    *  `addSentiment`'s emotion fields render as comboboxes backed by
    *  the palette's emotion names (case-insensitive lookup; free-text
@@ -64,6 +72,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   availableVariables,
   availableInventoryItems = [],
   availableCharacters,
+  availableSounds,
   emotionPalette,
   hideInventory = false,
   compact = false,
@@ -111,6 +120,12 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
       case 'addInventory':
       case 'removeInventory':
         return inventoryOptions;
+      case 'playSound':
+        // Project sound assets first, then the built-in presets.
+        return [
+          ...(availableSounds || []).map((a) => ({ name: a.id, displayName: a.name || a.id })),
+          ...getAllPresetSounds().map((ps) => ({ name: ps.id, displayName: `${ps.name} (preset)` })),
+        ];
       default:
         return [];
     }

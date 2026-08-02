@@ -2011,6 +2011,14 @@ export class StoryContext extends EventEmitter {
 
   applyEffect(effect: Effect): void {
     switch (effect.type) {
+      // Sound is a renderer concern; core just signals. Hosts subscribe
+      // (PreviewWindow / PlayerEngine) and route to the audio pipeline.
+      case 'playSound':
+        this.emit('playSound', {
+          sound: effect.target,
+          volume: typeof effect.value === 'number' ? effect.value : undefined,
+        });
+        break;
       case 'setVariable':
         this.setVariable(effect.target, effect.value);
         break;
