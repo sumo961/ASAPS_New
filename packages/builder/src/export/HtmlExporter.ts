@@ -11,6 +11,7 @@
  */
 
 import JSZip from 'jszip';
+import { buildRelayKitFiles } from './relayKit';
 import { getStorageManager } from '../storage/StorageManager';
 import type { TranslationResource } from '@asaps/core';
 import { UI_STRING_DEFAULTS } from '@asaps/core';
@@ -616,6 +617,47 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
 
       // AI API call
       async function callAI(systemPrompt, userMessage, config) {
+        // Relay mode: no key in the page — POST { provider, body } to the
+        // same-origin relay (see README-RELAY.md) which injects the key
+        // server-side and forwards to the official endpoint.
+        if (config.proxyUrl) {
+          var relayBody;
+          if (config.provider === 'anthropic') {
+            relayBody = {
+              model: config.model || 'claude-sonnet-5',
+              max_tokens: 8192,
+              system: systemPrompt,
+              messages: [{ role: 'user', content: userMessage }],
+            };
+          } else {
+            var rMsgs = [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage },
+            ];
+            if (!/json/i.test(systemPrompt + userMessage)) {
+              rMsgs[0].content += '\n\nRespond with a single valid JSON object.';
+            }
+            relayBody = { model: config.model || 'gpt-4o-mini', messages: rMsgs, temperature: 0.3, response_format: { type: 'json_object' } };
+            if (/^(gpt-5|o1|o3|o4)/i.test(relayBody.model) || /gpt-4o/i.test(relayBody.model)) {
+              relayBody.max_completion_tokens = 8192;
+            }
+          }
+          var relayResp = await fetch(config.proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ provider: config.provider === 'anthropic' ? 'anthropic' : 'openai', body: relayBody }),
+          });
+          if (!relayResp.ok) {
+            var relayErr = 'Relay error ' + relayResp.status;
+            try { var rj = await relayResp.json(); relayErr = (rj.error && (rj.error.message || rj.error)) || rj.message || relayErr; } catch (e) {}
+            throw new Error(relayErr);
+          }
+          var relayData = await relayResp.json();
+          if (config.provider === 'anthropic') {
+            return (relayData.content && relayData.content[0] && relayData.content[0].text) || '';
+          }
+          return (relayData.choices && relayData.choices[0] && relayData.choices[0].message && relayData.choices[0].message.content) || '';
+        }
         if (config.provider === 'anthropic') {
           var base = (config.baseUrl || 'https://api.anthropic.com').replace(/\\/+$/, '');
           var url = base.endsWith('/v1') ? base + '/messages' : base + '/v1/messages';
@@ -872,6 +914,23 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
     })();
   </script>`;
 
+
+/**
+ * AI config for the exported player. Relay mode (aiProxyUrl) embeds NO
+ * key — the entire point of the relay is that the key never reaches the
+ * browser. Shared by all three export flavors.
+ */
+function buildAiConfigJson(options: HtmlExportOptions): string {
+  if (!options.aiProvider || !(options.aiApiKey || options.aiProxyUrl)) return 'null';
+  return JSON.stringify({
+    provider: options.aiProvider,
+    apiKey: options.aiProxyUrl ? undefined : options.aiApiKey,
+    proxyUrl: options.aiProxyUrl || undefined,
+    baseUrl: options.aiBaseUrl || undefined,
+    model: options.aiModel || undefined,
+  });
+}
+
 export interface HtmlExportOptions {
   /** Export mode: 'folder' creates separate files, 'single-file' inlines everything */
   mode: 'folder' | 'single-file';
@@ -885,6 +944,15 @@ export interface HtmlExportOptions {
   aiProvider?: AIProvider;
   /** API key to embed (if provided by creator) */
   aiApiKey?: string;
+  /**
+   * Relay URL for public deployments (the "hide your API key" path).
+   * When set, NO key is embedded: the player POSTs { provider, body } to
+   * this URL and the relay (see relayKit.ts, deployed next to the story)
+   * injects the key from its host's env vars. Folder exports bundle the
+   * relay function automatically; single-file authors download the kit
+   * from the export dialog. Typically '/.netlify/functions/asaps-ai'.
+   */
+  aiProxyUrl?: string;
   /** Custom base URL for API (OpenAI-compatible endpoints) */
   aiBaseUrl?: string;
   /** Model override (e.g., 'gpt-5.6-sol', 'claude-sonnet-5') */
@@ -1035,14 +1103,7 @@ async function exportAsSingleFile(
   const playerScript = await getPlayerScript();
 
   // Build AI config object (or null if not provided)
-  const aiConfig = options.aiProvider && options.aiApiKey
-    ? JSON.stringify({
-        provider: options.aiProvider,
-        apiKey: options.aiApiKey,
-        baseUrl: options.aiBaseUrl || undefined,
-        model: options.aiModel || undefined,
-      })
-    : 'null';
+  const aiConfig = buildAiConfigJson(options);
 
   // Build TTS config object (or null if not provided).
   // The `enabled` flag mirrors the builder's TTS toggle so the exported
@@ -1099,14 +1160,7 @@ async function exportAsFolder(
   const playerScript = await getPlayerScript();
 
   // Build AI config object (or null if not provided)
-  const aiConfig = options.aiProvider && options.aiApiKey
-    ? JSON.stringify({
-        provider: options.aiProvider,
-        apiKey: options.aiApiKey,
-        baseUrl: options.aiBaseUrl || undefined,
-        model: options.aiModel || undefined,
-      })
-    : 'null';
+  const aiConfig = buildAiConfigJson(options);
 
   // Build TTS config (mirrors single-file export)
   const ttsEnabledFlag = options.ttsEnabled ?? true;
@@ -1146,6 +1200,9 @@ async function exportAsFolder(
   // Add files to ZIP
   zip.file('index.html', html);
   zip.file('story.asaps.zip', storyZipBlob);
+  if (options.aiProxyUrl) {
+    for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
+  }
 
   // Generate ZIP
   const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -1293,7 +1350,7 @@ export async function downloadHtmlExport(
 ): Promise<void> {
   const safeName = projectName.replace(/[^a-z0-9]/gi, '_');
   const hasExistingTranslations = options.existingTranslations && options.existingTranslations.length > 0;
-  const hasAIOnTheFly = options.enableAIOnTheFly && options.aiProvider && (options.aiApiKey || options.aiProvider === 'local');
+  const hasAIOnTheFly = options.enableAIOnTheFly && options.aiProvider && (options.aiApiKey || options.aiProxyUrl || options.aiProvider === 'local');
 
   if (!hasExistingTranslations && !hasAIOnTheFly) {
     // Standard export (no translations, no AI on-the-fly)
@@ -1392,14 +1449,7 @@ export async function downloadHtmlExport(
 
   const playerScript = await getPlayerScript();
 
-  const aiConfig = options.aiProvider && options.aiApiKey
-    ? JSON.stringify({
-        provider: options.aiProvider,
-        apiKey: options.aiApiKey,
-        baseUrl: options.aiBaseUrl || undefined,
-        model: options.aiModel || undefined,
-      })
-    : 'null';
+  const aiConfig = buildAiConfigJson(options);
 
   // Build language options HTML
   const languageOptionsHtml = translationEntries
@@ -1462,6 +1512,9 @@ export async function downloadHtmlExport(
     const zip = new JSZip();
     zip.file('index.html', html);
     zip.file('story.asaps.zip', originalZipBlob);
+    if (options.aiProxyUrl) {
+      for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
+    }
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     downloadBlob(zipBlob, `${safeName}_html.zip`);
   }

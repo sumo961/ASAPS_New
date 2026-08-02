@@ -176,6 +176,69 @@ describe('exportAsHtml — single-file', () => {
   });
 });
 
+describe('relay mode (hide the API key)', () => {
+  it('embeds proxyUrl and NO key when aiProxyUrl is set', async () => {
+    const res = await exportAsHtml(
+      'p1',
+      baseOpts({
+        precomputedStoryZip: sfZip(),
+        aiProvider: 'anthropic',
+        aiApiKey: 'sk-should-never-ship',
+        aiProxyUrl: '/.netlify/functions/asaps-ai',
+      }),
+    );
+    expect(res.html).toContain('"proxyUrl":"/.netlify/functions/asaps-ai"');
+    expect(res.html).toContain('"provider":"anthropic"');
+    // The whole point: the key must not appear anywhere in the page.
+    expect(res.html).not.toContain('sk-should-never-ship');
+  });
+
+  it('the on-page AI translation template carries the relay branch', async () => {
+    // callAI lives in the translations/on-the-fly export flavor; pin the
+    // template source so the relay branch (and the no-key contract) can't
+    // silently vanish from it.
+    const { readFileSync } = await import('fs');
+    const { join } = await import('path');
+    const src = readFileSync(join(__dirname, '../HtmlExporter.ts'), 'utf-8');
+    expect(src).toContain('if (config.proxyUrl) {');
+    expect(src).toContain("provider: config.provider === 'anthropic' ? 'anthropic' : 'openai'");
+  });
+
+  it('folder export bundles the relay function + README when relay mode is on', async () => {
+    const res = await exportAsHtml(
+      'p1',
+      baseOpts({
+        mode: 'folder',
+        precomputedStoryZip: folderZip(),
+        aiProvider: 'openai',
+        aiProxyUrl: '/.netlify/functions/asaps-ai',
+      }),
+    );
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(res.zip!);
+    expect(zip.file('netlify/functions/asaps-ai.mjs'), 'relay function missing').toBeTruthy();
+    expect(zip.file('README-RELAY.md'), 'relay README missing').toBeTruthy();
+    const fn = await zip.file('netlify/functions/asaps-ai.mjs')!.async('string');
+    // Fixed upstreams + env-var keys are the security posture — pin them.
+    expect(fn).toContain("anthropic: 'https://api.anthropic.com/v1/messages'");
+    expect(fn).toContain("openai: 'https://api.openai.com/v1/chat/completions'");
+    expect(fn).toContain('ANTHROPIC_API_KEY');
+    expect(fn).toContain('OPENAI_API_KEY');
+    // No CORS headers: same-origin only, so foreign sites can't spend the key.
+    expect(fn).not.toContain('Access-Control-Allow-Origin');
+  });
+
+  it('folder export omits the relay kit when relay mode is off', async () => {
+    const res = await exportAsHtml(
+      'p1',
+      baseOpts({ mode: 'folder', precomputedStoryZip: folderZip(), aiProvider: 'openai', aiApiKey: 'sk-x' }),
+    );
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(res.zip!);
+    expect(zip.file('netlify/functions/asaps-ai.mjs')).toBeNull();
+  });
+});
+
 describe('exportAsHtml — folder', () => {
   it('returns a non-empty zip blob in folder mode', async () => {
     const res = await exportAsHtml('p1', baseOpts({ mode: 'folder', precomputedStoryZip: folderZip() }));

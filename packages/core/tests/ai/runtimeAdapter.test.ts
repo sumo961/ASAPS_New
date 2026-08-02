@@ -15,6 +15,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   createRuntimeAIService,
   createProxyTransport,
+  createRelayTransport,
   createDirectAnthropicTransport,
   createDirectOpenAITransport,
   DEFAULT_OPENAI_MODEL,
@@ -188,6 +189,30 @@ describe('transports (fetch wire contracts)', () => {
     vi.stubGlobal('fetch', spy);
     return spy;
   }
+
+  it('relay transport posts { provider, body } and NEVER a key (public-deploy contract)', async () => {
+    const spy = fetchSpy({ content: [{ type: 'text', text: 'hi' }] });
+    const t = createRelayTransport({ endpoint: '/.netlify/functions/asaps-ai', family: 'anthropic' });
+    const out = await t({ model: 'claude-sonnet-5', max_tokens: 10, messages: [] });
+    const [url, init] = spy.mock.calls[0];
+    expect(url).toBe('/.netlify/functions/asaps-ai');
+    expect(JSON.parse(init.body)).toEqual({
+      provider: 'anthropic',
+      body: { model: 'claude-sonnet-5', max_tokens: 10, messages: [] },
+    });
+    expect(init.body).not.toContain('apiKey');
+    expect(out).toEqual({ content: [{ type: 'text', text: 'hi' }] });
+  });
+
+  it('relay transport surfaces the relay error message on non-ok responses', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'ANTHROPIC_API_KEY is not set. Add it under Site configuration.' }),
+    }) as any));
+    const t = createRelayTransport({ endpoint: '/relay', family: 'anthropic' });
+    await expect(t({ model: 'm' })).rejects.toThrow(/ANTHROPIC_API_KEY is not set/);
+  });
 
   it('proxy transport posts { baseUrl, apiKey, ...body } to the proxy endpoint', async () => {
     const spy = fetchSpy();

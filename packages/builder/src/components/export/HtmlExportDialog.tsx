@@ -5,6 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
 import { downloadHtmlExport, previewStoryZip, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
+import { DEFAULT_RELAY_PATH, buildRelayKitFiles } from '../../export/relayKit';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
@@ -33,6 +34,10 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [enableAI, setEnableAI] = useState(true);
   const [aiProvider, setAiProvider] = useState<AIProvider>('openai');
   const [aiApiKey, setAiApiKey] = useState('');
+  // AI access mode: embed the key in the page (private use) or point the
+  // player at a same-origin relay so the key never ships (public hosting).
+  const [aiAccess, setAiAccess] = useState<'embed' | 'relay'>('embed');
+  const [aiProxyUrl, setAiProxyUrl] = useState(DEFAULT_RELAY_PATH);
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiModel, setAiModel] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -132,9 +137,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     try {
       // For local provider, we need baseUrl but not apiKey
       // For others, we need apiKey (baseUrl is optional)
-      const hasAIConfig = aiProvider === 'local'
-        ? !!aiBaseUrl
-        : !!aiApiKey;
+      const relayMode = aiAccess === 'relay' && (aiProvider === 'openai' || aiProvider === 'anthropic');
+      const hasAIConfig = relayMode
+        ? true
+        : aiProvider === 'local'
+          ? !!aiBaseUrl
+          : !!aiApiKey;
 
       // Collect selected pre-made translations
       const selectedTranslations: TranslationResource[] = translationState.translations.filter(
@@ -159,7 +167,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         enableAI,
         showApiKeyPrompt: enableAI && !hasAIConfig,
         aiProvider: needsAIConfig ? aiProvider : undefined,
-        aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
+        aiApiKey: needsAIConfig && !relayMode && aiApiKey ? aiApiKey : undefined,
+        aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ttsProvider: savedTTS?.providerType,
@@ -222,7 +231,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -233,7 +242,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     setExporting(true);
     setError(null);
     try {
-      const hasAIConfig = aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
+      const relayMode = aiAccess === 'relay' && (aiProvider === 'openai' || aiProvider === 'anthropic');
+      const hasAIConfig = relayMode ? true : aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
       const selectedTranslations: TranslationResource[] = translationState.translations.filter(
         t => includedTranslations.has(t.languageCode)
       );
@@ -250,7 +260,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         enableAI,
         showApiKeyPrompt: enableAI && !hasAIConfig,
         aiProvider: needsAIConfig ? aiProvider : undefined,
-        aiApiKey: needsAIConfig && aiApiKey ? aiApiKey : undefined,
+        aiApiKey: needsAIConfig && !relayMode && aiApiKey ? aiApiKey : undefined,
+        aiProxyUrl: needsAIConfig && relayMode ? (aiProxyUrl.trim() || DEFAULT_RELAY_PATH) : undefined,
         aiBaseUrl: needsAIConfig && aiBaseUrl ? aiBaseUrl : undefined,
         aiModel: needsAIConfig && aiModel ? aiModel : undefined,
         ttsProvider: savedTTS?.providerType,
@@ -301,7 +312,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   }, []);
 
   // Check if AI config is available (needed for AI on-the-fly)
-  const hasAIConfig = aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
+  const relayModeUi = aiAccess === 'relay' && (aiProvider === 'openai' || aiProvider === 'anthropic');
+  const hasAIConfig = relayModeUi ? true : aiProvider === 'local' ? !!aiBaseUrl : !!aiApiKey;
 
   if (!isOpen) return null;
 
@@ -399,9 +411,11 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               <div>
                 <div className="font-medium text-gray-900">Enable AI Features</div>
                 <div className="text-sm text-gray-500">
-                  {aiApiKey
-                    ? 'API key will be embedded in export'
-                    : 'Players will be prompted for API key if story uses AI beats'
+                  {relayModeUi
+                    ? 'No key in the page — a relay you deploy holds it'
+                    : aiApiKey
+                      ? 'API key will be embedded in export'
+                      : 'Players will be prompted for API key if story uses AI beats'
                   }
                 </div>
               </div>
@@ -463,8 +477,84 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   </div>
                 )}
 
-                {/* API Key Input - not shown for local */}
-                {aiProvider !== 'local' && (
+                {/* AI access mode — public deployments should use the relay
+                    so the key never ships in the page. Relay upstreams are
+                    fixed to the official endpoints, so it's only offered for
+                    openai/anthropic (local/custom talk to their own URLs). */}
+                {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">AI access</label>
+                    <div className="flex gap-2 text-sm" role="radiogroup" aria-label="AI access mode">
+                      {([
+                        ['embed', 'Embed my API key', 'Key ships inside the HTML — private sharing only'],
+                        ['relay', 'Use a relay (recommended for public hosting)', 'No key in the page; a small server function you deploy next to the story holds it'],
+                      ] as const).map(([kind, label, hint]) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          title={hint}
+                          onClick={() => setAiAccess(kind)}
+                          className={`flex-1 px-3 py-2 rounded-lg border text-left ${
+                            aiAccess === kind
+                              ? 'border-blue-500 bg-blue-50 text-blue-900'
+                              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Relay settings */}
+                {relayModeUi && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Relay URL</label>
+                      <input
+                        type="text"
+                        value={aiProxyUrl}
+                        onChange={(e) => setAiProxyUrl(e.target.value)}
+                        placeholder={DEFAULT_RELAY_PATH}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Default works when the relay is deployed with the story (Netlify).
+                        Point it at another site's relay only if that relay allows it.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                      <div className="text-xs text-emerald-800 flex-1">
+                        {mode === 'folder'
+                          ? 'The folder export includes the relay function + README-RELAY.md. After deploying, set your API key in the host\u2019s environment variables.'
+                          : 'Single-file export: download the relay kit, put your exported HTML in that folder (as index.html), and deploy the folder. Then set your API key in the host\u2019s environment variables.'}
+                      </div>
+                      {mode === 'single-file' && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const JSZip = (await import('jszip')).default;
+                            const kit = new JSZip();
+                            for (const f of buildRelayKitFiles()) kit.file(f.path, f.content);
+                            const blob = await kit.generateAsync({ type: 'blob' });
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(blob);
+                            a.download = 'asaps-relay-kit.zip';
+                            a.click();
+                            URL.revokeObjectURL(a.href);
+                          }}
+                          className="text-xs bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-emerald-700 flex-shrink-0"
+                        >
+                          Download relay kit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* API Key Input - not shown for local or relay mode */}
+                {aiProvider !== 'local' && !relayModeUi && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       API Key {aiApiKey ? '' : '(optional)'}

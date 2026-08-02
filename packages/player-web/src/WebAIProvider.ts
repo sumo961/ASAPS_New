@@ -8,13 +8,17 @@ import {
   createRuntimeAIService,
   createDirectAnthropicTransport,
   createDirectOpenAITransport,
+  createRelayTransport,
 } from '@asaps/core';
 
 export type AIProvider = 'openai' | 'anthropic' | 'custom' | 'local';
 
 interface StoredConfig {
   provider: AIProvider;
-  apiKey: string;
+  /** Optional in relay deployments (proxyUrl carries the access instead). */
+  apiKey?: string;
+  /** Relay URL — see EmbeddedConfig.proxyUrl. */
+  proxyUrl?: string;
   baseUrl?: string;  // For custom providers
   model?: string;    // Model override
 }
@@ -22,7 +26,14 @@ interface StoredConfig {
 // Embedded config from creator (set in window.ASAPS_CONFIG.aiConfig)
 interface EmbeddedConfig {
   provider: AIProvider;
-  apiKey: string;
+  /** Absent in relay deployments — the key never reaches the browser. */
+  apiKey?: string;
+  /**
+   * Relay URL (same-origin serverless function, see the export's
+   * README-RELAY.md). When set, requests go { provider, body } → relay,
+   * which injects the key from its host's environment.
+   */
+  proxyUrl?: string;
   baseUrl?: string;
   model?: string;
 }
@@ -276,15 +287,20 @@ export class WebAIService implements IAIService {
   private serviceKey: string | null = null;
 
   private getService(config: StoredConfig): IAIService {
-    const key = `${config.provider}|${config.apiKey}|${config.baseUrl || ''}|${config.model || ''}`;
+    const key = `${config.provider}|${config.apiKey}|${(config as EmbeddedConfig).proxyUrl || ''}|${config.baseUrl || ''}|${config.model || ''}`;
     if (this.service && this.serviceKey === key) {
       return this.service;
     }
 
-    const transport = config.provider === 'anthropic'
-      ? createDirectAnthropicTransport({ apiKey: config.apiKey, baseUrl: config.baseUrl })
-      // 'openai', 'custom', and 'local' all speak the OpenAI-compatible API.
-      : createDirectOpenAITransport({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+    const family = config.provider === 'anthropic' ? 'anthropic' as const : 'openai' as const;
+    // Relay deployments carry a proxyUrl and no key — the relay injects
+    // the key server-side (the "hide your API key" export path).
+    const transport = (config as EmbeddedConfig).proxyUrl
+      ? createRelayTransport({ endpoint: (config as EmbeddedConfig).proxyUrl!, family })
+      : config.provider === 'anthropic'
+        ? createDirectAnthropicTransport({ apiKey: config.apiKey ?? '', baseUrl: config.baseUrl })
+        // 'openai', 'custom', and 'local' all speak the OpenAI-compatible API.
+        : createDirectOpenAITransport({ apiKey: config.apiKey ?? '', baseUrl: config.baseUrl });
 
     this.service = createRuntimeAIService({
       family: config.provider === 'anthropic' ? 'anthropic' : 'openai',
