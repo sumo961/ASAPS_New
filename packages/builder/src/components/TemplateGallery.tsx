@@ -71,8 +71,13 @@ async function fetchTemplateFile(meta: TemplateMeta): Promise<File> {
 }
 
 export interface TemplateCardHandlers {
-  /** Receives the fetched .asapst as a File — wire to the zip-import flow. */
-  onUseTemplate: (file: File, meta: TemplateMeta) => void | Promise<void>;
+  /**
+   * Receives the fetched .asapst as a File — wire to the zip-import flow.
+   * `name` is the project name the author chose in the card's naming step;
+   * hosts should pass it through as the import's `newName` so instantiated
+   * copies stop all being called after the template.
+   */
+  onUseTemplate: (file: File, meta: TemplateMeta, name: string) => void | Promise<void>;
 }
 
 const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & TemplateCardHandlers> = ({
@@ -80,19 +85,26 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
 }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Naming step: "Use template" first asks for the new project's name
+  // (default suggestion "My <template title>") instead of instantiating a
+  // copy that keeps the template's own name.
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState('');
 
   const use = async () => {
+    const chosen = name.trim() || `My ${meta.title}`;
     setBusy(true);
     setError(null);
     try {
       const file = await fetchTemplateFile(meta);
-      await onUseTemplate(file, meta);
+      await onUseTemplate(file, meta, chosen);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load template');
       setBusy(false);
       return;
     }
     setBusy(false);
+    setNaming(false);
   };
 
   return (
@@ -113,6 +125,29 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
           {meta.whatItShows}
         </div>
       )}
+      {naming ? (
+        <div className="flex items-center gap-2 w-full mt-auto pt-1">
+          <input
+            type="text"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void use(); if (e.key === 'Escape') setNaming(false); }}
+            placeholder={`My ${meta.title}`}
+            aria-label="Name for your new project"
+            className="flex-1 min-w-0 px-2 py-1.5 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+          />
+          <button
+            type="button"
+            onClick={use}
+            disabled={busy}
+            className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            Create
+          </button>
+        </div>
+      ) : (
       <div className="flex items-center gap-2 w-full mt-auto pt-1">
         <div className="flex flex-wrap gap-1 flex-1">
           {meta.tags.map((t) => (
@@ -121,15 +156,16 @@ const TemplateCard: React.FC<{ meta: TemplateMeta; compact?: boolean } & Templat
         </div>
         <button
           type="button"
-          onClick={use}
+          onClick={() => { setName(`My ${meta.title}`); setNaming(true); }}
           disabled={busy}
           className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-medium hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
           title="Creates your own copy of this template as a new project — the template itself is never changed"
         >
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          <Sparkles className="w-3.5 h-3.5" />
           Use template
         </button>
       </div>
+      )}
       {error && <div className="text-xs text-red-600">{error}</div>}
     </div>
   );

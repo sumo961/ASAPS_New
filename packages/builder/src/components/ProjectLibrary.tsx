@@ -41,7 +41,7 @@ export interface ProjectLibraryProps {
   /** ZIP import handler that takes a pre-selected File. Used by the
    *  drag-drop zone on the Browser surface so authors can drop a
    *  .asaps zip directly without going through the file picker. */
-  onImportZipFile?: (file: File) => Promise<void>;
+  onImportZipFile?: (file: File, options?: { newName?: string }) => Promise<void>;
 
   /** Called when renaming a project */
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
@@ -838,8 +838,8 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
           {onImportZipFile && (
             <TemplateShelf
               projectCount={projects.length}
-              onUseTemplate={async (file) => {
-                await onImportZipFile(file);
+              onUseTemplate={async (file, _meta, name) => {
+                await onImportZipFile(file, name ? { newName: name } : undefined);
                 // Same nudge as the drag-drop path: the import switched the
                 // editor behind the modal to the new project.
                 if (isModal) onClose?.();

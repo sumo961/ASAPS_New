@@ -4245,7 +4245,7 @@ function App() {
   // "Import ZIP" button (which opens the picker) AND the Project
   // Browser drag-drop zone, so the conflict-resolution + load-after-
   // import flow stays consistent across entry points.
-  const handleImportZipFile = useCallback(async (file: File) => {
+  const handleImportZipFile = useCallback(async (file: File, importOptions?: { newName?: string }) => {
     const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
       const result = await importProjectFromZip(file, options);
 
@@ -4279,7 +4279,7 @@ function App() {
     };
 
     try {
-      await doImport({ generateNewId: false });
+      await doImport({ generateNewId: false, ...(importOptions ?? {}) });
     } catch (error) {
       console.error('ZIP import failed:', error);
       alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);

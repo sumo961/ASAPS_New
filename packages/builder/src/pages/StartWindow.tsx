@@ -93,9 +93,9 @@ export const StartWindow: React.FC = () => {
 
   // Import — run the existing zip importer in this window's storage
   // context, then hand the imported project's id to the editor.
-  const handleImportFile = async (file: File) => {
+  const handleImportFile = async (file: File, options?: { newName?: string }) => {
     try {
-      const result = await importProjectFromZip(file, {});
+      const result = await importProjectFromZip(file, options ?? {});
       if (result.success && result.projectId) {
         dispatchPick({ openProject: result.projectId });
       } else if (result.error) {
@@ -104,6 +104,21 @@ export const StartWindow: React.FC = () => {
     } catch (err) {
       alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  // The Import TILE needs a no-arg click handler (ProjectLibrary
+  // disables the tile when `onImportZip` is absent — which is exactly
+  // how the start screen shipped with a permanently-inactive Import).
+  // Open a picker and feed the same path as drag-and-drop import.
+  const handleImportClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip,.asaps';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (file) void handleImportFile(file);
+    };
+    input.click();
   };
 
   // Stateless ProjectLibrary uses its own currentProjectDeleted, etc.
@@ -141,6 +156,7 @@ export const StartWindow: React.FC = () => {
             onCreateProject={handleEmpty}
             onOpenStoryFromPrompt={handlePrompt}
             onOpenIdeator={handleIdeator}
+            onImportZip={handleImportClick}
             onImportZipFile={handleImportFile}
             currentProjectId={lastProjectId}
             onContinueLast={lastProjectId ? () => handleLoadExisting(lastProjectId) : undefined}

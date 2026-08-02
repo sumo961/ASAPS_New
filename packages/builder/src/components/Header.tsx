@@ -42,7 +42,7 @@ interface HeaderProps {
    *  Project Browser's dropzone uses this so authors can drag a
    *  .asaps zip directly onto the modal without going through the
    *  file picker. */
-  onImportZipFile?: (file: File) => Promise<void>;
+  onImportZipFile?: (file: File, options?: { newName?: string }) => Promise<void>;
   onImportTwine?: () => void;
   onPreview?: () => void;
   onSettings?: () => void;
@@ -1142,8 +1142,8 @@ export const Header: React.FC<HeaderProps> = ({
       <TemplateGalleryModal
         isOpen={showTemplateGallery}
         onClose={() => setShowTemplateGallery(false)}
-        onUseTemplate={async (file) => {
-          await onImportZipFile?.(file);
+        onUseTemplate={async (file, _meta, name) => {
+          await onImportZipFile?.(file, name ? { newName: name } : undefined);
           setShowTemplateGallery(false);
         }}
       />

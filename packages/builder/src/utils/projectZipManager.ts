@@ -445,6 +445,12 @@ export async function importProjectFromZip(
     // Apply new name if provided
     if (options.newName) {
       projectData.project.name = options.newName;
+      // Template instantiation only: the story's on-screen title should
+      // match the chosen project name too (a regular import must never
+      // alter authored story content, so this stays template-scoped).
+      if (isTemplate && projectData.project.story?.metadata) {
+        projectData.project.story.metadata.title = options.newName;
+      }
     }
 
     // Import assets first
