@@ -2488,11 +2488,22 @@ export class ReactRenderer extends BaseRenderer {
     if (this.currentPresentationMode !== 'positioned') {
       const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      // Get avatar URL if available
+      // Get avatar URL if available. Two historical breaks lived here:
+      // (1) only the dedicated avatar resolver was consulted, but NO host
+      // ever wired it — PreviewWindow and PlayerEngine both set the
+      // PORTRAIT resolver, so chat views showed initial-letter fallbacks
+      // forever. Fall back to the portrait resolver (same signature, wired
+      // everywhere, resolves portrait.assetId → blob URL).
+      // (2) the lookup underscore-mangled the speaker ("Mary Jane" →
+      // mary_jane) while the resolvers match lowercased displayName/name —
+      // query with the RAW name first, keep the mangled form as a
+      // secondary probe for id-keyed custom resolvers.
       let avatarUrl: string | undefined;
-      if (this.characterAvatarResolver) {
-        // Try to resolve avatar using speaker name as character ID
-        avatarUrl = this.characterAvatarResolver(speaker.toLowerCase().replace(/\s+/g, '_'));
+      const resolveAvatar = this.characterAvatarResolver ?? this.characterPortraitResolver;
+      if (resolveAvatar) {
+        avatarUrl = resolveAvatar(speaker)
+          || resolveAvatar(speaker.toLowerCase().replace(/\s+/g, '_'))
+          || undefined;
       }
 
       const newMessage: ChatMessage = {

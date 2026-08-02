@@ -114,3 +114,36 @@ describe('ReactRenderer', () => {
   // getBoundingClientRect. Driving it would need a deeper layout harness; the
   // mount + content-render path above is the reliable coverage for this view.
 });
+
+describe('chat avatars (roadmap Tier-1 item 4)', () => {
+  // Speaker portraits never showed in chat views: renderDialog consulted only
+  // characterAvatarResolver — which NO host ever set (PreviewWindow and
+  // PlayerEngine wire the PORTRAIT resolver) — and mangled the speaker name
+  // to underscores while resolvers match plain lowercased names. These pin
+  // the fallback + raw-name lookup.
+  it('renderDialog resolves chat avatars via the portrait resolver with the raw speaker name', async () => {
+    const portraitResolver = vi.fn((name: string) =>
+      name === 'Mary Jane' ? 'blob:mock-portrait-url' : undefined,
+    );
+    renderer.setCharacterPortraitResolver(portraitResolver);
+    renderer.setState('presentationMode', 'chat-scroll');
+
+    void renderer.renderDialog('Mary Jane', 'Hello there!');
+
+    await waitFor(() => {
+      const img = container.querySelector('img[src="blob:mock-portrait-url"]');
+      expect(img, 'chat message should render the resolved portrait').toBeTruthy();
+    });
+    // raw name resolved on the first probe — no underscore mangling required
+    expect(portraitResolver).toHaveBeenCalledWith('Mary Jane');
+  });
+
+  it('falls back to the initial letter when no resolver matches', async () => {
+    renderer.setState('presentationMode', 'chat-scroll');
+    void renderer.renderDialog('Nora', 'Hi!');
+    await waitFor(() => {
+      expect(container.textContent).toContain('Hi!');
+    });
+    expect(container.querySelector('img')).toBeNull();
+  });
+});
