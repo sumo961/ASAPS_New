@@ -150,6 +150,24 @@ export class AIConditionBeat extends Beat {
     return connections;
   }
 
+
+  /**
+   * Last-resort routing when classification can't run or errors. After
+   * aiDefaultTarget and the graph fallback, fall back to the FIRST
+   * category's target — mirroring classifyContent's first-category
+   * fallback. Rationale (field bug 2026-08-02): aiCondition is
+   * parameter-derived, so exports carry connections: [] — a failed relay
+   * call returned null here, the engine declared the story ended, and the
+   * exported player restarted from the title. An arbitrary-but-sane branch
+   * beats a dead story.
+   */
+  private fallbackTargetId(context: StoryContext): string | null {
+    return this.aiDefaultTarget
+      || this.getNextBeat(context)
+      || this.categories.find(c => c.targetId)?.targetId
+      || null;
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -157,14 +175,14 @@ export class AIConditionBeat extends Beat {
     // Validate configuration
     if (!this.prompt || this.categories.length === 0) {
       console.error(`[AIConditionBeat ${this.id}] Missing prompt or categories`);
-      return this.aiDefaultTarget || this.getNextBeat(context);
+      return this.fallbackTargetId(context);
     }
 
     // Check if AI service is available
     const aiService = renderer.getState('aiService');
     if (!aiService || typeof aiService.classifyContent !== 'function') {
       console.warn(`[AIConditionBeat ${this.id}] AI service not configured, using default target`);
-      return this.aiDefaultTarget || this.getNextBeat(context);
+      return this.fallbackTargetId(context);
     }
 
     try {
@@ -226,7 +244,7 @@ Respond with ONLY the category name, nothing else.`;
         return matchedCategory.targetId;
       } else {
         console.warn(`[AIConditionBeat ${this.id}] AI returned unknown category: "${chosenCategory}"`);
-        const fallback = this.aiDefaultTarget || this.getNextBeat(context);
+        const fallback = this.fallbackTargetId(context);
         context.recordTimelineEvent({
           type: 'branch',
           beatId: this.id,
@@ -239,7 +257,7 @@ Respond with ONLY the category name, nothing else.`;
       }
     } catch (error) {
       console.error(`[AIConditionBeat ${this.id}] Error:`, error);
-      return this.aiDefaultTarget || this.getNextBeat(context);
+      return this.fallbackTargetId(context);
     }
   }
 }

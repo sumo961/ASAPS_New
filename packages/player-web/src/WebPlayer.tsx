@@ -107,9 +107,17 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     };
   }, [state]);
 
+  // Initialize once the splash is done — and ONLY once. This effect used
+  // to depend on `state` directly, so every later transition re-ran it
+  // (with its cleanup): 'ended' re-initialized the player and RESTARTED
+  // the story from the title (field bug: an exported story whose AI beat
+  // failed with no fallback flipped to 'ended' → surprise restart).
+  // `splashDone` flips false→true exactly once, so 'playing'/'ended'/
+  // 'error' neither re-run init nor fire the teardown cleanup. Language
+  // switches remount via a fresh ASAPSPlayer.init(), so they're unaffected.
+  const splashDone = state !== 'splash';
   useEffect(() => {
-    // Don't initialize until splash is done
-    if (state === 'splash') return;
+    if (!splashDone) return;
 
     let mounted = true;
 
@@ -679,7 +687,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         rendererRef.current = null;
       }
     };
-  }, [state, story, enableAI, mobileMode, mobileFontScale, language, onEnd, onError]);
+  }, [splashDone, story, enableAI, mobileMode, mobileFontScale, language, onEnd, onError]);
 
   // Note: Container resize is handled internally by ScaledStage component
   // via its own ResizeObserver
