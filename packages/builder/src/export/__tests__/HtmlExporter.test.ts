@@ -220,17 +220,23 @@ describe('relay mode (hide the API key)', () => {
     expect(zip.file('netlify.toml'), 'netlify.toml missing (CLI deploys need it explicit)').toBeTruthy();
     expect(zip.file('README-RELAY.md'), 'relay README missing').toBeTruthy();
     const readme = await zip.file('README-RELAY.md')!.async('string');
-    // Drop can't deploy functions — the README must steer to the CLI.
-    expect(readme).toContain('netlify-cli deploy --prod');
+    // Drop can't deploy functions — the README must warn and offer the
+    // no-terminal GitHub path, the CLI path, and the shared-relay path.
     expect(readme).toContain('does NOT deploy the relay function');
+    expect(readme).toContain('Path A — all in the browser');
+    expect(readme).toContain('netlify-cli deploy --prod');
+    expect(readme).toContain('ALLOWED_ORIGINS');
     const fn = await zip.file('netlify/functions/asaps-ai.mjs')!.async('string');
     // Fixed upstreams + env-var keys are the security posture — pin them.
     expect(fn).toContain("anthropic: 'https://api.anthropic.com/v1/messages'");
     expect(fn).toContain("openai: 'https://api.openai.com/v1/chat/completions'");
     expect(fn).toContain('ANTHROPIC_API_KEY');
     expect(fn).toContain('OPENAI_API_KEY');
-    // No CORS headers: same-origin only, so foreign sites can't spend the key.
-    expect(fn).not.toContain('Access-Control-Allow-Origin');
+    // CORS is opt-in via ALLOWED_ORIGINS: unset ⇒ no CORS headers emitted
+    // (same-origin only); set ⇒ only listed origins (exact or *.suffix).
+    expect(fn).toContain('ALLOWED_ORIGINS');
+    expect(fn).toContain("if (!raw || !origin) return null");
+    expect(fn).toContain('access-control-allow-origin');
   });
 
   it('folder export omits the relay kit when relay mode is off', async () => {

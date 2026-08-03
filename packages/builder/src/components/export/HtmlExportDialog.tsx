@@ -527,8 +527,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                       <div className="text-xs text-emerald-800 flex-1">
                         {mode === 'folder'
-                          ? 'The export includes the relay function + README-RELAY.md. Deploy with the Netlify CLI (drag-and-drop skips functions), then set your API key in the host\u2019s environment variables — the README walks through it.'
-                          : 'Single-file export: download the relay kit, put your exported HTML in it as index.html, and deploy with the Netlify CLI (drag-and-drop skips functions) — README-RELAY.md walks through it.'}
+                          ? 'The export includes the relay function + README-RELAY.md with three deploy paths: browser-only (GitHub + Netlify), Netlify CLI, or a shared relay for many stories. Plain drag-and-drop alone skips functions.'
+                          : 'Single-file export: download the relay kit and put your exported HTML in it as index.html. README-RELAY.md has three deploy paths: browser-only (GitHub + Netlify), Netlify CLI, or a shared relay. Plain drag-and-drop alone skips functions.'}
                       </div>
                       {mode === 'single-file' && (
                         <button
