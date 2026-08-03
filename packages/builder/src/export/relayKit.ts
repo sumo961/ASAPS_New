@@ -98,27 +98,49 @@ Your exported story uses AI at play time. Instead of embedding your API key
 in the HTML (where anyone can read it), this kit runs a tiny relay next to
 your story. The key stays on the server; players never see it.
 
-## Deploy in 3 steps (Netlify)
+## Deploy (Netlify)
 
-1. Put your exported story file(s) into THIS folder, next to the
-   \`netlify/\` directory (rename your export to \`index.html\` if it isn't
-   already). Then drag the WHOLE folder onto https://app.netlify.com/drop
+> **Important:** plain drag-and-drop (app.netlify.com/drop) only uploads
+> static files — it does NOT deploy the relay function (the story then
+> gets a 404 from \`/.netlify/functions/asaps-ai\`). Use the Netlify CLI
+> below; it bundles the function for you.
 
-2. In your new project: **Project configuration → Environment variables →
-   Add a variable**. The form has more options than you need — this is all
-   that matters:
+1. Put your exported story into THIS folder, next to \`netlify/\` and
+   \`netlify.toml\` (rename your export to \`index.html\` if it isn't
+   already).
+
+2. In a terminal, from this folder (requires Node.js):
+
+       npx netlify-cli deploy --prod
+
+   First run: it opens a browser to log in, then asks what to deploy —
+   choose **Create & configure a new project**, accept the defaults
+   (publish directory \`.\`). When it finishes it prints your site URL.
+   The output should list **asaps-ai** under "Functions" — that's the
+   relay going up.
+
+3. Add your API key: **Project configuration → Environment variables →
+   Add a variable**. The form has more options than you need — this is
+   all that matters:
    - **Key**: \`ANTHROPIC_API_KEY\` (Claude) or \`OPENAI_API_KEY\` (OpenAI) —
      exactly these names, all caps
    - **Secret**: check "Contains secret values" (recommended)
    - **Scopes**: leave "All scopes" (the relay runs under *Functions*, so
      if you pick specific scopes, Functions MUST stay checked)
    - **Values**: choose **"Same value for all deploy contexts"** and paste
-     your key once — no need for per-context values
+     your key once
    Then **Create variable**.
+   (CLI alternative: \`npx netlify-cli env:set ANTHROPIC_API_KEY sk-...\`)
 
-3. Environment variables only apply to NEW deploys: go to **Deploys →
-   Trigger deploy → Deploy project**. When it finishes, open the site —
-   AI beats now work with no key in the page.
+4. Functions read the key from the deploy they were built with, so run
+   the deploy once more:
+
+       npx netlify-cli deploy --prod
+
+   Open the site — AI beats now work, and there is no key in the page.
+
+To update the story later: replace \`index.html\` and run the same
+deploy command again (the key stays configured).
 
 ## How it stays safe
 
@@ -138,6 +160,18 @@ your story. The key stays on the server; players never see it.
   ~60 lines of standard fetch code with no dependencies.
 `;
 
+/**
+ * netlify.toml — declares the functions directory explicitly. The
+ * netlify/functions path is Netlify's default, but being explicit makes
+ * CLI deploys deterministic and the kit self-documenting.
+ */
+export const RELAY_NETLIFY_TOML = `[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+`;
+
 export interface RelayKitFile {
   path: string;
   content: string;
@@ -147,6 +181,7 @@ export interface RelayKitFile {
 export function buildRelayKitFiles(): RelayKitFile[] {
   return [
     { path: 'netlify/functions/asaps-ai.mjs', content: RELAY_FUNCTION_SOURCE },
+    { path: 'netlify.toml', content: RELAY_NETLIFY_TOML },
     { path: 'README-RELAY.md', content: RELAY_README },
   ];
 }
