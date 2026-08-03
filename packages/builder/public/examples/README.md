@@ -153,6 +153,21 @@ preview window): the venue's three beacons each get a distance slider.
 
 Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Indoor Location*.
 
+### Panorama & Transitions — Verification
+**File:** `pano-transitions-verification.asaps.zip`
+
+Two-part manual verification story. **Part 1 — visual transitions:** a chain
+of screens that each name the transition they must ENTER with (fade, slide
+from the right, zoom, dissolve) so you judge the entrance you just watched.
+**Part 2 — panoramas:** deterministic compass test cards (red horizon,
+meridian grid, N/E/S/W letters) as a full 2:1 equirectangular sphere and a
+4:1 cylindrical strip, each with a hotspot that routes onward; watch the
+viewer's upper-left corner for flicker while dragging/zooming. End screen
+loops back to the title for replay.
+
+Pass/fail criteria: `docs/TESTING_EXPERIMENTAL_BEATS.md` → *Panorama &
+Transitions*.
+
 ## Creating Your Own Examples
 
 To add new example stories to this directory:

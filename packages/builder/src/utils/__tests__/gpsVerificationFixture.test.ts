@@ -365,3 +365,60 @@ describe('Indoor Location fixture', () => {
     }
   });
 });
+
+describe('Panorama & Transitions fixture', () => {
+  const PT_ZIP = join(__dirname, '../../../public/examples/pano-transitions-verification.asaps.zip');
+  let ptBeats: any[];
+  let ptZip: JSZip;
+  beforeAll(async () => {
+    ptZip = await JSZip.loadAsync(readFileSync(PT_ZIP));
+    const data = JSON.parse(await ptZip.file('project.json')!.async('string'));
+    ptBeats = data.project.story.beats;
+  });
+
+  it('is a connected graph and closes the replay loop back to the start', () => {
+    const ids = new Set(ptBeats.map(b => b.id));
+    for (const b of ptBeats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+    }
+    const end = ptBeats.find(b => b.type === 'endScreen');
+    expect(end.connections.some((c: any) => c.targetId === 't')).toBe(true);
+  });
+
+  it('covers every UI transition type exactly once, with self-describing screens', () => {
+    // The five VE options are none/fade/slide/zoom/dissolve; 'none' is the
+    // untransitioned intro. Each transitioned screen names the entrance it
+    // must arrive with, so a human can judge without a checklist in hand.
+    const transitioned = ptBeats.filter(b => b.transition);
+    expect(transitioned.map(b => b.transition.type).sort())
+      .toEqual(['dissolve', 'fade', 'slide', 'zoom']);
+    for (const b of transitioned) {
+      expect(b.transition.duration).toBe(800);
+      expect(b.parameters.text.toUpperCase()).toContain(b.transition.type.toUpperCase());
+    }
+  });
+
+  it('pano stations cover both projections, with hotspot routing and assets in the zip', async () => {
+    const ids = new Set(ptBeats.map(b => b.id));
+    const panos = ptBeats.filter(b => b.type === 'panorama');
+    expect(panos.map(p => p.parameters.projectionType).sort())
+      .toEqual(['cylindrical', 'equirectangular']);
+    for (const p of panos) {
+      const assetId = p.parameters.panoramaAssetId;
+      expect(assetId).toBeTruthy();
+      const files = Object.keys((ptZip as any).files).filter(f => f.startsWith(`backgrounds/${assetId}_`));
+      expect(files.length, `${p.id} asset missing from zip`).toBe(1);
+      const png = await ptZip.file(files[0])!.async('uint8array');
+      // PNG magic + aspect sanity: equirect 2:1, cylindrical 4:1
+      expect([...png.slice(1, 4)].map(c => String.fromCharCode(c)).join('')).toBe('PNG');
+      const w = (png[16] << 24) | (png[17] << 16) | (png[18] << 8) | png[19];
+      const h = (png[20] << 24) | (png[21] << 16) | (png[22] << 8) | png[23];
+      expect(w / h).toBe(p.parameters.projectionType === 'cylindrical' ? 4 : 2);
+      for (const hs of p.parameters.hotspots) {
+        expect(ids.has(hs.target), `${p.id} hotspot target dangles`).toBe(true);
+      }
+    }
+  });
+});
