@@ -1,5 +1,66 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-04: API-key relay, signed macOS builds, transitions upgrade (v0.9.86)
+
+### Overview
+
+Three arcs. **Public AI stories no longer ship the author's API key**: a new relay export mode generates a tiny serverless function next to the story — the key lives in the host's environment variables, streaming keeps long generations alive past serverless timeouts (both providers), and the whole thing is ONE deploy-ready zip download validated across three field rounds. **macOS builds are now signed and notarized** — Gatekeeper accepts them as "Notarized Developer ID", the "unidentified developer" warning is gone, and electron-updater's auto-update finally works on Mac (it refuses unsigned builds). And the **transition system got real**: dissolve is an actual blur-dissolve, slide direction is authorable, easing is honored — verified with a new Panorama & Transitions kit. Plus the Tier-1 first-touch batch: start-screen Import tile, template naming step, chat-view speaker portraits, playSound effect, GPS point-set binding UI.
+
+### API-key relay for public HTML deployments — key never ships
+
+- New export mode **"Use a relay"**: instead of embedding the API key, the exported story POSTs `{ provider, body }` to a same-origin Netlify function (`relayKit.ts` generates it). The function injects the key from host env vars and forwards to the FIXED official endpoint — the key never travels to the browser, and callers cannot redirect the relay.
+- **Streaming beats serverless timeouts.** Field round 3 found aiDialogTree dying at Netlify's ~10 s buffered-function cap. The relay now pipes `text/event-stream` bodies through untouched, and `createRelayTransport` requests `stream: true` by default and reassembles the SSE back into the plain response shape — for BOTH families (`reassembleAnthropicStream`, `reassembleOpenAIStream`) — so parsers are byte-identical for direct and relayed calls.
+- **One download, deploy-ready.** Relay exports now produce a single `{name}-relay.zip` with the story as `index.html` plus function, `netlify.toml`, and README — no separate kit download. The README documents three paths: A) browser-only GitHub+Netlify, B) Netlify CLI, C) **one shared classroom relay** via `ALLOWED_ORIGINS` (exact origins + `*.suffix` wildcards with dot-boundary matching, https-only except localhost) so student stories stay drag-and-drop static pages.
+- Field rounds also fixed: restart-on-AI-call in exported players (AIConditionBeat fallback), and Netlify Drop silently skipping functions (README warns; paths A/B both bundle them).
+- Tests pin the GENERATED function's runtime behavior (imported as a real ES module via data: URL): CORS allowlist boundaries, lookalike-bypass rejection, SSE pass-through, streaming+CORS composition.
+
+**Files modified:**
+- `packages/builder/src/export/relayKit.ts` (new), `HtmlExporter.ts`, `__tests__/{HtmlExporter,relayFunction}.test.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`, `packages/core/src/ai/runtimeAdapter.ts`, `packages/core/tests/ai/runtimeAdapter.test.ts`, `packages/core/src/beats/AIConditionBeat.ts`, `packages/player-web/src/{WebAIProvider,WebPlayer}.tsx`
+
+### macOS signing + notarization — auto-update becomes real
+
+- CI now signs with "Developer ID Application: Hartmut Koenitz" (cert via `CSC_LINK`/`CSC_KEY_PASSWORD` secrets) and notarizes through an App Store Connect Team Key (`ASC_KEY_P8`/`ASC_KEY_ID`/`ASC_ISSUER_ID` → electron-builder `notarize: true`). Fork builds without secrets stay unsigned — the credential step is conditional.
+- Hardened-runtime entitlements cover what the stories actually need: Electron JIT, unsigned executable memory, library validation off (native modules), **camera (QR/AR), microphone (STT), location (GPS beats)** — plus the matching `NS*UsageDescription` strings in Info.plist.
+- A verify step proves every build: `codesign --verify --strict`, `spctl --assess` (must say "Notarized Developer ID"), `stapler validate` (ticket stapled → offline verification works). Validation run 30949605203: all green.
+- Also recovered `apps/builder-desktop/build/icon.png` — the unanchored `build/` gitignore rule had kept it out of git since the start, so CI builds shipped the default Electron icon.
+- **Auto-update consequence**: electron-updater refuses updates on unsigned macOS builds — from this release on, Mac auto-update actually works. One-time caveat: existing unsigned installs must download v0.9.86 manually; auto-update takes over from there.
+
+**Files modified:**
+- `.github/workflows/build-desktop.yml`, `apps/builder-desktop/build/entitlements.mac.plist` (new), `apps/builder-desktop/build/icon.png` (new to git), `apps/builder-desktop/package.json`
+
+### Transitions get real + Panorama & Transitions verification kit
+
+- **Dissolve is a real dissolve** (blur + crossfade, not a plain fade), **slide direction is authorable** (left/right/up/down), and the **easing setting is honored** end-to-end instead of being silently dropped. VisualPropertiesPanel exposes direction + easing.
+- New `pano-transitions-verification.asaps.zip` kit with generated equirect + cylindrical panorama fixtures — round 1 PASS across both pano projections and the transition matrix; fixture invariants pinned in CI.
+
+**Files modified:**
+- `packages/renderer/src/renderers/{ReactRenderer.tsx,BaseRenderer.ts,BaseRenderer-fixed.ts}`, `packages/renderer/tests/renderers/ReactRenderer.test.tsx`, `packages/core/src/types/index.ts`, `packages/builder/src/components/visual/VisualPropertiesPanel.tsx`, `packages/builder/public/examples/pano-*`
+
+### aiDialogTree must branch
+
+- Field-observed single-choice nodes (one option is not a choice): the prompt demanded depth × branching the token budget couldn't satisfy, so models pruned branching first. The prompt now makes 2–3 choices per node an explicit hard requirement ("do NOT sacrifice branching to reach the required depth"), sizes the expected tree, and the validator warns when a generated node under-branches.
+
+**Files modified:**
+- `packages/core/src/beats/AIDialogTreeBeat.ts`
+
+### Tier-1 first-touch batch (stakeholder-report follow-ups)
+
+- **Start screen**: the Import tile actually imports (was dead), and creating from a template now asks for a project name first instead of landing as "rehearsal-difficult-client".
+- **Speaker portraits show in chat views** — dialogTree/aiConversation chat presentation finally renders the configured portrait next to speaker lines.
+- **playSound effect**: location-triggered sound available on every effect host (choices, GPS/beacon zones, …) — StoryContext queues it, players/renderers play it.
+- **GPS point-set binding UI**: XRLocationsEditor binds location entries to curated GPS point sets directly; User Guide gained five new screenshots (captions editor, webView frame slot, GPS curator, aiConversation presentation, Mock Sensors).
+- Rehearsal template `.asapst` carries complete display settings (no corruption-repair alert on import).
+- User Guide QA pass covering v0.9.80–v0.9.85.
+
+**Files modified:**
+- `packages/builder/src/pages/StartWindow.tsx`, `components/{TemplateGallery,Header,ProjectLibrary}.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/core/src/engine/StoryContext.ts`, `packages/builder/src/editors/{ChoiceEffectsEditor,XRLocationsEditor}.tsx`, `packages/builder/src/templates/rehearsal-difficult-client.asapst`, `docs/USER_GUIDE.md`
+
+### Verification
+
+Relay: three live field rounds on a real Netlify deployment (Let's have a conversation, Environmental Choices 4) — onlineContent, aiSummary, aiDialogTree all pass, streaming confirmed for both providers, generated-function behavior pinned by 10 new tests. Signing: two CI validation runs (the first isolated a stale ASC Key ID → 401; the second went green with codesign/spctl/stapler all passing). Transitions: kit round 1 PASS. Suites green across core, builder, renderer, player.
+
+---
+
 ## 2026-07-31: Verification protocol closed — AR Scene + Indoor Location pass, Claude 5 support, fixed-layout overflow containment (v0.9.85)
 
 ### Overview

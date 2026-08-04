@@ -22,21 +22,26 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.85** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.85 closes the experimental-beats
-verification protocol**: **AR Scene** passed three field rounds on iPhone
-(each round exposing and fixing a real export/import bug — the AR tracker
-never loaded in exports, and importing any project silently destroyed
-arBeat's authored connections) and **Indoor Location** passed a full
-beacon-zone mock pass — **no beat carries the experimental badge anymore**.
-Both verification kits (self-compiled AR marker + floor-plan beacon venue)
-ship as importable examples. The AI stack now supports the **Claude 5
-family** model ids (the old classifier 400'd on them with reasoning effort),
-AI generation failures diagnose themselves (refusals fail fast with an
-actionable message instead of three blind retries), and the fixed-canvas
-renderer finally **contains overflow**: long AI text scrolls inside its box
-instead of overlapping the title or pushing buttons off-stage. Users on
-v0.9.84 will auto-update. For what shipped when, see:
+Current release: **v0.9.86** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.86 makes public AI stories safe
+to deploy**: the new **relay export** produces a single deploy-ready zip
+whose serverless function keeps your API key on the host — the key never
+ships in the HTML — with streaming so long generations survive serverless
+timeouts (both providers) and an `ALLOWED_ORIGINS` mode so one classroom
+relay can serve many drag-and-drop student stories. **macOS builds are now
+signed and notarized** (Gatekeeper: "Notarized Developer ID") — the
+"unidentified developer" warning is gone and **Mac auto-update finally
+works**. Transitions got real: actual blur-dissolve, authorable slide
+direction, honored easing — verified with a new Panorama & Transitions kit.
+Plus the first-touch batch: working start-screen Import tile, template
+naming step, chat-view speaker portraits, a playSound effect, and GPS
+point-set binding UI.
+
+> **macOS users on v0.9.85 or earlier**: your installed (unsigned) build
+> cannot auto-update across the signing boundary — download v0.9.86 once
+> manually; auto-update works from then on. Windows auto-updates normally.
+
+For what shipped when, see:
 
 - **[VERSION_HISTORY.md](VERSION_HISTORY.md)** — feature matrix and per-version
   highlights (the one-line-per-feature summary that used to live here)
