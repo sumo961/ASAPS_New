@@ -119,8 +119,26 @@ export default async (req) => {
     body: JSON.stringify(body),
   });
 
-  // Pass the provider-shaped JSON (and status) through untouched so the
-  // player's response parsing is identical for direct and relayed calls.
+  // Streaming requests (body.stream === true) are PIPED through untouched.
+  // This is what makes long generations (AI dialog trees) survive on
+  // serverless hosts: buffered functions are killed at the execution cap
+  // (Netlify: 10 s), while a streamed response starts within milliseconds
+  // and may keep streaming for as long as the model generates. The player
+  // reassembles the SSE back into the plain response shape.
+  const upstreamType = upstream.headers.get('content-type') || '';
+  if (body.stream === true && upstream.ok && upstreamType.includes('text/event-stream')) {
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        ...(cors || {}),
+      },
+    });
+  }
+
+  // Non-streaming: pass the provider-shaped JSON (and status) through
+  // untouched so response parsing is identical for direct and relayed calls.
   return new Response(await upstream.text(), {
     status: upstream.status,
     headers: { 'content-type': 'application/json', ...(cors || {}) },

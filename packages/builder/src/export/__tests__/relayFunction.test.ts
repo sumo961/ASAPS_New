@@ -87,6 +87,40 @@ describe('relay function — ALLOWED_ORIGINS allowlist', () => {
   });
 });
 
+describe('relay function — streaming pass-through (serverless timeout fix)', () => {
+  it('pipes an SSE upstream body through with event-stream content-type', async () => {
+    const sse = 'data: {"type":"message_start"}\n\ndata: {"type":"message_stop"}\n\n';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(sse, {
+      status: 200, headers: { 'content-type': 'text/event-stream' },
+    })));
+    const r = await handler(req('POST', null, {
+      provider: 'anthropic',
+      body: { model: 'm', stream: true },
+    }));
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('text/event-stream');
+    expect(await r.text()).toBe(sse);
+  });
+
+  it('streams with CORS headers for allowed cross-origin callers', async () => {
+    process.env.ALLOWED_ORIGINS = 'https://annas-story.netlify.app';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('data: {}\n\n', {
+      status: 200, headers: { 'content-type': 'text/event-stream' },
+    })));
+    const r = await handler(req('POST', 'https://annas-story.netlify.app', {
+      provider: 'anthropic', body: { model: 'm', stream: true },
+    }));
+    expect(r.headers.get('content-type')).toBe('text/event-stream');
+    expect(r.headers.get('access-control-allow-origin')).toBe('https://annas-story.netlify.app');
+  });
+
+  it('non-streaming requests still return buffered JSON', async () => {
+    const r = await handler(req('POST', null)); // default stub: JSON 200
+    expect(r.headers.get('content-type')).toBe('application/json');
+    expect((await r.json()).ok).toBe(true);
+  });
+});
+
 describe('relay function — request validation', () => {
   it('405 on GET, 400 on junk, 400 on bad provider', async () => {
     expect((await handler(req('GET', null))).status).toBe(405);

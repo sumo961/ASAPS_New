@@ -138,16 +138,86 @@ export function createDirectOpenAITransport(options: {
  * passed through untouched, so the same response-parsing code works
  * for direct and relayed calls.
  */
+/**
+ * Reassemble an Anthropic Messages SSE stream into the non-streaming
+ * response shape, so streaming is an invisible transport detail to every
+ * caller (they keep parsing { content, stop_reason, usage } as before).
+ * Handles text and thinking deltas; unknown event types are skipped.
+ */
+export async function reassembleAnthropicStream(response: Response): Promise<any> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Streaming response had no body');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let message: any = { content: [], stop_reason: null, usage: undefined };
+  const blocks: any[] = [];
+
+  const handle = (evt: any) => {
+    switch (evt.type) {
+      case 'message_start':
+        message = { ...evt.message, content: [] };
+        break;
+      case 'content_block_start':
+        blocks[evt.index] = { ...evt.content_block };
+        break;
+      case 'content_block_delta': {
+        const b = blocks[evt.index];
+        if (!b) break;
+        if (evt.delta?.type === 'text_delta') b.text = (b.text || '') + evt.delta.text;
+        else if (evt.delta?.type === 'thinking_delta') b.thinking = (b.thinking || '') + evt.delta.thinking;
+        else if (evt.delta?.type === 'input_json_delta') b.partial_json = (b.partial_json || '') + evt.delta.partial_json;
+        break;
+      }
+      case 'message_delta':
+        if (evt.delta?.stop_reason) message.stop_reason = evt.delta.stop_reason;
+        if (evt.usage) message.usage = { ...(message.usage || {}), ...evt.usage };
+        break;
+      case 'error':
+        throw new Error(evt.error?.message || 'Stream error');
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line; data lines carry the JSON.
+    let sep;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of frame.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try { handle(JSON.parse(data)); } catch (e) {
+          if (e instanceof Error && e.message !== 'Unexpected token') throw e;
+        }
+      }
+    }
+  }
+  message.content = blocks.filter(Boolean);
+  return message;
+}
+
 export function createRelayTransport(options: {
   /** Relay URL — typically same-origin '/.netlify/functions/asaps-ai'. */
   endpoint: string;
   family: RuntimeProviderFamily;
 }): RuntimeTransport {
   return async (body) => {
+    // Anthropic requests go STREAMING through the relay. This is not a UX
+    // nicety — serverless hosts cap buffered function execution (Netlify:
+    // 10 s), which long generations (dialog trees) blow past; a streamed
+    // response starts immediately and may run as long as the generation
+    // takes. The SSE is reassembled below so callers still receive the
+    // plain non-streaming response shape.
+    const wantStream = options.family === 'anthropic' && (body as any).stream !== false;
+    const sendBody = wantStream ? { ...body, stream: true } : body;
     const response = await fetch(options.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: options.family, body }),
+      body: JSON.stringify({ provider: options.family, body: sendBody }),
     });
     if (!response.ok) {
       let message = `Relay request failed (${response.status})`;
@@ -156,6 +226,10 @@ export function createRelayTransport(options: {
         message = err.error?.message || err.error || err.message || message;
       } catch { /* plaintext / empty body */ }
       throw new Error(message);
+    }
+    const contentType = response.headers?.get?.('content-type') || '';
+    if (wantStream && contentType.includes('text/event-stream')) {
+      return reassembleAnthropicStream(response);
     }
     return response.json();
   };

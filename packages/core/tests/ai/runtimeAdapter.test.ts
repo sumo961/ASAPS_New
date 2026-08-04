@@ -198,10 +198,48 @@ describe('transports (fetch wire contracts)', () => {
     expect(url).toBe('/.netlify/functions/asaps-ai');
     expect(JSON.parse(init.body)).toEqual({
       provider: 'anthropic',
-      body: { model: 'claude-sonnet-5', max_tokens: 10, messages: [] },
+      // stream:true is added by the transport (serverless timeout fix) —
+      // the response here is plain JSON, which the transport passes through.
+      body: { model: 'claude-sonnet-5', max_tokens: 10, messages: [], stream: true },
     });
     expect(init.body).not.toContain('apiKey');
     expect(out).toEqual({ content: [{ type: 'text', text: 'hi' }] });
+  });
+
+  it('relay transport STREAMS anthropic requests and reassembles the SSE (serverless timeout fix)', async () => {
+    const sse = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"id":"m1","role":"assistant","usage":{"input_tokens":5}}}',
+      '',
+      'event: content_block_start',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\"tree\\":"}}',
+      '',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"1}"}}',
+      '',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":9}}',
+      '',
+    ].join('\n') + '\n';
+    const spy = vi.fn(async () => new Response(sse, {
+      status: 200, headers: { 'content-type': 'text/event-stream' },
+    }));
+    vi.stubGlobal('fetch', spy);
+    const t = createRelayTransport({ endpoint: '/relay', family: 'anthropic' });
+    const out = await t({ model: 'claude-sonnet-5', max_tokens: 16000, messages: [] });
+    // the transport must have requested streaming from the relay
+    expect(JSON.parse(spy.mock.calls[0][1].body).body.stream).toBe(true);
+    // and callers still see the plain non-streaming response shape
+    expect(out.content).toEqual([{ type: 'text', text: '{"tree":1}' }]);
+    expect(out.stop_reason).toBe('end_turn');
+    expect(out.usage.output_tokens).toBe(9);
+  });
+
+  it('relay transport does NOT stream for the openai family', async () => {
+    const spy = fetchSpy({ choices: [] });
+    const t = createRelayTransport({ endpoint: '/relay', family: 'openai' });
+    await t({ model: 'gpt-4o-mini', messages: [] });
+    expect(JSON.parse(spy.mock.calls[0][1].body).body.stream).toBeUndefined();
   });
 
   it('relay transport surfaces the relay error message on non-ok responses', async () => {
