@@ -200,19 +200,70 @@ export async function reassembleAnthropicStream(response: Response): Promise<any
   return message;
 }
 
+/**
+ * Reassemble an OpenAI chat-completions SSE stream into the non-streaming
+ * response shape ({ choices: [{ message, finish_reason }], usage }). Only
+ * the fields the runtime adapter consumes are rebuilt; unknown chunks are
+ * skipped. Works for any OpenAI-compatible endpoint.
+ */
+export async function reassembleOpenAIStream(response: Response): Promise<any> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('Streaming response had no body');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let role = 'assistant';
+  let finishReason: string | null = null;
+  let usage: any;
+  let id: string | undefined;
+  let model: string | undefined;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of frame.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        let evt: any;
+        try { evt = JSON.parse(data); } catch { continue; }
+        if (evt.error) throw new Error(evt.error.message || 'Stream error');
+        id = id || evt.id;
+        model = model || evt.model;
+        if (evt.usage) usage = evt.usage;
+        const choice = evt.choices?.[0];
+        if (!choice) continue;
+        if (choice.delta?.role) role = choice.delta.role;
+        if (typeof choice.delta?.content === 'string') content += choice.delta.content;
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+      }
+    }
+  }
+  return {
+    id, model, usage,
+    choices: [{ index: 0, message: { role, content }, finish_reason: finishReason }],
+  };
+}
+
 export function createRelayTransport(options: {
   /** Relay URL — typically same-origin '/.netlify/functions/asaps-ai'. */
   endpoint: string;
   family: RuntimeProviderFamily;
 }): RuntimeTransport {
   return async (body) => {
-    // Anthropic requests go STREAMING through the relay. This is not a UX
+    // Relay requests go STREAMING for BOTH families. This is not a UX
     // nicety — serverless hosts cap buffered function execution (Netlify:
     // 10 s), which long generations (dialog trees) blow past; a streamed
     // response starts immediately and may run as long as the generation
     // takes. The SSE is reassembled below so callers still receive the
-    // plain non-streaming response shape.
-    const wantStream = options.family === 'anthropic' && (body as any).stream !== false;
+    // plain non-streaming response shape. Opt out per-request with
+    // stream:false.
+    const wantStream = (body as any).stream !== false;
     const sendBody = wantStream ? { ...body, stream: true } : body;
     const response = await fetch(options.endpoint, {
       method: 'POST',
@@ -229,7 +280,9 @@ export function createRelayTransport(options: {
     }
     const contentType = response.headers?.get?.('content-type') || '';
     if (wantStream && contentType.includes('text/event-stream')) {
-      return reassembleAnthropicStream(response);
+      return options.family === 'anthropic'
+        ? reassembleAnthropicStream(response)
+        : reassembleOpenAIStream(response);
     }
     return response.json();
   };

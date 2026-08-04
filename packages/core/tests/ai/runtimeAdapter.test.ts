@@ -235,11 +235,34 @@ describe('transports (fetch wire contracts)', () => {
     expect(out.usage.output_tokens).toBe(9);
   });
 
-  it('relay transport does NOT stream for the openai family', async () => {
+  it('relay transport streams the openai family too and reassembles chat-completions SSE', async () => {
+    const sse = [
+      'data: {"id":"c1","model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","content":"{\\"a\\":"}}]}',
+      '',
+      'data: {"choices":[{"index":0,"delta":{"content":"1}"}}]}',
+      '',
+      'data: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"completion_tokens":7}}',
+      '',
+      'data: [DONE]',
+      '',
+    ].join('\n') + '\n';
+    const spy = vi.fn(async () => new Response(sse, {
+      status: 200, headers: { 'content-type': 'text/event-stream' },
+    }));
+    vi.stubGlobal('fetch', spy);
+    const t = createRelayTransport({ endpoint: '/relay', family: 'openai' });
+    const out = await t({ model: 'gpt-4o-mini', messages: [] });
+    expect(JSON.parse(spy.mock.calls[0][1].body).body.stream).toBe(true);
+    expect(out.choices[0].message.content).toBe('{"a":1}');
+    expect(out.choices[0].finish_reason).toBe('stop');
+    expect(out.usage.completion_tokens).toBe(7);
+  });
+
+  it('stream:false opts a relay request out of streaming', async () => {
     const spy = fetchSpy({ choices: [] });
     const t = createRelayTransport({ endpoint: '/relay', family: 'openai' });
-    await t({ model: 'gpt-4o-mini', messages: [] });
-    expect(JSON.parse(spy.mock.calls[0][1].body).body.stream).toBeUndefined();
+    await t({ model: 'gpt-4o-mini', messages: [], stream: false });
+    expect(JSON.parse(spy.mock.calls[0][1].body).body.stream).toBe(false);
   });
 
   it('relay transport surfaces the relay error message on non-ok responses', async () => {
