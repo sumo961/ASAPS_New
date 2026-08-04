@@ -1356,8 +1356,7 @@ export async function downloadHtmlExport(
     // Standard export (no translations, no AI on-the-fly)
     const result = await exportAsHtml(projectId, options);
     if (result.mode === 'single-file' && result.html) {
-      const blob = new Blob([result.html], { type: 'text/html' });
-      downloadBlob(blob, `${safeName}.html`);
+      await downloadSingleFile(result.html, safeName, options);
     } else if (result.mode === 'folder' && result.zip) {
       downloadBlob(result.zip, `${safeName}_html.zip`);
     }
@@ -1504,8 +1503,7 @@ export async function downloadHtmlExport(
   console.log(`[HtmlExporter] Enhanced HTML size: ${html.length} bytes`);
 
   if (options.mode === 'single-file') {
-    const blob = new Blob([html], { type: 'text/html' });
-    downloadBlob(blob, `${safeName}.html`);
+    await downloadSingleFile(html, safeName, options);
   } else {
     // Folder mode: wrap in a ZIP with the HTML as index.html
     // Translations are embedded in the HTML itself (not as separate files)
@@ -1525,6 +1523,26 @@ export async function downloadHtmlExport(
 /**
  * Helper: Download blob as file
  */
+
+/**
+ * Deliver a single-file export. In relay mode the download is ONE
+ * deploy-ready zip — the story pre-placed as index.html next to the relay
+ * function, netlify.toml, and README — so deployment step 1 ("put your
+ * export into the kit folder") disappears. Without a relay it stays the
+ * classic bare .html download.
+ */
+async function downloadSingleFile(html: string, safeName: string, options: HtmlExportOptions): Promise<void> {
+  if (options.aiProxyUrl) {
+    const zip = new JSZip();
+    zip.file('index.html', html);
+    for (const f of buildRelayKitFiles()) zip.file(f.path, f.content);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    downloadBlob(zipBlob, `${safeName}-relay.zip`);
+    return;
+  }
+  downloadBlob(new Blob([html], { type: 'text/html' }), `${safeName}.html`);
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

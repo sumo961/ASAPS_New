@@ -158,20 +158,22 @@ function. The key stays on the server; players never see it.
 > path A or B below (both deploy the function), or path C to keep
 > drag-and-drop for the story itself.
 
+Your story is already in place: this folder came out of the export with
+\`index.html\` (the story), the relay function, and this README together.
+
 ## Path A — all in the browser, no terminal (GitHub + Netlify)
 
-1. Put your exported story into THIS folder as \`index.html\`.
-2. Go to https://github.com/new (free account is fine), name the
+1. Go to https://github.com/new (free account is fine), name the
    repository (e.g. \`my-story\`), leave it **Private** if you like →
    **Create repository**.
-3. On the new repo page, click **uploading an existing file**, then drag
+2. On the new repo page, click **uploading an existing file**, then drag
    the CONTENTS of this folder (index.html, netlify.toml, and the
    netlify folder) into the upload area → **Commit changes**.
-4. Go to https://app.netlify.com → **Add new project → Import an
+3. Go to https://app.netlify.com → **Add new project → Import an
    existing project → GitHub** → pick your repository. Accept the
    defaults → **Deploy**. (Because this is a Git deploy, Netlify DOES
    bundle the function.)
-5. Add your API key — see **"Setting the API key"** below — then
+4. Add your API key — see **"Setting the API key"** below — then
    **Deploys → Trigger deploy → Deploy project** once so the function
    picks it up. Done: open the site, AI beats work, no key in the page.
 

@@ -315,4 +315,31 @@ describe('downloadHtmlExport (standard path)', () => {
     expect(anchors).toHaveLength(1);
     expect(anchors[0].download).toBe('Demo_html.zip');
   });
+
+  it('relay mode single-file downloads ONE deploy-ready zip (story pre-placed as index.html)', async () => {
+    // Captured blobs: stub URL.createObjectURL to keep a handle on the zip.
+    const blobs: Blob[] = [];
+    const realCreate = URL.createObjectURL;
+    URL.createObjectURL = ((b: Blob) => { blobs.push(b); return 'blob:stub'; }) as any;
+    try {
+      await downloadHtmlExport('p1', 'Demo', baseOpts({
+        precomputedStoryZip: sfZip(),
+        aiProvider: 'anthropic',
+        aiProxyUrl: '/.netlify/functions/asaps-ai',
+      }));
+      expect(anchors).toHaveLength(1);
+      expect(anchors[0].download).toBe('Demo-relay.zip');
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(blobs[blobs.length - 1]);
+      expect(zip.file('index.html'), 'story must be pre-placed as index.html').toBeTruthy();
+      expect(zip.file('netlify/functions/asaps-ai.mjs')).toBeTruthy();
+      expect(zip.file('netlify.toml')).toBeTruthy();
+      expect(zip.file('README-RELAY.md')).toBeTruthy();
+      const html = await zip.file('index.html')!.async('string');
+      expect(html).toContain('"proxyUrl"');
+      expect(html).not.toContain('sk-');
+    } finally {
+      URL.createObjectURL = realCreate;
+    }
+  });
 });

@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
 import { downloadHtmlExport, previewStoryZip, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
-import { DEFAULT_RELAY_PATH, buildRelayKitFiles } from '../../export/relayKit';
+import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
@@ -526,29 +526,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     </div>
                     <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
                       <div className="text-xs text-emerald-800 flex-1">
-                        {mode === 'folder'
-                          ? 'The export includes the relay function + README-RELAY.md with three deploy paths: browser-only (GitHub + Netlify), Netlify CLI, or a shared relay for many stories. Plain drag-and-drop alone skips functions.'
-                          : 'Single-file export: download the relay kit and put your exported HTML in it as index.html. README-RELAY.md has three deploy paths: browser-only (GitHub + Netlify), Netlify CLI, or a shared relay. Plain drag-and-drop alone skips functions.'}
+                        The export is ONE deploy-ready zip: your story as index.html plus the relay function and README-RELAY.md, which walks through three deploy paths — browser-only (GitHub + Netlify), Netlify CLI, or a shared relay for many stories. Plain drag-and-drop alone skips functions.
                       </div>
-                      {mode === 'single-file' && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const JSZip = (await import('jszip')).default;
-                            const kit = new JSZip();
-                            for (const f of buildRelayKitFiles()) kit.file(f.path, f.content);
-                            const blob = await kit.generateAsync({ type: 'blob' });
-                            const a = document.createElement('a');
-                            a.href = URL.createObjectURL(blob);
-                            a.download = 'asaps-relay-kit.zip';
-                            a.click();
-                            URL.revokeObjectURL(a.href);
-                          }}
-                          className="text-xs bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-emerald-700 flex-shrink-0"
-                        >
-                          Download relay kit
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
