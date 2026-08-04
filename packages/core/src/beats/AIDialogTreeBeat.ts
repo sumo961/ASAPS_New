@@ -451,7 +451,7 @@ ${this.systemInstructions ? `ADDITIONAL INSTRUCTIONS: ${this.systemInstructions}
 REQUIREMENTS:
 1. Build a genuinely MULTI-LEVEL branching tree that runs the FULL ${this.maxTurns} conversation turns deep. Turn 1 is the root node; EACH of its choices must lead into a nested "dialogNode" (the NPC's turn-2 reply); EACH turn-2 choice must lead into a further nested "dialogNode" (turn 3); continue nesting until turn ${this.maxTurns}. A flat, single-level tree is WRONG.
 2. The NPC should respond based on the player's known state (name, choices, inventory)
-3. Each dialog node has: speaker, text, and 2-4 player choices
+3. EVERY dialog node MUST offer 2-3 player choices that are genuinely different in attitude or content. A node with a single choice is WRONG — one option is not a choice. Do NOT sacrifice branching to reach the required depth: use 2 choices per node (3 at the root if it helps) and keep each NPC text to 2-4 sentences, so the full-depth tree with branching fits the response. A 2-per-node tree ${this.maxTurns} turns deep is the expected size
 4. A choice either CONTINUES the conversation with a nested "dialogNode", or EXITS with a "target". Use "target" ONLY when a specific exit condition is genuinely satisfied by that choice. For a turn-limit exit (e.g. "after ${this.maxTurns} turns"), ONLY the choices at the DEEPEST turn (turn ${this.maxTurns}) may use "target" — every earlier-turn choice MUST use "dialogNode". NEVER put a "target" on a turn-1 or turn-2 choice for a turn-limit exit; that collapses the whole tree to a single level.
 5. PERSONALIZATION IS CRITICAL: Use the player's actual name, location, profession, and other details from the PLAYER CONTEXT above. Write them directly into the NPC's dialog text (e.g., "Welcome to Stockholm, Mirjam!" not "Welcome to your city!"). Never use placeholder syntax like {playerName}. If you don't know a value, omit it gracefully
 6. Make the conversation feel natural and engaging
@@ -694,6 +694,14 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
         text: 'Continue',
         target: this.exitTargets[0]?.id,
       }];
+    }
+
+    // Observability: a mid-tree node with a single continuing choice means
+    // the model sacrificed branching for depth (the field symptom: "only
+    // one option for the interactor"). We can't invent branches here, but
+    // the warning makes under-delivery visible in play-session logs.
+    if (validNode.choices.length === 1 && validNode.choices[0].dialogNode) {
+      console.warn(`[AIDialogTreeBeat ${this.id}] Generated node "${validNode.id}" has only ONE choice — the model under-branched (prompt asks for 2-3).`);
     }
 
     return validNode;
