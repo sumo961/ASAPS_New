@@ -147,3 +147,58 @@ describe('chat avatars (roadmap Tier-1 item 4)', () => {
     expect(container.querySelector('img')).toBeNull();
   });
 });
+
+describe('visual transitions (dissolve identity + direction + easing, v0.9.86)', () => {
+  // Backlog follow-ups from the Panorama & Transitions verification round:
+  // dissolve used to render identically to fade, and Transition.direction/
+  // easing existed in the type but were ignored. These pin the new contract.
+  const render1 = async () => {
+    await renderer.renderText('Hello', 'Continue');
+  };
+
+  it('dissolve prepares a blur that resolves — visually distinct from fade', async () => {
+    renderer.prepareTransition({ type: 'dissolve', duration: 300 });
+    expect(container.style.opacity).toBe('0');
+    expect(container.style.filter).toBe('blur(12px)');
+    void render1();
+    await new Promise(r => setTimeout(r, 120)); // double rAF + transition set
+    expect(container.style.transition).toContain('filter');
+    expect(container.style.filter).toBe('blur(0px)');
+  });
+
+  it('fade does NOT blur (the distinction is real)', () => {
+    renderer.prepareTransition({ type: 'fade', duration: 300 });
+    expect(container.style.opacity).toBe('0');
+    expect(container.style.filter).toBe('');
+  });
+
+  it('slide honors the entrance edge: left/top/bottom, legacy in/out → default right', () => {
+    const cases: Array<[string | undefined, string]> = [
+      ['left', 'translateX(-100%)'],
+      ['top', 'translateY(-100%)'],
+      ['bottom', 'translateY(100%)'],
+      ['right', 'translateX(100%)'],
+      ['in', 'translateX(100%)'],   // legacy value in old project data
+      [undefined, 'translateX(100%)'],
+    ];
+    for (const [dir, expected] of cases) {
+      container.style.transform = '';
+      renderer.prepareTransition({ type: 'slide', duration: 300, direction: dir });
+      expect(container.style.transform, String(dir)).toBe(expected);
+      (renderer as any).pendingTransitionType = null; // reset between probes
+    }
+  });
+
+  it('authored easing reaches the CSS transition; default keeps the historic curves', async () => {
+    renderer.prepareTransition({ type: 'fade', duration: 300, easing: 'linear' });
+    void render1();
+    await new Promise(r => setTimeout(r, 120));
+    expect(container.style.transition).toContain('opacity 300ms linear');
+
+    renderer.prepareTransition({ type: 'fade', duration: 300 });
+    void render1();
+    await new Promise(r => setTimeout(r, 120));
+    expect(container.style.transition).toContain('opacity 300ms ease-in-out');
+    expect(container.style.transition).toContain('transform 300ms ease-out');
+  });
+});

@@ -91,14 +91,18 @@ export abstract class BaseRenderer implements IRenderer {
     const duration = transition.duration || 500;
 
     switch (transition.type) {
+      // The spatial direction (left/right/top/bottom) is consumed by
+      // prepareTransition/applyPendingTransition in ReactRenderer; the
+      // legacy phase argument of these protected hooks is not derivable
+      // from it, so the dispatch no longer forwards it.
       case 'fade':
-        await this.fadeTransition(duration, transition.direction);
+        await this.fadeTransition(duration);
         break;
       case 'slide':
-        await this.slideTransition(duration, transition.direction);
+        await this.slideTransition(duration);
         break;
       case 'zoom':
-        await this.zoomTransition(duration, transition.direction);
+        await this.zoomTransition(duration);
         break;
       case 'dissolve':
         await this.dissolveTransition(duration);

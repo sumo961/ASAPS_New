@@ -87,7 +87,13 @@ export interface Location {
 export interface Transition {
   type: 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
   duration: number;
-  direction?: 'in' | 'out';
+  /**
+   * For 'slide': which edge the new beat enters FROM (default 'right').
+   * 'in'/'out' are legacy values kept for old project data; the renderer
+   * treats them as the default.
+   */
+  direction?: 'left' | 'right' | 'top' | 'bottom' | 'in' | 'out';
+  /** CSS timing function for the entrance (default 'ease-in-out'). */
   easing?: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 }
 

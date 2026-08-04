@@ -1025,24 +1025,39 @@ export class ReactRenderer extends BaseRenderer {
   private pendingTransitionType: string | null = null;
 
   // Prepare transition - set initial hidden state BEFORE rendering
-  prepareTransition(transition: { type: string; duration: number }): void {
+  prepareTransition(transition: { type: string; duration: number; direction?: string; easing?: string }): void {
     if (!this.context.container || transition.type === 'none') return;
 
     const container = this.context.container;
     this.pendingTransitionType = transition.type;
     this.pendingTransitionDuration = transition.duration || 500;
+    this.pendingTransitionEasing = transition.easing || null;
     this.transitionStartedByRender = false;
 
     // Set initial hidden state based on transition type
     switch (transition.type) {
       case 'fade':
+        container.style.opacity = '0';
+        break;
       case 'dissolve':
+        // Distinct from fade: the new beat resolves out of a blur while
+        // fading in (a single-container stand-in for a film dissolve).
+        container.style.opacity = '0';
+        container.style.filter = 'blur(12px)';
+        break;
+      case 'slide': {
+        // direction = the edge the new beat enters FROM. Legacy 'in'/'out'
+        // values (old project data) collapse to the default 'right'.
+        const dir = transition.direction;
+        const offset =
+          dir === 'left' ? 'translateX(-100%)' :
+          dir === 'top' ? 'translateY(-100%)' :
+          dir === 'bottom' ? 'translateY(100%)' :
+          'translateX(100%)';
+        container.style.transform = offset;
         container.style.opacity = '0';
         break;
-      case 'slide':
-        container.style.transform = 'translateX(100%)';
-        container.style.opacity = '0';
-        break;
+      }
       case 'zoom':
         container.style.transform = 'scale(0.8)';
         container.style.opacity = '0';
@@ -1110,23 +1125,32 @@ export class ReactRenderer extends BaseRenderer {
     // Force reflow to ensure browser recognizes the initial state
     void container.offsetHeight;
 
-    // Set up transition
-    container.style.transition = `opacity ${duration}ms ease-in-out, transform ${duration}ms ease-out`;
+    // Set up transition. Authored easing (Transition.easing) applies to the
+    // whole entrance; the historical default keeps opacity ease-in-out with
+    // ease-out movement.
+    const easing = this.pendingTransitionEasing;
+    this.pendingTransitionEasing = null;
+    container.style.transition = easing
+      ? `opacity ${duration}ms ${easing}, transform ${duration}ms ${easing}, filter ${duration}ms ${easing}`
+      : `opacity ${duration}ms ease-in-out, transform ${duration}ms ease-out, filter ${duration}ms ease-in-out`;
 
     // Use double requestAnimationFrame for reliable CSS transitions
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         container.style.opacity = '1';
         if (transitionType === 'slide') {
-          container.style.transform = 'translateX(0)';
+          container.style.transform = 'translate(0, 0)';
         } else if (transitionType === 'zoom') {
           container.style.transform = 'scale(1)';
+        } else if (transitionType === 'dissolve') {
+          container.style.filter = 'blur(0px)';
         }
 
         // Clean up after animation completes
         setTimeout(() => {
           container.style.transition = '';
           container.style.transform = '';
+          container.style.filter = '';
         }, duration);
       });
     });
@@ -1135,6 +1159,7 @@ export class ReactRenderer extends BaseRenderer {
   // Track if transition was already started by renderComponent
   private transitionStartedByRender: boolean = false;
   private pendingTransitionDuration: number = 500;
+  private pendingTransitionEasing: string | null = null;
 
   protected handleAction = (id: string): void => {
     // Stop any in-progress TTS when user advances

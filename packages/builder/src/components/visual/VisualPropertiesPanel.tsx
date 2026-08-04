@@ -33,6 +33,10 @@ import { useFonts } from '../../hooks/useFonts';
 
 // Transition types supported by the renderer
 type TransitionType = 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
+type TransitionDirection = 'left' | 'right' | 'top' | 'bottom';
+type TransitionEasing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+// Wire type = core's Transition (direction union includes legacy 'in'/'out').
+type BeatTransition = import('@asaps/core').Transition;
 
 interface VisualPropertiesPanelProps {
   /**
@@ -63,8 +67,8 @@ interface VisualPropertiesPanelProps {
   onOpenCharacterManager?: (callback: (character: any) => void) => void;  // For changing character
   characters?: Character[];  // Project characters for state selection
   // Beat-level settings
-  beatTransition?: { type: TransitionType; duration: number };
-  onBeatTransitionChange?: (transition: { type: TransitionType; duration: number }) => void;
+  beatTransition?: BeatTransition;
+  onBeatTransitionChange?: (transition: BeatTransition) => void;
   // Global settings for default font fallback
   globalSettings?: GlobalSettings;
   // DialogTree-specific settings
@@ -1005,6 +1009,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     onChange={(e) => {
                       if (onBeatTransitionChange) {
                         onBeatTransitionChange({
+                          ...(beatTransition || {}),
                           type: e.target.value as TransitionType,
                           duration: beatTransition?.duration || 500
                         });
@@ -1034,6 +1039,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         step="100"
                         value={beatTransition?.duration || 500}
                         onChange={(e) => onBeatTransitionChange({
+                          ...(beatTransition || {}),
                           type: beatTransition?.type || 'fade',
                           duration: parseInt(e.target.value)
                         })}
@@ -1043,6 +1049,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         type="number"
                         value={beatTransition?.duration || 500}
                         onChange={(e) => onBeatTransitionChange({
+                          ...(beatTransition || {}),
                           type: beatTransition?.type || 'fade',
                           duration: parseInt(e.target.value) || 500
                         })}
@@ -1052,6 +1059,56 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       />
                       <span className="text-xs text-gray-600">ms</span>
                     </div>
+                  </div>
+                )}
+
+                {/* Slide direction — which edge the beat enters FROM */}
+                {beatTransition?.type === 'slide' && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">
+                      Enters from
+                    </label>
+                    <select
+                      value={(['left','right','top','bottom'] as const).includes(beatTransition?.direction as TransitionDirection) ? beatTransition!.direction : 'right'}
+                      onChange={(e) => onBeatTransitionChange({
+                        ...(beatTransition || { type: 'slide', duration: 500 }),
+                        direction: e.target.value as TransitionDirection,
+                      })}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value="right">Right (default)</option>
+                      <option value="left">Left</option>
+                      <option value="top">Top</option>
+                      <option value="bottom">Bottom</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Easing — all animated types */}
+                {beatTransition?.type && beatTransition.type !== 'none' && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">
+                      Easing
+                    </label>
+                    <select
+                      value={beatTransition?.easing || 'default'}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const next: BeatTransition = {
+                          ...(beatTransition || { type: 'fade', duration: 500 }),
+                        };
+                        if (v === 'default') delete next.easing;
+                        else next.easing = v as TransitionEasing;
+                        onBeatTransitionChange(next);
+                      }}
+                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                    >
+                      <option value="default">Default</option>
+                      <option value="linear">Linear</option>
+                      <option value="ease-in">Ease in</option>
+                      <option value="ease-out">Ease out</option>
+                      <option value="ease-in-out">Ease in-out</option>
+                    </select>
                   </div>
                 )}
               </div>

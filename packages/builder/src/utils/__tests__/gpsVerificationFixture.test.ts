@@ -398,6 +398,13 @@ describe('Panorama & Transitions fixture', () => {
       expect(b.transition.duration).toBe(800);
       expect(b.parameters.text.toUpperCase()).toContain(b.transition.type.toUpperCase());
     }
+    // v0.9.86 follow-ups exercised by the kit: authored slide direction and
+    // easing must survive the round-trip (renderer honors both now).
+    const slide = transitioned.find(b => b.transition.type === 'slide');
+    expect(slide.transition.direction).toBe('left');
+    expect(slide.parameters.text).toContain('LEFT');
+    expect(transitioned.find(b => b.transition.type === 'zoom').transition.easing).toBe('ease-in');
+    expect(transitioned.find(b => b.transition.type === 'dissolve').parameters.text).toContain('BLUR');
   });
 
   it('pano stations cover both projections, with hotspot routing and assets in the zip', async () => {
