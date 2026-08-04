@@ -85,11 +85,45 @@ jobs:
           npm run build:electron
           npm run copy-builder
 
+      # Signing + notarization credentials. The .p8 must be a FILE for
+      # notarytool, so it's materialized into the runner temp dir and the
+      # env vars are appended only when the secret exists — fork builds
+      # without secrets keep packaging unsigned (electron-builder skips
+      # signing when CSC_LINK is empty and notarization when the API-key
+      # env is absent).
+      - name: Prepare macOS signing credentials
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [ -n "$ASC_KEY_P8" ]; then
+            printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+            echo "APPLE_API_KEY_ID=$ASC_KEY_ID" >> "$GITHUB_ENV"
+            echo "APPLE_API_ISSUER=$ASC_ISSUER_ID" >> "$GITHUB_ENV"
+            echo "Notarization credentials prepared"
+          else
+            echo "No ASC key secret — packaging will be unsigned/unnotarized"
+          fi
+
       - name: Package macOS Universal
         working-directory: apps/builder-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # electron-builder imports the Developer ID cert from the base64
+          # p12 into a temporary keychain for the build, then removes it.
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
         run: npx electron-builder@26.8.1 --mac --publish never
+
+      - name: Verify signature & notarization
+        if: env.APPLE_API_KEY != ''
+        run: |
+          APP=$(ls -d apps/builder-desktop/release/mac-universal/*.app | head -1)
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --type execute --verbose "$APP" || true
+          stapler validate "$APP" || true
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v7

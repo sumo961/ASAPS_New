@@ -86,7 +86,15 @@
       ],
       "icon": "build/icon.png",
       "hardenedRuntime": true,
-      "gatekeeperAssess": false
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": true,
+      "extendInfo": {
+        "NSCameraUsageDescription": "ASAPS stories can use the camera for QR scanning and AR scenes.",
+        "NSMicrophoneUsageDescription": "ASAPS stories can use the microphone for voice input.",
+        "NSLocationWhenInUseUsageDescription": "ASAPS stories can use your location for GPS-based story beats."
+      }
     },
     "dmg": {
       "artifactName": "ASAPS-Builder-${version}-${arch}.${ext}",
