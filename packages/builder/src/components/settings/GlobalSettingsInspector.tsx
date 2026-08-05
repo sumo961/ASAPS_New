@@ -2595,7 +2595,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           label: '', showLabel: true, showNumericValue: true,
                           numericFormat: 'fraction' as const, meterColor: '#5B8DEF',
                           meterBackgroundColor: 'rgba(255,255,255,0.25)', meterHeight: 12,
-                          meterWidth: 80, backgroundColor: '#1b1f2b', backgroundOpacity: 85,
+                          // 60% leaves the top corners free for the timer HUD
+                          meterWidth: 60, backgroundColor: '#1b1f2b', backgroundOpacity: 85,
                           borderRadius: 10, warningThreshold: 33, warningColor: '#EAB308',
                           criticalThreshold: 15, criticalColor: '#EF4444',
                         };

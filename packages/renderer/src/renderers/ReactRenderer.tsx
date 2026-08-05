@@ -12,6 +12,7 @@ import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
+import { HudOverlaysLayer } from '../components/HudOverlaysLayer';
 import { SpatialFlowView } from '../components/SpatialFlowView';
 import { shouldUseSlotMode, getSlotSpec, shouldUseSpatialMode, getSpatialSpec } from '../utils/slotLayout';
 import type { SlotSpec } from '../utils/slotLayout';
@@ -1100,7 +1101,36 @@ export class ReactRenderer extends BaseRenderer {
       }
     }
 
-    this.root.render(component);
+    // Screen-docked HUD overlays (timer / countdown meter) ride on EVERY
+    // painted screen. PositionedBeatView mounts them inline on the absolute
+    // path (detectable by its timerHudConfig prop) — every other path
+    // (slot, spatial, chat, renderChoices, loading …) historically mounted
+    // none, so enabled HUDs silently never rendered on responsive beats.
+    const rendersOwnHud = !!(
+      component &&
+      component.props &&
+      'timerHudConfig' in (component.props as Record<string, unknown>)
+    );
+    const content = rendersOwnHud ? component : (
+      <>
+        {component}
+        <HudOverlaysLayer
+          timerHudConfig={this.timerHudConfig}
+          initialTimerHudState={this.timerHudState}
+          onSubscribeTimerHudState={(listener) => this.subscribeToTimerHudState(listener)}
+          initialTimerHudOverrideText={this.timerHudOverrideText}
+          onSubscribeTimerHudOverrideText={(listener) => this.subscribeToTimerHudOverrideText(listener)}
+          initialFictionalTimeText={this.fictionalTimeText}
+          onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
+          countdownMeterConfig={this.countdownMeterConfig}
+          countdownMeterValue={this.countdownMeterValue}
+          overrideCountdownMeter={this.overrideCountdownMeter}
+          fontScale={this.mobileFontScale}
+        />
+      </>
+    );
+
+    this.root.render(content);
 
     // If there's a pending transition, apply it now that content is rendered
     if (this.pendingTransitionType && this.context.container) {

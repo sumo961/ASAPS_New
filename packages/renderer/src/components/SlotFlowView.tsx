@@ -1312,6 +1312,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   fontFamily: theme.fonts.textFont || 'sans-serif',
                   fontWeight: 600,
                   letterSpacing: '0.04em',
+                  // Honor the speaker-display accent color (matches the
+                  // fixed-mode label); unset falls through to inherited text.
+                  color: theme.speakerDisplay?.nameColor || undefined,
                   // Conversation: left-align the speaker label so it
                   // sits above the (left-aligned) body card. Stacked /
                   // custom keep the centered label above the centered

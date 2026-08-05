@@ -784,6 +784,21 @@ export const PreviewWindow: React.FC = () => {
       });
       console.log('[PreviewWindow] Sound blob resolver set up');
 
+      // HUD overlay configs must be (re)attached HERE, alongside the
+      // resolvers: the renderer instance is recreated at story start, and
+      // the config set at previewData-receipt time dies with the old
+      // instance — enabled HUDs silently never rendered on a fresh window.
+      const hudOverlays = previewDataRef.current?.settings?.hudOverlays;
+      if (hudOverlays?.timerHud) {
+        (reactRenderer as any).setTimerHudConfig?.(hudOverlays.timerHud);
+      }
+      if (hudOverlays?.countdownMeter) {
+        (reactRenderer as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
+      }
+      if (hudOverlays) {
+        console.log('[PreviewWindow] HUD overlay configs attached to renderer');
+      }
+
       // Set up character resolver - uses ref so it always accesses latest data
       (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {
           const pd = previewDataRef.current;
