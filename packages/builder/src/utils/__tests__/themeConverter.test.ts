@@ -37,6 +37,24 @@ describe('normalizeGlobalSettings', () => {
     expect(() => normalizeGlobalSettings(undefined)).not.toThrow();
     expect(normalizeGlobalSettings(null).colors.pcolor).toBe('#d9a441');
   });
+
+  // Regression: the Settings inspector reads project.width, copyright.notice,
+  // and debug.firstbeat unguarded — normalize(undefined) output reached it via
+  // the pristine-reset path and crashed the app on the Settings button.
+  it('fills EVERY section the Settings inspector dereferences unguarded', () => {
+    const n = normalizeGlobalSettings(undefined) as any;
+    expect(n.project.width).toBe(1024);
+    expect(n.project.height).toBe(768);
+    expect(n.project.layoutMode).toBeUndefined(); // undefined has meaning (legacy = fixed)
+    expect(typeof n.copyright.notice).toBe('string');
+    expect(typeof n.debug.firstbeat).toBe('string');
+    expect(n.sound.backgroundVolume).toBe(100);
+    // authored values still win
+    const kept = normalizeGlobalSettings({ project: { width: 800, layoutMode: 'responsive' } } as any) as any;
+    expect(kept.project.width).toBe(800);
+    expect(kept.project.height).toBe(768); // gap-filled
+    expect(kept.project.layoutMode).toBe('responsive');
+  });
 });
 
 describe('convertGlobalSettingsToTheme', () => {

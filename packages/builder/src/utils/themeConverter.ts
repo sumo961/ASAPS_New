@@ -188,6 +188,14 @@ export function normalizeGlobalSettings(
   // authored projects override every field via the spreads.
   return {
     ...s,
+    // Stage geometry — the Settings inspector reads project.width/height
+    // unguarded, so a settings object without `project` crashes it.
+    // layoutMode is deliberately NOT defaulted: undefined has meaning
+    // (existing projects without it are treated as 'fixed').
+    project: {
+      width: 1024, height: 768, aspectRatio: '4:3', scalingMode: 'fit',
+      ...(s.project ?? {}),
+    },
     colors: {
       pcolor: '#d9a441', palpha: 100, ptextcolor: '#201607',
       nonpcolor: '#1b1f2b', nonpalpha: 100, nonptextcolor: '#eae7de',
@@ -231,6 +239,14 @@ export function normalizeGlobalSettings(
     sound: {
       backgroundMusic: '', backgroundVolume: 100, mute: false,
       ...(s.sound ?? {}),
+    },
+    copyright: {
+      notice: '', year: new Date().getFullYear().toString(), owner: '',
+      ...(s.copyright ?? {}),
+    },
+    debug: {
+      firstbeat: '', showvals: false,
+      ...(s.debug ?? {}),
     },
   } as GlobalSettings;
 }
