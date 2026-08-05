@@ -111,3 +111,64 @@ describe('background', () => {
     expect(root.style.backgroundImage).toBe('');
   });
 });
+
+describe('themed player bubbles (v0.9.87 — no more hardcoded #0a66c2)', () => {
+  const theme: any = {
+    textBox: {
+      backgroundColor: '#1b1f2b', borderColor: '#3d4356',
+      borderWidth: 1, borderRadius: 16, padding: 12, opacity: 93,
+    },
+    button: {
+      backgroundColor: '#d9a441', hoverBackgroundColor: '#e2b35e',
+      textColor: '#201607', borderColor: '#3d4356', borderWidth: 1, borderRadius: 20,
+    },
+    colors: { textColor: '#eae7de', textAlpha: 100 },
+    fonts: { textFont: 'sans-serif', buttonFont: 'sans-serif' },
+  };
+
+  const findBubble = (container: HTMLElement, text: string): HTMLElement => {
+    const el = Array.from(container.querySelectorAll('div')).find(
+      (d) => d.textContent === text && (d as HTMLElement).style.backgroundColor,
+    );
+    if (!el) throw new Error(`no bubble found for "${text}"`);
+    return el as HTMLElement;
+  };
+
+  it("player bubbles take the theme's button colors (bg + contrast text)", () => {
+    const { container } = render(
+      <ChatDialogView
+        mode="chat-scroll"
+        theme={theme}
+        messages={[msg({ id: 'p', speaker: 'You', text: 'My reply', isPlayer: true })]}
+      />,
+    );
+    const bubble = findBubble(container, 'My reply');
+    expect(bubble.style.backgroundColor).toBe('rgb(217, 164, 65)'); // #d9a441
+    expect(bubble.style.color).toBe('rgb(32, 22, 7)'); // #201607, NOT the NPC text color
+  });
+
+  it('NPC bubbles keep the text-box background and narrator text color', () => {
+    const { container } = render(
+      <ChatDialogView
+        mode="chat-scroll"
+        theme={theme}
+        messages={[msg({ id: 'n', speaker: 'Marcus', text: 'NPC line' })]}
+      />,
+    );
+    const bubble = findBubble(container, 'NPC line');
+    // #1b1f2b at 93% opacity → rgba
+    expect(bubble.style.backgroundColor).toBe('rgba(27, 31, 43, 0.93)');
+    expect(bubble.style.color).toBe('rgb(234, 231, 222)'); // #eae7de
+  });
+
+  it('themeless mounts fall back to the Ink & Brass defaults (no LinkedIn blue)', () => {
+    const { container } = render(
+      <ChatDialogView
+        mode="chat-scroll"
+        messages={[msg({ id: 'p', speaker: 'You', text: 'My reply', isPlayer: true })]}
+      />,
+    );
+    const bubble = findBubble(container, 'My reply');
+    expect(bubble.style.backgroundColor).toBe('rgb(217, 164, 65)'); // brass fallback
+  });
+});

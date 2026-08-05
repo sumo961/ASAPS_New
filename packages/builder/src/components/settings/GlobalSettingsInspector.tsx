@@ -53,6 +53,7 @@ interface GlobalSettings {
   };
   textbox: {
     radius: number;         // Corner radius
+    buttonRadius?: number;  // Button/choice corner radius (unset ⇒ follows radius; 999 ⇒ pill)
     padding: number;        // Internal padding
     borderWidth: number;    // Border width
     opacity: number;        // Background opacity
@@ -1715,6 +1716,30 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                     className="w-full"
                   />
                   <div className="text-xs text-gray-500 text-center">{settings.textbox.radius}px</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Button Corner Radius
+                  </label>
+                  <input
+                    type="range"
+                    value={Math.min(settings.textbox.buttonRadius ?? settings.textbox.radius, 51)}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value);
+                      // Right end of the slider = pill (999); stored value is capped
+                      // display-side so the thumb doesn't vanish off-scale.
+                      handleChange('textbox', 'buttonRadius', v > 50 ? 999 : v);
+                    }}
+                    min="0"
+                    max="51"
+                    className="w-full"
+                  />
+                  <div className="text-xs text-gray-500 text-center">
+                    {(settings.textbox.buttonRadius ?? settings.textbox.radius) > 50
+                      ? 'Pill'
+                      : `${settings.textbox.buttonRadius ?? settings.textbox.radius}px`}
+                  </div>
                 </div>
 
                 <div>

@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { convertGlobalSettingsToTheme, normalizeGlobalSettings } from '../themeConverter';
 
 describe('normalizeGlobalSettings', () => {
-  it('fills every missing section for a partial globalSettings', () => {
+  it('fills every missing section for a partial globalSettings (Ink & Brass defaults)', () => {
     const n = normalizeGlobalSettings({ project: {}, debug: {} } as any);
-    expect(n.colors.pcolor).toBe('#ffffff');
-    expect(n.colors.bgColor).toBe('#1a1a2e');
+    expect(n.colors.pcolor).toBe('#d9a441');
+    expect(n.colors.bgColor).toBe('#14161f');
     expect(n.fonts.titleFont).toBeTruthy();
-    expect(n.fonts.fontSize.title).toBe(32);
+    expect(n.fonts.fontSize.title).toBe(40);
     expect(n.textbox).toBeTruthy();
     expect(n.textEffects).toBeTruthy();
     expect(n.hotspots).toBeTruthy();
@@ -16,12 +16,26 @@ describe('normalizeGlobalSettings', () => {
   it('preserves valid values that were present', () => {
     const n = normalizeGlobalSettings({ colors: { bgColor: '#000000' } } as any);
     expect(n.colors.bgColor).toBe('#000000'); // kept
-    expect(n.colors.pcolor).toBe('#ffffff');  // filled
+    expect(n.colors.pcolor).toBe('#d9a441');  // filled
+  });
+
+  it('seeds pill buttons + speaker label ONLY for projects with no authored appearance', () => {
+    // Brand-new project (no textbox, no colors): full default look
+    const fresh = normalizeGlobalSettings({ project: {} } as any);
+    expect((fresh.textbox as any).buttonRadius).toBe(999);
+    expect((fresh as any).speakerDisplay?.nameStyle).toBe('label');
+    // Legacy project WITH authored textbox/colors: no pills forced, no label popped
+    const legacy = normalizeGlobalSettings({
+      colors: { pcolor: '#ffffff' },
+      textbox: { radius: 8, padding: 20, borderWidth: 2, opacity: 90 },
+    } as any);
+    expect((legacy.textbox as any).buttonRadius).toBeUndefined();
+    expect((legacy as any).speakerDisplay).toBeUndefined();
   });
 
   it('handles null/undefined', () => {
     expect(() => normalizeGlobalSettings(undefined)).not.toThrow();
-    expect(normalizeGlobalSettings(null).colors.pcolor).toBe('#ffffff');
+    expect(normalizeGlobalSettings(null).colors.pcolor).toBe('#d9a441');
   });
 });
 
@@ -34,8 +48,8 @@ describe('convertGlobalSettingsToTheme', () => {
     expect(() => convertGlobalSettingsToTheme(partial)).not.toThrow();
 
     const theme = convertGlobalSettingsToTheme(partial);
-    expect(theme.backgroundColor).toBe('#1a1a2e'); // default bg
-    expect(theme.button.backgroundColor).toBe('#ffffff'); // default pcolor
+    expect(theme.backgroundColor).toBe('#14161f'); // default bg (Ink & Brass)
+    expect(theme.button.backgroundColor).toBe('#d9a441'); // default pcolor
     // getContrastColor / getFontFamily did not crash on undefined:
     expect(typeof theme.button.textColor).toBe('string');
     expect(theme.fonts.titleFont).toBeTruthy();

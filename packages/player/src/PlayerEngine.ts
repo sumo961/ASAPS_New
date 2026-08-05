@@ -92,6 +92,7 @@ interface GlobalSettings {
  * Font name to CSS font-family mapping
  */
 const FONT_FAMILIES: Record<string, string> = {
+  'System': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
   'Arial': 'Arial, sans-serif',
   'Times New Roman': 'Times New Roman, serif',
   'Courier New': 'Courier New, monospace',
@@ -155,11 +156,16 @@ function getContrastColor(hexColor: string): string {
 
 /**
  * Convert GlobalSettings to RenderThemeSettings
+ *
+ * Exported for tests: this is a duplicate of the builder's themeConverter
+ * (packages/builder/src/utils/themeConverter.ts) and MUST stay in sync —
+ * it is what exported stories derive their theme from.
  */
-function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
-  // Get effective colors with legacy fallbacks
-  const buttonBg = settings.colors.pcolor || settings.colors.buttonBg || '#ffffff';
-  const textBoxBg = settings.colors.nonpcolor || settings.colors.textBoxBg || '#cccccc';
+export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSettings {
+  // Get effective colors with legacy fallbacks (final fallbacks mirror the
+  // "Ink & Brass" default — keep in sync with the builder's themeConverter)
+  const buttonBg = settings.colors.pcolor || settings.colors.buttonBg || '#d9a441';
+  const textBoxBg = settings.colors.nonpcolor || settings.colors.textBoxBg || '#1b1f2b';
 
   // Calculate text colors: use explicit color if set, otherwise auto-calculate from background
   const buttonTextColor = settings.colors.ptextcolor || getContrastColor(buttonBg);
@@ -185,7 +191,9 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       textColor: buttonTextColor,
       borderColor: settings.colors.textBoxBorder,
       borderWidth: settings.textbox.borderWidth,
-      borderRadius: settings.textbox.radius,
+      // Buttons may carry their own radius (999 ⇒ pill); mirror of the
+      // builder's themeConverter — keep in sync.
+      borderRadius: (settings.textbox as any).buttonRadius ?? settings.textbox.radius,
     },
     colors: {
       textColor: npcTextColor, // NPC/narrator text color
@@ -195,6 +203,12 @@ function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderThemeSett
       titleFont: getFontFamily(settings.fonts.titleFont),
       textFont: getFontFamily(settings.fonts.textFont),
       buttonFont: getFontFamily(settings.fonts.btnFont),
+      // Font sizes chosen in the builder must reach exported stories too —
+      // this mapping was missing (builder themeConverter had it, this copy
+      // didn't), so exports silently fell back to element/default sizes.
+      titleFontSize: settings.fonts.fontSize?.title,
+      textFontSize: settings.fonts.fontSize?.text,
+      buttonFontSize: settings.fonts.fontSize?.button,
     },
     textEffects: settings.textEffects ? {
       animation: settings.textEffects.animation,

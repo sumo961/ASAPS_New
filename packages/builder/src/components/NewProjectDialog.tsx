@@ -13,6 +13,7 @@
 import React, { useState } from 'react';
 import { X, Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import { useProject } from '../contexts/PersistenceContext';
+import { normalizeGlobalSettings } from '../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../utils/languageCatalog';
 import { CultureSettingFields, cultureIsSet, type CultureValue } from './settings/CultureSettingFields';
 
@@ -38,7 +39,7 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
   onProjectCreated,
   isModal = true,
 }) => {
-  const { create, updateGlobalSettings, project: currentProject } = useProject();
+  const { create, updateGlobalSettings } = useProject();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('responsive');
@@ -70,7 +71,14 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
       // created project. updateGlobalSettings reads the current project
       // from the persistence ref, which create() has just swapped to
       // the new project, so this hits the right record.
-      const existing = (currentProject?.globalSettings ?? {}) as Record<string, any>;
+      //
+      // A new project starts PRISTINE: `currentProject` here is still the
+      // stale pre-create state, so seeding from it copied the PREVIOUS
+      // project's entire theme into every new project (theme bleed).
+      // Seed the COMPLETE default settings (not a partial — the corruption
+      // detector treats missing colors/fonts as damage and alerts), then
+      // let the wizard's own fields override.
+      const existing = normalizeGlobalSettings(undefined) as Record<string, any>;
       const nextSettings = {
         ...existing,
         project: {

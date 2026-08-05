@@ -81,6 +81,7 @@ export interface GlobalSettings {
   };
   textbox: {
     radius: number;         // Corner radius
+    buttonRadius?: number;  // Button/choice corner radius (unset ⇒ follows radius; 999 ⇒ pill)
     padding: number;        // Internal padding
     borderWidth: number;    // Border width
     opacity: number;        // Background opacity

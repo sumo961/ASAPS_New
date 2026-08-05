@@ -13,6 +13,7 @@ import type { GlobalSettings } from '../components/settings/GlobalSettingsInspec
  * Must match the mapping in GlobalSettingsInspector.tsx
  */
 const FONT_FAMILIES: Record<string, string> = {
+  'System': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
   'Arial': 'Arial, sans-serif',
   'Times New Roman': 'Times New Roman, serif',
   'Courier New': 'Courier New, monospace',
@@ -181,24 +182,43 @@ export function normalizeGlobalSettings(
   gs: Partial<GlobalSettings> | undefined | null
 ): GlobalSettings {
   const s = (gs ?? {}) as any;
+  // Gap-fill values below ARE the default look ("Ink & Brass", v0.9.87).
+  // They only apply to fields the project never authored: new projects
+  // (created with empty settings) and corrupted/partial imports. Fully
+  // authored projects override every field via the spreads.
   return {
     ...s,
     colors: {
-      pcolor: '#ffffff', palpha: 100, ptextcolor: '',
-      nonpcolor: '#cccccc', nonpalpha: 100, nonptextcolor: '',
-      bgColor: '#1a1a2e', textBoxBorder: '#4a90d9',
+      pcolor: '#d9a441', palpha: 100, ptextcolor: '#201607',
+      nonpcolor: '#1b1f2b', nonpalpha: 100, nonptextcolor: '#eae7de',
+      bgColor: '#14161f', textBoxBorder: '#3d4356',
       ...(s.colors ?? {}),
     },
     fonts: {
-      titleFont: 'Georgia', textFont: 'Arial', btnFont: 'Arial',
+      titleFont: 'Georgia', textFont: 'System', btnFont: 'System',
       ...(s.fonts ?? {}),
-      fontSize: { title: 32, text: 18, button: 18, ...(s.fonts?.fontSize ?? {}) },
+      fontSize: { title: 40, text: 19, button: 16, ...(s.fonts?.fontSize ?? {}) },
     },
     textbox: {
-      radius: 8, padding: 20, borderWidth: 2, opacity: 90,
+      radius: 14, padding: 22, borderWidth: 1, opacity: 93,
       position: 'bottom', boxVisibility: 'all',
+      // Pill buttons only for projects with NO authored textbox at all —
+      // a project that authored its textbox (but predates buttonRadius)
+      // must keep buttons following its box radius.
+      ...(s.textbox === undefined ? { buttonRadius: 999 } : {}),
       ...(s.textbox ?? {}),
     },
+    // Speaker-name label above the text box is part of the default look,
+    // but ONLY for projects with no authored appearance at all — enabling
+    // it on legacy projects would make labels pop up on existing scenes.
+    ...(s.speakerDisplay === undefined && s.colors === undefined
+      ? {
+          speakerDisplay: {
+            nameStyle: 'label', namePosition: 'left',
+            nameColor: '#d9a441', graphicPosition: 'off',
+          },
+        }
+      : {}),
     textEffects: {
       animation: 'none', typewriterSpeed: 15, fadeInDuration: 200,
       ...(s.textEffects ?? {}),
@@ -229,17 +249,17 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
   // colour defaults matter because getContrastColor / lightenColor are not
   // null-safe; fonts default to Arial because getFontFamily isn't either.
   const colors = {
-    pcolor: '#ffffff',
-    nonpcolor: '#cccccc',
-    bgColor: '#1a1a2e',
+    pcolor: '#d9a441',
+    nonpcolor: '#1b1f2b',
+    bgColor: '#14161f',
     ptextcolor: '',
     nonptextcolor: '',
     ...((settings.colors ?? {}) as Partial<NonNullable<GlobalSettings['colors']>>),
   } as NonNullable<GlobalSettings['colors']>;
   const textbox = { ...(settings.textbox ?? {}) } as NonNullable<GlobalSettings['textbox']>;
   const fonts = {
-    titleFont: 'Arial',
-    textFont: 'Arial',
+    titleFont: 'Georgia',
+    textFont: 'System',
     ...((settings.fonts ?? {}) as Partial<NonNullable<GlobalSettings['fonts']>>),
   } as NonNullable<GlobalSettings['fonts']>;
   const textEffects = { ...(settings.textEffects ?? {}) } as NonNullable<GlobalSettings['textEffects']>;
@@ -270,7 +290,9 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       textColor: buttonTextColor,
       borderColor: colors.textBoxBorder,
       borderWidth: textbox.borderWidth,
-      borderRadius: textbox.radius,
+      // Buttons may carry their own radius (999 ⇒ pill); legacy projects
+      // without one keep sharing the text-box radius.
+      borderRadius: textbox.buttonRadius ?? textbox.radius,
     },
     colors: {
       textColor: npcTextColor, // NPC/narrator text color

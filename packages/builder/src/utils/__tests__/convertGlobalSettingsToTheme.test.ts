@@ -332,4 +332,38 @@ describe('convertGlobalSettingsToTheme', () => {
       expect(theme.speakerDisplay).toBeUndefined();
     });
   });
+
+  describe('button radius (v0.9.87 Ink & Brass default)', () => {
+    it('buttons follow the text-box radius when buttonRadius is unset (legacy projects)', () => {
+      const theme = convertGlobalSettingsToTheme(makeSettings({ textbox: { radius: 8 } }));
+      expect(theme.button.borderRadius).toBe(8);
+      expect(theme.textBox.borderRadius).toBe(8);
+    });
+
+    it('buttonRadius overrides the shared radius without touching the text box', () => {
+      const theme = convertGlobalSettingsToTheme(makeSettings({
+        textbox: { radius: 14, buttonRadius: 999 },
+      }));
+      expect(theme.button.borderRadius).toBe(999); // pill
+      expect(theme.textBox.borderRadius).toBe(14);
+    });
+
+    it('buttonRadius 0 is respected (not treated as unset)', () => {
+      const theme = convertGlobalSettingsToTheme(makeSettings({
+        textbox: { radius: 14, buttonRadius: 0 },
+      }));
+      expect(theme.button.borderRadius).toBe(0);
+    });
+  });
+
+  describe('System font (native UI stack)', () => {
+    it('maps the System display name to the platform font stack', () => {
+      const theme = convertGlobalSettingsToTheme(makeSettings({
+        fonts: { titleFont: 'Georgia', textFont: 'System', btnFont: 'System' },
+      }));
+      expect(theme.fonts.textFont).toContain('system-ui');
+      expect(theme.fonts.buttonFont).toContain('system-ui');
+      expect(theme.fonts.titleFont).toBe('Georgia, serif');
+    });
+  });
 });

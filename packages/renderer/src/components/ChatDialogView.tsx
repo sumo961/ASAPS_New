@@ -109,27 +109,28 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
     }
   }, [choices.length, animatedMessages.size, messages.length]);
 
-  // Get theme colors
+  // Get theme colors (fallbacks mirror the "Ink & Brass" default theme —
+  // keep in sync with DEFAULT_THEME in PositionedBeatView)
   const textBox = theme?.textBox || {
-    backgroundColor: '#16213e',
-    borderColor: '#4a90d9',
-    borderWidth: 2,
+    backgroundColor: '#1b1f2b',
+    borderColor: '#3d4356',
+    borderWidth: 1,
     borderRadius: 16, // Rounder for chat bubbles
     padding: 12,
-    opacity: 95,
+    opacity: 93,
   };
 
   const button = theme?.button || {
-    backgroundColor: '#0f3460',
-    hoverBackgroundColor: '#1a4a7a',
-    textColor: '#ffffff',
-    borderColor: '#4a90d9',
+    backgroundColor: '#d9a441',
+    hoverBackgroundColor: '#e2b35e',
+    textColor: '#201607',
+    borderColor: '#3d4356',
     borderWidth: 1,
     borderRadius: 20, // Pill-shaped for chat choices
   };
 
   const colors = theme?.colors || {
-    textColor: '#ffffff',
+    textColor: '#eae7de',
     textAlpha: 100,
   };
 
@@ -146,8 +147,11 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
     ? `rgba(${parseInt(textBox.backgroundColor.slice(1, 3), 16)}, ${parseInt(textBox.backgroundColor.slice(3, 5), 16)}, ${parseInt(textBox.backgroundColor.slice(5, 7), 16)}, ${bgOpacity})`
     : textBox.backgroundColor;
 
-  // Player message styling (different from NPC)
-  const playerBubbleBg = '#0a66c2'; // Blue for player messages
+  // Player message styling: player bubbles take the theme's BUTTON colors
+  // (the player's voice = the player's controls), NPC bubbles the text box.
+  // Was a hardcoded #0a66c2 blue that ignored the theme entirely.
+  const playerBubbleBg = button.backgroundColor;
+  const playerBubbleText = button.textColor;
 
   // Render a single message bubble
   const renderMessage = (message: ChatMessage, index: number) => {
@@ -173,7 +177,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
             style={{
               width: 40,
               height: 40,
-              backgroundColor: isPlayer ? '#0a66c2' : textBox.backgroundColor,
+              backgroundColor: isPlayer ? playerBubbleBg : textBox.backgroundColor,
               border: `2px solid ${textBox.borderColor}`,
             }}
           >
@@ -184,7 +188,10 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
+              <div
+                className="w-full h-full flex items-center justify-center text-sm font-bold"
+                style={{ color: isPlayer ? playerBubbleText : colors.textColor }}
+              >
                 {message.speaker.charAt(0).toUpperCase()}
               </div>
             )}
@@ -233,7 +240,9 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               borderRadius: textBox.borderRadius || 16,
               borderTopLeftRadius: !isPlayer && !showAvatars ? 4 : textBox.borderRadius || 16,
               borderTopRightRadius: isPlayer && !showAvatars ? 4 : textBox.borderRadius || 16,
-              color: colors.textColor,
+              // Player bubbles need the button's contrast color, not the NPC
+              // text color — a light button bg + white NPC text was unreadable.
+              color: isPlayer ? playerBubbleText : colors.textColor,
               fontFamily: fonts.textFont,
               fontSize: Math.round(15 * fontScale),
               lineHeight: 1.5,

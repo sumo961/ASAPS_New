@@ -639,33 +639,43 @@ function App() {
       // / GlobalSettingsAdapter). The author then picks via migrator.
       layoutMode: 'responsive',
     },
+    // "Ink & Brass" default theme (v0.9.87): near-black ink stage, warm
+    // off-white serif titles, brass pill buttons. Only NEW projects get
+    // these — every existing project carries its own full settings copy.
     colors: {
-      pcolor: '#ffffff',       // Button/choice background color
+      pcolor: '#d9a441',       // Button/choice background — brass accent
       palpha: 100,             // Button/choice opacity (0-100)
-      ptextcolor: '',          // Button text color (auto-calculated if empty)
-      nonpcolor: '#cccccc',    // NPC/narrator text box background
+      ptextcolor: '#201607',   // Button text — near-black on brass
+      nonpcolor: '#1b1f2b',    // NPC/narrator text box — deep ink slate
       nonpalpha: 100,          // NPC/narrator text box opacity (0-100)
-      nonptextcolor: '',       // NPC text color (auto-calculated if empty)
-      bgColor: '#1a1a2e',      // Dark blue background
-      textBoxBorder: '#4a90d9' // Blue border
+      nonptextcolor: '#eae7de', // NPC text — warm off-white
+      bgColor: '#14161f',      // Ink stage background
+      textBoxBorder: '#3d4356' // Hairline slate border
     },
     fonts: {
       titleFont: 'Georgia',
-      textFont: 'Arial',
-      btnFont: 'Arial',
+      textFont: 'System',
+      btnFont: 'System',
       fontSize: {
-        title: 32,
-        text: 18,
-        button: 18
+        title: 40,
+        text: 19,
+        button: 16
       }
     },
     textbox: {
-      radius: 8,
-      padding: 20,
-      borderWidth: 2,
-      opacity: 90,  // Text box background opacity percentage (0-100)
+      radius: 14,
+      buttonRadius: 999,  // Pill buttons (box keeps its own radius)
+      padding: 22,
+      borderWidth: 1,
+      opacity: 93,  // Text box background opacity percentage (0-100)
       position: 'bottom',
       boxVisibility: 'all'
+    },
+    speakerDisplay: {
+      nameStyle: 'label',      // Speaker name above the text box
+      namePosition: 'left',
+      nameColor: '#d9a441',    // Brass, matching the accent
+      graphicPosition: 'off'
     },
     textEffects: {
       animation: 'none',        // No typewriter effect by default
@@ -2388,12 +2398,18 @@ function App() {
         };
         loadAssets();
 
-        // Restore global settings from project (if saved)
+        // Restore global settings from project (if saved). A project WITHOUT
+        // saved settings (every freshly created one) must reset to pristine
+        // defaults — otherwise the previous project's settings stay in state
+        // and silently become the new project's theme.
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
           notifyIfCorrupted(currentProject);
           setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
           applyProjectAIDefaults(currentProject.globalSettings);
+        } else {
+          console.log('[App] >>> Project has no globalSettings — resetting to defaults');
+          setGlobalSettings(normalizeGlobalSettings(undefined));
         }
 
         // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)
@@ -2505,6 +2521,10 @@ function App() {
           console.log('[App] >>> Restoring globalSettings from untitled project');
           notifyIfCorrupted(currentProject);
           setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
+        } else {
+          // No saved settings — pristine defaults, not the previous project's
+          console.log('[App] >>> Untitled project has no globalSettings — resetting to defaults');
+          setGlobalSettings(normalizeGlobalSettings(undefined));
         }
 
         // Initialize the default 3-beat story (title, intro, end)
@@ -2693,12 +2713,16 @@ function App() {
         };
         loadAssets();
 
-        // Restore global settings from project (if saved)
+        // Restore global settings from project (if saved); reset to pristine
+        // defaults otherwise so the previous project's theme can't bleed in.
         if (currentProject.globalSettings) {
           console.log('[App] >>> Restoring globalSettings from project');
           notifyIfCorrupted(currentProject);
           setGlobalSettings(normalizeGlobalSettings(currentProject.globalSettings));
           applyProjectAIDefaults(currentProject.globalSettings);
+        } else {
+          console.log('[App] >>> Project has no globalSettings — resetting to defaults');
+          setGlobalSettings(normalizeGlobalSettings(undefined));
         }
 
         // ALWAYS set theme ID from project (clear if undefined to prevent bleed between projects)

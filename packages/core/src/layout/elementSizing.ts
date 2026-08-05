@@ -15,6 +15,7 @@
  * Font name to CSS font-family mapping
  */
 const FONT_FAMILIES: Record<string, string> = {
+  'System': 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
   'Arial': 'Arial, sans-serif',
   'Helvetica': 'Helvetica, Arial, sans-serif',
   'Times New Roman': 'Times New Roman, serif',

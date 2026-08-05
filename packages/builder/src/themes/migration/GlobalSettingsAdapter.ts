@@ -59,7 +59,7 @@ export function globalSettingsToTheme(
     colors: convertColors(settings.colors),
     fonts: convertFonts(settings.fonts),
     textBox: convertTextBox(settings.textbox, settings.colors),
-    button: convertButton(settings.colors),
+    button: convertButton(settings.colors, settings.textbox),
     hotspot: convertHotspot(settings.hotspots),
     effects: convertEffects(settings.textEffects),
   };
@@ -151,7 +151,10 @@ function convertTextBox(
 /**
  * Convert GlobalSettings colors to ThemeButton
  */
-function convertButton(colors: GlobalSettings['colors']): ThemeButton {
+function convertButton(
+  colors: GlobalSettings['colors'],
+  textbox?: GlobalSettings['textbox']
+): ThemeButton {
   // Calculate button text color: use explicit color if set, otherwise auto-calculate
   const buttonTextColor = colors.ptextcolor || getContrastColor(colors.pcolor);
 
@@ -162,8 +165,8 @@ function convertButton(colors: GlobalSettings['colors']): ThemeButton {
     disabledBackground: { hex: colors.pcolor, alpha: 0.5 },
     textColor: { hex: buttonTextColor },
     borderColor: { hex: colors.textBoxBorder },
-    borderWidth: 1,
-    borderRadius: 4,
+    borderWidth: textbox?.borderWidth ?? 1,
+    borderRadius: textbox?.buttonRadius ?? textbox?.radius ?? 4,
     padding: { horizontal: 16, vertical: 8 },
     transitionDuration: 200,
   };
@@ -252,6 +255,11 @@ export function themeToGlobalSettings(
     },
     textbox: {
       radius: theme.textBox.borderRadius,
+      // Button radius only carries over when the theme differentiates it
+      // from the box radius; otherwise leave unset (buttons follow radius).
+      buttonRadius: theme.button.borderRadius !== theme.textBox.borderRadius
+        ? theme.button.borderRadius
+        : undefined,
       padding: theme.textBox.padding,
       borderWidth: theme.textBox.borderWidth,
       opacity: Math.round(theme.textBox.opacity * 100), // Convert 0-1 to 0-100

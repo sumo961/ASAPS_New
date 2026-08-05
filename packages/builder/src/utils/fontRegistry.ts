@@ -28,6 +28,9 @@ export interface FontDefinition {
  * Built-in fonts that are available on most systems
  */
 export const BUILTIN_FONTS: FontDefinition[] = [
+  // Native UI stack — resolves to SF (macOS/iOS), Segoe UI (Windows), Roboto
+  // (Android/ChromeOS). Real bold + italic cuts on every platform.
+  { id: 'system', displayName: 'System', fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif', type: 'builtin' },
   { id: 'arial', displayName: 'Arial', fontFamily: 'Arial, sans-serif', type: 'builtin' },
   { id: 'helvetica', displayName: 'Helvetica', fontFamily: 'Helvetica, Arial, sans-serif', type: 'builtin' },
   { id: 'times-new-roman', displayName: 'Times New Roman', fontFamily: 'Times New Roman, serif', type: 'builtin' },

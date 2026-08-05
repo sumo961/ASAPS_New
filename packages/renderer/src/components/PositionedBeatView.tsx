@@ -1106,36 +1106,38 @@ const BUTTON_BEAT_TYPES = ['infoText', 'endScreen', 'aiSummary', 'aiInfoText', '
 // Beat types without buttons (durScreen, aiDurScreen) - can use full height
 const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
 
-// Default theme to use if none provided (matches Visual Novel preset style)
+// Default theme to use if none provided. Matches the "Ink & Brass" default
+// that new projects get (builder App.tsx globalSettings literal) — real
+// projects always pass a derived theme, so this only covers themeless mounts.
 export const DEFAULT_THEME: RenderThemeSettings = {
   textBox: {
-    backgroundColor: '#16213e',  // Dark blue surface
-    borderColor: '#4a90d9',      // Blue border
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 20,
-    opacity: 90,
+    backgroundColor: '#1b1f2b',  // Deep ink slate surface
+    borderColor: '#3d4356',      // Hairline slate border
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 22,
+    opacity: 93,
     hideTitleTextBox: false,     // Default: show text boxes for title/author
   },
   button: {
-    backgroundColor: '#0f3460',       // Dark blue button
-    hoverBackgroundColor: '#1a4a7a',  // Lighter on hover
-    textColor: '#ffffff',             // White text
-    borderColor: '#4a90d9',           // Blue border
+    backgroundColor: '#d9a441',       // Brass accent button
+    hoverBackgroundColor: '#e2b35e',  // Lighter on hover (+15%)
+    textColor: '#201607',             // Near-black on brass
+    borderColor: '#3d4356',           // Hairline slate border
     borderWidth: 1,
-    borderRadius: 4,
+    borderRadius: 999,                // Pill
   },
   colors: {
-    textColor: '#ffffff',  // White text
+    textColor: '#eae7de',  // Warm off-white text
     textAlpha: 100,
   },
   fonts: {
-    titleFont: 'serif',
-    textFont: 'sans-serif',
-    buttonFont: 'sans-serif',
-    titleFontSize: 48,
-    textFontSize: 18,
-    buttonFontSize: 18,
+    titleFont: 'Georgia, serif',
+    textFont: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    buttonFont: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+    titleFontSize: 40,
+    textFontSize: 19,
+    buttonFontSize: 16,
   },
   hotspot: {
     highlightColor: '#ffff00',  // Yellow highlight color (default)
@@ -1732,11 +1734,13 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
               right: labelRight,
               zIndex: 200,
               background: 'rgba(0, 0, 0, 0.65)',
-              color: '#f0f0f0',
+              // nameColor from speaker-display settings; label uses the BODY
+              // font (sans in the default theme) — titles keep the title font.
+              color: theme.speakerDisplay?.nameColor || '#f0f0f0',
               padding: '4px 14px',
               borderRadius: 6,
               fontSize: Math.round(16 * mobileFontScale),
-              fontFamily: theme.fonts?.titleFont ? getFontFamily(theme.fonts.titleFont) : 'inherit',
+              fontFamily: theme.fonts?.textFont ? getFontFamily(theme.fonts.textFont) : 'inherit',
               fontWeight: 600,
               letterSpacing: '0.02em',
               pointerEvents: 'none',
@@ -2085,11 +2089,12 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             right: labelRight,
             zIndex: 200,
             background: 'rgba(0, 0, 0, 0.65)',
-            color: '#f0f0f0',
+            // Mirror of the fixed-mode label above: nameColor + BODY font.
+            color: theme.speakerDisplay?.nameColor || '#f0f0f0',
             padding: '4px 14px',
             borderRadius: 6,
             fontSize: Math.round(16 * mobileFontScale),
-            fontFamily: theme.fonts?.titleFont ? getFontFamily(theme.fonts.titleFont) : 'inherit',
+            fontFamily: theme.fonts?.textFont ? getFontFamily(theme.fonts.textFont) : 'inherit',
             fontWeight: 600,
             letterSpacing: '0.02em',
             pointerEvents: 'none',
