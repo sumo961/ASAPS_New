@@ -55,6 +55,9 @@ export interface ImageInputElementProps {
     buttonBg?: string;
     buttonText?: string;
     buttonBorder?: string;
+    /** Body text color — the transparent Skip button must use this, not
+     *  buttonText (dark-on-brass text is invisible on a dark stage). */
+    pageText?: string;
   };
 }
 
@@ -99,7 +102,7 @@ export const ImageInputElement: React.FC<ImageInputElementProps> = ({
   const secondaryButtonStyle: React.CSSProperties = {
     ...buttonStyle,
     background: 'transparent',
-    color: theme?.buttonText ?? '#ffffff',
+    color: theme?.pageText ?? '#ffffff',
     opacity: 0.85,
   };
 

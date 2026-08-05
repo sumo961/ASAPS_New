@@ -1469,7 +1469,10 @@ export class ReactRenderer extends BaseRenderer {
       const sttSupportsStreaming = activeSTTProvider?.supportsStreaming === true;
       console.log(`[ConversationInput] STT service: ${sttService ? 'yes' : 'no'}, provider: ${activeSTTProvider?.name || 'none'}, streaming: ${sttSupportsStreaming}`);
 
-      // Inline input component with optional mic button and auto-listen mode
+      // Inline input component with optional mic button and auto-listen mode.
+      // Chrome derives from the theme (was hardcoded white field + #0a66c2
+      // Send) so the bar sits inside ANY theme, incl. the dark default.
+      const inputTheme = this.theme;
       const ConversationInput = () => {
         const [inputText, setInputText] = React.useState('');
         const [isListening, setIsListening] = React.useState(false);
@@ -1714,7 +1717,9 @@ export class ReactRenderer extends BaseRenderer {
         return (
           <div style={{
             display: 'flex', gap: 8, padding: '8px 16px',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            // Opaque theme ground — the old translucent scrim went light grey
+            // when the bar rendered over the page outside the stage image.
+            backgroundColor: inputTheme?.backgroundColor || '#14161f',
             borderTop: '1px solid rgba(255, 255, 255, 0.1)',
             alignItems: 'center',
           }}>
@@ -1752,9 +1757,10 @@ export class ReactRenderer extends BaseRenderer {
               readOnly={isListening}
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: 20,
-                border: isListening ? '2px solid #ef4444' : '1px solid rgba(255,255,255,0.2)',
-                backgroundColor: isListening ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.95)',
-                fontSize: 14, outline: 'none', color: '#1a1a1a',
+                border: isListening ? '2px solid #ef4444' : `1px solid ${inputTheme?.textBox?.borderColor || 'rgba(255,255,255,0.2)'}`,
+                backgroundColor: inputTheme?.textBox?.backgroundColor || '#1b1f2b',
+                fontSize: 14, outline: 'none',
+                color: inputTheme?.colors?.textColor || '#eae7de',
                 fontStyle: isListening && interimText ? 'italic' : 'normal',
               }}
             />
@@ -1763,8 +1769,13 @@ export class ReactRenderer extends BaseRenderer {
               disabled={!inputText.trim()}
               style={{
                 padding: '10px 20px', borderRadius: 20,
-                backgroundColor: inputText.trim() ? '#0a66c2' : '#555',
-                color: 'white', border: 'none', cursor: inputText.trim() ? 'pointer' : 'default',
+                backgroundColor: inputText.trim()
+                  ? (inputTheme?.button?.backgroundColor || '#d9a441')
+                  : 'rgba(255,255,255,0.15)',
+                color: inputText.trim()
+                  ? (inputTheme?.button?.textColor || '#201607')
+                  : 'rgba(255,255,255,0.55)',
+                border: 'none', cursor: inputText.trim() ? 'pointer' : 'default',
                 fontSize: 14, fontWeight: 600, flexShrink: 0,
               }}
             >

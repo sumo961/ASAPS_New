@@ -202,7 +202,7 @@ const MeterBar: React.FC<{
     ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))
     : 0;
 
-  const barColor = color || '#3B82F6';
+  const barColor = color || '#5B8DEF';
   const bgColor = 'rgba(255, 255, 255, 0.3)';
 
   // Format numeric value based on format setting

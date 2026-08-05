@@ -40,6 +40,7 @@ export interface WebViewElementProps {
     buttonBg?: string;
     buttonText?: string;
     buttonBorder?: string;
+    pageText?: string;
   };
 }
 

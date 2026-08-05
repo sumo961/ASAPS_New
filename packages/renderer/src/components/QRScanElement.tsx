@@ -42,6 +42,7 @@ export interface QRScanElementProps {
     buttonBg?: string;
     buttonText?: string;
     buttonBorder?: string;
+    pageText?: string;
   };
 }
 

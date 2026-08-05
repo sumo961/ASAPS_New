@@ -1110,6 +1110,7 @@ const NO_BUTTON_BEAT_TYPES = ['durScreen', 'aiDurScreen'];
 // that new projects get (builder App.tsx globalSettings literal) — real
 // projects always pass a derived theme, so this only covers themeless mounts.
 export const DEFAULT_THEME: RenderThemeSettings = {
+  backgroundColor: '#14161f',  // Ink stage — without this, fallback paths painted a navy gradient
   textBox: {
     backgroundColor: '#1b1f2b',  // Deep ink slate surface
     borderColor: '#3d4356',      // Hairline slate border
@@ -2877,6 +2878,16 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             width={location.width}
             height={location.height}
             fontScale={mobileFontScale}
+            theme={{
+              // Mirror of the slot-mode mapping in SlotFlowView — without
+              // this the absolute path fell back to the green-digital look.
+              buttonBg: theme.button?.backgroundColor,
+              buttonText: theme.button?.textColor,
+              buttonBorder: theme.button?.borderColor,
+              displayBg: theme.textBox?.backgroundColor,
+              displayText: theme.colors?.textColor,
+              frameBg: theme.backgroundColor,
+            }}
           />
         </div>
       );
@@ -3467,8 +3478,9 @@ const ButtonElement: React.FC<{
       backgroundColor = hexToRgba(hotspotColor, isHovered ? hoverOpacity : hotspotOpacity);
     }
   } else if (isVisited) {
-    // Visited state: use a dimmed gray color
-    backgroundColor = isHovered ? '#c0c0c0' : '#e0e0e0';
+    // Visited state: the theme button, dimmed — light greys clashed with
+    // dark themes. color-mix keeps this correct for ANY authored color.
+    backgroundColor = `color-mix(in srgb, ${theme.button.backgroundColor} ${isHovered ? 38 : 26}%, transparent)`;
   } else {
     backgroundColor = isHovered ? theme.button.hoverBackgroundColor : theme.button.backgroundColor;
   }
@@ -3481,7 +3493,7 @@ const ButtonElement: React.FC<{
     borderColor = hotspotColor;
     borderStyle = editorMode ? `2px dashed ${hexToRgba(hotspotColor, 0.7)}` : 'none';
   } else if (isVisited) {
-    borderColor = '#999999';
+    borderColor = `color-mix(in srgb, ${theme.button.borderColor} 50%, transparent)`;
     borderStyle = `${theme.button.borderWidth}px solid ${borderColor}`;
   } else {
     borderColor = theme.button.borderColor;
@@ -3519,7 +3531,7 @@ const ButtonElement: React.FC<{
     } : {
       backgroundColor,
     }),
-    color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
+    color: hideButtonBox ? theme.colors.textColor : (isVisited ? `color-mix(in srgb, ${theme.colors.textColor} 60%, transparent)` : theme.button.textColor),
     border: buttonImageUrl ? 'none' : borderStyle,
     opacity: isVisited ? 0.7 : 1,
     borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
@@ -3739,17 +3751,19 @@ const InputFieldElement: React.FC<{
   // Determine if content is multi-line or long enough to need a textarea
   const needsTextarea = inputValue.includes('\n') || inputValue.length > 50 || content.includes('\n') || content.length > 50;
 
+  // Field chrome follows the theme (was a hardcoded white-on-ink field);
+  // mirrors the slot-mode input so both layout modes read alike.
   const baseStyle: React.CSSProperties = {
     ...style,
-    backgroundColor: '#fff',
-    color: '#000',
-    border: '2px solid #d1d5db',
+    backgroundColor: theme.textBox?.backgroundColor || '#1b1f2b',
+    color: theme.colors?.textColor || '#eae7de',
+    border: `1px solid ${theme.textBox?.borderColor || 'rgba(255,255,255,0.25)'}`,
     borderRadius: '8px',
     padding: `${paddingVertical}px ${paddingHorizontal}px`,
     fontSize: `${computedFontSize}px`,
     fontFamily: computedFont,
     textAlign: computedTextAlign,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
     cursor: interactive ? 'text' : 'default',
     boxSizing: 'border-box',
     outline: 'none',
@@ -4838,7 +4852,7 @@ const MeterElement: React.FC<{
     ? Math.min(100, Math.max(0, ((counterValue - counterMin) / (counterMax - counterMin)) * 100))
     : 0;
 
-  const barColor = location.meterColor || '#3B82F6';
+  const barColor = location.meterColor || '#5B8DEF';
   const bgColor = location.meterBackgroundColor || 'rgba(255, 255, 255, 0.3)';
 
   // Format numeric value based on format setting
@@ -5963,13 +5977,13 @@ const FlexButtonElement: React.FC<{
   if (hideButtonBox) {
     backgroundColor = 'transparent';
   } else if (isVisited) {
-    backgroundColor = isHovered ? '#c0c0c0' : '#e0e0e0';
+    backgroundColor = `color-mix(in srgb, ${theme.button.backgroundColor} ${isHovered ? 38 : 26}%, transparent)`;
   } else {
     backgroundColor = isHovered ? theme.button.hoverBackgroundColor : theme.button.backgroundColor;
   }
 
   // Determine border color based on visited state
-  const borderColor = isVisited && !hideButtonBox ? '#999999' : theme.button.borderColor;
+  const borderColor = isVisited && !hideButtonBox ? `color-mix(in srgb, ${theme.button.borderColor} 50%, transparent)` : theme.button.borderColor;
 
   // Determine if we should use button background images (from Ren'Py theme import)
   const useButtonImage = !hideButtonBox && !isVisited && theme.buttonNormalUrl;
@@ -6066,7 +6080,7 @@ const FlexButtonElement: React.FC<{
         } : {
           backgroundColor,
         }),
-        color: hideButtonBox ? theme.colors.textColor : (isVisited ? '#666666' : theme.button.textColor),
+        color: hideButtonBox ? theme.colors.textColor : (isVisited ? `color-mix(in srgb, ${theme.colors.textColor} 60%, transparent)` : theme.button.textColor),
         border: buttonImageUrl ? 'none' : (hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${borderColor}`),
         borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
         fontSize: `${computedFontSize}px`,

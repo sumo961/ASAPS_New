@@ -227,7 +227,9 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
     top: pos.y,
     width: cardWidth,
     height: cardHeight,
-    background: '#ffffff',
+    // Dark slate ground (was a white card that clashed with dark themes);
+    // quadrant hues stay semantic, only the ground + text flipped.
+    background: '#1b1f2b',
     borderRadius: 8,
     border: `1.5px solid ${accentColor}`,
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.10)',
@@ -275,7 +277,7 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
           <span style={{
             fontSize: 11,
             fontWeight: 600,
-            color: '#1f2937',
+            color: '#eae7de',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -288,22 +290,22 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
 
       <div style={{ width: discSize, height: discSize, alignSelf: 'center', flexShrink: 0 }}>
         <svg viewBox="0 0 100 100" width={discSize} height={discSize} style={{ display: 'block' }}>
-          <rect x={0} y={0} width={100} height={100} fill="#ffffff" />
-          <circle cx={50} cy={50} r={48} fill="#fafafa" stroke="#9ca3af" strokeWidth={0.7} />
+          <rect x={0} y={0} width={100} height={100} fill="#1b1f2b" />
+          <circle cx={50} cy={50} r={48} fill="#232838" stroke="rgba(255,255,255,0.25)" strokeWidth={0.7} />
           {/* Quadrant tints — saturated enough to read at HUD size,
               colour-coded by Russell's affect interpretation:
                 top-right (positive valence, high arousal): yellow ('joy')
                 top-left (negative, high arousal):  red    ('fear/anger')
                 bottom-left (negative, low arousal): blue   ('sad/calm')
                 bottom-right (positive, low arousal): green ('serene')  */}
-          <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fde68a" opacity={0.55} />
-          <path d="M 50 50 L 0 50 L 0 0 Z" fill="#fca5a5" opacity={0.45} />
-          <path d="M 50 50 L 0 50 L 0 100 Z" fill="#93c5fd" opacity={0.45} />
-          <path d="M 50 50 L 100 50 L 100 100 Z" fill="#86efac" opacity={0.55} />
+          <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fde68a" opacity={0.30} />
+          <path d="M 50 50 L 0 50 L 0 0 Z" fill="#fca5a5" opacity={0.26} />
+          <path d="M 50 50 L 0 50 L 0 100 Z" fill="#93c5fd" opacity={0.26} />
+          <path d="M 50 50 L 100 50 L 100 100 Z" fill="#86efac" opacity={0.30} />
 
           {/* Axis cross — stronger contrast than before */}
-          <line x1={2} y1={50} x2={98} y2={50} stroke="#4b5563" strokeWidth={0.6} />
-          <line x1={50} y1={2} x2={50} y2={98} stroke="#4b5563" strokeWidth={0.6} />
+          <line x1={2} y1={50} x2={98} y2={50} stroke="rgba(255,255,255,0.35)" strokeWidth={0.6} />
+          <line x1={50} y1={2} x2={50} y2={98} stroke="rgba(255,255,255,0.35)" strokeWidth={0.6} />
 
           {showMarkers && palette!.map((e) => {
             if (Math.abs(e.weightToValence) < 0.05 && Math.abs(e.weightToArousal) < 0.05) return null;
@@ -313,10 +315,10 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
 
           {showLabels && (
             <>
-              <text x={50} y={7} textAnchor="middle" fontSize={5} fill="#374151" fontWeight={600}>excited</text>
-              <text x={50} y={97} textAnchor="middle" fontSize={5} fill="#374151" fontWeight={600}>calm</text>
-              <text x={3} y={52} textAnchor="start" fontSize={5} fill="#374151" fontWeight={600}>sad</text>
-              <text x={97} y={52} textAnchor="end" fontSize={5} fill="#374151" fontWeight={600}>happy</text>
+              <text x={50} y={7} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>excited</text>
+              <text x={50} y={97} textAnchor="middle" fontSize={5} fill="#d9d6cc" fontWeight={600}>calm</text>
+              <text x={3} y={52} textAnchor="start" fontSize={5} fill="#d9d6cc" fontWeight={600}>sad</text>
+              <text x={97} y={52} textAnchor="end" fontSize={5} fill="#d9d6cc" fontWeight={600}>happy</text>
             </>
           )}
 
@@ -330,7 +332,7 @@ export const CharacterMoodFrame: React.FC<CharacterMoodFrameProps> = ({
       {showQualitativeLabel && (
         <div style={{
           fontSize: 11,
-          color: '#374151',
+          color: '#cfccc2',
           textAlign: 'center',
           padding: '2px 4px',
           fontStyle: 'italic',

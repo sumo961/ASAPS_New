@@ -1555,7 +1555,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 buttonText: theme.button?.textColor,
                 buttonBorder: theme.button?.borderColor,
                 displayBg: theme.textBox?.backgroundColor,
-                displayText: theme.button?.textColor,
+                // Display digits sit on the TEXT BOX ground — they need the
+                // narrator text color, not the button text color (dark
+                // button text on a dark display was unreadable).
+                displayText: theme.colors?.textColor,
                 frameBg: theme.backgroundColor,
               }}
             />
@@ -1614,6 +1617,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,
                   buttonBorder: theme.button?.borderColor,
+                  pageText: theme.colors?.textColor,
                 }}
               />
             )}
@@ -1671,6 +1675,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,
                   buttonBorder: theme.button?.borderColor,
+                  pageText: theme.colors?.textColor,
                 }}
               />
             )}
@@ -1745,6 +1750,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,
                   buttonBorder: theme.button?.borderColor,
+                  pageText: theme.colors?.textColor,
                 }}
               />
             )}
@@ -1809,6 +1815,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   buttonBg: theme.button?.backgroundColor,
                   buttonText: theme.button?.textColor,
                   buttonBorder: theme.button?.borderColor,
+                  pageText: theme.colors?.textColor,
                 }}
               />
             )}

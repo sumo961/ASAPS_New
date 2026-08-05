@@ -2233,10 +2233,13 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       checked={settings.hudOverlays?.timerHud?.enabled || false}
                       onChange={(e) => {
                         const current = settings.hudOverlays?.timerHud || {
+                          // Defaults harmonized with the Ink & Brass theme
+                          // (was green-on-black digital) — keep in sync with
+                          // the renderer fallbacks in TimerHudDisplay.
                           enabled: false, timerName: '', staticText: '',
-                          position: 'top-right' as const, style: 'digital' as const, fontSize: 24,
-                          textColor: '#00ff00', backgroundColor: '#000000', backgroundOpacity: 80,
-                          borderRadius: 8, padding: 12, showLabel: false, label: 'Time',
+                          position: 'top-right' as const, style: 'minimal' as const, fontSize: 24,
+                          textColor: '#eae7de', backgroundColor: '#1b1f2b', backgroundOpacity: 80,
+                          borderRadius: 10, padding: 12, showLabel: false, label: 'Time',
                           showWhenInactive: false,
                         };
                         setSettings({
@@ -2584,12 +2587,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       checked={settings.hudOverlays?.countdownMeter?.enabled || false}
                       onChange={(e) => {
                         const current = settings.hudOverlays?.countdownMeter || {
+                          // Defaults harmonized with the Ink & Brass theme:
+                          // slate frame (was old-navy #1a1a2e) + a softened
+                          // steel-blue fill that stays clearly distinct from
+                          // the amber warning and red critical states.
                           enabled: false, counterName: '', position: 'top-center' as const,
                           label: '', showLabel: true, showNumericValue: true,
-                          numericFormat: 'fraction' as const, meterColor: '#3B82F6',
-                          meterBackgroundColor: 'rgba(255,255,255,0.3)', meterHeight: 12,
-                          meterWidth: 80, backgroundColor: '#1a1a2e', backgroundOpacity: 85,
-                          borderRadius: 8, warningThreshold: 33, warningColor: '#EAB308',
+                          numericFormat: 'fraction' as const, meterColor: '#5B8DEF',
+                          meterBackgroundColor: 'rgba(255,255,255,0.25)', meterHeight: 12,
+                          meterWidth: 80, backgroundColor: '#1b1f2b', backgroundOpacity: 85,
+                          borderRadius: 10, warningThreshold: 33, warningColor: '#EAB308',
                           criticalThreshold: 15, criticalColor: '#EF4444',
                         };
                         setSettings({

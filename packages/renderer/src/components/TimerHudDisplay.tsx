@@ -122,7 +122,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   const posStyle = getPositionStyle(config.position);
 
   // Parse background color and apply opacity
-  const bgColor = config.backgroundColor || '#000000';
+  const bgColor = config.backgroundColor || '#1b1f2b';
   const bgOpacity = (config.backgroundOpacity ?? 80) / 100;
   let bgRgba: string;
   if (bgColor.startsWith('#') && bgColor.length >= 7) {
