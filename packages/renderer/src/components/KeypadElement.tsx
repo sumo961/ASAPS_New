@@ -325,8 +325,12 @@ export const KeypadElement: React.FC<KeypadElementProps> = ({
           disabled={digits.length < minDigits}
           style={{
             flex: 2,
-            backgroundColor: digits.length >= minDigits ? '#3B82F6' : 'rgba(59, 130, 246, 0.3)',
-            color: '#ffffff',
+            // Submit follows the theme button (was hardcoded blue and
+            // ignored the theme the digit keys already consume).
+            backgroundColor: digits.length >= minDigits
+              ? (theme?.buttonBg || '#3B82F6')
+              : `color-mix(in srgb, ${theme?.buttonBg || '#3B82F6'} 30%, transparent)`,
+            color: theme?.buttonText || '#ffffff',
             border: 'none',
             borderRadius: 8,
             fontSize: Math.round(14 * fontScale),
