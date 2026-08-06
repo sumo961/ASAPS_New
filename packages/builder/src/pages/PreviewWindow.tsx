@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -2799,6 +2799,36 @@ export const PreviewWindow: React.FC = () => {
                           characterPosition={{ x: 0, y: 0 }}
                           characterDimensions={{ width: 0, height: 0 }}
                           containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                        />
+                      );
+                    })}
+                    {/* Inventory-frame HUD — same hoist as the meter frame
+                        above: screen-docked inventory frames render here so
+                        they show in BOTH layout modes and on beats where the
+                        character isn't placed on stage. Was never hoisted —
+                        screen-docked inventories silently never rendered. */}
+                    {chars.map((c) => {
+                      const frame: any = (c as any).inventoryFrame;
+                      if (!frame || frame.dockMode !== 'screen') return null;
+                      const items = ((c as any).inventory || []).map((it: any) => ({
+                        id: it.id,
+                        name: it.name,
+                        displayName: it.displayName || it.name,
+                        description: it.description || '',
+                        icon: it.icon || '',
+                        quantity: it.quantity ?? 1,
+                        category: it.category || '',
+                      }));
+                      if (items.length === 0) return null;
+                      return (
+                        <CharacterInventoryFrame
+                          key={`inventory-hud-${c.id}`}
+                          items={items}
+                          config={frame}
+                          characterPosition={{ x: 0, y: 0 }}
+                          characterDimensions={{ width: 0, height: 0 }}
+                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                          isVisible={true}
                         />
                       );
                     })}

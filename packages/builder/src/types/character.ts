@@ -346,8 +346,8 @@ export const DEFAULT_METER_FRAME_CONFIG: MeterFrameConfig = {
   screenPosition: 'screen-top-left',
   offset: { x: 0, y: -10 },
   style: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderColor: '#4a90d9',
+    backgroundColor: '#1b1f2b',
+    borderColor: '#3d4356',
     borderWidth: 1,
     borderRadius: 6,
     padding: 8,
@@ -405,8 +405,8 @@ export const DEFAULT_INVENTORY_FRAME_CONFIG: InventoryFrameConfig = {
   screenPosition: 'screen-bottom-right',
   offset: { x: 0, y: 0 },
   style: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderColor: '#6366f1',
+    backgroundColor: '#1b1f2b',
+    borderColor: '#3d4356',
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,

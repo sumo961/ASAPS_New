@@ -24,6 +24,7 @@ export {
   type MeterFrameConfig,
   type MeterCounterData,
 } from './components/CharacterMeterFrame';
+export { CharacterInventoryFrame, type InventoryItemData } from './components/CharacterInventoryFrame';
 
 // Export from components/index for cleaner resolution
 export {

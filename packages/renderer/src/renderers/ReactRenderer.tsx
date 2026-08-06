@@ -3306,6 +3306,51 @@ export class ReactRenderer extends BaseRenderer {
       }
     }
 
+    // Responsive project, no hotspots, no author positions: slot path with
+    // a content-hugging question card + centered direction buttons. The
+    // absolute fallback gave the question a fixed-height box (dead space)
+    // and painted the directions as placeholder hotspot zones. Mirrors the
+    // pickProp routing.
+    if (projectIsResponsive && !anyHasHotspot && !authorPositioned) {
+      const slotBg = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+      const moveSlots: SlotSpec[] = [
+        { name: 'question', role: 'body', source: 'question' },
+        { name: 'actions', role: 'action' },
+      ];
+      return new Promise<string>(resolve => {
+        this.resolveAction = (id: string) => {
+          this.resolveAction = null;
+          resolve(id);
+        };
+        this.renderComponent(
+          <SlotFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-movementChoice'}
+            beatType="movementChoice"
+            slots={moveSlots}
+            content={{ question }}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={slotBg}
+            slotIntent={this.getState('slotIntent') as SlotIntent | undefined}
+            slotAnimations={this.getState('slotAnimations') as Record<string, any> | undefined}
+            dynamicChoices={choices.map(c => ({ id: c.id, text: c.displayText || c.text }))}
+            onAction={this.handleAction}
+            characterLocations={this.pickFreePositioned(locations)}
+            animations={this.getState('animations') as AnimationPath[] | undefined}
+            characterResolver={this.characterResolver ?? undefined}
+            assetResolver={this.assetResolver ?? undefined}
+            spriteDataResolver={this.spriteDataResolver ?? undefined}
+            timerState={this.timerState}
+            onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
+          />
+        );
+      });
+    }
+
     // Absolute-positioned fallback (existing path) — locations baked or
     // not all choices have hotspots.
     const content = { question, choices, markVisited };
