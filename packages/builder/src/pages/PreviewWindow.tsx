@@ -2776,69 +2776,91 @@ export const PreviewWindow: React.FC = () => {
                         character isn't placed on stage. Character-anchored
                         frames still come from PositionedBeatView. Values
                         re-render via debugInfo (counterChanged events). */}
-                    {chars.map((c) => {
-                      const frame: any = (c as any).meterFrame;
-                      if (!frame || frame.dockMode !== 'screen') return null;
-                      const variants = (c as any).variants;
-                      if (variants && variants.length > 0) {
-                        const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-                        if (!explicit) return null;
+{(() => {
+                      /* Multiple characters may dock frames to the SAME screen
+                         corner — stack them (top corners grow downward, bottom
+                         corners upward) instead of overlapping. One registry
+                         covers meter AND inventory frames so mixed frames in a
+                         corner stack too. */
+                      const cornerOffsets: Record<string, number> = {};
+                      const bump = (corner: string, estHeight: number): number => {
+                        const cur = cornerOffsets[corner] ?? 0;
+                        cornerOffsets[corner] = cur + estHeight + 8;
+                        return corner.includes('bottom') ? -cur : cur;
+                      };
+                      const nodes: React.ReactNode[] = [];
+                      for (const c of chars) {
+                        const frame: any = (c as any).meterFrame;
+                        if (!frame || frame.dockMode !== 'screen') continue;
+                        const variants = (c as any).variants;
+                        if (variants && variants.length > 0) {
+                          const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
+                          if (!explicit) continue;
+                        }
+                        const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
+                        if (visibleCounters.length === 0) continue;
+                        const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
+                        const counters = visibleCounters.map((counter: any) => ({
+                          name: counter.name,
+                          displayName: counter.displayName,
+                          value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
+                          min: counter.min ?? 0,
+                          max: counter.max ?? 100,
+                          color: counter.color || '#3B82F6',
+                          showNumericValue: counter.showNumericValue ?? false,
+                          numericFormat: counter.numericFormat || 'value',
+                          orientation: counter.levelMeterOrientation || 'horizontal',
+                        }));
+                        const corner = frame.screenPosition ?? 'screen-top-left';
+                        const est = (frame.style?.padding ?? 8) * 2 +
+                          counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
+                          Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);
+                        const dy = bump(corner, est);
+                        nodes.push(
+                          <CharacterMeterFrame
+                            key={`meter-hud-${c.id}`}
+                            counters={counters}
+                            config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
+                            characterPosition={{ x: 0, y: 0 }}
+                            characterDimensions={{ width: 0, height: 0 }}
+                            containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                          />
+                        );
                       }
-                      const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
-                      if (visibleCounters.length === 0) return null;
-                      const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
-                      const counters = visibleCounters.map((counter: any) => ({
-                        name: counter.name,
-                        displayName: counter.displayName,
-                        value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
-                        min: counter.min ?? 0,
-                        max: counter.max ?? 100,
-                        color: counter.color || '#3B82F6',
-                        showNumericValue: counter.showNumericValue ?? false,
-                        numericFormat: counter.numericFormat || 'value',
-                        orientation: counter.levelMeterOrientation || 'horizontal',
-                      }));
-                      return (
-                        <CharacterMeterFrame
-                          key={`meter-hud-${c.id}`}
-                          counters={counters}
-                          config={frame}
-                          characterPosition={{ x: 0, y: 0 }}
-                          characterDimensions={{ width: 0, height: 0 }}
-                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-                        />
-                      );
-                    })}
-                    {/* Inventory-frame HUD — same hoist as the meter frame
-                        above: screen-docked inventory frames render here so
-                        they show in BOTH layout modes and on beats where the
-                        character isn't placed on stage. Was never hoisted —
-                        screen-docked inventories silently never rendered. */}
-                    {chars.map((c) => {
-                      const frame: any = (c as any).inventoryFrame;
-                      if (!frame || frame.dockMode !== 'screen') return null;
-                      const items = ((c as any).inventory || []).map((it: any) => ({
-                        id: it.id,
-                        name: it.name,
-                        displayName: it.displayName || it.name,
-                        description: it.description || '',
-                        icon: it.icon || '',
-                        quantity: it.quantity ?? 1,
-                        category: it.category || '',
-                      }));
-                      if (items.length === 0) return null;
-                      return (
-                        <CharacterInventoryFrame
-                          key={`inventory-hud-${c.id}`}
-                          items={items}
-                          config={frame}
-                          characterPosition={{ x: 0, y: 0 }}
-                          characterDimensions={{ width: 0, height: 0 }}
-                          containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-                          isVisible={true}
-                        />
-                      );
-                    })}
+                      for (const c of chars) {
+                        const frame: any = (c as any).inventoryFrame;
+                        if (!frame || frame.dockMode !== 'screen') continue;
+                        const items = ((c as any).inventory || []).map((it: any) => ({
+                          id: it.id,
+                          name: it.name,
+                          displayName: it.displayName || it.name,
+                          description: it.description || '',
+                          icon: it.icon || '',
+                          quantity: it.quantity ?? 1,
+                          category: it.category || '',
+                        }));
+                        if (items.length === 0) continue;
+                        const corner = frame.screenPosition ?? 'screen-bottom-right';
+                        const cols = Math.max(1, frame.columns ?? 4);
+                        const rows = Math.ceil(items.length / cols);
+                        const est = (frame.style?.padding ?? 10) * 2 + 20 +
+                          rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
+                          Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
+                        const dy = bump(corner, est);
+                        nodes.push(
+                          <CharacterInventoryFrame
+                            key={`inventory-hud-${c.id}`}
+                            items={items}
+                            config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
+                            characterPosition={{ x: 0, y: 0 }}
+                            characterDimensions={{ width: 0, height: 0 }}
+                            containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                            isVisible={true}
+                          />
+                        );
+                      }
+                      return nodes;
+                    })()}
                   </div>
                 );
               })()}

@@ -139,6 +139,12 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   }
 
   const isDigital = config.style === 'digital';
+  // Frameless mode: with background opacity 0 the display drops the whole
+  // card (border/shadow/padding box) and renders as an ambient overlay —
+  // a text-shadow keeps it legible over any scene. This is the default
+  // look for the 'minimal' style; authors get the card back by raising
+  // the background opacity.
+  const frameless = bgOpacity === 0;
 
   return (
     <div
@@ -150,11 +156,13 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        backgroundColor: bgRgba,
+        backgroundColor: frameless ? 'transparent' : bgRgba,
         borderRadius: config.borderRadius,
-        padding: config.padding,
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        padding: frameless ? Math.min(config.padding, 4) : config.padding,
+        boxShadow: frameless ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.3)',
+        border: frameless ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+        textShadow: frameless ? '0 1px 3px rgba(0, 0, 0, 0.85)' : undefined,
+        letterSpacing: frameless && !isDigital ? '0.05em' : undefined,
         // Cap to stage width minus 24px gutters so a long
         // "datetime-12h" display ("8 January 2024, 9:04 PM") never
         // overruns the right edge. The whiteSpace below switches

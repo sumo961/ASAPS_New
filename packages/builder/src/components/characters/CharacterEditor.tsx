@@ -694,6 +694,17 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 placeholder="Display name"
               />
             </div>
+            {/* Qualified reference — how this counter is addressed in
+                calculations and conditions. Teaches the owner syntax and
+                makes the scoping visible at authoring time. */}
+            {counter.name && (
+              <p className="text-[11px] text-gray-400 mb-2 -mt-1">
+                Reference in calculations/conditions:{' '}
+                <code className="px-1 py-0.5 bg-gray-100 rounded text-gray-600">
+                  {(editedCharacter.name || editedCharacter.id)}.{counter.name}
+                </code>
+              </p>
+            )}
             {/* Value / Min / Max labels */}
             <div className="grid grid-cols-4 gap-2 mb-1">
               <label className="text-xs text-gray-500">Initial</label>
