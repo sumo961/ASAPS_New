@@ -805,10 +805,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           }
           const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
           if (visibleCounters.length === 0) return null;
+          const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
           const counters = visibleCounters.map((counter: any) => ({
             name: counter.name,
             displayName: counter.displayName,
-            value: ctx.getCounter?.(counter.name) ?? counter.value ?? 0,
+            value: scoped[counter.name] ?? ctx.getCounter?.(counter.name) ?? counter.value ?? 0,
             min: counter.min ?? 0,
             max: counter.max ?? 100,
             color: counter.color || '#3B82F6',

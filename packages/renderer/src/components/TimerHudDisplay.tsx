@@ -29,6 +29,9 @@ export interface TimerHudDisplayProps {
   fictionalTimeText?: string;
   /** Whether the HUD should be visible */
   visible: boolean;
+  /** Body font from the theme — coordinates the HUD with the rest of the
+   *  UI chrome. 'digital' style keeps its monospace stack regardless. */
+  fontFamily?: string;
   /** Configuration from GlobalSettings */
   config: TimerHudConfig;
   /** Font scale multiplier (default 1.0) */
@@ -82,6 +85,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   fictionalTimeText,
   visible,
   config,
+  fontFamily,
   fontScale = 1.0,
 }) => {
   // Auto-detect what to display: timer countdown takes priority when running,
@@ -166,7 +170,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
             color: config.textColor,
             opacity: 0.7,
             marginBottom: 2,
-            fontFamily: isDigital ? 'monospace' : 'inherit',
+            fontFamily: isDigital ? 'monospace' : (fontFamily || 'inherit'),
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: 600,
@@ -180,7 +184,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
         style={{
           fontSize: Math.round(config.fontSize * fontScale),
           color: timerColor,
-          fontFamily: isDigital ? '"Courier New", "Consolas", monospace' : 'inherit',
+          fontFamily: isDigital ? '"Courier New", "Consolas", monospace' : (fontFamily || 'inherit'),
           fontWeight: isDigital ? 700 : 500,
           letterSpacing: isDigital ? '0.05em' : 'normal',
           lineHeight: 1.2,

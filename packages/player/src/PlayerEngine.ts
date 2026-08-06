@@ -1071,7 +1071,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         const counters = visibleCounters.map((counter: any) => {
           // Get runtime value from context (returns 0 if not set)
           // Fall back to definition value if context not available
-          const value = ctx ? ctx.getCounter(counter.name) : (counter.value ?? 0);
+          const scoped = ctx ? ((ctx as any).getCharacterCountersFor?.(characterId) ?? {}) : {};
+          const value = scoped[counter.name] ?? (ctx ? ctx.getCounter(counter.name) : (counter.value ?? 0));
 
           return {
             name: counter.name,

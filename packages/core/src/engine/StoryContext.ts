@@ -705,6 +705,24 @@ export class StoryContext extends EventEmitter {
     return this.state.characterCounters[key]?.[name] ?? 0;
   }
 
+  /**
+   * All scoped counters for one character (copy). Unlike getCharacterCounter
+   * this distinguishes "unset" from 0 — display surfaces (meter frames) need
+   * scoped-first fallback chains: scoped ?? global ?? authored default.
+   */
+  getCharacterCountersFor(charRef: string): Record<string, number> {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return {};
+    return { ...(this.state.characterCounters[key] || {}) };
+  }
+
+  /** Full scoped-counter map (copy), keyed by resolved character key. */
+  getAllCharacterCounters(): Record<string, Record<string, number>> {
+    const out: Record<string, Record<string, number>> = {};
+    for (const [k, v] of Object.entries(this.state.characterCounters)) out[k] = { ...v };
+    return out;
+  }
+
   setCharacterCounter(charRef: string, name: string, value: number): void {
     const key = this.resolveCharRef(charRef);
     if (!key) return;

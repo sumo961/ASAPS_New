@@ -1142,6 +1142,7 @@ export class ReactRenderer extends BaseRenderer {
           countdownMeterValue={this.countdownMeterValue}
           overrideCountdownMeter={this.overrideCountdownMeter}
           fontScale={this.mobileFontScale}
+          fontFamily={this.theme?.fonts?.textFont}
         />
       </>
     );

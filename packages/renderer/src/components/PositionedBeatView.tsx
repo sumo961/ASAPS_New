@@ -2052,6 +2052,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           displayText={timerHudOverrideText}
           fictionalTimeText={fictionalTimeText}
           fontScale={mobileFontScale}
+          fontFamily={theme.fonts?.textFont}
         />
       )}
       {/* Countdown Meter HUD overlay */}
@@ -2065,6 +2066,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           counterMin={countdownMeterValue.min}
           counterMax={countdownMeterValue.max}
           fontScale={mobileFontScale}
+          fontFamily={theme.fonts?.textFont}
         />
       )}
       {/* Speaker name label overlay (VN-style) */}

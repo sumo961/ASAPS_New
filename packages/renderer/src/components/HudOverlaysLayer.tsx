@@ -64,6 +64,8 @@ export interface HudOverlaysLayerProps {
   countdownMeterValue?: { value: number; min: number; max: number };
   overrideCountdownMeter?: boolean;
   fontScale?: number;
+  /** Theme body font for HUD chrome coordination. */
+  fontFamily?: string;
 }
 
 export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
@@ -78,6 +80,7 @@ export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
   countdownMeterValue,
   overrideCountdownMeter,
   fontScale = 1.0,
+  fontFamily,
 }) => {
   const [timerHudTime, setTimerHudTime] = React.useState(initialTimerHudState);
   React.useEffect(() => {
@@ -115,6 +118,7 @@ export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
           displayText={overrideText}
           fictionalTimeText={fictionalTimeText}
           fontScale={fontScale}
+          fontFamily={fontFamily}
         />
       )}
       {showMeter && (
@@ -126,6 +130,7 @@ export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
           counterMin={countdownMeterValue!.min}
           counterMax={countdownMeterValue!.max}
           fontScale={fontScale}
+          fontFamily={fontFamily}
         />
       )}
     </div>

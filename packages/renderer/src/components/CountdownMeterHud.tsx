@@ -38,6 +38,8 @@ export interface CountdownMeterHudProps {
   /** Extra offset from the docked edge (px) — auto-stack below the timer
    *  HUD when both are docked to the same top/bottom band. */
   edgeOffsetPx?: number;
+  /** Body font from the theme — coordinates the HUD with the rest of the UI chrome. */
+  fontFamily?: string;
   /** Font scale multiplier (default 1.0) */
   fontScale?: number;
 }
@@ -77,6 +79,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
   visible,
   fontScale = 1.0,
   edgeOffsetPx = 0,
+  fontFamily,
 }) => {
   // Clamp meterWidth to valid percentage range (handles migration from old pixel values)
   const effectiveWidth = Math.min(Math.max(config.meterWidth, 10), 90);
@@ -128,6 +131,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
     <div
       style={{
         position: 'absolute',
+        fontFamily: fontFamily || undefined,
         ...posStyle,
         zIndex: 1001,
         pointerEvents: 'none',

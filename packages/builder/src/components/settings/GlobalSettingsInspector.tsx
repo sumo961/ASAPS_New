@@ -2237,7 +2237,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           // (was green-on-black digital) — keep in sync with
                           // the renderer fallbacks in TimerHudDisplay.
                           enabled: false, timerName: '', staticText: '',
-                          position: 'top-right' as const, style: 'minimal' as const, fontSize: 24,
+                          position: 'top-right' as const, style: 'minimal' as const, fontSize: 18,
                           textColor: '#eae7de', backgroundColor: '#1b1f2b', backgroundOpacity: 80,
                           borderRadius: 10, padding: 12, showLabel: false, label: 'Time',
                           showWhenInactive: false,

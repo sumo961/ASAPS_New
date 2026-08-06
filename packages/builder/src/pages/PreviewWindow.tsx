@@ -346,6 +346,7 @@ export const PreviewWindow: React.FC = () => {
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
+  const charCountersRef = useRef<Record<string, Record<string, number>>>({});
   // Beat ids marked visited by the applied start-state preset rather than by
   // actual playthrough — lets the debug panel distinguish "seeded" from
   // "visited in this run". Reset on every (re)start.
@@ -888,10 +889,11 @@ export const PreviewWindow: React.FC = () => {
         }
 
         // Build counter data with current values
+        const scoped = charCountersRef.current[character.id] ?? charCountersRef.current[(character as any).name] ?? {};
         const counters = visibleCounters.map(counter => ({
           name: counter.name,
           displayName: counter.displayName,
-          value: countersRef.current[counter.name] ?? counter.value,
+          value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
           min: counter.min ?? 0,
           max: counter.max ?? 100,
           color: counter.color || '#3B82F6',
@@ -1518,6 +1520,10 @@ export const PreviewWindow: React.FC = () => {
 
         // Replace countersRef with current context state (ensures reset clears old values)
         countersRef.current = { ...counters };
+        // Mirror the CHARACTER-scoped counters too — meter frames resolve
+        // scoped-first (a character's authored counters seed the scoped
+        // store at story start; reading only globals showed 0/stale).
+        charCountersRef.current = (ctx as any).getAllCharacterCounters?.() ?? {};
 
         const visitedBeats = ctx.getVisitedBeats();
         const currentBeatId = ctx.getCurrentBeatId() || null;
@@ -2780,10 +2786,11 @@ export const PreviewWindow: React.FC = () => {
                       }
                       const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
                       if (visibleCounters.length === 0) return null;
+                      const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
                       const counters = visibleCounters.map((counter: any) => ({
                         name: counter.name,
                         displayName: counter.displayName,
-                        value: countersRef.current[counter.name] ?? counter.value,
+                        value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
                         min: counter.min ?? 0,
                         max: counter.max ?? 100,
                         color: counter.color || '#3B82F6',
