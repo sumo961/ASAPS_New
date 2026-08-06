@@ -91,7 +91,19 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
 
     updateScale();
     window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    // The parent box can resize WITHOUT a window resize — the preview's
+    // device-size presets clamp it to fixed pixels. Window-resize alone
+    // left a stale scale and the stage rendered cut off after a preset
+    // switch. Observe the parent directly.
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current?.parentElement) {
+      ro = new ResizeObserver(updateScale);
+      ro.observe(containerRef.current.parentElement);
+    }
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      ro?.disconnect();
+    };
   }, [width, height, disableScaling, scalingMode]);
 
   // Don't render until scale is calculated to prevent flash
@@ -937,6 +949,10 @@ export class ReactRenderer extends BaseRenderer {
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
+  /** Emulated viewport (device-size preview presets). When set, flow views
+   *  compute their fluid sizes from THESE dimensions instead of raw vw/vh
+   *  (which reference the window, not the clamped preview frame). */
+  protected viewportOverride: { width: number; height: number } | undefined;
   protected timerHudOverrideText: string | undefined;  // Per-beat static time display override
   protected timerHudState: { remainingTime: number; totalTime: number } | undefined;  // Timer HUD time state (separate from progress bar)
   private timerHudStateListeners: Set<(state: typeof this.timerHudState) => void> = new Set();
@@ -1909,6 +1925,46 @@ export class ReactRenderer extends BaseRenderer {
       // handleSubmit so the player's bubble appears immediately on Send.
       const paint = (opts: { showInput: boolean; typing: boolean }) => {
         if (options.positioned) { paintPositioned(opts); return; }
+        // Responsive projects: render WITHOUT the ScaledStage wrapper —
+        // the chat reflows to the real (or device-preset) frame like the
+        // dialogTree chat path (Bug 20). Inside a 1024×768 ScaledStage a
+        // phone-sized frame clipped the sides and pushed the input bar
+        // out of view. Fixed projects keep the scaled-canvas behavior.
+        const chatProjectResponsive =
+          (this.getState('projectLayoutMode') as string | undefined) === 'responsive';
+        if (chatProjectResponsive) {
+          this.renderComponent(
+            <div
+              style={{
+                width: '100%', height: '100%', display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
+                backgroundImage: this.backgroundImageUrl ? `url(${this.backgroundImageUrl})` : undefined,
+                backgroundColor: this.backgroundImageUrl ? undefined : backgroundColor,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <ChatDialogView
+                  messages={[...this.chatMessages]}
+                  choices={[]}
+                  mode={'chat-scroll'}
+                  showAvatars={this.currentShowAvatars}
+                  theme={this.theme}
+                  backgroundUrl={null}
+                  backgroundColor="transparent"
+                  onChoiceSelect={() => {}}
+                  characterAvatarResolver={this.characterAvatarResolver || undefined}
+                  showTypingIndicator={opts.typing}
+                  fontScale={this.mobileFontScale}
+                  responsive
+                />
+              </div>
+              {opts.showInput && <ConversationInput />}
+            </div>
+          );
+          return;
+        }
         this.renderComponent(
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             <ScaledStage
@@ -2089,6 +2145,10 @@ export class ReactRenderer extends BaseRenderer {
   /**
    * Set the timer HUD configuration from global settings
    */
+  setViewportOverride(v: { width: number; height: number } | undefined): void {
+    this.viewportOverride = v;
+  }
+
   setTimerHudConfig(config: import('../components/TimerHudDisplay').TimerHudConfig | undefined): void {
     this.timerHudConfig = config;
   }
@@ -2306,6 +2366,8 @@ export class ReactRenderer extends BaseRenderer {
           ?? (content.spatialAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SpatialFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-default'}
             beatType={beatType}
             spatial={spatialSpec}
@@ -2360,6 +2422,8 @@ export class ReactRenderer extends BaseRenderer {
         const slotAutoExitMs = this.getState('slotAutoExitMs') as number | undefined;
         this.renderComponent(
           <SlotFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-default'}
             beatType={beatType}
             slots={slotSpec}
@@ -2882,6 +2946,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-dialogTree'}
               beatType="dialogTree"
               spatial={spatialSpec}
@@ -2992,6 +3058,8 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? `slot-${beatType}`}
             beatType={beatType}
             slots={effectiveSlotSpec}
@@ -3210,6 +3278,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-movementChoice'}
               beatType="movementChoice"
               spatial={spatialSpec}
@@ -3301,6 +3371,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-pickProp'}
               beatType="pickProp"
               spatial={spatialSpec}
@@ -3325,6 +3397,50 @@ export class ReactRenderer extends BaseRenderer {
           );
         });
       }
+    }
+
+    // Responsive project, no hotspots, no author positions: render through
+    // the SLOT path (question card + CENTERED action stack). The absolute
+    // fallback below places prop buttons at 1024-design pixel positions,
+    // which drift right-of-center and clip on phone-sized stages.
+    if (projectIsResponsive && !anyHasHotspot && !authorPositioned) {
+      const slotBg = this.backgroundImageUrl
+        ? 'transparent'
+        : (this.theme?.backgroundColor || 'linear-gradient(to bottom, #1e3a8a, #1e40af)');
+      const propSlots: SlotSpec[] = [
+        { name: 'question', role: 'body', source: 'question' },
+        { name: 'actions', role: 'action' },
+      ];
+      return new Promise<string>(resolve => {
+        this.resolveAction = (id: string) => {
+          this.resolveAction = null;
+          resolve(id);
+        };
+        this.renderComponent(
+          <SlotFlowView
+            previewWidth={this.viewportOverride?.width}
+            previewHeight={this.viewportOverride?.height}
+            key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-pickProp'}
+            beatType="pickProp"
+            slots={propSlots}
+            content={{ question }}
+            theme={this.theme}
+            backgroundUrl={this.backgroundImageUrl}
+            backgroundColor={slotBg}
+            slotIntent={this.getState('slotIntent') as SlotIntent | undefined}
+            slotAnimations={this.getState('slotAnimations') as Record<string, any> | undefined}
+            dynamicChoices={props.map(p => ({ id: p.id, text: p.displayName || p.name }))}
+            onAction={this.handleAction}
+            characterLocations={this.pickFreePositioned(locations)}
+            animations={this.getState('animations') as AnimationPath[] | undefined}
+            characterResolver={this.characterResolver ?? undefined}
+            assetResolver={this.assetResolver ?? undefined}
+            spriteDataResolver={this.spriteDataResolver ?? undefined}
+            timerState={this.timerState}
+            onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
+          />
+        );
+      });
     }
 
     // Absolute-positioned fallback (existing path).

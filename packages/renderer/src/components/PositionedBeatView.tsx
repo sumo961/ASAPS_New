@@ -11,6 +11,7 @@ import { CharacterMoodToken } from './CharacterMoodToken';
 import { TimerProgressBar } from './TimerProgressBar';
 import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
+import { meterEdgeOffset } from './HudOverlaysLayer';
 import { KeypadElement } from './KeypadElement';
 import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
@@ -2059,6 +2060,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         <CountdownMeterHud
           config={countdownMeterConfig}
           visible={true}
+          edgeOffsetPx={meterEdgeOffset(timerHudConfig, countdownMeterConfig)}
           counterValue={countdownMeterValue.value}
           counterMin={countdownMeterValue.min}
           counterMax={countdownMeterValue.max}

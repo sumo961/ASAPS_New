@@ -299,6 +299,15 @@ export const PreviewWindow: React.FC = () => {
     null | { id: string; width: number; height: number; label: string }
   >(null);
   const [isAutoFit, setIsAutoFit] = useState(true);
+  // Ref mirror so renderer-setup code (which runs outside React's render
+  // cycle) always reads the current preset.
+  const previewViewportRef = useRef<null | { id: string; width: number; height: number; label: string }>(null);
+  useEffect(() => {
+    previewViewportRef.current = previewViewport;
+    (rendererRef.current as any)?.setViewportOverride?.(
+      previewViewport ? { width: previewViewport.width, height: previewViewport.height } : undefined
+    );
+  }, [previewViewport]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [ttsEnabled, setTtsEnabled] = useState(() => {
     try { return localStorage.getItem('asaps_tts_enabled') !== 'false'; } catch { return true; }
@@ -798,6 +807,14 @@ export const PreviewWindow: React.FC = () => {
       if (hudOverlays) {
         console.log('[PreviewWindow] HUD overlay configs attached to renderer');
       }
+
+      // Device-size preset → flow views size against the emulated frame
+      // instead of the window (see viewportOverride in ReactRenderer).
+      (reactRenderer as any).setViewportOverride?.(
+        previewViewportRef.current
+          ? { width: previewViewportRef.current.width, height: previewViewportRef.current.height }
+          : undefined
+      );
 
       // Set up character resolver - uses ref so it always accesses latest data
       (reactRenderer as any).setCharacterResolver((characterId: string, stateId?: string) => {

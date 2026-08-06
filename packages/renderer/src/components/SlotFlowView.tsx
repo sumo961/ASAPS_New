@@ -114,6 +114,8 @@ interface SlotFlowViewProps {
    * REAL component, just told a different viewport). Unset at runtime.
    */
   previewWidth?: number;
+  /** Emulated viewport height (device-size preview) — pairs with previewWidth. */
+  previewHeight?: number;
   /**
    * VE viewport simulation for touch presets (phone/tablet): forces the
    * coarse-pointer narrative floor that `@media (pointer: coarse)` would
@@ -274,6 +276,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   onResolve,
   onAction,
   previewWidth,
+  previewHeight,
   previewCoarse,
   autoExitMs,
   extraExitMs,
@@ -354,6 +357,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // `100vw` at runtime; a fixed simulated width in the VE viewport preview
   // so a narrow preview box reflows like the real device.
   const vwTerm = previewWidth ? `${previewWidth}px` : '100vw';
+  // Device-size emulation: when the preview clamps the stage to preset
+  // pixels, raw vw/vh still reference the WINDOW — sizes computed from
+  // them overflow the emulated frame. These helpers substitute emulated
+  // dimensions when provided (the real player passes nothing → true units).
+  const vwU = (n: number): string => previewWidth ? `${((n * previewWidth) / 100).toFixed(1)}px` : `${n}vw`;
+  const vhU = (n: number): string => previewHeight ? `${((n * previewHeight) / 100).toFixed(1)}px` : `${n}vh`;
   const grow = (k: number) => `max(0px, (${vwTerm} - ${DESIGN_WIDTH}px)) * ${k}`;
   const bodyFluid = `calc(${authoredBody}px + ${grow(0.012)})`;
   const titleFluid = `calc(${authoredTitle}px + ${grow(0.016)})`;
@@ -608,7 +617,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // anchor (slot keeps the default flow layout).
   const customSlotStyle = (anchor?: { h?: 'left' | 'center' | 'right'; v?: 'top' | 'middle' | 'bottom' }): React.CSSProperties | null => {
     if (!isCustom || !anchor || (!anchor.h && !anchor.v)) return null;
-    const inset = 'clamp(16px, 4vw, 48px)';
+    const inset = `clamp(16px, ${vwU(4)}, 48px)`;
     const style: React.CSSProperties = { position: 'absolute' };
     const tx: string[] = [];
     if (anchor.h === 'left') style.left = inset;
@@ -773,7 +782,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     flexDirection: isConversation ? 'row' : 'column',
     alignItems: isConversation ? 'flex-start' : undefined,
     justifyContent: isConversation ? 'space-between' : undefined,
-    gap: isConversation ? 'clamp(20px, 4vw, 64px)' : undefined,
+    gap: isConversation ? `clamp(20px, ${vwU(4)}, 64px)` : undefined,
     overflow: 'hidden',
     // NEVER the `background` SHORTHAND here. The VE renders this component
     // first without the background URL (asset still resolving) and then
@@ -797,11 +806,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     backgroundPosition: 'center',
     paddingTop: 'env(safe-area-inset-top, 0px)',
     paddingRight: isConversation
-      ? 'max(env(safe-area-inset-right, 0px), clamp(20px, 4vw, 48px))'
+      ? `max(env(safe-area-inset-right, 0px), clamp(20px, ${vwU(4)}, 48px))`
       : 'env(safe-area-inset-right, 0px)',
     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     paddingLeft: isConversation
-      ? 'max(env(safe-area-inset-left, 0px), clamp(20px, 4vw, 48px))'
+      ? `max(env(safe-area-inset-left, 0px), clamp(20px, ${vwU(4)}, 48px))`
       : 'env(safe-area-inset-left, 0px)',
     // Bug 16 — apply theme.colors.textAlpha (0-100) to the inherited
     // text color using the same #RRGGBB+AA hex pattern used elsewhere.
@@ -1270,7 +1279,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             // READABLE_MAX_WIDTH (760) covering most of the stage.
             maxWidth: bodyAnchor?.h ? 'clamp(280px, 45%, 520px)' : READABLE_MAX_WIDTH,
             width: '100%',
-            padding: 'clamp(24px, 5vh, 64px) clamp(20px, 5vw, 48px)',
+            padding: `clamp(24px, ${vhU(5)}, 64px) clamp(20px, ${vwU(5)}, 48px)`,
             // Conversation: scroller is capped on the left half of the
             // stage; the card aligns to its left edge so the NPC text
             // reads from the stage's left padding, not floated mid-card.
@@ -1322,7 +1331,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   textAlign: isConversation ? 'left' : 'center',
                   alignSelf: isConversation ? 'flex-start' : 'center',
                   opacity: 0.78,
-                  marginBottom: 'clamp(6px, 1vh, 12px)',
+                  marginBottom: `clamp(6px, ${vhU(1)}, 12px)`,
                   // ~70% of body font size — sits as a label, not a heading.
                   fontSize: `clamp(calc(var(--slotflow-body-floor) - 2px), calc(${bodyFluid} * 0.78), 22px)`,
                   ...a.style,
@@ -1360,7 +1369,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                   lineHeight: 1.25,
                   textAlign: 'center',
-                  marginBottom: 'clamp(16px, 3vh, 32px)',
+                  marginBottom: `clamp(16px, ${vhU(3)}, 32px)`,
                   fontSize: `clamp(calc(var(--slotflow-body-floor) + 4px), ${titleFluid}, ${TITLE_CEILING}px)`,
                   // Bug 14 — apply theme.textBox so titles match the absolute
                   // path's card styling (background, border, radius, padding,
@@ -1488,7 +1497,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1508,7 +1517,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               style={{
                 fontFamily: theme.fonts.textFont || 'sans-serif',
                 fontSize: `clamp(var(--slotflow-body-floor), ${bodyFluid}, ${BODY_CEILING}px)`,
-                padding: 'clamp(6px, 1.2vh, 12px) clamp(10px, 2vw, 16px)',
+                padding: `clamp(6px, ${vhU(1.2)}, 12px) clamp(10px, ${vwU(2)}, 16px)`,
                 borderRadius: theme.textBox?.borderRadius ?? 4,
                 border: `2px solid ${theme.textBox?.borderColor ?? 'rgba(255,255,255,0.4)'}`,
                 background: 'rgba(0,0,0,0.6)',
@@ -1537,7 +1546,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1587,7 +1596,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1604,7 +1613,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  fontSize: `clamp(12px, ${vwU(1.4)}, 16px)`,
                 }}
               >
                 📷 Camera preview (runtime)
@@ -1645,7 +1654,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1662,7 +1671,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  fontSize: `clamp(12px, ${vwU(1.4)}, 16px)`,
                 }}
               >
                 📸 Image input (runtime)
@@ -1712,7 +1721,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               // the prompt above it — found during the Web View round.
               flex: wvHeightPercent != null ? `0 0 ${wvHeightPercent}%` : '1 1 0',
               minHeight: 0,
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1730,7 +1739,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  fontSize: `clamp(12px, ${vwU(1.4)}, 16px)`,
                   textAlign: 'center',
                   padding: 16,
                 }}
@@ -1779,7 +1788,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             style={{
               display: 'flex',
               justifyContent: 'center',
-              padding: 'clamp(8px, 2vh, 16px) 16px',
+              padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
               ...(editorMode ? { cursor: 'pointer' } : null),
               ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
             }}
@@ -1796,7 +1805,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 'clamp(12px, 1.4vw, 16px)',
+                  fontSize: `clamp(12px, ${vwU(1.4)}, 16px)`,
                   textAlign: 'center',
                   padding: 16,
                 }}
@@ -1944,18 +1953,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // first line of the prompt. (Stacked alignSelf is set
                 // above to 'stretch' when dynamicChoices are present.)
                 justifyContent: isConversation ? 'flex-start' : actionJustify,
-                gap: 'clamp(12px, 2vw, 24px)',
+                gap: `clamp(12px, ${vwU(2)}, 24px)`,
                 paddingTop: isConversation
-                  ? 'clamp(24px, 5vh, 64px)'
-                  : (actionGap != null ? actionGap : 'clamp(16px, 3vh, 28px)'),
-                paddingBottom: 'clamp(16px, 3vh, 28px)',
+                  ? `clamp(24px, ${vhU(5)}, 64px)`
+                  : (actionGap != null ? actionGap : `clamp(16px, ${vhU(3)}, 28px)`),
+                paddingBottom: `clamp(16px, ${vhU(3)}, 28px)`,
                 // Match the body card's horizontal padding in conversation
                 // so buttons aren't packed tighter against the panel edge
                 // than text is against the card edge — the visible
                 // content edges end up the same distance from the stage
                 // margin on both sides.
-                paddingLeft: isConversation ? 'clamp(20px, 5vw, 48px)' : 16,
-                paddingRight: isConversation ? 'clamp(20px, 5vw, 48px)' : 16,
+                paddingLeft: isConversation ? `clamp(20px, ${vwU(5)}, 48px)` : 16,
+                paddingRight: isConversation ? `clamp(20px, ${vwU(5)}, 48px)` : 16,
                 // Custom-template absolute placement: lift the action
                 // panel out of the column flow and pin it to the anchor.
                 ...(customActionStyle ?? {}),
@@ -1990,7 +1999,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                     className="slotflow-btn"
                     onClick={handleClick}
                     style={{
-                      ...buttonStyle(theme, buttonFluid),
+                      ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
                       ...(editorMode ? { cursor: 'pointer' } : null),
                       ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                       ...(ovFont ? { fontFamily: ovFont } : null),
@@ -2017,7 +2026,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   className={`slotflow-btn ${a.className ?? ''}`}
                   onClick={handleClick}
                   style={{
-                    ...buttonStyle(theme, buttonFluid),
+                    ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
                     position: 'absolute',
                     ...anchoredButtonPlacement(anchor),
                     zIndex: 4,
@@ -2091,7 +2100,7 @@ function anchoredButtonPlacement(anchor: SlotAnchor): React.CSSProperties {
   return out;
 }
 
-function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProperties {
+function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string): React.CSSProperties {
   // 'hideAll' box visibility strips button boxes too — bare labels.
   const bare = theme.textBox?.boxVisibility === 'hideAll';
   return {
@@ -2101,7 +2110,7 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string): React.CSSProper
     background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
     border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
     borderRadius: `${theme.button?.borderRadius ?? 8}px`,
-    padding: '0 clamp(20px, 3vw, 36px)',
+    padding: `0 ${hPad ?? 'clamp(20px, 3vw, 36px)'}`,
     minHeight: 44, // Apple HIG minimum tap target
     minWidth: 120,
     cursor: 'pointer',

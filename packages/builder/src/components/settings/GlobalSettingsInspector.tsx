@@ -2615,6 +2615,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </label>
                 </div>
 
+                {settings.hudOverlays?.countdownMeter?.enabled && settings.hudOverlays?.timerHud?.enabled &&
+                  (settings.hudOverlays.countdownMeter.position || 'top-center').split('-')[0] ===
+                    (settings.hudOverlays.timerHud.position || 'top-right').split('-')[0] && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                    ⚠ The Countdown Meter and the Timer HUD are both docked to the
+                    same edge — the meter automatically shifts past the timer so
+                    they don't overlap. Pick different positions to place them
+                    independently.
+                  </p>
+                )}
                 {settings.hudOverlays?.countdownMeter?.enabled && (() => {
                   const meter = settings.hudOverlays!.countdownMeter!;
                   const updateMeter = (updates: Partial<typeof meter>) => {

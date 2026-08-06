@@ -74,6 +74,8 @@ interface SpatialFlowViewProps {
   onResolve?: (resolutions: SlotIntentResolution[]) => void;
   onAction: (id: string) => void;
   previewWidth?: number;
+  /** Emulated viewport height — pairs with previewWidth (device-size preview). */
+  previewHeight?: number;
   previewCoarse?: boolean;
   /**
    * Free-positioned sprite layer — character / prop locations that
@@ -253,6 +255,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   onResolve,
   onAction,
   previewWidth,
+  previewHeight,
   previewCoarse,
   characterLocations,
   animations,
@@ -267,6 +270,9 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
 }) => {
+  // Device-size emulation helpers — see SlotFlowView (keep in sync).
+  const vwU = (n: number): string => previewWidth ? `${((n * previewWidth) / 100).toFixed(1)}px` : `${n}vw`;
+  const vhU = (n: number): string => previewHeight ? `${((n * previewHeight) / 100).toFixed(1)}px` : `${n}vh`;
   const objectFit = spatial.fit === 'cover' ? 'cover' : 'contain';
 
   // Read-gate coordination for multi-choice spatial beats (dialogTree
@@ -781,7 +787,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                       pointerEvents: 'none',
                       fontFamily: theme?.fonts.textFont || 'sans-serif',
                       fontWeight: 600,
-                      fontSize: 'clamp(12px, 1.6vw, 18px)',
+                      fontSize: `clamp(12px, ${vwU(1.6)}, 18px)`,
                       color: theme?.colors?.textColor || '#fff',
                       textShadow: '0 1px 2px rgba(0,0,0,0.6)',
                       padding: '4px 8px',
@@ -827,6 +833,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           selectedSlotKey={selectedSlotKey}
           onSlotSelect={onSlotSelect}
           previewWidth={previewWidth}
+          previewHeight={previewHeight}
           previewCoarse={previewCoarse}
           extraExitMs={spatialExitMs}
           onExitStart={handleExitStart}
@@ -840,8 +847,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 'clamp(10px, 1.8vw, 18px)',
-                  padding: 'clamp(12px, 2.5vh, 20px) clamp(16px, 3vw, 28px) clamp(20px, 4vh, 32px)',
+                  gap: `clamp(10px, ${vwU(1.8)}, 18px)`,
+                  padding: `clamp(12px, ${vhU(2.5)}, 20px) clamp(16px, ${vwU(3)}, 28px) clamp(20px, ${vhU(4)}, 32px)`,
                   width: '100%',
                   maxWidth: 760,
                   margin: '0 auto',
@@ -858,13 +865,13 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                       width: '100%',
                       pointerEvents: gateEarned ? 'auto' : 'none',
                       fontFamily: theme?.fonts.buttonFont || theme?.fonts.textFont || 'sans-serif',
-                      fontSize: 'clamp(13px, 1.4vw, 18px)',
+                      fontSize: `clamp(13px, ${vwU(1.4)}, 18px)`,
                       fontWeight: 600,
                       color: theme?.button?.textColor || '#fff',
                       background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
                       border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
                       borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
-                      padding: '10px clamp(14px, 2.5vw, 24px)',
+                      padding: `10px clamp(14px, ${vwU(2.5)}, 24px)`,
                       minHeight: 44,
                       cursor: gateEarned ? 'pointer' : 'default',
                       opacity: gateEarned ? 1 : 0.55,

@@ -35,6 +35,9 @@ export interface CountdownMeterHudProps {
   config: CountdownMeterConfig;
   /** Whether the HUD should be visible */
   visible: boolean;
+  /** Extra offset from the docked edge (px) — auto-stack below the timer
+   *  HUD when both are docked to the same top/bottom band. */
+  edgeOffsetPx?: number;
   /** Font scale multiplier (default 1.0) */
   fontScale?: number;
 }
@@ -42,8 +45,8 @@ export interface CountdownMeterHudProps {
 /**
  * Get position CSS based on position setting
  */
-function getPositionStyle(position: CountdownMeterConfig['position']): React.CSSProperties {
-  const margin = 12;
+function getPositionStyle(position: CountdownMeterConfig['position'], edgeOffsetPx = 0): React.CSSProperties {
+  const margin = 12 + edgeOffsetPx;
   switch (position) {
     case 'top-left':
       return { top: margin, left: margin };
@@ -73,6 +76,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
   config,
   visible,
   fontScale = 1.0,
+  edgeOffsetPx = 0,
 }) => {
   // Clamp meterWidth to valid percentage range (handles migration from old pixel values)
   const effectiveWidth = Math.min(Math.max(config.meterWidth, 10), 90);
@@ -103,7 +107,7 @@ export const CountdownMeterHud: React.FC<CountdownMeterHudProps> = ({
     return null;
   }
 
-  const posStyle = getPositionStyle(config.position);
+  const posStyle = getPositionStyle(config.position, edgeOffsetPx);
 
   // Parse background color and apply opacity
   const bgColor = config.backgroundColor || '#1b1f2b';

@@ -396,7 +396,11 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
           // Responsive: use viewport-relative padding so it scales on
           // mobile. Legacy: fixed 20px/16px for ScaledStage-compatible
           // pixels.
-          padding: responsive ? 'clamp(12px, 2vh, 24px) clamp(12px, 3vw, 24px)' : '20px 16px',
+          // Stage-relative (vh/vw would reference the WINDOW, which is
+          // wrong inside a scaled/emulated stage box).
+          padding: responsive
+            ? `${Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02)))}px ${Math.round(Math.min(24, Math.max(12, (stageWidth ?? 1024) * 0.03)))}px`
+            : '20px 16px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: mode === 'chat-bubble' ? 'center' : 'flex-end',
