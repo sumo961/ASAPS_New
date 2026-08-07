@@ -22,20 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.86** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.86 makes public AI stories safe
-to deploy**: the new **relay export** produces a single deploy-ready zip
-whose serverless function keeps your API key on the host — the key never
-ships in the HTML — with streaming so long generations survive serverless
-timeouts (both providers) and an `ALLOWED_ORIGINS` mode so one classroom
-relay can serve many drag-and-drop student stories. **macOS builds are now
-signed and notarized** (Gatekeeper: "Notarized Developer ID") — the
-"unidentified developer" warning is gone and **Mac auto-update finally
-works**. Transitions got real: actual blur-dissolve, authorable slide
-direction, honored easing — verified with a new Panorama & Transitions kit.
-Plus the first-touch batch: working start-screen Import tile, template
-naming step, chat-view speaker portraits, a playSound effect, and GPS
-point-set binding UI.
+Current release: **v0.9.87** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.87 is a presentation release.** A new
+default theme, **"Ink & Brass"** (literary dark ground, Georgia titles, brass
+pill buttons), replaces the old blue-on-white defaults — every visible beat and
+HUD was swept to fit it across device sizes and both layout modes. **Screen HUDs
+now have a single layout authority**: one packer places timer, countdown, mood,
+meter and inventory per corner so they can no longer collide, and the same
+function drives an author-facing schematic in the Character Manager. **Title
+screens are distraction-free** by default (no HUD chrome competing with the
+title; one setting turns it back on). And a new **HUD explanation system** teaches
+players what those readouts mean — callouts drawn over the real HUD positions,
+as a standalone beat or as an overlay on any beat, with the beat held inert so
+nobody clicks past it.
 
 > **macOS users on v0.9.85 or earlier**: your installed (unsigned) build
 > cannot auto-update across the signing boundary — download v0.9.86 once

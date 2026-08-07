@@ -1,5 +1,56 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-08: Ink & Brass default theme, unified HUD layout, HUD explanations (v0.9.87)
+
+### Overview
+
+Three arcs, all converging on what the player actually sees. **A new default theme, "Ink & Brass"** — literary dark ground, Georgia titles, brass pill buttons — replaces the old blue-on-white defaults, and every visible beat and HUD was swept content-complete across device sizes and both layout modes to fit it. **Screen HUDs got a single layout authority**: one packer places timer, countdown, mood, meter and inventory per corner so they can no longer collide across types, and the same function drives an author-facing schematic in the Character Manager. And a new **HUD explanation system** teaches interactors what those HUDs mean — callouts drawn over the real packed positions, available as a standalone beat or as an overlay on any beat.
+
+### "Ink & Brass" — new default theme
+
+- Literary dark palette (bg `#14161f`, text box `#1b1f2b`, text `#eae7de`, brass accent `#d9a441`), Georgia 40 for titles, system stack 19 for body, pill buttons.
+- Swept every visible beat and HUD to fit it: the last hardcoded blues are gone (keypad submit, chat bubbles, hyperlinks), speaker labels honour `nameColor`, and HUDs render in slot mode as well as fixed.
+- Fixed along the way: a Settings crash (`normalizeGlobalSettings` didn't fill project/copyright/debug), new-project theme bleed from a stale `currentProject`, and exported players dropping font sizes.
+- Render batch: bold titles, shrink-to-content text boxes with headroom for wide faces, empty-prompt hiding, themed hyperlinks, EndScreen credits working in both directions, inputText field position in flex canvas.
+
+**Files modified:**
+- `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`, `packages/builder/src/components/NewProjectDialog.tsx`, `packages/renderer/src/components/{PositionedBeatView,SlotFlowView,TimerHudDisplay,CharacterMeterFrame,CountdownMeterHud}.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/src/editors/HyperTextEditor.tsx`
+
+### Unified screen-HUD layout authority
+
+- New `layoutScreenHuds` (renderer/utils) is the single packer for every screen-docked HUD. It groups by corner, orders by kind priority, and stacks so nothing overlaps **across types** — the collision the old per-type registries couldn't see (a top-right timer under a top-right mood token).
+- PreviewWindow and WebPlayer both consume it; global timer/countdown are reserved obstacles (space only — still drawn by the renderer), so character frames flow clear of them.
+- `HudLayoutPreview` in the Character Editor is a schematic driven by the SAME function, with global HUDs dashed as "from General Settings" — what an author sees while configuring is what plays.
+- Character counters now seed the runtime store and resolve scoped-first in meter frames; the timer HUD went frameless and font-coordinated; counters show their qualified `Character.counter` name in the editor and populate effects and conditionCheck pickers.
+
+**Files modified:**
+- `packages/renderer/src/utils/hudLayout.ts` (new), `packages/renderer/src/components/{CharacterMoodToken,HudOverlaysLayer}.tsx`, `packages/builder/src/components/characters/HudLayoutPreview.tsx` (new), `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/core/src/engine/StoryContext.ts`
+
+### Distraction-free title screens
+
+- All screen HUDs are hidden on `titleScreen` by default — the timer hasn't started, counters are at authored initial values and no mood has moved, so the chrome only competes with the title. `hudOverlays.showOnTitleScreen` turns it back on for authors who want a HUD visible from the first frame.
+- One predicate (`beatSuppressesScreenHuds`) is shared by the renderer-owned HUDs and the host-owned character frames, so the start screen is uniformly clean rather than half-suppressed. Recomputed at every render entry point so it can't stick across a beat transition.
+
+**Files modified:**
+- `packages/renderer/src/utils/hudVisibility.ts` (new), `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`
+
+### HUD explanation system — one mechanism, two triggers
+
+- Callouts are drawn over the REAL packed HUD positions (same `layoutScreenHuds` authority), so a pointer can never drift from the HUD it describes when a HUD moves or the stack re-packs.
+- Deliberately ONE mechanism rather than one beat type per interaction pattern — what differs between "here's the timer" and "here's the inventory" is the caption, which is data. **Standalone `explanation` beat** (a text screen with the HUDs annotated behind it) and **overlay trigger `Beat.explainHuds`** (annotates any beat). The overlay flag is cross-cutting, so it lives on the Beat base class and appears on all 24 visible beat types from the schema alone.
+- Input gating uses `inert`: it blocks pointer, keyboard/Tab focus and screen-reader traversal in one attribute, so the interactor can't click past the explanation. No timed gate. Acknowledged beats are remembered per playthrough.
+- The overlay dims the beat behind a scrim and centres the acknowledge — the one region a corner-based packer can never occupy — styled as the story's own accent pill.
+- Pre-existing gaps this surfaced: `SchemaFormGenerator` ignored `ui.label` in the generic control path (so "Hfov", "Lat", "Timeout Ms", "Interpret Asaps Uri" replaced the schema's own wording — ~35 params); `projectDeserializer` and the preview serializer both whitelist top-level beat fields, silently dropping base-class fields added later; the Inspector's auto-apply path didn't assign cross-cutting base fields, only `handleSave` did.
+
+**Files modified:**
+- `packages/core/src/beats/ExplanationBeat.ts` (new), `packages/core/src/beats/{Beat,BeatRegistry,index}.ts`, `packages/renderer/src/components/HudExplanationLayer.tsx` (new), `beat-definitions/core-beats.json`, `packages/builder/src/components/{SchemaFormGenerator,Inspector}.tsx`, `packages/builder/src/utils/projectDeserializer.ts`, `packages/builder/src/App.tsx`
+
+### Verification
+
+Two content-complete sweep rounds across device sizes, both layout modes and HUD combinations, with the author filling real beat content between rounds. HUD packing, title-screen suppression and the explanation layer are unit-tested (`hudLayout`, `hudVisibility`, `HudExplanationLayer`, `ExplanationBeat`) and driven live in the Preview Window. Suites green: core 2596, renderer 531, builder 2396; type-checks clean.
+
+---
+
 ## 2026-08-04: API-key relay, signed macOS builds, transitions upgrade (v0.9.86)
 
 ### Overview
