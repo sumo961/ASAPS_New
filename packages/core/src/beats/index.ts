@@ -1,5 +1,6 @@
 export { Beat } from './Beat';
 export { InfoTextBeat } from './InfoTextBeat';
+export { ExplanationBeat } from './ExplanationBeat';
 export { TitleScreenBeat } from './TitleScreenBeat';
 export { MovementChoiceBeat } from './MovementChoiceBeat';
 export { MultiChoiceBeat } from './MultiChoiceBeat';

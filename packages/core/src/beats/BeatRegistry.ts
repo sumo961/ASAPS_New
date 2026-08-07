@@ -1,6 +1,7 @@
 import { Beat } from './Beat';
 import { TitleScreenBeat } from './TitleScreenBeat';
 import { InfoTextBeat } from './InfoTextBeat';
+import { ExplanationBeat } from './ExplanationBeat';
 import { DialogTreeBeat } from './DialogTreeBeat';
 import { ConversationChoiceBeat } from './ConversationChoiceBeat';
 import { MultiChoiceBeat } from './MultiChoiceBeat';
@@ -70,6 +71,7 @@ export class BeatTypeRegistry {
     // Visible beats
     this.registerBeatType('titleScreen', TitleScreenBeat);
     this.registerBeatType('infoText', InfoTextBeat);
+    this.registerBeatType('explanation', ExplanationBeat);
     this.registerBeatType('introText', InfoTextBeat); // Legacy alias - renamed to infoText in v2.3
     this.registerBeatType('dialogTree', DialogTreeBeat);
     this.registerBeatType('conversationChoice', ConversationChoiceBeat); // Legacy

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -71,6 +71,27 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // can position screen-docked widgets correctly.
   const [stageDims, setStageDims] = useState<{ width: number; height: number } | null>(null);
   const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
+  /* HUD explanation (overlay trigger) — mirrors the Preview Window. Beats
+     carrying `explainHuds` annotate the live HUDs on entry and are held INERT
+     until acknowledged; acknowledged beats are remembered for the playthrough
+     so the tutorial doesn't re-fire on every visit. */
+  const [explainAcknowledged, setExplainAcknowledged] = useState<Record<string, boolean>>({});
+  const [currentBeatMeta, setCurrentBeatMeta] = useState<{ id: string; explainHuds?: boolean } | null>(null);
+  const explainOverlayActive = !!(
+    currentBeatMeta?.explainHuds && !explainAcknowledged[currentBeatMeta.id]
+  );
+
+  /* `inert` blocks pointer, keyboard/Tab focus and screen-reader traversal in
+     one attribute, so the interactor can't click past the explanation — and
+     the screen stays fully legible (no dimming scrim). The callout layer sits
+     outside this subtree, so its acknowledge button stays live. */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (explainOverlayActive) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+    return () => { el.removeAttribute('inert'); };
+  }, [explainOverlayActive]);
 
   // Handle settings changes from PlayerUI
   const handleSettingsChange = useCallback((settings: PlayerSettings) => {
@@ -382,6 +403,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           // Beat changes flip HUD suppression (title screens are chrome-free),
           // so the overlay must repaint on every transition too.
           context.on('beatChanged', bumpHud);
+          context.on('beatChanged', () => {
+            const id = context.getCurrentBeatId?.();
+            const b: any = id ? (story as any).getBeat?.(id) : null;
+            setCurrentBeatMeta(b ? { id: b.id, explainHuds: b.explainHuds } : null);
+          });
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
@@ -742,7 +768,6 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const chars = (story as any).getCharacters?.() || [];
     const palette = (story as any).getEmotionPalette?.();
     const assetsList = (story as any).getAssets?.() || [];
-    if (chars.length === 0) return null;
     return (
       <div
         style={{
@@ -877,6 +902,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           }
           const place = placementMap(layoutScreenHuds(boxes, stageDims));
 
+          // HUD explanation — mirrors the Preview Window: standalone
+          // `explanation` beat annotates behind its own screen; the overlay
+          // trigger annotates any beat and gates it until acknowledged.
+          const isExplanationBeat = beatNow?.type === 'explanation';
+          const showCallouts = isExplanationBeat || explainOverlayActive;
+          const themeNow: any = gsNow?.theme;
+
           return (
             <>
               {Object.entries(railGroups).map(([corner, entries]) => (
@@ -908,6 +940,23 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
                   isVisible={true}
                 />
               ))}
+              {showCallouts && (
+                <HudExplanationLayer
+                  boxes={boxes}
+                  placements={place}
+                  stage={stageDims}
+                  captions={(beatNow as any)?.resolvedCaptions ?? (beatNow as any)?.captions}
+                  skipKinds={(beatNow as any)?.skipKinds}
+                  onAcknowledge={explainOverlayActive
+                    ? () => setExplainAcknowledged((m) => ({ ...m, [beatNow.id]: true }))
+                    : undefined}
+                  accentColor={themeNow?.button?.backgroundColor}
+                  accentTextColor={themeNow?.button?.textColor}
+                  textColor={themeNow?.textBox?.textColor}
+                  backgroundColor={themeNow?.textBox?.backgroundColor}
+                  fontFamily={themeNow?.fonts?.textFont}
+                />
+              )}
             </>
           );
         })()}

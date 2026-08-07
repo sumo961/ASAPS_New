@@ -1,8 +1,7 @@
 {
   "schema": "asaps-beat-definitions-v2.5",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "description": "Complete beat type definitions for ASAPS Modern with nested connection architecture, cluster container support, and schema-driven normalize/validate metadata (conditionTypes registry, parameter aliases, primitive coercion)",
-  
   "connectionModel": {
     "description": "Defines how connections are structured within beats",
     "principles": [
@@ -12,7 +11,6 @@
       "All connections support labels, conditions, and effects"
     ]
   },
-
   "customTypes": {
     "dialogNode": {
       "description": "A node in a dialog tree representing NPC/system output. Followed by player choices, or auto-advances if target is set with no choices.",
@@ -113,7 +111,7 @@
       }
     },
     "effect": {
-      "description": "Effect to apply to story state", 
+      "description": "Effect to apply to story state",
       "schema": {
         "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter'",
         "target": "string",
@@ -156,101 +154,212 @@
       "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. locationName optionally references a hotspot, prop, or character from beat.locations by name. soundEffect plays when this hotspot is selected."
     }
   },
-
   "conditionTypes": {
     "_meta": {
       "description": "Per-condition-type field requirements. Drives the schema-driven normalize/validate pipeline (v0.9.51+). Each entry lists the condition's discriminator value, its required fields, and optional fields. The 'type' field itself is always required as the discriminator. The pipeline uses this to: (1) flatten condition.* into top-level params via the conditionBeat 'nested' block, (2) validate that the required fields for the chosen type are present, (3) emit warnings for unknown fields. Replaces the hardcoded per-condition-type required-field map in AIValidator.ts and the partial flattening passes in AIService and App.tsx.",
       "discriminator": "type",
-      "operators": ["==", "!=", ">", "<", ">=", "<=", "contains", "not"]
+      "operators": [
+        "==",
+        "!=",
+        ">",
+        "<",
+        ">=",
+        "<=",
+        "contains",
+        "not"
+      ]
     },
     "variable": {
-      "required": ["variableName", "operator", "value"],
+      "required": [
+        "variableName",
+        "operator",
+        "value"
+      ],
       "optional": [],
       "aliases": {
-        "variableName": ["variable", "left"]
+        "variableName": [
+          "variable",
+          "left"
+        ]
       },
       "description": "Compare a story variable against a value. AI commonly emits `variable` or `left`; pipeline aliases either to `variableName`."
     },
     "counter": {
-      "required": ["variableName", "operator", "value"],
+      "required": [
+        "variableName",
+        "operator",
+        "value"
+      ],
       "optional": [],
       "aliases": {
-        "variableName": ["variable", "left", "counter"]
+        "variableName": [
+          "variable",
+          "left",
+          "counter"
+        ]
       },
       "description": "Compare a counter against a value (variableName is the counter name). AI commonly emits `variable`, `left`, or `counter` — pipeline aliases all to `variableName`."
     },
     "counterCompare": {
-      "required": ["counter1", "counter2", "operator"],
+      "required": [
+        "counter1",
+        "counter2",
+        "operator"
+      ],
       "optional": [],
       "description": "Compare two counters against each other"
     },
     "timer": {
-      "required": ["timer", "operator", "value"],
+      "required": [
+        "timer",
+        "operator",
+        "value"
+      ],
       "optional": [],
       "description": "Compare a timer's remaining seconds against a value"
     },
     "inventory": {
-      "required": ["item"],
-      "optional": ["character", "checkType", "operator", "value", "quantityCheck", "quantityOperator", "quantityValue", "compareSource", "compareVariable"],
+      "required": [
+        "item"
+      ],
+      "optional": [
+        "character",
+        "checkType",
+        "operator",
+        "value",
+        "quantityCheck",
+        "quantityOperator",
+        "quantityValue",
+        "compareSource",
+        "compareVariable"
+      ],
       "description": "Check whether a character holds an item (character defaults to 'player'; checkType: has | notHas | quantity)"
     },
     "visitedBeat": {
-      "required": ["beatId"],
-      "optional": ["operator"],
+      "required": [
+        "beatId"
+      ],
+      "optional": [
+        "operator"
+      ],
       "description": "Branch on whether a named beat has been visited"
     },
     "fictionalTime": {
-      "required": ["operator"],
-      "optional": ["timeYear", "timeMonth", "timeDay", "timeHour", "timeMinute"],
+      "required": [
+        "operator"
+      ],
+      "optional": [
+        "timeYear",
+        "timeMonth",
+        "timeDay",
+        "timeHour",
+        "timeMinute"
+      ],
       "description": "Compare the story's fictional time against a target time"
     },
     "mood": {
-      "required": ["character", "moodAxis", "operator", "value"],
-      "optional": ["baseline"],
+      "required": [
+        "character",
+        "moodAxis",
+        "operator",
+        "value"
+      ],
+      "optional": [
+        "baseline"
+      ],
       "description": "Compare a character's mood (valence or arousal axis) against a value. baseline: 'literal' | 'initial' | { bookmark: name }"
     },
     "emotion": {
-      "required": ["character", "emotionName", "operator", "value"],
-      "optional": ["baseline"],
+      "required": [
+        "character",
+        "emotionName",
+        "operator",
+        "value"
+      ],
+      "optional": [
+        "baseline"
+      ],
       "description": "Compare a character's emotion intensity against a value"
     },
     "sentiment": {
-      "required": ["character", "sentimentTarget", "operator", "value"],
-      "optional": ["sentimentEmotion", "baseline"],
+      "required": [
+        "character",
+        "sentimentTarget",
+        "operator",
+        "value"
+      ],
+      "optional": [
+        "sentimentEmotion",
+        "baseline"
+      ],
       "description": "Compare a character's sentiment toward a target against a value. sentimentEmotion optional — empty sums all emotions toward target"
     },
     "trait": {
-      "required": ["character", "traitName", "operator", "value"],
+      "required": [
+        "character",
+        "traitName",
+        "operator",
+        "value"
+      ],
       "optional": [],
       "description": "Compare a character's static trait value against a value"
     },
     "goal": {
-      "required": ["character", "goalId", "operator"],
-      "optional": ["goalStatus", "value"],
+      "required": [
+        "character",
+        "goalId",
+        "operator"
+      ],
+      "optional": [
+        "goalStatus",
+        "value"
+      ],
       "description": "Branch on a character's goal status (open | met | failed | abandoned). Status read from goalStatus or value."
     },
     "characterVariant": {
-      "required": ["character", "operator"],
-      "optional": ["variantId", "value"],
+      "required": [
+        "character",
+        "operator"
+      ],
+      "optional": [
+        "variantId",
+        "value"
+      ],
       "description": "Branch on which variant is currently active on a character. variantId or value carries the compared variant id."
     },
     "gpsProximity": {
-      "required": ["targetLat", "targetLng"],
-      "optional": ["radiusMeters", "operator", "proximityMode"],
+      "required": [
+        "targetLat",
+        "targetLng"
+      ],
+      "optional": [
+        "radiusMeters",
+        "operator",
+        "proximityMode"
+      ],
       "description": "Branch on player's distance to a GPS target. proximityMode: 'within' | 'outside'."
     },
     "indoorProximity": {
-      "required": ["beaconUuid"],
-      "optional": ["beaconRangeMeters", "operator", "proximityMode"],
+      "required": [
+        "beaconUuid"
+      ],
+      "optional": [
+        "beaconRangeMeters",
+        "operator",
+        "proximityMode"
+      ],
       "description": "Branch on a Bluetooth beacon's signal strength. proximityMode: 'within' | 'outside'."
     },
     "permissionGranted": {
-      "required": ["permission"],
-      "optional": ["operator"],
+      "required": [
+        "permission"
+      ],
+      "optional": [
+        "operator"
+      ],
       "description": "Branch on whether the player has granted a sensor permission (location | beacons | …)"
     }
   },
-
   "clusterContainerTypes": {
     "spatial": {
       "icon": "🏠",
@@ -267,7 +376,6 @@
       "supportsBeatContainment": true
     }
   },
-
   "beatTypes": {
     "titleScreen": {
       "category": "visible",
@@ -280,19 +388,25 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "spatialAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for the SPATIAL layer (Phase-3 composite image). Cinematic enter presets — ken-burns, zoom-in, zoom-out, pan-{left,right,up,down}. Resolved against the image's currently-rendered rect, so motion survives reflow / viewport. Distinct from slotAnimations (flow layer). Absent → no animation. Only meaningful for spatial-mode beats.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "title": {
           "type": "string",
@@ -301,7 +415,7 @@
           "description": "Story title text"
         },
         "author": {
-          "type": "string", 
+          "type": "string",
           "required": false,
           "default": "Anonymous",
           "description": "Author name"
@@ -324,21 +438,47 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Target beat when start is clicked"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["title", "author", "startButton"],
+      "locations": [
+        "title",
+        "author",
+        "startButton"
+      ],
       "locationMapping": {
         "title": "title",
         "author": "author",
@@ -351,15 +491,28 @@
         "fit": "contain"
       },
       "slots": [
-        { "name": "title", "role": "title", "source": "title" },
-        { "name": "author", "role": "body", "source": "author" },
-        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+        {
+          "name": "title",
+          "role": "title",
+          "source": "title"
+        },
+        {
+          "name": "author",
+          "role": "body",
+          "source": "author"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "continueButton"
+          ]
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "titleScreen"
     },
-
     "infoText": {
       "category": "visible",
       "displayName": "Info Text",
@@ -394,13 +547,23 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
@@ -411,10 +574,27 @@
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text", "continueButton"],
+      "locations": [
+        "text",
+        "continueButton"
+      ],
       "locationMapping": {
         "text": "text",
         "continueButton": "buttonText"
@@ -422,15 +602,140 @@
       "layoutMode": "slot",
       "layoutModeNote": "Phase-2 responsive-slot (stack beats). infoText instances with NO author-persisted locations render via SlotFlowView (body from 'text', single continue button) — same renderText path / authorPositioned guard as aiInfoText. Baked-location instances stay absolute (zero regression). Speaker slot (Task #225) renders above the body when the beat's showSpeaker (or global theme.speakerDisplay.showNames) is true; content.speaker is '' otherwise so the slot collapses. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
-        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "continueButton"
+          ]
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay"
     },
-
+    "explanation": {
+      "category": "visible",
+      "displayName": "Explanation",
+      "icon": "💡",
+      "description": "Teaches the interactor what the on-screen HUDs mean. Callout labels are drawn over the real, packed HUD positions, so they stay correct when a HUD moves or the stack re-packs.",
+      "connectionType": "single",
+      "parameters": {
+        "text": {
+          "type": "string",
+          "required": false,
+          "default": "Here's what you'll see on screen.",
+          "description": "Intro text shown in the beat's own text box"
+        },
+        "buttonText": {
+          "type": "string",
+          "required": false,
+          "default": "Got it",
+          "description": "Continue button text (also used as connection label)"
+        },
+        "captionTimer": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Callout caption for the timer HUD. Leave blank to use the built-in wording.",
+          "ui": {
+            "label": "Timer",
+            "group": "Callout captions",
+            "help": "Only shown if this HUD is actually on screen. Default: “The time in the story.”"
+          }
+        },
+        "captionCountdown": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Callout caption for the countdown HUD. Leave blank to use the built-in wording.",
+          "ui": {
+            "label": "Countdown",
+            "group": "Callout captions",
+            "help": "Only shown if this HUD is actually on screen. Default: “How long you have left.”"
+          }
+        },
+        "captionMeter": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Callout caption for the counters HUD. Leave blank to use the built-in wording.",
+          "ui": {
+            "label": "Counters",
+            "group": "Callout captions",
+            "help": "Only shown if this HUD is actually on screen. Default: “A character's values as they change.”"
+          }
+        },
+        "captionInventory": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Callout caption for the inventory HUD. Leave blank to use the built-in wording.",
+          "ui": {
+            "label": "Inventory",
+            "group": "Callout captions",
+            "help": "Only shown if this HUD is actually on screen. Default: “What you're carrying.”"
+          }
+        },
+        "captionMood": {
+          "type": "string",
+          "required": false,
+          "default": "",
+          "description": "Callout caption for the mood HUD. Leave blank to use the built-in wording.",
+          "ui": {
+            "label": "Mood",
+            "group": "Callout captions",
+            "help": "Only shown if this HUD is actually on screen. Default: “How a character is feeling.”"
+          }
+        },
+        "connection": {
+          "type": "connection",
+          "required": true,
+          "description": "Target beat when button is clicked"
+        },
+        "slotAnimations": {
+          "type": "object",
+          "required": false,
+          "description": "Responsive motion intent for slot-mode rendering (P3-anim).",
+          "ui": {
+            "hidden": true
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        }
+      },
+      "locations": [
+        "text",
+        "continueButton"
+      ],
+      "locationMapping": {
+        "text": "text",
+        "continueButton": "buttonText"
+      },
+      "layoutMode": "slot"
+    },
     "dialogTree": {
       "category": "visible",
       "displayName": "Dialog Tree",
@@ -468,7 +773,13 @@
           "description": "How the dialog renders in responsive mode. 'conversation' (default) lays text on one side and choices on the other — the natural back-and-forth feel. 'stacked' keeps text on top, choices below. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors for fine-grained author control. Lives in the LEFT-side VE settings panel (it's a layout property, not a content property).",
           "ui": {
             "control": "select",
-            "options": ["conversation", "stacked", "chat-scroll", "chat-bubble", "custom"],
+            "options": [
+              "conversation",
+              "stacked",
+              "chat-scroll",
+              "chat-bubble",
+              "custom"
+            ],
             "label": "Layout",
             "scope": "ve-left"
           }
@@ -477,7 +788,9 @@
           "type": "string",
           "required": false,
           "description": "DEPRECATED in v0.9.62 — use layoutTemplate instead. Existing projects auto-migrate at load: 'positioned' → 'conversation', 'chat-scroll' → 'chat-scroll', 'chat-bubble' → 'chat-bubble'. The field is kept in the schema only so legacy ZIPs deserialize without warnings; new projects should never write to it.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "showAvatars": {
           "type": "boolean",
@@ -502,7 +815,12 @@
           "type": "boolean",
           "default": false,
           "description": "Displays per-node speaker names as labels during dialog",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "spatialFit": {
           "type": "string",
@@ -511,9 +829,24 @@
           "ui": {
             "hidden": true
           }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["dialog", "choices"],
+      "locations": [
+        "dialog",
+        "choices"
+      ],
       "locationMapping": {
         "dialog": "text"
       },
@@ -523,8 +856,18 @@
         "fit": "contain"
       },
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        }
       ],
       "transitions": true,
       "sound": true,
@@ -538,7 +881,6 @@
         "example": "{ id: 'root', speaker: 'NPC', text: 'Hello!', choices: [{ id: 'c1', text: 'Hi there!', dialogNode: { id: 'n1', speaker: 'NPC', text: 'Nice day!', choices: [{ id: 'c2', text: 'Indeed it is. Goodbye!', target: 'next_beat' }] } }] }"
       }
     },
-
     "multiChoice": {
       "category": "visible",
       "displayName": "Multi Choice",
@@ -583,7 +925,12 @@
           "description": "How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel.",
           "ui": {
             "control": "select",
-            "options": ["stacked", "conversation", "chat-bubble", "custom"],
+            "options": [
+              "stacked",
+              "conversation",
+              "chat-bubble",
+              "custom"
+            ],
             "label": "Layout",
             "scope": "ve-left"
           }
@@ -609,9 +956,24 @@
             "group": "Speaker",
             "scope": "beat"
           }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["question", "choices"],
+      "locations": [
+        "question",
+        "choices"
+      ],
       "locationMapping": {
         "question": "question"
       },
@@ -640,7 +1002,6 @@
       "renderer": "multiChoice",
       "_authoringNote": "Simpler-than-DialogTree counterpart in the Multi Choice → Buttons sub-group. Use this when the player picks ONE of several responses on a single screen — no nested follow-ups, no spatial map, no in-text links. For multi-turn back-and-forth use DialogTree; for spatial map navigation use MovementChoice. layoutMode:'slot' + dynamicSource on the action slot lets the responsive renderer treat each choice as a flow button without the schema needing to enumerate them by name like infoText's `continueButton`."
     },
-
     "movementChoice": {
       "category": "visible",
       "displayName": "Movement Choice",
@@ -696,16 +1057,41 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["question", "choices"],
+      "locations": [
+        "question",
+        "choices"
+      ],
       "locationMapping": {
         "question": "question"
       },
@@ -715,17 +1101,20 @@
         "fit": "contain"
       },
       "slots": [
-        { "name": "question", "role": "body", "source": "question" }
+        {
+          "name": "question",
+          "role": "body",
+          "source": "question"
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "movementChoice"
     },
-
     "pickProp": {
       "category": "visible",
       "displayName": "Pick Prop",
-      "icon": "🎒", 
+      "icon": "🎒",
       "description": "Interactive object selection",
       "connectionType": "multiple",
       "parameters": {
@@ -771,16 +1160,41 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["question", "props"],
+      "locations": [
+        "question",
+        "props"
+      ],
       "locationMapping": {
         "question": "question"
       },
@@ -790,60 +1204,78 @@
         "fit": "contain"
       },
       "slots": [
-        { "name": "question", "role": "body", "source": "question" }
+        {
+          "name": "question",
+          "role": "body",
+          "source": "question"
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "propSelection"
     },
-
     "videoBeat": {
       "category": "visible",
       "displayName": "Video Beat",
       "icon": "🎥",
       "description": "Video playback with optional controls",
       "connectionType": "single",
-      "locations": ["video"],
+      "locations": [
+        "video",
+        "controls"
+      ],
       "parameters": {
         "videoFile": {
           "type": "string",
           "required": false,
           "description": "Direct URL/path to video file (legacy — prefer videoAssetId)",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "videoAssetId": {
           "type": "string",
           "required": false,
           "description": "Asset ID referencing the video file",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "autoplay": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Start playing automatically",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "controls": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Show video controls",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "skipButton": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Allow skipping video",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "captionsEnabled": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Show captions/subtitles when cues are present",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "captions": {
           "type": "array<object>",
@@ -884,27 +1316,50 @@
           "type": "object",
           "required": false,
           "description": "Per-language alternate video: { langCode: { videoAssetId } }. Applied at export/preview time; falls back to the base video for languages without an override.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "speaker": {
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": false,
           "description": "Target beat after video ends"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["video", "controls"],
       "locationMapping": {
         "video": "videoFile"
       },
@@ -918,14 +1373,15 @@
         {
           "name": "actions",
           "role": "action",
-          "buttons": ["continueButton"]
+          "buttons": [
+            "continueButton"
+          ]
         }
       ],
       "transitions": true,
       "sound": false,
       "renderer": "videoPlayer"
     },
-
     "endScreen": {
       "category": "visible",
       "displayName": "End Screen",
@@ -937,13 +1393,17 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "message": {
           "type": "string",
@@ -974,49 +1434,98 @@
           "required": false,
           "default": true,
           "description": "Clear all variables",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Variables" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Variables"
+          }
         },
         "resetCounters": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear all counters",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Counters" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Counters"
+          }
         },
         "resetInventory": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear inventory",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Inventory" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Inventory"
+          }
         },
         "resetTimers": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear all timers",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Timers" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Timers"
+          }
         },
         "resetFictionalTime": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear fictional time",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Fictional Time" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Fictional Time"
+          }
         },
         "resetVisitedTracking": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear visited beat tracking",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "Visited Tracking" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Visited Tracking"
+          }
         },
         "resetHistory": {
           "type": "boolean",
           "required": false,
           "default": true,
           "description": "Clear beat history",
-          "ui": { "dependsOn": { "field": "reset", "value": true }, "group": "resetOptions", "label": "History" }
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "History"
+          }
         },
         "restartText": {
           "type": "string",
@@ -1056,13 +1565,23 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "restartConnection": {
           "type": "connection",
@@ -1073,10 +1592,28 @@
           "type": "connection",
           "required": false,
           "description": "Alias of restartConnection — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["message", "restartButton", "creditsButton"],
+      "locations": [
+        "message",
+        "restartButton",
+        "creditsButton"
+      ],
       "locationMapping": {
         "message": "message",
         "restartButton": "restartText",
@@ -1085,11 +1622,32 @@
       "layoutMode": "slot",
       "layoutModeNote": "Phase-1 responsive-slot test bed. When a beat instance has NO author-persisted locations, the runtime renders it via SlotFlowView (vertical flow, clamped-fluid font outside the stage-fit transform) instead of absolute positioning. Instances with baked locations stay on the absolute path unchanged. Speaker slot (Task #225) renders above the body when showSpeaker/global is true. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "message", "role": "body", "source": "message", "grow": true, "scroll": true },
-        { "name": "actions", "role": "action", "buttons": ["restartButton", "creditsButton"] }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "message",
+          "role": "body",
+          "source": "message",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "restartButton",
+            "creditsButton"
+          ]
+        }
       ],
-      "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
+      "creditsLocations": [
+        "creditsTitle",
+        "creditsBody",
+        "creditsCloseButton"
+      ],
       "creditsLocationMapping": {
         "creditsTitle": "creditsPageTitle",
         "creditsBody": "creditsPageBody",
@@ -1099,7 +1657,6 @@
       "sound": true,
       "renderer": "endScreen"
     },
-
     "panorama": {
       "category": "visible",
       "displayName": "360° Panorama",
@@ -1115,8 +1672,14 @@
           "ui": {
             "control": "select",
             "options": [
-              { "value": "equirectangular", "label": "Equirectangular (2:1 ratio, e.g. 4096×2048)" },
-              { "value": "cylindrical", "label": "Cylindrical (4:1–8:1 ratio, e.g. 8000×2000)" }
+              {
+                "value": "equirectangular",
+                "label": "Equirectangular (2:1 ratio, e.g. 4096×2048)"
+              },
+              {
+                "value": "cylindrical",
+                "label": "Cylindrical (4:1–8:1 ratio, e.g. 8000×2000)"
+              }
             ],
             "label": "Projection",
             "hint": "Equirectangular: use 2:1 images from 360° cameras. Cylindrical: use wide panoramas from phone cameras (4:1 to 8:1 aspect ratio)."
@@ -1230,8 +1793,14 @@
           "ui": {
             "control": "select",
             "options": [
-              { "value": "static", "label": "Static (floating)" },
-              { "value": "pinned", "label": "Pinned (scrolls with pano)" }
+              {
+                "value": "static",
+                "label": "Static (floating)"
+              },
+              {
+                "value": "pinned",
+                "label": "Pinned (scrolls with pano)"
+              }
             ],
             "label": "Prompt Display"
           }
@@ -1240,22 +1809,48 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["prompt", "hotspots"],
-      "locationMapping": { "prompt": "prompt" },
+      "locations": [
+        "prompt",
+        "hotspots"
+      ],
+      "locationMapping": {
+        "prompt": "prompt"
+      },
       "transitions": true,
       "sound": true,
       "renderer": "panorama"
     },
-
     "setVariable": {
       "category": "invisible",
       "displayName": "Set Variable/Counter",
@@ -1273,13 +1868,25 @@
           "type": "string",
           "required": true,
           "description": "Variable or counter name (ignored when type='fictionalTime' — the runtime targets the project's fictional-time clock instead)",
-          "ui": { "dependsOn": { "field": "type", "value": "variable" } }
+          "ui": {
+            "dependsOn": {
+              "field": "type",
+              "value": "variable"
+            }
+          }
         },
         "character": {
           "type": "string",
           "required": false,
           "description": "type='counter' only. Counter owner. OMIT for a story-global counter (default — world/plot tallies). Set to a Character id/name to scope the counter to that character's per-character store (per-character stats like health/trust). Unlike inventory there is no implicit 'player' default — absence means global. Ignored for type='variable'|'fictionalTime'.",
-          "ui": { "control": "counter-owner", "label": "Counter", "dependsOn": { "field": "type", "value": "counter" } }
+          "ui": {
+            "control": "counter-owner",
+            "label": "Counter",
+            "dependsOn": {
+              "field": "type",
+              "value": "counter"
+            }
+          }
         },
         "value": {
           "type": "any",
@@ -1301,44 +1908,55 @@
           "type": "number",
           "required": false,
           "description": "type='fictionalTime' / operation='set' only. Year component (e.g. 2024).",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "timeMonth": {
           "type": "number",
           "required": false,
           "description": "type='fictionalTime' / operation='set' only. Month component (1-12).",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "timeDay": {
           "type": "number",
           "required": false,
           "description": "type='fictionalTime' / operation='set' only. Day component (1-31).",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "timeHour": {
           "type": "number",
           "required": false,
           "description": "type='fictionalTime' / operation='set' only. Hour component (0-23).",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "timeMinute": {
           "type": "number",
           "required": false,
           "description": "type='fictionalTime' / operation='set' only. Minute component (0-59).",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "timeUnit": {
           "type": "string",
           "required": false,
           "description": "type='fictionalTime' / operation='advance'|'subtract' only. Unit of advance: 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         }
       },
       "transitions": false,
       "sound": false,
       "renderer": "none"
     },
-
     "setGpsLocation": {
       "category": "invisible",
       "displayName": "Set GPS Location",
@@ -1355,10 +1973,22 @@
             "control": "select",
             "label": "Mode",
             "options": [
-              { "value": "capture", "label": "Capture current position" },
-              { "value": "explicit", "label": "Set explicit coordinates" },
-              { "value": "scatter", "label": "Randomly scatter points (at play time)" },
-              { "value": "preset", "label": "Place points on a map (authoring)" }
+              {
+                "value": "capture",
+                "label": "Capture current position"
+              },
+              {
+                "value": "explicit",
+                "label": "Set explicit coordinates"
+              },
+              {
+                "value": "scatter",
+                "label": "Randomly scatter points (at play time)"
+              },
+              {
+                "value": "preset",
+                "label": "Place points on a map (authoring)"
+              }
             ]
           }
         },
@@ -1367,50 +1997,89 @@
           "required": false,
           "default": [],
           "description": "preset mode: author-curated GPS points ({ lat, lng, radiusMeters? }) placed and reviewed on a map, optionally auto-generated onto walkable streets/parks. Written verbatim at play time — no network or sensor needed.",
-          "ui": { "control": "gps-point-curator", "label": "Points", "dependsOn": { "field": "mode", "value": "preset" } },
+          "ui": {
+            "control": "gps-point-curator",
+            "label": "Points",
+            "dependsOn": {
+              "field": "mode",
+              "value": "preset"
+            }
+          },
           "itemSchema": {
-            "lat": { "type": "number", "required": true, "description": "Latitude (WGS84)" },
-            "lng": { "type": "number", "required": true, "description": "Longitude (WGS84)" },
-            "radiusMeters": { "type": "number", "required": false, "description": "Optional per-point geofence radius" }
+            "lat": {
+              "type": "number",
+              "required": true,
+              "description": "Latitude (WGS84)"
+            },
+            "lng": {
+              "type": "number",
+              "required": true,
+              "description": "Longitude (WGS84)"
+            },
+            "radiusMeters": {
+              "type": "number",
+              "required": false,
+              "description": "Optional per-point geofence radius"
+            }
           }
         },
         "pointName": {
           "type": "string",
           "required": true,
           "description": "Name of the GPS point set to write. Reference this name from a GpsLocation entry (its 'pointName') to geofence these points.",
-          "ui": { "label": "Point set name" }
+          "ui": {
+            "label": "Point set name"
+          }
         },
         "lat": {
           "type": "number",
           "required": false,
           "description": "Latitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
-          "ui": { "label": "Latitude" }
+          "ui": {
+            "label": "Latitude"
+          }
         },
         "lng": {
           "type": "number",
           "required": false,
           "description": "Longitude (WGS84). Used by 'explicit' mode, and by 'scatter' when the center source is explicit coordinates.",
-          "ui": { "label": "Longitude" }
+          "ui": {
+            "label": "Longitude"
+          }
         },
         "pointRadiusMeters": {
           "type": "number",
           "required": false,
           "description": "Optional geofence radius (metres) stamped on each stored point; falls back to the GpsLocation beat's radius when omitted.",
-          "ui": { "label": "Point radius (m)" }
+          "ui": {
+            "label": "Point radius (m)"
+          }
         },
         "count": {
           "type": "number",
           "required": false,
           "default": 3,
           "description": "scatter mode: how many points to generate.",
-          "ui": { "label": "Number of points", "dependsOn": { "field": "mode", "value": "scatter" } }
+          "ui": {
+            "label": "Number of points",
+            "dependsOn": {
+              "field": "mode",
+              "value": "scatter"
+            }
+          }
         },
         "scatterRadiusMeters": {
           "type": "number",
           "required": false,
           "default": 100,
           "description": "scatter mode: maximum distance (metres) from the center to scatter points.",
-          "ui": { "label": "Scatter radius (m)", "dependsOn": { "field": "mode", "value": "scatter" } }
+          "ui": {
+            "label": "Scatter radius (m)",
+            "dependsOn": {
+              "field": "mode",
+              "value": "scatter"
+            }
+          }
         },
         "centerSource": {
           "type": "string",
@@ -1421,18 +2090,32 @@
             "control": "select",
             "label": "Scatter around",
             "options": [
-              { "value": "current", "label": "The player's current position" },
-              { "value": "point", "label": "Another point set" },
-              { "value": "explicit", "label": "Explicit coordinates" }
+              {
+                "value": "current",
+                "label": "The player's current position"
+              },
+              {
+                "value": "point",
+                "label": "Another point set"
+              },
+              {
+                "value": "explicit",
+                "label": "Explicit coordinates"
+              }
             ],
-            "dependsOn": { "field": "mode", "value": "scatter" }
+            "dependsOn": {
+              "field": "mode",
+              "value": "scatter"
+            }
           }
         },
         "centerPointName": {
           "type": "string",
           "required": false,
           "description": "scatter mode with center source 'point': the name of the point set to center on (uses its first point).",
-          "ui": { "label": "Center point set" }
+          "ui": {
+            "label": "Center point set"
+          }
         },
         "placement": {
           "type": "string",
@@ -1443,23 +2126,36 @@
             "control": "select",
             "label": "Placement",
             "options": [
-              { "value": "uniform", "label": "Uniform (offline, anywhere)" },
-              { "value": "walkable", "label": "Walkable (streets & parks, via OpenStreetMap)" }
+              {
+                "value": "uniform",
+                "label": "Uniform (offline, anywhere)"
+              },
+              {
+                "value": "walkable",
+                "label": "Walkable (streets & parks, via OpenStreetMap)"
+              }
             ],
-            "dependsOn": { "field": "mode", "value": "scatter" }
+            "dependsOn": {
+              "field": "mode",
+              "value": "scatter"
+            }
           }
         },
         "fallbackLat": {
           "type": "number",
           "required": false,
           "description": "Fallback latitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
-          "ui": { "label": "Fallback latitude" }
+          "ui": {
+            "label": "Fallback latitude"
+          }
         },
         "fallbackLng": {
           "type": "number",
           "required": false,
           "description": "Fallback longitude used when the sensor is unavailable / permission denied (capture, or scatter-from-current).",
-          "ui": { "label": "Fallback longitude" }
+          "ui": {
+            "label": "Fallback longitude"
+          }
         },
         "connection": {
           "type": "connection",
@@ -1471,7 +2167,6 @@
       "sound": false,
       "renderer": "none"
     },
-
     "conditionBeat": {
       "category": "invisible",
       "displayName": "Condition Check",
@@ -1488,13 +2183,17 @@
           "type": "connection",
           "required": true,
           "description": "Target if condition is true",
-          "aliases": ["trueTarget"]
+          "aliases": [
+            "trueTarget"
+          ]
         },
         "falseConnection": {
           "type": "connection",
           "required": false,
           "description": "Target if condition is false",
-          "aliases": ["falseTarget"]
+          "aliases": [
+            "falseTarget"
+          ]
         }
       },
       "nested": {
@@ -1511,8 +2210,6 @@
       "sound": false,
       "renderer": "none"
     },
-
-
     "durScreen": {
       "category": "visible",
       "displayName": "Duration Screen",
@@ -1524,13 +2221,17 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "text": {
           "type": "string",
@@ -1554,41 +2255,79 @@
           "required": true,
           "default": 5,
           "description": "Display duration in SECONDS (fractional allowed, e.g. 0.5). Set proportional to text length — roughly ceil(words / 200 * 60 * 1.5), minimum ~3s. Legacy projects storing milliseconds (value > 60) are auto-migrated to seconds on load.",
-          "ui": { "control": "number", "min": 0.5, "step": 0.5, "label": "Duration (seconds)" }
+          "ui": {
+            "control": "number",
+            "min": 0.5,
+            "step": 0.5,
+            "label": "Duration (seconds)"
+          }
         },
         "speaker": {
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": false,
           "description": "Target beat after duration expires"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text"],
+      "locations": [
+        "text"
+      ],
       "locationMapping": {
         "text": "text"
       },
       "layoutMode": "slot",
       "layoutModeNote": "Phase-2 responsive-slot (stack beats). Body-only: timed text with NO action row — the beat auto-advances after its duration, the slot path is purely the responsive visual. renderDurScreen threads authorPositioned; baked-location instances stay absolute (zero regression). Speaker slot (Task #225) renders above the body when showSpeaker/global is true. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "timedText"
     },
-
     "randomTarget": {
       "category": "invisible",
       "displayName": "Random Target",
@@ -1607,7 +2346,6 @@
       "sound": false,
       "renderer": "none"
     },
-
     "setTimer": {
       "category": "invisible",
       "displayName": "Set Timer",
@@ -1640,7 +2378,6 @@
       "sound": false,
       "renderer": "none"
     },
-
     "addRemoveInventory": {
       "category": "invisible",
       "displayName": "Inventory Management",
@@ -1710,7 +2447,6 @@
       "sound": false,
       "renderer": "none"
     },
-
     "updateAffect": {
       "category": "invisible",
       "displayName": "Update Affect",
@@ -1738,7 +2474,10 @@
             "min": -2,
             "max": 2,
             "step": 0.1,
-            "axisLabels": ["← sadder", "happier →"],
+            "axisLabels": [
+              "← sadder",
+              "happier →"
+            ],
             "affectAxis": "valence",
             "group": "Mood"
           }
@@ -1753,7 +2492,10 @@
             "min": -2,
             "max": 2,
             "step": 0.1,
-            "axisLabels": ["← calmer", "more excited →"],
+            "axisLabels": [
+              "← calmer",
+              "more excited →"
+            ],
             "affectAxis": "arousal",
             "group": "Mood"
           }
@@ -1787,7 +2529,10 @@
             "min": -2,
             "max": 2,
             "step": 0.1,
-            "axisLabels": ["← weaker / opposite", "stronger →"],
+            "axisLabels": [
+              "← weaker / opposite",
+              "stronger →"
+            ],
             "group": "Sentiment"
           }
         },
@@ -1810,7 +2555,10 @@
             "min": -1,
             "max": 1,
             "step": 0.1,
-            "axisLabels": ["← weaker", "stronger →"],
+            "axisLabels": [
+              "← weaker",
+              "stronger →"
+            ],
             "group": "Emotion"
           }
         },
@@ -1823,14 +2571,15 @@
           "type": "array<effect>",
           "required": false,
           "description": "v0.9.45+ canonical shape — an ordered list of Effects (mood nudge, sentiment delta, emotion fire, goal status, variant switch, bookmark, …). When present, this replaces the legacy single-row fields above (moodValenceDelta, sentimentTarget, …). The migration helpers in core promote legacy shapes into this array on load.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         }
       },
       "transitions": false,
       "sound": false,
       "renderer": "none"
     },
-
     "gpsLocation": {
       "category": "xr",
       "displayName": "GPS Location",
@@ -1847,9 +2596,18 @@
             "label": "Mode",
             "control": "select",
             "options": [
-              { "value": "display", "label": "Display only (continue button)" },
-              { "value": "trigger-on-arrival", "label": "Trigger on arrival" },
-              { "value": "trigger-on-departure", "label": "Trigger on departure" }
+              {
+                "value": "display",
+                "label": "Display only (continue button)"
+              },
+              {
+                "value": "trigger-on-arrival",
+                "label": "Trigger on arrival"
+              },
+              {
+                "value": "trigger-on-departure",
+                "label": "Trigger on departure"
+              }
             ]
           }
         },
@@ -1857,44 +2615,63 @@
           "type": "number",
           "required": true,
           "description": "Target latitude in degrees (WGS84). E.g. 51.5074 for London.",
-          "ui": { "label": "Target latitude", "step": 0.000001 }
+          "ui": {
+            "label": "Target latitude",
+            "step": 1e-06
+          }
         },
         "targetLng": {
           "type": "number",
           "required": true,
           "description": "Target longitude in degrees (WGS84). E.g. -0.1278 for London.",
-          "ui": { "label": "Target longitude", "step": 0.000001 }
+          "ui": {
+            "label": "Target longitude",
+            "step": 1e-06
+          }
         },
         "radiusMeters": {
           "type": "number",
           "required": false,
           "description": "Proximity radius in metres. Falls back to the project's LocationSettings.defaultProximityRadiusM when unset, then 25m.",
-          "ui": { "label": "Radius (metres)", "min": 1 }
+          "ui": {
+            "label": "Radius (metres)",
+            "min": 1
+          }
         },
         "text": {
           "type": "string",
           "required": false,
           "description": "Instructional text shown over the map (e.g. 'Walk to the meeting point at the fountain').",
-          "ui": { "label": "Instructional text", "control": "textarea" }
+          "ui": {
+            "label": "Instructional text",
+            "control": "textarea"
+          }
         },
         "buttonText": {
           "type": "string",
           "required": false,
           "default": "Continue",
           "description": "Continue button label (display mode).",
-          "ui": { "label": "Continue button text" }
+          "ui": {
+            "label": "Continue button text"
+          }
         },
         "cancelButtonText": {
           "type": "string",
           "required": false,
           "description": "Optional skip / cancel button label. Lets the player exit the beat without waiting for arrival.",
-          "ui": { "label": "Skip button text" }
+          "ui": {
+            "label": "Skip button text"
+          }
         },
         "timeoutMs": {
           "type": "number",
           "required": false,
           "description": "Optional timeout in milliseconds. The beat resolves with 'timeout' if no arrival / departure / skip happens within this window.",
-          "ui": { "label": "Timeout (ms)", "min": 0 }
+          "ui": {
+            "label": "Timeout (ms)",
+            "min": 0
+          }
         },
         "mapStyle": {
           "type": "string",
@@ -1905,9 +2682,18 @@
             "label": "Map style",
             "control": "select",
             "options": [
-              { "value": "streets", "label": "Streets" },
-              { "value": "satellite", "label": "Satellite" },
-              { "value": "minimal", "label": "Minimal" }
+              {
+                "value": "streets",
+                "label": "Streets"
+              },
+              {
+                "value": "satellite",
+                "label": "Satellite"
+              },
+              {
+                "value": "minimal",
+                "label": "Minimal"
+              }
             ]
           }
         },
@@ -1916,7 +2702,9 @@
           "required": false,
           "default": true,
           "description": "Whether to show the player's current location on the map.",
-          "ui": { "label": "Show player marker" }
+          "ui": {
+            "label": "Show player marker"
+          }
         },
         "connection": {
           "type": "connection",
@@ -1928,7 +2716,6 @@
       "sound": false,
       "renderer": "map"
     },
-
     "indoorLocation": {
       "category": "xr",
       "displayName": "Indoor Location",
@@ -1945,9 +2732,18 @@
             "label": "Mode",
             "control": "select",
             "options": [
-              { "value": "display", "label": "Display only (continue button)" },
-              { "value": "trigger-on-arrival", "label": "Trigger on arrival" },
-              { "value": "trigger-on-departure", "label": "Trigger on departure" }
+              {
+                "value": "display",
+                "label": "Display only (continue button)"
+              },
+              {
+                "value": "trigger-on-arrival",
+                "label": "Trigger on arrival"
+              },
+              {
+                "value": "trigger-on-departure",
+                "label": "Trigger on departure"
+              }
             ]
           }
         },
@@ -1955,38 +2751,53 @@
           "type": "string",
           "required": true,
           "description": "UUID of the target beacon — must match a beacon configured in Project Settings → Location & XR → Indoor venue → Beacons.",
-          "ui": { "label": "Target beacon UUID" }
+          "ui": {
+            "label": "Target beacon UUID"
+          }
         },
         "radiusMeters": {
           "type": "number",
           "required": false,
           "description": "Proximity radius in metres. Falls back to LocationSettings.defaultProximityRadiusM when unset, then 5m (room-scale default — indoor is tighter than outdoor).",
-          "ui": { "label": "Radius (metres)", "min": 0.5 }
+          "ui": {
+            "label": "Radius (metres)",
+            "min": 0.5
+          }
         },
         "text": {
           "type": "string",
           "required": false,
           "description": "Instructional text shown over the floor plan (e.g. 'Find the artefact in the east wing').",
-          "ui": { "label": "Instructional text", "control": "textarea" }
+          "ui": {
+            "label": "Instructional text",
+            "control": "textarea"
+          }
         },
         "buttonText": {
           "type": "string",
           "required": false,
           "default": "Continue",
           "description": "Continue button label (display mode).",
-          "ui": { "label": "Continue button text" }
+          "ui": {
+            "label": "Continue button text"
+          }
         },
         "cancelButtonText": {
           "type": "string",
           "required": false,
           "description": "Optional skip / cancel button label.",
-          "ui": { "label": "Skip button text" }
+          "ui": {
+            "label": "Skip button text"
+          }
         },
         "timeoutMs": {
           "type": "number",
           "required": false,
           "description": "Optional timeout in milliseconds. Beat resolves with 'timeout' if no arrival / departure / skip within this window.",
-          "ui": { "label": "Timeout (ms)", "min": 0 }
+          "ui": {
+            "label": "Timeout (ms)",
+            "min": 0
+          }
         },
         "connection": {
           "type": "connection",
@@ -1998,7 +2809,6 @@
       "sound": false,
       "renderer": "indoorMap"
     },
-
     "inputText": {
       "category": "visible",
       "displayName": "Input Text",
@@ -2020,7 +2830,9 @@
         },
         "variable": {
           "type": "string",
-          "aliases": ["variableName"],
+          "aliases": [
+            "variableName"
+          ],
           "required": false,
           "default": "userInput",
           "description": "Variable name to store the input (when saveToType='variable'). AI sometimes emits 'variableName' — pipeline aliases it to 'variable'."
@@ -2078,21 +2890,47 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Target beat after input is submitted"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["prompt", "inputField", "submitButton"],
+      "locations": [
+        "prompt",
+        "inputField",
+        "submitButton"
+      ],
       "locationMapping": {
         "prompt": "prompt",
         "inputField": "placeholder",
@@ -2100,16 +2938,33 @@
       },
       "layoutMode": "slot",
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "prompt", "role": "body", "source": "prompt" },
-        { "name": "input", "role": "input", "placeholderSource": "placeholder" },
-        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "input",
+          "role": "input",
+          "placeholderSource": "placeholder"
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "continueButton"
+          ]
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "inputText"
     },
-
     "inputImage": {
       "category": "visible",
       "displayName": "Input Image",
@@ -2122,14 +2977,22 @@
           "required": true,
           "default": "Take or choose a photo:",
           "description": "Question or instruction shown to the player",
-          "ui": { "control": "textarea", "rows": 2, "label": "Prompt" }
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Prompt"
+          }
         },
         "analysisPrompt": {
           "type": "string",
           "required": true,
           "default": "Describe what is shown in this image in one or two sentences.",
           "description": "Instruction for the AI describing what to extract from the image. Not shown to the player; stays in the source language.",
-          "ui": { "control": "textarea", "rows": 3, "label": "AI Analysis Prompt" }
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "AI Analysis Prompt"
+          }
         },
         "saveTo": {
           "type": "string",
@@ -2145,9 +3008,18 @@
           "ui": {
             "control": "select",
             "options": [
-              { "value": "both", "label": "Camera or upload" },
-              { "value": "camera", "label": "Camera (mobile)" },
-              { "value": "upload", "label": "Upload only" }
+              {
+                "value": "both",
+                "label": "Camera or upload"
+              },
+              {
+                "value": "camera",
+                "label": "Camera (mobile)"
+              },
+              {
+                "value": "upload",
+                "label": "Upload only"
+              }
             ],
             "label": "Image Source"
           }
@@ -2169,7 +3041,10 @@
           "required": false,
           "default": "",
           "description": "Stored in the variable when AI is unavailable, fails, or the player skips",
-          "ui": { "control": "text", "label": "Fallback Value" }
+          "ui": {
+            "control": "text",
+            "label": "Fallback Value"
+          }
         },
         "timeout": {
           "type": "number",
@@ -2181,29 +3056,65 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Target beat after the image is analyzed (or the player skips)"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["prompt", "imageInput"],
+      "locations": [
+        "prompt",
+        "imageInput"
+      ],
       "locationMapping": {
         "prompt": "prompt"
       },
       "layoutMode": "slot",
       "slots": [
-        { "name": "speaker", "role": "speaker", "source": "speaker" },
-        { "name": "prompt", "role": "body", "source": "prompt" },
-        { "name": "imageInput", "role": "imageInput" }
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "prompt",
+          "role": "body",
+          "source": "prompt"
+        },
+        {
+          "name": "imageInput",
+          "role": "imageInput"
+        }
       ],
       "transitions": true,
       "sound": true,
@@ -2217,7 +3128,6 @@
         ]
       }
     },
-
     "keypad": {
       "category": "visible",
       "displayName": "Keypad",
@@ -2238,7 +3148,11 @@
           "description": "Keypad layout: numeric (1-9,←,0,✓), phone (1-9,*,0,#), pin (1-9,C,0,✓)",
           "ui": {
             "control": "select",
-            "options": ["numeric", "phone", "pin"],
+            "options": [
+              "numeric",
+              "phone",
+              "pin"
+            ],
             "label": "Layout"
           }
         },
@@ -2323,9 +3237,24 @@
           "type": "connection",
           "required": true,
           "description": "Target beat after code is entered"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["prompt", "keypadGrid"],
+      "locations": [
+        "prompt",
+        "keypadGrid"
+      ],
       "locationMapping": {
         "prompt": "prompt"
       },
@@ -2350,7 +3279,6 @@
       "sound": true,
       "renderer": "keypad"
     },
-
     "qrScan": {
       "category": "visible",
       "displayName": "QR Scan",
@@ -2393,8 +3321,14 @@
           "ui": {
             "control": "select",
             "options": [
-              { "value": "rear", "label": "Rear (environment)" },
-              { "value": "front", "label": "Front (selfie)" }
+              {
+                "value": "rear",
+                "label": "Rear (environment)"
+              },
+              {
+                "value": "front",
+                "label": "Front (selfie)"
+              }
             ],
             "label": "Camera"
           }
@@ -2436,26 +3370,53 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Target beat after a code is scanned (or the player cancels)"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "permissions": ["camera"],
+      "permissions": [
+        "camera"
+      ],
       "onPermissionDenied": {
         "behavior": "fallthrough",
         "message": "Camera access is required to scan QR codes."
       },
-      "locations": ["prompt", "camera"],
+      "locations": [
+        "prompt",
+        "camera"
+      ],
       "locationMapping": {
         "prompt": "prompt"
       },
@@ -2478,7 +3439,9 @@
         {
           "name": "actions",
           "role": "action",
-          "buttons": ["cancelButton"]
+          "buttons": [
+            "cancelButton"
+          ]
         }
       ],
       "transitions": true,
@@ -2493,7 +3456,6 @@
         ]
       }
     },
-
     "arBeat": {
       "category": "visible",
       "displayName": "AR Scene",
@@ -2520,9 +3482,18 @@
           "ui": {
             "control": "select",
             "options": [
-              { "value": "marker", "label": "Image marker (.mind target)" },
-              { "value": "world", "label": "World tracking (Phase 2)" },
-              { "value": "face", "label": "Face tracking (Phase 2)" }
+              {
+                "value": "marker",
+                "label": "Image marker (.mind target)"
+              },
+              {
+                "value": "world",
+                "label": "World tracking (Phase 2)"
+              },
+              {
+                "value": "face",
+                "label": "Face tracking (Phase 2)"
+              }
             ],
             "label": "Tracking Mode"
           }
@@ -2551,19 +3522,26 @@
               "type": "string",
               "required": true,
               "description": "Stable id for the anchor",
-              "ui": { "label": "ID" }
+              "ui": {
+                "label": "ID"
+              }
             },
             "label": {
               "type": "string",
               "required": false,
               "description": "Text shown on the anchor card / tooltip",
-              "ui": { "label": "Label" }
+              "ui": {
+                "label": "Label"
+              }
             },
             "assetId": {
               "type": "string",
               "required": false,
               "description": "Optional image asset shown as a billboard at the anchor position",
-              "ui": { "control": "asset-picker", "label": "Image" }
+              "ui": {
+                "control": "asset-picker",
+                "label": "Image"
+              }
             },
             "anchoredTo": {
               "type": "string",
@@ -2576,21 +3554,30 @@
               "required": false,
               "default": 0,
               "description": "Local-space X offset from the marker center (-1..1)",
-              "ui": { "control": "number", "label": "X offset" }
+              "ui": {
+                "control": "number",
+                "label": "X offset"
+              }
             },
             "offsetY": {
               "type": "number",
               "required": false,
               "default": 0,
               "description": "Local-space Y offset from the marker center (-1..1)",
-              "ui": { "control": "number", "label": "Y offset" }
+              "ui": {
+                "control": "number",
+                "label": "Y offset"
+              }
             },
             "scale": {
               "type": "number",
               "required": false,
               "default": 1,
               "description": "Anchor size multiplier",
-              "ui": { "control": "number", "label": "Scale" }
+              "ui": {
+                "control": "number",
+                "label": "Scale"
+              }
             },
             "onTap": {
               "type": "string",
@@ -2615,21 +3602,48 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "permissions": ["camera"],
+      "permissions": [
+        "camera"
+      ],
       "onPermissionDenied": {
         "behavior": "fallthrough",
         "message": "Camera access is required for AR scenes."
       },
-      "locations": ["prompt", "arScene"],
+      "locations": [
+        "prompt",
+        "arScene"
+      ],
       "locationMapping": {
         "prompt": "prompt"
       },
@@ -2657,7 +3671,9 @@
         {
           "name": "actions",
           "role": "action",
-          "buttons": ["cancelButton"]
+          "buttons": [
+            "cancelButton"
+          ]
         }
       ],
       "transitions": true,
@@ -2672,7 +3688,6 @@
         ]
       }
     },
-
     "webView": {
       "category": "visible",
       "displayName": "Web View",
@@ -2732,22 +3747,49 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "connection": {
           "type": "connection",
           "required": true,
           "description": "Target beat after the player exits the web view"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "permissions": ["network"],
-      "locations": ["prompt", "webview"],
+      "permissions": [
+        "network"
+      ],
+      "locations": [
+        "prompt",
+        "webview"
+      ],
       "locationMapping": {
         "prompt": "prompt"
       },
@@ -2770,7 +3812,9 @@
         {
           "name": "actions",
           "role": "action",
-          "buttons": ["doneButton"]
+          "buttons": [
+            "doneButton"
+          ]
         }
       ],
       "transitions": true,
@@ -2785,7 +3829,6 @@
         ]
       }
     },
-
     "hyperText": {
       "category": "visible",
       "displayName": "Hyper Text",
@@ -2827,16 +3870,41 @@
           "type": "string",
           "default": "",
           "description": "Who speaks this beat's text (for TTS voice and optional display)",
-          "ui": { "control": "speaker", "label": "Speaker", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
         },
         "showSpeaker": {
           "type": "boolean",
           "default": false,
           "description": "Show speaker name to the interactor",
-          "ui": { "control": "speaker-visibility", "label": "Show Speaker Name", "group": "Speaker", "scope": "beat" }
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text", "hyperlinks"],
+      "locations": [
+        "text",
+        "hyperlinks"
+      ],
       "locationMapping": {
         "text": "text"
       },
@@ -2859,7 +3927,6 @@
       "sound": true,
       "renderer": "hyperText"
     },
-
     "onlineContent": {
       "category": "visible",
       "displayName": "Online Content",
@@ -2871,13 +3938,17 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "sourceType": {
           "type": "string",
@@ -2886,7 +3957,10 @@
           "description": "Data source type: 'api' for direct API calls, 'ai-query' for AI-powered search",
           "ui": {
             "control": "select",
-            "options": ["api", "ai-query"],
+            "options": [
+              "api",
+              "ai-query"
+            ],
             "label": "Source Type"
           }
         },
@@ -2958,9 +4032,25 @@
           "type": "connection",
           "required": true,
           "description": "Target beat when button is clicked"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["title", "text", "continueButton"],
+      "locations": [
+        "title",
+        "text",
+        "continueButton"
+      ],
       "locationMapping": {
         "title": "title",
         "text": "displayTemplate",
@@ -2969,18 +4059,33 @@
       "layoutMode": "slot",
       "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView (clamped-fluid font outside the stage transform). The runtime renderText path supplies content {text, buttonText}; body draws from 'text', the action is a single continue button. Instances with baked locations stay on the absolute path. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
-        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "continueButton"
+          ]
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay",
       "aiNotes": {
         "purpose": "Incorporate real-world dynamic data into stories",
-        "examples": ["Weather for player's city", "News headlines", "Statistics lookup"]
+        "examples": [
+          "Weather for player's city",
+          "News headlines",
+          "Statistics lookup"
+        ]
       }
     },
-
     "aiCondition": {
       "category": "invisible",
       "displayName": "AI Condition",
@@ -3013,20 +4118,28 @@
               "type": "string",
               "required": true,
               "description": "Category name (returned by AI)",
-              "ui": { "label": "Name" }
+              "ui": {
+                "label": "Name"
+              }
             },
             "description": {
               "type": "string",
               "required": true,
               "description": "When this category applies",
-              "ui": { "control": "textarea", "rows": 2, "label": "Description" }
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "Description"
+              }
             },
             "targetId": {
               "type": "string",
               "required": true,
               "targetField": true,
               "description": "Beat to navigate to",
-              "ui": { "label": "Target Beat" }
+              "ui": {
+                "label": "Target Beat"
+              }
             }
           }
         },
@@ -3081,10 +4194,13 @@
       "renderer": "none",
       "aiNotes": {
         "purpose": "Dynamic branching based on player personality or accumulated state",
-        "examples": ["Personality type routing", "Difficulty adjustment", "Content matching"]
+        "examples": [
+          "Personality type routing",
+          "Difficulty adjustment",
+          "Content matching"
+        ]
       }
     },
-
     "aiDialogTree": {
       "category": "visible",
       "displayName": "AI Dialog Tree",
@@ -3159,7 +4275,13 @@
           "description": "How the dialog renders. 'stacked' keeps the NPC text on top with choices below (visual-novel). 'conversation' lays text on one side and choices on the other. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors. Lives in the LEFT-side VE settings panel.",
           "ui": {
             "control": "select",
-            "options": ["stacked", "conversation", "chat-scroll", "chat-bubble", "custom"],
+            "options": [
+              "stacked",
+              "conversation",
+              "chat-scroll",
+              "chat-bubble",
+              "custom"
+            ],
             "label": "Layout",
             "scope": "ve-left"
           }
@@ -3180,19 +4302,29 @@
               "required": true,
               "targetField": true,
               "description": "Target beat ID",
-              "ui": { "label": "Target Beat" }
+              "ui": {
+                "label": "Target Beat"
+              }
             },
             "description": {
               "type": "string",
               "required": true,
               "description": "When to use this exit (for AI)",
-              "ui": { "control": "textarea", "rows": 2, "label": "When to Use" }
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "When to Use"
+              }
             },
             "npcExitMessage": {
               "type": "string",
               "required": false,
               "description": "Prompt for AI to generate a farewell NPC message when exiting via this target. If set, the NPC delivers a final line before transitioning.",
-              "ui": { "control": "textarea", "rows": 2, "label": "NPC Exit Message Prompt" }
+              "ui": {
+                "control": "textarea",
+                "rows": 2,
+                "label": "NPC Exit Message Prompt"
+              }
             }
           }
         },
@@ -3200,9 +4332,24 @@
           "type": "number",
           "required": false,
           "description": "Delay before showing choices"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["dialog", "choices"],
+      "locations": [
+        "dialog",
+        "choices"
+      ],
       "locationMapping": {
         "dialog": "scenario"
       },
@@ -3229,10 +4376,12 @@
       "renderer": "dialogTree",
       "aiNotes": {
         "purpose": "Generate personalized conversations that reference player state",
-        "examples": ["NPC reacts to player's name/profession", "References earlier choices"]
+        "examples": [
+          "NPC reacts to player's name/profession",
+          "References earlier choices"
+        ]
       }
     },
-
     "aiSummary": {
       "category": "visible",
       "displayName": "AI Summary",
@@ -3244,13 +4393,17 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "prompt": {
           "type": "string",
@@ -3294,7 +4447,11 @@
           "description": "Summary style",
           "ui": {
             "control": "select",
-            "options": ["narrative", "bullet-points", "reflection"]
+            "options": [
+              "narrative",
+              "bullet-points",
+              "reflection"
+            ]
           }
         },
         "maxLength": {
@@ -3304,7 +4461,11 @@
           "description": "Summary length",
           "ui": {
             "control": "select",
-            "options": ["short", "medium", "long"]
+            "options": [
+              "short",
+              "medium",
+              "long"
+            ]
           }
         },
         "title": {
@@ -3334,7 +4495,9 @@
           "type": "connection",
           "required": false,
           "description": "Alias of restartTarget — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "resetOnRestart": {
           "type": "boolean",
@@ -3348,7 +4511,10 @@
           "default": true,
           "description": "Clear all variables",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Variables"
           }
@@ -3359,7 +4525,10 @@
           "default": true,
           "description": "Clear all counters",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Counters"
           }
@@ -3370,7 +4539,10 @@
           "default": true,
           "description": "Clear inventory",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Inventory"
           }
@@ -3381,7 +4553,10 @@
           "default": true,
           "description": "Clear all timers",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Timers"
           }
@@ -3392,7 +4567,10 @@
           "default": true,
           "description": "Clear fictional time",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Fictional Time"
           }
@@ -3403,7 +4581,10 @@
           "default": true,
           "description": "Clear visited beat tracking",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "Visited Tracking"
           }
@@ -3414,7 +4595,10 @@
           "default": true,
           "description": "Clear beat history",
           "ui": {
-            "dependsOn": { "field": "resetOnRestart", "value": true },
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
             "group": "resetOptions",
             "label": "History"
           }
@@ -3452,9 +4636,26 @@
           "required": false,
           "default": "Close",
           "description": "Text for the close button on credits page"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["title", "summary", "restartButton", "creditsButton"],
+      "locations": [
+        "title",
+        "summary",
+        "restartButton",
+        "creditsButton"
+      ],
       "locationMapping": {
         "title": "title",
         "restartButton": "restartText",
@@ -3463,11 +4664,32 @@
       "layoutMode": "slot",
       "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView. renderAISummary supplies {title, summary, showRestart, showCredits, restartText, creditsText}; title slot from 'title', body from 'summary', restart/credits action row (same EndScreenBeat substring contract). Baked-location instances stay absolute. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "title", "role": "title", "source": "title" },
-        { "name": "summary", "role": "body", "source": "summary", "grow": true, "scroll": true },
-        { "name": "actions", "role": "action", "buttons": ["restartButton", "creditsButton"] }
+        {
+          "name": "title",
+          "role": "title",
+          "source": "title"
+        },
+        {
+          "name": "summary",
+          "role": "body",
+          "source": "summary",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "restartButton",
+            "creditsButton"
+          ]
+        }
       ],
-      "creditsLocations": ["creditsTitle", "creditsBody", "creditsCloseButton"],
+      "creditsLocations": [
+        "creditsTitle",
+        "creditsBody",
+        "creditsCloseButton"
+      ],
       "creditsLocationMapping": {
         "creditsTitle": "creditsPageTitle",
         "creditsBody": "creditsPageBody",
@@ -3478,10 +4700,13 @@
       "renderer": "aiSummary",
       "aiNotes": {
         "purpose": "Personalized ending that explains how choices led to this outcome",
-        "features": ["References player name", "Explains key decisions", "Narrative epilogue"]
+        "features": [
+          "References player name",
+          "Explains key decisions",
+          "Narrative epilogue"
+        ]
       }
     },
-
     "aiInfoText": {
       "category": "visible",
       "displayName": "AI Info Text",
@@ -3493,13 +4718,17 @@
           "type": "object",
           "required": false,
           "description": "Soft responsive layout intent for slot-mode rendering (per-slot preferredLines / anchor / gap). Visual-Editor managed; NEVER serialized as baked locations[] — a beat carrying slotIntent and no locations[] stays responsive (slot mode). Absent → pure flow.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "slotAnimations": {
           "type": "object",
           "required": false,
           "description": "Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "prompt": {
           "type": "string",
@@ -3583,9 +4812,24 @@
           "type": "connection",
           "required": true,
           "description": "Target beat when button is clicked"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text", "continueButton"],
+      "locations": [
+        "text",
+        "continueButton"
+      ],
       "locationMapping": {
         "text": "fallbackText",
         "continueButton": "buttonText"
@@ -3593,18 +4837,33 @@
       "layoutMode": "slot",
       "layoutModeNote": "Phase-1 responsive-slot. Instances with no author-persisted locations render via SlotFlowView. The runtime renderText path supplies content {text, buttonText} (text = the AI-generated or fallback text); body from 'text', single continue button. Baked-location instances stay absolute. See project_responsive_layout_system memory.",
       "slots": [
-        { "name": "text", "role": "body", "source": "text", "grow": true, "scroll": true },
-        { "name": "actions", "role": "action", "buttons": ["continueButton"] }
+        {
+          "name": "text",
+          "role": "body",
+          "source": "text",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "buttons": [
+            "continueButton"
+          ]
+        }
       ],
       "transitions": true,
       "sound": true,
       "renderer": "textDisplay",
       "aiNotes": {
         "purpose": "Generate short contextual text that responds to player state",
-        "examples": ["Merchant reaction to player's offer", "NPC comment on player's inventory", "Dynamic weather description"]
+        "examples": [
+          "Merchant reaction to player's offer",
+          "NPC comment on player's inventory",
+          "Dynamic weather description"
+        ]
       }
     },
-
     "aiDurScreen": {
       "category": "visible",
       "displayName": "AI Duration Screen",
@@ -3726,9 +4985,23 @@
           "type": "connection",
           "required": false,
           "description": "Target beat after duration expires"
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text"],
+      "locations": [
+        "text"
+      ],
       "locationMapping": {
         "text": "fallbackText"
       },
@@ -3752,10 +5025,13 @@
       "renderer": "durScreen",
       "aiNotes": {
         "purpose": "Auto-advancing text screen with AI-generated content and calculated reading time",
-        "examples": ["Atmospheric description", "Time-passing narrative", "Brief status update based on player state"]
+        "examples": [
+          "Atmospheric description",
+          "Time-passing narrative",
+          "Brief status update based on player state"
+        ]
       }
     },
-
     "aiConversation": {
       "category": "visible",
       "displayName": "AI Conversation",
@@ -3773,8 +5049,14 @@
             "label": "Presentation",
             "scope": "ve-left",
             "options": [
-              { "value": "chat", "label": "Chat (scrolling panel)" },
-              { "value": "dialog", "label": "Dialog (back-and-forth, positionable)" }
+              {
+                "value": "chat",
+                "label": "Chat (scrolling panel)"
+              },
+              {
+                "value": "dialog",
+                "label": "Dialog (back-and-forth, positionable)"
+              }
             ]
           }
         },
@@ -3833,7 +5115,9 @@
               "type": "string",
               "required": true,
               "description": "Unique direction ID",
-              "ui": { "label": "ID" }
+              "ui": {
+                "label": "ID"
+              }
             },
             "triggerType": {
               "type": "string",
@@ -3844,11 +5128,26 @@
                 "label": "Trigger",
                 "control": "select",
                 "options": [
-                  { "value": "topic-mention", "label": "Topic Mentioned" },
-                  { "value": "sentiment", "label": "Player Sentiment" },
-                  { "value": "turn-count", "label": "After N Turns" },
-                  { "value": "variable", "label": "Variable Check" },
-                  { "value": "custom", "label": "Custom (AI-evaluated)" }
+                  {
+                    "value": "topic-mention",
+                    "label": "Topic Mentioned"
+                  },
+                  {
+                    "value": "sentiment",
+                    "label": "Player Sentiment"
+                  },
+                  {
+                    "value": "turn-count",
+                    "label": "After N Turns"
+                  },
+                  {
+                    "value": "variable",
+                    "label": "Variable Check"
+                  },
+                  {
+                    "value": "custom",
+                    "label": "Custom (AI-evaluated)"
+                  }
                 ]
               }
             },
@@ -3857,7 +5156,9 @@
               "required": false,
               "default": false,
               "description": "Invert the trigger (fires when condition is NOT met)",
-              "ui": { "label": "Negate (NOT)" }
+              "ui": {
+                "label": "Negate (NOT)"
+              }
             },
             "triggerKeywords": {
               "type": "string",
@@ -3865,7 +5166,10 @@
               "description": "Comma-separated keywords (e.g. sword, weapon, blade)",
               "ui": {
                 "label": "Keywords",
-                "dependsOn": { "field": "triggerType", "value": "topic-mention" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "topic-mention"
+                }
               }
             },
             "triggerSentiment": {
@@ -3876,12 +5180,27 @@
                 "label": "Sentiment",
                 "control": "select",
                 "options": [
-                  { "value": "positive", "label": "Positive" },
-                  { "value": "negative", "label": "Negative" },
-                  { "value": "angry", "label": "Angry" },
-                  { "value": "curious", "label": "Curious" }
+                  {
+                    "value": "positive",
+                    "label": "Positive"
+                  },
+                  {
+                    "value": "negative",
+                    "label": "Negative"
+                  },
+                  {
+                    "value": "angry",
+                    "label": "Angry"
+                  },
+                  {
+                    "value": "curious",
+                    "label": "Curious"
+                  }
                 ],
-                "dependsOn": { "field": "triggerType", "value": "sentiment" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "sentiment"
+                }
               }
             },
             "triggerTurnCount": {
@@ -3893,7 +5212,10 @@
                 "label": "After Turn",
                 "min": 1,
                 "max": 50,
-                "dependsOn": { "field": "triggerType", "value": "turn-count" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "turn-count"
+                }
               }
             },
             "triggerVariableName": {
@@ -3902,7 +5224,10 @@
               "description": "Variable name to check",
               "ui": {
                 "label": "Variable Name",
-                "dependsOn": { "field": "triggerType", "value": "variable" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "variable"
+                }
               }
             },
             "triggerVariableValue": {
@@ -3911,7 +5236,10 @@
               "description": "Expected variable value",
               "ui": {
                 "label": "Expected Value",
-                "dependsOn": { "field": "triggerType", "value": "variable" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "variable"
+                }
               }
             },
             "triggerDescription": {
@@ -3922,20 +5250,27 @@
                 "control": "textarea",
                 "rows": 2,
                 "label": "Condition",
-                "dependsOn": { "field": "triggerType", "value": "custom" }
+                "dependsOn": {
+                  "field": "triggerType",
+                  "value": "custom"
+                }
               }
             },
             "requiresVariable": {
               "type": "string",
               "required": false,
               "description": "Additional guard: only fire if this variable is set (enables chaining directions)",
-              "ui": { "label": "Requires Variable (optional)" }
+              "ui": {
+                "label": "Requires Variable (optional)"
+              }
             },
             "requiresVariableValue": {
               "type": "string",
               "required": false,
               "description": "Expected value (leave empty to just check existence)",
-              "ui": { "label": "Required Value" }
+              "ui": {
+                "label": "Required Value"
+              }
             },
             "actionType": {
               "type": "string",
@@ -3946,8 +5281,14 @@
                 "label": "Action",
                 "control": "select",
                 "options": [
-                  { "value": "steer", "label": "Steer Conversation" },
-                  { "value": "exit", "label": "Exit to Beat" }
+                  {
+                    "value": "steer",
+                    "label": "Steer Conversation"
+                  },
+                  {
+                    "value": "exit",
+                    "label": "Exit to Beat"
+                  }
                 ]
               }
             },
@@ -3959,7 +5300,10 @@
                 "control": "textarea",
                 "rows": 2,
                 "label": "Steering Instruction",
-                "dependsOn": { "field": "actionType", "value": "steer" }
+                "dependsOn": {
+                  "field": "actionType",
+                  "value": "steer"
+                }
               }
             },
             "actionExitTarget": {
@@ -3969,7 +5313,10 @@
               "description": "Target beat to exit to",
               "ui": {
                 "label": "Exit Target",
-                "dependsOn": { "field": "actionType", "value": "exit" }
+                "dependsOn": {
+                  "field": "actionType",
+                  "value": "exit"
+                }
               }
             },
             "actionExitMessage": {
@@ -3981,20 +5328,27 @@
                 "rows": 2,
                 "label": "NPC Exit Message (optional)",
                 "placeholder": "e.g. confirm the order enthusiastically",
-                "dependsOn": { "field": "actionType", "value": "exit" }
+                "dependsOn": {
+                  "field": "actionType",
+                  "value": "exit"
+                }
               }
             },
             "actionVariableName": {
               "type": "string",
               "required": false,
               "description": "Optionally set a variable when this direction triggers",
-              "ui": { "label": "Set Variable (optional)" }
+              "ui": {
+                "label": "Set Variable (optional)"
+              }
             },
             "actionVariableValue": {
               "type": "string",
               "required": false,
               "description": "Static value to set (leave empty to use AI extraction)",
-              "ui": { "label": "Variable Value (static)" }
+              "ui": {
+                "label": "Variable Value (static)"
+              }
             },
             "actionExtractionPrompt": {
               "type": "string",
@@ -4014,7 +5368,10 @@
               "description": "Only trigger once per conversation",
               "ui": {
                 "label": "Once only",
-                "dependsOn": { "field": "actionType", "value": "steer" }
+                "dependsOn": {
+                  "field": "actionType",
+                  "value": "steer"
+                }
               }
             }
           }
@@ -4080,9 +5437,24 @@
             "rows": 3,
             "label": "System Instructions"
           }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
-      "locations": ["text", "input"],
+      "locations": [
+        "text",
+        "input"
+      ],
       "locationMapping": {
         "text": "openingLine"
       },
@@ -4115,7 +5487,6 @@
       }
     }
   },
-
   "connectionTypes": {
     "single": {
       "description": "Beat has exactly one outgoing connection",
@@ -4138,7 +5509,6 @@
       "structure": null
     }
   },
-
   "validationRules": {
     "connections": {
       "singleConnection": "Beats with connectionType='single' must have exactly one connection",
@@ -4147,7 +5517,6 @@
       "noOrphans": "All beats except endScreen should have at least one outgoing connection"
     }
   },
-
   "exportFormat": {
     "connectionLocation": {
       "single": "Within <function> element as nested <connection>",
@@ -4159,17 +5528,18 @@
       "movementChoice": "<function kind='movementChoice'><choice text='Go left' target='beat_3' /></function>"
     }
   },
-
   "aiIntegration": {
     "enabled": true,
-    "providers": ["openai", "claude", "custom"],
+    "providers": [
+      "openai",
+      "claude",
+      "custom"
+    ],
     "contextAwareness": true
   },
-
   "clusterDefinitions": {
     "schema": "asaps-cluster-definitions-v1.0",
     "description": "Cluster container definitions for spatial story organization with embedded reference graphics",
-
     "customTypes": {
       "ContainerBeatPosition": {
         "description": "Position of beat within cluster container",
@@ -4184,7 +5554,6 @@
           "mapStyle": "ContainerBeatStyle?"
         }
       },
-
       "ContainerBeatStyle": {
         "description": "Visual styling for beat within container",
         "schema": {
@@ -4195,7 +5564,6 @@
         }
       }
     },
-
     "clusterTypes": {
       "spatial": {
         "displayName": "Spatial Cluster",
@@ -4239,7 +5607,6 @@
           }
         }
       },
-
       "organizational": {
         "displayName": "Organizational Cluster",
         "icon": "📂",

@@ -4367,6 +4367,7 @@ function App() {
       timeDisplayMode: beat.timeDisplayMode,
       timeDisplayText: beat.timeDisplayText,
       overrideCountdownMeter: beat.overrideCountdownMeter,
+      explainHuds: (beat as any).explainHuds,
       parameters: beat.getParameters?.() || {},
       connections: beat.connections?.map(conn => ({
         targetId: conn.targetId,

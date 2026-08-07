@@ -995,6 +995,15 @@ export const Inspector: React.FC<InspectorProps> = ({
       // New beat selected — duration starts in auto-track mode again.
       durationManualRef.current = false;
       const beatData = beat.toJSON();
+      // explainHuds lives on the Beat base class (top-level in toJSON), but the
+      // schema form reads values out of `parameters` — mirror it in so the
+      // checkbox reflects the saved state instead of always reading false.
+      if ((beatData as any).explainHuds !== undefined) {
+        (beatData as any).parameters = {
+          ...((beatData as any).parameters || {}),
+          explainHuds: (beatData as any).explainHuds,
+        };
+      }
 
       const connections = beat.getConnections ? beat.getConnections() : [];
       const uniqueConnections = Array.from(
@@ -1486,6 +1495,13 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.updateParameters(parameters);
     }
 
+    // Cross-cutting HUD-explanation flag: it lives on the Beat base class, so
+    // no subclass's updateParameters() picks it up — assign it directly, the
+    // same way handleSave does for the other shared fields.
+    if (parametersForUpdate && 'explainHuds' in parametersForUpdate) {
+      beat.explainHuds = parametersForUpdate.explainHuds || undefined;
+    }
+
     // Handle connections
     // Most beat types rebuild connections from parameters in updateParameters().
     // For simple beats (single target, conditional), we set connections from local state.
@@ -1543,6 +1559,11 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.notes = localBeat.notes;
       beat.speaker = localBeat.speaker || '';
       beat.showSpeaker = localBeat.showSpeaker ?? undefined;
+      // Cross-cutting HUD-explanation flag. Like showSpeaker it lives on the
+      // Beat base class rather than in each subclass's updateParameters, so
+      // it's assigned here with the other shared fields.
+      beat.explainHuds = ((localBeat as any).explainHuds
+        ?? (localBeat.parameters as any)?.explainHuds) || undefined;
       // State requirements (gate the beat behind prior story state)
       beat.requires = (localBeat.requires && localBeat.requires.length > 0)
         ? localBeat.requires

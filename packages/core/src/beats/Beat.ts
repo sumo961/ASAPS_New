@@ -79,6 +79,15 @@ export abstract class Beat {
   public timeDisplayText?: string; // Override Timer HUD text for this beat (manual mode)
   public overrideCountdownMeter?: boolean; // Override default countdown meter visibility on this beat
   /**
+   * Annotate the screen HUDs when this beat is entered — the "overlay" form of
+   * the explanation system (the standalone `explanation` beat is the other).
+   * The host draws callouts over the real, packed HUD positions and makes the
+   * beat inert until acknowledged, so the interactor can't click past the
+   * explanation. Cross-cutting like timeDisplayMode / overrideCountdownMeter:
+   * any beat type can carry it, so it lives on the base class.
+   */
+  public explainHuds?: boolean;
+  /**
    * Level-2 analyzer annotation. Optional list of state requirements the path
    * analyzer will check when simulating. Not enforced by the engine.
    */
@@ -113,6 +122,7 @@ export abstract class Beat {
     this.timeDisplayMode = (config as any).timeDisplayMode || (config.parameters as any)?.timeDisplayMode;
     this.timeDisplayText = (config as any).timeDisplayText || (config.parameters as any)?.timeDisplayText;
     this.overrideCountdownMeter = (config as any).overrideCountdownMeter || (config.parameters as any)?.overrideCountdownMeter;
+    this.explainHuds = (config as any).explainHuds ?? (config.parameters as any)?.explainHuds;
     this.requires = (config as any).requires || (config.parameters as any)?.requires;
     this.requiresMode = (config as any).requiresMode
       || (config.parameters as any)?.requiresMode
@@ -650,6 +660,7 @@ export abstract class Beat {
       timeDisplayMode: this.timeDisplayMode,
       timeDisplayText: this.timeDisplayText,
       overrideCountdownMeter: this.overrideCountdownMeter,
+      explainHuds: this.explainHuds,
       // Persist state requirements as a top-level field (the constructor also
       // accepts them nested under parameters for backwards compatibility).
       ...(this.requires && this.requires.length > 0 ? { requires: this.requires } : {}),

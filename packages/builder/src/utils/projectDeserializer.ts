@@ -462,6 +462,10 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         timeDisplayMode: beatData.timeDisplayMode,
         timeDisplayText: beatData.timeDisplayText,
         overrideCountdownMeter: beatData.overrideCountdownMeter,
+        // HUD explanation overlay. Accept both top-level (how Beat.toJSON
+        // persists it) and nested-in-parameters (how the inspector's schema
+        // form writes it) so it survives the save → load round-trip.
+        explainHuds: beatData.explainHuds ?? beatData.parameters?.explainHuds,
         // State requirements (Level-2 authoring). Accept both top-level and
         // nested-in-parameters placements for forward/backwards compatibility.
         requires: beatData.requires ?? beatData.parameters?.requires,

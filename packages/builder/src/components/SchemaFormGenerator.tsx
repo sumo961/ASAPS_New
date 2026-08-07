@@ -285,7 +285,12 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
       ? (v: any) => onBeatPropertyChange(paramName, v)
       : (v: any) => onParameterChange(paramName, v);
     const isRequired = paramDef.required ?? false;
-    const label = paramName.charAt(0).toUpperCase() + paramName.slice(1).replace(/([A-Z])/g, ' $1');
+    // Honour the schema's own label when it declares one — deriving from the
+    // param name mangles acronyms ("explainHuds" → "Explain Huds") and ignores
+    // wording the schema author chose deliberately. Special-cased controls
+    // already read ui.label; the generic path silently didn't.
+    const label = paramDef.ui?.label
+      || (paramName.charAt(0).toUpperCase() + paramName.slice(1).replace(/([A-Z])/g, ' $1'));
 
     // Speaker visibility - tri-state select (default / show / hide)
     // Checked before the type switch since showSpeaker is type "boolean" but needs custom rendering

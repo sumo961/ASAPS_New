@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -285,6 +285,12 @@ export const PreviewWindow: React.FC = () => {
   const [endedNotice, setEndedNotice] = useState<string | null>(null);
   const stopRequestedRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
+  /* HUD explanation (overlay trigger). Beats carrying `explainHuds` annotate
+     the live HUDs on entry and are held INERT until acknowledged, so the
+     interactor can't click past the explanation. Acknowledged beats are
+     remembered for the playthrough — a tutorial that re-fires every visit
+     becomes the nuisance it was meant to prevent. */
+  const [explainAcknowledged, setExplainAcknowledged] = useState<Record<string, boolean>>({});
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [fitScale, setFitScale] = useState(1);
@@ -329,6 +335,11 @@ export const PreviewWindow: React.FC = () => {
   const [pendingInputTextBeats, setPendingInputTextBeats] = useState<InputTextBeatInfo[]>([]);
   const [pendingPreset, setPendingPreset] = useState<StatePreset | null>(null);
   const [showDebugPanel, setShowDebugPanel] = useState(true);
+  // True while an explainHuds beat is showing its callouts unacknowledged.
+  const explainOverlayActive = !!(
+    currentBeat && (currentBeat as any).explainHuds && !explainAcknowledged[currentBeat.id]
+  );
+
   const [debugInfo, setDebugInfo] = useState<{
     visitedBeats?: string[];
     /** Beats injected by the start-state preset (mid-story start), NOT
@@ -342,6 +353,20 @@ export const PreviewWindow: React.FC = () => {
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  /* Hold the beat inert while its HUD explanation is up. `inert` blocks
+     pointer clicks, keyboard/Tab focus AND screen-reader traversal in one
+     attribute — no per-beat plumbing, and the screen stays fully legible
+     (no dimming scrim fighting the thing we're asking them to look at).
+     The callout layer sits outside this subtree, so its acknowledge button
+     stays live. */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (explainOverlayActive) el.setAttribute('inert', '');
+    else el.removeAttribute('inert');
+    return () => { el.removeAttribute('inert'); };
+  }, [explainOverlayActive]);
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ReactRenderer | null>(null);
   const engineRef = useRef<StoryEngine | null>(null);
@@ -2732,10 +2757,9 @@ export const PreviewWindow: React.FC = () => {
                 if (beatSuppressesScreenHuds(currentBeat?.type, {
                   showOnTitleScreen: (previewDataRef.current?.settings?.hudOverlays as any)?.showOnTitleScreen,
                 })) return null;
-                const chars = previewDataRef.current?.characters;
+                const chars = previewDataRef.current?.characters || [];
                 const palette = previewDataRef.current?.emotionPalette;
                 const assetsList = previewDataRef.current?.assets || [];
-                if (!chars) return null;
                 // Just touch debugInfo so the linter / React knows we
                 // depend on it for re-renders. Read is cheap.
                 void debugInfo;
@@ -2868,6 +2892,17 @@ export const PreviewWindow: React.FC = () => {
                 }
                 const place = placementMap(layoutScreenHuds(boxes, stageDim));
 
+                /* HUD explanation — one mechanism, two triggers. The standalone
+                   `explanation` beat annotates behind its own text screen (its
+                   continue button advances, so no competing acknowledge); the
+                   overlay trigger annotates any beat and gates it. Callouts are
+                   positioned from `place` above, so they can never drift from
+                   the HUDs they point at. */
+                const explainBeat: any = currentBeat;
+                const isExplanationBeat = explainBeat?.type === 'explanation';
+                const showCallouts = isExplanationBeat || explainOverlayActive;
+                const theme: any = previewDataRef.current?.settings?.theme;
+
                 return (
                   <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
                     {Object.entries(railGroups).map(([corner, entries]) => (
@@ -2899,6 +2934,23 @@ export const PreviewWindow: React.FC = () => {
                         isVisible={true}
                       />
                     ))}
+                    {showCallouts && (
+                      <HudExplanationLayer
+                        boxes={boxes}
+                        placements={place}
+                        stage={stageDim}
+                        captions={explainBeat?.resolvedCaptions ?? explainBeat?.captions}
+                        skipKinds={explainBeat?.skipKinds}
+                        onAcknowledge={explainOverlayActive
+                          ? () => setExplainAcknowledged((m) => ({ ...m, [explainBeat.id]: true }))
+                          : undefined}
+                        accentColor={theme?.button?.backgroundColor}
+                        accentTextColor={theme?.button?.textColor}
+                        textColor={theme?.textBox?.textColor}
+                        backgroundColor={theme?.textBox?.backgroundColor}
+                        fontFamily={theme?.fonts?.textFont}
+                      />
+                    )}
                   </div>
                 );
               })()}
