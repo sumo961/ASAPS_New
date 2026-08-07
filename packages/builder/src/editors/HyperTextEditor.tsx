@@ -134,7 +134,8 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
       word: selection.word,
       targetBeatId: '',
       style: {
-        color: '#0066cc',
+        // No baked color — the renderer resolves links to the theme accent
+        // (button color) by default so they read on any theme.
         underline: true
       }
     };

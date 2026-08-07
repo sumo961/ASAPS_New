@@ -2285,7 +2285,9 @@ const HyperTextBody: React.FC<{
     const linkStyle: React.CSSProperties = {
       color: isHovered && link.style?.hoverColor
         ? link.style.hoverColor
-        : (link.style?.color || accentLink),
+        : ((link.style?.color && !['#0066cc', '#3b82f6'].includes(link.style.color.toLowerCase()))
+            ? link.style.color
+            : accentLink),
       textDecoration: link.style?.underline !== false ? 'underline' : 'none',
       fontWeight: link.style?.bold ? 'bold' : 'inherit',
       cursor: 'pointer',

@@ -146,11 +146,14 @@ export function calculateSmartTextBoxDimensions(
     // sensible floor), re-flow, and shrink height to the wrapped lines.
     // Keep the box centered on its authored center (xOffset shifts left).
     const longestLine = Math.max(1, ...content.split('\n').map((l) => l.length));
-    const naturalWidth = Math.ceil(longestLine * charWidth + contentPadding + inlineContentWidth);
-    const widthFloor = Math.min(location.width, Math.max(120, fontSize * 6));
+    // 1.18 headroom: the 0.58 char-width ratio undershoots wide/bold faces
+    // (Georgia bold especially), so a tight hug would wrap a word that fit
+    // before. Better a touch wide than a mid-word break.
+    const naturalWidth = Math.ceil(longestLine * charWidth * 1.18 + contentPadding + inlineContentWidth + 16);
+    const widthFloor = Math.min(location.width, Math.max(140, fontSize * 6));
     const huggedWidth = Math.max(widthFloor, Math.min(location.width, naturalWidth));
 
-    const charsPerHugLine = Math.max(1, Math.floor((huggedWidth - contentPadding - inlineContentWidth) / charWidth));
+    const charsPerHugLine = Math.max(1, Math.floor((huggedWidth - contentPadding - inlineContentWidth) / (charWidth * 1.18)));
     const hugLines = content.split('\n').reduce(
       (acc, l) => acc + Math.max(1, Math.ceil((l.length || 1) / charsPerHugLine)), 0);
     const huggedHeight = Math.min(location.height, Math.ceil(hugLines * lineHeight + contentPadding));
@@ -3897,7 +3900,14 @@ const HyperTextContent: React.FC<{
     // Add the clickable link
     const isHovered = hoveredLink === link.word;
     const linkStyle: React.CSSProperties = {
-      color: isHovered && link.style?.hoverColor ? link.style.hoverColor : (link.style?.color || themeLinkColor || '#3b82f6'),
+      // The app's default link blues (#0066cc from the editor, #3b82f6
+      // legacy) are treated as "use the theme accent" so links read on the
+      // dark stage; an author-picked non-default color still wins.
+      color: isHovered && link.style?.hoverColor
+        ? link.style.hoverColor
+        : ((link.style?.color && !['#0066cc', '#3b82f6'].includes(link.style.color.toLowerCase()))
+            ? link.style.color
+            : (themeLinkColor || '#0066cc')),
       textDecoration: link.style?.underline !== false ? 'underline' : 'none',
       fontWeight: link.style?.bold ? 'bold' : 'inherit',
       cursor: 'pointer',
