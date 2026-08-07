@@ -26,6 +26,7 @@ export {
 } from './components/CharacterMeterFrame';
 export { CharacterInventoryFrame, type InventoryItemData } from './components/CharacterInventoryFrame';
 export { layoutScreenHuds, placementMap, type HudBox, type HudPlacement, type HudCorner, type HudKind } from './utils/hudLayout';
+export { beatSuppressesScreenHuds, HUD_FREE_BEAT_TYPES, type HudVisibilityOptions } from './utils/hudVisibility';
 
 // Export from components/index for cleaner resolution
 export {

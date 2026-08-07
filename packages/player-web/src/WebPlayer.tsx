@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -379,6 +379,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           // Counter HUD (screen-docked meter frames) lives in the same
           // overlay — re-render it when counters move.
           context.on('counterChanged', bumpHud);
+          // Beat changes flip HUD suppression (title screens are chrome-free),
+          // so the overlay must repaint on every transition too.
+          context.on('beatChanged', bumpHud);
 
           // Set up global settings for layout and HUD
           const gs = player.getGlobalSettings?.() || (player as any).globalSettings;
@@ -434,6 +437,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           if (hudOverlays?.countdownMeter) {
             (renderer as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
           }
+          (renderer as any).setShowHudsOnTitleScreen?.(!!(hudOverlays as any)?.showOnTitleScreen);
           const ftConfig = hudOverlays?.fictionalTime;
           if (ftConfig?.enabled) {
             (renderer as any)._fictionalTimeConfig = ftConfig;
@@ -728,6 +732,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const ctx = player?.getEngine()?.getContext();
     const story = player?.getEngine()?.getStory();
     if (!ctx || !story || !stageDims) return null;
+    // Chrome-free beats (title screens by default) show no screen HUDs at all —
+    // same rule the renderer applies to its own timer / countdown.
+    const beatNow = (story as any).getBeat?.(ctx.getCurrentBeatId?.());
+    const gsNow: any = player?.getGlobalSettings?.() || (player as any)?.globalSettings;
+    if (beatSuppressesScreenHuds(beatNow?.type, {
+      showOnTitleScreen: gsNow?.hudOverlays?.showOnTitleScreen,
+    })) return null;
     const chars = (story as any).getCharacters?.() || [];
     const palette = (story as any).getEmotionPalette?.();
     const assetsList = (story as any).getAssets?.() || [];

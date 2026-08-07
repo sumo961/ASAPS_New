@@ -109,6 +109,9 @@ interface GlobalSettings {
     sourceLanguage: string;  // BCP 47 code, default 'en'
   };
   hudOverlays?: {
+    /** Show HUD chrome on the title screen too. Off by default — the start
+     *  screen is distraction-free (see renderer utils/hudVisibility). */
+    showOnTitleScreen?: boolean;
     timerHud?: {
       enabled: boolean;
       mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects
@@ -2222,6 +2225,28 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             <div className="space-y-6">
               <h3 className="font-medium text-gray-700 mb-3">HUD Overlays</h3>
               <p className="text-xs text-gray-500">Configure persistent HUD elements that overlay the stage during playback.</p>
+
+              {/* Title-screen chrome. HUDs are hidden on the title screen by
+                  default — the timer hasn't started and no counter or mood has
+                  moved yet, so the chrome only competes with the title. */}
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={settings.hudOverlays?.showOnTitleScreen || false}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    hudOverlays: { ...settings.hudOverlays, showOnTitleScreen: e.target.checked },
+                  })}
+                />
+                <span>
+                  Show HUDs on the title screen
+                  <span className="block text-xs text-gray-500">
+                    Off by default for a distraction-free start. Turn on if a HUD should be
+                    visible from the first frame — e.g. a countdown that is already running.
+                  </span>
+                </span>
+              </label>
 
               {/* Timer HUD Section */}
               <div className="border rounded-lg p-4 space-y-3">

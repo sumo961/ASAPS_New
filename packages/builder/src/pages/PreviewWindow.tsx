@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -805,6 +805,7 @@ export const PreviewWindow: React.FC = () => {
       if (hudOverlays?.countdownMeter) {
         (reactRenderer as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
       }
+      (reactRenderer as any).setShowHudsOnTitleScreen?.(!!(hudOverlays as any)?.showOnTitleScreen);
       if (hudOverlays) {
         console.log('[PreviewWindow] HUD overlay configs attached to renderer');
       }
@@ -1397,6 +1398,7 @@ export const PreviewWindow: React.FC = () => {
       if (hudOverlays?.countdownMeter) {
         (rendererRef.current as any).setCountdownMeterConfig?.(hudOverlays.countdownMeter);
       }
+      (rendererRef.current as any).setShowHudsOnTitleScreen?.(!!(hudOverlays as any)?.showOnTitleScreen);
 
       // Initialize fictional time from global settings
       if (hudOverlays?.fictionalTime?.enabled) {
@@ -2724,6 +2726,12 @@ export const PreviewWindow: React.FC = () => {
               {(() => {
                 const ctx = engineRef.current?.getContext();
                 if (!ctx) return null;
+                // Chrome-free beats (title screens by default) show no screen
+                // HUDs at all — same rule the renderer applies to its own
+                // timer / countdown, so the start screen is uniformly clean.
+                if (beatSuppressesScreenHuds(currentBeat?.type, {
+                  showOnTitleScreen: (previewDataRef.current?.settings?.hudOverlays as any)?.showOnTitleScreen,
+                })) return null;
                 const chars = previewDataRef.current?.characters;
                 const palette = previewDataRef.current?.emotionPalette;
                 const assetsList = previewDataRef.current?.assets || [];

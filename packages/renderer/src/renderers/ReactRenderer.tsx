@@ -13,6 +13,7 @@ import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
 import { HudOverlaysLayer } from '../components/HudOverlaysLayer';
+import { beatSuppressesScreenHuds } from '../utils/hudVisibility';
 import { SpatialFlowView } from '../components/SpatialFlowView';
 import { shouldUseSlotMode, getSlotSpec, shouldUseSpatialMode, getSpatialSpec } from '../utils/slotLayout';
 import type { SlotSpec } from '../utils/slotLayout';
@@ -960,6 +961,11 @@ export class ReactRenderer extends BaseRenderer {
   protected countdownMeterConfig: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined;  // Countdown meter HUD config
   protected countdownMeterValue: { value: number; min: number; max: number } | undefined;  // Current countdown meter value
   protected overrideCountdownMeter: boolean = false;  // Per-beat flag to override default countdown meter visibility
+  // Screen HUDs are suppressed on the beat being painted (title screens are
+  // chrome-free by default — see utils/hudVisibility). Recomputed at every
+  // render entry point so it can't go stale across a beat transition.
+  protected hudSuppressed: boolean = false;
+  protected showHudsOnTitleScreen: boolean = false;  // Author opt-in (hudOverlays.showOnTitleScreen)
   protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
@@ -1126,12 +1132,13 @@ export class ReactRenderer extends BaseRenderer {
     // path (detectable by its timerHudConfig prop) — every other path
     // (slot, spatial, chat, renderChoices, loading …) historically mounted
     // none, so enabled HUDs silently never rendered on responsive beats.
+    // Chrome-free beats (title screens by default) paint no HUD layer at all.
     const rendersOwnHud = !!(
       component &&
       component.props &&
       'timerHudConfig' in (component.props as Record<string, unknown>)
     );
-    const content = rendersOwnHud ? component : (
+    const content = (rendersOwnHud || this.hudSuppressed) ? component : (
       <>
         {component}
         <HudOverlaysLayer
@@ -1450,6 +1457,7 @@ export class ReactRenderer extends BaseRenderer {
     npcText?: string;
     locations?: Location[];
   }): Promise<string> {
+    this.applyHudSuppression(null);
     return new Promise<string>(resolve => {
       // Render the chat view with an inline text input instead of choice buttons
       const placeholder = options.placeholder || uiString('typeYourResponse');
@@ -2208,6 +2216,35 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * Author opt-in for HUD chrome on the title screen (hudOverlays
+   * .showOnTitleScreen). Off by default — see utils/hudVisibility.
+   */
+  setShowHudsOnTitleScreen(show: boolean): void {
+    this.showHudsOnTitleScreen = !!show;
+  }
+
+  /**
+   * Whether the beat currently being painted suppresses screen HUDs.
+   * Hosts (PreviewWindow / WebPlayer) read this so their character frames
+   * (mood / meter / inventory) disappear on the same beats the renderer's
+   * own timer / countdown do — one rule, uniformly applied.
+   */
+  isScreenHudSuppressed(): boolean {
+    return this.hudSuppressed;
+  }
+
+  /**
+   * Recompute HUD suppression for the beat about to be painted. Called from
+   * every render entry point that reaches renderComponent, so the flag can
+   * never go stale across a beat transition.
+   */
+  private applyHudSuppression(beatType?: string | null): void {
+    this.hudSuppressed = beatSuppressesScreenHuds(beatType, {
+      showOnTitleScreen: this.showHudsOnTitleScreen,
+    });
+  }
+
+  /**
    * Set the current countdown meter value
    */
   setCountdownMeterValue(value: { value: number; min: number; max: number } | undefined): void {
@@ -2299,6 +2336,9 @@ export class ReactRenderer extends BaseRenderer {
      */
     authorPositioned: boolean = true
   ): Promise<string> {
+    // Chrome-free beats (title screens by default) suppress every screen HUD.
+    // Recomputed here rather than remembered, so it can't survive a beat change.
+    this.applyHudSuppression(beatType);
     // Defensive normalisation: builder VisualElement locations (e.g. those
     // baked by SchemaLocationInitializer) carry the element `type` field
     // rather than the renderer's canonical `kind`. The visual editor converts
@@ -2542,12 +2582,12 @@ export class ReactRenderer extends BaseRenderer {
               onSubscribeTimerState={(listener) => this.subscribeToTimerState(listener)}
               beatType={beatType}
               beatId={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id}
-              timerHudConfig={this.timerHudConfig}
+              timerHudConfig={this.hudSuppressed ? undefined : this.timerHudConfig}
               timerHudOverrideText={this.timerHudOverrideText}
               timerHudState={this.timerHudState}
               onSubscribeTimerHudState={(listener) => this.subscribeToTimerHudState(listener)}
               onSubscribeTimerHudOverrideText={(listener) => this.subscribeToTimerHudOverrideText(listener)}
-              countdownMeterConfig={this.countdownMeterConfig}
+              countdownMeterConfig={this.hudSuppressed ? undefined : this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
               overrideCountdownMeter={this.overrideCountdownMeter}
               fictionalTimeText={this.fictionalTimeText}
@@ -2818,6 +2858,7 @@ export class ReactRenderer extends BaseRenderer {
     choices: Array<{ id: string; text: string }>,
     showTypingIndicator: boolean
   ): void {
+    this.applyHudSuppression(null);
     // Determine background — used by both the bg layer below and the
     // chat view's transparent fallback.
     const defaultGradient = 'linear-gradient(to bottom, #1e3a8a, #1e40af)';
@@ -2868,6 +2909,7 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   async renderChoices(choices: { id: string; text: string; isExit?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+    this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -3217,6 +3259,7 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   async renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+    this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -3372,6 +3415,7 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   async renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+    this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
@@ -4110,6 +4154,7 @@ export class ReactRenderer extends BaseRenderer {
     promptDisplay?: 'static' | 'pinned';
     locations?: any[];
   }): Promise<string> {
+    this.applyHudSuppression(null);
     // Resolve panorama URL from asset ID if not already a URL
     const panoramaAssetId = this.getState('panoramaAssetId');
     const resolvedUrl = panoramaUrl || this.getState('panoramaAssetUrl') || this.resolveAssetUrl(panoramaAssetId) || '';
@@ -4233,6 +4278,7 @@ export class ReactRenderer extends BaseRenderer {
   }, _locations?: Location[]): Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }> {
     const sensorService = this.getState('sensorService');
     if (options.text) {
+    this.applyHudSuppression(null);
       this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
     }
     return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
@@ -4275,6 +4321,7 @@ export class ReactRenderer extends BaseRenderer {
   }): Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }> {
     const sensorService = this.getState('sensorService');
     if (options.text) {
+    this.applyHudSuppression(null);
       this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
     }
     const floorPlanUrl = options.venue?.floorPlanAssetId
