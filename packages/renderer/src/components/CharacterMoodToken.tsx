@@ -281,10 +281,15 @@ export interface MoodRailProps {
   containerDimensions: { width: number; height: number };
   fontScale?: number;
   backgroundOpacity?: number;
+  /** Distance (px) to push the rail inward from its corner edge so it stacks
+   *  clear of other HUDs sharing the corner. Assigned by the unified HUD
+   *  layout authority (layoutScreenHuds); 0 means flush to the edge. */
+  offsetY?: number;
 }
 
 export const MoodRail: React.FC<MoodRailProps> = ({
   entries, screenPosition, containerDimensions, fontScale = 1, backgroundOpacity = 0.95,
+  offsetY = 0,
 }) => {
   if (entries.length === 0) return null;
   const tokenSize = Math.max(22, Math.round(30 * fontScale));
@@ -295,7 +300,7 @@ export const MoodRail: React.FC<MoodRailProps> = ({
   return (
     <div style={{
       position: 'absolute',
-      [top ? 'top' : 'bottom']: margin,
+      [top ? 'top' : 'bottom']: margin + Math.abs(offsetY),
       [left ? 'left' : 'right']: margin,
       // wrap toward the interior; cap so the rail can't span the whole stage
       maxWidth: Math.max(120, containerDimensions.width - margin * 2),

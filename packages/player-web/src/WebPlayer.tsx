@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -743,18 +743,28 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         }}
       >
         {(() => {
-          // Collect screen-docked, enabled mood frames (variant-gated) into
-          // a shared list, then: token-style ones are grouped by corner into
-          // a MoodRail (no overlap), disc-style ones stay individual cards.
+          // ---- Unified screen-HUD layout (single authority) ----
+          // Mirrors PreviewWindow: global timer/countdown obstacles (drawn by
+          // the renderer, only reserved here), character mood rails, meter and
+          // inventory frames are packed per corner by layoutScreenHuds so
+          // nothing overlaps across kinds.
+          const toCorner = (s?: string): HudCorner =>
+            ((s || 'top-left').replace('screen-', '') as HudCorner);
+          const hasExplicitVariant = (c: any): boolean => {
+            if (c.variants && c.variants.length > 0) {
+              return !!(ctx as any).hasExplicitlySetVariant?.(c.id);
+            }
+            return true;
+          };
+
+          // Token-style mood HUDs group into a per-corner rail; disc-style ones
+          // stay individual self-anchored cards (not packed).
           const railGroups: Record<string, MoodRailEntry[]> = {};
           const discFrames: React.ReactNode[] = [];
           chars.forEach((c: any) => {
             const mf = c?.moodFrame;
             if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
-            if (c.variants && c.variants.length > 0) {
-              const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-              if (!explicit) return;
-            }
+            if (!hasExplicitVariant(c)) return;
             const merged = (ctx as any).getMergedCharacter?.(c.id) || c;
             const mood = ctx.getCharacterMood(c.id);
             const portraitAsset = merged.portrait?.assetId
@@ -781,38 +791,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
               });
             }
           });
-          return (
-            <>
-              {Object.entries(railGroups).map(([corner, entries]) => (
-                <MoodRail key={`mood-rail-${corner}`} entries={entries}
-                  screenPosition={corner as any} containerDimensions={stageDims} />
-              ))}
-              {discFrames}
-            </>
-          );
-        })()}
-        {/* Counter (meter-frame) HUD — same hoist as the mood pad:
-            screen-docked frames render at the top level so they show in
-            both layout modes and regardless of whether the character is
-            placed on the current beat. Values update via the counterChanged
-            hudTick bump. */}
-{(() => {
-          /* Stack same-corner screen frames (meters + inventories) instead
-             of overlapping — mirrors the PreviewWindow hoist. */
-          const cornerOffsets: Record<string, number> = {};
-          const bump = (corner: string, estHeight: number): number => {
-            const cur = cornerOffsets[corner] ?? 0;
-            cornerOffsets[corner] = cur + estHeight + 8;
-            return corner.includes('bottom') ? -cur : cur;
-          };
-          const nodes: React.ReactNode[] = [];
+
+          // Meter-frame descriptors.
+          const meterDescs: Array<{ c: any; counters: any[]; frame: any; corner: string; est: number }> = [];
           for (const c of chars as any[]) {
             const frame = c?.meterFrame;
             if (!frame || frame.dockMode !== 'screen') continue;
-            if (c.variants && c.variants.length > 0) {
-              const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-              if (!explicit) continue;
-            }
+            if (!hasExplicitVariant(c)) continue;
             const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
             if (visibleCounters.length === 0) continue;
             const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
@@ -827,55 +812,93 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
               numericFormat: counter.numericFormat || 'value',
               orientation: counter.levelMeterOrientation || 'horizontal',
             }));
-            const corner = frame.screenPosition ?? 'screen-top-left';
             const est = (frame.style?.padding ?? 8) * 2 +
               counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
               Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);
-            const dy = bump(corner, est);
-            nodes.push(
-              <CharacterMeterFrame
-                key={`meter-hud-${c.id}`}
-                counters={counters}
-                config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
-                characterPosition={{ x: 0, y: 0 }}
-                characterDimensions={{ width: 0, height: 0 }}
-                containerDimensions={stageDims}
-              />
-            );
+            meterDescs.push({ c, counters, frame, corner: frame.screenPosition ?? 'screen-top-left', est });
           }
+
+          // Inventory-frame descriptors.
+          const invDescs: Array<{ c: any; items: any[]; frame: any; corner: string; est: number }> = [];
           for (const c of chars as any[]) {
             const frame = c?.inventoryFrame;
             if (!frame || frame.dockMode !== 'screen') continue;
             const items = (c.inventory || []).map((it: any) => ({
-              id: it.id,
-              name: it.name,
-              displayName: it.displayName || it.name,
-              description: it.description || '',
-              icon: it.icon || '',
-              quantity: it.quantity ?? 1,
-              category: it.category || '',
+              id: it.id, name: it.name, displayName: it.displayName || it.name,
+              description: it.description || '', icon: it.icon || '',
+              quantity: it.quantity ?? 1, category: it.category || '',
             }));
             if (items.length === 0) continue;
-            const corner = frame.screenPosition ?? 'screen-bottom-right';
             const cols = Math.max(1, frame.columns ?? 4);
             const rows = Math.ceil(items.length / cols);
             const est = (frame.style?.padding ?? 10) * 2 + 20 +
               rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
               Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
-            const dy = bump(corner, est);
-            nodes.push(
-              <CharacterInventoryFrame
-                key={`inventory-hud-${c.id}`}
-                items={items}
-                config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
-                characterPosition={{ x: 0, y: 0 }}
-                characterDimensions={{ width: 0, height: 0 }}
-                containerDimensions={stageDims}
-                isVisible={true}
-              />
-            );
+            invDescs.push({ c, items, frame, corner: frame.screenPosition ?? 'screen-bottom-right', est });
           }
-          return nodes;
+
+          // Pack. Global timer/countdown HUDs reserve their corners as obstacles.
+          const boxes: HudBox[] = [];
+          const gs: any = playerRef.current?.getGlobalSettings?.() || (playerRef.current as any)?.globalSettings;
+          const hud = gs?.hudOverlays;
+          if (hud?.timerHud?.enabled) {
+            boxes.push({ id: '__timer', corner: toCorner(hud.timerHud.position),
+              width: 160, height: (hud.timerHud.fontSize ?? 18) + (hud.timerHud.padding ?? 8) * 2 + 8,
+              kind: 'timer' });
+          }
+          if (hud?.countdownMeter?.enabled) {
+            boxes.push({ id: '__countdown', corner: toCorner(hud.countdownMeter.position),
+              width: Math.round(stageDims.width * ((hud.countdownMeter.meterWidth ?? 60) / 100)),
+              height: (hud.countdownMeter.meterHeight ?? 12) + 26, kind: 'countdown' });
+          }
+          for (const d of meterDescs) {
+            boxes.push({ id: `meter-${d.c.id}`, corner: toCorner(d.corner),
+              width: d.frame.width ?? 160, height: d.est, kind: 'meter' });
+          }
+          for (const d of invDescs) {
+            boxes.push({ id: `inv-${d.c.id}`, corner: toCorner(d.corner),
+              width: (d.frame.itemSize ?? 36) * Math.max(1, d.frame.columns ?? 4) + 24,
+              height: d.est, kind: 'inventory' });
+          }
+          for (const corner of Object.keys(railGroups)) {
+            boxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner),
+              width: 200, height: 54, kind: 'mood' });
+          }
+          const place = placementMap(layoutScreenHuds(boxes, stageDims));
+
+          return (
+            <>
+              {Object.entries(railGroups).map(([corner, entries]) => (
+                <MoodRail key={`mood-rail-${corner}`} entries={entries}
+                  screenPosition={corner as any} containerDimensions={stageDims}
+                  offsetY={place.get(`mood-rail-${corner}`)?.offsetY ?? 0} />
+              ))}
+              {discFrames}
+              {meterDescs.map((d) => (
+                <CharacterMeterFrame
+                  key={`meter-hud-${d.c.id}`}
+                  counters={d.counters}
+                  config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
+                    y: (d.frame.offset?.y ?? 0) + (place.get(`meter-${d.c.id}`)?.offsetY ?? 0) } }}
+                  characterPosition={{ x: 0, y: 0 }}
+                  characterDimensions={{ width: 0, height: 0 }}
+                  containerDimensions={stageDims}
+                />
+              ))}
+              {invDescs.map((d) => (
+                <CharacterInventoryFrame
+                  key={`inventory-hud-${d.c.id}`}
+                  items={d.items}
+                  config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
+                    y: (d.frame.offset?.y ?? 0) + (place.get(`inv-${d.c.id}`)?.offsetY ?? 0) } }}
+                  characterPosition={{ x: 0, y: 0 }}
+                  characterDimensions={{ width: 0, height: 0 }}
+                  containerDimensions={stageDims}
+                  isVisible={true}
+                />
+              ))}
+            </>
+          );
         })()}
       </div>
     );

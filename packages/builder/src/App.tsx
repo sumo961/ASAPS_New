@@ -6681,6 +6681,7 @@ function App() {
                 emotionPalette={emotionPalette}
                 onEmotionPaletteChange={setEmotionPalette}
                 onGenerateWithAI={() => setDevelopCharSession({ seed: {}, askFirst: true })}
+                hudOverlays={(globalSettings as any).hudOverlays}
               />
             </div>
           </div>

@@ -40,6 +40,7 @@ import {
   describeStance,
 } from '../../services/prompts/interpersonalStance';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
+import { HudLayoutPreview, type HudOverlaySettings } from './HudLayoutPreview';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 
@@ -77,6 +78,10 @@ interface CharacterEditorProps {
    *  manager, jump straight to the Affect tab and scroll the requested
    *  variant into view. */
   focusVariantId?: string;
+  /** Global-settings HUD overlays (timer / countdown). Drives the HUD-layout
+   *  preview so screen-docked character frames are shown flowing clear of the
+   *  global chrome. */
+  hudOverlays?: HudOverlaySettings;
 }
 
 export const CharacterEditor: React.FC<CharacterEditorProps> = ({
@@ -87,6 +92,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   onAssetAdd,
   emotionPalette,
   focusVariantId,
+  hudOverlays,
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
@@ -1003,6 +1009,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     </button>
                   ))}
                 </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">HUD layout preview</label>
+                  <HudLayoutPreview character={editedCharacter} hudOverlays={hudOverlays} />
+                </div>
               </div>
             )}
 
@@ -1512,6 +1522,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       {label}
                     </button>
                   ))}
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">HUD layout preview</label>
+                  <HudLayoutPreview character={editedCharacter} hudOverlays={hudOverlays} />
                 </div>
               </div>
             )}
@@ -3154,6 +3168,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     />
                     Show qualitative mood label below the disc (e.g. "sad, alert")
                   </label>
+                  {mf.dockMode === 'screen' && (
+                    <div className="pt-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">HUD layout preview</label>
+                      <HudLayoutPreview character={editedCharacter} hudOverlays={hudOverlays} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

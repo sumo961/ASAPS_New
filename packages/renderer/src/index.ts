@@ -25,6 +25,7 @@ export {
   type MeterCounterData,
 } from './components/CharacterMeterFrame';
 export { CharacterInventoryFrame, type InventoryItemData } from './components/CharacterInventoryFrame';
+export { layoutScreenHuds, placementMap, type HudBox, type HudPlacement, type HudCorner, type HudKind } from './utils/hudLayout';
 
 // Export from components/index for cleaner resolution
 export {

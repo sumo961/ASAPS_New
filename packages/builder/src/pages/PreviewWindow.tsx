@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -2732,19 +2732,30 @@ export const PreviewWindow: React.FC = () => {
                 // depend on it for re-renders. Read is cheap.
                 void debugInfo;
                 const stageDim = { width: STAGE_WIDTH, height: STAGE_HEIGHT };
-                // Token-style screen HUDs group into a per-corner MoodRail
-                // (no overlap when several characters are on screen); disc-
-                // style ones stay individual cards.
+                // ---- Unified screen-HUD layout (single authority) ----
+                // Every screen-docked HUD — global timer/countdown obstacles
+                // (drawn by the renderer, only reserved here), character mood
+                // rails, meter frames and inventory frames — is packed per
+                // corner by layoutScreenHuds so nothing overlaps across kinds.
+                // The same function drives the character-manager HUD preview.
+                const toCorner = (s?: string): HudCorner =>
+                  ((s || 'top-left').replace('screen-', '') as HudCorner);
+                const hasExplicitVariant = (c: any): boolean => {
+                  const variants = c.variants;
+                  if (variants && variants.length > 0) {
+                    return !!(ctx as any).hasExplicitlySetVariant?.(c.id);
+                  }
+                  return true;
+                };
+
+                // Token-style mood HUDs group into a per-corner rail; disc-style
+                // ones stay individual self-anchored cards (not packed).
                 const railGroups: Record<string, MoodRailEntry[]> = {};
                 const discFrames: React.ReactNode[] = [];
                 chars.forEach((c) => {
                   const mf: any = (c as any).moodFrame;
                   if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
-                  const variants = (c as any).variants;
-                  if (variants && variants.length > 0) {
-                    const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-                    if (!explicit) return;
-                  }
+                  if (!hasExplicitVariant(c)) return;
                   const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
                   const mood = ctx.getCharacterMood(c.id);
                   const portraitAsset = merged.portrait?.assetId
@@ -2771,104 +2782,115 @@ export const PreviewWindow: React.FC = () => {
                     });
                   }
                 });
+
+                // Meter-frame descriptors (screen-docked, one per character).
+                type MeterDesc = { c: any; counters: any[]; frame: any; corner: string; est: number };
+                const meterDescs: MeterDesc[] = [];
+                for (const c of chars) {
+                  const frame: any = (c as any).meterFrame;
+                  if (!frame || frame.dockMode !== 'screen') continue;
+                  if (!hasExplicitVariant(c)) continue;
+                  const visibleCounters = ((c as any).counters || []).filter((k: any) => k.visible);
+                  if (visibleCounters.length === 0) continue;
+                  const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
+                  const counters = visibleCounters.map((counter: any) => ({
+                    name: counter.name,
+                    displayName: counter.displayName,
+                    value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
+                    min: counter.min ?? 0,
+                    max: counter.max ?? 100,
+                    color: counter.color || '#3B82F6',
+                    showNumericValue: counter.showNumericValue ?? false,
+                    numericFormat: counter.numericFormat || 'value',
+                    orientation: counter.levelMeterOrientation || 'horizontal',
+                  }));
+                  const est = (frame.style?.padding ?? 8) * 2 +
+                    counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
+                    Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);
+                  meterDescs.push({ c, counters, frame, corner: frame.screenPosition ?? 'screen-top-left', est });
+                }
+
+                // Inventory-frame descriptors (screen-docked, one per character).
+                type InvDesc = { c: any; items: any[]; frame: any; corner: string; est: number };
+                const invDescs: InvDesc[] = [];
+                for (const c of chars) {
+                  const frame: any = (c as any).inventoryFrame;
+                  if (!frame || frame.dockMode !== 'screen') continue;
+                  const items = ((c as any).inventory || []).map((it: any) => ({
+                    id: it.id, name: it.name, displayName: it.displayName || it.name,
+                    description: it.description || '', icon: it.icon || '',
+                    quantity: it.quantity ?? 1, category: it.category || '',
+                  }));
+                  if (items.length === 0) continue;
+                  const cols = Math.max(1, frame.columns ?? 4);
+                  const rows = Math.ceil(items.length / cols);
+                  const est = (frame.style?.padding ?? 10) * 2 + 20 +
+                    rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
+                    Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
+                  invDescs.push({ c, items, frame, corner: frame.screenPosition ?? 'screen-bottom-right', est });
+                }
+
+                // Build the box list and pack it. Global timer/countdown HUDs
+                // (rendered by the renderer, not here) reserve their corners as
+                // obstacles so character frames flow clear of them.
+                const boxes: HudBox[] = [];
+                const hud: any = previewDataRef.current?.settings?.hudOverlays;
+                if (hud?.timerHud?.enabled) {
+                  boxes.push({ id: '__timer', corner: toCorner(hud.timerHud.position),
+                    width: 160, height: (hud.timerHud.fontSize ?? 18) + (hud.timerHud.padding ?? 8) * 2 + 8,
+                    kind: 'timer' });
+                }
+                if (hud?.countdownMeter?.enabled) {
+                  boxes.push({ id: '__countdown', corner: toCorner(hud.countdownMeter.position),
+                    width: Math.round(STAGE_WIDTH * ((hud.countdownMeter.meterWidth ?? 60) / 100)),
+                    height: (hud.countdownMeter.meterHeight ?? 12) + 26, kind: 'countdown' });
+                }
+                for (const d of meterDescs) {
+                  boxes.push({ id: `meter-${d.c.id}`, corner: toCorner(d.corner),
+                    width: d.frame.width ?? 160, height: d.est, kind: 'meter' });
+                }
+                for (const d of invDescs) {
+                  boxes.push({ id: `inv-${d.c.id}`, corner: toCorner(d.corner),
+                    width: (d.frame.itemSize ?? 36) * Math.max(1, d.frame.columns ?? 4) + 24,
+                    height: d.est, kind: 'inventory' });
+                }
+                for (const corner of Object.keys(railGroups)) {
+                  boxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner),
+                    width: 200, height: 54, kind: 'mood' });
+                }
+                const place = placementMap(layoutScreenHuds(boxes, stageDim));
+
                 return (
                   <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
                     {Object.entries(railGroups).map(([corner, entries]) => (
                       <MoodRail key={`mood-rail-${corner}`} entries={entries}
-                        screenPosition={corner as any} containerDimensions={stageDim} />
+                        screenPosition={corner as any} containerDimensions={stageDim}
+                        offsetY={place.get(`mood-rail-${corner}`)?.offsetY ?? 0} />
                     ))}
                     {discFrames}
-                    {/* Counter (meter-frame) HUD — same hoist as the mood
-                        pad above: screen-docked frames render here so they
-                        show in BOTH layout modes and on beats where the
-                        character isn't placed on stage. Character-anchored
-                        frames still come from PositionedBeatView. Values
-                        re-render via debugInfo (counterChanged events). */}
-{(() => {
-                      /* Multiple characters may dock frames to the SAME screen
-                         corner — stack them (top corners grow downward, bottom
-                         corners upward) instead of overlapping. One registry
-                         covers meter AND inventory frames so mixed frames in a
-                         corner stack too. */
-                      const cornerOffsets: Record<string, number> = {};
-                      const bump = (corner: string, estHeight: number): number => {
-                        const cur = cornerOffsets[corner] ?? 0;
-                        cornerOffsets[corner] = cur + estHeight + 8;
-                        return corner.includes('bottom') ? -cur : cur;
-                      };
-                      const nodes: React.ReactNode[] = [];
-                      for (const c of chars) {
-                        const frame: any = (c as any).meterFrame;
-                        if (!frame || frame.dockMode !== 'screen') continue;
-                        const variants = (c as any).variants;
-                        if (variants && variants.length > 0) {
-                          const explicit = (ctx as any).hasExplicitlySetVariant?.(c.id);
-                          if (!explicit) continue;
-                        }
-                        const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
-                        if (visibleCounters.length === 0) continue;
-                        const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
-                        const counters = visibleCounters.map((counter: any) => ({
-                          name: counter.name,
-                          displayName: counter.displayName,
-                          value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
-                          min: counter.min ?? 0,
-                          max: counter.max ?? 100,
-                          color: counter.color || '#3B82F6',
-                          showNumericValue: counter.showNumericValue ?? false,
-                          numericFormat: counter.numericFormat || 'value',
-                          orientation: counter.levelMeterOrientation || 'horizontal',
-                        }));
-                        const corner = frame.screenPosition ?? 'screen-top-left';
-                        const est = (frame.style?.padding ?? 8) * 2 +
-                          counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
-                          Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);
-                        const dy = bump(corner, est);
-                        nodes.push(
-                          <CharacterMeterFrame
-                            key={`meter-hud-${c.id}`}
-                            counters={counters}
-                            config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
-                            characterPosition={{ x: 0, y: 0 }}
-                            characterDimensions={{ width: 0, height: 0 }}
-                            containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-                          />
-                        );
-                      }
-                      for (const c of chars) {
-                        const frame: any = (c as any).inventoryFrame;
-                        if (!frame || frame.dockMode !== 'screen') continue;
-                        const items = ((c as any).inventory || []).map((it: any) => ({
-                          id: it.id,
-                          name: it.name,
-                          displayName: it.displayName || it.name,
-                          description: it.description || '',
-                          icon: it.icon || '',
-                          quantity: it.quantity ?? 1,
-                          category: it.category || '',
-                        }));
-                        if (items.length === 0) continue;
-                        const corner = frame.screenPosition ?? 'screen-bottom-right';
-                        const cols = Math.max(1, frame.columns ?? 4);
-                        const rows = Math.ceil(items.length / cols);
-                        const est = (frame.style?.padding ?? 10) * 2 + 20 +
-                          rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
-                          Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
-                        const dy = bump(corner, est);
-                        nodes.push(
-                          <CharacterInventoryFrame
-                            key={`inventory-hud-${c.id}`}
-                            items={items}
-                            config={{ ...frame, offset: { x: frame.offset?.x ?? 0, y: (frame.offset?.y ?? 0) + dy } }}
-                            characterPosition={{ x: 0, y: 0 }}
-                            characterDimensions={{ width: 0, height: 0 }}
-                            containerDimensions={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
-                            isVisible={true}
-                          />
-                        );
-                      }
-                      return nodes;
-                    })()}
+                    {meterDescs.map((d) => (
+                      <CharacterMeterFrame
+                        key={`meter-hud-${d.c.id}`}
+                        counters={d.counters}
+                        config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
+                          y: (d.frame.offset?.y ?? 0) + (place.get(`meter-${d.c.id}`)?.offsetY ?? 0) } }}
+                        characterPosition={{ x: 0, y: 0 }}
+                        characterDimensions={{ width: 0, height: 0 }}
+                        containerDimensions={stageDim}
+                      />
+                    ))}
+                    {invDescs.map((d) => (
+                      <CharacterInventoryFrame
+                        key={`inventory-hud-${d.c.id}`}
+                        items={d.items}
+                        config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
+                          y: (d.frame.offset?.y ?? 0) + (place.get(`inv-${d.c.id}`)?.offsetY ?? 0) } }}
+                        characterPosition={{ x: 0, y: 0 }}
+                        characterDimensions={{ width: 0, height: 0 }}
+                        containerDimensions={stageDim}
+                        isVisible={true}
+                      />
+                    ))}
                   </div>
                 );
               })()}

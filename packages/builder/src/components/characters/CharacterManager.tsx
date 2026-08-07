@@ -20,6 +20,7 @@ import {
 import { Character, CHARACTER_TEMPLATES } from '../../types/character';
 import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
+import type { HudOverlaySettings } from './HudLayoutPreview';
 import { EmotionPaletteEditor } from './EmotionPaletteEditor';
 import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from '@asaps/core';
 
@@ -72,6 +73,10 @@ interface CharacterManagerProps {
   /** Opens the AI "Develop character" dialog (rendered by the host app).
    * Shown as a card in the template picker when provided. */
   onGenerateWithAI?: () => void;
+  /** Global-settings HUD overlays, threaded to the editor's HUD-layout
+   *  preview so screen-docked frames are shown flowing clear of the
+   *  timer / countdown chrome configured in General Settings. */
+  hudOverlays?: HudOverlaySettings;
 }
 
 
@@ -86,6 +91,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   emotionPalette: emotionPaletteProp,
   onEmotionPaletteChange,
   onGenerateWithAI,
+  hudOverlays,
 }) => {
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
@@ -754,6 +760,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           onAssetAdd={onAssetAdd} // Pass through the asset handler
           emotionPalette={emotionPalette}
           focusVariantId={focusVariantId || undefined}
+          hudOverlays={hudOverlays}
         />
       )}
 
