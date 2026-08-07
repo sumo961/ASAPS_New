@@ -964,6 +964,10 @@ export class ReactRenderer extends BaseRenderer {
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
   protected mobileFontScale: number = 1.0;  // Font scale multiplier for mobile (1.0-2.0)
+  /** Right-side inset (px) for the aiConversation input bar so the Send
+   *  button clears a bottom-right screen-docked HUD (inventory/meter frame).
+   *  Set by the host (PreviewWindow / player) which knows the frame layout. */
+  protected chatInputRightInset: number = 0;
   private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null = null;
   private ttsStopCallback: (() => void) | null = null;
   private choiceTextMap: Map<string, string> = new Map(); // actionId → choice text for TTS
@@ -1520,6 +1524,7 @@ export class ReactRenderer extends BaseRenderer {
       // Chrome derives from the theme (was hardcoded white field + #0a66c2
       // Send) so the bar sits inside ANY theme, incl. the dark default.
       const inputTheme = this.theme;
+      const inputInsetRight = this.chatInputRightInset;
       const ConversationInput = () => {
         const [inputText, setInputText] = React.useState('');
         const [isListening, setIsListening] = React.useState(false);
@@ -1763,7 +1768,10 @@ export class ReactRenderer extends BaseRenderer {
 
         return (
           <div style={{
-            display: 'flex', gap: 8, padding: '8px 16px',
+            display: 'flex', gap: 8,
+            // Extra right padding clears a bottom-right screen-docked HUD
+            // (inventory/meter frame) so the Send button isn't obscured.
+            padding: `8px ${16 + (inputInsetRight || 0)}px 8px 16px`,
             // Opaque theme ground — the old translucent scrim went light grey
             // when the bar rendered over the page outside the stage image.
             backgroundColor: inputTheme?.backgroundColor || '#14161f',
@@ -2146,6 +2154,10 @@ export class ReactRenderer extends BaseRenderer {
   /**
    * Set the timer HUD configuration from global settings
    */
+  setChatInputRightInset(px: number): void {
+    this.chatInputRightInset = Math.max(0, Math.round(px || 0));
+  }
+
   setViewportOverride(v: { width: number; height: number } | undefined): void {
     this.viewportOverride = v;
   }
@@ -3590,7 +3602,20 @@ export class ReactRenderer extends BaseRenderer {
       speaker: this.resolveSpeakerForSlot(),
     };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('endScreen', content), locations);
+    let effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('endScreen', content), locations);
+
+    // Credits button follows showCredits (was purely location-driven, so
+    // toggling showCredits ON did nothing when the baked layout had no
+    // creditsButton — and it showed even when OFF if a location existed).
+    const hasCredits = (effectiveLocations || []).some(l => (l.name || '').toLowerCase().includes('credits'));
+    if (showCredits && !hasCredits) {
+      // Synthesize a default credits button next to restart.
+      const gen = generateDefaultLocations('endScreen', content);
+      const creditsLoc = gen.find(l => (l.name || '').toLowerCase().includes('credits'));
+      if (creditsLoc) effectiveLocations = [...(effectiveLocations || []), creditsLoc];
+    } else if (!showCredits && hasCredits) {
+      effectiveLocations = (effectiveLocations || []).filter(l => !(l.name || '').toLowerCase().includes('credits'));
+    }
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
     this.ttsSpeakCallback?.(message, this.currentSpeaker);

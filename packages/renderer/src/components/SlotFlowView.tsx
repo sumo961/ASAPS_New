@@ -1251,14 +1251,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           // With an embedded-surface slot (webView) the body also hugs its
           // natural height — the SURFACE is the star and takes the rest
           // (the old 1:1 grow split gave the frame only half the stage).
-          flex: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot) ? '0 1 auto' : 1,
+          flex: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot || !!inputSlot) ? '0 1 auto' : 1,
           // Conversation: cap the body scroller so the NPC card hugs the
           // left half of the stage (with the action panel on the right).
           // Without a cap, flex:1 lets the scroller fill all leftover
           // width, dragging the card mid-stage and leaving an oversized
           // left margin next to a too-tight right margin.
           maxWidth: isConversation ? 'clamp(280px, 50%, 560px)' : undefined,
-          maxHeight: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot) ? '100%' : undefined,
+          maxHeight: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot || !!inputSlot) ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
@@ -1453,6 +1453,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       text={bodyText}
                       links={(content as any).links}
                       onLinkClick={onAction}
+                      linkColor={theme.button?.backgroundColor}
                     />
                   : bodyReveal.rendered}
               </div>
@@ -2258,8 +2259,12 @@ const HyperTextBody: React.FC<{
     style?: { color?: string; hoverColor?: string; underline?: boolean; bold?: boolean };
   }>;
   onLinkClick: (targetBeatId: string) => void;
-}> = ({ text, links, onLinkClick }) => {
+  /** Theme accent for links (button color) — reads on the dark stage where
+   *  a conventional #3b82f6 blue is low-contrast. Per-link style still wins. */
+  linkColor?: string;
+}> = ({ text, links, onLinkClick, linkColor }) => {
   const [hoveredWord, setHoveredWord] = React.useState<string | null>(null);
+  const accentLink = linkColor || '#3b82f6';
 
   const sortedLinks = links
     .map(link => ({ ...link, index: text.indexOf(link.word) }))
@@ -2280,7 +2285,7 @@ const HyperTextBody: React.FC<{
     const linkStyle: React.CSSProperties = {
       color: isHovered && link.style?.hoverColor
         ? link.style.hoverColor
-        : (link.style?.color || '#3b82f6'),
+        : (link.style?.color || accentLink),
       textDecoration: link.style?.underline !== false ? 'underline' : 'none',
       fontWeight: link.style?.bold ? 'bold' : 'inherit',
       cursor: 'pointer',

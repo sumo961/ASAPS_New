@@ -140,7 +140,31 @@ export function calculateSmartTextBoxDimensions(
 
   // Check if content fits in original dimensions
   if (estimatedTotalHeight <= location.height) {
-    return { width: location.width, height: location.height, needsScroll: false, xOffset: 0, yOffset: 0 };
+    // Content fits at the authored width. HUG short content instead of
+    // leaving a full-width / full-height box around a single word: shrink
+    // width to the longest line's natural width (never grow, never below a
+    // sensible floor), re-flow, and shrink height to the wrapped lines.
+    // Keep the box centered on its authored center (xOffset shifts left).
+    const longestLine = Math.max(1, ...content.split('\n').map((l) => l.length));
+    const naturalWidth = Math.ceil(longestLine * charWidth + contentPadding + inlineContentWidth);
+    const widthFloor = Math.min(location.width, Math.max(120, fontSize * 6));
+    const huggedWidth = Math.max(widthFloor, Math.min(location.width, naturalWidth));
+
+    const charsPerHugLine = Math.max(1, Math.floor((huggedWidth - contentPadding - inlineContentWidth) / charWidth));
+    const hugLines = content.split('\n').reduce(
+      (acc, l) => acc + Math.max(1, Math.ceil((l.length || 1) / charsPerHugLine)), 0);
+    const huggedHeight = Math.min(location.height, Math.ceil(hugLines * lineHeight + contentPadding));
+
+    const dw = location.width - huggedWidth;
+    return {
+      width: huggedWidth,
+      height: huggedHeight,
+      needsScroll: false,
+      // Negative xOffset shifts the box RIGHT (adjustedLeft = x - xOffset),
+      // re-centering the narrower box over the authored center.
+      xOffset: dw > 8 ? -Math.round(dw / 2) : 0,
+      yOffset: 0,
+    };
   }
 
   // Calculate maximum allowed dimensions
@@ -3122,6 +3146,13 @@ const TextElement: React.FC<{
   const isVeryLongContent = contentLength > 200;
   const isExtremelyLongContent = contentLength > 400;
 
+  // Empty prompt/text: render nothing at play time so an unused prompt box
+  // (e.g. a webView with no prompt) doesn't leave an empty card on stage.
+  // The editor still shows it (selectable/placeable). Hooks above already ran.
+  if (!editorMode && (content ?? '').trim() === '') {
+    return null;
+  }
+
   // Determine if this is a title/author element (for theme font styling)
   const isTitleElement = location.name?.toLowerCase().includes('title') || location.name?.toLowerCase().includes('author');
 
@@ -3294,7 +3325,7 @@ const TextElement: React.FC<{
           borderRadius: shouldHideTextBox ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
-          fontWeight: isLongContent ? '400' : '500',
+          fontWeight: isTitleElement ? 700 : (isLongContent ? 400 : 500),
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
           boxShadow: shouldHideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
@@ -3827,7 +3858,10 @@ const HyperTextContent: React.FC<{
   hyperlinks: HyperlinkData[];
   onLinkClick: (targetBeatId: string) => void;
   defaultLinkStyle?: React.CSSProperties;
-}> = ({ text, hyperlinks, onLinkClick, defaultLinkStyle }) => {
+  /** Theme accent (button color) — links read on the dark stage where a
+   *  conventional blue is low-contrast. Per-link authored color still wins. */
+  themeLinkColor?: string;
+}> = ({ text, hyperlinks, onLinkClick, defaultLinkStyle, themeLinkColor }) => {
   const [hoveredLink, setHoveredLink] = React.useState<string | null>(null);
 
   // If no hyperlinks, just return plain text
@@ -3863,7 +3897,7 @@ const HyperTextContent: React.FC<{
     // Add the clickable link
     const isHovered = hoveredLink === link.word;
     const linkStyle: React.CSSProperties = {
-      color: isHovered && link.style?.hoverColor ? link.style.hoverColor : (link.style?.color || '#3b82f6'),
+      color: isHovered && link.style?.hoverColor ? link.style.hoverColor : (link.style?.color || themeLinkColor || '#3b82f6'),
       textDecoration: link.style?.underline !== false ? 'underline' : 'none',
       fontWeight: link.style?.bold ? 'bold' : 'inherit',
       cursor: 'pointer',
@@ -4264,6 +4298,7 @@ const DialogElement: React.FC<{
                 text={displayedText}
                 hyperlinks={hyperlinks}
                 onLinkClick={onAction}
+                themeLinkColor={theme.button?.backgroundColor}
               />
             ) : (
               <>
@@ -4279,6 +4314,7 @@ const DialogElement: React.FC<{
                 text={displayedText}
                 hyperlinks={hyperlinks}
                 onLinkClick={onAction}
+                themeLinkColor={theme.button?.backgroundColor}
               />
             ) : (
               <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
@@ -5874,7 +5910,7 @@ const FlexTextElement: React.FC<{
           borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
-          fontWeight: isLongContent ? '400' : '500',
+          fontWeight: isTitleElement ? 700 : (isLongContent ? 400 : 500),
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
           boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
@@ -5928,6 +5964,7 @@ const FlexTextElement: React.FC<{
             text={textToDisplay}
             hyperlinks={hyperlinks}
             onLinkClick={onAction}
+            themeLinkColor={theme.button?.backgroundColor}
           />
         ) : (
           textToDisplay

@@ -809,6 +809,14 @@ export const PreviewWindow: React.FC = () => {
         console.log('[PreviewWindow] HUD overlay configs attached to renderer');
       }
 
+      // Reserve right space in the chat input bar if any character docks an
+      // inventory/meter frame bottom-right (else Send hides behind it).
+      const chars0 = previewDataRef.current?.characters || [];
+      const hasBottomRight = chars0.some((c: any) =>
+        (c?.inventoryFrame?.dockMode === 'screen' && String(c.inventoryFrame.screenPosition || '').includes('bottom-right') && (c.inventory || []).length > 0) ||
+        (c?.meterFrame?.dockMode === 'screen' && String(c.meterFrame.screenPosition || '').includes('bottom-right') && (c.counters || []).some((k: any) => k.visible)));
+      (reactRenderer as any).setChatInputRightInset?.(hasBottomRight ? 220 : 0);
+
       // Device-size preset → flow views size against the emulated frame
       // instead of the window (see viewportOverride in ReactRenderer).
       (reactRenderer as any).setViewportOverride?.(

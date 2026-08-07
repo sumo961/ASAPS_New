@@ -738,6 +738,15 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
     console.log(`[PlayerEngine] Setting up resolvers with ${this.assetMap.size} assets, ${characters.length} characters, ${propAssetMap.size} prop icons`);
 
+    // Reserve chat-input right space when a character docks a frame
+    // bottom-right (else the aiConversation Send button hides behind it).
+    if ('setChatInputRightInset' in renderer) {
+      const hasBottomRight = characters.some((c: any) =>
+        (c?.inventoryFrame?.dockMode === 'screen' && String(c.inventoryFrame.screenPosition || '').includes('bottom-right') && (c.inventory || []).length > 0) ||
+        (c?.meterFrame?.dockMode === 'screen' && String(c.meterFrame.screenPosition || '').includes('bottom-right') && (c.counters || []).some((k: any) => k.visible)));
+      (renderer as any).setChatInputRightInset(hasBottomRight ? 220 : 0);
+    }
+
     // Apply theme settings from globalSettings
     if (this.globalSettings && 'setTheme' in renderer) {
       try {
