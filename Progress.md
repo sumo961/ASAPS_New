@@ -1,5 +1,50 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-08: Security release — Electron 43, vite 8, URL scheme hardening (v0.9.88)
+
+### Overview
+
+A security-only release, no feature changes. Open Dependabot alerts drop **39 → 9**. Two of those alerts were against **Electron itself** — the shipped desktop runtime, not build tooling — and had no fix available on the version line we were on, because Electron 40 had reached end of life. The rest were the long-deferred vite/esbuild pile, which turned out to be far less risky to clear than the earlier triage assumed. Plus a hardening fix that makes the Electron advisory non-exploitable in this app regardless of runtime version.
+
+### Electron 40 → 43.3.0
+
+- GHSA-9f4c-93c8-jc8g (high): a sandboxed iframe can bypass the `allow-popups` restriction via the OpenURL navigation path. **No 40.x backport exists** — Electron supports only its newest three majors, so 40 was EOL and would have kept accumulating unpatched CVEs in the shipped runtime.
+- This mattered more than the other open alerts because ASAPS deliberately embeds untrusted remote content: `webviewTag` is enabled on the main and preview windows for the WebView beat, which is exactly the scenario the advisory covers.
+- Upgraded to 43.3.0 (current `latest`) rather than the minimum 41.10.4, so the app sits at the start of the support window rather than the end of it.
+
+**Files modified:**
+- `apps/builder-desktop/package.json`, `package-lock.json`
+
+### URL scheme validation before `shell.openExternal`
+
+- Both `setWindowOpenHandler` callbacks denied the popup window but still handed the URL to the OS first, with no scheme check — as did the `shell:open-external` IPC handler and the update-feed release links. The OS will launch a registered protocol handler for `file:`, `smb:`, `data:` or a third-party app scheme.
+- Every one of those callers takes its URL from content we do not control (a page inside a WebView beat, a story's own markup, or the update feed). Now gated by `isSafeExternalUrl` — http/https only, exported so the rule is testable independently of Electron.
+- This blunts the Electron advisory directly and closes a footgun that predated it.
+
+**Files modified:**
+- `apps/builder-desktop/src/main/index.ts`
+
+### vite 5 → 8 across the monorepo
+
+- Clears 27 vite + 1 esbuild advisories. Every open vite advisory was patched only at >= 6.4.2, so the entire 5.x line was permanently vulnerable with no backport path.
+- The blocker recorded in the earlier triage was wrong: **vitest 4, already in use, declares `vite ^6 || ^7 || ^8`**, so the test integration needed no work. Coordinated bumps: vite 5→8.2.1 (9 workspaces), `@vitejs/plugin-react` 4→6, `vite-plugin-dts` 4→5, `vite-plugin-electron` 0.28→1.1.
+- **Two real breakages, both fixed.** vite 8 uses Rolldown, which does not paper over CommonJS the way Rollup did: `react/jsx-runtime` was never in the library `external` lists, so its CJS build got bundled into the renderer and player ESM outputs and called `__require("react")` — unresolvable in a browser, and it broke the dev server outright. Externalising `react/jsx-runtime` and `react/jsx-dev-runtime` is the correct config for a React library regardless. Separately, `apps/player-desktop` and `apps/player-mobile` held stale nested `vite@5.4.21` lock entries marked `peer: true` that nothing required; npm would not prune them across reinstalls, so the entries were removed and re-resolved.
+- Also cleared vite 8's forward-compat warning: `__dirname` → `import.meta.dirname` in all five package configs, plus an explicit `.ts` extension on the builder config's local plugin import. Both are unsupported by `configLoader: 'native'`, which becomes the default in a future major.
+- Side benefit: Rolldown builds the whole monorepo in ~3 s.
+
+**Files modified:**
+- `package.json`, `packages/*/package.json`, `packages/*/vite.config.ts`, `apps/{builder-desktop,player-desktop,player-mobile}/package.json`, `package-lock.json`, `packages/builder/public/player-web.{js,css}`, `packages/core/src/generated/beat-types.ts`
+
+### Verification
+
+Full build green; core 2596, renderer 531, builder 2396 tests pass; core/builder/player-web/electron-main type-checks clean. Dev Electron boots to the start window under 43 with the full process tree healthy. Dev server starts clean on vite 8 with no warnings.
+
+The rebuilt `player-web.js` (embedded in every HTML export) was verified specifically, since Rolldown regenerated it: it loads without error in jsdom and exposes `window.ASAPSPlayer` with init/autoInit; a differential run proved the pre-upgrade bundle behaves identically in that harness; and an export-equivalent page was played in a real browser — title screen rendered, Start advanced to the next beat, zero JS errors.
+
+**Still open (9):** `tar` ×8 via `@capacitor/cli@6` (mobile build CLI, never in a shipped bundle; needs a Capacitor 8 major that can't be verified without an Android/iOS build environment) and `uuid` ×1 in the gitignored `apps/web-service` (the advisory requires a `buf` argument the code never passes — unreachable).
+
+---
+
 ## 2026-08-08: Ink & Brass default theme, unified HUD layout, HUD explanations (v0.9.87)
 
 ### Overview
