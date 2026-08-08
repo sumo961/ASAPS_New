@@ -7,6 +7,43 @@ import { autoUpdater, type UpdateInfo } from 'electron-updater';
 import { startWatching, stopWatching } from './fileWatcher';
 import { execFile, spawn } from 'child_process';
 
+/**
+ * True only for URLs it is safe to hand to the operating system.
+ *
+ * `shell.openExternal` asks the OS to open the URL, and the OS will happily
+ * launch a registered protocol handler for schemes like `file:`, `smb:` or a
+ * third-party app scheme. Several callers below receive their URL from content
+ * we do not control — a page inside a WebView beat, a story's own markup, or
+ * the update feed — so the scheme is checked rather than trusted.
+ *
+ * Exported so the rule can be unit-tested independently of Electron.
+ */
+export function isSafeExternalUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Open a URL in the user's browser, refusing anything that isn't http(s).
+ *
+ * Directly relevant to GHSA-9f4c-93c8-jc8g (Electron < 41.10.3): a sandboxed
+ * iframe can bypass the `allow-popups` restriction and reach the window-open
+ * path, which lands in the setWindowOpenHandler callbacks below. Denying the
+ * popup window is not sufficient on its own — without this check we would
+ * still forward the attacker-chosen URL to the OS.
+ */
+function openExternalIfSafe(url: string): void {
+  if (!isSafeExternalUrl(url)) {
+    console.warn('[main] Refused to open external URL (unsupported scheme):', url);
+    return;
+  }
+  void shell.openExternal(url);
+}
+
 // Suppress EPIPE errors from console.log when stdout/stderr pipes are closed
 // (common when the launching terminal is closed while the app keeps running)
 process.stdout?.on('error', (err: NodeJS.ErrnoException) => {
@@ -157,7 +194,7 @@ function setupAutoUpdater(): void {
         if (result.response === 0) {
           const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
           console.log('[AutoUpdater] Opening release page:', releaseUrl);
-          shell.openExternal(releaseUrl);
+          openExternalIfSafe(releaseUrl);
         }
       });
     } else {
@@ -209,7 +246,7 @@ function setupAutoUpdater(): void {
           // Open the GitHub releases page for the specific version
           const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
           console.log('[AutoUpdater] Opening release page:', releaseUrl);
-          shell.openExternal(releaseUrl);
+          openExternalIfSafe(releaseUrl);
         }
       });
     } else {
@@ -371,7 +408,7 @@ function createWindow(intent?: Record<string, string>): void {
 
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalIfSafe(url);
     return { action: 'deny' };
   });
 
@@ -423,7 +460,7 @@ function createStartWindow(): void {
   }
 
   startWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalIfSafe(url);
     return { action: 'deny' };
   });
 
@@ -1012,7 +1049,7 @@ ipcMain.handle('dialog:message', async (_, options: Electron.MessageBoxOptions) 
 });
 
 ipcMain.handle('shell:open-external', async (_, url: string) => {
-  await shell.openExternal(url);
+  openExternalIfSafe(url);
 });
 
 ipcMain.handle('app:get-path', async (_, name: string) => {
