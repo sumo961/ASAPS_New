@@ -14,6 +14,7 @@ export {
 } from './PersonalityTraits';
 export {
   DEFAULT_PERSONALITY_ARCHETYPES,
+  matchPersonalityArchetype,
   findPersonalityArchetype,
   type PersonalityArchetype,
   type ArchetypeSelfSentiment,

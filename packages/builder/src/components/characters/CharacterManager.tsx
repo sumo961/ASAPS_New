@@ -22,7 +22,7 @@ import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
 import type { HudOverlaySettings } from './HudLayoutPreview';
 import { EmotionPaletteEditor } from './EmotionPaletteEditor';
-import { DEFAULT_EMOTION_PALETTE, type EmotionDefinition } from '@asaps/core';
+import { DEFAULT_EMOTION_PALETTE, matchPersonalityArchetype, type EmotionDefinition } from '@asaps/core';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -205,6 +205,14 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       description: template.description,
       tags: template.tags || [],
       color: template.color,
+      // Personality / affect seed. Templates carry archetype-derived traits and
+      // an initial mood so a new character arrives somewhere rather than
+      // flat-neutral; these are only spread when the template sets them, so
+      // templates without them behave exactly as before.
+      ...(template.traits ? { traits: template.traits } : {}),
+      ...(template.initialMood ? { initialMood: template.initialMood } : {}),
+      ...(template.initialSentiments ? { initialSentiments: template.initialSentiments } : {}),
+      ...(template.goals ? { goals: template.goals } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -688,7 +696,18 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                 >
                   <div className="text-2xl mb-2">{getRoleIcon(template.role!)}</div>
                   <div className="font-medium">{template.displayName}</div>
-                  <div className="text-xs text-gray-500">{template.role}</div>
+                  <div className="text-xs text-gray-500">
+                    {template.role}
+                    {/* Name the personality the template carries. Traits feed the
+                        character dossier and shape AI conversations, so a template
+                        that seeds them must SAY so — otherwise an author picking
+                        "Merchant" for its states silently gets a disposition they
+                        never chose. "Blank Character" below stays affect-free. */}
+                    {(() => {
+                      const a = matchPersonalityArchetype(template.traits);
+                      return a ? <> · {a.name.toLowerCase()}</> : null;
+                    })()}
+                  </div>
                 </div>
               ))}
               <div
@@ -718,7 +737,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
               >
                 <div className="text-2xl mb-2">➕</div>
                 <div className="font-medium">Blank Character</div>
-                <div className="text-xs text-gray-500">Start from scratch</div>
+                <div className="text-xs text-gray-500">Start from scratch — no personality</div>
               </div>
             </div>
             <button

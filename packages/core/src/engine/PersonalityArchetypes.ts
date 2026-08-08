@@ -139,6 +139,34 @@ export const DEFAULT_PERSONALITY_ARCHETYPES: PersonalityArchetype[] = [
  * throwing — callers can fall back to a no-op when the id is stale (e.g.
  * a project authored with a future version of the library).
  */
+/**
+ * Reverse lookup: which archetype does this trait bag correspond to?
+ *
+ * `findPersonalityArchetype` only resolves an id, so anything that STARTED from
+ * an archetype (a character template, an imported project, a hand-tuned set
+ * that happens to land on one) had no way to say so — the editor's archetype
+ * picker sat blank next to traits that exactly matched a named archetype.
+ *
+ * Matching is tolerant by `epsilon` because trait values round-trip through
+ * JSON and sliders; the default is tight enough that two distinct archetypes
+ * can never both match, since none of them sit within 0.01 on every axis.
+ * Returns undefined when the traits are genuinely custom — a bespoke character
+ * should NOT be mislabelled with an archetype the author never picked.
+ */
+export function matchPersonalityArchetype(
+  traits: Record<string, number> | undefined,
+  library: ReadonlyArray<PersonalityArchetype> = DEFAULT_PERSONALITY_ARCHETYPES,
+  epsilon = 0.01,
+): PersonalityArchetype | undefined {
+  if (!traits) return undefined;
+  return library.find((a) =>
+    Object.entries(a.traits).every(([axis, value]) => {
+      const actual = traits[axis];
+      return typeof actual === 'number' && Math.abs(actual - value) <= epsilon;
+    }),
+  );
+}
+
 export function findPersonalityArchetype(
   id: string,
   library: ReadonlyArray<PersonalityArchetype> = DEFAULT_PERSONALITY_ARCHETYPES,

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_PERSONALITY_ARCHETYPES,
   findPersonalityArchetype,
+  matchPersonalityArchetype,
 } from '../../src/engine/PersonalityArchetypes';
 import { DEFAULT_TRAIT_NAMES } from '../../src/engine/PersonalityTraits';
 
@@ -110,5 +111,48 @@ describe('findPersonalityArchetype', () => {
     }];
     expect(findPersonalityArchetype('x', custom)?.id).toBe('x');
     expect(findPersonalityArchetype('balanced', custom)).toBeUndefined();
+  });
+});
+
+describe('matchPersonalityArchetype (reverse lookup)', () => {
+  it('recognises traits copied verbatim from an archetype', () => {
+    for (const a of DEFAULT_PERSONALITY_ARCHETYPES) {
+      expect(matchPersonalityArchetype({ ...a.traits })?.id).toBe(a.id);
+    }
+  });
+
+  it('tolerates the rounding that slider / JSON round-trips introduce', () => {
+    const stoic = DEFAULT_PERSONALITY_ARCHETYPES.find((a) => a.id === 'stoic')!;
+    const nudged = Object.fromEntries(
+      Object.entries(stoic.traits).map(([k, v]) => [k, v + 0.005]),
+    );
+    expect(matchPersonalityArchetype(nudged)?.id).toBe('stoic');
+  });
+
+  it('does NOT mislabel bespoke traits as an archetype', () => {
+    // The important negative: a hand-tuned character must not be presented as
+    // something the author never picked.
+    expect(matchPersonalityArchetype({
+      openness: 0.42, conscientiousness: 0.63, extraversion: 0.21,
+      agreeableness: 0.77, neuroticism: 0.38,
+    })).toBeUndefined();
+  });
+
+  it('returns undefined for missing or partial traits', () => {
+    expect(matchPersonalityArchetype(undefined)).toBeUndefined();
+    expect(matchPersonalityArchetype({})).toBeUndefined();
+    expect(matchPersonalityArchetype({ openness: 0.5 })).toBeUndefined();
+  });
+
+  it('never matches two archetypes at the default epsilon', () => {
+    // Guards the library itself: if someone adds an archetype within 0.01 of an
+    // existing one on every axis, the label becomes ambiguous.
+    for (const a of DEFAULT_PERSONALITY_ARCHETYPES) {
+      const matches = DEFAULT_PERSONALITY_ARCHETYPES.filter((b) =>
+        Object.entries(b.traits).every(([axis, v]) =>
+          Math.abs((a.traits as Record<string, number>)[axis] - v) <= 0.01),
+      );
+      expect(matches).toHaveLength(1);
+    }
   });
 });

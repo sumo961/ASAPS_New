@@ -451,6 +451,20 @@ export interface CharacterReference {
 }
 
 // Default character templates
+/**
+ * Starter characters offered by "New from template".
+ *
+ * Trait sets are taken VERBATIM from DEFAULT_PERSONALITY_ARCHETYPES in
+ * @asaps/core, so the Character Editor's archetype picker recognises the
+ * template and shows which archetype it started from — templates stay legible
+ * in the same vocabulary the AI helper and the hand-authoring UI already use.
+ * Before this, templates predated the personality model entirely and produced
+ * characters the affect system read as flat-neutral, with the archetype picker
+ * sitting unused beside them.
+ *
+ * Traits and mood are a STARTING POINT, not a prescription — the point is that
+ * a new character arrives somewhere rather than nowhere.
+ */
 export const CHARACTER_TEMPLATES: Partial<Character>[] = [
   {
     name: 'player',
@@ -466,6 +480,10 @@ export const CHARACTER_TEMPLATES: Partial<Character>[] = [
       { name: 'energy', displayName: 'Energy', value: 100, min: 0, max: 100, visible: true, color: '#4444ff' },
     ],
     inventory: [],
+    // 'balanced' — deliberately neutral. The player stands in for the
+    // interactor, so the template imposes no personality of its own.
+    traits: { openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5 },
+    initialMood: { valence: 0, arousal: 0 },
   },
   {
     name: 'npc_merchant',
@@ -482,6 +500,10 @@ export const CHARACTER_TEMPLATES: Partial<Character>[] = [
       { name: 'friendship', displayName: 'Friendship', value: 0, min: -100, max: 100, visible: false },
     ],
     inventory: [],
+    // 'conscientious-leader' — a reliable, sociable trader: disciplined,
+    // outgoing, slow to anger.
+    traits: { openness: 0.55, conscientiousness: 0.85, extraversion: 0.65, agreeableness: 0.65, neuroticism: 0.25 },
+    initialMood: { valence: 0.2, arousal: 0.1 },
   },
   {
     name: 'npc_wizard',
@@ -500,5 +522,41 @@ export const CHARACTER_TEMPLATES: Partial<Character>[] = [
       { name: 'trust', displayName: 'Trust', value: 50, min: 0, max: 100, visible: false },
     ],
     inventory: [],
+    // 'stoic' — self-contained and emotionally even, the mentor register.
+    traits: { openness: 0.50, conscientiousness: 0.75, extraversion: 0.35, agreeableness: 0.55, neuroticism: 0.15 },
+    initialMood: { valence: 0.1, arousal: -0.3 },
+  },
+  {
+    // Animated character. Sprite AUTHORING already existed (SpriteSheetEditor),
+    // but no template started from it, so the sprite path was invisible unless
+    // an author knew to switch visual.type by hand. Frame size and animations
+    // are a conventional starting grid — the author picks the sheet asset in
+    // the editor, which fills url/assetId and the real image dimensions.
+    name: 'npc_animated',
+    displayName: 'Animated Character',
+    role: 'npc',
+    visual: {
+      type: 'sprite',
+      spriteSheet: {
+        url: '',
+        frameWidth: 128,
+        frameHeight: 128,
+        animations: [
+          { name: 'idle', frames: [0, 1, 2, 1], frameDuration: 200, loop: true },
+          { name: 'talk', frames: [3, 4, 5, 4], frameDuration: 120, loop: true },
+          { name: 'react', frames: [6, 7], frameDuration: 160, loop: false },
+        ],
+      },
+    },
+    states: [
+      { id: 'default', name: 'default', displayName: 'Default', visual: {} },
+      { id: 'talking', name: 'talking', displayName: 'Talking', visual: {} },
+    ],
+    defaultState: 'default',
+    counters: [],
+    inventory: [],
+    // 'free-spirit' — expressive and animated in register as well as visuals.
+    traits: { openness: 0.85, conscientiousness: 0.30, extraversion: 0.75, agreeableness: 0.55, neuroticism: 0.40 },
+    initialMood: { valence: 0.3, arousal: 0.35 },
   },
 ];
