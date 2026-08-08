@@ -2,8 +2,8 @@
  * Auto-generated TypeScript types from beat-definitions/core-beats.json
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
- * Schema Version: 2.16.0
- * Generated: 2026-08-06T17:52:09.859Z
+ * Schema Version: 2.17.0
+ * Generated: 2026-08-08T07:31:54.195Z
  */
 
 // ============================================
@@ -154,6 +154,8 @@ export interface TitleScreenParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat when start is clicked */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -176,6 +178,36 @@ export interface InfoTextParameters {
   connection: Connection;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
   slotAnimations?: Object | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
+}
+
+/**
+ * Explanation - Teaches the interactor what the on-screen HUDs mean. Callout labels are drawn over the real, packed HUD positions, so they stay correct when a HUD moves or the stack re-packs.
+ * Category: visible
+ * Connection Type: single
+ */
+export interface ExplanationParameters {
+  /** Intro text shown in the beat's own text box */
+  text?: string | undefined;
+  /** Continue button text (also used as connection label) */
+  buttonText?: string | undefined;
+  /** Callout caption for the timer HUD. Leave blank to use the built-in wording. */
+  captionTimer?: string | undefined;
+  /** Callout caption for the countdown HUD. Leave blank to use the built-in wording. */
+  captionCountdown?: string | undefined;
+  /** Callout caption for the counters HUD. Leave blank to use the built-in wording. */
+  captionMeter?: string | undefined;
+  /** Callout caption for the inventory HUD. Leave blank to use the built-in wording. */
+  captionInventory?: string | undefined;
+  /** Callout caption for the mood HUD. Leave blank to use the built-in wording. */
+  captionMood?: string | undefined;
+  /** Target beat when button is clicked */
+  connection: Connection;
+  /** Responsive motion intent for slot-mode rendering (P3-anim). */
+  slotAnimations?: Object | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -202,6 +234,8 @@ export interface DialogTreeParameters {
   showSpeaker?: boolean | undefined;
   /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -224,6 +258,8 @@ export interface MultiChoiceParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -248,6 +284,8 @@ export interface MovementChoiceParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -270,6 +308,8 @@ export interface PickPropParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -300,6 +340,8 @@ export interface VideoBeatParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after video ends */
   connection?: Connection | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -352,6 +394,8 @@ export interface EndScreenParameters {
   restartConnection?: Connection | undefined;
   /** Alias of restartConnection — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target. */
   connection?: Connection | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -386,6 +430,8 @@ export interface PanoramaParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -492,6 +538,8 @@ export interface DurScreenParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after duration expires */
   connection?: Connection | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -660,6 +708,8 @@ export interface InputTextParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after input is submitted */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -690,6 +740,8 @@ export interface InputImageParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after the image is analyzed (or the player skips) */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -730,6 +782,8 @@ export interface KeypadParameters {
   showDisplay?: boolean | undefined;
   /** Target beat after code is entered */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -760,6 +814,8 @@ export interface QrScanParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after a code is scanned (or the player cancels) */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -784,6 +840,8 @@ export interface ArBeatParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -810,6 +868,8 @@ export interface WebViewParameters {
   showSpeaker?: boolean | undefined;
   /** Target beat after the player exits the web view */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -832,6 +892,8 @@ export interface HyperTextParameters {
   speaker?: string | undefined;
   /** Show speaker name to the interactor */
   showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -866,6 +928,8 @@ export interface OnlineContentParameters {
   errorMessage?: string | undefined;
   /** Target beat when button is clicked */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -922,6 +986,8 @@ export interface AiDialogTreeParameters {
   exitTargets: Object[];
   /** Delay before showing choices */
   choiceDelay?: number | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -986,6 +1052,8 @@ export interface AiSummaryParameters {
   creditsPageBody?: string | undefined;
   /** Text for the close button on credits page */
   creditsCloseText?: string | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -1020,6 +1088,8 @@ export interface AiInfoTextParameters {
   buttonText?: string | undefined;
   /** Target beat when button is clicked */
   connection: Connection;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -1054,6 +1124,8 @@ export interface AiDurScreenParameters {
   maxDuration?: number | undefined;
   /** Target beat after duration expires */
   connection?: Connection | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**
@@ -1092,6 +1164,8 @@ export interface AiConversationParameters {
   language?: string | undefined;
   /** Custom system instructions for the AI */
   systemInstructions?: string | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 // ============================================
@@ -1104,6 +1178,7 @@ export interface AiConversationParameters {
 export type BeatType =
   | 'titleScreen'
   | 'infoText'
+  | 'explanation'
   | 'dialogTree'
   | 'multiChoice'
   | 'movementChoice'
@@ -1142,6 +1217,7 @@ export type BeatType =
 export interface BeatParameterMap {
   'titleScreen': TitleScreenParameters;
   'infoText': InfoTextParameters;
+  'explanation': ExplanationParameters;
   'dialogTree': DialogTreeParameters;
   'multiChoice': MultiChoiceParameters;
   'movementChoice': MovementChoiceParameters;

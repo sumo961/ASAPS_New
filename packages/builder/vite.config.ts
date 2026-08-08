@@ -2,12 +2,12 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
-import { viteAIProxyPlugin } from './src/api/vite-ai-proxy';
+import { viteAIProxyPlugin } from './src/api/vite-ai-proxy.ts';
 
-const rootPkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
+const rootPkg = JSON.parse(readFileSync(resolve(import.meta.dirname, '../../package.json'), 'utf-8'));
 
 // Read build number (incremented by CI workflow, tracked in git)
-const buildNumberPath = resolve(__dirname, '../../build-number.json');
+const buildNumberPath = resolve(import.meta.dirname, '../../build-number.json');
 let buildData: { build: number };
 try {
   buildData = JSON.parse(readFileSync(buildNumberPath, 'utf-8'));
@@ -23,7 +23,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src')
+      '@': resolve(import.meta.dirname, './src')
       // Removed @asaps aliases - use workspace resolution instead
     }
   },

@@ -6,16 +6,17 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
+      entry: resolve(import.meta.dirname, 'src/index.ts'),
       name: 'ASAPSPlayer',
       formats: ['es', 'cjs', 'umd'],
       fileName: (format) => `asaps-player.${format}.js`
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'react-dom/client'],
+      external: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client'],
       output: {
         globals: {
           react: 'React',
+          'react/jsx-runtime': 'ReactJSXRuntime',
           'react-dom': 'ReactDOM',
           'react-dom/client': 'ReactDOMClient'
         }
@@ -26,7 +27,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src')
+      '@': resolve(import.meta.dirname, './src')
     }
   }
 });
