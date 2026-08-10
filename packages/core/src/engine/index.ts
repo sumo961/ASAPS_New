@@ -20,6 +20,24 @@ export {
   type ArchetypeSelfSentiment,
 } from './PersonalityArchetypes';
 export {
+  isDerivedCounter,
+  counterRange,
+  projectStrength,
+  zeroOffsetRatio,
+  barFill,
+  resolveBand,
+  readSourceStrength,
+  resolveCounterValue,
+  resolveCounter,
+  type CounterSource,
+  type CounterBand,
+  type BindableCounter,
+  type AffectReader,
+  type CounterRange,
+  type BarFill,
+  type ResolvedCounter,
+} from './counterBinding';
+export {
   WebSensorService,
   MockSensorService,
   createSensorService,
