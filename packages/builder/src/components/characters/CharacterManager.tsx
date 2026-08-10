@@ -780,6 +780,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           emotionPalette={emotionPalette}
           focusVariantId={focusVariantId || undefined}
           hudOverlays={hudOverlays}
+          allCharacters={characters}
         />
       )}
 

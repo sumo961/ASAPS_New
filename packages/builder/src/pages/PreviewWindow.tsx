@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -924,17 +924,15 @@ export const PreviewWindow: React.FC = () => {
 
         // Build counter data with current values
         const scoped = charCountersRef.current[character.id] ?? charCountersRef.current[(character as any).name] ?? {};
-        const counters = visibleCounters.map(counter => ({
-          name: counter.name,
-          displayName: counter.displayName,
-          value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
-          min: counter.min ?? 0,
-          max: counter.max ?? 100,
-          color: counter.color || '#3B82F6',
-          showNumericValue: counter.showNumericValue ?? false,
-          numericFormat: counter.numericFormat || 'value',
-          orientation: counter.levelMeterOrientation || 'horizontal',
-        }));
+        const counters = visibleCounters.map(counter =>
+          toMeterCounterData(
+            counter as any,
+            character.id,
+            engineRef.current?.getContext() as any,
+            scoped,
+            (n: string) => countersRef.current[n],
+          ),
+        );
 
         return {
           counters,
@@ -2825,17 +2823,15 @@ export const PreviewWindow: React.FC = () => {
                   const visibleCounters = ((c as any).counters || []).filter((k: any) => k.visible);
                   if (visibleCounters.length === 0) continue;
                   const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
-                  const counters = visibleCounters.map((counter: any) => ({
-                    name: counter.name,
-                    displayName: counter.displayName,
-                    value: scoped[counter.name] ?? countersRef.current[counter.name] ?? counter.value,
-                    min: counter.min ?? 0,
-                    max: counter.max ?? 100,
-                    color: counter.color || '#3B82F6',
-                    showNumericValue: counter.showNumericValue ?? false,
-                    numericFormat: counter.numericFormat || 'value',
-                    orientation: counter.levelMeterOrientation || 'horizontal',
-                  }));
+                  const counters = visibleCounters.map((counter: any) =>
+                    toMeterCounterData(
+                      counter,
+                      c.id,
+                      engineRef.current?.getContext() as any,
+                      scoped,
+                      (n: string) => countersRef.current[n],
+                    ),
+                  );
                   const est = (frame.style?.padding ?? 8) * 2 +
                     counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
                     Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);

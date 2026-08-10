@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -837,17 +837,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
             if (visibleCounters.length === 0) continue;
             const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
-            const counters = visibleCounters.map((counter: any) => ({
-              name: counter.name,
-              displayName: counter.displayName,
-              value: scoped[counter.name] ?? ctx.getCounter?.(counter.name) ?? counter.value ?? 0,
-              min: counter.min ?? 0,
-              max: counter.max ?? 100,
-              color: counter.color || '#3B82F6',
-              showNumericValue: counter.showNumericValue ?? false,
-              numericFormat: counter.numericFormat || 'value',
-              orientation: counter.levelMeterOrientation || 'horizontal',
-            }));
+            const counters = visibleCounters.map((counter: any) =>
+              toMeterCounterData(counter, c.id, ctx as any, scoped, (n) => ctx.getCounter?.(n)),
+            );
             const est = (frame.style?.padding ?? 8) * 2 +
               counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
               Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);

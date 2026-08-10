@@ -6860,7 +6860,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           counterName: counter.name,
                           meterOrientation: counter.levelMeterOrientation || 'horizontal',
                           showNumericValue: counter.showNumericValue || false,
-                          numericFormat: counter.numericFormat || 'value',
+                          numericFormat: counter.numericFormat === 'band' ? 'value' : (counter.numericFormat || 'value'),
                           meterColor: counter.color || '#3B82F6',
                           meterBackgroundColor: 'rgba(255, 255, 255, 0.3)',
                         };
@@ -6884,7 +6884,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             counterName: counter.name,
                             meterOrientation: counter.levelMeterOrientation || 'horizontal',
                             showNumericValue: counter.showNumericValue || false,
-                            numericFormat: counter.numericFormat || 'value',
+                            numericFormat: counter.numericFormat === 'band' ? 'value' : (counter.numericFormat || 'value'),
                             meterColor: counter.color || '#3B82F6',
                             meterBackgroundColor: 'rgba(255, 255, 255, 0.3)',
                           });

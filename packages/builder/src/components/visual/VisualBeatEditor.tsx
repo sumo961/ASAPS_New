@@ -36,6 +36,7 @@ import {
   ChatDialogView,
   type PositionedElementData,
   type ChatMessage,
+  toMeterCounterData,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
@@ -265,17 +266,12 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const visibleCounters = character.counters?.filter(c => c.visible) || [];
     if (visibleCounters.length === 0) return null;
     return {
-      counters: visibleCounters.map(counter => ({
-        name: counter.name,
-        displayName: counter.displayName,
-        value: counter.value,
-        min: counter.min ?? 0,
-        max: counter.max ?? 100,
-        color: counter.color || '#3B82F6',
-        showNumericValue: counter.showNumericValue ?? false,
-        numericFormat: (counter.numericFormat || 'value') as 'value' | 'fraction' | 'percentage',
-        orientation: (counter.levelMeterOrientation || 'horizontal') as 'horizontal' | 'vertical',
-      })),
+      // No engine in the editor, so no live affect to read — a derived
+      // counter shows its authored range at zero. That is the honest
+      // preview: the value only exists while a story is running.
+      counters: visibleCounters.map(counter =>
+        toMeterCounterData(counter as any, character.id, null),
+      ),
       config: character.meterFrame,
     };
   }, [showHud, characters]);

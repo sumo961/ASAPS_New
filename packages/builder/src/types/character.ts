@@ -3,6 +3,12 @@
  * Defines the data model for characters in ASPS stories
  */
 
+import type { CounterSource, CounterBand } from '@asaps/core';
+
+// Re-exported so the editor and renderer can import binding types from the
+// same place as the rest of the character model.
+export type { CounterSource, CounterBand };
+
 export interface Character {
   id: string;
   name: string;
@@ -279,8 +285,27 @@ export interface CharacterCounter {
   levelMeterOrientation?: 'horizontal' | 'vertical';
   /** Show numeric value alongside level meter */
   showNumericValue?: boolean;
-  /** Numeric display format: 'value' (75), 'fraction' (75/100), 'percentage' (75%) */
-  numericFormat?: 'value' | 'fraction' | 'percentage';
+  /**
+   * Numeric display format: 'value' (75), 'fraction' (75/100),
+   * 'percentage' (75%), or 'band' — the qualitative phrase from `bands`
+   * shown where the number would otherwise go ("trusting").
+   */
+  numericFormat?: 'value' | 'fraction' | 'percentage' | 'band';
+
+  // ---- Counter binding (docs/Counter-Binding-Design.md) ----
+  /**
+   * Omitted (the default, and every counter authored before this existed) =
+   * an authored counter, moved only by effects. Present = a derived,
+   * read-only display of affect state; `value` is then ignored and the
+   * counter cannot be targeted by setCounter/changeCounter effects.
+   */
+  source?: CounterSource;
+  /**
+   * Optional named ranges rendered as a phrase (with `numericFormat: 'band'`).
+   * Applies to authored counters too — nothing here is affect-specific.
+   * `label` is player-facing and must ride through both translation extractors.
+   */
+  bands?: CounterBand[];
 }
 
 // ============================================

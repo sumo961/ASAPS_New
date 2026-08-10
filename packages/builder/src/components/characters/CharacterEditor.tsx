@@ -40,6 +40,7 @@ import {
   describeStance,
 } from '../../services/prompts/interpersonalStance';
 import { SpriteSheetEditor } from './SpriteSheetEditor';
+import { CounterSourceEditor } from './CounterSourceEditor';
 import { HudLayoutPreview, type HudOverlaySettings } from './HudLayoutPreview';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
@@ -82,6 +83,10 @@ interface CharacterEditorProps {
    *  preview so screen-docked character frames are shown flowing clear of the
    *  global chrome. */
   hudOverlays?: HudOverlaySettings;
+  /** The rest of the cast. A counter bound to a sentiment needs someone to
+   *  point at, and may show a *different* character's feeling — the
+   *  player-facing "do they trust me?" meter. */
+  allCharacters?: Character[];
 }
 
 export const CharacterEditor: React.FC<CharacterEditorProps> = ({
@@ -93,6 +98,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   emotionPalette,
   focusVariantId,
   hudOverlays,
+  allCharacters = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
@@ -722,12 +728,18 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               <input
                 type="number"
                 value={counter.value}
+                disabled={!!counter.source}
+                title={counter.source
+                  ? 'This counter mirrors affect state, so it has no starting value of its own.'
+                  : undefined}
                 onChange={(e) => {
                   const newCounters = [...editedCharacter.counters];
                   newCounters[index] = { ...counter, value: Number(e.target.value) };
                   setEditedCharacter({ ...editedCharacter, counters: newCounters });
                 }}
-                className="px-2 py-1 border rounded text-sm"
+                className={`px-2 py-1 border rounded text-sm ${
+                  counter.source ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''
+                }`}
                 placeholder="0"
               />
               <input
@@ -858,7 +870,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       value={counter.numericFormat || 'value'}
                       onChange={(e) => {
                         const newCounters = [...editedCharacter.counters];
-                        newCounters[index] = { ...counter, numericFormat: e.target.value as 'value' | 'fraction' | 'percentage' };
+                        newCounters[index] = { ...counter, numericFormat: e.target.value as 'value' | 'fraction' | 'percentage' | 'band' };
                         setEditedCharacter({ ...editedCharacter, counters: newCounters });
                       }}
                       className="px-2 py-1 border rounded text-xs"
@@ -866,11 +878,24 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       <option value="value">75</option>
                       <option value="fraction">75/100</option>
                       <option value="percentage">75%</option>
+                      <option value="band" disabled={!counter.bands?.length}>
+                        {counter.bands?.length ? 'trusting (words)' : 'words — add them below'}
+                      </option>
                     </select>
                   )}
                 </>
               )}
             </div>
+            <CounterSourceEditor
+              counter={counter}
+              owner={editedCharacter}
+              characters={allCharacters}
+              onChange={(next) => {
+                const newCounters = [...editedCharacter.counters];
+                newCounters[index] = next;
+                setEditedCharacter({ ...editedCharacter, counters: newCounters });
+              }}
+            />
           </div>
         ))}
       </div>

@@ -146,3 +146,54 @@ describe('screen docking position', () => {
     expect(root.style.opacity).toBe('0.5');
   });
 });
+
+describe('zero-origin bar and qualitative bands', () => {
+  const fillOf = (c: HTMLElement) => c.querySelector('[data-meter-fill]') as HTMLElement;
+
+  it('fills from the left edge when zero is the left edge (unchanged legacy behaviour)', () => {
+    const { container } = renderFrame({ counters: [counter({ value: 62, min: 0, max: 100 })] });
+    const fill = fillOf(container);
+    expect(fill.style.left).toBe('0%');
+    expect(parseFloat(fill.style.width)).toBeCloseTo(62);
+    expect(container.querySelector('[data-meter-zero-tick]')).toBeNull();
+  });
+
+  it('grows outward from the centre on a bipolar range', () => {
+    const { container } = renderFrame({ counters: [counter({ value: 62, min: -100, max: 100 })] });
+    const fill = fillOf(container);
+    expect(parseFloat(fill.style.left)).toBeCloseTo(50);
+    expect(parseFloat(fill.style.width)).toBeCloseTo(31);
+    // The origin is marked, so the centre reads as zero rather than as half-full.
+    expect(container.querySelector('[data-meter-zero-tick]')).not.toBeNull();
+  });
+
+  it('grows leftward from the centre for a negative value', () => {
+    const { container } = renderFrame({ counters: [counter({ value: -45, min: -100, max: 100 })] });
+    const fill = fillOf(container);
+    expect(parseFloat(fill.style.left)).toBeCloseTo(27.5);
+    expect(parseFloat(fill.style.width)).toBeCloseTo(22.5);
+  });
+
+  it('renders zero as an empty bar, never as half-full', () => {
+    // The rejected "remapped" reading would have shown 50% here.
+    const { container } = renderFrame({ counters: [counter({ value: 0, min: -100, max: 100 })] });
+    expect(parseFloat(fillOf(container).style.width)).toBeCloseTo(0);
+  });
+
+  it('shows the band phrase in place of the number', () => {
+    renderFrame({
+      counters: [counter({
+        value: 62, min: -100, max: 100, numericFormat: 'band',
+        bands: [{ from: -100, label: 'wary' }, { from: 20, label: 'trusting' }],
+      })],
+    });
+    expect(screen.getByText('trusting')).toBeDefined();
+    expect(screen.queryByText('62')).toBeNull();
+  });
+
+  it('falls back to the number when words are on but none are written', () => {
+    // A blank readout would look like a broken meter.
+    renderFrame({ counters: [counter({ value: 62, numericFormat: 'band', bands: [] })] });
+    expect(screen.getByText('62')).toBeDefined();
+  });
+});
