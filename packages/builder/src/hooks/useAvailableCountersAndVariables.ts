@@ -17,6 +17,34 @@ export interface AvailableCounter {
   min?: number;
   max?: number;
   fullName: string; // "characterName: displayName"
+  /**
+   * True when the counter mirrors affect state rather than storing a value
+   * of its own (docs/Counter-Binding-Design.md).
+   *
+   * Annotated here rather than filtered, because the same list feeds both
+   * *reads* and *writes*. Reading a derived counter in a condition is
+   * exactly as valid as reading any other; only writing to one is
+   * meaningless, since the next appraisal tick would overwrite it. Write
+   * surfaces disable these with a reason — see `derivedWriteReason`.
+   */
+  derived?: boolean;
+  /** The affect effect that actually moves this quantity, for write surfaces to suggest. */
+  derivedWriteReason?: string;
+}
+
+/**
+ * Why a derived counter can't be assigned, and what to use instead. Shown
+ * inline at write surfaces so the option is visibly unavailable rather than
+ * silently missing — an author who defined a counter and then can't find it
+ * would reasonably assume a bug.
+ */
+export function derivedWriteReason(counter: { name: string; source?: { kind: string } }): string {
+  const target = counter.source?.kind === 'mood'
+    ? 'a Nudge Mood effect'
+    : counter.source?.kind === 'emotion'
+      ? 'a Fire Emotion effect'
+      : 'an Add Sentiment effect';
+  return `${counter.name} mirrors affect state — change it with ${target}`;
 }
 
 /**
@@ -59,6 +87,8 @@ export function useAvailableCounters(characters: Character[]): AvailableCounter[
             min: counter.min,
             max: counter.max,
             fullName: `${character.displayName || character.name}: ${counter.displayName || counter.name}`,
+            derived: !!counter.source,
+            derivedWriteReason: counter.source ? derivedWriteReason(counter) : undefined,
           });
         });
       }

@@ -321,6 +321,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
             <CounterOwnerPicker
               compact
               label="Counter"
+              forWriting
               counters={availableCounters}
               characters={(availableCharacters || []).map((c) => ({
                 id: c.id,

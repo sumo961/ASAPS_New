@@ -32,6 +32,13 @@ interface CounterOwnerPickerProps {
   compact?: boolean;
   /** Wrapper class (compact callers size it within a flex row). */
   className?: string;
+  /**
+   * True when this picker chooses a counter to *assign to*. Derived counters
+   * are then shown disabled: they mirror affect state, so a written value
+   * would be undone by the next appraisal tick. Reads (condition operands,
+   * interpolation) leave this off — reading a derived counter is fine.
+   */
+  forWriting?: boolean;
 }
 
 const CUSTOM = '__custom__';
@@ -55,6 +62,7 @@ export const CounterOwnerPicker: React.FC<CounterOwnerPickerProps> = ({
   help,
   compact = false,
   className,
+  forWriting = false,
 }) => {
   const locked = lockedCharacter !== undefined;
 
@@ -121,11 +129,23 @@ export const CounterOwnerPicker: React.FC<CounterOwnerPickerProps> = ({
       title={compact && name ? `${name} — ${charLabel(character || '')}` : undefined}
     >
       <option value="">Select counter…</option>
-      {pairs.map((c) => (
-        <option key={`${c.characterId}:${c.name}`} value={`pair:${c.characterId}:${c.name}`}>
-          {(c.displayName || c.name)} — {c.characterName || 'Story-global'}
-        </option>
-      ))}
+      {pairs.map((c) => {
+        // Derived counters are readable but not assignable. Shown disabled
+        // with the reason, so an author who just defined one doesn't conclude
+        // the picker has lost it.
+        const blocked = forWriting && c.derived;
+        return (
+          <option
+            key={`${c.characterId}:${c.name}`}
+            value={`pair:${c.characterId}:${c.name}`}
+            disabled={blocked}
+            title={blocked ? c.derivedWriteReason : undefined}
+          >
+            {(c.displayName || c.name)} — {c.characterName || 'Story-global'}
+            {blocked ? ' (mirrors affect state)' : ''}
+          </option>
+        );
+      })}
       <option value={CUSTOM}>+ Type a counter name…</option>
     </select>
   );

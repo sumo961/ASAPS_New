@@ -24,8 +24,8 @@ describe('useAvailableCounters', () => {
     ];
     const { result } = renderHook(() => useAvailableCounters(chars));
     expect(result.current).toEqual([
-      { name: 'trust', displayName: 'Trust', characterId: 'c1', characterName: 'Eve', min: 0, max: 10, fullName: 'Eve: Trust' },
-      { name: 'hp', displayName: 'hp', characterId: 'c2', characterName: 'bob', min: undefined, max: undefined, fullName: 'bob: hp' },
+      { name: 'trust', displayName: 'Trust', characterId: 'c1', characterName: 'Eve', min: 0, max: 10, fullName: 'Eve: Trust', derived: false, derivedWriteReason: undefined },
+      { name: 'hp', displayName: 'hp', characterId: 'c2', characterName: 'bob', min: undefined, max: undefined, fullName: 'bob: hp', derived: false, derivedWriteReason: undefined },
     ]);
   });
 
@@ -85,5 +85,30 @@ describe('useAvailableCountersAndVariables (combined)', () => {
   it('handles empty inputs', () => {
     const { result } = renderHook(() => useAvailableCountersAndVariables([], null));
     expect(result.current).toEqual({ counters: [], variables: [], allNumericOptions: [], allStringOptions: [] });
+  });
+});
+
+describe('derived counters are annotated, not filtered', () => {
+  // The same list feeds reads and writes. Removing derived counters here
+  // would break conditions, which may legitimately read one.
+  it('flags a bound counter and names the effect that does move it', () => {
+    const chars = [char({
+      counters: [
+        { name: 'gold', displayName: 'Gold' },
+        { name: 'trust', displayName: 'Trust', source: { kind: 'sentiment', toEntityRef: 'p', emotion: 'trust' } },
+        { name: 'fear', displayName: 'Fear', source: { kind: 'emotion', emotion: 'fear' } },
+        { name: 'spirits', displayName: 'Spirits', source: { kind: 'mood', axis: 'valence' } },
+      ],
+    })];
+    const { result } = renderHook(() => useAvailableCounters(chars));
+
+    expect(result.current.map(c => c.derived)).toEqual([false, true, true, true]);
+    // Still present — a condition may read any of them.
+    expect(result.current).toHaveLength(4);
+
+    expect(result.current[0].derivedWriteReason).toBeUndefined();
+    expect(result.current[1].derivedWriteReason).toContain('Add Sentiment');
+    expect(result.current[2].derivedWriteReason).toContain('Fire Emotion');
+    expect(result.current[3].derivedWriteReason).toContain('Nudge Mood');
   });
 });

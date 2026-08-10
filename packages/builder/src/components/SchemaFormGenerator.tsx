@@ -523,6 +523,9 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               name={typeof parameters.name === 'string' ? parameters.name : (parameters.name || '')}
               character={parameters.character || ''}
               onChange={setNameAndOwner}
+              // setVariable assigns to the chosen counter, so derived ones
+              // are offered but not selectable.
+              forWriting
             />
           );
         }
@@ -821,7 +824,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           if (parameters.saveToType !== 'counter') {
             return null;
           }
-          const hasCounters = availableCounters.length > 0;
+          // This field *writes* the input into a counter, so derived counters
+          // are not offered — assigning to one is undone by the next appraisal
+          // tick. The field stays free text, so an author can still type one;
+          // that case gets an explicit warning rather than silent failure.
+          const writableCounters = availableCounters.filter((c) => !c.derived);
+          const hasCounters = writableCounters.length > 0;
+          const derivedHit = availableCounters.find((c) => c.derived && c.name === value);
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -838,16 +847,20 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               />
               {hasCounters && (
                 <datalist id="inputtext-counter-datalist">
-                  {availableCounters.map((c) => (
+                  {writableCounters.map((c) => (
                     <option key={`${c.characterId}-${c.name}`} value={c.name}>
                       {c.fullName}
                     </option>
                   ))}
                 </datalist>
               )}
-              {hasCounters ? (
+              {derivedHit ? (
+                <p className="text-xs text-amber-700 mt-1">
+                  {derivedHit.derivedWriteReason} — a value saved here would be overwritten.
+                </p>
+              ) : hasCounters ? (
                 <p className="text-xs text-gray-500 mt-1">
-                  {availableCounters.length} counter(s) available from characters
+                  {writableCounters.length} counter(s) available from characters
                 </p>
               ) : (
                 <p className="text-xs text-gray-500 mt-1">
