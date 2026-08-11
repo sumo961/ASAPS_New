@@ -30,7 +30,7 @@ import {
   Heart
 } from 'lucide-react';
 import { Character, CharacterState, CharacterCounter, InventoryItem, SpriteAnimation, MeterFrameConfig, MeterFrameAnchor, MeterFrameScreenPosition, MeterFrameDockMode, DEFAULT_METER_FRAME_CONFIG, InventoryFrameConfig, DEFAULT_INVENTORY_FRAME_CONFIG, MoodFrameConfig, DEFAULT_MOOD_FRAME_CONFIG } from '../../types/character';
-import { describeMoodAxis, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS, DEFAULT_PERSONALITY_ARCHETYPES, findPersonalityArchetype } from '@asaps/core';
+import { describeMoodAxis, suggestOpeningStance, DEFAULT_TRAIT_NAMES, DEFAULT_TRAIT_VALUES, TRAIT_DESCRIPTIONS, DEFAULT_PERSONALITY_ARCHETYPES, findPersonalityArchetype } from '@asaps/core';
 import { MoodPad } from './MoodPad';
 import { StancePad } from './StancePad';
 import {
@@ -101,6 +101,8 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   allCharacters = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
+  // Who a suggested opening stance points at. Empty = first available.
+  const [openingStanceTarget, setOpeningStanceTarget] = useState('');
   const [editedCharacter, setEditedCharacter] = useState<Character>(character);
 
   // When opened with focusVariantId set (variant card click), scroll the
@@ -1974,6 +1976,22 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     const moodIsNeutral = !editedCharacter.initialMood
       || (Math.abs(mood.valence) < 0.05 && Math.abs(mood.arousal) < 0.05);
 
+    // Opening stance: only worth proposing when there is a personality to
+    // derive it from, someone to point it at, and no authored trust toward
+    // that target already. A character with no traits gets nothing — the
+    // affect opt-out has to survive this feature.
+    const openingStanceTargets = allCharacters.filter((c) => c.id !== editedCharacter.id);
+    const rawOpeningStance = suggestOpeningStance(editedCharacter.traits);
+    const chosenTarget = openingStanceTarget || openingStanceTargets[0]?.id || '';
+    const alreadyAuthored = sentiments.some(
+      (s) => s.toEntityRef === chosenTarget && s.emotion === 'trust',
+    );
+    // A neutral suggestion is no suggestion — it would just add a zero row.
+    const openingStance =
+      rawOpeningStance && rawOpeningStance.strength !== 0 && !alreadyAuthored
+        ? rawOpeningStance
+        : null;
+
     // Step 6 — Personality traits. Authored on the Character; modulate
     // emotion deltas at runtime via the project's TraitModulationProfile.
     const traits = editedCharacter.traits || {};
@@ -2504,6 +2522,53 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               Add sentiment
             </button>
           </div>
+
+          {/* Opening-stance suggestion. Every sentiment otherwise starts at
+              exactly zero, so a character with a strong personality still
+              meets the whole cast perfectly neutral. Offered, never applied
+              automatically — an opening stance is an authorial decision. */}
+          {openingStance && openingStanceTargets.length > 0 && (
+            <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+              <p className="text-amber-900">
+                {editedCharacter.displayName || editedCharacter.name} has{' '}
+                <strong>{openingStance.basis}</strong> — start them{' '}
+                <strong>{openingStance.description}</strong> ({openingStance.strength > 0 ? '+' : ''}
+                {openingStance.strength}) toward someone?
+              </p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <select
+                  value={openingStanceTarget}
+                  onChange={(e) => setOpeningStanceTarget(e.target.value)}
+                  className="px-1.5 py-0.5 border rounded text-xs"
+                  aria-label="Opening stance target"
+                >
+                  {openingStanceTargets.map((c) => (
+                    <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const target = openingStanceTarget || openingStanceTargets[0].id;
+                    setEditedCharacter({
+                      ...editedCharacter,
+                      initialSentiments: [
+                        ...sentiments.filter(
+                          (s) => !(s.toEntityRef === target && s.emotion === 'trust'),
+                        ),
+                        { toEntityRef: target, emotion: 'trust', strength: openingStance.strength },
+                      ],
+                    });
+                  }}
+                  className="px-2 py-0.5 bg-amber-600 text-white rounded hover:bg-amber-700"
+                >
+                  Add it
+                </button>
+                <span className="text-amber-700">
+                  Or set your own below — this only fills in a starting point.
+                </span>
+              </div>
+            </div>
+          )}
 
           {sentiments.length === 0 ? (
             <p className="text-xs text-gray-400 italic">No initial sentiments. Click "Add sentiment" to define one.</p>

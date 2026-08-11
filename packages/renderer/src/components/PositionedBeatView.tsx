@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
-import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont } from '@asaps/core';
+import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
@@ -386,6 +386,8 @@ export interface PositionedElementData {
   counterValue?: number;
   counterMin?: number;
   counterMax?: number;
+  /** Band wording for the bound counter, from the counter resolver. */
+  counterBands?: Array<{ from: number; label: string }>;
   /** Optional tooltip/hover description for interactive elements (e.g., pickProp items) */
   description?: string;
   /** Keypad-specific fields (for kind='keypad') */
@@ -530,7 +532,7 @@ export interface PositionedBeatViewProps {
   /** Animation paths for elements (path animations) */
   animations?: AnimationPath[];
   /** Resolver function to get counter values by name (for meter elements) */
-  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null;
+  counterResolver?: (counterName: string) => { value: number; min: number; max: number; bands?: Array<{ from: number; label: string }> } | null;
   /** Resolver function to get meter frame data for a character (for HUD display) */
   characterMeterFrameResolver?: (characterId: string) => {
     counters: MeterCounterData[];
@@ -2886,6 +2888,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           counterValue={element.counterValue ?? 0}
           counterMin={element.counterMin ?? 0}
           counterMax={element.counterMax ?? 100}
+          counterBands={element.counterBands}
           theme={theme}
           fontScale={mobileFontScale}
         />
@@ -4894,15 +4897,28 @@ const MeterElement: React.FC<{
   counterValue: number;
   counterMin: number;
   counterMax: number;
+  /** Band wording from the counter, supplied by the counter resolver. */
+  counterBands?: Array<{ from: number; label: string }>;
   theme: RenderThemeSettings;
   fontScale?: number;
-}> = ({ style, location, counterValue, counterMin, counterMax, theme, fontScale = 1.0 }) => {
+}> = ({ style, location, counterValue, counterMin, counterMax, counterBands, theme, fontScale = 1.0 }) => {
   const isHorizontal = location.meterOrientation !== 'vertical';
-  const percentage = counterMax > counterMin
-    ? Math.min(100, Math.max(0, ((counterValue - counterMin) / (counterMax - counterMin)) * 100))
-    : 0;
+  const range = counterMax > counterMin
+    ? { min: counterMin, max: counterMax }
+    : { min: counterMin, max: counterMin + 1 };
+  const percentage = ((counterValue - range.min) / (range.max - range.min)) * 100;
+
+  // Same zero-origin rule as the character meter frame and the editor preview:
+  // the fill grows from wherever zero falls in [min, max]. A 0..100 counter
+  // still fills from the left edge exactly as before.
+  const fill = barFill(counterValue, range);
+  const fillStartPct = fill.start * 100;
+  const fillSizePct = (fill.end - fill.start) * 100;
+  const zeroPct = ((0 - range.min) / (range.max - range.min)) * 100;
+  const showZeroTick = range.min < 0;
 
   const barColor = location.meterColor || '#5B8DEF';
+  const negativeColor = '#DC2626';
   const bgColor = location.meterBackgroundColor || 'rgba(255, 255, 255, 0.3)';
 
   // Format numeric value based on format setting
@@ -4910,9 +4926,12 @@ const MeterElement: React.FC<{
     if (!location.showNumericValue) return null;
     switch (location.numericFormat) {
       case 'fraction':
-        return `${counterValue}/${counterMax}`;
+        return `${counterValue}/${range.max}`;
       case 'percentage':
-        return `${Math.round(percentage)}%`;
+        return `${Math.round(Math.min(100, Math.max(0, percentage)))}%`;
+      case 'band':
+        // Fall back to the number when words are on but none were captured.
+        return resolveBand(counterValue, counterBands) ?? `${counterValue}`;
       default:
         return `${counterValue}`;
     }
@@ -4946,19 +4965,36 @@ const MeterElement: React.FC<{
             flexDirection: isHorizontal ? 'row' : 'column-reverse',
             border: '1px solid rgba(0, 0, 0, 0.2)',
             boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
+            position: 'relative',
           }}
         >
-          {/* Fill bar */}
+          {/* Fill bar — anchored at zero, so it can start part-way along the
+              track and grow either direction. */}
           <div
+            data-meter-fill={location.counterName || ''}
             style={{
-              width: isHorizontal ? `${percentage}%` : '100%',
-              height: isHorizontal ? '100%' : `${percentage}%`,
-              backgroundColor: barColor,
+              position: 'absolute',
+              ...(isHorizontal
+                ? { left: `${fillStartPct}%`, width: `${fillSizePct}%`, top: 0, bottom: 0 }
+                : { bottom: `${fillStartPct}%`, height: `${fillSizePct}%`, left: 0, right: 0 }),
+              backgroundColor: fill.negative ? negativeColor : barColor,
               borderRadius: '3px',
               transition: 'all 300ms ease-out',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
             }}
           />
+          {showZeroTick && (
+            <div
+              data-meter-zero-tick=""
+              style={{
+                position: 'absolute',
+                backgroundColor: 'rgba(0, 0, 0, 0.35)',
+                ...(isHorizontal
+                  ? { left: `${zeroPct}%`, width: '1px', top: 0, bottom: 0 }
+                  : { bottom: `${zeroPct}%`, height: '1px', left: 0, right: 0 }),
+              }}
+            />
+          )}
         </div>
 
         {/* Numeric value display */}
@@ -5044,7 +5080,7 @@ export function createPositionedElementData(
   beatType: string,
   assetResolver?: (assetId: string) => string | undefined,
   characterResolver?: (characterId: string, stateId?: string) => string | undefined,
-  counterResolver?: (counterName: string) => { value: number; min: number; max: number } | null,
+  counterResolver?: (counterName: string) => { value: number; min: number; max: number; bands?: Array<{ from: number; label: string }> } | null,
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null
 ): PositionedElementData[] {
   console.log('[createPositionedElementData] Creating elements:', { beatType, content, locationCount: locations.length });
@@ -5285,12 +5321,14 @@ export function createPositionedElementData(
     let counterValue: number | undefined;
     let counterMin: number | undefined;
     let counterMax: number | undefined;
+    let counterBands: Array<{ from: number; label: string }> | undefined;
     if (location.kind === 'meter' && location.counterName && counterResolver) {
       const counterData = counterResolver(location.counterName);
       if (counterData) {
         counterValue = counterData.value;
         counterMin = counterData.min;
         counterMax = counterData.max;
+        counterBands = counterData.bands;
       }
     }
 
@@ -5343,6 +5381,7 @@ export function createPositionedElementData(
       counterValue,
       counterMin,
       counterMax,
+      counterBands,
       keypadLayout,
       keypadMaxDigits,
       keypadMinDigits,

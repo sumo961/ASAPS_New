@@ -20,6 +20,12 @@ export {
   type ArchetypeSelfSentiment,
 } from './PersonalityArchetypes';
 export {
+  suggestOpeningStance,
+  describeOpeningStance,
+  OPENING_STANCE_SCALE,
+  type OpeningStanceSuggestion,
+} from './openingStance';
+export {
   isDerivedCounter,
   counterRange,
   projectStrength,

@@ -131,7 +131,7 @@ export interface VisualElement {
   counterName?: string;      // Name of the counter to display
   meterOrientation?: 'horizontal' | 'vertical';
   showNumericValue?: boolean;
-  numericFormat?: 'value' | 'fraction' | 'percentage';
+  numericFormat?: 'value' | 'fraction' | 'percentage' | 'band';
   meterColor?: string;       // Bar fill color
   meterBackgroundColor?: string;  // Bar background color
   // Grouping

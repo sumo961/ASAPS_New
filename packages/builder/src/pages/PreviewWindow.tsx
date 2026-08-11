@@ -890,15 +890,23 @@ export const PreviewWindow: React.FC = () => {
 
       // Set up counter resolver - uses ref for latest data
       (reactRenderer as any).setCounterResolver?.((counterName: string) => {
-        const value = countersRef.current[counterName] ?? 0;
-        const counterDef = previewDataRef.current?.characters
-          ?.flatMap(c => c.counters || [])
-          .find(c => c.name === counterName);
-        return {
-          value,
-          min: counterDef?.min ?? 0,
-          max: counterDef?.max ?? 100,
-        };
+        // Find the owning character too, not just the definition: a bound
+        // counter is projected from that character's affect state, and the
+        // story-global counter store has no value for it at all.
+        const owner = previewDataRef.current?.characters
+          ?.find(c => (c.counters || []).some(k => k.name === counterName));
+        const counterDef = owner?.counters?.find(k => k.name === counterName);
+        if (!counterDef) {
+          return { value: countersRef.current[counterName] ?? 0, min: 0, max: 100 };
+        }
+        const data = toMeterCounterData(
+          counterDef as any,
+          owner!.id,
+          engineRef.current?.getContext() as any,
+          charCountersRef.current[owner!.id] ?? charCountersRef.current[(owner as any).name] ?? {},
+          (n: string) => countersRef.current[n],
+        );
+        return { value: data.value, min: data.min, max: data.max, bands: data.bands };
       });
 
       // Set up character meter frame resolver for HUD overlays

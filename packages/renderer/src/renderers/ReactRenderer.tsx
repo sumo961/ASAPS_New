@@ -919,7 +919,7 @@ export class ReactRenderer extends BaseRenderer {
     url: string;
   }> | undefined) | null = null;
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
-  private counterResolver: ((counterName: string) => { value: number; min: number; max: number } | null) | null = null;  // NEW: Counter value resolver
+  private counterResolver: ((counterName: string) => { value: number; min: number; max: number; bands?: Array<{ from: number; label: string }> } | null) | null = null;  // NEW: Counter value resolver
   private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
   private characterInventoryResolver: ((characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null) | null = null;  // NEW: Character inventory resolver
   private characterMoodFrameResolver: ((characterId: string) => { valence: number; arousal: number; config: import('../components/CharacterMoodFrame').MoodFrameConfig; palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>; characterName?: string; characterPortraitUrl?: string; characterColor?: string } | null) | null = null;
@@ -1333,7 +1333,7 @@ export class ReactRenderer extends BaseRenderer {
    * This allows the renderer to get counter values for meter elements
    * The resolver should look up the counter and return { value, min, max }
    */
-  setCounterResolver(resolver: (counterName: string) => { value: number; min: number; max: number } | null): void {
+  setCounterResolver(resolver: (counterName: string) => { value: number; min: number; max: number; bands?: Array<{ from: number; label: string }> } | null): void {
     this.counterResolver = resolver;
   }
 

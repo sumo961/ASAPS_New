@@ -73,7 +73,8 @@ export interface Location {
   counterName?: string;      // Name of the counter to display
   meterOrientation?: 'horizontal' | 'vertical';
   showNumericValue?: boolean;
-  numericFormat?: 'value' | 'fraction' | 'percentage';
+  /** 'band' renders the qualitative phrase from `meterBands` instead of a number. */
+  numericFormat?: 'value' | 'fraction' | 'percentage' | 'band';
   meterColor?: string;       // Bar fill color
   meterBackgroundColor?: string;  // Bar background color
   // Per-element hotspot appearance override (overrides global hotspot settings)
