@@ -428,3 +428,68 @@ describe('getEnhancedStoryExample', () => {
     });
   });
 });
+
+describe('guidance stays current with the schema', () => {
+  const prompt = buildEnhancedStoryGenerationSystemPrompt(SAMPLE_SCHEMA);
+
+  describe('dialog layout vocabulary', () => {
+    it('teaches layoutTemplate, the authoritative field', () => {
+      // v0.9.82 unified aiDialogTree onto layoutTemplate; the picker used to
+      // read a field the beat didn't have, so it showed one layout and ran
+      // another. The prompt kept teaching the legacy field afterwards.
+      expect(prompt).toMatch(/layoutTemplate/);
+    });
+
+    it('warns off the legacy presentationMode and its dead "positioned" value', () => {
+      expect(prompt).toMatch(/NOT "presentationMode" and NOT "positioned"/);
+    });
+
+    it('never presents "positioned" as a layout the model may choose', () => {
+      // 'positioned' migrates to 'stacked'; offering it teaches a vocabulary
+      // the current schema does not have.
+      expect(prompt).not.toMatch(/layoutTemplate:.*"positioned"/);
+    });
+  });
+
+  describe('counter binding', () => {
+    it('explains that a counter can display a feeling rather than store a number', () => {
+      expect(prompt).toMatch(/"source"/);
+      expect(prompt).toMatch(/kind.*sentiment/i);
+    });
+
+    it('forbids writing to a bound counter', () => {
+      // The write is silently lost to the next appraisal — the single most
+      // likely mistake once binding exists.
+      expect(prompt).toMatch(/NEVER emit an incrementCounter\/setCounter effect targeting a bound counter/);
+    });
+
+    it('ties the range to whether the feeling has an opposite', () => {
+      expect(prompt).toMatch(/min: -100 when the feeling has a real opposite/);
+      expect(prompt).toMatch(/min: 0 when it does not/);
+    });
+
+    it('requires a neutral band on a bipolar ladder', () => {
+      expect(prompt).toMatch(/band covering ZERO/);
+    });
+  });
+
+  describe('cross-beat properties shipped since the last prompt update', () => {
+    it('documents spatialFit', () => {
+      expect(prompt).toMatch(/spatialFit/);
+    });
+
+    it('documents explainHuds, and says not to overuse it', () => {
+      expect(prompt).toMatch(/explainHuds/);
+      expect(prompt).toMatch(/not decoration/i);
+    });
+
+    it('documents the playSound effect', () => {
+      expect(prompt).toMatch(/"type": "playSound"/);
+    });
+
+    it('documents video captions as the accessibility default', () => {
+      expect(prompt).toMatch(/captions: cue rows/);
+      expect(prompt).toMatch(/accessibility default/i);
+    });
+  });
+});

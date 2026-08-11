@@ -180,7 +180,8 @@ const BEAT_TYPE_GUIDE = `
   }
 - Optional parameters:
   - choiceDelay: seconds before choices fade in (creates suspense)
-  - presentationMode: "positioned" (default) | "chat-scroll" (scrollable chat) | "chat-bubble" (single bubble)
+  - layoutTemplate: "conversation" (default — text one side, choices the other) | "stacked" (text on top, choices below) | "chat-scroll" (scrollable chat history) | "chat-bubble" (one bubble at a time)
+    ⚠️ Prefer layoutTemplate. The legacy "presentationMode" still parses but layoutTemplate wins; do not emit both.
   - markVisited: true to block and dim choices leading to previously visited beats
 - 🚨 DO NOT enable markVisited on hub beats the player must return to (investigation hubs, shops, menus, decision loops). It makes each option one-shot and can leave the story unsolvable. Only enable markVisited on beats representing a truly one-way decision.
 - ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
@@ -361,6 +362,8 @@ Concrete rules:
   - autoplay: boolean (default: true)
   - controls: boolean (default: true)
   - skipButton: boolean (default: true)
+  - captions: cue rows [{ "start": 0, "end": 3.5, "text": "..." }] in seconds. Cue text goes through the normal translation system, so subtitles arrive in every exported language. Write captions whenever the video carries spoken narrative — it is the accessibility default, not an extra.
+  - videoTranslations: per-language alternate video { "de": { "videoAssetId": "..." } }. Only emit this if the author supplied language-specific footage; captions cover the usual case.
 - ⚠️ CRITICAL: Use "videoFile" parameter, NOT "videoAssetId"!
 - Connections: Single → after video ends or skip
 - videoBeat uses "connections" array at beat level (NOT inside parameters!)
@@ -544,6 +547,16 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
   - Example (per-character): { "type": "counter", "name": "trust", "value": 2, "operation": "add", "character": "char_mother" }
   - Example (global, unchanged): { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }
   - SAME RULE for counter EFFECTS on choices/dialog nodes: an incrementCounter/setCounter effect may carry a "character" to scope to that character's per-character counter; omit it for a global counter. Example: { "type": "incrementCounter", "target": "trust", "value": 1, "character": "char_mother" }. (For these effects "target" is the counter name; the affect effects nudgeMood/fireEmotion/addSentiment instead use "target" as the character.)
+- COUNTER BINDING — a counter can DISPLAY a feeling instead of storing a number:
+  - A character counter may carry a "source", which makes it a READ-ONLY window onto that character's affect state. You never write to it; the affect effects move the feeling underneath and the meter follows.
+  - Use it when the quantity IS a feeling the character has: trust, suspicion, respect, fear. Then a choice fires addSentiment (or fireEmotion / nudgeMood) and the meter reports it — no counter effect needed, and none allowed.
+  - Use an ORDINARY counter (no "source") for things that are not feelings: gold, ammunition, cluesFound, daysElapsed. Those you increment yourself.
+  - 🚨 NEVER emit an incrementCounter/setCounter effect targeting a bound counter. The next appraisal overwrites it, so the write is silently lost. Bound counters may still be READ by a conditionBeat.
+  - Shape: { "name": "trust", "displayName": "Trust", "min": -100, "max": 100, "visible": true, "showLevelMeter": true, "source": { "kind": "sentiment", "toEntityRef": "player", "emotion": "trust" } }
+  - "kind" is "sentiment" (directed at someone — needs toEntityRef + emotion), "emotion" (an intensity the character feels — needs emotion), or "mood" (needs axis: "valence" | "arousal").
+  - RANGE CARRIES MEANING. The bar grows from ZERO, wherever zero falls in min..max. Set min: -100 when the feeling has a real opposite (trust/distrust) so the bar grows outward from the centre. Set min: 0 when it does not (fear's absence is calm, not anti-fear) — negatives then read as an empty bar.
+  - Optional "bands" replace the number with a word. Give a bipolar ladder a band covering ZERO, because sentiments start at zero and a ladder without one opens the story calling someone "wary" before they have met anyone: "bands": [ { "from": -100, "label": "strong distrust" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] with "numericFormat": "band".
+  - A visible meter needs a frame to render in — give the character a "meterFrame": { "dockMode": "screen", "screenPosition": "screen-top-left" }.
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
   - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
   - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)
@@ -716,7 +729,8 @@ Fictional time condition example (CORRECT format):
     - npcExitMessage: Optional prompt for AI to generate a farewell message when exiting via this target
   - includeVariables, includeInventory, includeVisitedBeats, includeChoiceHistory: Context toggles
   - systemInstructions: Additional instructions for the AI
-  - presentationMode: "positioned" | "chat-scroll" | "chat-bubble"
+  - layoutTemplate: "stacked" (default — NPC text on top, choices below) | "conversation" (text one side, choices the other) | "chat-scroll" (scrollable chat history) | "chat-bubble" (one bubble at a time)
+    ⚠️ NOT "presentationMode" and NOT "positioned" — both are legacy. Use layoutTemplate; the old "positioned" value is now "stacked".
 - Connections: Multiple → one per exit target
 
 **aiConversation** - Real-time AI conversation with steering rules
@@ -858,6 +872,19 @@ Each beat can override the Timer HUD content via timeDisplayMode:
 - "fictionalTime" (default): Show formatted fictional time
 - "manual": Show custom text from timeDisplayText field (e.g., "Meanwhile...")
 - "none": Hide the Timer HUD on this beat entirely
+
+### Cross-Beat Properties (available on most beats — use sparingly, only when they serve the story)
+
+- **spatialFit** — how a background image fits the stage. "contain" (default) shows the whole image with letterboxed bars; "cover" fills the stage and may crop the edges. Set "cover" for immersive establishing shots where losing the edges is fine; leave default when the image content matters to the edges (a map, a document, a group photo).
+
+- **explainHuds** (boolean, default false) — annotates the on-screen HUDs when this beat is entered, holding the beat until the player acknowledges. Set it TRUE on the FIRST beat after a HUD becomes meaningful — typically the first scene where a counter, timer or mood meter starts mattering. Do NOT set it on the title screen (screen HUDs are hidden there by default) and do NOT set it on more than one or two beats: it is a teaching moment, not decoration. If a story has no HUDs, omit it entirely.
+  - There is also a dedicated **explanation** beat for when you want a deliberate standalone pause to label the readouts, with optional per-HUD captions (captionTimer, captionCountdown, captionMeter, captionInventory, captionMood). Prefer the explainHuds flag on a real story beat; use the separate beat only when a pause is warranted.
+
+### Sound Effects on Choices
+
+Any effect host (choice, dialog node, movement option, GPS/indoor location entry) accepts a **playSound** effect — the location-triggered-sound mechanic:
+- { "type": "playSound", "target": "<asset id | preset id | URL>" }
+- Use it for a door closing on a choice, an alarm when a threshold is crossed, a sting on a bad ending. One per choice at most; silence is a legitimate default and constant sound is fatiguing.
 
 ## Character & Speaker System
 
