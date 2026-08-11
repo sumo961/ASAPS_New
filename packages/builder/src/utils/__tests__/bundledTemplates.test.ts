@@ -104,3 +104,72 @@ describe('rehearsal template content', () => {
     expect(inner).toEqual(data);
   });
 });
+
+describe('counter-displays template content', () => {
+  const data = JSON.parse(
+    readFileSync(join(templatesDir, 'src/counter-displays.project.json'), 'utf-8'),
+  );
+  const story = data.project.story;
+  const ada = story.characters.find((c: any) => c.id === 'char_ada');
+
+  it('carries the template flag and a valid beat graph', () => {
+    expect(data.project.projectType).toBe('template');
+    const ids = new Set(story.beats.map((b: any) => b.id));
+    expect(ids.has(story.metadata.firstBeatId)).toBe(true);
+    for (const beat of story.beats) {
+      for (const conn of beat.connections) {
+        expect(ids.has(conn.targetId), `${beat.id} → ${conn.targetId} dangles`).toBe(true);
+      }
+    }
+  });
+
+  it('shows one counter of every kind — the point of the template', () => {
+    const kinds = ada.counters.map((c: any) => c.source?.kind ?? 'authored');
+    expect(new Set(kinds)).toEqual(new Set(['authored', 'sentiment', 'emotion', 'mood']));
+  });
+
+  it('declares polarity correctly per source', () => {
+    const by = Object.fromEntries(ada.counters.map((c: any) => [c.name, c]));
+    // A sentiment has an opposite; an emotion level does not.
+    expect(by.trust.min).toBeLessThan(0);
+    expect(by.fear.min).toBe(0);
+    expect(by.spirits.min).toBeLessThan(0);
+  });
+
+  it('gives every bipolar ladder a band covering zero', () => {
+    // Sentiments start near zero, so a ladder without one opens the story
+    // by calling someone wary before they have met anyone.
+    for (const c of ada.counters) {
+      if (!c.bands?.length || (c.min ?? 0) >= 0) continue;
+      const sorted = [...c.bands].sort((a: any, b: any) => a.from - b.from);
+      let atZero = sorted[0];
+      for (const b of sorted) if (0 >= b.from) atZero = b;
+      expect(atZero.label, `${c.name} labels zero "${atZero.label}"`).toBe('neutral');
+    }
+  });
+
+  it('moves the meters only through affect effects, never by writing a counter', () => {
+    // This is what the template demonstrates: no setCounter anywhere, yet
+    // three of the four meters move.
+    const choices = story.beats.flatMap((b: any) => b.parameters?.choices ?? []);
+    const effects = choices.flatMap((c: any) => c.effects ?? []);
+    expect(effects.length).toBeGreaterThan(0);
+    const kinds = new Set(effects.map((e: any) => e.type));
+    expect(kinds.has('addSentiment')).toBe(true);
+    expect(kinds.has('fireEmotion')).toBe(true);
+    expect(kinds.has('nudgeMood')).toBe(true);
+    for (const e of effects) {
+      expect(['setCounter', 'incrementCounter']).not.toContain(e.type);
+    }
+  });
+
+  it('points every choice at a beat that exists', () => {
+    const ids = new Set(story.beats.map((b: any) => b.id));
+    for (const beat of story.beats) {
+      for (const choice of beat.parameters?.choices ?? []) {
+        expect(choice.id, 'choice needs a stable id').toBeTruthy();
+        expect(ids.has(choice.target), `choice ${choice.id} → ${choice.target} dangles`).toBe(true);
+      }
+    }
+  });
+});

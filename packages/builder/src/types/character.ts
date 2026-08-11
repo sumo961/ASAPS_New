@@ -584,4 +584,76 @@ export const CHARACTER_TEMPLATES: Partial<Character>[] = [
     traits: { openness: 0.85, conscientiousness: 0.30, extraversion: 0.75, agreeableness: 0.55, neuroticism: 0.40 },
     initialMood: { valence: 0.3, arousal: 0.35 },
   },
+  {
+    // Pre-wired counter bindings — the fiddly half of "counter as display,
+    // not mechanic" (docs/Counter-Binding-Design.md). Three meters reading
+    // the three affect stores, plus one ordinary counter for contrast.
+    //
+    // NOTE the half this template cannot carry: meters only move when
+    // *choices* fire addSentiment / fireEmotion / nudgeMood. A character
+    // alone gives you motionless meters. The template card says so, and the
+    // "Counter Displays" starter template has the working other half.
+    name: 'npc_affect_meters',
+    displayName: 'Character with affect meters',
+    role: 'npc',
+    visual: { type: 'static' },
+    states: [
+      { id: 'default', name: 'default', displayName: 'Default', visual: {} },
+    ],
+    defaultState: 'default',
+    counters: [
+      {
+        name: 'gold', displayName: 'Gold', value: 0, min: 0, max: 100, visible: true,
+        color: '#c9a227', showLevelMeter: true, levelMeterOrientation: 'horizontal',
+        showNumericValue: true, numericFormat: 'value',
+      },
+      {
+        // Bipolar: zero sits at the centre, so distrust reads as distrust.
+        name: 'trust', displayName: 'Trust', value: 0, min: -100, max: 100, visible: true,
+        color: '#4ade80', showLevelMeter: true, levelMeterOrientation: 'horizontal',
+        showNumericValue: true, numericFormat: 'band',
+        source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' },
+        bands: [
+          { from: -100, label: 'strong distrust' },
+          { from: -60, label: 'wary' },
+          { from: -20, label: 'neutral' },
+          { from: 20, label: 'trusting' },
+          { from: 60, label: 'deep trust' },
+        ],
+      },
+      {
+        // Unipolar: an emotion level has no opposite, so min stays at 0.
+        name: 'fear', displayName: 'Fear', value: 0, min: 0, max: 100, visible: true,
+        color: '#f87171', showLevelMeter: true, levelMeterOrientation: 'horizontal',
+        showNumericValue: true, numericFormat: 'band',
+        source: { kind: 'emotion', emotion: 'fear' },
+        bands: [
+          { from: 0, label: 'calm' },
+          { from: 25, label: 'uneasy' },
+          { from: 50, label: 'afraid' },
+          { from: 75, label: 'terrified' },
+        ],
+      },
+      {
+        name: 'spirits', displayName: 'Spirits', value: 0, min: -100, max: 100, visible: true,
+        color: '#60a5fa', showLevelMeter: true, levelMeterOrientation: 'horizontal',
+        showNumericValue: true, numericFormat: 'value',
+        source: { kind: 'mood', axis: 'valence' },
+      },
+    ],
+    inventory: [],
+    meterFrame: {
+      ...DEFAULT_METER_FRAME_CONFIG,
+      dockMode: 'screen',
+      screenPosition: 'screen-top-left',
+      meterWidth: 130,
+    },
+    // 'agreeable' — high agreeableness, so the opening-stance suggestion in
+    // the Affect tab has something to propose.
+    traits: { openness: 0.6, conscientiousness: 0.6, extraversion: 0.5, agreeableness: 0.8, neuroticism: 0.3 },
+    initialMood: { valence: 0.1, arousal: 0 },
+    // Opens mildly trusting rather than dead neutral, so the meters do not
+    // all start pinned at their origin.
+    initialSentiments: [{ toEntityRef: 'player', emotion: 'trust', strength: 0.11 }],
+  },
 ];

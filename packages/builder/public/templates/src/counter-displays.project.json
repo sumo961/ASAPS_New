@@ -1,0 +1,553 @@
+{
+  "metadata": {
+    "exportVersion": "1.1.0",
+    "exportedAt": "2026-08-11T12:00:00.000Z",
+    "exportedBy": "ASAPS Builder",
+    "projectId": "template-counter-displays",
+    "projectName": "Counters that read affect"
+  },
+  "project": {
+    "id": "template-counter-displays",
+    "name": "Counters that read affect",
+    "description": "A character whose meters mirror trust, fear and mood, plus choices whose effects move them. Replace the text; keep the wiring.",
+    "story": {
+      "beats": [
+        {
+          "id": "beat_title",
+          "name": "Title",
+          "type": "titleScreen",
+          "locations": [],
+          "x": 60,
+          "y": 200,
+          "connections": [
+            {
+              "targetId": "beat_intro",
+              "label": "Begin"
+            }
+          ],
+          "parameters": {
+            "title": "Your story title",
+            "author": "You",
+            "buttonText": "Begin"
+          }
+        },
+        {
+          "id": "beat_intro",
+          "name": "Opening",
+          "type": "infoText",
+          "locations": [],
+          "x": 320,
+          "y": 200,
+          "connections": [
+            {
+              "targetId": "beat_choice",
+              "label": "Continue"
+            }
+          ],
+          "parameters": {
+            "text": "Replace this with your opening.\n\nThe meters in the corner belong to Ada. Gold is an ordinary counter. Trust, Fear and Spirits are bound to her affect state \u2014 you never set them directly; the choice effects below move the feelings underneath, and the meters follow.",
+            "buttonText": "Continue"
+          }
+        },
+        {
+          "id": "beat_choice",
+          "name": "A choice that moves her",
+          "type": "multiChoice",
+          "locations": [],
+          "x": 580,
+          "y": 200,
+          "connections": [
+            {
+              "targetId": "beat_result",
+              "label": "Speak gently"
+            },
+            {
+              "targetId": "beat_result",
+              "label": "Be blunt"
+            },
+            {
+              "targetId": "beat_result",
+              "label": "Raise your voice"
+            },
+            {
+              "targetId": "beat_end",
+              "label": "Stop here"
+            }
+          ],
+          "parameters": {
+            "text": "Replace this with your scene. Each choice below already carries affect effects \u2014 edit the wording, keep the effects.",
+            "choices": [
+              {
+                "id": "gentle",
+                "text": "Something kind",
+                "target": "beat_result",
+                "effects": [
+                  {
+                    "type": "addSentiment",
+                    "target": "char_ada",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.25
+                  },
+                  {
+                    "type": "nudgeMood",
+                    "target": "char_ada",
+                    "valenceDelta": 0.15,
+                    "arousalDelta": 0
+                  }
+                ]
+              },
+              {
+                "id": "blunt",
+                "text": "Something blunt",
+                "target": "beat_result",
+                "effects": [
+                  {
+                    "type": "addSentiment",
+                    "target": "char_ada",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.2
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "char_ada",
+                    "emotion": "fear",
+                    "emotionDelta": 0.15
+                  },
+                  {
+                    "type": "nudgeMood",
+                    "target": "char_ada",
+                    "valenceDelta": -0.1,
+                    "arousalDelta": 0
+                  }
+                ]
+              },
+              {
+                "id": "shout",
+                "text": "Something harsh",
+                "target": "beat_result",
+                "effects": [
+                  {
+                    "type": "addSentiment",
+                    "target": "char_ada",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.45
+                  },
+                  {
+                    "type": "fireEmotion",
+                    "target": "char_ada",
+                    "emotion": "fear",
+                    "emotionDelta": 0.4
+                  },
+                  {
+                    "type": "nudgeMood",
+                    "target": "char_ada",
+                    "valenceDelta": -0.3,
+                    "arousalDelta": 0
+                  }
+                ]
+              },
+              {
+                "id": "stop",
+                "text": "Move on",
+                "target": "beat_end",
+                "effects": []
+              }
+            ]
+          }
+        },
+        {
+          "id": "beat_result",
+          "name": "After",
+          "type": "infoText",
+          "locations": [],
+          "x": 840,
+          "y": 200,
+          "connections": [
+            {
+              "targetId": "beat_choice",
+              "label": "Again"
+            }
+          ],
+          "parameters": {
+            "text": "Replace this too.\n\nHer meters just moved, and no effect named a counter \u2014 the choice changed her sentiment, her fear and her mood, and the meters reported it.",
+            "buttonText": "Back to the choice"
+          }
+        },
+        {
+          "id": "beat_end",
+          "name": "End",
+          "type": "endScreen",
+          "locations": [],
+          "x": 1100,
+          "y": 200,
+          "connections": [],
+          "parameters": {
+            "text": "The end.",
+            "buttonText": "Restart"
+          }
+        }
+      ],
+      "metadata": {
+        "title": "Counter Displays",
+        "author": "ASAPS example",
+        "firstBeatId": "beat_title"
+      },
+      "settings": {
+        "project": {
+          "width": 1024,
+          "height": 768,
+          "aspectRatio": "4:3",
+          "scalingMode": "fit"
+        },
+        "colors": {
+          "pcolor": "#d9a441",
+          "palpha": 100,
+          "ptextcolor": "",
+          "nonpcolor": "#1b1f2b",
+          "nonpalpha": 100,
+          "nonptextcolor": "",
+          "bgColor": "#12141c",
+          "textBoxBorder": "#3d4356"
+        },
+        "fonts": {
+          "titleFont": "Georgia",
+          "textFont": "Arial",
+          "btnFont": "Arial",
+          "fontSize": {
+            "title": 32,
+            "text": 18,
+            "button": 18
+          }
+        },
+        "textbox": {
+          "radius": 8,
+          "padding": 20,
+          "borderWidth": 1,
+          "opacity": 90,
+          "position": "bottom"
+        },
+        "textEffects": {
+          "animation": "none",
+          "typewriterSpeed": 30,
+          "fadeInDuration": 300
+        },
+        "hotspots": {
+          "visible": false,
+          "labels": false,
+          "highlightColor": "#ffffff",
+          "opacity": 30,
+          "showInPreview": "onHover"
+        },
+        "sound": {
+          "backgroundVolume": 50
+        }
+      },
+      "environment": {},
+      "characters": [
+        {
+          "id": "player",
+          "name": "player",
+          "displayName": "You",
+          "role": "player",
+          "visual": {
+            "type": "static"
+          },
+          "states": [
+            {
+              "id": "default",
+              "name": "default",
+              "displayName": "Default"
+            }
+          ],
+          "defaultState": "default",
+          "createdAt": "2026-08-11T00:00:00.000Z",
+          "updatedAt": "2026-08-11T00:00:00.000Z",
+          "counters": [],
+          "inventory": []
+        },
+        {
+          "id": "char_ada",
+          "name": "ada",
+          "displayName": "Ada",
+          "role": "npc",
+          "visual": {
+            "type": "static"
+          },
+          "states": [
+            {
+              "id": "default",
+              "name": "default",
+              "displayName": "Default"
+            }
+          ],
+          "defaultState": "default",
+          "color": "#d9a441",
+          "description": "A caseworker meeting you for the first time.",
+          "createdAt": "2026-08-11T00:00:00.000Z",
+          "updatedAt": "2026-08-11T00:00:00.000Z",
+          "traits": {
+            "openness": 0.6,
+            "conscientiousness": 0.75,
+            "extraversion": 0.45,
+            "agreeableness": 0.8,
+            "neuroticism": 0.3
+          },
+          "initialMood": {
+            "valence": 0.1,
+            "arousal": 0
+          },
+          "initialSentiments": [
+            {
+              "toEntityRef": "player",
+              "emotion": "trust",
+              "strength": 0.11
+            }
+          ],
+          "inventory": [],
+          "counters": [
+            {
+              "name": "gold",
+              "displayName": "Gold",
+              "value": 12,
+              "min": 0,
+              "max": 100,
+              "visible": true,
+              "color": "#c9a227",
+              "showLevelMeter": true,
+              "levelMeterOrientation": "horizontal",
+              "showNumericValue": true,
+              "numericFormat": "value"
+            },
+            {
+              "name": "trust",
+              "displayName": "Trust",
+              "value": 0,
+              "min": -100,
+              "max": 100,
+              "visible": true,
+              "color": "#4ade80",
+              "showLevelMeter": true,
+              "levelMeterOrientation": "horizontal",
+              "showNumericValue": true,
+              "numericFormat": "band",
+              "source": {
+                "kind": "sentiment",
+                "toEntityRef": "player",
+                "emotion": "trust"
+              },
+              "bands": [
+                {
+                  "from": -100,
+                  "label": "strong distrust"
+                },
+                {
+                  "from": -60,
+                  "label": "wary"
+                },
+                {
+                  "from": -20,
+                  "label": "neutral"
+                },
+                {
+                  "from": 20,
+                  "label": "trusting"
+                },
+                {
+                  "from": 60,
+                  "label": "deep trust"
+                }
+              ]
+            },
+            {
+              "name": "fear",
+              "displayName": "Fear",
+              "value": 0,
+              "min": 0,
+              "max": 100,
+              "visible": true,
+              "color": "#f87171",
+              "showLevelMeter": true,
+              "levelMeterOrientation": "horizontal",
+              "showNumericValue": true,
+              "numericFormat": "band",
+              "source": {
+                "kind": "emotion",
+                "emotion": "fear"
+              },
+              "bands": [
+                {
+                  "from": 0,
+                  "label": "calm"
+                },
+                {
+                  "from": 25,
+                  "label": "uneasy"
+                },
+                {
+                  "from": 50,
+                  "label": "afraid"
+                },
+                {
+                  "from": 75,
+                  "label": "terrified"
+                }
+              ]
+            },
+            {
+              "name": "spirits",
+              "displayName": "Spirits",
+              "value": 0,
+              "min": -100,
+              "max": 100,
+              "visible": true,
+              "color": "#60a5fa",
+              "showLevelMeter": true,
+              "levelMeterOrientation": "horizontal",
+              "showNumericValue": true,
+              "numericFormat": "value",
+              "source": {
+                "kind": "mood",
+                "axis": "valence"
+              }
+            }
+          ],
+          "meterFrame": {
+            "dockMode": "screen",
+            "anchor": "top",
+            "screenPosition": "screen-top-left",
+            "offset": {
+              "x": 0,
+              "y": 0
+            },
+            "style": {
+              "backgroundColor": "#1b1f2b",
+              "borderColor": "#3d4356",
+              "borderWidth": 1,
+              "borderRadius": 6,
+              "padding": 8,
+              "opacity": 90
+            },
+            "meterHeight": 12,
+            "meterSpacing": 6,
+            "showLabels": true,
+            "meterWidth": 130
+          }
+        }
+      ],
+      "clusters": [],
+      "containerBeatPositions": {},
+      "assets": [],
+      "title": "Counter Displays",
+      "author": "ASAPS example",
+      "connections": []
+    },
+    "settings": {
+      "project": {
+        "width": 1024,
+        "height": 768,
+        "aspectRatio": "4:3",
+        "scalingMode": "fit"
+      },
+      "colors": {
+        "pcolor": "#d9a441",
+        "palpha": 100,
+        "ptextcolor": "",
+        "nonpcolor": "#1b1f2b",
+        "nonpalpha": 100,
+        "nonptextcolor": "",
+        "bgColor": "#12141c",
+        "textBoxBorder": "#3d4356"
+      },
+      "fonts": {
+        "titleFont": "Georgia",
+        "textFont": "Arial",
+        "btnFont": "Arial",
+        "fontSize": {
+          "title": 32,
+          "text": 18,
+          "button": 18
+        }
+      },
+      "textbox": {
+        "radius": 8,
+        "padding": 20,
+        "borderWidth": 1,
+        "opacity": 90,
+        "position": "bottom"
+      },
+      "textEffects": {
+        "animation": "none",
+        "typewriterSpeed": 30,
+        "fadeInDuration": 300
+      },
+      "hotspots": {
+        "visible": false,
+        "labels": false,
+        "highlightColor": "#ffffff",
+        "opacity": 30,
+        "showInPreview": "onHover"
+      },
+      "sound": {
+        "backgroundVolume": 50
+      }
+    },
+    "assetIds": [],
+    "createdAt": "2026-08-11T00:00:00.000Z",
+    "modifiedAt": "2026-08-11T00:00:00.000Z",
+    "version": "1.0.0",
+    "globalSettings": {
+      "project": {
+        "width": 1024,
+        "height": 768,
+        "aspectRatio": "4:3",
+        "scalingMode": "fit"
+      },
+      "colors": {
+        "pcolor": "#d9a441",
+        "palpha": 100,
+        "ptextcolor": "",
+        "nonpcolor": "#1b1f2b",
+        "nonpalpha": 100,
+        "nonptextcolor": "",
+        "bgColor": "#12141c",
+        "textBoxBorder": "#3d4356"
+      },
+      "fonts": {
+        "titleFont": "Georgia",
+        "textFont": "Arial",
+        "btnFont": "Arial",
+        "fontSize": {
+          "title": 32,
+          "text": 18,
+          "button": 18
+        }
+      },
+      "textbox": {
+        "radius": 8,
+        "padding": 20,
+        "borderWidth": 1,
+        "opacity": 90,
+        "position": "bottom"
+      },
+      "textEffects": {
+        "animation": "none",
+        "typewriterSpeed": 30,
+        "fadeInDuration": 300
+      },
+      "hotspots": {
+        "visible": false,
+        "labels": false,
+        "highlightColor": "#ffffff",
+        "opacity": 30,
+        "showInPreview": "onHover"
+      },
+      "sound": {
+        "backgroundVolume": 50
+      }
+    },
+    "projectType": "template"
+  }
+}

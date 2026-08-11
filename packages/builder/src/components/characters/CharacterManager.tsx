@@ -213,6 +213,12 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       ...(template.initialMood ? { initialMood: template.initialMood } : {}),
       ...(template.initialSentiments ? { initialSentiments: template.initialSentiments } : {}),
       ...(template.goals ? { goals: template.goals } : {}),
+      // HUD frames. A template whose counters are meant to be *seen* carries
+      // its frame config; without this line the meters exist but never render.
+      // (Same copy-list trap that would have swallowed `traits`.)
+      ...(template.meterFrame ? { meterFrame: template.meterFrame } : {}),
+      ...(template.inventoryFrame ? { inventoryFrame: template.inventoryFrame } : {}),
+      ...(template.moodFrame ? { moodFrame: template.moodFrame } : {}),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -708,6 +714,18 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
                       return a ? <> · {a.name.toLowerCase()}</> : null;
                     })()}
                   </div>
+                  {/* A template carrying bound counters carries only half the
+                      mechanic: meters read affect state, and affect state moves
+                      when *choices* fire effects. Say so on the card, or the
+                      author adds the character, sees four motionless meters and
+                      concludes it is broken. */}
+                  {template.counters?.some((c) => c.source) && (
+                    <div className="text-[11px] text-amber-700 mt-1.5 leading-snug">
+                      Meters read affect state — add <strong>Add Sentiment</strong> /{' '}
+                      <strong>Fire Emotion</strong> effects to your choices to move them.
+                      The <em>Counter Displays</em> template has a working example.
+                    </div>
+                  )}
                 </div>
               ))}
               <div

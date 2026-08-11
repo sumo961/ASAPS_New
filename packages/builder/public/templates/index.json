@@ -10,6 +10,17 @@
       "beats": 5,
       "characters": 1,
       "requiresAI": true
+    },
+    {
+      "id": "counter-displays",
+      "file": "counter-displays.asapst",
+      "title": "Counters that read affect",
+      "description": "A character whose meters mirror trust, fear and mood, plus choices whose effects move them. Replace the text; keep the wiring.",
+      "whatItShows": "Counter binding end to end: one ordinary counter beside three bound to sentiment, emotion level and mood. Bipolar meters grow outward from zero and show a phrase instead of a number. No choice writes to a counter — they change how the character feels, and the meters report it.",
+      "tags": ["counters", "affect", "meters"],
+      "beats": 5,
+      "characters": 2,
+      "requiresAI": false
     }
   ]
 }
