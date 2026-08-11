@@ -229,3 +229,35 @@ describe('character identification', () => {
     withName.unmount(); withoutName.unmount();
   });
 });
+
+describe('words without a bar', () => {
+  it('omits the bar when the author asked for words only', () => {
+    // Previously unreachable: the flag never reached the renderer, so a
+    // counter set to "a word" still drew a bar it did not need.
+    const { container } = renderFrame({
+      counters: [counter({
+        value: 62, min: -100, max: 100, showLevelMeter: false, numericFormat: 'band',
+        bands: [{ from: -100, label: 'wary' }, { from: 20, label: 'trusting' }],
+      })],
+    });
+    expect(container.querySelector('[data-meter-fill]')).toBeNull();
+    expect(screen.getByText('trusting')).toBeDefined();
+  });
+
+  it('still draws the bar by default, so existing meters are unaffected', () => {
+    const { container } = renderFrame({ counters: [counter()] });
+    expect(container.querySelector('[data-meter-fill]')).not.toBeNull();
+  });
+
+  it('reclaims the bar height so the frame does not sit half empty', () => {
+    const words = renderFrame({ counters: [counter({ showLevelMeter: false })],
+      config: config({ dockMode: 'screen', screenPosition: 'screen-bottom-left' }) });
+    const bar = renderFrame({ counters: [counter()],
+      config: config({ dockMode: 'screen', screenPosition: 'screen-bottom-left' }) });
+    const top = (r: ReturnType<typeof renderFrame>) =>
+      parseFloat((r.container.firstChild as HTMLElement).style.top);
+    // Bottom-docked frames position from their own height: the shorter
+    // words-only frame must sit lower.
+    expect(top(words)).toBeGreaterThan(top(bar));
+  });
+});

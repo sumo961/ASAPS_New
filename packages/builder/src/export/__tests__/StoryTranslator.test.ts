@@ -78,6 +78,48 @@ describe('StoryTranslator', () => {
       expect(strings['project.story.characters.0.counters.1.displayName']).toBe('Health Points');
     });
 
+    it('should extract counter band labels', () => {
+      // A meter set to words shows the BAND, not the counter name — so band
+      // labels are the most player-facing string on the whole counter. Without
+      // extraction they render in the authoring language inside an otherwise
+      // translated story.
+      const data = createProjectData({
+        story: {
+          characters: [
+            {
+              name: 'Ada',
+              counters: [
+                {
+                  name: 'trust',
+                  displayName: 'Trust',
+                  bands: [
+                    { from: -100, label: 'strong distrust' },
+                    { from: -20, label: 'neutral' },
+                    { from: 20, label: 'trusting' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      const strings = extractTranslatableStrings(data);
+
+      expect(strings['project.story.characters.0.counters.0.bands.0.label']).toBe('strong distrust');
+      expect(strings['project.story.characters.0.counters.0.bands.2.label']).toBe('trusting');
+      // Thresholds are numbers, not text — nothing to translate.
+      expect(strings['project.story.characters.0.counters.0.bands.0.from']).toBeUndefined();
+    });
+
+    it('should not invent band keys for counters without bands', () => {
+      const data = createProjectData({
+        story: { characters: [{ name: 'Ada', counters: [{ name: 'gold', displayName: 'Gold' }] }] },
+      });
+      const strings = extractTranslatableStrings(data);
+      expect(Object.keys(strings).some((k) => k.includes('.bands.'))).toBe(false);
+    });
+
     it('should extract inventory displayNames and descriptions', () => {
       const data = createProjectData({
         story: {

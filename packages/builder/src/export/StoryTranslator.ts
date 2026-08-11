@@ -91,6 +91,19 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
           if (counters[j].displayName) {
             strings[`${P}.characters.${i}.counters.${j}.displayName`] = counters[j].displayName;
           }
+          // Band labels are what the player actually READS on a meter set to
+          // words ("wary", "trusting") — more player-facing than the counter's
+          // own name. Without this they render in the authoring language
+          // inside an otherwise translated story. (NOT band.from — a threshold
+          // is a number, not text.)
+          const bands = (counters[j] as { bands?: Array<{ label?: string }> }).bands;
+          if (Array.isArray(bands)) {
+            for (let k = 0; k < bands.length; k++) {
+              if (bands[k]?.label) {
+                strings[`${P}.characters.${i}.counters.${j}.bands.${k}.label`] = bands[k].label!;
+              }
+            }
+          }
         }
       }
       // Inventory item display names and descriptions (NOT item.name — that's an internal identifier)

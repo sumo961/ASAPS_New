@@ -67,6 +67,14 @@ export interface MeterCounterData {
   orientation: 'horizontal' | 'vertical';
   /** Optional named ranges — see docs/Counter-Binding-Design.md. */
   bands?: CounterBand[];
+  /**
+   * False renders the readout WITHOUT a bar — a counter shown purely as a
+   * word ("wary", "trusting"). Defaults to true, so every existing meter is
+   * unaffected. Previously the frame's callers filtered on `visible` alone
+   * and this flag never reached the renderer, which made "words, no bar"
+   * unreachable despite being an offered choice.
+   */
+  showLevelMeter?: boolean;
 }
 
 /**
@@ -210,6 +218,7 @@ const MeterBar: React.FC<{
   fontScale?: number;
 }> = ({ counter, showLabel, height, width, fontScale = 1.0 }) => {
   const { value, min, max, color, showNumericValue, numericFormat, orientation, bands } = counter;
+  const showBar = counter.showLevelMeter !== false;
   const range = max > min ? { min, max } : { min, max: min + 1 };
   const percentage = ((value - min) / (range.max - range.min)) * 100;
 
@@ -280,7 +289,7 @@ const MeterBar: React.FC<{
           gap: '4px',
         }}
       >
-        <div
+        {showBar && <div
           style={{
             width: isHorizontal ? width : height,
             height: isHorizontal ? height : width,
@@ -321,7 +330,7 @@ const MeterBar: React.FC<{
               }}
             />
           )}
-        </div>
+        </div>}
 
         {/* Inline numeric value (when no label) */}
         {!showLabel && numericDisplay && (
@@ -379,8 +388,10 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
 
   // Calculate frame dimensions based on content
   const labelHeight = showLabels ? 14 : 0;
+  // A words-only counter contributes no bar height.
+  const barlessCount = counters.filter((c) => c.showLevelMeter === false).length;
   const singleMeterHeight = meterHeight + labelHeight + 2; // 2px for margins
-  const frameContentHeight = counters.length * singleMeterHeight +
+  const frameContentHeight = -barlessCount * meterHeight + counters.length * singleMeterHeight +
     (counters.length - 1) * meterSpacing +
     (showHeader ? HEADER_HEIGHT + meterSpacing : 0);
   const frameHeight = frameContentHeight + style.padding * 2;

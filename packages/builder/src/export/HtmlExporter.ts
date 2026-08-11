@@ -486,6 +486,16 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
                 if (ch.counters[j].displayName) {
                   strings[C + '.counters.' + j + '.displayName'] = ch.counters[j].displayName;
                 }
+                // Band labels — what the player reads on a words-mode meter.
+                // Mirrors StoryTranslator.ts; the two must stay in sync.
+                var bands = ch.counters[j].bands;
+                if (Array.isArray(bands)) {
+                  for (var b = 0; b < bands.length; b++) {
+                    if (bands[b] && bands[b].label) {
+                      strings[C + '.counters.' + j + '.bands.' + b + '.label'] = bands[b].label;
+                    }
+                  }
+                }
               }
             }
             if (Array.isArray(ch.inventory)) {

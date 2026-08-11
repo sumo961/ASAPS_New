@@ -75,5 +75,8 @@ export function toMeterCounterData(
     numericFormat: counter.numericFormat || 'value',
     orientation: counter.levelMeterOrientation || 'horizontal',
     bands: counter.bands,
+    // Only meaningful for counters the frame renders; a false value means
+    // "show the words, not the bar".
+    showLevelMeter: counter.showLevelMeter,
   };
 }
