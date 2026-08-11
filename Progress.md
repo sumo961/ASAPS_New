@@ -1,5 +1,96 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-11: Counter binding — meters that read affect state (v0.9.89)
+
+### Overview
+
+A counter can now be a **display** rather than a mechanic. Bind one to a character's sentiment, emotion level or mood and it becomes a read-only window onto that state — rendered as an ordinary meter, updated every draw, never written to. The motivating case: a trust bar is far easier to communicate to an interactor than a full affect model, and until now an author had to choose between the two. They are a mechanic and a display, and they vary independently.
+
+Nothing existing changes. `source` is absent on every counter authored before this, so they all resolve exactly as before.
+
+Design and the reasoning behind each decision: `docs/Counter-Binding-Design.md`.
+
+### The projection: one rule, no setting
+
+The bar **originates at zero**, wherever zero falls in `[min, max]`, and grows toward the value.
+
+- `min: 0` — zero is the left edge, so the bar fills rightward from it. The familiar gauge, unchanged.
+- `min: -100` — zero is the centre, so the bar grows *outward* from the centre. Distrust reads as distrust rather than as "less trust".
+
+An earlier draft offered two selectable projections; they turned out to be one rule with zero landing in different places. The rejected alternative — remapping −1…+1 onto 0…100 — moves the origin off zero, so a character who feels nothing shows a half-filled bar. `min` therefore carries meaning: setting it to 0 declares "this word has no opposite".
+
+Range defaults follow one principle: **never hide state**. Sentiment and mood sources default to bipolar, because defaulting a signed store to `[0, 100]` would floor real negative strength and leave the meter under-reading while the value underneath kept drifting.
+
+### Three affect stores, three source kinds
+
+The runtime already distinguished intensities from stances; the clamps are the evidence. `fireCharacterEmotion` clamps to `[0, 1]` — fear has no opposite. `addCharacterSentiment` clamps to `[-1, 1]` — negative trust is distrust, a real state. So a word like "wary" is neither: it is a *region of the trust axis*, which is what bands are for.
+
+**Files modified:** `packages/core/src/engine/counterBinding.ts` (new), `packages/core/src/engine/index.ts`, `packages/core/tests/engine/CounterBinding.test.ts` (new)
+
+### Qualitative bands
+
+A counter may carry named ranges rendered as a phrase — *strong distrust · wary · neutral · trusting · deep trust* — via `numericFormat: 'band'`, reusing the existing display fields rather than adding new ones. Suggested ladders are seeded per source kind and fully editable.
+
+Bipolar ladders get a neutral band by default: sentiments currently start at zero for everyone, so a ladder without one opens the story by calling someone wary before they have met anyone.
+
+### Authoring
+
+- **Source picker** on each counter, asking about the fiction rather than the machinery: *you set it at specific moments* vs *it responds to what happens*, with a separate question about how the interactor sees it. No complexity tiers — an author asked to rank their own ambition picks "full" every time and ends up owning a model they did not want.
+- **Interactive projection preview.** There is no runtime value at authoring time, so a "live" readout would be a fiction; dragging the strength slider shows the real geometry, number and band phrase agreeing.
+- **Assists, never enforcement.** Naming a sentiment after a palette emotion suggests `min: 0` with the reason ("negative fear isn't a state") — a hint, not a clamp.
+- **Derived counters cannot be assigned.** A written value would be undone by the next appraisal tick, so write surfaces show them disabled with the affect effect that does move them. Reads stay open: the counter list is *annotated*, not filtered, because reading a bound counter in a condition is perfectly valid.
+
+**Files modified:** `packages/builder/src/components/characters/CounterSourceEditor.tsx` (new), `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/builder/src/types/character.ts`, `packages/builder/src/hooks/useAvailableCountersAndVariables.ts`, `packages/builder/src/components/CounterOwnerPicker.tsx`, `packages/builder/src/components/SchemaFormGenerator.tsx`, `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+
+### Rendering
+
+`toMeterCounterData` is the single place that decides what a meter reads, consumed by the Preview Window, the exported player and the visual editor — so no call site can forget the derived branch and render a permanent zero.
+
+Two real defects fixed along the way:
+
+- **Exported stories rendered every placed meter at 0.** `PlayerEngine` never set a counter resolver; the builder's Preview Window wired one, which kept the bug invisible until export.
+- **Float noise reached players.** A mood of −0.44 projected to `-43.99999999999999` and rendered verbatim.
+
+**Files modified:** `packages/renderer/src/utils/meterData.ts` (new), `packages/renderer/src/components/CharacterMeterFrame.tsx`, `packages/renderer/src/components/PositionedBeatView.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player/src/PlayerEngine.ts`, `packages/player-web/src/WebPlayer.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/builder/src/components/visual/{VisualBeatEditor,VisualWorkspace}.tsx`, `packages/core/src/types/index.ts`
+
+### Meter frames now say whose meters they are
+
+Two screen-docked frames stack in the same corner with nothing to tell them apart, so a second character's meters read as one character's counters duplicated — and since only one set responds to effects, the other looks broken rather than like it belongs to someone else. Mood frames already carried a name; meter frames now carry a name and colour dot too, shown whenever a name is supplied rather than only on collision. The header height is added to the HUD packer's stacking estimate as well as the frame's own layout, or labelled frames would overlap by exactly the header.
+
+**Files modified:** `packages/renderer/src/components/CharacterMeterFrame.tsx`, plus the four call sites above
+
+### Opening stances
+
+Sentiments start at exactly zero, and archetypes deliberately seed only self-directed ones, so even a fully specified personality met the whole cast neutral — which made every bound meter open at dead centre. `suggestOpeningStance` proposes a starting value from traits, grounded in Agreeableness, whose NEO-PI-R facet A1 *is* Trust. Capped at ±0.35 so the story still earns the rest.
+
+Suggested, never applied. It returns nothing for a character with no agreeableness, so Blank Character gets no proposal — the affect opt-out survives the feature.
+
+**Files modified:** `packages/core/src/engine/openingStance.ts` (new), `packages/core/tests/engine/OpeningStance.test.ts` (new), `packages/builder/src/components/characters/CharacterEditor.tsx`
+
+### Character templates disclose what they carry
+
+Templates seed traits, and traits feed the dossier that shapes AI conversations — so a template that seeds them must say so, or an author picking "Merchant" for its states silently gets a disposition they never chose. Template cards now name the personality they carry (*npc · conscientious leader*), and Blank Character reads "Start from scratch — no personality". Needed a value-based reverse lookup, `matchPersonalityArchetype`, which deliberately returns nothing for hand-tuned traits so a bespoke character is never mislabelled.
+
+**Files modified:** `packages/core/src/engine/PersonalityArchetypes.ts`, `packages/builder/src/types/character.ts`, `packages/builder/src/components/characters/CharacterManager.tsx`
+
+### Templates and an example
+
+- **Starter template "Counters that read affect"** — the full mechanic: a character with bound meters plus the choices whose effects move them, written as a starting point rather than a lesson.
+- **Character template "Character with affect meters"** — the fiddly setup alone. It can only carry half the mechanic (meters move because *choices* fire effects), so its card says so outright and points at the starter template.
+- **Example project** `examples/Counter_Displays.asaps.zip` — the teaching version, with prose explaining what is happening.
+
+Third repeat of the copy-list trap: `handleSelectTemplate` never copied `meterFrame` / `inventoryFrame` / `moodFrame`, so a template whose counters are meant to be *seen* would have instantiated with the counters present and the frame gone.
+
+**Files modified:** `packages/builder/public/templates/{index.json,counter-displays.asapst}`, `packages/builder/public/templates/src/counter-displays.project.json`, `packages/builder/src/utils/__tests__/bundledTemplates.test.ts`, `packages/builder/src/components/characters/CharacterManager.tsx`
+
+### Verification
+
+Core 2650, renderer 546, builder 2403 tests pass; type-checks clean across all packages. Template tests read the shipped `.asapst` from disk, so a future edit that breaks it fails CI rather than a student.
+
+Driven live in the running app throughout: the projection preview across positive, zero and negative strengths; the write gate disabled in `setVariable` and open in Condition Check; the starter template creating its own copy and playing `neutral/calm/10 → wary/uneasy/-44`; two labelled frames stacking without overlap. Two of the defects above were found only by playing it, not by any test.
+
+---
+
 ## 2026-08-08: Security release — Electron 43, vite 8, URL scheme hardening (v0.9.88)
 
 ### Overview

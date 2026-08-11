@@ -22,19 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.88** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.88 is a security release** with no
-feature changes: the desktop runtime moves to **Electron 43** (Electron 40 had
-reached end of life, so a high-severity advisory affecting embedded web content
-had no fix on that line), external links are now scheme-validated before being
-handed to the operating system, and the build toolchain moves to **vite 8**.
-Open dependency alerts drop from 39 to 9, with the remainder confined to a
-mobile build CLI and an unreachable code path.
+Current release: **v0.9.89** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.89 adds counter binding**: a counter
+can now be a *display* rather than a mechanic. Bind one to a character's
+sentiment, emotion or mood and it becomes a read-only window onto that state,
+so a simple trust bar can front a full affect model instead of competing with
+it. Bipolar meters grow outward from zero, optional word ladders replace raw
+numbers, and HUD meter frames now name the character they belong to. A starter
+template and a worked example ship with it. Existing counters are untouched.
 
-The **v0.9.87** feature release before it brought the "Ink & Brass" default
-theme, a single layout authority for on-screen HUDs, distraction-free title
-screens, and a new HUD explanation system that teaches players what each
-readout means.
+**v0.9.88** before it was a security release with no feature changes: the
+desktop runtime moved to **Electron 43**, external links became
+scheme-validated before being handed to the operating system, and the build
+toolchain moved to **vite 8** — open dependency alerts dropping from 39 to 9.
 
 > **macOS users on v0.9.85 or earlier**: your installed (unsigned) build
 > cannot auto-update across the signing boundary — download v0.9.86 once
@@ -67,6 +67,7 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 ### Rich Characters & Affect
 - **2D Mood Model**: Russell's circumplex (valence × arousal) with editable initial mood, runtime nudges, and an optional on-stage HUD
 - **Sentiments**: Directed emotional memories — characters feel `<emotion>` toward other entities with strength clamped to [-1, 1]
+- **Counter Binding** *(new in v0.9.89)*: A counter can display affect instead of storing a value — bind it to a sentiment, emotion level or mood and it becomes a read-only meter. Bipolar meters grow outward from zero (distrust reads as distrust, not "less trust"); optional word ladders replace numbers (*wary → trusting*); derived counters can be read in conditions but never assigned. HUD meter frames name the character they belong to
 - **Emotion Nodes**: Per-character runtime intensity for each emotion, decaying per beat. Author-editable emotion palette (default Ekman 6 + pride/shame/interest)
 - **Personality Traits**: Static Big Five trait bag per character that modulates emotion deltas. 10 psychology-grounded archetype presets (narcissist, anxious-introvert, conscientious-leader, free-spirit, recluse, hothead, peacekeeper, stoic, trickster, balanced)
 - **Goals + GAMYGDALA**: Authored goals with optional satisfaction predicates; runtime auto-fires pride/joy on `met` and shame/sadness on `failed`, scaled by goal priority and trait modulation
