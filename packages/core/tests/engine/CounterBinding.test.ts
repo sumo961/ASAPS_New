@@ -102,6 +102,13 @@ describe('projectStrength', () => {
     }
   });
 
+  it('rounds away floating-point noise — the value reaches players verbatim', () => {
+    // -0.44 * 100 is -43.99999999999999 in IEEE754, which showed up in a
+    // live meter readout as exactly that.
+    expect(projectStrength(-0.44, BIPOLAR)).toBe(-44);
+    expect(projectStrength(0.07, { min: 0, max: 3 })).toBe(0.21);
+  });
+
   it('clamps out-of-contract strengths and survives NaN', () => {
     expect(projectStrength(5, BIPOLAR)).toBe(100);
     expect(projectStrength(-5, BIPOLAR)).toBe(-100);

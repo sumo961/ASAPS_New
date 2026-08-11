@@ -139,7 +139,10 @@ export function counterRange(counter: BindableCounter | null | undefined): Count
 export function projectStrength(strength: number, range: CounterRange): number {
   const s = clamp(Number.isFinite(strength) ? strength : 0, -1, 1);
   const raw = s >= 0 ? s * range.max : s * Math.abs(range.min);
-  return clamp(raw, range.min, range.max);
+  // Round before clamping: floating-point multiplication produces values like
+  // -43.99999999999999, which reach the player as-is in a numeric readout.
+  // Two decimals keeps small ranges (0..1) usable while killing the noise.
+  return clamp(Math.round(raw * 100) / 100, range.min, range.max);
 }
 
 /**

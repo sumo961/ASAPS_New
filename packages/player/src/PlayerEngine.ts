@@ -1,6 +1,7 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
+import { toMeterCounterData } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
 import { WebSaveAdapter } from './storage/WebSaveAdapter';
@@ -817,6 +818,32 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           if (url) out.push({ ...v, url });
         }
         return out.length > 0 ? out : undefined;
+      });
+    }
+
+    // Counter resolver — feeds placed meter elements (kind: 'meter').
+    //
+    // Without this, exported stories rendered every placed meter at 0: the
+    // builder's Preview Window wired a resolver but the player never did, so
+    // the bug was invisible until export. Derived counters go through the
+    // same helper as the HUD meter frames, which is also what supplies the
+    // band wording. See docs/Counter-Binding-Design.md.
+    if ('setCounterResolver' in renderer) {
+      (renderer as any).setCounterResolver((counterName: string) => {
+        const ctx: any = this.engine?.getContext();
+        const owner: any = characters.find((c: any) =>
+          (c.counters || []).some((k: any) => k.name === counterName),
+        );
+        const def = owner?.counters?.find((k: any) => k.name === counterName);
+        if (!def) {
+          // Story-global counter with no character declaration.
+          return { value: ctx?.getCounter?.(counterName) ?? 0, min: 0, max: 100 };
+        }
+        const scoped = ctx?.getCharacterCountersFor?.(owner.id) ?? {};
+        const data = toMeterCounterData(def, owner.id, ctx, scoped, (n: string) =>
+          ctx?.getCounter?.(n),
+        );
+        return { value: data.value, min: data.min, max: data.max, bands: data.bands };
       });
     }
 
