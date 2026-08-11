@@ -30,11 +30,15 @@ const ASAPS_API_URL = process.env.ASAPS_API_URL || 'http://localhost:3001';
 // =====================================================================
 // SYNC SOURCE: packages/core/src/prompts/affectPrompt.ts
 //
-// The MCP servers don't depend on @asaps/core (they're standalone for
-// portability), so this affect-prompt content is duplicated here. When
-// the canonical module changes, mirror the changes into this block.
-// Keep this in sync with mcp-server/src/utils/aiHelper.ts as well —
-// both copies should be byte-identical to the core source.
+// This server doesn't depend on @asaps/core (it's standalone for
+// portability), so this affect-prompt content is duplicated here. The
+// canonical source is packages/core/src/prompts/affectPrompt.ts — when it
+// changes, mirror the change into this block; the copy should stay
+// byte-identical to it.
+//
+// This is the LAST hand-mirrored prompt copy. Everything else this server
+// needs it fetches live from the running Builder (/api/schema/beats), which
+// is why it can't drift on beat types the way the retired mcp-server did.
 // =====================================================================
 
 function buildAffectPromptSection(

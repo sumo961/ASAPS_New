@@ -196,8 +196,7 @@ asaps-modern/
 │   └── player-web/    # Browser bundle of the player (for HTML exports)
 ├── apps/
 │   └── builder-desktop/  # Electron wrapper for the builder
-├── mcp-server/        # HTTP MCP server for AI tool integration
-├── mcp-server-desktop/  # Stdio MCP server for Claude Desktop / Claude Code
+├── mcp-server-desktop/  # MCP server (stdio) for Claude Desktop / Claude Code
 ├── beat-definitions/  # JSON schema for all beat types (single source of truth)
 └── docs/              # User Guide and reference documentation
 ```
@@ -396,14 +395,33 @@ Seven beat types call an LLM at playback. They share the same provider configura
 - **HTML export embedding**: TTS works in standalone HTML exports with language-aware voice switching
 
 ### MCP Server
-Two MCP variants ship with the project — `mcp-server/` (HTTP, for IDE integrations) and `mcp-server-desktop/` (stdio, for Claude Desktop / Claude Code). Both let AI assistants:
-- Create complete stories from scratch with full beat structures (including affect annotations and `requires`)
-- Read and analyze story structures
-- Generate and modify beats, including AI beats and dialog trees
-- Translate stories or individual strings
-- Export in ASML format
+`mcp-server-desktop/` connects Claude Desktop or Claude Code to a running ASAPS
+Builder over stdio. It needs **no API key**: the assistant you are already
+talking to does the thinking, and the server supplies it with the live beat
+schema and injects the result into the editor.
 
-Configure in your AI assistant's MCP settings pointing to either server directory.
+The tools it exposes:
+- `asaps_get_beat_schema` — the complete, live beat schema, read from the
+  running Builder rather than a copy, so it is never out of date
+- `asaps_get_affect_guide` / `asaps_get_example_story` / `asaps_get_themes` —
+  the authoring guidance and a worked example to structure a story correctly
+- `asaps_inject_story` — push a complete story into the Builder, where it
+  appears immediately in the visual editor
+- `asaps_check_connection` — confirm the Builder API is reachable
+
+**Prerequisite:** the Builder API server must be running —
+`cd packages/builder && STORAGE_TYPE=filesystem npm run api:start` (port 3001).
+
+Configure it in your assistant's MCP settings pointing at
+`mcp-server-desktop/dist/index.js`. Setup details live in
+[`mcp-server-desktop/README.md`](mcp-server-desktop/README.md).
+
+> A second server (`mcp-server/`) previously carried its own Anthropic API key
+> and its own copy of the generation prompts. It was retired in favour of the
+> above: it required the same running Builder, duplicated prompts that drifted
+> silently out of date, and needed a key to do what Claude Desktop already
+> does. For editing a story that is already open, use the in-app **Co-Designer**
+> (AI menu → *Design with Co-Designer*).
 
 ## 📋 Version History
 

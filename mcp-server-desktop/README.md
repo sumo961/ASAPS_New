@@ -8,7 +8,7 @@ This MCP (Model Context Protocol) server enables **Claude Desktop** to directly 
 Claude Desktop <--> MCP Server <--> ASAPS Builder (localhost:3001)
 ```
 
-Unlike the AI-powered MCP server (`mcp-server/`), this one requires **NO API KEYS**:
+This server requires **NO API KEYS**:
 
 - **Claude Desktop** does all the creative thinking and story generation
 - **MCP Server** provides schema documentation and story injection
