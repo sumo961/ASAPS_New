@@ -114,6 +114,7 @@ const TAXONOMY: Array<{
         beats: [
           'titleScreen',
           'infoText',
+          'explanation',
           'aiInfoText',
           'aiSummary',
           'onlineContent',
@@ -344,7 +345,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
 
         {orphanBeats.length > 0 && (
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200" title="Beats in the schema not yet placed in the BeatPalette taxonomy. Update TAXONOMY in BeatPalette.tsx to give them a proper home.">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2 pb-1 border-b border-gray-200" title="Beats that don't fit the groups above — usually newly added ones.">
               Other
             </h4>
             <div className="grid grid-cols-1 gap-1.5">

@@ -399,6 +399,31 @@ listened to the old woman's warning.
 [Button: "Press deeper into the woods"]
 ```
 
+### Explanation
+
+**Purpose:** Teach the interactor what the readouts on screen actually mean.
+
+A story with a timer, a countdown, character meters and an inventory panel is showing the interactor four things they've never seen before. This beat labels them — drawing a short caption beside each HUD that's *currently on screen*, then waiting for a "Got it".
+
+The captions are drawn over the **real** HUD positions, worked out at that moment. Move a HUD to a different corner, add a second character's meters so the stack re-packs, and the callouts follow. This is the reason to use the beat rather than writing "your trust meter is in the top left" into an Info Text — that sentence goes stale the first time you rearrange anything, and silently.
+
+**Key Settings:**
+- **Text** - Intro line in the beat's own text box (default: *"Here's what you'll see on screen."*)
+- **Button Text** - The acknowledge button (default: *"Got it"*)
+- **Callout captions** - One optional field per HUD kind: **Timer**, **Countdown**, **Counters**, **Inventory**, **Mood**. Leave any blank and a sensible built-in caption is used — *"How long you have left"*, *"A character's values as they change"*, and so on. Write your own when the story's language matters ("Hours until the tide turns").
+
+**Only HUDs that are actually visible get a callout.** You don't need to prune the captions to match a given beat — a caption for a HUD that isn't on screen is simply not drawn. The same beat can therefore sit in several stories, or early and late in one story, and explain whatever happens to be showing.
+
+**When to Use:** Right after the first beat that turns a HUD on. Not the title screen — screen HUDs are hidden there by default, so there'd be nothing to point at.
+
+#### Explaining without a separate beat
+
+Every visible beat also carries an **Explain HUDs on entry** checkbox (Inspector → *Explanation*). Tick it and the callouts appear over that beat when it's first reached, with the beat held inert until the interactor acknowledges — they can't click a choice past the explanation. It's remembered for the playthrough, so revisiting the beat doesn't re-explain.
+
+Use the checkbox when the explanation belongs *on* a real story beat — the first scene where trust starts to matter. Use the standalone beat when you want a deliberate pause with its own wording.
+
+> **A note on scope.** This system explains **HUDs** — the ambient readouts round the edge of the screen that carry no label of their own. It deliberately doesn't annotate buttons, choices or input fields: those already say what they are, and you can explain them far better in the story's own voice than a floating callout can.
+
 ---
 
 ### Dialog Tree
@@ -1176,6 +1201,8 @@ A counter that's only in the data does nothing for your interactor. The **Meter 
 - **Show Labels**, plus **Meter Width**, **Meter Height** and **Spacing** for the bars themselves.
 
 The frame draws every counter whose eye toggle is on, in the order they're listed, and it carries a **header with the character's name and their colour dot** *(new in v0.9.89)*. That header matters as soon as you have two characters with meters: two frames docked in the same screen corner used to look like one character's counters duplicated, and since only one set responded to anything, the other looked broken. Now the HUD says whose meters it is.
+
+> **Will your interactor know what it is?** A bar labelled *Trust* in the corner is still a bar they've never seen before. The [Explanation beat](#explanation) labels the HUDs that are actually on screen, and every beat carries an *Explain HUDs on entry* checkbox that does the same thing in place — worth one beat early on.
 
 <a id="counter-binding"></a>
 #### Counters that read affect — "a display, not a mechanic"
@@ -3316,6 +3343,7 @@ Quick reference for all beat types.
 |------|---------|--------------|
 | Title Screen | Story opening | title, subtitle, author, button text |
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
+| Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
 | Dialog Tree | Choices | prompt, choices (each with text, target, condition), NPC auto-exit target, presentation mode, markVisited, choice effects |
 | Movement Choice | Navigation | description, destinations |
 | Pick Prop | Item selection | prompt, props, display mode |
