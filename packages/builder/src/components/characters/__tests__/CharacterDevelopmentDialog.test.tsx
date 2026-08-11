@@ -261,3 +261,84 @@ describe('CharacterDevelopmentDialog', () => {
     expect(screen.getByPlaceholderText(/45-year-old client/i)).toBeInTheDocument();
   });
 });
+
+describe('tracked quantity offer', () => {
+  const withQuantity: GeneratedCharacterProfile = {
+    ...profileNoVariants,
+    trackedQuantity: {
+      emotion: 'trust',
+      displayName: 'Trust',
+      rationale: 'she has been let down before',
+      bipolar: true,
+    },
+  };
+
+  const toPreview = async (
+    profile: GeneratedCharacterProfile,
+    characters: Character[] = [],
+    existingCharacterId?: string,
+  ) => {
+    generateCharacterProfile.mockResolvedValue(profile);
+    const r = renderDialog({ seed: { brief: 'a mother' }, existingCharacterId }, characters);
+    fireEvent.click(screen.getByRole('button', { name: /generate$/i }));
+    await waitFor(() => expect(screen.getByText('Solo description.')).toBeInTheDocument());
+    return r;
+  };
+
+  it('offers the feeling the AI proposed, with its reasoning', async () => {
+    await toPreview(withQuantity);
+    expect(screen.getByText(/Track Trust/i)).toBeInTheDocument();
+    expect(screen.getByText(/let down before/i)).toBeInTheDocument();
+  });
+
+  it('makes no offer when the model proposed nothing', async () => {
+    await toPreview(profileNoVariants);
+    expect(screen.queryByText(/^Track /i)).not.toBeInTheDocument();
+  });
+
+  it('adds nothing unless the author opts in', async () => {
+    // A personality is not a licence to add machinery nobody asked for.
+    const { onCharactersChange } = await toPreview(withQuantity);
+    fireEvent.click(screen.getByRole('button', { name: /add character/i }));
+    expect(onCharactersChange.mock.calls[0][0][0].counters).toEqual([]);
+  });
+
+  it('writes a bound counter with word display when opted in', async () => {
+    const { onCharactersChange } = await toPreview(withQuantity);
+    fireEvent.click(screen.getByRole('checkbox', { name: /track trust/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add character/i }));
+
+    const created = onCharactersChange.mock.calls[0][0][0];
+    const counter = created.counters[0];
+    expect(counter.name).toBe('trust');
+    expect(counter.source).toEqual({ kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' });
+    expect(counter.numericFormat).toBe('band');
+    // A visible meter needs a frame to render in.
+    expect(created.meterFrame?.dockMode).toBe('screen');
+  });
+
+  it('adds no counter for a modelled feeling the interactor never sees', async () => {
+    const { onCharactersChange } = await toPreview(withQuantity);
+    fireEvent.click(screen.getByRole('checkbox', { name: /track trust/i }));
+    fireEvent.change(screen.getByDisplayValue(/A word/i), { target: { value: 'hidden' } });
+    fireEvent.click(screen.getByRole('button', { name: /add character/i }));
+
+    const created = onCharactersChange.mock.calls[0][0][0];
+    expect(created.counters).toEqual([]);
+    expect(created.meterFrame).toBeUndefined();
+  });
+
+  it('leaves an existing character\'s configured frame alone', async () => {
+    const framed: Character = {
+      ...existingIris,
+      meterFrame: { dockMode: 'character', anchor: 'top' } as any,
+    };
+    const { onCharactersChange } = await toPreview(withQuantity, [framed], framed.id);
+    fireEvent.click(screen.getByRole('checkbox', { name: /track trust/i }));
+    fireEvent.click(screen.getByRole('button', { name: /apply to/i }));
+
+    const updated = onCharactersChange.mock.calls[0][0][0];
+    expect(updated.meterFrame.dockMode).toBe('character');
+    expect(updated.counters.map((c: any) => c.name)).toContain('trust');
+  });
+});

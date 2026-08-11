@@ -20,6 +20,14 @@ export {
   type ArchetypeSelfSentiment,
 } from './PersonalityArchetypes';
 export {
+  buildTrackedQuantityCounter,
+  describeTrackedQuantity,
+  type TrackedQuantityProposal,
+  type TrackedQuantityChoice,
+  type QuantityMovement,
+  type QuantityVisibility,
+} from './trackedQuantity';
+export {
   suggestOpeningStance,
   describeOpeningStance,
   OPENING_STANCE_SCALE,

@@ -75,6 +75,25 @@ export interface GeneratedCharacterProfile {
   traits: Record<string, number>;
   initialMood: { valence: number; arousal: number };
   variants?: GeneratedCharacterVariant[];
+  /**
+   * Optional: the one feeling this character's relationship with the player
+   * most naturally tracks, proposed from the brief. The helper offers it as
+   * an opt-in tracked quantity — the author decides whether it exists at all,
+   * how it moves, and whether the interactor ever sees it.
+   *
+   * Optional by design: models omit it, and a missing proposal simply means
+   * no offer is made. See docs/Counter-Binding-Design.md.
+   */
+  trackedQuantity?: {
+    /** Sentiment emotion name, lowercase — e.g. "trust", "respect", "fear". */
+    emotion: string;
+    /** Author-facing meter label — e.g. "Trust". */
+    displayName: string;
+    /** One short line on why this feeling is the one worth tracking here. */
+    rationale?: string;
+    /** True when the feeling has a meaningful opposite (trust/distrust). */
+    bipolar?: boolean;
+  };
 }
 
 const TRAIT_GUIDE = `"traits" uses the Big Five, each 0.0-1.0 (0.5 = average):
@@ -146,13 +165,16 @@ ${knownStanceLines ? `\nDISPOSITION STANCES:\n${knownStanceLines}` : ''}`
 ${TRAIT_GUIDE}
 ${variantRules}
 
+Also propose ONE "trackedQuantity": the single feeling this character's relationship with the player most naturally tracks over a story — the thing an author would want a meter for. Pick the feeling the brief actually implies (trust, respect, fear, suspicion, affection, patience…), not a generic default. "bipolar" is true only when the feeling has a real opposite that could be named (trust/distrust: yes; fear: no — its absence is just calm). Keep "rationale" to one short clause. Omit the whole field if nothing fits.
+
 Respond with ONLY valid JSON:
 {
   "name": "code_name_slug",
   "displayName": "...",
   "description": "...",
   "traits": { "openness": 0.5, "conscientiousness": 0.5, "extraversion": 0.5, "agreeableness": 0.5, "neuroticism": 0.5 },
-  "initialMood": { "valence": 0.0, "arousal": 0.0 }${
+  "initialMood": { "valence": 0.0, "arousal": 0.0 },
+  "trackedQuantity": { "emotion": "trust", "displayName": "Trust", "rationale": "...", "bipolar": true }${
     wantsVariants
       ? `,
   "variants": [

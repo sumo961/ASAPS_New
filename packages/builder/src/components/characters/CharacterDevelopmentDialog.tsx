@@ -26,6 +26,13 @@ import type {
 } from '../../services/prompts/characterGeneration';
 import { StancePad } from './StancePad';
 import {
+  buildTrackedQuantityCounter,
+  describeTrackedQuantity,
+  type QuantityMovement,
+  type QuantityVisibility,
+} from '@asaps/core';
+import { DEFAULT_METER_FRAME_CONFIG } from '../../types/character';
+import {
   bigFiveToStance,
   stanceToBigFive,
   applyStanceToTraits,
@@ -96,6 +103,12 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
   const [questions, setQuestions] = useState<GeneratedCharacterQuestion[]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [profile, setProfile] = useState<GeneratedCharacterProfile | null>(null);
+  /* Tracked quantity — opt-in, and OFF until the author says otherwise. The
+     helper proposes which feeling is worth following; whether it exists at
+     all stays the author's call. */
+  const [trackQuantity, setTrackQuantity] = useState(false);
+  const [quantityMovement, setQuantityMovement] = useState<QuantityMovement>('responsive');
+  const [quantityVisibility, setQuantityVisibility] = useState<QuantityVisibility>('words');
   const [includedVariantIds, setIncludedVariantIds] = useState<Set<string>>(new Set());
   const [randomPolicy, setRandomPolicy] = useState(true);
   const [adjustDrafts, setAdjustDrafts] = useState<Record<string, string>>({});
@@ -211,6 +224,24 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
   const handleAccept = () => {
     if (!profile) return;
     const now = new Date().toISOString();
+
+    /* The tracked quantity, if the author opted in. `hidden` + `responsive`
+       deliberately yields no counter: the feeling is already modelled in the
+       affect system, and an invisible mirror of it would be a second
+       representation of one thing with no way to read either. */
+    const tracked = trackQuantity && profile.trackedQuantity
+      ? buildTrackedQuantityCounter(profile.trackedQuantity, {
+          movement: quantityMovement,
+          visibility: quantityVisibility,
+        })
+      : null;
+    /* A meter nobody can see is not a meter — a visible counter needs a frame
+       to render in. Only added when one is actually wanted, and never over an
+       existing frame the author already configured. */
+    const trackedFrame = tracked && quantityVisibility !== 'hidden'
+      ? { meterFrame: { ...DEFAULT_METER_FRAME_CONFIG, dockMode: 'screen' as const,
+                        screenPosition: 'screen-top-left' as const, meterWidth: 130 } }
+      : {};
     const included = (profile.variants || []).filter((v) => includedVariantIds.has(v.id));
 
     // Convention (matches CharacterEditor's variant migration): when variants
@@ -245,6 +276,10 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
           : { traits: profile.traits, initialMood: profile.initialMood }),
         variants: [...(existingCharacter.variants || []), ...newVariants],
         ...variantPolicy,
+        ...(tracked && !(existingCharacter.counters || []).some((c) => c.name === tracked.name)
+          ? { counters: [...(existingCharacter.counters || []), tracked as any] }
+          : {}),
+        ...(existingCharacter.meterFrame ? {} : trackedFrame),
         updatedAt: now,
       };
       onCharactersChange(characters.map((c) => (c.id === accepted.id ? accepted : c)));
@@ -260,8 +295,9 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
         visual: { type: 'static' },
         states: [{ id: 'default', name: 'default', displayName: 'Default', visual: {} }],
         defaultState: 'default',
-        counters: [],
+        counters: tracked ? [tracked as any] : [],
         inventory: [],
+        ...trackedFrame,
         description: profile.description,
         ...baseAffect,
         ...(hasVariants ? { variants: included } : {}),
@@ -603,6 +639,75 @@ export const CharacterDevelopmentDialog: React.FC<CharacterDevelopmentDialogProp
                   Pick a disposition at random each playthrough
                   <span className="text-xs text-gray-400">(rehearsal variety)</span>
                 </label>
+              )}
+
+              {/* Tracked quantity — the helper's answer to "how do I show what
+                  this character feels?". Opt-in and off by default: a
+                  personality is not a licence to add machinery the author did
+                  not ask for. The two questions are about the fiction and are
+                  independent of each other; neither is a tier of the other. */}
+              {profile.trackedQuantity?.emotion && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={trackQuantity}
+                      onChange={(e) => setTrackQuantity(e.target.checked)}
+                      className="mt-0.5 rounded border-gray-300"
+                    />
+                    <span className="text-sm">
+                      <span className="font-medium">
+                        Track {profile.trackedQuantity.displayName || profile.trackedQuantity.emotion}
+                        {' '}toward the player
+                      </span>
+                      {profile.trackedQuantity.rationale && (
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          {profile.trackedQuantity.rationale}
+                        </span>
+                      )}
+                    </span>
+                  </label>
+
+                  {trackQuantity && (
+                    <div className="mt-3 pl-6 space-y-2">
+                      <label className="block text-xs text-gray-600">
+                        How does it change?
+                        <select
+                          value={quantityMovement}
+                          onChange={(e) => setQuantityMovement(e.target.value as QuantityMovement)}
+                          className="mt-1 w-full px-2 py-1 border rounded text-xs"
+                        >
+                          <option value="responsive">It responds to what happens in the story</option>
+                          <option value="authored">You set it at specific moments</option>
+                        </select>
+                      </label>
+                      <label className="block text-xs text-gray-600">
+                        What does the interactor see?
+                        <select
+                          value={quantityVisibility}
+                          onChange={(e) => setQuantityVisibility(e.target.value as QuantityVisibility)}
+                          className="mt-1 w-full px-2 py-1 border rounded text-xs"
+                        >
+                          <option value="words">A word — &ldquo;wary&rdquo;, &ldquo;trusting&rdquo;</option>
+                          <option value="meter">A meter</option>
+                          <option value="hidden">Nothing — it shapes what happens</option>
+                        </select>
+                      </label>
+                      <p className="text-[11px] text-gray-500 bg-gray-50 border rounded p-2">
+                        {describeTrackedQuantity(profile.trackedQuantity, {
+                          movement: quantityMovement,
+                          visibility: quantityVisibility,
+                        })}
+                        {quantityMovement === 'responsive' && quantityVisibility !== 'hidden' && (
+                          <span className="block mt-1 text-gray-400">
+                            Your choices move it with <strong>Add Sentiment</strong> effects — the
+                            meter only reports.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
