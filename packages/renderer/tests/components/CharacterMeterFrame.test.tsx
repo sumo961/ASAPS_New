@@ -197,3 +197,35 @@ describe('zero-origin bar and qualitative bands', () => {
     expect(screen.getByText('62')).toBeDefined();
   });
 });
+
+describe('character identification', () => {
+  it('names whose meters these are', () => {
+    // Two screen-docked frames stack in the same corner. Without a name they
+    // are indistinguishable, and read as one set of duplicated counters.
+    renderFrame({ counters: [counter()], characterName: 'Ada' });
+    expect(screen.getByText('Ada')).toBeDefined();
+  });
+
+  it('shows the name even for a single character', () => {
+    const { container } = renderFrame({ counters: [counter()], characterName: 'Ada' });
+    expect(container.querySelector('[data-meter-frame-name]')).not.toBeNull();
+  });
+
+  it('renders the bare frame when no name is supplied', () => {
+    const { container } = renderFrame({ counters: [counter()] });
+    expect(container.querySelector('[data-meter-frame-name]')).toBeNull();
+  });
+
+  it('reserves height for the header so stacked frames do not overlap', () => {
+    const withName = renderFrame({ counters: [counter()], characterName: 'Ada' });
+    const withoutName = renderFrame({ counters: [counter()] });
+    const h = (r: ReturnType<typeof renderFrame>) =>
+      parseFloat((r.container.firstChild as HTMLElement).style.top);
+    // Bottom-docked frames are positioned from their own height, so a taller
+    // frame sits higher: the header must be in the height calculation.
+    const a = renderFrame({ counters: [counter()], characterName: 'Ada', config: config({ dockMode: 'screen', screenPosition: 'screen-bottom-left' }) });
+    const b = renderFrame({ counters: [counter()], config: config({ dockMode: 'screen', screenPosition: 'screen-bottom-left' }) });
+    expect(h(a)).toBeLessThan(h(b));
+    withName.unmount(); withoutName.unmount();
+  });
+});

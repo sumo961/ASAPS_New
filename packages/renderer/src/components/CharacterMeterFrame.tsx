@@ -85,6 +85,14 @@ export interface CharacterMeterFrameProps {
   containerDimensions?: { width: number; height: number };
   /** Font scale multiplier (default 1.0) */
   fontScale?: number;
+  /**
+   * Whose meters these are, shown as a header. Always worth showing: two
+   * screen-docked frames stack in the same corner and are otherwise
+   * indistinguishable. Omit to render the bare frame (legacy behaviour).
+   */
+  characterName?: string;
+  /** Character's theme colour, shown as a dot beside the name. */
+  characterColor?: string;
 }
 
 /**
@@ -349,6 +357,8 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   characterDimensions,
   containerDimensions,
   fontScale = 1.0,
+  characterName,
+  characterColor,
 }) => {
   // Counters are pre-filtered by the resolver (visible && showLevelMeter)
   if (counters.length === 0) {
@@ -359,11 +369,20 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   // Handle backward compatibility - dockMode may be undefined in older configs
   const dockMode = config.dockMode ?? 'character';
 
+  // Whose meters these are. Two screen-docked frames stack in the same
+  // corner and are otherwise indistinguishable — an author reads them as one
+  // set of duplicated counters. Mood frames already carry a name header;
+  // this brings meter frames in line. Shown even for a single character, so
+  // the HUD says what it is rather than relying on the reader to infer it.
+  const showHeader = !!characterName;
+  const HEADER_HEIGHT = 16;
+
   // Calculate frame dimensions based on content
   const labelHeight = showLabels ? 14 : 0;
   const singleMeterHeight = meterHeight + labelHeight + 2; // 2px for margins
   const frameContentHeight = counters.length * singleMeterHeight +
-    (counters.length - 1) * meterSpacing;
+    (counters.length - 1) * meterSpacing +
+    (showHeader ? HEADER_HEIGHT + meterSpacing : 0);
   const frameHeight = frameContentHeight + style.padding * 2;
   const frameWidth = meterWidth + style.padding * 2;
 
@@ -412,7 +431,38 @@ export const CharacterMeterFrame: React.FC<CharacterMeterFrameProps> = ({
   };
 
   return (
-    <div style={frameStyle}>
+    <div style={frameStyle} data-meter-frame={characterName || ''}>
+      {showHeader && (
+        <div
+          data-meter-frame-name=""
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            height: HEADER_HEIGHT,
+            flexShrink: 0,
+          }}
+        >
+          {characterColor && (
+            <span style={{
+              width: 7, height: 7, borderRadius: '50%',
+              backgroundColor: characterColor, flexShrink: 0,
+            }} />
+          )}
+          <span style={{
+            fontSize: `${Math.round(11 * fontScale)}px`,
+            fontWeight: 600,
+            color: 'rgba(255, 255, 255, 0.75)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+            lineHeight: 1,
+          }}>
+            {characterName}
+          </span>
+        </div>
+      )}
       {counters.map((counter) => (
         <MeterBar
           key={counter.name}

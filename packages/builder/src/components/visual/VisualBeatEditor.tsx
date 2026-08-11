@@ -273,6 +273,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         toMeterCounterData(counter as any, character.id, null),
       ),
       config: character.meterFrame,
+      characterName: character.displayName || character.name,
+      characterColor: character.color,
     };
   }, [showHud, characters]);
 

@@ -920,7 +920,7 @@ export class ReactRenderer extends BaseRenderer {
   }> | undefined) | null = null;
   private characterResolver: ((characterId: string, stateId?: string) => string | undefined) | null = null;  // NEW: Character state resolver
   private counterResolver: ((counterName: string) => { value: number; min: number; max: number; bands?: Array<{ from: number; label: string }> } | null) | null = null;  // NEW: Counter value resolver
-  private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null) | null = null;  // NEW: Character meter frame resolver
+  private characterMeterFrameResolver: ((characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig; characterName?: string; characterColor?: string } | null) | null = null;  // NEW: Character meter frame resolver
   private characterInventoryResolver: ((characterId: string) => { items: InventoryItemData[]; config: InventoryFrameConfig } | null) | null = null;  // NEW: Character inventory resolver
   private characterMoodFrameResolver: ((characterId: string) => { valence: number; arousal: number; config: import('../components/CharacterMoodFrame').MoodFrameConfig; palette?: ReadonlyArray<{ name: string; weightToValence: number; weightToArousal: number }>; characterName?: string; characterPortraitUrl?: string; characterColor?: string } | null) | null = null;
   protected inventoryVisible: boolean = false;  // NEW: Whether inventory is currently visible (controlled by Ctrl/Cmd+I)
@@ -1349,7 +1349,7 @@ export class ReactRenderer extends BaseRenderer {
    * This allows the renderer to get meter frame data for character HUD overlays
    * The resolver should look up the character and return { counters, config }
    */
-  setCharacterMeterFrameResolver(resolver: (characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig } | null): void {
+  setCharacterMeterFrameResolver(resolver: (characterId: string) => { counters: MeterCounterData[]; config: MeterFrameConfig; characterName?: string; characterColor?: string } | null): void {
     this.characterMeterFrameResolver = resolver;
   }
 

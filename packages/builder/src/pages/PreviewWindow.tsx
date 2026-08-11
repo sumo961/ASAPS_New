@@ -945,6 +945,8 @@ export const PreviewWindow: React.FC = () => {
         return {
           counters,
           config: character.meterFrame,
+          characterName: character.displayName || character.name,
+          characterColor: (character as any).color,
         };
       });
       console.log('[PreviewWindow] Character meter frame resolver set up');
@@ -2842,7 +2844,9 @@ export const PreviewWindow: React.FC = () => {
                   );
                   const est = (frame.style?.padding ?? 8) * 2 +
                     counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
-                    Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6);
+                    Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6) +
+                    // name header (16px) + its gap — the packer must account for it
+                    (16 + (frame.meterSpacing ?? 6));
                   meterDescs.push({ c, counters, frame, corner: frame.screenPosition ?? 'screen-top-left', est });
                 }
 
@@ -2924,6 +2928,8 @@ export const PreviewWindow: React.FC = () => {
                         characterPosition={{ x: 0, y: 0 }}
                         characterDimensions={{ width: 0, height: 0 }}
                         containerDimensions={stageDim}
+                        characterName={d.c.displayName || d.c.name}
+                        characterColor={d.c.color}
                       />
                     ))}
                     {invDescs.map((d) => (

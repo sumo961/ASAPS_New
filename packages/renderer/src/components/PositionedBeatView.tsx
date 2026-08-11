@@ -537,6 +537,9 @@ export interface PositionedBeatViewProps {
   characterMeterFrameResolver?: (characterId: string) => {
     counters: MeterCounterData[];
     config: MeterFrameConfig;
+    /** Whose meters these are — rendered as the frame's header. */
+    characterName?: string;
+    characterColor?: string;
   } | null;
   /** Resolver function to get inventory data for a character (for HUD display) */
   characterInventoryResolver?: (characterId: string) => {
@@ -2262,6 +2265,9 @@ interface PositionedElementProps {
   characterMeterFrameResolver?: (characterId: string) => {
     counters: MeterCounterData[];
     config: MeterFrameConfig;
+    /** Whose meters these are — rendered as the frame's header. */
+    characterName?: string;
+    characterColor?: string;
   } | null;
   /** Resolver function to get inventory data for a character (for HUD display) */
   characterInventoryResolver?: (characterId: string) => {
@@ -2808,6 +2814,8 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             <CharacterMeterFrame
               counters={meterFrameData.counters}
               config={meterFrameData.config}
+              characterName={meterFrameData.characterName}
+              characterColor={meterFrameData.characterColor}
               characterPosition={{ x: effectiveX, y: effectiveY }}
               characterDimensions={{ width: location.width, height: location.height }}
               containerDimensions={containerDimensions}
