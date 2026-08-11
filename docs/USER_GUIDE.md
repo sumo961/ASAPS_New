@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.85*
+*Last revised against v0.9.89*
 
 ---
 
@@ -181,7 +181,10 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 **Make your own templates.** Use **Export → Export as Template (.asapst)** to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
 
-**Bundled templates.** ASAPS ships with **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
+**Bundled templates.** ASAPS ships with two:
+
+- **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
+- **Counters that read affect** *(new in v0.9.89)* — a character called Ada carrying four meters in one HUD frame: *Gold* (an ordinary counter you set by hand) beside *Trust*, *Fear* and *Spirits*, which are wired to her actual feelings. Three choices move her sentiment, her fear and her mood — and **none of them names a counter**. The meters simply report. It needs no AI provider, and the result beat loops back to the choice so you can push Trust below zero and watch the bar grow the other way from the centre. This is the working companion to [Counters that read affect](#counter-binding) in Part 4.
 
 ### Drag-drop import
 
@@ -846,6 +849,8 @@ Set a variable to true/false or modify a counter value. This is how your story r
 
 If evaluation fails (unknown name, division by zero, syntax error), the raw string is stored unchanged and a warning appears in the console — never a `NaN` in your story state. And it's fully opt-in: without the leading `=`, nothing is evaluated (`5+3` stays the literal text `5+3`), so existing stories behave exactly as before.
 
+**Counters bound to affect state can't be assigned (v0.9.89).** If a counter has been wired to read a character's feelings (see [Counters that read affect](#counter-binding)), it still appears in the counter picker — labelled *"(mirrors affect state)"* — but greyed out, with the reason and the right substitute on hover: *"trust mirrors affect state — change it with an Add Sentiment effect."* Writing to one would simply be overwritten the next time the character reacts to something. Reading it in a Condition Check is untouched and works exactly as before.
+
 **Flow:** Executes instantly, then moves to the target beat.
 
 ---
@@ -1113,7 +1118,7 @@ A great experience needs a great cast and a rich world. Let's populate yours.
 
 Characters aren't just pretty faces. They're miniature systems in their own right:
 - Multiple visual appearances (happy, sad, angry)
-- Their own counters (health, trust, energy)
+- Their own counters (health, trust, energy) — which you can either move by hand *or* bind to what the character actually feels
 - Inventory they carry from beat to beat
 - A personality (Big Five traits and an archetype) that quietly modulates how they react
 - A 2D mood (valence × arousal) that can drift over the session
@@ -1150,16 +1155,130 @@ In your story, you can then show the character in different states. Elena can lo
 
 Track numeric values for each character:
 
-1. In the character editor, find **Counters**
-2. Click **Add Counter**
+1. Open a character in the Character Editor and click the **Counters** tab
+2. Click **+ Add Counter**
 3. Configure:
-   - **Name** - "Health", "Trust", "Energy", etc.
-   - **Min/Max Values** - Range limits
-   - **Starting Value** - Initial amount
-   - **Color** - For visual display
-   - **Display Format** - Number, percentage, or fraction
+   - **Name** and **Display Name** — the internal key ("trust") and the label the interactor sees ("Trust"). The editor shows you the reference you'll use in conditions and calculations underneath, e.g. `ada.trust`.
+   - **Initial** — the value the counter starts at
+   - **Min / Max** — the range the meter spans (more on this below — it matters more than you'd think)
+   - **Colour** and the **eye** toggle — how it looks, and whether it's visible at all
+   - **Show Level Meter** — tick this to unfold the display controls: a horizontal/vertical **Orientation**, and **Show Value** with a format: `75`, `75/100`, `75%`, or *words* (see [Words instead of numbers](#counter-bands))
 
-Counters can be displayed as bars in your story, giving interactors visual feedback.
+Counters are **scoped to the character**, so two characters can each have a `trust` without colliding. To change one during play, use a **Set Variable/Counter** beat with **Owner** set to that character, or a **Change Counter** / **Set Counter** effect on a choice.
+
+<a id="meter-frame"></a>
+#### Showing counters on stage — the Meter Frame
+
+A counter that's only in the data does nothing for your interactor. The **Meter Frame** is the little panel that puts them on screen. Scroll to the bottom of the **Counters** tab, tick **Enable**, and choose:
+
+- **Dock To** — *Character* (the frame floats beside the character's sprite, positioned by **Anchor Position**) or *Screen* (pinned to one of the four corners, with a small **HUD layout preview** showing how it will stack alongside any other overlays in that corner).
+- **Offset X / Y**, and a **Style** block: background, border colour and width, corner radius, padding, opacity.
+- **Show Labels**, plus **Meter Width**, **Meter Height** and **Spacing** for the bars themselves.
+
+The frame draws every counter whose eye toggle is on, in the order they're listed, and it carries a **header with the character's name and their colour dot** *(new in v0.9.89)*. That header matters as soon as you have two characters with meters: two frames docked in the same screen corner used to look like one character's counters duplicated, and since only one set responded to anything, the other looked broken. Now the HUD says whose meters it is.
+
+<a id="counter-binding"></a>
+#### Counters that read affect — "a display, not a mechanic"
+
+Here's the idea, and it's a genuinely useful one: **a counter doesn't have to be something you move. It can be a window onto something the character actually feels.**
+
+Say you want a trust bar. Traditionally you'd hand-author every trust change: *this choice +10, that one −15*. That's honest work and sometimes exactly right — you know precisely what the number does. But ASAPS also models feelings properly: characters carry **sentiments** toward people, **emotion levels**, and a **mood** that drifts (see [The Affect Tab](#character-affect)). Until v0.9.89 those two systems couldn't meet. You could have a trust *bar* or modelled *trust*, never both.
+
+Now you can **bind** a counter to affect state. The meter renders exactly as before — same bar, same colours, same frame — but its value is read live from the character's feelings instead of stored. You stop writing to it, and it starts reporting.
+
+**Setting it up.** Every counter in the Counters tab has a **How does this change?** picker with four options, phrased about your fiction rather than the machinery:
+
+| Option | What it gives you |
+|---|---|
+| **You set it at specific moments** | An ordinary counter. You decide exactly when it changes and by how much, using effects. This is the default and nothing about it has changed. |
+| **It responds — a feeling toward someone** | Reads a **sentiment**. Pick the **Feeling** (free text — "trust", "respect", "fear"), who it's **Toward**, and optionally who it's **Held by**. Directed and two-sided: negative trust is distrust. |
+| **It responds — an emotion they feel** | Reads an **emotion level** — an intensity from none to overwhelming. Fear has no opposite, so this one is always one-sided. The **Emotion** field auto-completes from the built-in emotion names (fear, anger, joy, shame…), and accepts anything else you type. |
+| **It responds — their overall mood** | Reads one **Axis** of the character's mood: *Valence — unpleasant … pleasant* or *Arousal — calm … excited*. |
+
+**Held by** is the quietly powerful one. Leave it as *(this character)* and the meter shows how *they* feel. Point it at someone else and you get the player-facing bar every social scene wants: *does the caseworker trust me?* — a meter that lives on the player but reads the caseworker's sentiment.
+
+![Binding a counter to a sentiment](images/61-counter-source-sentiment.png)
+*The Counters tab with Trust bound to a sentiment. Note that **Initial** greys out — a bound counter has no stored value to seed. The preview underneath answers the only question that matters: what will this bar actually do?*
+
+<a id="counter-projection"></a>
+#### The one rule: the bar starts at zero
+
+This is the part worth reading twice, because it's the thing that surprises new authors.
+
+Feelings inside ASAPS are signed and small: a sentiment runs from **−1 to +1**, a mood axis likewise. Counters are usually **0 to 100**. So something has to translate, and ASAPS uses exactly one rule, with no setting to get wrong:
+
+> **The bar starts at zero — wherever zero happens to fall in your Min…Max — and grows toward the value.**
+
+Which means your **Min** is not just a display bound. It's you telling ASAPS whether this feeling has an opposite:
+
+- **`Min: 0, Max: 100`** — zero is the left edge, so the bar fills rightward from it. The familiar gauge. Negative feeling clamps to an empty bar, which is the honest reading of *"I'm not modelling distrust"*: nothing yet.
+- **`Min: -100, Max: 100`** — zero is the **centre**, so the bar grows *outward* from the middle. Distrust now reads as distrust rather than as "a bit less trust". This is almost always what you want for a two-sided feeling like trust or respect.
+
+Asymmetric ranges work too, and fall out of the same rule — `Min: -50, Max: 100` puts zero a third of the way in.
+
+What ASAPS deliberately does *not* do is squash −1…+1 onto 0…100 so that neutral sits half-full. That would show a character who feels nothing as a half-filled bar, which reads as a partial score. Zero means empty, or centre. Always.
+
+**The preview shows you all of this.** Under the source fields there's a live **Preview**: drag the strength slider and watch the readout — *strength −0.45 → **−45** / 100 → **wary*** — with the bar rendering the real geometry, growing leftward from the centre and turning red for the negative direction. It's interactive rather than live because at authoring time there's no running story to read a real sentiment from; dragging the slider is the honest equivalent, and it answers your actual question. If the bar surprises you here, it will surprise you in play — fix it now.
+
+![The preview at a negative strength, with the band ladder below](images/62-counter-bands-and-negative-preview.png)
+*Strength −0.45 projects to −45 on a −100…100 range, the bar grows leftward from the centre, and the readout says "wary". The band ladder that produced that word is directly underneath.*
+
+**A gentle nudge about polarity.** If you name a sentiment after one of the built-in emotion names — *fear*, *anger*, *shame* — while Min is still below zero, an amber hint appears: *"fear usually has no opposite — 'negative fear' isn't a state. Set **Min** to 0 unless you really do mean the reverse feeling."* It's a suggestion, not a rule. Sentiments genuinely vary: *trust* is two-sided, *fear of the wolf* is not, and only you know which you meant. ASAPS never silently clamps a value you deliberately authored — the help belongs here, at authoring time, where you can see it and overrule it.
+
+<a id="counter-bands"></a>
+#### Words instead of numbers
+
+A number is precise. A word is readable. Bands let you have the second without teaching your interactor the first.
+
+Under the preview, a **Words instead of numbers** block lets you give the counter a ladder of thresholds — each one a value and a phrase. Set **Show Value** to the *words* format and the readout shows the phrase covering the current value instead of the digits: **−100** *strong distrust* · **−60** *wary* · **−20** *neutral* · **20** *trusting* · **60** *deep trust*.
+
+Click **Suggest wording** and ASAPS seeds a ladder appropriate to the source *and* switches the value format to words for you. (If nothing changes on screen, check that **Show Value** is ticked — the format picker only shows when it is, and the *words* option stays greyed out, reading *"words — add them below"*, until at least one band exists.) Every row is editable and deletable; delete them all and you're back to a bare number. The suggestions are:
+
+| Source | Suggested ladder |
+|---|---|
+| Two-sided sentiment (Min below 0) | strong distrust · wary · neutral · trusting · deep trust |
+| One-sided — an emotion level, or any counter with Min 0 | none · slight · moderate · strong |
+| Mood axis (Min below 0) | unpleasant · flat · pleasant |
+
+Thresholds don't have to be written in order, and a value below every threshold falls back to the lowest phrase — the readout is never blank.
+
+Nothing about bands is affect-specific — the runtime resolves them on any counter — but the band editor currently lives inside the binding block, so in practice you'll be adding them to bound counters. (A ladder you've already created survives if you switch that counter back to *You set it at specific moments*.)
+
+**Why the suggested ladders include a "neutral" band.** Every point on the range always resolves to *some* word, so there's never a blank readout. The thing to watch is subtler: a ladder with no neutral band puts a judgemental word on the opening value, and that word is the first characterisation your interactor ever receives. Since sentiments start at exactly zero unless you seed them, "wary" at the top of the story asserts a suspicion nobody has earned yet. If you *have* seeded an opening stance — a guarded character who genuinely opens wary — delete the neutral band without a second thought. That's characterisation, and a useful one.
+
+> **Band phrases translate.** Both the counter's display name and its band phrases are picked up by [translation](#multi-language-translation), so a meter reading *"wary"* in English reads *"misstänksam"* in a Swedish export. The thresholds themselves are numbers and stay as they are.
+
+**Turning the label off.** With **Show Labels** on (the Meter Frame default), each meter shows its name on the left and the readout on the right above the bar. Turn Show Labels off and the name disappears while the readout moves inline, right beside the bar — so a compact frame can read simply `▓▓▓░░ wary`.
+
+**Words with no bar at all.** Untick **Show Level Meter** while leaving **Show Value** on with the *words* format, and the meter drops the bar entirely — the frame shows just the name and the phrase, `Trust  wary`. Useful when the exact quantity is none of the interactor's business and only the shift in wording should register.
+
+<a id="derived-counters-readonly"></a>
+#### Bound counters are read-only
+
+Once a counter reads affect state, assigning to it stops making sense: the next time the character appraises something, your written value is gone. You'd have found a bug, not a feature. So ASAPS refuses the write, visibly rather than silently:
+
+- In **Set Variable/Counter** and in the **Change Counter** / **Set Counter** choice effects, a bound counter still appears in the picker — labelled *"Trust — Ada (mirrors affect state)"* — but greyed out and unselectable, with the reason on hover: *"trust mirrors affect state — change it with an Add Sentiment effect."* It names the substitute, too: an **Add Sentiment** effect for a sentiment binding, **Fire Emotion** for an emotion level, **Nudge Mood** for a mood axis.
+- The **Input Text** beat's *save to counter* field drops bound counters from its suggestions, and warns you if you type one by hand.
+
+They're shown disabled rather than hidden on purpose: an author who has just defined a counter and then can't find it in the picker would reasonably conclude the picker is broken.
+
+**Reading them is completely fine.** A Condition Check can test a bound counter exactly like any other — `ada.trust > 40` works, and resolves to the live derived value. Only writing is blocked.
+
+**And if you want direct control, you already have it.** Leave the source on *You set it at specific moments*. Authored and bound counters are equal citizens, they can sit side by side in the same frame — *Gold: 42* next to *Trust: ▓▓▓░░* — and a story that never touches affect is entirely unaffected by any of this.
+
+<a id="counter-binding-in-play"></a>
+#### Seeing it work
+
+Open the Preview Window and play a beat or two. Bound meters resolve live, so they move as the character's feelings move — in the Preview Window and in an exported HTML story alike.
+
+The **Visual Editor** shows the frame too, so you can see where it sits and how big it is, but bound counters read **zero** there. That's deliberate rather than a bug: no story is running, so there is no sentiment to read, and showing an invented number would be worse than showing none. Use the Preview Window whenever you want to see real values.
+
+![Bound meters running in the Preview Window](images/64-bound-meters-in-preview.png)
+*Ada's frame after a harsh choice. Gold hasn't budged — nothing wrote to it. Trust has grown leftward from the centre and reads "wary", Fear has filled from the left edge and reads "uneasy", and Spirits has dropped to −44. The choice fired affect effects; the meters simply reported. The Debug panel on the right shows the same state underneath — mood, fear level, and "mild anti-trust toward You".*
+
+**Try this first.** Start a project from the **Counters that read affect** template ([Templates](#templates)), play it, then go and read the character's Counters tab with the running behaviour fresh in your mind. The wiring makes far more sense once you've watched a bar do the thing.
+
+> **A note on paradigm.** This is the systems-not-scripts idea in miniature. A hand-authored trust counter is a script: you decide, in advance, what every choice is worth. A bound meter is a system: you describe how the character *reacts*, their personality shapes how strongly, and the display reports whatever the interaction produced — including combinations you never explicitly wrote down. Neither is better. But if your story is about a relationship rather than a resource, the second one usually surprises you in the right way.
 
 ### Character Inventory
 
@@ -1242,12 +1361,23 @@ When you assign the player character as a beat's speaker, the character's actual
 
 ### Character Templates
 
-Start faster with pre-made templates:
-- **Player** - Standard protagonist setup
-- **Merchant NPC** - Comes with gold counter and inventory
-- **Wizard NPC** - Magic-focused stats
+Clicking **Add Character** opens a **Choose a Template** picker rather than dropping you into an empty form. Pick a starting point and customise from there:
 
-Select a template, customize to fit your story.
+| Template | What it carries |
+|---|---|
+| **Player** | Standard protagonist setup · *balanced* personality |
+| **Merchant** | Gold counter and inventory · *conscientious leader* personality |
+| **Old Wizard** | Magic-focused stats · *stoic* personality |
+| **Animated Character** | A sprite-sheet visual with idle/talk/react animations · *free spirit* personality |
+| **Character with affect meters** | Four pre-wired meters in a docked HUD frame — Gold, Trust, Fear, Spirits — plus traits and a seeded opening sentiment |
+| **Blank Character** | Start from scratch — **no personality** |
+
+![The character template picker](images/60-character-template-picker.png)
+*Each card names the personality it carries, so a template never hands you a disposition you didn't choose. "Blank Character" says outright that it carries none.*
+
+**Templates say what they seed.** Personality traits are not cosmetic — they feed the character dossier and shape how the character behaves in AI conversations. So each card discloses the personality underneath it (*"npc · conscientious leader"*), and **Blank Character** promises the opposite: *"Start from scratch — no personality."* Picking a template for its inventory or its sprite sheet should never quietly hand you a disposition.
+
+**About "Character with affect meters."** Its card carries an extra amber note, and it's worth heeding: *"Meters read affect state — add **Add Sentiment** / **Fire Emotion** effects to your choices to move them."* The template can only carry half the mechanic. Meters read a character's feelings, and feelings change because *choices* fire affect effects — which live on beats, not on characters. Add this character to a story with no such effects and you get four perfectly configured meters that never move. The **Counters that read affect** starter template has the working other half; see [Counters that read affect](#counter-binding).
 
 The same picker also offers **✨ Generate with AI** — describe the person in a sentence or two and the AI drafts the whole profile, optionally with disposition variants. See [AI Character Development](#ai-character-development).
 
@@ -1299,6 +1429,25 @@ A sentiment is a (target, emotion, strength) tuple: *fear toward wolf +0.7*, *tr
 Sentiments can target other characters, the player, items, or any string you want to use as a key — but linking to a defined Character via id is what gives you stable references that survive renames.
 
 When the sentiment's holder and target are the same character (a self-shame, self-pride etc.), ASAPS renders it with the *self-* prefix — e.g. **mild self-shame** instead of *mild shame toward Alex*. The same convention is used in the LLM dossier, which splits affect into "Feels toward themselves:" and "Feels toward others:" so prompts don't sound recursive.
+
+**Opening stance — a suggested starting point (v0.9.89).** Sentiments start at exactly zero unless you write them down, which means even a fully specified personality meets your whole cast perfectly neutral. That's rarely what you meant: a warm character and a prickly one should not open on the same blank.
+
+So when a character has an **agreeableness** trait and there's somebody in the cast to point at, an amber prompt appears at the top of the Initial sentiments card:
+
+> *Merchant has **high agreeableness** — start them **mildly trusting** (+0.11) toward someone?*
+
+Pick the target from the little dropdown and click **Add it**, and ASAPS writes an ordinary `trust` sentiment row — indistinguishable from one you typed yourself, and just as editable. Or ignore it entirely: *"Or set your own below — this only fills in a starting point."*
+
+![The opening-stance suggestion](images/63-opening-stance-suggestion.png)
+*The suggestion reads the character's agreeableness and proposes an opening trust. It is offered, never applied — an opening stance toward another character is an authorial decision.*
+
+Three things worth knowing about it:
+
+- **It's grounded, not invented.** Agreeableness is the trait whose research literature puts *trust* squarely inside it, so it's the honest source for this particular quantity. Extraversion is deliberately left out — a shy character can be perfectly trusting.
+- **It's modest on purpose.** The suggestion is capped well short of the extremes (roughly ±0.35), because an opening disposition should leave your story room to earn the rest.
+- **It never appears for a character with no personality.** A **Blank Character** has no traits, so there's nothing to derive from and nothing is proposed. The affect opt-out survives this feature intact. The prompt also withdraws once you've authored trust toward that target yourself.
+
+If you've bound a meter to that sentiment (see [Counters that read affect](#counter-binding)), an opening stance is what stops every bar in your story from starting pinned at dead centre.
 
 #### Dossier policy — how the LLM sees this character
 
@@ -1417,7 +1566,9 @@ Anywhere ASAPS lets you attach **Effects** to a player choice — Dialog Tree ch
 
 The **target** field for all of these effect types is a **dropdown of the project's characters** (display name shown, stable id stored under the hood) plus a sentinel **Player** entry pinned at the top. No more typing `char_alex` by hand and hoping you spelled it right. If the editor isn't given a project character roster (some compact sub-editors don't have one in scope), the field falls back to a free-text input. The one quirk: when *Bookmark Affect State* is set to scope `all characters`, the target field hides itself entirely — the snapshot covers everyone, so a target would only confuse the read.
 
-> **Where to find Effects.** Effects sit on Dialog Tree choices, Dialog Tree nodes, Movement Choice destinations, and Pick Prop choices. Open the **Effects** section on any of these and click **+ Add Effect**.
+> **Where to find Effects.** Effects sit on Dialog Tree choices, Dialog Tree nodes, Multi Choice and Movement Choice destinations, Pick Prop choices, and Panorama / AR hotspots. Open the **Effects** section on any of these and click **+ Add Effect**. On some beat types — Multi Choice, Movement Choice, and hotspots among them — the Effects block only appears once you click **Show Advanced Options** near the bottom of the Inspector. If you're looking for Effects and can't see them, that's usually why.
+
+> **Effects are also how you move a bound meter.** If a counter has been wired to read a character's feelings ([Counters that read affect](#counter-binding)), you don't write to the counter — you use **Add Sentiment**, **Fire Emotion** or **Nudge Mood** here, and the meter reports the result. This is the whole idea: the choice changes how someone *feels*, and the display follows.
 
 <a id="effects-easier-authoring"></a>
 ### Easier authoring: labels, palette suggestions, templates, and a live summary
@@ -3237,7 +3388,13 @@ Quick reference for all beat types.
 
 **Connection** - A link between beats defining possible transitions in the experience.
 
-**Counter** - A numeric variable that tracks quantities (gold, health, reputation).
+**Counter** - A numeric quantity scoped to a character (gold, health, reputation). Either *authored* — you move it with effects — or *bound*, reading a feeling instead. See [Counters that read affect](#counter-binding).
+
+**Bound counter (derived counter)** - A counter whose value is not stored but read live from a character's sentiment, emotion level, or mood. It renders as an ordinary meter but is read-only: write surfaces disable it with the reason, while conditions read it normally.
+
+**Counter band** - A named range on a counter — a threshold plus a phrase — rendered instead of the number when the counter's value format is set to *words*. `−60 → "wary"`, `20 → "trusting"`. Player-facing, so band labels translate.
+
+**Meter Frame** - The HUD panel that draws a character's visible counters as bars, docked either beside the character or in a screen corner. Carries a header with the character's name and colour dot.
 
 **Flowchart** - The visual graph showing beats and their connections.
 
@@ -3404,6 +3561,15 @@ Yes! Use the language selector (top right) to add target languages. You can tran
 
 ### What browsers are supported?
 Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects.
+
+### Should my trust bar be a counter I set, or one that reads the character's feelings?
+Both are first-class; it depends on what you want to be in charge of. Choose an **authored counter** when the number is the mechanic and you want exact control — a reputation score, a quest tally, anything where "+10 here, −15 there" *is* the design. Choose a **bound counter** when the number is a *readout* of a relationship, and you'd rather describe how the character reacts than tabulate every increment — then their personality does the scaling for you, and the meter reports the result. You can mix both on the same character in the same frame. See [Counters that read affect](#counter-binding).
+
+### My bound meter isn't moving. What did I miss?
+Almost always one of three things. **One:** no effect is moving the underlying feeling — bound meters don't respond to *Change Counter*, they respond to **Add Sentiment**, **Fire Emotion** or **Nudge Mood** effects on your choices. **Two:** the binding points somewhere nothing happens — check that the sentiment's **Feeling** name and **Toward** target exactly match what your effects are changing. **Three:** you're looking at the Visual Editor, where bound counters always read zero because no story is running; open the Preview Window instead.
+
+### Why does my trust meter sit half-empty when the character feels nothing?
+It doesn't — it sits at *zero*, and zero is where you put it. On a `Min: 0` range zero is the left edge, so an empty bar is correct. On a `Min: -100` range zero is the centre, so a neutral character shows a bar of no width at the midpoint. If you wanted neutral to look "half full", that's the one reading ASAPS deliberately doesn't offer, because a half-filled bar reads as a partial score rather than as *nothing yet*. See [The one rule: the bar starts at zero](#counter-projection).
 
 ### Should I pick Responsive or Static (fixed canvas) for my new project?
 **Responsive** is the default and the right pick for most new projects — especially anything you might run on phones or tablets. Text, buttons, and images flow and adapt to any screen: you guide the layout, and the player's device decides exact placement. The Preview Window's viewport switcher (Fit / Desktop / Tablet / Phone) lets you sanity-check device sizes without leaving the editor. **Static (fixed canvas)** gives you full pixel control on a 1024×768-ish stage — what you see in the editor is exactly what the player sees. Pick it for precise, hand-crafted compositions like visual-novel-style layouts, or if you're porting a pre-v0.9.58 project and don't want to migrate. Both modes are fully supported — this is a choice of authoring style, not old-vs-new. And it's not final: switch later via the header pill or **Settings → Project → Layout Mode** (a one-shot migrator converts your beats, with a preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for the full breakdown.
