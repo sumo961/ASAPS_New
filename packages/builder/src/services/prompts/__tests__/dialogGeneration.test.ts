@@ -51,10 +51,48 @@ describe('buildDialogGenerationSystemPrompt', () => {
     expect(prompt).toContain('Narrator');
   });
 
-  it('documents the three presentation modes', () => {
-    expect(prompt).toContain('positioned');
+  it('teaches layoutTemplate with the current vocabulary and default', () => {
+    // Was "the three presentation modes" pinning 'positioned' as correct.
+    // layoutTemplate is authoritative; dialogTree defaults to 'conversation'
+    // and 'positioned' migrated to 'stacked'.
+    expect(prompt).toContain('layoutTemplate');
+    expect(prompt).toMatch(/"conversation" \(default\)/);
     expect(prompt).toContain('chat-scroll');
     expect(prompt).toContain('chat-bubble');
+  });
+
+  it('warns off the legacy presentationMode instead of teaching it', () => {
+    expect(prompt).toMatch(/older "presentationMode" still parses but layoutTemplate wins/);
+    expect(prompt).toMatch(/"positioned" value is now "stacked"/);
+  });
+
+  it('documents the effects array, not just the counter shorthand', () => {
+    expect(prompt).toContain('"type": "incrementCounter"');
+    expect(prompt).toContain('"type": "playSound"');
+  });
+
+  it('documents affect effects as the truer consequence of dialogue', () => {
+    expect(prompt).toContain('addSentiment');
+    expect(prompt).toContain('nudgeMood');
+    expect(prompt).toContain('fireEmotion');
+  });
+
+  it('warns that counter and affect effects use "target" for different things', () => {
+    // The single easiest mistake: target = counter name for counter effects,
+    // target = character for affect effects.
+    expect(prompt).toMatch(/"target" is the CHARACTER, not a counter/);
+  });
+
+  it('forbids writing to a bound counter', () => {
+    expect(prompt).toMatch(/Never write to a counter that is BOUND to affect state/);
+  });
+
+  it('documents character-scoped counter effects', () => {
+    expect(prompt).toMatch(/scope it to that character's own counter/);
+  });
+
+  it('documents conditions for gating choices', () => {
+    expect(prompt).toContain('"conditions"');
   });
 
   it('documents counter effects on choices (counter/counterOperation/counterValue)', () => {

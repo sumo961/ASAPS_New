@@ -81,31 +81,42 @@ Respond with JSON in this exact structure:
    - When "target" is set on a node, choices on that node are ignored
    - Example: { "id": "n1", "speaker": "Guard", "text": "Go away!", "target": "beat_kicked_out", "choices": [] }
 
-## Presentation Modes
-The dialogTree supports different presentation styles via "presentationMode" parameter:
-- "positioned" (default): Traditional positioned text boxes at fixed screen locations
-- "chat-scroll": Scrollable chat history like a messaging app
-- "chat-bubble": Single message bubble that replaces previous content
+## Layout
+The dialogTree renders according to its "layoutTemplate" parameter:
+- "conversation" (default): text on one side, choices on the other — the natural back-and-forth feel
+- "stacked": NPC text on top, choices below (visual-novel style)
+- "chat-scroll": scrollable chat history like a messaging app
+- "chat-bubble": a single bubble at a time
+⚠️ Use "layoutTemplate". The older "presentationMode" still parses but layoutTemplate wins, and its old "positioned" value is now "stacked" — do not emit both fields.
 Additional options:
 - "showAvatars": boolean (default true) - Show character avatars in chat modes
 - "responseDelay": number (seconds) - NPC typing delay before response
 - "choiceDelay": number (seconds) - Delay before choices appear
 
-## Counter Effects on Choices
-Choices can modify counters directly using these 3 properties:
-- "counter": counter name (e.g., "trust", "fear", "suspicion")
-- "counterOperation": "change" (add/subtract) or "set" (replace value)
-- "counterValue": numeric value (positive to increment, negative to decrement)
+## Consequences: effects on choices and nodes
+Both a choice and a dialogNode can carry an "effects" array. This is the full vocabulary — reach for it whenever a line of dialogue should actually change something:
 
-Examples:
-- Friendly response: { "text": "I want to help.", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
-- Threatening: { "text": "Talk or else!", "target": "next", "counter": "fear", "counterOperation": "change", "counterValue": 10 }
-- Multiple effects: Different choices on the same dialog can modify different counters
+- Counters and state: { "type": "incrementCounter", "target": "trust", "value": 1 }, "setCounter", "setVariable", "addInventory", "removeInventory"
+  - A counter effect may carry "character": "<character id>" to scope it to that character's own counter. Omit it for a story-wide tally. For these effects "target" is the COUNTER name.
+- How a character feels — usually the truer consequence of dialogue than a number:
+  - { "type": "addSentiment", "target": "char_jenkins", "sentimentTarget": "player", "sentimentEmotion": "trust", "strengthDelta": 0.2 }
+  - { "type": "nudgeMood", "target": "char_jenkins", "valenceDelta": -0.2, "arousalDelta": 0.1 }
+  - { "type": "fireEmotion", "target": "char_jenkins", "emotion": "fear", "emotionDelta": 0.3 }
+  - For these affect effects "target" is the CHARACTER, not a counter — the opposite of the counter effects above.
+- Sound: { "type": "playSound", "target": "<asset id | preset id | URL>" }
+
+🚨 Never write to a counter that is BOUND to affect state (one carrying a "source" in the character's definition). Those are read-only displays of a feeling — the next appraisal discards your write. Move the feeling instead, with addSentiment / fireEmotion / nudgeMood, and the meter follows.
+
+Shorthand (still supported, for a plain counter and nothing else): a choice may carry "counter" + "counterOperation" ("change" | "set") + "counterValue" instead of an effects array.
+Example: { "text": "I want to help.", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
 
 ## Sound Effects on Choices
-Choices can play a sound when selected:
-- "soundEffect": filename of sound to play (e.g., "click.mp3", "gasp.wav", "door_slam.mp3")
+A choice may also carry "soundEffect": a filename or asset id played when it is selected.
 Example: { "text": "I accept your offer.", "target": "deal_done", "soundEffect": "handshake.mp3" }
+
+## Gating choices
+- "conditions": [ ... ] on a choice hides or blocks it until the story state matches — use it so earlier decisions visibly change what the player can say.
+- "visible": false hides a choice outright.
 
 ## Visited Choice Tracking
 When "markVisited" is true on the dialogTree beat:
@@ -119,7 +130,7 @@ When "markVisited" is true on the dialogTree beat:
 3. Use emotions to convey character state
 4. Create branching that matters to the story
 5. Balance dialog length - not too long per node
-6. Consider adding counter effects to make choices have mechanical consequences
+6. Give choices real consequences — prefer shifting how the character FEELS (addSentiment / nudgeMood) over incrementing a number, when the scene is about a relationship
 7. Use "__self__" with markVisited for multi-question interrogation/shopping dialogs
 8. Add sound effects to enhance emotional impact of key choices
 

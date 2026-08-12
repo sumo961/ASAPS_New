@@ -80,6 +80,7 @@ block in EXACTLY this form:
     { "kind": "addBeat", "beatType": "infoText", "name": "…", "parameters": { "text": "…" }, "connectFrom": "beat_3", "connectLabel": "…", "note": "why" },
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
     { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" },
+    { "kind": "updateCharacter", "characterId": "elena", "updates": { "counters": [ { "name": "trust", "displayName": "Trust", "min": -100, "max": 100, "showLevelMeter": true, "numericFormat": "band", "source": { "kind": "sentiment", "toEntityRef": "player", "emotion": "trust" }, "bands": [ { "from": -100, "label": "wary" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] } ] }, "note": "why" },
     { "kind": "updateCharacter", "characterId": "karin", "updates": { "variantSelectionPolicy": "random", "variants": [ { "id": "hostile", "name": "Hostile", "characterDescription": "…", "stance": { "warmth": -0.7, "dominance": 0.5 }, "initialMood": { "valence": -0.5, "arousal": 0.6 } } ] }, "note": "why" }
   ]
 }
@@ -94,10 +95,37 @@ Rules for proposals:
 - 'updateCharacter' may change: displayName, description, color; base
   personality 'traits' (Big Five, each 0..1); 'variantSelectionPolicy'
   ('fixed' | 'random' — random draws a disposition each playthrough, for
-  rehearsal/training variety); and 'variants' (a FULL replacement of the
-  character's disposition/persona overlays). Reference the character by the
-  id or name in the digest. Unlike beat changes it is NOT undoable; prefer
-  it only for clearly-agreed changes.
+  rehearsal/training variety); 'variants' (a FULL replacement of the
+  character's disposition/persona overlays); and 'counters' (also a FULL
+  replacement — include the existing ones from the digest that should stay).
+  Reference the character by the id or name in the digest. Unlike beat
+  changes it is NOT undoable; prefer it only for clearly-agreed changes.
+- A counter is either something the author moves, or a read-only display of
+  how the character FEELS:
+  - Ordinary: { "name": "gold", "displayName": "Gold", "value": 0, "min": 0, "max": 100 }
+    — moved by setCounter/incrementCounter effects on choices.
+  - Bound: add a "source" and it becomes a live window onto affect state.
+    Nothing writes to it; the choices move the feeling and the meter follows.
+    { "name": "trust", "displayName": "Trust", "min": -100, "max": 100,
+      "showLevelMeter": true,
+      "source": { "kind": "sentiment", "toEntityRef": "player", "emotion": "trust" } }
+    "kind" is "sentiment" (needs toEntityRef + emotion), "emotion" (an
+    intensity — needs emotion), or "mood" (needs axis "valence" | "arousal").
+  - Choose bound when the quantity IS a feeling (trust, suspicion, respect);
+    ordinary for gold, ammunition, clues found.
+  - Set min below 0 only when the feeling has a real opposite (trust/distrust)
+    — the bar grows from zero, so a bipolar range grows outward from the
+    centre. Fear has no opposite: leave min at 0.
+  - Optional "bands" replace the number with a word:
+    "bands": [ { "from": -100, "label": "wary" }, { "from": -20, "label": "neutral" },
+    { "from": 20, "label": "trusting" } ] with "numericFormat": "band". Give a
+    bipolar ladder a band covering ZERO — sentiments start at zero, and a
+    ladder without one opens the story calling someone wary before anything
+    has happened.
+  - 🚨 NEVER propose a setCounter/incrementCounter effect against a counter
+    the digest marks "[reads …, read-only]". The write is discarded by the
+    next appraisal. Move the feeling instead (addSentiment / nudgeMood /
+    fireEmotion) and the meter follows.
 - Each variant may carry a 'stance' — its interpersonal-circumplex position
   { "warmth": -1..1, "dominance": -1..1 } (cold↔warm, submissive↔dominant).
   When a variant's identity is interpersonal (hostile, cooperative,

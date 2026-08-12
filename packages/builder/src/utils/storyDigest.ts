@@ -147,7 +147,14 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
         else if (c.defaultVariantId) bits.push(`default variant: ${c.defaultVariantId}`);
       }
       if (c.counters && c.counters.length > 0) {
-        bits.push(`counters: ${c.counters.map(k => k.displayName || k.name).join(', ')}`);
+        // Mark bound counters. They read affect state and cannot be written
+        // to, so the Co-Designer must not propose a setCounter against one —
+        // the name alone doesn't reveal that.
+        bits.push(`counters: ${c.counters.map((k) => {
+          const name = k.displayName || k.name;
+          const src = (k as { source?: { kind?: string } }).source;
+          return src?.kind ? `${name} [reads ${src.kind}, read-only]` : name;
+        }).join(', ')}`);
       }
       lines.push(`- ${label}${bits.length ? ` (${bits.join('; ')})` : ''}`);
     }

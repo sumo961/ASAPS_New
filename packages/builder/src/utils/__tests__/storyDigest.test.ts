@@ -118,3 +118,23 @@ describe('buildStoryDigest', () => {
     expect(digest).toContain('- b2 [infoText]');
   });
 });
+
+describe('bound counters in the digest', () => {
+  it('marks a bound counter read-only so the Co-Designer will not write to it', () => {
+    // The name alone doesn't reveal that a setCounter against it is discarded
+    // by the next appraisal.
+    const digest = buildStoryDigest({
+      title: 'T',
+      beats: [],
+      characters: [{
+        id: 'ada', name: 'ada', displayName: 'Ada',
+        counters: [
+          { name: 'gold', displayName: 'Gold' },
+          { name: 'trust', displayName: 'Trust', source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' } },
+        ],
+      }],
+    } as any);
+    expect(digest).toContain('Gold');
+    expect(digest).toContain('Trust [reads sentiment, read-only]');
+  });
+});

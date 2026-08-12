@@ -38,6 +38,67 @@ function normalizeCharacterUpdates(rawUpdates: any): Record<string, unknown> {
   if (rawUpdates.variantSelectionPolicy === 'fixed' || rawUpdates.variantSelectionPolicy === 'random') {
     out.variantSelectionPolicy = rawUpdates.variantSelectionPolicy;
   }
+  // Counters. A full replacement of the character's counter list, mirroring
+  // how variants work — the model sees the existing ones in the digest and
+  // returns the set it wants. Every field is clamped or dropped, so a stray
+  // value can't corrupt a character.
+  if (Array.isArray(rawUpdates.counters)) {
+    const seenNames = new Set<string>();
+    const counters = rawUpdates.counters
+      .filter((k: any) => k && typeof k === 'object' && typeof k.name === 'string' && k.name.trim())
+      .map((k: any, i: number) => {
+        let name = slugify(k.name, `counter${i + 1}`);
+        while (seenNames.has(name)) name = `${name}_2`;
+        seenNames.add(name);
+
+        const out: Record<string, unknown> = {
+          name,
+          displayName: (typeof k.displayName === 'string' && k.displayName.trim()) || name,
+          value: Number.isFinite(k.value) ? Number(k.value) : 0,
+          visible: k.visible !== false,
+        };
+        if (Number.isFinite(k.min)) out.min = Number(k.min);
+        if (Number.isFinite(k.max)) out.max = Number(k.max);
+        if (typeof k.color === 'string' && k.color.trim()) out.color = k.color;
+        if (k.showLevelMeter !== undefined) out.showLevelMeter = !!k.showLevelMeter;
+        if (['value', 'fraction', 'percentage', 'band'].includes(k.numericFormat)) {
+          out.numericFormat = k.numericFormat;
+        }
+
+        // A binding is only accepted when it is complete and well-formed;
+        // a half-specified source would render a meter that reads nothing.
+        const src = k.source;
+        if (src && typeof src === 'object') {
+          if (src.kind === 'sentiment' && typeof src.emotion === 'string' && src.emotion.trim()
+              && typeof src.toEntityRef === 'string' && src.toEntityRef.trim()) {
+            out.source = {
+              kind: 'sentiment',
+              emotion: src.emotion.trim().toLowerCase(),
+              toEntityRef: src.toEntityRef.trim(),
+              ...(typeof src.fromCharacterRef === 'string' && src.fromCharacterRef.trim()
+                ? { fromCharacterRef: src.fromCharacterRef.trim() } : {}),
+            };
+          } else if (src.kind === 'emotion' && typeof src.emotion === 'string' && src.emotion.trim()) {
+            out.source = { kind: 'emotion', emotion: src.emotion.trim().toLowerCase() };
+          } else if (src.kind === 'mood' && (src.axis === 'valence' || src.axis === 'arousal')) {
+            out.source = { kind: 'mood', axis: src.axis };
+          }
+        }
+        // A derived counter stores nothing of its own.
+        if (out.source) out.value = 0;
+
+        if (Array.isArray(k.bands)) {
+          const bands = k.bands
+            .filter((b: any) => b && Number.isFinite(b.from) && typeof b.label === 'string' && b.label.trim())
+            .map((b: any) => ({ from: Number(b.from), label: b.label.trim() }))
+            .sort((a: any, b: any) => a.from - b.from);
+          if (bands.length > 0) out.bands = bands;
+        }
+        return out;
+      });
+    if (counters.length > 0) out.counters = counters;
+  }
+
   if (Array.isArray(rawUpdates.variants)) {
     const seen = new Set<string>();
     const variants: CoDesignerVariant[] = rawUpdates.variants
