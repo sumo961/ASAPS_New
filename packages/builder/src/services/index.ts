@@ -42,6 +42,5 @@ export { ElevenLabsProvider } from './tts/ElevenLabsProvider';
 export { CustomTTSProvider } from './tts/CustomTTSProvider';
 
 // Prompt templates
-export * as StoryPrompts from './prompts/storyGeneration';
 export * as DialogPrompts from './prompts/dialogGeneration';
 export * as BeatSuggestionsPrompts from './prompts/beatSuggestions';

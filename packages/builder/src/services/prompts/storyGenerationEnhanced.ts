@@ -499,7 +499,43 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
 - 🚨 NEVER create an "endings" array - it will be IGNORED! All endings go in "beats"!
 - Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
 
+#### Beats that reach outside the story — use ONLY when the author asked for them
+
+These work and are fully supported, but each depends on something outside the text: a URL, a printed code, the player's camera, a panoramic image. Do not sprinkle them into an ordinary story for variety — a story that opens the camera unprompted is worse than one that doesn't.
+
+**webView** - Embed a live external web page
+- Required: url, and a connection. Optional: prompt, exitUrlPattern (regex — the player is returned when they reach a matching URL), passContext (variable names injected into the URL hash), saveTo (captures a postMessage from the page), doneButtonText.
+- Use when the author names a real site or their own page. Never invent a URL.
+
+**qrScan** - Scan a QR code with the camera
+- Required: prompt, saveTo, and a connection. Optional: matchPatterns (regex accept-list), interpretAsapsUri (lets a code jump straight to a beat), facing, helperText.
+- Use for museum/classroom trails where the author is placing physical codes. The decoded string lands in saveTo; branch on it with a conditionBeat.
+
+**inputImage** - Player submits a photo, AI reads it
+- Required: prompt, analysisPrompt (the instruction the vision model follows — keep it in the story's source language), saveTo, and a connection. Optional: imageSource ("camera" | "upload" | "both"), fallbackValue (used when the player skips or analysis fails — always set one), timeout.
+- The analysis result is text in saveTo; branch on it with a conditionBeat.
+
+**panorama** - 360° scene with hotspots
+- Required: panoramaAssetId and hotspots (each hotspot carries its own target beat). connectionType is multiple — one exit per hotspot.
+- Requires an equirectangular image the author supplies. Do not emit this beat without one.
+
+#### Beats requiring real-world data you cannot invent — PROPOSE, do not emit
+
+**arBeat** (marker-tracked AR), **gpsLocation** (map-anchored geofences), **indoorLocation** (Bluetooth beacon zones) and **setGpsLocation** (writes named GPS point sets) all need assets or coordinates that only the author can supply: a compiled .mind tracker, real latitudes and longitudes, beacon identifiers. Inventing them produces a story that cannot run.
+
+If the author's brief clearly calls for a location-based or AR experience, say so in your reasoning and structure the story so those beats can be dropped in later — but generate ordinary beats in their place. Do not emit these beat types with placeholder coordinates or asset ids.
+
 ### INVISIBLE BEATS (Logic/Background Operations)
+
+**updateAffect** - Shift how a character feels, with no visible screen
+- Use: a beat-level equivalent of the affect effects, for when the shift belongs to the STORY reaching a point rather than to a choice the player made — time passing, news arriving off-screen, a threshold crossed.
+- Prefer affect EFFECTS on a choice when the player caused the change; use this beat when nobody chose anything.
+- Required: "character" (the character ref). Then any of:
+  - moodValenceDelta / moodArousalDelta — nudge mood (each clamped to [-1, 1])
+  - sentimentTarget + sentimentEmotion + sentimentDelta — strengthen a directed feeling
+  - emotion + emotionDelta — fire an emotion level
+- Connections: Single → continues automatically
+- Example: { "type": "updateAffect", "parameters": { "character": "char_mother", "sentimentTarget": "player", "sentimentEmotion": "trust", "sentimentDelta": -0.3, "moodValenceDelta": -0.2 } }
 
 **setVariable** - Set/modify story state
 - Use: Track player choices, update counters, set flags
@@ -878,7 +914,11 @@ Each beat can override the Timer HUD content via timeDisplayMode:
 - **spatialFit** — how a background image fits the stage. "contain" (default) shows the whole image with letterboxed bars; "cover" fills the stage and may crop the edges. Set "cover" for immersive establishing shots where losing the edges is fine; leave default when the image content matters to the edges (a map, a document, a group photo).
 
 - **explainHuds** (boolean, default false) — annotates the on-screen HUDs when this beat is entered, holding the beat until the player acknowledges. Set it TRUE on the FIRST beat after a HUD becomes meaningful — typically the first scene where a counter, timer or mood meter starts mattering. Do NOT set it on the title screen (screen HUDs are hidden there by default) and do NOT set it on more than one or two beats: it is a teaching moment, not decoration. If a story has no HUDs, omit it entirely.
-  - There is also a dedicated **explanation** beat for when you want a deliberate standalone pause to label the readouts, with optional per-HUD captions (captionTimer, captionCountdown, captionMeter, captionInventory, captionMood). Prefer the explainHuds flag on a real story beat; use the separate beat only when a pause is warranted.
+  - There is also a dedicated **explanation** beat for when you want a deliberate standalone pause to label the readouts:
+    - Parameters: text (intro line), buttonText (default "Got it"), and optional per-HUD captions — captionTimer, captionCountdown, captionMeter, captionInventory, captionMood. Leave a caption blank to use the built-in wording.
+    - Only HUDs actually on screen get a callout, so you never need to prune captions to match the beat.
+    - Connections: Single → continues when acknowledged.
+    - Prefer the explainHuds flag on a real story beat; use this separate beat only when a deliberate pause is warranted. At most one per story.
 
 ### Sound Effects on Choices
 

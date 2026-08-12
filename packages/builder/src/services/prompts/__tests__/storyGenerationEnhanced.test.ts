@@ -19,6 +19,8 @@
  *     structure matches what the system prompt instructs.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import {
   buildEnhancedStoryGenerationSystemPrompt,
   buildEnhancedUserPrompt,
@@ -491,5 +493,30 @@ describe('guidance stays current with the schema', () => {
       expect(prompt).toMatch(/captions: cue rows/);
       expect(prompt).toMatch(/accessibility default/i);
     });
+  });
+});
+
+describe('every beat type in the schema has authorial guidance', () => {
+  // The condensed schema already gives the model every beat type and its
+  // parameters, so this is not about reachability — it's about the model
+  // knowing WHEN to reach for something. That guidance is hand-written, so
+  // it goes stale silently every time a beat type is added. This test is the
+  // tripwire: add a beat to core-beats.json and it fails until documented.
+  const realSchema = JSON.parse(
+    readFileSync(join(__dirname, '../../../../../../beat-definitions/core-beats.json'), 'utf-8'),
+  );
+  const prompt = buildEnhancedStoryGenerationSystemPrompt(realSchema);
+  const documented = new Set([...prompt.matchAll(/\*\*([a-zA-Z]+)\*\*/g)].map((m) => m[1]));
+
+  it('documents all of them', () => {
+    const missing = Object.keys(realSchema.beatTypes).filter((t) => !documented.has(t));
+    expect(missing, `undocumented beat types: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('tells the model not to invent real-world assets', () => {
+    // arBeat/gpsLocation/indoorLocation need trackers, coordinates and beacon
+    // ids. A story generated with placeholders cannot run.
+    expect(prompt).toMatch(/PROPOSE, do not emit/);
+    expect(prompt).toMatch(/cannot run/);
   });
 });
