@@ -55,9 +55,10 @@ Respond with JSON in this structure:
 7. Position beats to the right of current beat with vertical spacing
 
 ## Common Patterns
-- After titleScreen → infoText or dialogTree (setup story)
-- After infoText → movementChoice or pickProp (give player agency)
-- After choice beats → durScreen or dialogTree (show consequences)
+- After titleScreen → infoText or multiChoice (setup story)
+- After infoText → multiChoice (give player agency — the DEFAULT for branching)
+- After choice beats → durScreen or infoText (show consequences)
+- Reach for multiChoice first: a single prompt with response buttons. Use dialogTree only for genuine multi-turn NPC conversation (nesting, follow-ups), and movementChoice only when the options are spatial hotspots on a background image.
 - After pickProp → infoText describing the item (MANDATORY - player needs narrative payoff)
 - Before endScreen → conditionBeat checking accumulated state (counters, variables, inventory)
 - Use setVariable before conditional branches
@@ -70,7 +71,7 @@ All beats support advanced timing features to create pressure or self-running st
 - **defaultTargetDelay**: Seconds before auto-advancing to defaultTarget (default: 5)
 - **showTimer**: Whether to display a countdown timer to the player (boolean)
 
-Choice beats (dialogTree, movementChoice, pickProp) also support:
+Choice beats (multiChoice, dialogTree, movementChoice, pickProp) also support:
 - **choiceDelay**: Delay in seconds before choices appear (creates dramatic pauses)
 - **markVisited**: Block and dim choices leading to previously visited beats
 
@@ -80,19 +81,31 @@ Use these features when suggesting beats that should:
 - Create self-running story sections (cutscenes with auto-advance)
 - Force quick decisions under pressure
 
-## Counter Effects on Choices
-Choice beats (dialogTree, movementChoice, pickProp) support counter modifications:
+## Consequences on Choices
+Choice beats (multiChoice, dialogTree, movementChoice, pickProp) can carry consequences.
+
+Shorthand for a plain counter:
 - "counter": name of counter to modify
 - "counterOperation": "change" (add/subtract) or "set" (replace)
 - "counterValue": numeric value
 - "soundEffect": filename to play when selected
-Suggest adding counter effects to choices when the story needs state tracking.
+
+Or an "effects" array for the full vocabulary — inventory, variables,
+{ "type": "playSound", "target": "…" }, and the affect effects that shift how
+a character feels: addSentiment, nudgeMood, fireEmotion. When a scene is about
+a relationship, moving the feeling is usually the truer consequence than
+incrementing a number.
+
+🚨 Some counters are BOUND to affect state (they carry a "source" and act as a
+read-only display of a feeling). Never suggest a counter effect targeting one —
+the write is discarded by the next appraisal. Suggest an affect effect instead
+and the meter follows.
 
 ## Fictional Time System
 Stories can track in-story date/time progression:
 - **setVariable** with type "fictionalTime" to set/advance/subtract time
 - **conditionBeat** with type "fictionalTime" to branch based on date/time
-- Supports units: minutes, hours, days, months, years
+- Supports units: minutes, hours, days, weeks, months, years
 - Useful for: historical fiction, day counters, time-of-day mechanics, time travel stories
 Suggest fictional time beats when the story involves date/time progression.
 
