@@ -34,6 +34,34 @@ import {
 /**
  * Claude Provider Implementation
  */
+/**
+ * Output-token budget for story generation, scaled to reasoning effort.
+ *
+ * CRITICAL (per platform.claude.com/docs/en/api/messages): thinking tokens
+ * COUNT AGAINST max_tokens. In adaptive mode there is no separate thinking
+ * budget — Claude decides how much to think, bounded only by max_tokens. So a
+ * 32K cap at xhigh can burn 20K+ on thinking and leave too little for the JSON
+ * output, causing mid-JSON truncation (observed: 10K → 30K → 42K chars across
+ * three retries).
+ *
+ * Exported so the AI settings dialog can show the value that will actually be
+ * used as its placeholder. A hardcoded number there drifts from this one, and
+ * a wrong "Default: …" hint is what invites someone to type a smaller value
+ * and silently defeat this scaling.
+ */
+export function defaultStoryMaxTokensFor(effort: string | undefined): number {
+  switch (effort) {
+    case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
+    case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
+    case 'high':  return 64000;
+    case 'medium': return 48000;
+    case 'low':
+    case 'minimal':
+    case 'none':
+    default: return 32000;
+  }
+}
+
 export class ClaudeProvider extends BaseAIProvider {
   readonly name = 'claude';
   private client: Anthropic | null = null;
@@ -322,19 +350,7 @@ export class ClaudeProvider extends BaseAIProvider {
       //
       // Scale headroom by effort so a default install just works without
       // requiring users to manually bump Max Tokens.
-      const defaultMaxTokensFor = (effort: string | undefined): number => {
-        switch (effort) {
-          case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
-          case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
-          case 'high':  return 64000;
-          case 'medium': return 48000;
-          case 'low':
-          case 'minimal':
-          case 'none':
-          default: return 32000;
-        }
-      };
-      const defaultMaxTokens = defaultMaxTokensFor(this.config?.reasoningEffort);
+      const defaultMaxTokens = defaultStoryMaxTokensFor(this.config?.reasoningEffort);
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
       console.log(
         `[ClaudeProvider] generateStory max_tokens=${maxTokens} ` +

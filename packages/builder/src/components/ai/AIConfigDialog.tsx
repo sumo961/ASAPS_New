@@ -12,6 +12,7 @@ import {
   saveBraveApiKey,
   clearSavedBraveApiKey,
 } from './ideator/braveConfig';
+import { defaultStoryMaxTokensFor } from '../../services/providers/ClaudeProvider';
 
 // Provider presets for easy configuration
 type ProviderType = 'claude' | 'openai' | 'local';
@@ -99,6 +100,8 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   const [reasoningEffort, setReasoningEffort] = useState<
     '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   >('');
+  // Same scaling the provider uses, so this can't drift from what actually runs.
+  const computedMaxTokens = defaultStoryMaxTokensFor(reasoningEffort || undefined);
   // OpenAI pro reasoning (GPT-5.6 via the Responses API). '' = standard.
   const [reasoningMode, setReasoningMode] = useState<'' | 'pro'>('');
   const [error, setError] = useState('');
@@ -455,14 +458,29 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               type="number"
               value={maxTokens}
               onChange={(e) => setMaxTokens(e.target.value)}
-              placeholder="32000"
+              placeholder={`${computedMaxTokens} (automatic)`}
               min="1000"
               max="256000"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Max output tokens for story generation. Default: 32000. Claude supports up to 64K output; Kimi K2 supports up to 256K.
+              <strong>Leave blank.</strong> The budget is chosen for you and scales with reasoning
+              effort — currently <strong>{computedMaxTokens.toLocaleString()}</strong> for story
+              generation at {reasoningEffort || 'the default'} effort, with smaller budgets for
+              lighter operations. Change it only if you really want to tinker.
             </p>
+            {/* Thinking tokens count against this budget, so a number that looks
+                generous can still starve the output entirely — which is exactly
+                how a stored 4000 produced "spent the whole budget thinking" on
+                every generation. Warn rather than silently obey. */}
+            {maxTokens && Number(maxTokens) < computedMaxTokens && (
+              <p className="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                This is below the automatic budget of {computedMaxTokens.toLocaleString()}.
+                Reasoning tokens count against it, so at {reasoningEffort || 'this'} effort the model
+                may spend the whole budget thinking and return nothing — or truncate mid-JSON.
+                Clear the field to use the automatic value.
+              </p>
+            )}
           </div>
 
           {/* Brave Search API Key (Optional, used by Ideator's web_search tool) */}
