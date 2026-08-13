@@ -651,19 +651,107 @@ const injectStoryTool: Tool = {
             role: { type: 'string', description: 'Character role: "player", "npc", or "companion"' },
             counters: {
               type: 'array',
-              description: 'Numeric counters for tracking values (health, trust, etc.)',
+              description:
+                'Counters for this character. A counter either stores a number you change with effects, ' +
+                'or carries a "source" and becomes a READ-ONLY display of how the character feels — ' +
+                'nothing writes to it, the affect effects move the feeling underneath and the meter follows. ' +
+                'Use a bound counter when the quantity IS a feeling (trust, suspicion, respect); use a plain ' +
+                'one for gold, ammunition, clues found. Call asaps_get_affect_guide for the full system.',
               items: {
                 type: 'object',
                 properties: {
-                  name: { type: 'string' },
-                  displayName: { type: 'string' },
-                  value: { type: 'number' },
-                  min: { type: 'number' },
-                  max: { type: 'number' },
+                  name: { type: 'string', description: 'Internal name (e.g. "trust")' },
+                  displayName: { type: 'string', description: 'Label shown on the meter (e.g. "Trust")' },
+                  value: { type: 'number', description: 'Starting value. Ignored when "source" is set.' },
+                  min: {
+                    type: 'number',
+                    description:
+                      'Range floor. The bar grows from ZERO wherever zero falls in min..max, so use a ' +
+                      'negative min only when the feeling has a real opposite (trust/distrust) — the bar ' +
+                      'then grows outward from the centre. Fear has no opposite: leave min at 0.',
+                  },
+                  max: { type: 'number', description: 'Range ceiling (commonly 100)' },
+                  visible: { type: 'boolean', description: 'Whether the interactor can see it at all' },
+                  showLevelMeter: { type: 'boolean', description: 'Draw a bar. Set false with numericFormat "band" for words only.' },
+                  numericFormat: {
+                    type: 'string',
+                    description: '"value" | "fraction" | "percentage" | "band" ("band" shows the phrase from bands instead of a number)',
+                    enum: ['value', 'fraction', 'percentage', 'band'],
+                  },
+                  color: { type: 'string', description: 'Bar colour (hex)' },
+                  source: {
+                    type: 'object',
+                    description:
+                      'Makes this counter a live window onto affect state instead of a stored number. ' +
+                      'Omit for an ordinary counter.',
+                    properties: {
+                      kind: {
+                        type: 'string',
+                        description:
+                          '"sentiment" = a directed feeling (needs toEntityRef + emotion); ' +
+                          '"emotion" = an intensity the character feels (needs emotion); ' +
+                          '"mood" = one axis of their mood (needs axis).',
+                        enum: ['sentiment', 'emotion', 'mood'],
+                      },
+                      toEntityRef: { type: 'string', description: 'Who the feeling points at, e.g. "player" (sentiment only)' },
+                      emotion: { type: 'string', description: 'Emotion name, lowercase, e.g. "trust" (sentiment/emotion)' },
+                      axis: { type: 'string', description: 'Mood axis (mood only)', enum: ['valence', 'arousal'] },
+                      fromCharacterRef: { type: 'string', description: "Whose feeling, if not this character's own" },
+                    },
+                    required: ['kind'],
+                  },
+                  bands: {
+                    type: 'array',
+                    description:
+                      'Named ranges shown as a word instead of a number (with numericFormat "band"). ' +
+                      'Give a bipolar ladder a band covering ZERO — sentiments start at zero, and a ladder ' +
+                      'without one opens the story calling someone "wary" before anything has happened.',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        from: { type: 'number', description: 'Inclusive lower bound' },
+                        label: { type: 'string', description: 'Phrase shown at or above this value' },
+                      },
+                      required: ['from', 'label'],
+                    },
+                  },
                 },
+                required: ['name'],
               },
             },
             inventory: { type: 'array', description: 'Starting inventory items', items: { type: 'object' } },
+            traits: {
+              type: 'object',
+              description:
+                'Big Five personality, each 0..1 (0.5 = average): openness, conscientiousness, extraversion, ' +
+                'agreeableness, neuroticism. Feeds the character dossier the LLM sees, so it shapes how the ' +
+                'character behaves in AI conversation beats — not decoration.',
+            },
+            initialMood: {
+              type: 'object',
+              description: 'Mood at story start: { "valence": -1..1 (unpleasant..pleasant), "arousal": -1..1 (calm..activated) }',
+            },
+            initialSentiments: {
+              type: 'array',
+              description:
+                'Directed feelings the character starts with. Without these every character meets the whole ' +
+                'cast at exactly neutral, which leaves any bound meter pinned at its origin on beat one.',
+              items: {
+                type: 'object',
+                properties: {
+                  toEntityRef: { type: 'string', description: 'Who it points at, e.g. "player"' },
+                  emotion: { type: 'string', description: 'Emotion name, lowercase' },
+                  strength: { type: 'number', description: 'Strength -1..1 (negative = the opposite feeling)' },
+                },
+                required: ['toEntityRef', 'emotion', 'strength'],
+              },
+            },
+            meterFrame: {
+              type: 'object',
+              description:
+                'The HUD panel that draws this character\'s visible counters. A visible meter needs one or it ' +
+                'renders nowhere. Typical: { "dockMode": "screen", "screenPosition": "screen-top-left" }.',
+            },
           },
         },
       },

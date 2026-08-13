@@ -50,7 +50,9 @@ The handler forwards `characters` verbatim to `/api/stories/inject`, so nothing 
 
 This contradicts the server's own `asaps_get_affect_guide` tool, which returns the full rich-character guide. The server teaches Claude Desktop how to author interiority and then offers a shape that cannot express it — the same gap the Co-Designer had before `updateCharacter` learned counters.
 
-**Severity:** medium. Nothing is broken; injected stories simply arrive flat, with no affect and no bound counters, which is exactly the outcome this release set out to make easy. Worth fixing before Round 4.
+**Severity:** medium. Nothing is broken; injected stories simply arrive flat, with no affect and no bound counters, which is exactly the outcome this release set out to make easy.
+
+**FIXED 2026-08-13.** The schema now advertises counters with `source`, `bands`, `visible`, `showLevelMeter`, `numericFormat` and `color`, plus `traits`, `initialMood`, `initialSentiments` and `meterFrame` on the character. Verified over stdio: `source.kind` enumerates sentiment/emotion/mood and `numericFormat` includes `band`. The descriptions carry the judgement calls too — when to bind rather than store, why a negative `min` only suits a feeling with an opposite, and why a bipolar ladder needs a band covering zero.
 
 ---
 
