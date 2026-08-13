@@ -109,6 +109,27 @@ pkill -f "vite" 2>/dev/null; sleep 1; npm run dev > /dev/null 2>&1 &
 
 Do this automatically when making changes to core or renderer packages - don't ask the user to restart.
 
+**Do not run `npm run build` while the dev server is up.** Stop it first. The
+builder resolves `@asaps/*` through workspace symlinks to each package's
+`dist/`, and a build rewrites those files underneath the running server —
+`packages/core` sets `emptyOutDir: true`, so there is a window where the files
+genuinely do not exist. A request landing in that window produces:
+
+> `[plugin:vite:import-analysis] Failed to resolve import "@asaps/renderer" … Does the file exist?`
+
+**This looks like a code error and is not one.** The files are fine on disk;
+the dev server has cached the failed resolution and will not recover on its
+own — reloading the page keeps showing the overlay. Recovery:
+
+```bash
+pkill -f "vite"; rm -rf packages/builder/node_modules/.vite node_modules/.vite
+npm run dev > /dev/null 2>&1 &
+```
+
+Rule out this cause *before* investigating the import as a real breakage. It
+has cost time twice. (Related: the Preview Window separately needs closing and
+reopening after a rebuild — a page reload is not enough.)
+
 ## Architecture Overview
 
 ### Monorepo Structure
