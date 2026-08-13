@@ -31,7 +31,7 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 1e — dialog generation | ✅ passed clean | affect effects, correct target, no counter writes (2026-08-14) |
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ✅ passed | live value + band in a real HTML export (2026-08-14) |
-| Round 3b — band phrases translated | ⚠️ extractor verified; full round-trip open | 9 band keys extracted (2026-08-14) |
+| Round 3b — band phrases translated | ✅ passed | "vertrauensvoll" in an exported story (2026-08-14) |
 | Round 4 — MCP desktop server | ⬜ | needs Claude Desktop |
 | Round 5 — device/layout matrix | ⬜ | |
 
@@ -183,9 +183,13 @@ Exercises both extractors, including the embedded copy in `HtmlExporter.ts` that
 
 - [x] **Extractor verified against the live project**, not just unit tests: `extractTranslatableStrings` returns 65 strings including **9 band keys** — `project.story.characters.1.counters.1.bands.0.label = "strong distrust"` through `bands.4.label = "deep trust"` — alongside the four counter display names.
 - [x] Thresholds are absent from the key set, as intended: a number is not text.
-- [ ] **Still open:** the full round-trip — translate to a second language and confirm the phrases arrive translated in an exported story. That also exercises the embedded extractor copy in `HtmlExporter.ts`, which could not be inspected directly because a single-file export encodes its payload (`"counters"` appears zero times in the 3.8 MB HTML).
+- [x] **Full round-trip verified.** German added through the real UI (not by injecting a record — that path is known to brick project load), translated with the AI path to 100%, exported as single-file HTML, opened from `file://`, and switched to German in the player's language gate. The placed meter rendered **"vertrauensvoll"**.
+- [x] The stored ladder is fully translated: `starkes Misstrauen · vorsichtig · neutral · vertrauensvoll · tiefes Vertrauen`, each with `status: "translated"`.
+- [x] Both extractors are therefore exercised — the builder's at export time and the embedded copy at runtime, which is what actually resolves the phrase in the player.
 
-The remaining risk is narrow: extraction is proven, and the embedded copy was written from the same edit. What is unproven is that the two stay in step at runtime.
+Two notes from doing it:
+- The single-file export **encodes its payload**, so grepping the HTML for `bands` returns zero — as does `counters`. That is not evidence of absence; it was the grep being meaningless.
+- **Band labels have no manual translation surface.** The character editor's Translations tab covers display names only, and the Counters tab edits source values even when another language is active. The AI path fills them correctly, so nothing is broken, but a translator working by hand cannot reach them. Worth considering separately.
 
 ---
 
