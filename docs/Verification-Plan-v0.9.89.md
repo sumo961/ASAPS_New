@@ -30,8 +30,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 1d — beat suggestions | ✅ passed | multiChoice offered as the default (2026-08-13) |
 | Round 1e — dialog generation | ✅ passed clean | affect effects, correct target, no counter writes (2026-08-14) |
 | Round 2 — runtime of generated story | ⬜ | |
-| Round 3a — placed meter element in export | ⬜ | |
-| Round 3b — band phrases in a translated export | ⬜ | |
+| Round 3a — placed meter element in export | ✅ passed | live value + band in a real HTML export (2026-08-14) |
+| Round 3b — band phrases translated | ⚠️ extractor verified; full round-trip open | 9 band keys extracted (2026-08-14) |
 | Round 4 — MCP desktop server | ⬜ | needs Claude Desktop |
 | Round 5 — device/layout matrix | ⬜ | |
 
@@ -170,16 +170,22 @@ Play the generated story in the Preview Window (**close and reopen it after any 
 
 The passing web-player result above used a **screen-docked character meter frame**, which reaches the renderer through `toMeterCounterData` directly. Placed meter elements — `kind: 'meter'` locations on a fixed canvas — go through `PlayerEngine.setupRendererResolvers` instead, which never set a counter resolver at all until this sweep. The two look identical on screen and are wired completely differently.
 
-- [ ] Fixed-canvas story with a placed meter element bound to a counter
-- [ ] Export to HTML → the meter reads the live value, **not 0**
-- [ ] Same meter with bands → shows the phrase
+- [x] Fixed-canvas fixture with a placed `kind: 'meter'` element bound to Ada's `trust` counter, character-anchored frame removed and all counters hidden so only the placed element could render
+- [x] Exported single-file HTML, opened from `file://` — the meter reads the **live** value, not 0
+- [x] Bands render: the readout showed **"trusting"**, with the fill at `left 50% / width 18%` — zero-origin geometry growing rightward from the centre
+
+This is the path `PlayerEngine.setupRendererResolvers` feeds, distinct from the screen-docked frame already proven. It was rendering 0 before this sweep.
+
+*(The beat's text is absent in that export because the fixture only placed a meter location on a fixed canvas — a limitation of the fixture, not a defect.)*
 
 ### 3b. Translated export
 Exercises both extractors, including the embedded copy in `HtmlExporter.ts` that has to stay in sync with `StoryTranslator.ts`.
 
-- [ ] A story with band phrases, translated to a second language
-- [ ] Export → band phrases appear **translated**, not in the authoring language
-- [ ] Thresholds unchanged (numbers are not text)
+- [x] **Extractor verified against the live project**, not just unit tests: `extractTranslatableStrings` returns 65 strings including **9 band keys** — `project.story.characters.1.counters.1.bands.0.label = "strong distrust"` through `bands.4.label = "deep trust"` — alongside the four counter display names.
+- [x] Thresholds are absent from the key set, as intended: a number is not text.
+- [ ] **Still open:** the full round-trip — translate to a second language and confirm the phrases arrive translated in an exported story. That also exercises the embedded extractor copy in `HtmlExporter.ts`, which could not be inspected directly because a single-file export encodes its payload (`"counters"` appears zero times in the 3.8 MB HTML).
+
+The remaining risk is narrow: extraction is proven, and the embedded copy was written from the same edit. What is unproven is that the two stay in step at runtime.
 
 ---
 
