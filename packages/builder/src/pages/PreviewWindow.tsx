@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -914,13 +914,14 @@ export const PreviewWindow: React.FC = () => {
       (reactRenderer as any).setCharacterMeterFrameResolver?.((characterId: string) => {
         const pd = previewDataRef.current;
         const character = pd?.characters?.find(c => c.id === characterId);
-        if (!character || !character.meterFrame) {
+        const resolvedFrame = resolveMeterFrame(character as any);
+        if (!character || !resolvedFrame) {
           return null;
         }
         // Screen-docked frames are rendered by the top-level HUD overlay
         // (mode-independent); this resolver only feeds the
         // character-anchored variant inside PositionedBeatView.
-        if ((character.meterFrame as any).dockMode === 'screen') {
+        if ((resolvedFrame as any).dockMode === 'screen') {
           return null;
         }
 
@@ -944,7 +945,7 @@ export const PreviewWindow: React.FC = () => {
 
         return {
           counters,
-          config: character.meterFrame,
+          config: resolvedFrame,
           characterName: character.displayName || character.name,
           characterColor: (character as any).color,
         };
@@ -2827,7 +2828,10 @@ export const PreviewWindow: React.FC = () => {
                 type MeterDesc = { c: any; counters: any[]; frame: any; corner: string; est: number };
                 const meterDescs: MeterDesc[] = [];
                 for (const c of chars) {
-                  const frame: any = (c as any).meterFrame;
+                  // resolveMeterFrame supplies a screen-docked default when the
+                  // character has visible meters but no authored frame — without
+                  // it the meter is simply absent, with nothing to indicate why.
+                  const frame: any = resolveMeterFrame(c as any);
                   if (!frame || frame.dockMode !== 'screen') continue;
                   if (!hasExplicitVariant(c)) continue;
                   const visibleCounters = ((c as any).counters || []).filter((k: any) => k.visible);

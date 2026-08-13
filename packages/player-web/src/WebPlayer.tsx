@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -831,7 +831,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           // Meter-frame descriptors.
           const meterDescs: Array<{ c: any; counters: any[]; frame: any; corner: string; est: number }> = [];
           for (const c of chars as any[]) {
-            const frame = c?.meterFrame;
+            const frame = resolveMeterFrame(c as any);
             if (!frame || frame.dockMode !== 'screen') continue;
             if (!hasExplicitVariant(c)) continue;
             const visibleCounters = (c.counters || []).filter((k: any) => k.visible);

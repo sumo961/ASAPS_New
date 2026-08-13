@@ -37,6 +37,7 @@ import {
   type PositionedElementData,
   type ChatMessage,
   toMeterCounterData,
+  resolveMeterFrame,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
@@ -262,7 +263,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const characterMeterFrameResolver = useCallback((characterId: string) => {
     if (!showHud) return null;
     const character = characters.find(c => c.id === characterId);
-    if (!character?.meterFrame) return null;
+    const resolvedFrame = resolveMeterFrame(character as any);
+    if (!character || !resolvedFrame) return null;
     const visibleCounters = character.counters?.filter(c => c.visible) || [];
     if (visibleCounters.length === 0) return null;
     return {
@@ -272,7 +274,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       counters: visibleCounters.map(counter =>
         toMeterCounterData(counter as any, character.id, null),
       ),
-      config: character.meterFrame,
+      config: resolvedFrame,
       characterName: character.displayName || character.name,
       characterColor: character.color,
     };

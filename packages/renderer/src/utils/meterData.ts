@@ -18,7 +18,7 @@ import {
   type BindableCounter,
   type CounterBand,
 } from '@asaps/core';
-import type { MeterCounterData } from '../components/CharacterMeterFrame';
+import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
 
 /** The authored counter shape this reads — a superset of BindableCounter. */
 export interface MeterCounterDef extends BindableCounter {
@@ -71,7 +71,12 @@ export function toMeterCounterData(
     min: range.min,
     max: range.max,
     color: counter.color || '#3B82F6',
-    showNumericValue: counter.showNumericValue ?? false,
+    // Choosing the word format and writing the ladder IS the intent to show
+    // the words — a format for a value you never display is meaningless. An
+    // explicit `false` still wins (?? only fills an absent value), so an author
+    // who wants a bare bar keeps one.
+    showNumericValue: counter.showNumericValue
+      ?? (counter.numericFormat === 'band' && (counter.bands?.length ?? 0) > 0),
     numericFormat: counter.numericFormat || 'value',
     orientation: counter.levelMeterOrientation || 'horizontal',
     bands: counter.bands,
@@ -80,3 +85,60 @@ export function toMeterCounterData(
     showLevelMeter: counter.showLevelMeter,
   };
 }
+
+/**
+ * The frame a character's meters render in, falling back when none is authored.
+ *
+ * A counter marked `visible` with `showLevelMeter` is an explicit instruction
+ * to show it — but it renders through a frame, and if the character has none
+ * the meter appears nowhere at all. Nothing errors; the meter is simply
+ * absent, which is invisible in the data and only shows up at runtime. An
+ * AI-generated story hit exactly this: it bound a trust counter, set it
+ * visible, wrote an explanation beat telling the player to watch the meter,
+ * and shipped no frame.
+ *
+ * Supplying a default for an ABSENT value is not overriding authored intent —
+ * `visible: true, showLevelMeter: true` IS the intent to show it, and an
+ * author who wants a counter tracked but hidden sets `visible: false`. An
+ * authored frame always wins; this only fills a gap.
+ *
+ * Returns null when nothing should render, so callers keep their existing
+ * "no frame → skip" branch.
+ */
+export function resolveMeterFrame(
+  character: { meterFrame?: MeterFrameConfig | null; counters?: MeterCounterDef[] } | null | undefined,
+): MeterFrameConfig | null {
+  if (!character) return null;
+  if (character.meterFrame) return character.meterFrame;
+
+  const wantsAMeter = (character.counters || []).some(
+    (c) => c && c.visible !== false && c.showLevelMeter,
+  );
+  if (!wantsAMeter) return null;
+
+  return { ...FALLBACK_METER_FRAME };
+}
+
+/**
+ * Screen-docked rather than character-anchored: a character-anchored frame
+ * needs the character to be placed on stage, which is not true in slot-based
+ * responsive beats — the fallback has to render wherever it is used.
+ */
+export const FALLBACK_METER_FRAME: MeterFrameConfig = {
+  dockMode: 'screen',
+  anchor: 'top',
+  screenPosition: 'screen-top-left',
+  offset: { x: 0, y: 0 },
+  style: {
+    backgroundColor: '#1b1f2b',
+    borderColor: '#3d4356',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 8,
+    opacity: 90,
+  },
+  meterHeight: 12,
+  meterSpacing: 6,
+  showLabels: true,
+  meterWidth: 130,
+};
