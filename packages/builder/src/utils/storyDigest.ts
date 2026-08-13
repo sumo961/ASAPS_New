@@ -152,8 +152,16 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
         // the name alone doesn't reveal that.
         bits.push(`counters: ${c.counters.map((k) => {
           const name = k.displayName || k.name;
-          const src = (k as { source?: { kind?: string } }).source;
-          return src?.kind ? `${name} [reads ${src.kind}, read-only]` : name;
+          const meta = k as { source?: { kind?: string }; bands?: unknown[]; min?: number; max?: number };
+          const notes: string[] = [];
+          if (meta.source?.kind) notes.push(`reads ${meta.source.kind}, read-only`);
+          if (typeof meta.min === 'number' && typeof meta.max === 'number') notes.push(`${meta.min}..${meta.max}`);
+          // Say that a ladder exists. The Co-Designer replaces a character's
+          // counter list wholesale, and without this it cannot tell there is
+          // authored wording to preserve — observed live: it restated a
+          // counter without its bands and flagged its own uncertainty.
+          if (meta.bands?.length) notes.push(`${meta.bands.length} bands`);
+          return notes.length ? `${name} [${notes.join('; ')}]` : name;
         }).join(', ')}`);
       }
       lines.push(`- ${label}${bits.length ? ` (${bits.join('; ')})` : ''}`);

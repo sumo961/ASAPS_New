@@ -139,6 +139,29 @@ export function applyChangeProposals(
               return { ...v, traits: { ...(v.traits || {}), extraversion: ea.extraversion, agreeableness: ea.agreeableness } };
             });
           }
+          // Counters MERGE by name rather than replacing the list.
+          //
+          // The digest names a character's counters but not their bands or
+          // bounds, so a model asked to "add a fear meter" cannot faithfully
+          // restate the trust meter it must send alongside — observed live: it
+          // echoed trust without its four bands and said so ("tell me and I'll
+          // match them, so you don't lose that setup"). Replacing would have
+          // silently destroyed an authored ladder.
+          //
+          // Merging makes a partial proposal safe and matches how an author
+          // reads it: "add fear" should not rewrite trust. Fields the proposal
+          // states win; fields it omits are kept.
+          if (Array.isArray(updates.counters)) {
+            const existing = (target as { counters?: Array<Record<string, unknown>> }).counters || [];
+            const byName = new Map(existing.map((c) => [String(c.name), c]));
+            const merged = (updates.counters as Array<Record<string, unknown>>).map((incoming) => {
+              const prior = byName.get(String(incoming.name));
+              byName.delete(String(incoming.name));
+              return prior ? { ...prior, ...incoming } : incoming;
+            });
+            // Counters the proposal didn't mention are untouched, not deleted.
+            updates.counters = [...merged, ...byName.values()];
+          }
           ctx.updateCharacter(target.id, updates);
           const summary = Object.keys(updates).map(k =>
             k === 'variants' ? `${(updates.variants as any[]).length} variants` : k,

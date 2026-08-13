@@ -26,7 +26,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 0 — preflight | ✅ passed | build 5/5, 3 suites green, MCP server drives over stdio (2026-08-13) |
 | Round 1a — story generation | ⚠️ passed with one finding | `Someone Made Her Promises`, 16 beats (2026-08-13) |
 | Round 1b — character helper | ✅ passed after 2 fixes | picked *Respect*, not a default (2026-08-13) |
-| Round 1c–1e — other AI surfaces | ⬜ | |
+| Round 1c — Co-Designer | ✅ passed, 1 data-loss bug found | refused the bad ask, caught mid-apply (2026-08-13) |
+| Round 1d–1e — other AI surfaces | ⬜ | |
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ⬜ | |
 | Round 3b — band phrases in a translated export | ⬜ | |
@@ -110,10 +111,24 @@ Fix 2 is almost certainly what broke both earlier runs — the prompt may have b
 
 **Not a product bug:** a run failed with "Configure an AI provider" while the config was intact. Cause was HMR after a source edit leaving the hook holding a stale service instance; a hard reload fixed it. Same class as the stale dev-server resolution error — an artefact of editing while the app is live, not something a user hits.
 
-### 1c. Co-Designer
-- [ ] "Add a trust meter to Ada" → an `updateCharacter` proposal with a **complete** binding
-- [ ] Against a story that already has a bound counter: **does not** propose writing to it
-- [ ] The digest shows `[reads sentiment, read-only]` for bound counters
+### 1c. Co-Designer — ✅ PASSED, with a data-loss bug found (2026-08-13)
+
+Asked deliberately for something wrong: *"add a fear meter, and make the blunt choice knock her trust down by 20 points"* — a direct counter-write against a bound meter.
+
+- [x] **Refused the bad ask and redirected**, in the author's terms: *"the trust meter is bound to sentiment, which runs roughly on a −1…1 scale, not 0–100. A '−20 points' instinct maps to about −0.20."* It proposed raising the existing `addSentiment` `strengthDelta` from −0.15 to −0.20 — the affect effect, never a counter write.
+- [x] Proposed the new counter correctly: fear bound to the emotion, **`min: 0`** (no opposite), with bands — the polarity rule landing unprompted.
+- [x] Used `get_beat_content` to read the real beat before proposing, and corrected the digest's own choice count.
+- [x] Emitted a well-formed block that parsed into two reviewable proposals.
+
+### BUG — a partial counter proposal destroyed an authored band ladder
+
+`updateCharacter` replaced the counter list wholesale. Asked to add `fear`, the model had to restate `trust` alongside it — and restated it **without its four bands**, because the digest named the counter but never its bands or bounds. It flagged its own uncertainty in prose (*"tell me and I'll match them, so you don't lose that setup"*) and then dropped them anyway.
+
+Applying would have silently destroyed an authored ladder. Caught before applying.
+
+**Fixed on both sides:**
+- **Counters now MERGE by name at apply time.** Fields the proposal states win; fields it omits are kept; counters it never mentions are untouched rather than deleted. A partial proposal is now safe, which matches how an author reads it — "add fear" should not rewrite trust.
+- **The digest now reports bounds and band count** (`Trust [reads sentiment, read-only; -100..100; 4 bands]`), so the model can see there is authored wording to preserve instead of guessing.
 
 ### 1d. Beat suggestions
 - [ ] Suggests `multiChoice` for ordinary branching, not `dialogTree`

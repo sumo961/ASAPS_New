@@ -135,6 +135,26 @@ describe('bound counters in the digest', () => {
       }],
     } as any);
     expect(digest).toContain('Gold');
-    expect(digest).toContain('Trust [reads sentiment, read-only]');
+    expect(digest).toContain('Trust [reads sentiment, read-only');
+  });
+});
+
+describe('digest reports enough to preserve a counter', () => {
+  it('names bounds and the presence of a band ladder', () => {
+    // The Co-Designer replaces a counter list wholesale. Without knowing a
+    // ladder exists it restates the counter without one — seen live.
+    const digest = buildStoryDigest({
+      title: 'T', beats: [],
+      characters: [{
+        id: 'ada', name: 'ada', displayName: 'Ada',
+        counters: [{
+          name: 'trust', displayName: 'Trust', min: -100, max: 100,
+          source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' },
+          bands: [{ from: -100, label: 'wary' }, { from: 20, label: 'trusting' }],
+        }],
+      }],
+    } as any);
+    expect(digest).toContain('-100..100');
+    expect(digest).toContain('2 bands');
   });
 });

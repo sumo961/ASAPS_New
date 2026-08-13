@@ -126,3 +126,55 @@ describe('applyChangeProposals', () => {
     expect(results[1].ok).toBe(true);
   });
 });
+
+describe('updateCharacter — counters merge rather than replace', () => {
+  const ada = () => ({
+    id: 'ada', name: 'ada', displayName: 'Ada',
+    counters: [
+      {
+        name: 'trust', displayName: 'Trust', min: -100, max: 100, showLevelMeter: true,
+        source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' },
+        bands: [{ from: -100, label: 'wary' }, { from: 20, label: 'trusting' }],
+      },
+      { name: 'gold', displayName: 'Gold', value: 12 },
+    ],
+  });
+
+  const apply = (counters: unknown) => {
+    const updateCharacter = vi.fn();
+    applyChangeProposals(
+      [{ kind: 'updateCharacter', characterId: 'ada', updates: { counters } } as any],
+      { beats: [], characters: [ada()], updateCharacter } as any,
+    );
+    return updateCharacter.mock.calls[0]?.[1]?.counters;
+  };
+
+  it('keeps bands the proposal could not restate', () => {
+    // Observed live: the model echoed trust without its bands, because the
+    // digest never showed them. Replacing would have destroyed the ladder.
+    const out = apply([
+      { name: 'trust', displayName: 'Trust', min: -100, max: 100, source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' } },
+      { name: 'fear', displayName: 'Fear', min: 0, max: 100, source: { kind: 'emotion', emotion: 'fear' } },
+    ]);
+    const trust = out.find((c: any) => c.name === 'trust');
+    expect(trust.bands).toHaveLength(2);
+    expect(out.find((c: any) => c.name === 'fear')).toBeTruthy();
+  });
+
+  it('lets the proposal win on fields it does state', () => {
+    const out = apply([{ name: 'trust', displayName: 'Her Trust In You' }]);
+    const trust = out.find((c: any) => c.name === 'trust');
+    expect(trust.displayName).toBe('Her Trust In You');
+    expect(trust.source).toBeTruthy();      // untouched
+  });
+
+  it('leaves counters the proposal never mentioned alone', () => {
+    const out = apply([{ name: 'fear', source: { kind: 'emotion', emotion: 'fear' } }]);
+    expect(out.map((c: any) => c.name).sort()).toEqual(['fear', 'gold', 'trust']);
+  });
+
+  it('adds a brand-new counter unchanged', () => {
+    const out = apply([{ name: 'patience', displayName: 'Patience', min: 0, max: 100 }]);
+    expect(out.find((c: any) => c.name === 'patience')).toMatchObject({ displayName: 'Patience', min: 0 });
+  });
+});
