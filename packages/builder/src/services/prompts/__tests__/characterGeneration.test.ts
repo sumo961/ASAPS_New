@@ -349,3 +349,37 @@ describe('applyRevisedCard', () => {
     expect(next.description).toBe('Base.');
   });
 });
+
+describe('normalizeGeneratedProfile — trackedQuantity survives', () => {
+  const seed = { brief: 'a porter' } as any;
+  const base = { displayName: 'Len', description: 'A porter who has seen everything.', traits: {}, initialMood: {} };
+
+  it('carries a well-formed proposal through', () => {
+    // This function builds its result from an explicit field list, so a new
+    // field is dropped unless named. trackedQuantity was dropped exactly that
+    // way — the model returned it and the UI never saw it.
+    const p = normalizeGeneratedProfile({
+      ...base,
+      trackedQuantity: { emotion: 'Respect', displayName: 'Respect', rationale: 'he sizes people up fast', bipolar: true },
+    }, seed);
+    expect(p.trackedQuantity).toEqual({
+      emotion: 'respect', displayName: 'Respect', rationale: 'he sizes people up fast', bipolar: true,
+    });
+  });
+
+  it('derives a display name when the model omits one', () => {
+    const p = normalizeGeneratedProfile({ ...base, trackedQuantity: { emotion: 'patience' } }, seed);
+    expect(p.trackedQuantity?.displayName).toBe('Patience');
+  });
+
+  it('drops a proposal with no usable emotion rather than offering a dead binding', () => {
+    for (const tq of [null, {}, { emotion: '   ' }, { displayName: 'Trust' }, 'trust']) {
+      expect(normalizeGeneratedProfile({ ...base, trackedQuantity: tq }, seed).trackedQuantity).toBeUndefined();
+    }
+  });
+
+  it('omits the key entirely when the model returns null — a valid answer', () => {
+    const p = normalizeGeneratedProfile({ ...base, trackedQuantity: null }, seed);
+    expect('trackedQuantity' in p).toBe(false);
+  });
+});

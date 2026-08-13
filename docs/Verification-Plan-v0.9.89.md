@@ -25,7 +25,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | **Screen-docked meter frame in an HTML export** | ✅ passed | Safari, `file://`, all four counter kinds correct (2026-08-13) |
 | Round 0 — preflight | ✅ passed | build 5/5, 3 suites green, MCP server drives over stdio (2026-08-13) |
 | Round 1a — story generation | ⚠️ passed with one finding | `Someone Made Her Promises`, 16 beats (2026-08-13) |
-| Round 1b–1e — other AI surfaces | ⬜ | |
+| Round 1b — character helper | ✅ passed after 2 fixes | picked *Respect*, not a default (2026-08-13) |
+| Round 1c–1e — other AI surfaces | ⬜ | |
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ⬜ | |
 | Round 3b — band phrases in a translated export | ⬜ | |
@@ -91,11 +92,23 @@ The prompt does say a visible meter needs a frame. The model followed every othe
 - **Editor-side:** warn in the Counters tab when a counter is set to show and no frame is enabled. Zero risk, but does nothing for generated stories, which is the case at hand.
 - **Prompt-side:** make the requirement more emphatic. Weakest — the guidance was already present and everything else was followed.
 
-### 1b. Character helper — "Develop character with AI"
-- [ ] Returns `trackedQuantity` at all *(optional field; absence = prompt not landing)*
-- [ ] The proposed emotion fits the brief rather than defaulting to "trust" regardless
-- [ ] Accepting writes a correctly-shaped bound counter **and** a meter frame
-- [ ] Declining writes no counters
+### 1b. Character helper — ✅ PASSED after two fixes (2026-08-13)
+
+Brief chosen so the natural quantity was **respect**, not trust — a test of whether the model reads the brief or reaches for a default.
+
+- [x] Returns `trackedQuantity` — *after* the fixes below; the first two runs returned nothing
+- [x] Fits the brief: **"Track Respect toward the player — his respect decides whether he bends rules or goes by the book"**
+- [x] Accepting writes a correct counter: `respect`, `min: -100 / max: 100`, `source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'respect' }`, a five-rung ladder (`strong disrespect / wary / neutral / respect / deep respect`) with a band covering zero, `numericFormat: 'band'`, `showLevelMeter: false` (words-only, matching the chosen display), **and** a screen-docked `meterFrame`
+- [x] Declining writes no counters (unit-tested)
+
+**Two fixes were needed, and the second was the real cause.**
+
+1. The prompt offered an escape hatch — *"Omit the whole field if nothing fits"* — under an "Also propose" framing that read as secondary. Now the key is required, with `null` as the explicit "nothing fits" answer and a note that null should be rare.
+2. **The whitelist trap, again.** `normalizeGeneratedProfile` builds its result from an explicit field list and never named `trackedQuantity`, so the model's answer was discarded before the UI could see it. Fixed with validation (a proposal with no usable emotion is dropped rather than offering a binding that reads nothing).
+
+Fix 2 is almost certainly what broke both earlier runs — the prompt may have been landing all along. This is the fourth time in this codebase that a hand-maintained copy-list has silently eaten a new field.
+
+**Not a product bug:** a run failed with "Configure an AI provider" while the config was intact. Cause was HMR after a source edit leaving the hook holding a stale service instance; a hard reload fixed it. Same class as the stale dev-server resolution error — an artefact of editing while the app is live, not something a user hits.
 
 ### 1c. Co-Designer
 - [ ] "Add a trust meter to Ada" → an `updateCharacter` proposal with a **complete** binding

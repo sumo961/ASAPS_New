@@ -165,7 +165,8 @@ ${knownStanceLines ? `\nDISPOSITION STANCES:\n${knownStanceLines}` : ''}`
 ${TRAIT_GUIDE}
 ${variantRules}
 
-Also propose ONE "trackedQuantity": the single feeling this character's relationship with the player most naturally tracks over a story — the thing an author would want a meter for. Pick the feeling the brief actually implies (trust, respect, fear, suspicion, affection, patience…), not a generic default. "bipolar" is true only when the feeling has a real opposite that could be named (trust/distrust: yes; fear: no — its absence is just calm). Keep "rationale" to one short clause. Omit the whole field if nothing fits.
+ALWAYS include a "trackedQuantity" key. It names the ONE feeling this character's relationship with the player most naturally follows over a story — the thing an author would want a meter for. Pick the feeling the brief actually implies (trust, respect, fear, suspicion, affection, patience…), never a generic default: a porter who decides whether he respects you tracks RESPECT, not trust. "bipolar" is true only when the feeling has a real opposite that could be named (trust/distrust: yes; fear: no — its absence is just calm). Keep "rationale" to one short clause.
+Set "trackedQuantity" to null ONLY when the character has no ongoing relationship with the player at all — a one-scene functionary, a voice on a recording. Almost every character worth generating has one feeling worth following, so null should be rare.
 
 Respond with ONLY valid JSON:
 {
@@ -317,6 +318,27 @@ export function normalizeGeneratedProfile(
       };
     });
 
+  // The tracked-quantity proposal. Validated rather than trusted: a
+  // half-specified one would offer the author a binding that reads nothing.
+  //
+  // This function builds its result from an explicit field list, so anything
+  // not named here is silently dropped no matter what the model returned —
+  // which is exactly what happened to trackedQuantity until this line existed.
+  const tq = obj.trackedQuantity;
+  const trackedQuantity =
+    tq && typeof tq === 'object' && typeof tq.emotion === 'string' && tq.emotion.trim()
+      ? {
+          emotion: tq.emotion.trim().toLowerCase(),
+          displayName:
+            (typeof tq.displayName === 'string' && tq.displayName.trim()) ||
+            tq.emotion.trim().charAt(0).toUpperCase() + tq.emotion.trim().slice(1),
+          ...(typeof tq.rationale === 'string' && tq.rationale.trim()
+            ? { rationale: tq.rationale.trim() }
+            : {}),
+          ...(typeof tq.bipolar === 'boolean' ? { bipolar: tq.bipolar } : {}),
+        }
+      : undefined;
+
   return {
     name: slugify(typeof obj.name === 'string' ? obj.name : displayName, 'new_character'),
     displayName,
@@ -324,6 +346,7 @@ export function normalizeGeneratedProfile(
     traits: baseTraits,
     initialMood: normalizeMood(obj.initialMood),
     ...(variants.length > 0 ? { variants } : {}),
+    ...(trackedQuantity ? { trackedQuantity } : {}),
   };
 }
 
