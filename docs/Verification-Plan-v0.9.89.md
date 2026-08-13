@@ -24,7 +24,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | Explanation beat placement in the palette | ✅ passed | live; catch-all group now empty |
 | **Screen-docked meter frame in an HTML export** | ✅ passed | Safari, `file://`, all four counter kinds correct (2026-08-13) |
 | Round 0 — preflight | ✅ passed | build 5/5, 3 suites green, MCP server drives over stdio (2026-08-13) |
-| Round 1 — AI surfaces | ⬜ | |
+| Round 1a — story generation | ⚠️ passed with one finding | `Someone Made Her Promises`, 16 beats (2026-08-13) |
+| Round 1b–1e — other AI surfaces | ⬜ | |
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ⬜ | |
 | Round 3b — band phrases in a translated export | ⬜ | |
@@ -64,12 +65,31 @@ The spine. One brief that demands the new features and needs no external assets:
 
 Run each surface once. **The negative checks matter more than the positive ones** — they are exactly what the new warnings were written for, and a model ignoring a warning is the failure this round exists to catch.
 
-### 1a. Story generation
-- [ ] Emits at least one counter with a `source`, with a sensible emotion
-- [ ] Uses `layoutTemplate`; **never** emits `presentationMode: "positioned"`
-- [ ] **Never** emits `setCounter` / `incrementCounter` against a bound counter
-- [ ] **Does not** emit `gpsLocation` / `arBeat` / `indoorLocation` with invented coordinates or asset ids
-- [ ] Bipolar ladder (if any) carries a band covering zero
+### 1a. Story generation — ⚠️ PASSED with one finding (2026-08-13)
+
+Model: `claude-opus-4-8`, effort `xhigh`, automatic budget. Result: *Someone Made Her Promises*, 16 beats.
+
+- [x] Bound counter with a sensible source — Mara carries `trust`, `min: -100 / max: 100`, `source: { kind: 'sentiment', toEntityRef: 'player', emotion: 'trust' }`, four bands, `numericFormat: 'band'`
+- [x] Uses `layoutTemplate` (`"conversation"`); **no** `presentationMode`, **no** `"positioned"` anywhere in the story
+- [x] **Zero** counter writes against the bound counter — all 41 effects are `addSentiment` / `nudgeMood` / `fireEmotion`
+- [x] **No** asset-dependent beats emitted (`gpsLocation`, `arBeat`, `indoorLocation`, `setGpsLocation` all absent)
+- [x] Band ladder correct — and better than the check anticipated (see below)
+- [x] Unprompted bonus: used the **`explanation`** beat, guidance added only days earlier
+
+**The band ladder was right, and my check was wrong.** The ladder is `-100 "Braced to leave" / -30 "Wary" / 20 "Opening up" / 60 "Trusting you"` — no band covering zero, which the plan flagged as a risk. But the model also seeded `initialSentiments: [{ emotion: 'trust', strength: -0.3 }]`, which projects to exactly **-30**: the "Wary" boundary. So the story opens reading *Wary* deliberately, for a character who has been let down before — precisely the case `Counter-Binding-Design.md` describes as legitimate ("if you HAVE seeded an opening stance, delete the neutral band without a second thought"). It even wrote a caption saying so.
+
+### FINDING — a visible bound counter renders nowhere without a `meterFrame`
+
+Mara's `trust` counter is `visible: true`, `showLevelMeter: true`, bound — and the character has **no `meterFrame`**. Confirmed by playing it: no `[data-meter-frame]`, no `[data-meter-fill]` on stage.
+
+The symptom is sharp: the generated `explanation` beat says *"This is Mara's trust in you… watch it shift as the conversation goes"* — **explaining a meter that is not on screen.**
+
+The prompt does say a visible meter needs a frame. The model followed every other rule including all four negatives, and missed this one — which is unsurprising, because the omission is invisible in the data and only shows up at runtime. A human author would miss it the same way.
+
+**Candidate fixes:**
+- **App-side (preferred):** when a character has a counter with `visible && showLevelMeter` and no `meterFrame`, fall back to `DEFAULT_METER_FRAME_CONFIG` docked to a screen corner. Supplying a default for an *absent* value is not an override of authored intent — `visible: true, showLevelMeter: true` **is** the intent to show it. Caveat: this changes runtime rendering for any existing project in the same state, where the meters are currently invisible despite being marked visible.
+- **Editor-side:** warn in the Counters tab when a counter is set to show and no frame is enabled. Zero risk, but does nothing for generated stories, which is the case at hand.
+- **Prompt-side:** make the requirement more emphatic. Weakest — the guidance was already present and everything else was followed.
 
 ### 1b. Character helper — "Develop character with AI"
 - [ ] Returns `trackedQuantity` at all *(optional field; absence = prompt not landing)*
