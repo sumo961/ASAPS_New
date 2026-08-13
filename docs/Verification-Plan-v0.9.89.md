@@ -27,7 +27,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 1a — story generation | ⚠️ passed with one finding | `Someone Made Her Promises`, 16 beats (2026-08-13) |
 | Round 1b — character helper | ✅ passed after 2 fixes | picked *Respect*, not a default (2026-08-13) |
 | Round 1c — Co-Designer | ✅ passed, 1 data-loss bug found | refused the bad ask, caught mid-apply (2026-08-13) |
-| Round 1d–1e — other AI surfaces | ⬜ | |
+| Round 1d — beat suggestions | ✅ passed | multiChoice offered as the default (2026-08-13) |
+| Round 1e — dialog generation | ✅ passed clean | affect effects, correct target, no counter writes (2026-08-14) |
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ⬜ | |
 | Round 3b — band phrases in a translated export | ⬜ | |
@@ -130,14 +131,21 @@ Applying would have silently destroyed an authored ladder. Caught before applyin
 - **Counters now MERGE by name at apply time.** Fields the proposal states win; fields it omits are kept; counters it never mentions are untouched rather than deleted. A partial proposal is now safe, which matches how an author reads it — "add fear" should not rewrite trust.
 - **The digest now reports bounds and band count** (`Trust [reads sentiment, read-only; -100..100; 4 bands]`), so the model can see there is authored wording to preserve instead of guessing.
 
-### 1d. Beat suggestions
-- [ ] Suggests `multiChoice` for ordinary branching, not `dialogTree`
-- [ ] Offers affect effects, not only counter shorthand
+### 1d. Beat suggestions — ✅ PASSED (2026-08-13)
 
-### 1e. Dialog generation
-- [ ] Uses the `effects` array, including affect effects
-- [ ] Gets `target` right in both senses — counter name for counter effects, **character** for affect effects
-- [ ] Uses `layoutTemplate` if it mentions layout at all
+- [x] Suggested `multiChoice` at 74%, described as *"the default way to hand the player agency right after setup"* — the guidance landed.
+- [x] `dialogTree` ranked higher (82%) but for a defensible reason: *"the story already leans heavily on dialogTree (5 existing), so this matches the established narrative style."* Matching an established style is sound design advice, not a reach for the heavier beat.
+- **Check withdrawn:** "offers affect effects" was mis-specified for this surface. Beat suggestions propose a beat *skeleton* — type, name, reasoning, parameter names — and the author fills the content. Effects live on choices inside a beat, which is 1e's territory.
+
+### 1e. Dialog generation — ✅ PASSED CLEAN (2026-08-14)
+
+The only surface that needed no fix.
+
+- [x] Uses the `effects` array with **affect effects throughout** — `addSentiment`, `nudgeMood`, `fireEmotion`
+- [x] **`target` correct in the hard sense**: every affect effect targets `char_mara`, the CHARACTER — not the counter name. This is the single easiest mistake in the vocabulary and the reason the warning was written.
+- [x] **Zero counter writes** — it moved feelings rather than numbers, which is what the guidance asks for in a relationship scene
+- [x] `layoutTemplate: "conversation"` — the current field, not legacy `presentationMode`
+- [x] Deltas are proportionate and signed sensibly: warm opening `+0.25` trust, defensive `-0.2` trust plus `fireEmotion anger +0.3`, the strongest repair `+0.35`
 
 **On failure:** fix the prompt, re-run *that* surface only. Record what the model actually emitted — a wrong output is the useful artefact, not the fact that it was wrong.
 
