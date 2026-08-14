@@ -48,3 +48,37 @@ describe('backfillUnplacedDefaults', () => {
     expect(out.map((l) => l.kind)).toContain('button');
   });
 });
+
+describe('backfilled defaults do not land on authored elements', () => {
+  const at = (kind: string, x: number, y: number, w = 100, h = 40): Location =>
+    ({ kind, name: kind, x, y, width: w, height: h } as Location);
+
+  it('drops a colliding default below what the author placed', () => {
+    // The live symptom: a default text box rendered straight under a placed
+    // meter. The collision pass never reconciles them — a meter is scenery to
+    // it, neither moving nor blocking.
+    const meter = at('meter', 60, 60, 320, 44);
+    const out = backfillUnplacedDefaults([at('text', 60, 60, 320, 200)], [meter]);
+    const text = out.find((l) => l.kind === 'text')!;
+    expect(text.y).toBeGreaterThanOrEqual(meter.y + meter.height);
+  });
+
+  it('leaves a default alone when it never overlapped', () => {
+    const out = backfillUnplacedDefaults([at('text', 60, 400)], [at('meter', 60, 60, 320, 44)]);
+    expect(out.find((l) => l.kind === 'text')!.y).toBe(400);
+  });
+
+  it('clears the lowest of several blockers, not just the first', () => {
+    const out = backfillUnplacedDefaults(
+      [at('text', 0, 0, 400, 300)],
+      [at('meter', 0, 0, 400, 40), at('image', 0, 100, 400, 60)],
+    );
+    expect(out.find((l) => l.kind === 'text')!.y).toBeGreaterThanOrEqual(160);
+  });
+
+  it('never moves what the author positioned', () => {
+    const meter = at('meter', 60, 60, 320, 44);
+    const out = backfillUnplacedDefaults([at('text', 60, 60, 320, 200)], [meter]);
+    expect(out.find((l) => l.kind === 'meter')).toEqual(meter);
+  });
+});

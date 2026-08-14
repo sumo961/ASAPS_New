@@ -38,6 +38,8 @@ import {
   type ChatMessage,
   toMeterCounterData,
   resolveMeterFrame,
+  countersPlacedOnBeat,
+  isCounterPlaced,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
@@ -265,7 +267,14 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const character = characters.find(c => c.id === characterId);
     const resolvedFrame = resolveMeterFrame(character as any);
     if (!character || !resolvedFrame) return null;
-    const visibleCounters = character.counters?.filter(c => c.visible) || [];
+    // Same rule the runtime applies: a counter placed as an element on this
+    // beat is not repeated in the frame.
+    const placed = countersPlacedOnBeat(
+      elements.filter(el => el.visible).map(el => ({ kind: el.type, characterId: el.characterId, counterName: el.counterName })),
+    );
+    const visibleCounters = (character.counters || []).filter(
+      c => c.visible && !isCounterPlaced(placed, character.id, c.name),
+    );
     if (visibleCounters.length === 0) return null;
     return {
       // No engine in the editor, so no live affect to read — a derived
@@ -278,7 +287,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       characterName: character.displayName || character.name,
       characterColor: character.color,
     };
-  }, [showHud, characters]);
+  }, [showHud, characters, elements]);
 
   const characterInventoryResolver = useCallback((characterId: string) => {
     if (!showHud) return null;

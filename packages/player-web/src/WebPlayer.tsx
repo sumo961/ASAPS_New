@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -76,7 +76,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
      until acknowledged; acknowledged beats are remembered for the playthrough
      so the tutorial doesn't re-fire on every visit. */
   const [explainAcknowledged, setExplainAcknowledged] = useState<Record<string, boolean>>({});
-  const [currentBeatMeta, setCurrentBeatMeta] = useState<{ id: string; explainHuds?: boolean } | null>(null);
+  const [currentBeatMeta, setCurrentBeatMeta] = useState<{ id: string; explainHuds?: boolean; placedMeters?: Set<string> } | null>(null);
   const explainOverlayActive = !!(
     currentBeatMeta?.explainHuds && !explainAcknowledged[currentBeatMeta.id]
   );
@@ -406,7 +406,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           context.on('beatChanged', () => {
             const id = context.getCurrentBeatId?.();
             const b: any = id ? (story as any).getBeat?.(id) : null;
-            setCurrentBeatMeta(b ? { id: b.id, explainHuds: b.explainHuds } : null);
+            setCurrentBeatMeta(b ? { id: b.id, explainHuds: b.explainHuds, placedMeters: countersPlacedOnBeat((b as any).locations) } : null);
           });
 
           // Set up global settings for layout and HUD
@@ -834,7 +834,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             const frame = resolveMeterFrame(c as any);
             if (!frame || frame.dockMode !== 'screen') continue;
             if (!hasExplicitVariant(c)) continue;
-            const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
+            // A counter the author placed on this beat is drawn there; keeping
+            // it in the frame too would show the same number twice.
+            const visibleCounters = (c.counters || []).filter(
+              (k: any) => k.visible && !isCounterPlaced(currentBeatMeta?.placedMeters, c.id, k.name),
+            );
             if (visibleCounters.length === 0) continue;
             const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
             const counters = visibleCounters.map((counter: any) =>

@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, type HudBox, type HudCorner } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -285,6 +285,16 @@ export const PreviewWindow: React.FC = () => {
   const [endedNotice, setEndedNotice] = useState<string | null>(null);
   const stopRequestedRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
+  // Counters the author placed as elements on the beat now on screen. They are
+  // suppressed in the HUD frame so one number is not drawn twice — see
+  // countersPlacedOnBeat. A ref because the meter-frame resolver is a callback
+  // handed to the renderer once, and would otherwise close over a stale beat.
+  const placedMetersRef = useRef<Set<string>>(new Set());
+  const placedMeters = useMemo(
+    () => countersPlacedOnBeat((currentBeat as any)?.locations),
+    [currentBeat],
+  );
+  placedMetersRef.current = placedMeters;
   /* HUD explanation (overlay trigger). Beats carrying `explainHuds` annotate
      the live HUDs on entry and are held INERT until acknowledged, so the
      interactor can't click past the explanation. Acknowledged beats are
@@ -926,7 +936,9 @@ export const PreviewWindow: React.FC = () => {
         }
 
         // Filter to visible counters
-        const visibleCounters = character.counters?.filter(c => c.visible) || [];
+        const visibleCounters = (character.counters || []).filter(
+          c => c.visible && !isCounterPlaced(placedMetersRef.current, character.id, c.name),
+        );
         if (visibleCounters.length === 0) {
           return null;
         }
@@ -2834,7 +2846,9 @@ export const PreviewWindow: React.FC = () => {
                   const frame: any = resolveMeterFrame(c as any);
                   if (!frame || frame.dockMode !== 'screen') continue;
                   if (!hasExplicitVariant(c)) continue;
-                  const visibleCounters = ((c as any).counters || []).filter((k: any) => k.visible);
+                  const visibleCounters = ((c as any).counters || []).filter(
+                    (k: any) => k.visible && !isCounterPlaced(placedMeters, c.id, k.name),
+                  );
                   if (visibleCounters.length === 0) continue;
                   const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
                   const counters = visibleCounters.map((counter: any) =>

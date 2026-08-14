@@ -904,13 +904,33 @@ export function backfillUnplacedDefaults(
   authored?: Location[],
 ): Location[] {
   if (!authored || authored.length === 0) return defaults;
-  const placedKinds = new Set(
-    authored
-      .filter((l) => !FREE_POSITIONED_KINDS.has(l.kind ?? ''))
-      .map((l) => l.kind ?? ''),
-  );
+  const layoutAuthored = authored.filter((l) => !FREE_POSITIONED_KINDS.has(l.kind ?? ''));
+  const placedKinds = new Set(layoutAuthored.map((l) => l.kind ?? ''));
   const missing = defaults.filter((d) => !placedKinds.has(d.kind ?? ''));
-  return missing.length > 0 ? [...authored, ...missing] : authored;
+  if (missing.length === 0) return authored;
+
+  // A backfilled default carries no authored position, so it must not land on
+  // top of something the author DID place. The collision pass only reconciles
+  // text against text, buttons and the top-centre HUD — a placed meter or
+  // image is passed through as scenery, neither moving nor blocking. So a
+  // default dropped at its schema position can sit straight under one.
+  //
+  // Authored overlaps are left alone: if the author stacked things, that is
+  // their layout. Only the defaults we inserted are moved, and only when they
+  // actually intersect.
+  const intersects = (a: Location, b: Location) =>
+    a.x < b.x + b.width && a.x + a.width > b.x &&
+    a.y < b.y + b.height && a.y + a.height > b.y;
+
+  const cleared = missing.map((d) => {
+    const blockers = layoutAuthored.filter((a) => intersects(d, a));
+    if (blockers.length === 0) return d;
+    // Drop it just below whatever it collided with, preserving x.
+    const floor = Math.max(...blockers.map((b) => b.y + b.height));
+    return { ...d, y: floor + 16 };
+  });
+
+  return [...authored, ...cleared];
 }
 
 // ============= REACT RENDERER CLASS =============
