@@ -34,7 +34,7 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 3b — band phrases translated | ✅ passed | "vertrauensvoll" in an exported story (2026-08-14) |
 | Round 3b — placed-meter display | ⚠️ partly | 2 of 3 overlaps fixed (9d921ec1); HUD-over-content open, see below |
 | Round 4 — MCP desktop server | ⬜ | needs Claude Desktop |
-| Round 5 — device/layout matrix | ⬜ | |
+| Round 5 — device/layout matrix | ✅ passed | 2 modes × 6 viewports measured; found + fixed responsive HUD overlap (2026-08-14) |
 
 ---
 
@@ -203,14 +203,86 @@ Two notes from doing it:
 
 ---
 
-## Round 5 — Device and layout matrix
+## Round 5 — Device and layout matrix — ✅ PASSED (2026-08-14)
 
 Per the standing rule that one-viewport-verified is not verified.
 
-- [ ] Meter frame with name header at desktop, tablet portrait/landscape, phone portrait/landscape
-- [ ] Both layout modes — responsive and fixed canvas
-- [ ] Frame label truncates rather than overflowing on the narrowest viewport
-- [ ] Stacked frames still clear each other at phone sizes
+- [x] Meter frame with name header at desktop, tablet portrait/landscape, phone portrait/landscape
+- [x] Both layout modes — responsive and fixed canvas
+- [x] Frame label truncates rather than overflowing on the narrowest viewport
+- [x] Stacked frames still clear each other at phone sizes
+
+Run against a purpose-built fixture (`ZZ Device Matrix`, one copy per layout
+mode): Ada with a screen-docked meter frame **and** an inventory frame in the
+*same* corner, so the packer has to stack them, and a deliberately long
+display name ("Ada Lovelace-Fitzgerald") to force the truncation case.
+
+Measured rather than eyeballed — a DOM harness reporting pairwise overlap
+areas, stage-bounds overflow, and clipped text. Two false alarms came out of
+the harness before any of it was trustworthy, both worth remembering:
+
+* Walking up from a text node to find its "box" climbed **past the stage**
+  into page ancestors, which are all painted — every element then reported the
+  same rect and the numbers looked catastrophic. Element lookups must be
+  scoped inside the stage.
+* `getBoundingClientRect()` ignores the scroller clipping it. Text inside an
+  `overflow: auto` body reported a 653px box overlapping the button, when the
+  painted region was 317px and overlapped nothing. Intersect with every
+  clipping ancestor before calling anything a collision.
+
+### Result — fixed canvas
+
+Clean at auto / desktop / tablet-landscape / tablet-portrait: no overlaps, and
+the HUD stack is identical in canvas coordinates at every size (meter 10,10
+146×174; inventory 20,225 120×52 — a 41px gap, so stacked frames clear each
+other everywhere).
+
+Phone sizes show cropped content, which is the **mode's contract, not a
+regression**: `previewWidth` is consumed only by `SlotFlowView` /
+`SpatialFlowView`, so a fixed canvas does not reflow for a device preset — it
+crops. A 1024×768 canvas viewed at 390×740 shows its top-left corner. The
+author's remedy is responsive mode.
+
+### Finding — responsive mode reserved nothing, at every viewport
+
+The reserved-rect fix (9f3d7724) went into `PositionedBeatView`, which slot
+mode does not use. Responsive beats therefore started their flow at y≈37 while
+the meter frame occupied y 10–184 — overlapping at **all six** viewports,
+worst on narrow ones (19992px² at phone portrait). One layout mode verified is
+not verified either.
+
+Fixed by reserving the HUD band as padding on the slot root. Padding is the
+right shape here precisely because slot mode reflows: the column simply begins
+below the top HUD band and ends above the bottom one, rather than lifting
+individual elements. Re-measured: zero overlap at all six viewports in both
+modes.
+
+Two things that fix turned up:
+
+* `previewHeight` is not passed at every `SlotFlowView` call site in
+  `ReactRenderer` (2 of 4 lack it). Anything deriving from it silently fell
+  back to `window.innerHeight` — which is the *window*, not the emulated
+  device — so the cap below did nothing where it was needed most. The slot
+  root now measures its own height via `ResizeObserver`.
+* Uncapped, the reservation is dangerous on short viewports. Two stacked
+  frames are 277px of fixed-size HUD; on a 740×360 phone-landscape stage that
+  left the body **zero visible text** — a screen with no story on it. Capped
+  at 40% of stage height per edge; past that, content wins and may run under
+  the lowest HUD, because text partly behind a meter is readable and
+  scrollable while an empty screen is neither.
+
+### Known limitation — HUD load vs. short viewports
+
+At 740×360 this fixture shows no body text even with the reservation forced to
+zero: measured 79px of visible text at 0 reserve, 39px at 40, 0 at 80. The
+viewport cannot hold 277px of HUD plus this content, and no layout rule
+recovers that — it is an authoring decision that only fails on the smallest
+target.
+
+Recommended follow-up (not built): now that the Visual Editor draws screen
+HUDs, it is the natural place to warn when a character's HUD stack exceeds a
+share of the project's smallest target viewport — the same "flag it while
+authoring" shape as the ⚠ shown twice badge, rather than a runtime override.
 
 ---
 

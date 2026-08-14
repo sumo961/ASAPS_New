@@ -114,6 +114,13 @@ interface SlotFlowViewProps {
    * REAL component, just told a different viewport). Unset at runtime.
    */
   previewWidth?: number;
+  /**
+   * Screen-docked HUD boxes (stage px) the flow must not start underneath.
+   * Slot mode reflows, so unlike the fixed canvas — where individual elements
+   * are lifted — the whole column simply begins below the top HUD band and
+   * ends above the bottom one.
+   */
+  reservedHudRects?: Array<{ x: number; y: number; width: number; height: number }>;
   /** Emulated viewport height (device-size preview) — pairs with previewWidth. */
   previewHeight?: number;
   /**
@@ -276,6 +283,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   onResolve,
   onAction,
   previewWidth,
+  reservedHudRects,
   previewHeight,
   previewCoarse,
   autoExitMs,
@@ -775,6 +783,58 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     }
   }, [titleText, bodyText, requireFullRead]);
 
+  /**
+   * How much vertical room the screen HUDs take at each edge.
+   *
+   * A HUD is drawn at a fixed pixel size regardless of viewport, so its
+   * height carries over unchanged; only which edge it is anchored to matters
+   * here. Splitting on the midline is the same test the fixed-canvas path
+   * uses — reserving at the wrong edge pushes content further into a HUD
+   * rather than clear of it.
+   */
+  // The stage's own height, measured rather than inferred — see below.
+  const [measuredH, setMeasuredH] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const read = () => setMeasuredH(el.clientHeight || 0);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const hudReserve = React.useMemo(() => {
+    const rects = reservedHudRects || [];
+    if (rects.length === 0) return { top: 0, bottom: 0 };
+    // Measure the stage we are actually inside. `previewHeight` is only
+    // supplied at some of the renderer's SlotFlowView call sites, and falling
+    // back to window.innerHeight silently disabled the cap below whenever it
+    // was missing — the device preset is smaller than the window it sits in.
+    const viewportH = measuredH || previewHeight
+      || (typeof window !== 'undefined' ? window.innerHeight : 768);
+    const mid = viewportH / 2;
+    let top = 0, bottom = 0;
+    for (const r of rects) {
+      if (r.y + r.height <= mid) top = Math.max(top, r.y + r.height + 8);
+      else bottom = Math.max(bottom, (viewportH - r.y) + 8);
+    }
+    /*
+     * Never let the HUDs starve the beat. HUD boxes are a fixed pixel size, so
+     * on a short viewport a stack of them can claim most of the height: two
+     * frames in one corner take 277px, and at 740×360 that left the body with
+     * nothing — measured zero visible text, a screen with no story on it.
+     *
+     * Past this ceiling the content wins and is allowed to run under the
+     * lowest HUD. Text partly behind a meter is readable and scrollable; an
+     * empty screen is not, and the author cannot discover why from looking at
+     * it. The cap is per-edge so a top and a bottom HUD cannot combine to the
+     * same effect.
+     */
+    const ceiling = viewportH * 0.4;
+    return { top: Math.round(Math.min(top, ceiling)), bottom: Math.round(Math.min(bottom, ceiling)) };
+  }, [reservedHudRects, previewHeight, measuredH]);
+
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
@@ -804,11 +864,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     backgroundSize: backgroundFit === 'contain' ? 'contain' : 'cover',
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
-    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingTop: `max(env(safe-area-inset-top, 0px), ${hudReserve.top}px)`,
     paddingRight: isConversation
       ? `max(env(safe-area-inset-right, 0px), clamp(20px, ${vwU(4)}, 48px))`
       : 'env(safe-area-inset-right, 0px)',
-    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+    paddingBottom: `max(env(safe-area-inset-bottom, 0px), ${hudReserve.bottom}px)`,
     paddingLeft: isConversation
       ? `max(env(safe-area-inset-left, 0px), clamp(20px, ${vwU(4)}, 48px))`
       : 'env(safe-area-inset-left, 0px)',

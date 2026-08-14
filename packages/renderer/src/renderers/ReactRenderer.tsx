@@ -2539,6 +2539,7 @@ export class ReactRenderer extends BaseRenderer {
         const slotAutoExitMs = this.getState('slotAutoExitMs') as number | undefined;
         this.renderComponent(
           <SlotFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-default'}
@@ -3183,6 +3184,7 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? `slot-${beatType}`}
@@ -3452,6 +3454,7 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-movementChoice'}
@@ -3592,6 +3595,7 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-pickProp'}
