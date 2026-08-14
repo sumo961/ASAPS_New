@@ -27,7 +27,7 @@ export {
 export { CharacterInventoryFrame, type InventoryItemData } from './components/CharacterInventoryFrame';
 export { layoutScreenHuds, placementMap, type HudBox, type HudPlacement, type HudCorner, type HudKind } from './utils/hudLayout';
 export { beatSuppressesScreenHuds, HUD_FREE_BEAT_TYPES, type HudVisibilityOptions } from './utils/hudVisibility';
-export { toMeterCounterData, resolveMeterFrame, FALLBACK_METER_FRAME, countersPlacedOnBeat, isCounterPlaced, type MeterCounterDef } from './utils/meterData';
+export { toMeterCounterData, resolveMeterFrame, FALLBACK_METER_FRAME, type MeterCounterDef } from './utils/meterData';
 export { HudExplanationLayer, DEFAULT_HUD_CAPTIONS, type HudExplanationLayerProps } from './components/HudExplanationLayer';
 // Screen-docked HUD assembly — one authority for what exists, where it packs,
 // and what it draws, shared by both players and the Visual Editor.

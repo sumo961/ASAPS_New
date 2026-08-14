@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -285,16 +285,6 @@ export const PreviewWindow: React.FC = () => {
   const [endedNotice, setEndedNotice] = useState<string | null>(null);
   const stopRequestedRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
-  // Counters the author placed as elements on the beat now on screen. They are
-  // suppressed in the HUD frame so one number is not drawn twice — see
-  // countersPlacedOnBeat. A ref because the meter-frame resolver is a callback
-  // handed to the renderer once, and would otherwise close over a stale beat.
-  const placedMetersRef = useRef<Set<string>>(new Set());
-  const placedMeters = useMemo(
-    () => countersPlacedOnBeat((currentBeat as any)?.locations),
-    [currentBeat],
-  );
-  placedMetersRef.current = placedMeters;
 
 
   /* HUD explanation (overlay trigger). Beats carrying `explainHuds` annotate
@@ -427,9 +417,7 @@ export const PreviewWindow: React.FC = () => {
         ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
         : undefined;
       const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[c.name] ?? {};
-      const visibleCounters = (c.counters || []).filter(
-        (k: any) => k.visible && !isCounterPlaced(placedMeters, c.id, k.name),
-      );
+      const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
       return {
         id: c.id,
         name: merged.displayName || merged.name || c.id,
@@ -455,7 +443,7 @@ export const PreviewWindow: React.FC = () => {
       hudOverlays: previewDataRef.current?.settings?.hudOverlays,
       stage: { width: STAGE_WIDTH, height: STAGE_HEIGHT },
     });
-  }, [currentBeat, debugInfo, placedMeters, isRunning]);
+  }, [currentBeat, debugInfo, isRunning]);
 
   /* HUD explanation — one mechanism, two triggers. The standalone `explanation`
      beat annotates behind its own text screen (its continue button advances, so
@@ -1035,9 +1023,7 @@ export const PreviewWindow: React.FC = () => {
         }
 
         // Filter to visible counters
-        const visibleCounters = (character.counters || []).filter(
-          c => c.visible && !isCounterPlaced(placedMetersRef.current, character.id, c.name),
-        );
+        const visibleCounters = (character.counters || []).filter(c => c.visible);
         if (visibleCounters.length === 0) {
           return null;
         }

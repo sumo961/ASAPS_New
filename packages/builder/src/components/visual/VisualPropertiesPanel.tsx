@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { duplicateHudCounterOwner } from '../../utils/duplicateHudCounter';
 import {
   Image as ImageIcon,
   Trash2,
@@ -2099,6 +2100,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         c.name === elementCharacterRef ||
                         c.name === element.name
                       );
+
+                    // Flagged, never prevented — see duplicateHudCounterOwner
+                    // for why suppressing either display is worse.
+                    const duplicateHudCounter = duplicateHudCounterOwner(element, characters as never);
                     return (
                     <div
                       key={element.id}
@@ -2124,6 +2129,14 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                               title={`No character named "${elementCharacterRef || element.name}" exists in this project. This row is a leftover from a deleted/renamed character — use Delete to clean it up.`}
                             >
                               ⚠ orphan
+                            </span>
+                          )}
+                          {duplicateHudCounter && (
+                            <span
+                              className="text-[10px] px-1 py-0.5 bg-amber-200 text-amber-900 rounded font-medium"
+                              title={`"${element.counterName}" is shown twice on this beat: here, and in ${duplicateHudCounter}'s HUD frame. That is allowed — a placed meter can be deliberate emphasis — but if you only want one, either move this element or turn the counter's meter off in the character editor.`}
+                            >
+                              ⚠ shown twice
                             </span>
                           )}
                           {element.groupId && (

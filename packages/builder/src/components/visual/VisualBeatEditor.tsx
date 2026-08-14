@@ -38,8 +38,6 @@ import {
   type ChatMessage,
   toMeterCounterData,
   resolveMeterFrame,
-  countersPlacedOnBeat,
-  isCounterPlaced,
   ScreenHudLayer,
   buildScreenHudLayout,
   beatSuppressesScreenHuds,
@@ -279,14 +277,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     // does not need the character to be standing on it. Returning one here too
     // would draw it twice for a character who happens to be placed.
     if ((resolvedFrame as any).dockMode === 'screen') return null;
-    // Same rule the runtime applies: a counter placed as an element on this
-    // beat is not repeated in the frame.
-    const placed = countersPlacedOnBeat(
-      elements.filter(el => el.visible).map(el => ({ kind: el.type, characterId: el.characterId, counterName: el.counterName })),
-    );
-    const visibleCounters = (character.counters || []).filter(
-      c => c.visible && !isCounterPlaced(placed, character.id, c.name),
-    );
+    const visibleCounters = (character.counters || []).filter(c => c.visible);
     if (visibleCounters.length === 0) return null;
     return {
       // No engine in the editor, so no live affect to read — a derived
@@ -355,17 +346,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       showOnTitleScreen: (globalSettings?.hudOverlays as any)?.showOnTitleScreen,
     })) return null;
 
-    const placed = countersPlacedOnBeat(
-      elements.filter(el => el.visible).map(el => ({
-        kind: el.type, characterId: el.characterId, counterName: el.counterName,
-      })),
-    );
-
     const hudChars: ScreenHudCharacter[] = (characters || []).map(c => {
       const frame = resolveMeterFrame(c as any);
-      const visibleCounters = (c.counters || []).filter(
-        k => k.visible && !isCounterPlaced(placed, c.id, k.name),
-      );
+      const visibleCounters = (c.counters || []).filter(k => k.visible);
       const items = (c.inventory || []).map(item => ({
         id: item.id, name: item.name, displayName: item.displayName || item.name,
         description: item.description || '', icon: item.icon || '',

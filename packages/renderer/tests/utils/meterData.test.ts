@@ -5,7 +5,7 @@
  * a permanent zero (or worse, a stale authored placeholder).
  */
 import { describe, it, expect } from 'vitest';
-import { toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, type MeterCounterDef } from '../../src/utils/meterData';
+import { toMeterCounterData, resolveMeterFrame, type MeterCounterDef } from '../../src/utils/meterData';
 import type { AffectReader } from '@asaps/core';
 
 const reader = (sentiment: number): AffectReader => ({
@@ -127,43 +127,5 @@ describe('band words show without a second flag', () => {
 
   it('does not show words when the format is band but no ladder exists', () => {
     expect(toMeterCounterData(banded({ bands: [] }), 'ada', null).showNumericValue).toBe(false);
-  });
-});
-
-describe('countersPlacedOnBeat', () => {
-  const placed = (over = {}) => ({ kind: 'meter', characterId: 'char_ada', counterName: 'trust', ...over });
-
-  it('names the counter a placed element already draws', () => {
-    // The case that surfaced it: Ada had four visible counters in a screen HUD
-    // and a placed trust meter on the same beat, so trust appeared twice.
-    const set = countersPlacedOnBeat([placed()]);
-    expect(isCounterPlaced(set, 'char_ada', 'trust')).toBe(true);
-    expect(isCounterPlaced(set, 'char_ada', 'fear')).toBe(false);
-  });
-
-  it('keeps two characters\' identically-named counters apart', () => {
-    const set = countersPlacedOnBeat([placed()]);
-    expect(isCounterPlaced(set, 'char_bo', 'trust')).toBe(false);
-  });
-
-  it('reads locations whether they arrive as an array or a Map', () => {
-    const asMap = new Map([['loc1', placed()]]);
-    expect(isCounterPlaced(countersPlacedOnBeat(asMap), 'char_ada', 'trust')).toBe(true);
-  });
-
-  it('ignores elements that are not meters, and meters naming no counter', () => {
-    const set = countersPlacedOnBeat([
-      placed({ kind: 'text' }),
-      placed({ counterName: undefined }),
-    ]);
-    expect(set.size).toBe(0);
-  });
-
-  it('is inert when the beat has no locations at all', () => {
-    for (const input of [null, undefined, []]) {
-      expect(countersPlacedOnBeat(input as any).size).toBe(0);
-    }
-    expect(isCounterPlaced(new Set(), 'char_ada', 'trust')).toBe(false);
-    expect(isCounterPlaced(countersPlacedOnBeat([placed()]), 'char_ada', undefined)).toBe(false);
   });
 });

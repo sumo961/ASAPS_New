@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -76,7 +76,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
      until acknowledged; acknowledged beats are remembered for the playthrough
      so the tutorial doesn't re-fire on every visit. */
   const [explainAcknowledged, setExplainAcknowledged] = useState<Record<string, boolean>>({});
-  const [currentBeatMeta, setCurrentBeatMeta] = useState<{ id: string; explainHuds?: boolean; placedMeters?: Set<string> } | null>(null);
+  const [currentBeatMeta, setCurrentBeatMeta] = useState<{ id: string; explainHuds?: boolean } | null>(null);
   const explainOverlayActive = !!(
     currentBeatMeta?.explainHuds && !explainAcknowledged[currentBeatMeta.id]
   );
@@ -406,7 +406,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           context.on('beatChanged', () => {
             const id = context.getCurrentBeatId?.();
             const b: any = id ? (story as any).getBeat?.(id) : null;
-            setCurrentBeatMeta(b ? { id: b.id, explainHuds: b.explainHuds, placedMeters: countersPlacedOnBeat((b as any).locations) } : null);
+            setCurrentBeatMeta(b ? { id: b.id, explainHuds: b.explainHuds } : null);
           });
 
           // Set up global settings for layout and HUD
@@ -773,7 +773,6 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
     const chars = (story as any).getCharacters?.() || [];
     const assetsList = (story as any).getAssets?.() || [];
-    const placed = countersPlacedOnBeat((beatNow as any)?.locations);
 
     // A character with unchosen variants has not appeared yet; their HUD would
     // announce someone the interactor has not met.
@@ -788,9 +787,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
         : undefined;
       const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
-      const visibleCounters = (c.counters || []).filter(
-        (k: any) => k.visible && !isCounterPlaced(placed, c.id, k.name),
-      );
+      const visibleCounters = (c.counters || []).filter((k: any) => k.visible);
       return {
         id: c.id,
         name: merged.displayName || merged.name || c.id,
