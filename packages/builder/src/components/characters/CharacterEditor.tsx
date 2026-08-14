@@ -800,12 +800,22 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 </button>
               </div>
             </div>
-            {/* Level Meter Settings */}
+            {/* Level Meter Settings.
+                `visible` (the eye above) and `showLevelMeter` both read as
+                "show this", and the quieter one wins — a counter with the meter
+                ticked but the eye off renders nothing, with no indication why.
+                Rather than let the two contradict each other silently, the
+                meter control is disabled while the counter is hidden and says
+                so. */}
             <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
-              <label className="flex items-center gap-2 text-sm">
+              <label
+                className={`flex items-center gap-2 text-sm ${counter.visible ? '' : 'opacity-50 cursor-not-allowed'}`}
+                title={counter.visible ? undefined : 'This counter is hidden — turn on the eye above to show it.'}
+              >
                 <input
                   type="checkbox"
-                  checked={counter.showLevelMeter || false}
+                  checked={(counter.showLevelMeter && counter.visible) || false}
+                  disabled={!counter.visible}
                   onChange={(e) => {
                     const newCounters = [...editedCharacter.counters];
                     newCounters[index] = { ...counter, showLevelMeter: e.target.checked };
@@ -816,6 +826,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 <BarChart3 className="w-4 h-4 text-gray-500" />
                 <span className="text-gray-600">Show Level Meter</span>
               </label>
+              {!counter.visible && (
+                <span className="text-[11px] text-gray-500">
+                  Hidden — the <strong>eye</strong> above controls whether the interactor sees this
+                  counter at all.
+                </span>
+              )}
               {counter.showLevelMeter && (
                 <>
                   <div className="flex items-center gap-2">

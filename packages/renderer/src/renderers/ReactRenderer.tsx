@@ -882,6 +882,37 @@ function mergeWithFreePositioned(
   return [...defaults, ...free];
 }
 
+/**
+ * Fill in schema defaults for content the author did NOT place.
+ *
+ * A fixed-canvas beat used to be all-or-nothing: place a single element and
+ * the beat became "author positioned", so everything else — its text, its
+ * continue button — was dropped. Adding one meter to a working beat silently
+ * emptied it, with nothing to indicate why.
+ *
+ * Now placement is per element. Anything the author positioned is used
+ * verbatim and always wins; anything they never placed falls back to its
+ * schema default so the beat still says what it has to say.
+ *
+ * Matching is by `kind`: placing one text box means the author is laying out
+ * text and no default text is added, but it leaves buttons alone. Free
+ * positioned kinds (character / prop) are excluded because they are an
+ * overlay, not layout, and are merged separately.
+ */
+export function backfillUnplacedDefaults(
+  defaults: Location[],
+  authored?: Location[],
+): Location[] {
+  if (!authored || authored.length === 0) return defaults;
+  const placedKinds = new Set(
+    authored
+      .filter((l) => !FREE_POSITIONED_KINDS.has(l.kind ?? ''))
+      .map((l) => l.kind ?? ''),
+  );
+  const missing = defaults.filter((d) => !placedKinds.has(d.kind ?? ''));
+  return missing.length > 0 ? [...authored, ...missing] : authored;
+}
+
 // ============= REACT RENDERER CLASS =============
 
 export class ReactRenderer extends BaseRenderer {
@@ -2639,7 +2670,9 @@ export class ReactRenderer extends BaseRenderer {
     // (zero regression). Mirrors renderText/renderEndScreen/renderDurScreen.
     const content = { title, author, buttonText };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('titleScreen', content), locations);
+    const effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(generateDefaultLocations('titleScreen', content), locations)
+      : mergeWithFreePositioned(generateDefaultLocations('titleScreen', content), locations);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
     this.ttsSpeakCallback?.(title, this.currentSpeaker);
@@ -2666,7 +2699,10 @@ export class ReactRenderer extends BaseRenderer {
     // (beat override > global theme) governs both modes.
     const content: Record<string, any> = { text, buttonText, speaker: this.resolveSpeakerForSlot() };
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content), locations);
+    const defaultsForBeat = generateDefaultLocations(beatType === 'onlineContent' ? 'infoText' : beatType, content);
+    const effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(defaultsForBeat, locations)
+      : mergeWithFreePositioned(defaultsForBeat, locations);
 
     // Log each location's position and dimensions
     effectiveLocations.forEach((loc, i) => {
