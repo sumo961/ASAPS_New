@@ -32,6 +32,7 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ✅ passed | live value + band in a real HTML export (2026-08-14) |
 | Round 3b — band phrases translated | ✅ passed | "vertrauensvoll" in an exported story (2026-08-14) |
+| Round 3b — placed-meter display | ⚠️ partly | 2 of 3 overlaps fixed (9d921ec1); HUD-over-content open, see below |
 | Round 4 — MCP desktop server | ⬜ | needs Claude Desktop |
 | Round 5 — device/layout matrix | ⬜ | |
 
@@ -216,3 +217,45 @@ Per the standing rule that one-viewport-verified is not verified.
 ## What we keep
 
 Following the kit pattern: generate a story, fix what breaks, and commit the **fixed** story as evidence under `examples/`, with CI tests pinning anything structural. A throwaway that proved something once and vanished is worth much less than a fixture that fails when the thing regresses.
+
+---
+
+## Open: screen-docked HUDs overlap stage content
+
+Found while verifying 3b, fixed only in part. Two of the three overlaps in
+that screenshot are closed (commit 9d921ec1): backfilled default elements now
+step clear of authored ones, and a counter is no longer drawn both in the HUD
+frame and as a placed element.
+
+The third is a gap in the layout authority, not a bug in either fix. A
+screen-docked HUD is drawn as a top-level overlay by PreviewWindow and
+WebPlayer; the stage below it is laid out by `PositionedBeatView`, which knows
+nothing about it. `adjustElementsForCollisions` does take a `hudBottomY`, but
+it is computed only from the top-**centre** countdown meter, on the reasoning
+recorded in the comment there: *"Corner HUDs (top-left, top-right timer) don't
+overlap with centered content."* That held when a corner HUD was a timer chip.
+A character meter frame with a name header and three or four counters is far
+taller and wider, and on a 1024-wide stage it reaches under the default text
+box: measured 137–792 × 203–405 for the box against 44–166 × 111–227 for the
+frame, so the first word of every line clips.
+
+The tempting cheap fix — have the meter-frame resolver hand its rect back for
+screen-docked frames too, and fold that one rect into the collision pass — is
+the same mistake `hudLayout.ts` was written to undo. Its own header records
+that HUDs used to collide because *"three separate systems positioned these
+and none knew about the others."* Estimating one HUD's rect in a second place
+makes a fourth.
+
+The fix is to extend the single authority: hoist the HUD box computation in
+both players out of their render JSX into a memo, so the packed placements
+from `layoutScreenHuds` are available before the stage renders, and pass those
+rects into `PositionedBeatView` as reserved obstacles — lifting only text,
+dialog and button elements that actually intersect one, exactly as `hudBottomY`
+does today for the countdown.
+
+Two caveats for whoever picks this up. Authored positions must keep winning:
+an author who deliberately places text under a HUD corner is making a choice,
+and the same principle that forbids runtime overrides elsewhere applies here —
+the assist belongs in the Visual Editor, which already draws the HUD overlay.
+And because this changes layout for every beat that shows a screen HUD, it
+needs the full verification matrix, not one viewport.
