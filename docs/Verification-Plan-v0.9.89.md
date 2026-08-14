@@ -271,63 +271,70 @@ Two things that fix turned up:
   the lowest HUD, because text partly behind a meter is readable and
   scrollable while an empty screen is neither.
 
-### Known limitation — HUD load vs. short viewports
+### Correction — the "cannot be recovered" claim was wrong
 
-At 740×360 this fixture shows no body text even with the reservation forced to
-zero: measured 79px of visible text at 0 reserve, 39px at 40, 0 at 80. The
-viewport cannot hold 277px of HUD plus this content, and no layout rule
-recovers that — it is an authoring decision that only fails on the smallest
-target.
+The first write-up of this round said a 740×360 stage simply could not hold the
+content, and that no layout rule would recover it. Both halves were wrong, and
+the fixture was to blame: it stacked a second HUD frame in the same corner
+*and* used the longest beat in the story.
+
+Isolating the two, with the meter frame alone:
+
+| At 740×360, responsive | visible body text |
+|---|---|
+| meter frame + inventory frame | 0px |
+| meter frame alone (4 counters) | 192px |
+
+So most of the starvation was the second frame — an adversarial fixture, not a
+property of the viewport.
+
+### Landscape: content beside the HUD, choices in two columns
+
+What remained was a layout that never used the width it had. Two fixes:
+
+*Choices wrapped into two columns on short, wide stages.* Buttons stack
+vertically by design — a column reads as a list of things you might say, a row
+reads as a toolbar — but four choices are ~200px of column against a 360px
+stage, so the list ran off the bottom while half the width sat empty. Short and
+wide now lays them out 2×2, still in reading order.
+
+*A narrow corner HUD is stepped around, not under.* A full-width reserved band
+is right when the content column spans the stage. On a short, wide stage it
+cost the frame's entire height for a HUD occupying a fifth of the width. The
+reserve now becomes a side inset there, so the column starts at the top and
+begins past the frame.
+
+An intermediate attempt — skipping the reserve entirely for narrow corner HUDs
+— is worth recording as a wrong turn: it assumed the centred column would not
+reach the corner. It does, and the text ran straight under the frame. Reserving
+the HUD's *width* is the fix; reserving nothing is not.
+
+Result at 740×360: 260px of visible text where there was 0, no overlap at any
+of the six viewports in either mode.
+
+### The reservation was a race, and passed by luck
+
+Found while verifying the above. `setReservedHudRects` only stored its value,
+in the shape of the other renderer setters. But the host computes the HUD
+layout in an effect — after the paint that needed it — while the renderer
+paints the moment the beat changes. So the rects arrived after the render that
+should have used them, and nothing re-rendered: the reservation applied a beat
+late, or never.
+
+It measured correctly several times during this round purely because some
+unrelated state change forced a second render. That is the worst failure mode
+to test for — it passes whenever you poke at it.
+
+Now an initial-value-plus-subscribe pair, the same contract `ReactRenderer`
+already uses for timer-HUD state, consumed through `useReservedHudRects`.
+
+### Remaining authoring-side limitation
+
+Two frames stacked in one corner is 277px of fixed-size HUD. That still does
+not fit a 360px-tall stage alongside a long beat, and no layout rule invents
+the space. It is an authoring decision that only fails on the smallest target.
 
 Recommended follow-up (not built): now that the Visual Editor draws screen
 HUDs, it is the natural place to warn when a character's HUD stack exceeds a
 share of the project's smallest target viewport — the same "flag it while
 authoring" shape as the ⚠ shown twice badge, rather than a runtime override.
-
----
-
-## What we keep
-
-Following the kit pattern: generate a story, fix what breaks, and commit the **fixed** story as evidence under `examples/`, with CI tests pinning anything structural. A throwaway that proved something once and vanished is worth much less than a fixture that fails when the thing regresses.
-
----
-
-## Open: screen-docked HUDs overlap stage content
-
-Found while verifying 3b, fixed only in part. Two of the three overlaps in
-that screenshot are closed (commit 9d921ec1): backfilled default elements now
-step clear of authored ones, and a counter is no longer drawn both in the HUD
-frame and as a placed element.
-
-The third is a gap in the layout authority, not a bug in either fix. A
-screen-docked HUD is drawn as a top-level overlay by PreviewWindow and
-WebPlayer; the stage below it is laid out by `PositionedBeatView`, which knows
-nothing about it. `adjustElementsForCollisions` does take a `hudBottomY`, but
-it is computed only from the top-**centre** countdown meter, on the reasoning
-recorded in the comment there: *"Corner HUDs (top-left, top-right timer) don't
-overlap with centered content."* That held when a corner HUD was a timer chip.
-A character meter frame with a name header and three or four counters is far
-taller and wider, and on a 1024-wide stage it reaches under the default text
-box: measured 137–792 × 203–405 for the box against 44–166 × 111–227 for the
-frame, so the first word of every line clips.
-
-The tempting cheap fix — have the meter-frame resolver hand its rect back for
-screen-docked frames too, and fold that one rect into the collision pass — is
-the same mistake `hudLayout.ts` was written to undo. Its own header records
-that HUDs used to collide because *"three separate systems positioned these
-and none knew about the others."* Estimating one HUD's rect in a second place
-makes a fourth.
-
-The fix is to extend the single authority: hoist the HUD box computation in
-both players out of their render JSX into a memo, so the packed placements
-from `layoutScreenHuds` are available before the stage renders, and pass those
-rects into `PositionedBeatView` as reserved obstacles — lifting only text,
-dialog and button elements that actually intersect one, exactly as `hudBottomY`
-does today for the countdown.
-
-Two caveats for whoever picks this up. Authored positions must keep winning:
-an author who deliberately places text under a HUD corner is making a choice,
-and the same principle that forbids runtime overrides elsewhere applies here —
-the assist belongs in the Visual Editor, which already draws the HUD overlay.
-And because this changes layout for every beat that shows a screen HUD, it
-needs the full verification matrix, not one viewport.

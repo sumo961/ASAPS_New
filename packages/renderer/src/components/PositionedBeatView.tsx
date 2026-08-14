@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
 import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
+import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
@@ -596,6 +597,8 @@ export interface PositionedBeatViewProps {
    * buildScreenHudLayout so there is still one authority for where they sit.
    */
   reservedHudRects?: ReservedHudRect[];
+  /** Live channel for the above — see useReservedHudRects. */
+  onSubscribeReservedHudRects?: (listener: (rects: ReservedHudRect[] | undefined) => void) => () => void;
   countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
   /** Current counter value for countdown meter HUD */
   countdownMeterValue?: { value: number; min: number; max: number };
@@ -1280,7 +1283,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   timerHudState: initialTimerHudState,
   onSubscribeTimerHudState,
   onSubscribeTimerHudOverrideText,
-  reservedHudRects,
+  reservedHudRects: reservedHudRectsProp,
+  onSubscribeReservedHudRects,
   countdownMeterConfig,
   countdownMeterValue,
   overrideCountdownMeter,
@@ -1985,6 +1989,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   const calculatedButtonHeight = computeButtonSpaceReserve(
     buttonElements, beatType, theme, stageWidth, stageHeight
   );
+
+  const reservedHudRects = useReservedHudRects(reservedHudRectsProp, onSubscribeReservedHudRects);
 
   // Calculate HUD bottom Y to prevent content from overlapping wide HUD overlays
   // Only applies to top-center HUDs (countdown meter) that span the center of the stage

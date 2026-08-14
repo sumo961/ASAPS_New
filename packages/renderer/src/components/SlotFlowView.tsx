@@ -28,6 +28,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor, uiString } from '@asaps/core';
+import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
@@ -121,6 +122,10 @@ interface SlotFlowViewProps {
    * ends above the bottom one.
    */
   reservedHudRects?: Array<{ x: number; y: number; width: number; height: number }>;
+  /** Live channel for the above — see useReservedHudRects. */
+  onSubscribeReservedHudRects?: (
+    listener: (rects: Array<{ x: number; y: number; width: number; height: number }> | undefined) => void,
+  ) => () => void;
   /** Emulated viewport height (device-size preview) — pairs with previewWidth. */
   previewHeight?: number;
   /**
@@ -283,7 +288,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   onResolve,
   onAction,
   previewWidth,
-  reservedHudRects,
+  reservedHudRects: reservedHudRectsProp,
+  onSubscribeReservedHudRects,
   previewHeight,
   previewCoarse,
   autoExitMs,
@@ -793,20 +799,39 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
    * rather than clear of it.
    */
   // The stage's own height, measured rather than inferred — see below.
+  const reservedHudRects = useReservedHudRects(reservedHudRectsProp as never, onSubscribeReservedHudRects as never);
   const [measuredH, setMeasuredH] = React.useState(0);
+  const [measuredW, setMeasuredW] = React.useState(0);
   React.useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const read = () => setMeasuredH(el.clientHeight || 0);
+    const read = () => { setMeasuredH(el.clientHeight || 0); setMeasuredW(el.clientWidth || 0); };
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
+  /**
+   * A viewport with room sideways but not downwards — phone landscape, and
+   * any short window.
+   *
+   * Choice buttons stack vertically by design: a column reads as a list of
+   * things you might say, where a row reads as a toolbar. That holds while
+   * there is height to spend. At 740×360 four choices are ~200px of column
+   * against a 360px stage, so the list runs off the bottom while more than
+   * half the width sits empty — the layout never uses the room it has.
+   */
+  const shortAndWide = React.useMemo(() => {
+    const h = measuredH || previewHeight || 0;
+    const w = measuredW || previewWidth || 0;
+    if (!h || !w) return false;
+    return h <= 480 && w / h >= 1.4;
+  }, [measuredH, measuredW, previewHeight, previewWidth]);
+
   const hudReserve = React.useMemo(() => {
     const rects = reservedHudRects || [];
-    if (rects.length === 0) return { top: 0, bottom: 0 };
+    if (rects.length === 0) return { top: 0, bottom: 0, left: 0, right: 0 };
     // Measure the stage we are actually inside. `previewHeight` is only
     // supplied at some of the renderer's SlotFlowView call sites, and falling
     // back to window.innerHeight silently disabled the cap below whenever it
@@ -814,8 +839,36 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const viewportH = measuredH || previewHeight
       || (typeof window !== 'undefined' ? window.innerHeight : 768);
     const mid = viewportH / 2;
-    let top = 0, bottom = 0;
+    const viewportW = measuredW || previewWidth || 0;
+    let top = 0, bottom = 0, left = 0, right = 0;
     for (const r of rects) {
+      /*
+       * The reserve is a full-width band, which is right when the content
+       * column spans the stage — it cannot avoid a corner HUD sideways, so it
+       * has to start below it.
+       *
+       * On a short, wide stage that is too blunt. At 740×360 the frame is
+       * 146px of the width and sits in a corner, while the column is centred
+       * with empty margins either side: nothing would have collided, yet the
+       * band pushed every beat down by the frame's full height and cost more
+       * than it saved. A narrow corner HUD on a landscape stage is beside the
+       * content, not above it.
+       */
+      /*
+       * A narrow corner HUD on a short, wide stage is stepped AROUND rather
+       * than under. Reserving a full-width band costs the whole frame height
+       * on a stage that has none to give — at 740×360 it pushed a four-choice
+       * beat's question off the top. Reserving the HUD's width instead lets
+       * the column start at the top and simply begin past it.
+       *
+       * Only when the HUD is genuinely narrow: indenting by a wide one would
+       * leave a column too thin to read. Those keep the horizontal band.
+       */
+      if (shortAndWide && viewportW > 0 && r.width / viewportW < 0.4) {
+        if (r.x + r.width / 2 < viewportW / 2) left = Math.max(left, r.x + r.width + 8);
+        else right = Math.max(right, (viewportW - r.x) + 8);
+        continue;
+      }
       if (r.y + r.height <= mid) top = Math.max(top, r.y + r.height + 8);
       else bottom = Math.max(bottom, (viewportH - r.y) + 8);
     }
@@ -832,8 +885,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
      * same effect.
      */
     const ceiling = viewportH * 0.4;
-    return { top: Math.round(Math.min(top, ceiling)), bottom: Math.round(Math.min(bottom, ceiling)) };
-  }, [reservedHudRects, previewHeight, measuredH]);
+    const sideCeiling = viewportW * 0.35;
+    return {
+      top: Math.round(Math.min(top, ceiling)),
+      bottom: Math.round(Math.min(bottom, ceiling)),
+      left: Math.round(Math.min(left, sideCeiling)),
+      right: Math.round(Math.min(right, sideCeiling)),
+    };
+  }, [reservedHudRects, previewHeight, previewWidth, measuredH, measuredW, shortAndWide]);
 
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
@@ -867,11 +926,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     paddingTop: `max(env(safe-area-inset-top, 0px), ${hudReserve.top}px)`,
     paddingRight: isConversation
       ? `max(env(safe-area-inset-right, 0px), clamp(20px, ${vwU(4)}, 48px))`
-      : 'env(safe-area-inset-right, 0px)',
+      : `max(env(safe-area-inset-right, 0px), ${hudReserve.right}px)`,
     paddingBottom: `max(env(safe-area-inset-bottom, 0px), ${hudReserve.bottom}px)`,
     paddingLeft: isConversation
       ? `max(env(safe-area-inset-left, 0px), clamp(20px, ${vwU(4)}, 48px))`
-      : 'env(safe-area-inset-left, 0px)',
+      : `max(env(safe-area-inset-left, 0px), ${hudReserve.left}px)`,
     // Bug 16 — apply theme.colors.textAlpha (0-100) to the inherited
     // text color using the same #RRGGBB+AA hex pattern used elsewhere.
     // This colors only TEXT (buttons override `color` via buttonStyle),
@@ -1980,6 +2039,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // choice menus. System-action rows (Continue, restart +
                 // credits) keep the horizontal flex they always had.
                 flexDirection: (isConversation || hasDynamicChoices) ? 'column' : undefined,
+                // Short and wide: wrap the list into two columns rather than
+                // letting it run off the bottom. Still a list — reading order
+                // is left-to-right, top-to-bottom — but it spends width the
+                // stage already has instead of height it does not. Untouched
+                // on any viewport with room to stack.
+                ...(hasDynamicChoices && !isConversation && shortAndWide
+                  ? {
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                      alignContent: 'start',
+                    }
+                  : {}),
                 // Conversation right-aligns buttons at their NATURAL
                 // widths inside the panel — the panel sizes to the
                 // widest button + padding, and each button fits its

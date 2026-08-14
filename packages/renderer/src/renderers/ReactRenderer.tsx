@@ -1021,6 +1021,9 @@ export class ReactRenderer extends BaseRenderer {
   // cannot see that layer, so without these text is laid out as if the corner
   // were empty and ends up underneath it.
   protected reservedHudRects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined;
+  private reservedHudRectsListeners = new Set<
+    (rects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined) => void
+  >();
   protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
@@ -2273,6 +2276,18 @@ export class ReactRenderer extends BaseRenderer {
    */
   setReservedHudRects(rects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined): void {
     this.reservedHudRects = rects;
+    // Notify, don't just store. The host computes these in an effect, after
+    // the render that needed them — without this the reservation lands a beat
+    // late, or not at all if nothing else re-renders.
+    for (const l of this.reservedHudRectsListeners) l(rects);
+  }
+
+  subscribeToReservedHudRects(
+    listener: (rects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined) => void,
+  ): () => void {
+    this.reservedHudRectsListeners.add(listener);
+    listener(this.reservedHudRects);
+    return () => this.reservedHudRectsListeners.delete(listener);
   }
 
   setCountdownMeterConfig(config: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined): void {
@@ -2540,6 +2555,7 @@ export class ReactRenderer extends BaseRenderer {
         this.renderComponent(
           <SlotFlowView
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-default'}
@@ -2653,6 +2669,7 @@ export class ReactRenderer extends BaseRenderer {
               onSubscribeTimerHudState={(listener) => this.subscribeToTimerHudState(listener)}
               onSubscribeTimerHudOverrideText={(listener) => this.subscribeToTimerHudOverrideText(listener)}
               reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+              onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
               countdownMeterConfig={this.hudSuppressed ? undefined : this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
               overrideCountdownMeter={this.overrideCountdownMeter}
@@ -3185,6 +3202,7 @@ export class ReactRenderer extends BaseRenderer {
         this.renderComponent(
           <SlotFlowView
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? `slot-${beatType}`}
@@ -3455,6 +3473,7 @@ export class ReactRenderer extends BaseRenderer {
         this.renderComponent(
           <SlotFlowView
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-movementChoice'}
@@ -3596,6 +3615,7 @@ export class ReactRenderer extends BaseRenderer {
         this.renderComponent(
           <SlotFlowView
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'slot-pickProp'}
