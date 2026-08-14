@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Move,
   Square,
@@ -40,6 +40,12 @@ import {
   resolveMeterFrame,
   countersPlacedOnBeat,
   isCounterPlaced,
+  ScreenHudLayer,
+  buildScreenHudLayout,
+  beatSuppressesScreenHuds,
+  generateDefaultLocations,
+  backfillUnplacedDefaults,
+  type ScreenHudCharacter,
 } from '@asaps/renderer';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
@@ -251,7 +257,9 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Snap guides state
   const [activeGuides, setActiveGuides] = useState<SnapLine[]>([]);
   const [snappingEnabled, setSnappingEnabled] = useState(true);
-  const [showHud, setShowHud] = useState(false);
+  // On by default: an editor that hides the HUDs is not a preview of what
+  // plays, and the author has no cue that anything is missing.
+  const [showHud, setShowHud] = useState(true);
 
   // Panorama viewport rectangle drag state (uses ref + document listeners to avoid z-index / stale closure issues)
   const viewportDraggingRef = useRef(false);
@@ -267,6 +275,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const character = characters.find(c => c.id === characterId);
     const resolvedFrame = resolveMeterFrame(character as any);
     if (!character || !resolvedFrame) return null;
+    // Screen-docked frames are drawn by ScreenHudLayer above the stage, which
+    // does not need the character to be standing on it. Returning one here too
+    // would draw it twice for a character who happens to be placed.
+    if ((resolvedFrame as any).dockMode === 'screen') return null;
     // Same rule the runtime applies: a counter placed as an element on this
     // beat is not repeated in the frame.
     const placed = countersPlacedOnBeat(
@@ -293,6 +305,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     if (!showHud) return null;
     const character = characters.find(c => c.id === characterId);
     if (!character?.inventoryFrame) return null;
+    if ((character.inventoryFrame as any).dockMode === 'screen') return null;
     // Show configured inventory items, or placeholder items for preview
     let items = (character.inventory || []).map(item => ({
       id: item.id,
@@ -322,6 +335,63 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   // Use stage size from project settings, with fallback to 1024×768
   const stageWidth = projectSettings?.width || 1024;
   const stageHeight = projectSettings?.height || 768;
+
+  /**
+   * Screen-docked HUDs, assembled exactly as the runtime assembles them.
+   *
+   * Without this the editor showed nothing at all for a character who was not
+   * placed on stage as an element — PositionedBeatView mounts HUD frames from
+   * its character branch — so four configured counters looked like an empty
+   * canvas until the author ran the story.
+   *
+   * There is no engine here, so derived counters read their authored range at
+   * rest rather than a live affect value. That is the honest preview: the
+   * number only exists while a story is running, and inventing one would
+   * misrepresent what plays.
+   */
+  const screenHudLayout = useMemo(() => {
+    if (!showHud) return null;
+    if (beatSuppressesScreenHuds(beatType, {
+      showOnTitleScreen: (globalSettings?.hudOverlays as any)?.showOnTitleScreen,
+    })) return null;
+
+    const placed = countersPlacedOnBeat(
+      elements.filter(el => el.visible).map(el => ({
+        kind: el.type, characterId: el.characterId, counterName: el.counterName,
+      })),
+    );
+
+    const hudChars: ScreenHudCharacter[] = (characters || []).map(c => {
+      const frame = resolveMeterFrame(c as any);
+      const visibleCounters = (c.counters || []).filter(
+        k => k.visible && !isCounterPlaced(placed, c.id, k.name),
+      );
+      const items = (c.inventory || []).map(item => ({
+        id: item.id, name: item.name, displayName: item.displayName || item.name,
+        description: item.description || '', icon: item.icon || '',
+        quantity: item.quantity ?? 1, category: item.category || '',
+      }));
+      return {
+        id: c.id,
+        name: c.displayName || c.name,
+        color: (c as any).color,
+        meterFrame: frame,
+        counters: visibleCounters.map(k => toMeterCounterData(k as any, c.id, null)),
+        inventoryFrame: (c as any).inventoryFrame,
+        inventoryItems: items,
+        moodFrame: (c as any).moodFrame,
+        // At rest — the pad shows its neutral centre, not a fabricated mood.
+        mood: { valence: 0, arousal: 0 },
+      };
+    });
+
+    return buildScreenHudLayout({
+      characters: hudChars,
+      hudOverlays: globalSettings?.hudOverlays,
+      stage: { width: stageWidth, height: stageHeight },
+    });
+  }, [showHud, characters, elements, globalSettings, beatType, stageWidth, stageHeight]);
+
   const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
   const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
   const [showGrid, setShowGrid] = useState(true);
@@ -563,9 +633,31 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     return asset?.url;
   };
 
+  /**
+   * The runtime draws a beat's default text box and button whenever the author
+   * did not position them; the editor drew only what was positioned, so a beat
+   * with one placed element looked almost empty here and played full. These
+   * are preview-only — they are not added to `elements`, so they stay out of
+   * the Elements list and are never written back as authored positions.
+   */
+  const locationsWithDefaults: Location[] = React.useMemo(() => {
+    if (isPanoramaBeat || !beatType) return locationsForRenderer;
+    if (locationsForRenderer.length === 0) return locationsForRenderer;
+    try {
+      const defaults = generateDefaultLocations(
+        beatType === 'onlineContent' ? 'infoText' : beatType,
+        (beatContent || {}) as any,
+      );
+      return backfillUnplacedDefaults(defaults, locationsForRenderer) as Location[];
+    } catch {
+      // A beat type with no default generator keeps exactly what was authored.
+      return locationsForRenderer;
+    }
+  }, [locationsForRenderer, beatType, beatContent, isPanoramaBeat]);
+
   // Create positioned elements for the shared renderer using helper function
   const positionedElements: PositionedElementData[] = createPositionedElementData(
-    locationsForRenderer,
+    locationsWithDefaults,
     beatContent || {},
     beatType || 'unknown',
     assetResolver
@@ -1460,6 +1552,15 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   characterMeterFrameResolver={showHud ? characterMeterFrameResolver : undefined}
                   characterInventoryResolver={showHud ? characterInventoryResolver : undefined}
                   inventoryVisible={showHud}
+                />
+              )}
+
+              {/* Screen-docked HUDs — the same layer the players mount, so the
+                  editor shows what plays instead of a bare stage. */}
+              {screenHudLayout && (
+                <ScreenHudLayer
+                  layout={screenHudLayout}
+                  stage={{ width: stageWidth, height: stageHeight }}
                 />
               )}
 

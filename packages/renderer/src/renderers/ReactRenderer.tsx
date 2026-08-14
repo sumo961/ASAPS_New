@@ -3466,7 +3466,9 @@ export class ReactRenderer extends BaseRenderer {
     // Absolute-positioned fallback (existing path) — locations baked or
     // not all choices have hotspots.
     const content = { question, choices, markVisited };
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('movementChoice', content), locations);
+    const effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(generateDefaultLocations('movementChoice', content), locations)
+      : mergeWithFreePositioned(generateDefaultLocations('movementChoice', content), locations);
     return this.renderPositionedBeat('movementChoice', content, effectiveLocations, true);
   }
 
@@ -3603,7 +3605,9 @@ export class ReactRenderer extends BaseRenderer {
 
     // Absolute-positioned fallback (existing path).
     const content = { question, props, markVisited };
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('pickProp', content), locations);
+    const effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(generateDefaultLocations('pickProp', content), locations)
+      : mergeWithFreePositioned(generateDefaultLocations('pickProp', content), locations);
     return this.renderPositionedBeat('pickProp', content, effectiveLocations, true);
   }
 
@@ -3642,7 +3646,7 @@ export class ReactRenderer extends BaseRenderer {
     };
     const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned
-      ? locations!
+      ? backfillUnplacedDefaults(generateDefaultLocations('videoBeat', content), locations)
       : mergeWithFreePositioned(generateDefaultLocations('videoBeat', content), locations);
 
     return new Promise<void>(resolve => {
@@ -3702,7 +3706,9 @@ export class ReactRenderer extends BaseRenderer {
       speaker: this.resolveSpeakerForSlot(),
     };
     const authorPositioned = layoutAuthorPositioned(locations);
-    let effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('endScreen', content), locations);
+    let effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(generateDefaultLocations('endScreen', content), locations)
+      : mergeWithFreePositioned(generateDefaultLocations('endScreen', content), locations);
 
     // Credits button follows showCredits (was purely location-driven, so
     // toggling showCredits ON did nothing when the baked layout had no
@@ -3748,7 +3754,9 @@ export class ReactRenderer extends BaseRenderer {
     // authorPositioned=false (no baked layout) + aiSummary's schema
     // layoutMode:slot → SlotFlowView (title + summary body + restart/credits).
     const authorPositioned = layoutAuthorPositioned(locations);
-    const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('aiSummary', content), locations);
+    const effectiveLocations = authorPositioned
+      ? backfillUnplacedDefaults(generateDefaultLocations('aiSummary', content), locations)
+      : mergeWithFreePositioned(generateDefaultLocations('aiSummary', content), locations);
 
     // Return the user's action (e.g., 'restart', 'credits')
     this.ttsSpeakCallback?.(data.summary, this.currentSpeaker);

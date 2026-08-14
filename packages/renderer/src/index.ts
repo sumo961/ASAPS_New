@@ -29,6 +29,17 @@ export { layoutScreenHuds, placementMap, type HudBox, type HudPlacement, type Hu
 export { beatSuppressesScreenHuds, HUD_FREE_BEAT_TYPES, type HudVisibilityOptions } from './utils/hudVisibility';
 export { toMeterCounterData, resolveMeterFrame, FALLBACK_METER_FRAME, countersPlacedOnBeat, isCounterPlaced, type MeterCounterDef } from './utils/meterData';
 export { HudExplanationLayer, DEFAULT_HUD_CAPTIONS, type HudExplanationLayerProps } from './components/HudExplanationLayer';
+// Screen-docked HUD assembly — one authority for what exists, where it packs,
+// and what it draws, shared by both players and the Visual Editor.
+export {
+  ScreenHudLayer,
+  buildScreenHudLayout,
+  type ScreenHudLayerProps,
+  type ScreenHudLayout,
+  type ScreenHudLayoutInput,
+  type ScreenHudCharacter,
+  type HudRect,
+} from './components/ScreenHudLayer';
 
 // Export from components/index for cleaner resolution
 export {
@@ -87,3 +98,10 @@ export { TimerHudDisplay, type TimerHudConfig } from './components/TimerHudDispl
 
 // Export markdown-lite renderer
 export { renderMarkdownLite } from './utils/markdownLite';
+
+// Default element positions — exported so the Visual Editor can show the same
+// text box and button the runtime falls back to. Without them an author who
+// positioned one element saw a canvas holding only that element, while the
+// story played the full screen.
+export { generateDefaultLocations } from './utils/DefaultLocationGenerator';
+export { backfillUnplacedDefaults } from './renderers/ReactRenderer';
