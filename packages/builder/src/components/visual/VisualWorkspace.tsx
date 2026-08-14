@@ -26,7 +26,8 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, type TimerHudConfig } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter } from '@asaps/renderer';
+import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
 
@@ -901,6 +902,52 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Slot-mode preview: which simulated viewport, and the latest per-slot
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
+
+  /**
+   * Screen-docked HUDs for the responsive preview.
+   *
+   * The fixed-canvas editor got these first; slot mode is the other half of
+   * the same gap — a character with four counters showed a bare stage here
+   * too, and this is the mode where the runtime's HUD reservation actually
+   * costs layout space, so it is the mode where seeing it matters most.
+   *
+   * No engine in the editor, so derived counters read their authored range at
+   * rest rather than a live affect value.
+   */
+  const slotScreenHud = useMemo(() => {
+    const chars = characters || [];
+    if (chars.length === 0) return null;
+    const hudChars: ScreenHudCharacter[] = chars.map((c: any) => ({
+      id: c.id,
+      name: c.displayName || c.name,
+      color: c.color,
+      meterFrame: resolveMeterFrame(c),
+      counters: (c.counters || [])
+        .filter((k: any) => k.visible)
+        .map((k: any) => toMeterCounterData(k, c.id, null)),
+      inventoryFrame: c.inventoryFrame,
+      inventoryItems: (c.inventory || []).map((it: any) => ({
+        id: it.id, name: it.name, displayName: it.displayName || it.name,
+        description: it.description || '', icon: it.icon || '',
+        quantity: it.quantity ?? 1, category: it.category || '',
+      })),
+      moodFrame: c.moodFrame,
+      mood: { valence: 0, arousal: 0 },
+    }));
+    return buildScreenHudLayout({
+      characters: hudChars,
+      hudOverlays: globalSettings?.hudOverlays,
+      stage: {
+        width: globalSettings?.project?.width || 1024,
+        height: globalSettings?.project?.height || 768,
+      },
+    });
+  }, [characters, globalSettings]);
+
+  const slotHudWarnings = useMemo(
+    () => hudStackWarnings(slotScreenHud?.rects),
+    [slotScreenHud],
+  );
   // P2.5 — when the project orientation is 'flexible' the author still needs
   // to check both ways; this is a preview-only toggle (does NOT change the
   // project setting). When the policy is locked it is forced to the lock.
@@ -6299,8 +6346,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     );
                   }
                   return (
+                  <>
                   <SlotFlowView
                     key={`slotprev-${beat!.id}-${selVp.id}-${animReplayTick}`}
+                    reservedHudRects={slotScreenHud?.rects}
                     beatType={beat!.type}
                     slots={slotSpec}
                     content={slotPreviewContent}
@@ -6366,6 +6415,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             : 'stacked') as 'stacked' | 'conversation' | 'custom')
                       : undefined}
                     previewWidth={isFixed ? devW : undefined}
+                    previewHeight={isFixed ? devH : undefined}
                     previewCoarse={selVp.coarse}
                     onResolve={(res) =>
                       setSlotResolutions(prev =>
@@ -6405,6 +6455,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       setSelectedElementIds([]);
                     }}
                   />
+                  {/* Screen HUDs over the slot preview — the same layer the
+                      runtime mounts, so this editor shows what plays. */}
+                  {slotScreenHud && (
+                    <ScreenHudLayer
+                      layout={slotScreenHud}
+                      stage={{
+                        width: isFixed ? devW : (globalSettings?.project?.width || 1024),
+                        height: isFixed ? devH : (globalSettings?.project?.height || 768),
+                      }}
+                    />
+                  )}
+                  </>
                   );
                 })()}
                 {/* 3d-4 — direct-manipulation gap grip. Delta is divided by
@@ -6500,6 +6562,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               <div className="absolute inset-0 flex flex-col bg-neutral-900">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-white text-[11px] flex-wrap shrink-0">
                   <span className="opacity-70 mr-1">Responsive (slot mode)</span>
+                  {slotHudWarnings.length > 0 && (
+                    <span
+                      className="mr-1 px-1.5 py-0.5 text-[10px] rounded bg-amber-300 text-amber-950 font-medium whitespace-nowrap cursor-help"
+                      title={slotHudWarnings.map((w) => describeHudStackWarning(w)).join('\n\n')}
+                    >
+                      ⚠ HUD stack tall
+                    </span>
+                  )}
                   <div className="flex rounded overflow-hidden border border-white/20">
                     {SLOT_PREVIEW_VIEWPORTS.map(vp => (
                       <button

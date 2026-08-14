@@ -69,6 +69,8 @@ export interface ScreenHudLayoutInput {
 export interface HudRect {
   id: string;
   kind: HudKind;
+  /** Which corner it is anchored to — a stack is per corner. */
+  corner: HudCorner;
   x: number;
   y: number;
   width: number;
@@ -198,7 +200,7 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
   const placements = placementMap(layoutScreenHuds(boxes, stage));
   const rects: HudRect[] = boxes.map((b) => {
     const p = placements.get(b.id);
-    return { id: b.id, kind: b.kind, x: p?.left ?? 0, y: p?.top ?? 0, width: b.width, height: b.height };
+    return { id: b.id, kind: b.kind, corner: b.corner, x: p?.left ?? 0, y: p?.top ?? 0, width: b.width, height: b.height };
   });
 
   return { boxes, placements, rects, rails, discs, meters, inventories };

@@ -45,6 +45,7 @@ import {
   backfillUnplacedDefaults,
   type ScreenHudCharacter,
 } from '@asaps/renderer';
+import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { convertGlobalSettingsToTheme } from '../../utils/themeConverter';
 import { resolvePortraitUrl, shouldShowSpeaker, resolveTranslatedSpeakerName } from '../../utils/speakerUtils';
 import { useTranslationState } from '../../contexts/TranslationContext';
@@ -374,6 +375,17 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       stage: { width: stageWidth, height: stageHeight },
     });
   }, [showHud, characters, elements, globalSettings, beatType, stageWidth, stageHeight]);
+
+  /**
+   * HUD stacks too tall for the smallest screen this story could run on.
+   * Computed from the same layout the editor draws, so the warning and the
+   * picture above it can never disagree.
+   */
+  const hudWarnings = useMemo(
+    () => hudStackWarnings(screenHudLayout?.rects),
+    [screenHudLayout],
+  );
+
 
   const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
   const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
@@ -1104,6 +1116,14 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         >
           <Eye className="w-4 h-4" />
         </button>
+        {showHud && hudWarnings.length > 0 && (
+          <span
+            className="ml-1 px-1.5 py-0.5 text-[10px] rounded bg-amber-200 text-amber-900 font-medium whitespace-nowrap cursor-help"
+            title={hudWarnings.map((w) => describeHudStackWarning(w)).join('\n\n')}
+          >
+            ⚠ HUD stack tall
+          </span>
+        )}
         <div className="w-px bg-gray-300 mx-1" />
         <button
           onClick={() => setZoom(Math.max(0.25, zoom - 0.1))}
