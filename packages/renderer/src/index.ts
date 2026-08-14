@@ -48,6 +48,8 @@ export {
   calculateSmartTextBoxDimensions,
   calculateSmartButtonDimensions,
   adjustElementsForCollisions,
+  reservedHudFloor,
+  type ReservedHudRect,
   type PositionedBeatViewProps,
   type PositionedElementData,
   type RenderThemeSettings

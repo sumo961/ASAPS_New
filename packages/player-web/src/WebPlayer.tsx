@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, OrientationGate, type OrientationPolicy, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -752,22 +752,81 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // stays hidden until the player picks a variant; reads merged
   // character (variant overlay applied) for name / portrait / color;
   // re-renders on every characterMoodChanged via hudTick.
-  const renderMoodHudOverlay = () => {
-    void hudTick; // re-render dependency
+  /**
+   * Screen-docked HUDs, built by the shared builder so the exported player,
+   * the preview and the Visual Editor agree on what exists and where it sits.
+   * `hudTick` is the re-render dependency: it fires on every affect change,
+   * which is when bound meters and mood tokens move.
+   */
+  const screenHud = (() => {
+    void hudTick;
     const player = playerRef.current;
     const ctx = player?.getEngine()?.getContext();
     const story = player?.getEngine()?.getStory();
     if (!ctx || !story || !stageDims) return null;
-    // Chrome-free beats (title screens by default) show no screen HUDs at all —
-    // same rule the renderer applies to its own timer / countdown.
     const beatNow = (story as any).getBeat?.(ctx.getCurrentBeatId?.());
     const gsNow: any = player?.getGlobalSettings?.() || (player as any)?.globalSettings;
+    // Chrome-free beats (title screens by default) show no screen HUDs at all.
     if (beatSuppressesScreenHuds(beatNow?.type, {
       showOnTitleScreen: gsNow?.hudOverlays?.showOnTitleScreen,
     })) return null;
+
     const chars = (story as any).getCharacters?.() || [];
-    const palette = (story as any).getEmotionPalette?.();
     const assetsList = (story as any).getAssets?.() || [];
+    const placed = countersPlacedOnBeat((beatNow as any)?.locations);
+
+    // A character with unchosen variants has not appeared yet; their HUD would
+    // announce someone the interactor has not met.
+    const hasExplicitVariant = (c: any): boolean =>
+      (c.variants && c.variants.length > 0)
+        ? !!(ctx as any).hasExplicitlySetVariant?.(c.id)
+        : true;
+
+    const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {
+      const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
+      const portraitAsset = merged.portrait?.assetId
+        ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+        : undefined;
+      const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
+      const visibleCounters = (c.counters || []).filter(
+        (k: any) => k.visible && !isCounterPlaced(placed, c.id, k.name),
+      );
+      return {
+        id: c.id,
+        name: merged.displayName || merged.name || c.id,
+        color: merged.color,
+        portraitUrl: portraitAsset?.url || merged.portrait?.image,
+        meterFrame: resolveMeterFrame(c as any),
+        counters: visibleCounters.map((counter: any) =>
+          toMeterCounterData(counter, c.id, ctx as any, scoped, (n: string) => ctx.getCounter?.(n)),
+        ),
+        inventoryFrame: c.inventoryFrame,
+        inventoryItems: (c.inventory || []).map((it: any) => ({
+          id: it.id, name: it.name, displayName: it.displayName || it.name,
+          description: it.description || '', icon: it.icon || '',
+          quantity: it.quantity ?? 1, category: it.category || '',
+        })),
+        moodFrame: c.moodFrame,
+        mood: ctx.getCharacterMood(c.id),
+      };
+    });
+
+    return {
+      layout: buildScreenHudLayout({
+        characters: hudChars,
+        hudOverlays: gsNow?.hudOverlays,
+        stage: stageDims,
+      }),
+      palette: (story as any).getEmotionPalette?.(),
+      beatNow,
+      theme: gsNow?.theme,
+    };
+  })();
+
+  const renderMoodHudOverlay = () => {
+    if (!screenHud || !stageDims) return null;
+    const { layout, palette, beatNow, theme } = screenHud;
+    const showCallouts = (beatNow as any)?.type === 'explanation' || explainOverlayActive;
     return (
       <div
         style={{
@@ -778,191 +837,33 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           zIndex: 40,
         }}
       >
-        {(() => {
-          // ---- Unified screen-HUD layout (single authority) ----
-          // Mirrors PreviewWindow: global timer/countdown obstacles (drawn by
-          // the renderer, only reserved here), character mood rails, meter and
-          // inventory frames are packed per corner by layoutScreenHuds so
-          // nothing overlaps across kinds.
-          const toCorner = (s?: string): HudCorner =>
-            ((s || 'top-left').replace('screen-', '') as HudCorner);
-          const hasExplicitVariant = (c: any): boolean => {
-            if (c.variants && c.variants.length > 0) {
-              return !!(ctx as any).hasExplicitlySetVariant?.(c.id);
-            }
-            return true;
-          };
-
-          // Token-style mood HUDs group into a per-corner rail; disc-style ones
-          // stay individual self-anchored cards (not packed).
-          const railGroups: Record<string, MoodRailEntry[]> = {};
-          const discFrames: React.ReactNode[] = [];
-          chars.forEach((c: any) => {
-            const mf = c?.moodFrame;
-            if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
-            if (!hasExplicitVariant(c)) return;
-            const merged = (ctx as any).getMergedCharacter?.(c.id) || c;
-            const mood = ctx.getCharacterMood(c.id);
-            const portraitAsset = merged.portrait?.assetId
-              ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
-              : undefined;
-            const name = merged.displayName || merged.name || c.id;
-            const portraitUrl = portraitAsset?.url || merged.portrait?.image;
-            if ((mf.displayStyle ?? 'token') === 'disc') {
-              discFrames.push(
-                <CharacterMoodFrame
-                  key={`mood-hud-${c.id}`}
-                  valence={mood.valence} arousal={mood.arousal} config={mf} palette={palette}
-                  characterName={name} characterPortraitUrl={portraitUrl} characterColor={merged.color}
-                  characterPosition={{ x: 0, y: 0 }} characterDimensions={{ width: 0, height: 0 }}
-                  containerDimensions={stageDims}
-                />,
-              );
-            } else {
-              const corner = mf.screenPosition || 'screen-top-right';
-              (railGroups[corner] ||= []).push({
-                key: c.id, valence: mood.valence, arousal: mood.arousal,
-                characterName: name, characterPortraitUrl: portraitUrl, characterColor: merged.color,
-                showLabel: mf.showQualitativeLabel !== false,
-              });
-            }
-          });
-
-          // Meter-frame descriptors.
-          const meterDescs: Array<{ c: any; counters: any[]; frame: any; corner: string; est: number }> = [];
-          for (const c of chars as any[]) {
-            const frame = resolveMeterFrame(c as any);
-            if (!frame || frame.dockMode !== 'screen') continue;
-            if (!hasExplicitVariant(c)) continue;
-            // A counter the author placed on this beat is drawn there; keeping
-            // it in the frame too would show the same number twice.
-            const visibleCounters = (c.counters || []).filter(
-              (k: any) => k.visible && !isCounterPlaced(currentBeatMeta?.placedMeters, c.id, k.name),
-            );
-            if (visibleCounters.length === 0) continue;
-            const scoped = (ctx as any).getCharacterCountersFor?.(c.id) ?? {};
-            const counters = visibleCounters.map((counter: any) =>
-              toMeterCounterData(counter, c.id, ctx as any, scoped, (n) => ctx.getCounter?.(n)),
-            );
-            const est = (frame.style?.padding ?? 8) * 2 +
-              counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
-              Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6) +
-              // name header (16px) + its gap — the packer must account for it
-              (16 + (frame.meterSpacing ?? 6));
-            meterDescs.push({ c, counters, frame, corner: frame.screenPosition ?? 'screen-top-left', est });
-          }
-
-          // Inventory-frame descriptors.
-          const invDescs: Array<{ c: any; items: any[]; frame: any; corner: string; est: number }> = [];
-          for (const c of chars as any[]) {
-            const frame = c?.inventoryFrame;
-            if (!frame || frame.dockMode !== 'screen') continue;
-            const items = (c.inventory || []).map((it: any) => ({
-              id: it.id, name: it.name, displayName: it.displayName || it.name,
-              description: it.description || '', icon: it.icon || '',
-              quantity: it.quantity ?? 1, category: it.category || '',
-            }));
-            if (items.length === 0) continue;
-            const cols = Math.max(1, frame.columns ?? 4);
-            const rows = Math.ceil(items.length / cols);
-            const est = (frame.style?.padding ?? 10) * 2 + 20 +
-              rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
-              Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
-            invDescs.push({ c, items, frame, corner: frame.screenPosition ?? 'screen-bottom-right', est });
-          }
-
-          // Pack. Global timer/countdown HUDs reserve their corners as obstacles.
-          const boxes: HudBox[] = [];
-          const gs: any = playerRef.current?.getGlobalSettings?.() || (playerRef.current as any)?.globalSettings;
-          const hud = gs?.hudOverlays;
-          if (hud?.timerHud?.enabled) {
-            boxes.push({ id: '__timer', corner: toCorner(hud.timerHud.position),
-              width: 160, height: (hud.timerHud.fontSize ?? 18) + (hud.timerHud.padding ?? 8) * 2 + 8,
-              kind: 'timer' });
-          }
-          if (hud?.countdownMeter?.enabled) {
-            boxes.push({ id: '__countdown', corner: toCorner(hud.countdownMeter.position),
-              width: Math.round(stageDims.width * ((hud.countdownMeter.meterWidth ?? 60) / 100)),
-              height: (hud.countdownMeter.meterHeight ?? 12) + 26, kind: 'countdown' });
-          }
-          for (const d of meterDescs) {
-            boxes.push({ id: `meter-${d.c.id}`, corner: toCorner(d.corner),
-              width: d.frame.width ?? 160, height: d.est, kind: 'meter' });
-          }
-          for (const d of invDescs) {
-            boxes.push({ id: `inv-${d.c.id}`, corner: toCorner(d.corner),
-              width: (d.frame.itemSize ?? 36) * Math.max(1, d.frame.columns ?? 4) + 24,
-              height: d.est, kind: 'inventory' });
-          }
-          for (const corner of Object.keys(railGroups)) {
-            boxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner),
-              width: 200, height: 54, kind: 'mood' });
-          }
-          const place = placementMap(layoutScreenHuds(boxes, stageDims));
-
-          // HUD explanation — mirrors the Preview Window: standalone
-          // `explanation` beat annotates behind its own screen; the overlay
-          // trigger annotates any beat and gates it until acknowledged.
-          const isExplanationBeat = beatNow?.type === 'explanation';
-          const showCallouts = isExplanationBeat || explainOverlayActive;
-          const themeNow: any = gsNow?.theme;
-
-          return (
-            <>
-              {Object.entries(railGroups).map(([corner, entries]) => (
-                <MoodRail key={`mood-rail-${corner}`} entries={entries}
-                  screenPosition={corner as any} containerDimensions={stageDims}
-                  offsetY={place.get(`mood-rail-${corner}`)?.offsetY ?? 0} />
-              ))}
-              {discFrames}
-              {meterDescs.map((d) => (
-                <CharacterMeterFrame
-                  key={`meter-hud-${d.c.id}`}
-                  counters={d.counters}
-                  config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
-                    y: (d.frame.offset?.y ?? 0) + (place.get(`meter-${d.c.id}`)?.offsetY ?? 0) } }}
-                  characterPosition={{ x: 0, y: 0 }}
-                  characterDimensions={{ width: 0, height: 0 }}
-                  containerDimensions={stageDims}
-                  characterName={d.c.displayName || d.c.name}
-                  characterColor={d.c.color}
-                />
-              ))}
-              {invDescs.map((d) => (
-                <CharacterInventoryFrame
-                  key={`inventory-hud-${d.c.id}`}
-                  items={d.items}
-                  config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
-                    y: (d.frame.offset?.y ?? 0) + (place.get(`inv-${d.c.id}`)?.offsetY ?? 0) } }}
-                  characterPosition={{ x: 0, y: 0 }}
-                  characterDimensions={{ width: 0, height: 0 }}
-                  containerDimensions={stageDims}
-                  isVisible={true}
-                />
-              ))}
-              {showCallouts && (
-                <HudExplanationLayer
-                  boxes={boxes}
-                  placements={place}
-                  stage={stageDims}
-                  captions={(beatNow as any)?.resolvedCaptions ?? (beatNow as any)?.captions}
-                  skipKinds={(beatNow as any)?.skipKinds}
-                  onAcknowledge={explainOverlayActive
-                    ? () => setExplainAcknowledged((m) => ({ ...m, [beatNow.id]: true }))
-                    : undefined}
-                  accentColor={themeNow?.button?.backgroundColor}
-                  accentTextColor={themeNow?.button?.textColor}
-                  textColor={themeNow?.textBox?.textColor}
-                  backgroundColor={themeNow?.textBox?.backgroundColor}
-                  fontFamily={themeNow?.fonts?.textFont}
-                />
-              )}
-            </>
-          );
-        })()}
+        <ScreenHudLayer
+          layout={layout}
+          stage={stageDims}
+          palette={palette}
+          zIndex={0}
+          explanation={showCallouts ? {
+            captions: (beatNow as any)?.resolvedCaptions ?? (beatNow as any)?.captions,
+            skipKinds: (beatNow as any)?.skipKinds,
+            onAcknowledge: explainOverlayActive
+              ? () => setExplainAcknowledged((m) => ({ ...m, [(beatNow as any).id]: true }))
+              : undefined,
+            accentColor: theme?.button?.backgroundColor,
+            accentTextColor: theme?.button?.textColor,
+            textColor: theme?.textBox?.textColor,
+            backgroundColor: theme?.textBox?.backgroundColor,
+            fontFamily: theme?.fonts?.textFont,
+          } : undefined}
+        />
       </div>
     );
   };
+
+  // Reserve the packed HUD boxes so stage text is laid out clear of them.
+  useEffect(() => {
+    (rendererRef.current as any)?.setReservedHudRects?.(screenHud?.layout.rects);
+  }, [screenHud]);
+
 
   return (
     <OrientationGate orientation={orientationPolicy}>

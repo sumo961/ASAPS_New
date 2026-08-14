@@ -589,6 +589,13 @@ export interface PositionedBeatViewProps {
   /** Subscribe to timer HUD override text updates */
   onSubscribeTimerHudOverrideText?: (listener: (text: string | undefined) => void) => () => void;
   /** Countdown meter HUD configuration from global settings */
+  /**
+   * Screen-docked HUD boxes in stage coordinates. Text that would otherwise be
+   * drawn under one is lifted clear. Supplied by the host, which is the only
+   * side that knows which HUDs are live — the layout comes from
+   * buildScreenHudLayout so there is still one authority for where they sit.
+   */
+  reservedHudRects?: ReservedHudRect[];
   countdownMeterConfig?: import('./CountdownMeterHud').CountdownMeterConfig;
   /** Current counter value for countdown meter HUD */
   countdownMeterValue?: { value: number; min: number; max: number };
@@ -681,6 +688,42 @@ function calculateTextBoxDimensions(
  * - Text boxes: Keep original x position, only expand width if needed
  * - Buttons: Keep original x position and width, only adjust y if colliding
  */
+/** A screen-docked HUD's box, which stage text must not slide under. */
+export interface ReservedHudRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Lowest edge of any top-anchored HUD standing over this horizontal span.
+ *
+ * Only HUDs the element actually passes under count. A global floor would push
+ * centred text down the moment a HUD existed in any corner, which is why the
+ * old top-centre-only rule was written that way — it was the sole case where
+ * "anywhere at the top" and "in the way" coincided.
+ */
+export function reservedHudFloor(
+  rects: ReservedHudRect[] | undefined,
+  left: number,
+  right: number,
+  stageHeight: number,
+  gap = 8,
+): number {
+  if (!rects || rects.length === 0) return 0;
+  let floor = 0;
+  for (const r of rects) {
+    // Bottom-anchored HUDs are below the content; lifting text for them would
+    // push it further into them.
+    if (r.y + r.height > stageHeight / 2) continue;
+    if (r.x < right && r.x + r.width > left) {
+      floor = Math.max(floor, r.y + r.height + gap);
+    }
+  }
+  return floor;
+}
+
 export function adjustElementsForCollisions(
   elements: PositionedElementData[],
   stageWidth: number,
@@ -688,7 +731,8 @@ export function adjustElementsForCollisions(
   theme: RenderThemeSettings,
   calculatedButtonHeight: number = 0,
   hudBottomY: number = 0,
-  beatType?: string
+  beatType?: string,
+  reservedHudRects?: ReservedHudRect[]
 ): PositionedElementData[] {
   const padding = theme.textBox.padding || 20;
 
@@ -728,6 +772,8 @@ export function adjustElementsForCollisions(
     let effectiveX: number;
     let effectiveWidth: number;
     let yOffset = 0;
+    // How far the smart-sized box grows to each side of its authored x.
+    let widthGrowth = 0;
 
     if (el.location.manuallyResized) {
       // Manually resized: use stored dimensions directly
@@ -759,14 +805,29 @@ export function adjustElementsForCollisions(
       height = isDynamic ? Math.round(smartDims.height / 1.15) : smartDims.height;
       effectiveX = el.location.x + (smartDims.xOffset || 0);
       effectiveWidth = smartDims.width;
+      widthGrowth = smartDims.xOffset || 0;
       yOffset = isDynamic ? 0 : (smartDims.yOffset || 0);
     }
 
     // Shift text down if it overlaps HUD overlays at the top, then stack it
     // below the previous text box if the two would overlap.
     let newY = el.location.y;
-    if (hudBottomY > 0 && newY < hudBottomY) {
-      newY = hudBottomY;
+    // Horizontal span the box is actually DRAWN across. A smart-sized text box
+    // grows symmetrically, so its left edge is `x - xOffset` — `effectiveX`
+    // above is a different quantity used for stacking bounds, and reading it
+    // as a left edge puts the box hundreds of pixels right of where it renders,
+    // which silently reports "not under the HUD" for a box that plainly is.
+    const drawnLeft = el.location.x - widthGrowth;
+    const drawnRight = Math.max(
+      el.location.x + (el.location.width || 0),
+      drawnLeft + effectiveWidth,
+    );
+    const hudFloor = Math.max(
+      hudBottomY,
+      reservedHudFloor(reservedHudRects, drawnLeft, drawnRight, stageHeight),
+    );
+    if (hudFloor > 0 && newY < hudFloor) {
+      newY = hudFloor;
       console.log(`[CollisionDetect] Text "${el.location.name}": shifted down from y=${el.location.y} to y=${newY} to avoid HUD overlap`);
     }
     if (!el.location.manuallyResized && newY - yOffset < prevTextBottom + TEXT_STACK_GAP) {
@@ -1219,6 +1280,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   timerHudState: initialTimerHudState,
   onSubscribeTimerHudState,
   onSubscribeTimerHudOverrideText,
+  reservedHudRects,
   countdownMeterConfig,
   countdownMeterValue,
   overrideCountdownMeter,
@@ -1948,7 +2010,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
 
   // Apply collision detection to adjust button positions when text boxes grow
   // Always run in both editor and preview modes for unified layout
-  let adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType);
+  let adjustedElements = adjustElementsForCollisions(elements, stageWidth, stageHeight, theme, calculatedButtonHeight, hudBottomY, beatType, reservedHudRects);
 
   // When portrait is "above" text box, ensure text elements are pushed down if portrait would clip at top
   if (speakerPortraitUrl && (theme.speakerDisplay?.graphicPosition === 'above-left' || theme.speakerDisplay?.graphicPosition === 'above-right')) {
@@ -2009,7 +2071,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
     });
     onLayoutComputedRef.current(positions);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elements, stageWidth, stageHeight, theme, beatType, calculatedButtonHeight, hudBottomY]);
+  }, [elements, stageWidth, stageHeight, theme, beatType, calculatedButtonHeight, hudBottomY, reservedHudRects]);
 
   // Calculate animation delays for sequenced typewriter effect on text elements
   const animation = theme.textEffects?.animation || 'none';

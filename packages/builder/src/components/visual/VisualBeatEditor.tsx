@@ -1552,6 +1552,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   characterMeterFrameResolver={showHud ? characterMeterFrameResolver : undefined}
                   characterInventoryResolver={showHud ? characterInventoryResolver : undefined}
                   inventoryVisible={showHud}
+                  reservedHudRects={screenHudLayout?.rects}
                 />
               )}
 

@@ -1017,6 +1017,10 @@ export class ReactRenderer extends BaseRenderer {
   // render entry point so it can't go stale across a beat transition.
   protected hudSuppressed: boolean = false;
   protected showHudsOnTitleScreen: boolean = false;  // Author opt-in (hudOverlays.showOnTitleScreen)
+  // Screen-docked HUD boxes the host has mounted above the stage. The stage
+  // cannot see that layer, so without these text is laid out as if the corner
+  // were empty and ends up underneath it.
+  protected reservedHudRects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined;
   protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
@@ -2262,6 +2266,15 @@ export class ReactRenderer extends BaseRenderer {
   /**
    * Set the countdown meter HUD configuration from global settings
    */
+  /**
+   * Boxes occupied by the host's screen-HUD layer, in stage coordinates.
+   * Built by buildScreenHudLayout, so the reservation and the drawing always
+   * agree about where a HUD is.
+   */
+  setReservedHudRects(rects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined): void {
+    this.reservedHudRects = rects;
+  }
+
   setCountdownMeterConfig(config: import('../components/CountdownMeterHud').CountdownMeterConfig | undefined): void {
     this.countdownMeterConfig = config;
   }
@@ -2638,6 +2651,7 @@ export class ReactRenderer extends BaseRenderer {
               timerHudState={this.timerHudState}
               onSubscribeTimerHudState={(listener) => this.subscribeToTimerHudState(listener)}
               onSubscribeTimerHudOverrideText={(listener) => this.subscribeToTimerHudOverrideText(listener)}
+              reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
               countdownMeterConfig={this.hudSuppressed ? undefined : this.countdownMeterConfig}
               countdownMeterValue={this.countdownMeterValue}
               overrideCountdownMeter={this.overrideCountdownMeter}

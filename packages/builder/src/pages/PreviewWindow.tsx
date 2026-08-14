@@ -10,7 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
-import { ReactRenderer, getAudioManager, CharacterMoodFrame, MoodRail, type MoodRailEntry, CharacterMeterFrame, CharacterInventoryFrame, layoutScreenHuds, placementMap, beatSuppressesScreenHuds, HudExplanationLayer, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, countersPlacedOnBeat, isCounterPlaced, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
 import { initializeBeatLocations } from '../utils/SchemaLocationInitializer';
@@ -295,6 +295,8 @@ export const PreviewWindow: React.FC = () => {
     [currentBeat],
   );
   placedMetersRef.current = placedMeters;
+
+
   /* HUD explanation (overlay trigger). Beats carrying `explainHuds` annotate
      the live HUDs on entry and are held INERT until acknowledged, so the
      interactor can't click past the explanation. Acknowledged beats are
@@ -382,11 +384,108 @@ export const PreviewWindow: React.FC = () => {
   const engineRef = useRef<StoryEngine | null>(null);
   const countersRef = useRef<Record<string, number>>({});
   const charCountersRef = useRef<Record<string, Record<string, number>>>({});
+
   // Beat ids marked visited by the applied start-state preset rather than by
   // actual playthrough — lets the debug panel distinguish "seeded" from
   // "visited in this run". Reset on every (re)start.
   const seededBeatsRef = useRef<Set<string>>(new Set());
   const previewDataRef = useRef<PreviewData | null>(null);
+
+  /**
+   * Screen-docked HUDs for the beat on screen, assembled by the same builder
+   * the Visual Editor uses. Computed before the stage renders, because the
+   * stage needs the resulting boxes to keep its text out from under them —
+   * this used to be built inline further down the tree, where nothing above
+   * could see it.
+   *
+   * `debugInfo` is a dependency on purpose: it changes whenever affect moves,
+   * which is exactly when a bound meter's value and its band phrase change.
+   */
+  const screenHud = useMemo(() => {
+    const ctx = engineRef.current?.getContext();
+    if (!ctx) return null;
+    // Chrome-free beats (title screens by default) show no screen HUDs at all,
+    // the same rule the renderer applies to its own timer and countdown.
+    if (beatSuppressesScreenHuds(currentBeat?.type, {
+      showOnTitleScreen: (previewDataRef.current?.settings?.hudOverlays as any)?.showOnTitleScreen,
+    })) return null;
+
+    const chars = previewDataRef.current?.characters || [];
+    const assetsList = previewDataRef.current?.assets || [];
+    void debugInfo;
+
+    // A character with unchosen variants is not on stage in any meaningful
+    // sense yet; showing their HUD would announce someone who has not appeared.
+    const hasExplicitVariant = (c: any): boolean =>
+      (c.variants && c.variants.length > 0)
+        ? !!(ctx as any).hasExplicitlySetVariant?.(c.id)
+        : true;
+
+    const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {
+      const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
+      const portraitAsset = merged.portrait?.assetId
+        ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
+        : undefined;
+      const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[c.name] ?? {};
+      const visibleCounters = (c.counters || []).filter(
+        (k: any) => k.visible && !isCounterPlaced(placedMeters, c.id, k.name),
+      );
+      return {
+        id: c.id,
+        name: merged.displayName || merged.name || c.id,
+        color: merged.color,
+        portraitUrl: portraitAsset?.url || merged.portrait?.image,
+        meterFrame: resolveMeterFrame(c as any),
+        counters: visibleCounters.map((counter: any) =>
+          toMeterCounterData(counter, c.id, ctx as any, scoped, (n: string) => countersRef.current[n]),
+        ),
+        inventoryFrame: c.inventoryFrame,
+        inventoryItems: (c.inventory || []).map((it: any) => ({
+          id: it.id, name: it.name, displayName: it.displayName || it.name,
+          description: it.description || '', icon: it.icon || '',
+          quantity: it.quantity ?? 1, category: it.category || '',
+        })),
+        moodFrame: c.moodFrame,
+        mood: ctx.getCharacterMood(c.id),
+      };
+    });
+
+    return buildScreenHudLayout({
+      characters: hudChars,
+      hudOverlays: previewDataRef.current?.settings?.hudOverlays,
+      stage: { width: STAGE_WIDTH, height: STAGE_HEIGHT },
+    });
+  }, [currentBeat, debugInfo, placedMeters, isRunning]);
+
+  /* HUD explanation — one mechanism, two triggers. The standalone `explanation`
+     beat annotates behind its own text screen (its continue button advances, so
+     nothing competes with the acknowledge); the overlay trigger annotates any
+     beat and gates it. Callouts read their positions from the layout above, so
+     they cannot drift from the HUDs they point at. */
+  const hudExplanation = useMemo(() => {
+    const beat: any = currentBeat;
+    if (!beat) return undefined;
+    if (beat.type !== 'explanation' && !explainOverlayActive) return undefined;
+    const theme: any = previewDataRef.current?.settings?.theme;
+    return {
+      captions: beat.resolvedCaptions ?? beat.captions,
+      skipKinds: beat.skipKinds,
+      onAcknowledge: explainOverlayActive
+        ? () => setExplainAcknowledged((m) => ({ ...m, [beat.id]: true }))
+        : undefined,
+      accentColor: theme?.button?.backgroundColor,
+      accentTextColor: theme?.button?.textColor,
+      textColor: theme?.textBox?.textColor,
+      backgroundColor: theme?.textBox?.backgroundColor,
+      fontFamily: theme?.fonts?.textFont,
+    };
+  }, [currentBeat, explainOverlayActive]);
+
+  // Hand the packed boxes to the renderer so stage text is laid out clear of
+  // them instead of underneath.
+  useEffect(() => {
+    (rendererRef.current as any)?.setReservedHudRects?.(screenHud?.rects);
+  }, [screenHud]);
   const loadingTranslationsRef = useRef<Map<string, string>>(new Map());
   const isElectronRef = useRef<boolean>(false);
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
@@ -2769,219 +2868,14 @@ export const PreviewWindow: React.FC = () => {
                   character is on stage. The `debugInfo` state already
                   subscribes to characterMoodChanged events, so this layer
                   re-renders whenever mood updates. */}
-              {(() => {
-                const ctx = engineRef.current?.getContext();
-                if (!ctx) return null;
-                // Chrome-free beats (title screens by default) show no screen
-                // HUDs at all — same rule the renderer applies to its own
-                // timer / countdown, so the start screen is uniformly clean.
-                if (beatSuppressesScreenHuds(currentBeat?.type, {
-                  showOnTitleScreen: (previewDataRef.current?.settings?.hudOverlays as any)?.showOnTitleScreen,
-                })) return null;
-                const chars = previewDataRef.current?.characters || [];
-                const palette = previewDataRef.current?.emotionPalette;
-                const assetsList = previewDataRef.current?.assets || [];
-                // Just touch debugInfo so the linter / React knows we
-                // depend on it for re-renders. Read is cheap.
-                void debugInfo;
-                const stageDim = { width: STAGE_WIDTH, height: STAGE_HEIGHT };
-                // ---- Unified screen-HUD layout (single authority) ----
-                // Every screen-docked HUD — global timer/countdown obstacles
-                // (drawn by the renderer, only reserved here), character mood
-                // rails, meter frames and inventory frames — is packed per
-                // corner by layoutScreenHuds so nothing overlaps across kinds.
-                // The same function drives the character-manager HUD preview.
-                const toCorner = (s?: string): HudCorner =>
-                  ((s || 'top-left').replace('screen-', '') as HudCorner);
-                const hasExplicitVariant = (c: any): boolean => {
-                  const variants = c.variants;
-                  if (variants && variants.length > 0) {
-                    return !!(ctx as any).hasExplicitlySetVariant?.(c.id);
-                  }
-                  return true;
-                };
-
-                // Token-style mood HUDs group into a per-corner rail; disc-style
-                // ones stay individual self-anchored cards (not packed).
-                const railGroups: Record<string, MoodRailEntry[]> = {};
-                const discFrames: React.ReactNode[] = [];
-                chars.forEach((c) => {
-                  const mf: any = (c as any).moodFrame;
-                  if (!mf || !mf.enabled || mf.dockMode !== 'screen') return;
-                  if (!hasExplicitVariant(c)) return;
-                  const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
-                  const mood = ctx.getCharacterMood(c.id);
-                  const portraitAsset = merged.portrait?.assetId
-                    ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
-                    : undefined;
-                  const portraitUrl = portraitAsset?.url || merged.portrait?.image;
-                  const name = merged.displayName || merged.name || c.id;
-                  if ((mf.displayStyle ?? 'token') === 'disc') {
-                    discFrames.push(
-                      <CharacterMoodFrame
-                        key={`mood-hud-${c.id}`}
-                        valence={mood.valence} arousal={mood.arousal} config={mf} palette={palette}
-                        characterName={name} characterPortraitUrl={portraitUrl} characterColor={merged.color}
-                        characterPosition={{ x: 0, y: 0 }} characterDimensions={{ width: 0, height: 0 }}
-                        containerDimensions={stageDim}
-                      />,
-                    );
-                  } else {
-                    const corner = mf.screenPosition || 'screen-top-right';
-                    (railGroups[corner] ||= []).push({
-                      key: c.id, valence: mood.valence, arousal: mood.arousal,
-                      characterName: name, characterPortraitUrl: portraitUrl, characterColor: merged.color,
-                      showLabel: mf.showQualitativeLabel !== false,
-                    });
-                  }
-                });
-
-                // Meter-frame descriptors (screen-docked, one per character).
-                type MeterDesc = { c: any; counters: any[]; frame: any; corner: string; est: number };
-                const meterDescs: MeterDesc[] = [];
-                for (const c of chars) {
-                  // resolveMeterFrame supplies a screen-docked default when the
-                  // character has visible meters but no authored frame — without
-                  // it the meter is simply absent, with nothing to indicate why.
-                  const frame: any = resolveMeterFrame(c as any);
-                  if (!frame || frame.dockMode !== 'screen') continue;
-                  if (!hasExplicitVariant(c)) continue;
-                  const visibleCounters = ((c as any).counters || []).filter(
-                    (k: any) => k.visible && !isCounterPlaced(placedMeters, c.id, k.name),
-                  );
-                  if (visibleCounters.length === 0) continue;
-                  const scoped = charCountersRef.current[c.id] ?? charCountersRef.current[(c as any).name] ?? {};
-                  const counters = visibleCounters.map((counter: any) =>
-                    toMeterCounterData(
-                      counter,
-                      c.id,
-                      engineRef.current?.getContext() as any,
-                      scoped,
-                      (n: string) => countersRef.current[n],
-                    ),
-                  );
-                  const est = (frame.style?.padding ?? 8) * 2 +
-                    counters.length * ((frame.meterHeight ?? 12) + (frame.showLabels ? 16 : 0)) +
-                    Math.max(0, counters.length - 1) * (frame.meterSpacing ?? 6) +
-                    // name header (16px) + its gap — the packer must account for it
-                    (16 + (frame.meterSpacing ?? 6));
-                  meterDescs.push({ c, counters, frame, corner: frame.screenPosition ?? 'screen-top-left', est });
-                }
-
-                // Inventory-frame descriptors (screen-docked, one per character).
-                type InvDesc = { c: any; items: any[]; frame: any; corner: string; est: number };
-                const invDescs: InvDesc[] = [];
-                for (const c of chars) {
-                  const frame: any = (c as any).inventoryFrame;
-                  if (!frame || frame.dockMode !== 'screen') continue;
-                  const items = ((c as any).inventory || []).map((it: any) => ({
-                    id: it.id, name: it.name, displayName: it.displayName || it.name,
-                    description: it.description || '', icon: it.icon || '',
-                    quantity: it.quantity ?? 1, category: it.category || '',
-                  }));
-                  if (items.length === 0) continue;
-                  const cols = Math.max(1, frame.columns ?? 4);
-                  const rows = Math.ceil(items.length / cols);
-                  const est = (frame.style?.padding ?? 10) * 2 + 20 +
-                    rows * ((frame.itemSize ?? 36) + (frame.showLabels ? 14 : 0)) +
-                    Math.max(0, rows - 1) * (frame.itemSpacing ?? 6);
-                  invDescs.push({ c, items, frame, corner: frame.screenPosition ?? 'screen-bottom-right', est });
-                }
-
-                // Build the box list and pack it. Global timer/countdown HUDs
-                // (rendered by the renderer, not here) reserve their corners as
-                // obstacles so character frames flow clear of them.
-                const boxes: HudBox[] = [];
-                const hud: any = previewDataRef.current?.settings?.hudOverlays;
-                if (hud?.timerHud?.enabled) {
-                  boxes.push({ id: '__timer', corner: toCorner(hud.timerHud.position),
-                    width: 160, height: (hud.timerHud.fontSize ?? 18) + (hud.timerHud.padding ?? 8) * 2 + 8,
-                    kind: 'timer' });
-                }
-                if (hud?.countdownMeter?.enabled) {
-                  boxes.push({ id: '__countdown', corner: toCorner(hud.countdownMeter.position),
-                    width: Math.round(STAGE_WIDTH * ((hud.countdownMeter.meterWidth ?? 60) / 100)),
-                    height: (hud.countdownMeter.meterHeight ?? 12) + 26, kind: 'countdown' });
-                }
-                for (const d of meterDescs) {
-                  boxes.push({ id: `meter-${d.c.id}`, corner: toCorner(d.corner),
-                    width: d.frame.width ?? 160, height: d.est, kind: 'meter' });
-                }
-                for (const d of invDescs) {
-                  boxes.push({ id: `inv-${d.c.id}`, corner: toCorner(d.corner),
-                    width: (d.frame.itemSize ?? 36) * Math.max(1, d.frame.columns ?? 4) + 24,
-                    height: d.est, kind: 'inventory' });
-                }
-                for (const corner of Object.keys(railGroups)) {
-                  boxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner),
-                    width: 200, height: 54, kind: 'mood' });
-                }
-                const place = placementMap(layoutScreenHuds(boxes, stageDim));
-
-                /* HUD explanation — one mechanism, two triggers. The standalone
-                   `explanation` beat annotates behind its own text screen (its
-                   continue button advances, so no competing acknowledge); the
-                   overlay trigger annotates any beat and gates it. Callouts are
-                   positioned from `place` above, so they can never drift from
-                   the HUDs they point at. */
-                const explainBeat: any = currentBeat;
-                const isExplanationBeat = explainBeat?.type === 'explanation';
-                const showCallouts = isExplanationBeat || explainOverlayActive;
-                const theme: any = previewDataRef.current?.settings?.theme;
-
-                return (
-                  <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
-                    {Object.entries(railGroups).map(([corner, entries]) => (
-                      <MoodRail key={`mood-rail-${corner}`} entries={entries}
-                        screenPosition={corner as any} containerDimensions={stageDim}
-                        offsetY={place.get(`mood-rail-${corner}`)?.offsetY ?? 0} />
-                    ))}
-                    {discFrames}
-                    {meterDescs.map((d) => (
-                      <CharacterMeterFrame
-                        key={`meter-hud-${d.c.id}`}
-                        counters={d.counters}
-                        config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
-                          y: (d.frame.offset?.y ?? 0) + (place.get(`meter-${d.c.id}`)?.offsetY ?? 0) } }}
-                        characterPosition={{ x: 0, y: 0 }}
-                        characterDimensions={{ width: 0, height: 0 }}
-                        containerDimensions={stageDim}
-                        characterName={d.c.displayName || d.c.name}
-                        characterColor={d.c.color}
-                      />
-                    ))}
-                    {invDescs.map((d) => (
-                      <CharacterInventoryFrame
-                        key={`inventory-hud-${d.c.id}`}
-                        items={d.items}
-                        config={{ ...d.frame, offset: { x: d.frame.offset?.x ?? 0,
-                          y: (d.frame.offset?.y ?? 0) + (place.get(`inv-${d.c.id}`)?.offsetY ?? 0) } }}
-                        characterPosition={{ x: 0, y: 0 }}
-                        characterDimensions={{ width: 0, height: 0 }}
-                        containerDimensions={stageDim}
-                        isVisible={true}
-                      />
-                    ))}
-                    {showCallouts && (
-                      <HudExplanationLayer
-                        boxes={boxes}
-                        placements={place}
-                        stage={stageDim}
-                        captions={explainBeat?.resolvedCaptions ?? explainBeat?.captions}
-                        skipKinds={explainBeat?.skipKinds}
-                        onAcknowledge={explainOverlayActive
-                          ? () => setExplainAcknowledged((m) => ({ ...m, [explainBeat.id]: true }))
-                          : undefined}
-                        accentColor={theme?.button?.backgroundColor}
-                        accentTextColor={theme?.button?.textColor}
-                        textColor={theme?.textBox?.textColor}
-                        backgroundColor={theme?.textBox?.backgroundColor}
-                        fontFamily={theme?.fonts?.textFont}
-                      />
-                    )}
-                  </div>
-                );
-              })()}
+              {screenHud && (
+                <ScreenHudLayer
+                  layout={screenHud}
+                  stage={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                  palette={previewDataRef.current?.emotionPalette}
+                  explanation={hudExplanation}
+                />
+              )}
               {startBlockedReason && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-red-600 text-white text-sm shadow-lg">
                   {startBlockedReason}
