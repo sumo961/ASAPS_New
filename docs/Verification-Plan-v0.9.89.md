@@ -32,8 +32,8 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 2 — runtime of generated story | ⬜ | |
 | Round 3a — placed meter element in export | ✅ passed | live value + band in a real HTML export (2026-08-14) |
 | Round 3b — band phrases translated | ✅ passed | "vertrauensvoll" in an exported story (2026-08-14) |
-| Round 3b — placed-meter display | ⚠️ partly | 2 of 3 overlaps fixed (9d921ec1); HUD-over-content open, see below |
-| Round 4 — MCP desktop server | ⬜ | needs Claude Desktop |
+| Round 3b — placed-meter display | ✅ passed | all three overlaps fixed; see the HUD work in v0.9.90 |
+| Round 4 — MCP desktop server | ✅ passed | 34 beat types live, affect survived the inject (2026-08-16) |
 | Round 5 — device/layout matrix | ✅ passed | 2 modes × 6 viewports measured; found + fixed responsive HUD overlap (2026-08-14) |
 
 ---
@@ -194,12 +194,45 @@ Two notes from doing it:
 
 ---
 
-## Round 4 — MCP desktop server *(needs Claude Desktop)*
+## Round 4 — MCP desktop server — ✅ PASSED (2026-08-16)
 
-- [ ] Server starts and connects after the `mcp-server` retirement
-- [ ] `asaps_get_beat_schema` returns all 34 beat types
-- [ ] `asaps_inject_story` puts a story into the running Builder
-- [ ] The affect-prompt block still matches `packages/core/src/prompts/affectPrompt.ts` *(the one remaining hand-mirrored copy)*
+- [x] Server starts and connects after the `mcp-server` retirement
+- [x] `asaps_get_beat_schema` returns all 34 beat types
+- [x] `asaps_inject_story` puts a story into the running Builder
+- [x] The affect-prompt block still matches `packages/core/src/prompts/affectPrompt.ts` *(the one remaining hand-mirrored copy)*
+
+Driven over stdio against `dist/` rebuilt from source, with the desktop Builder
+running and serving its API on `127.0.0.1:3001`. Claude Desktop turned out not
+to be needed: the transport is stdio JSON-RPC either way, so the server can be
+driven directly and the Builder is the thing that has to be live.
+
+- **Handshake**: protocol `2025-11-25`, `serverInfo: asaps-desktop`,
+  `capabilities: { tools }`, all six tools listed. The `mcp-server` retirement
+  did not break it.
+- **Schema**: exactly **34** beat types, fetched live from the running Builder
+  rather than from a bundled copy — so this also proves the server↔Builder link,
+  not merely that the server boots.
+- **Mirrored prompt**: both `AFFECT_CATALOG` blocks are byte-identical (3557
+  characters). The one hand-maintained copy has not drifted.
+
+### The inject carried affect, which is the part worth checking
+
+Injecting three beats only proves transport. The payload therefore also
+exercised the Round-0 finding and its fix (`44d00d15`): Mara carries Big Five
+traits, an initial mood, `initialSentiments` seeding trust toward the player at
+**−0.25**, and a Trust counter *bound* to that sentiment with a five-band
+ladder.
+
+The check is one word. A bound meter reads its band from live affect, so if the
+sentiment had been dropped anywhere between the MCP schema, the API and the
+Builder, the meter would sit at its origin and read **"neutral"**. It reads
+**"wary"** — the seeded value survived the whole trip and the binding is
+projecting it.
+
+No confirmation dialog appeared, which is correct rather than a gap: the
+workspace guard only fires when there are beats to protect, and the Builder had
+been started without a project open.
+
 
 ---
 
