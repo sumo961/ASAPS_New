@@ -772,22 +772,6 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     onGateChange?.(gateEarned);
   }, [gateEarned, onGateChange]);
 
-  // When the beat's body/title text changes, reset scroll back to the top
-  // and re-arm the gate. Otherwise the previous beat's scrollTop persists
-  // (player has read to the end → next beat starts mid-text instead of
-  // at the start of the new content).
-  React.useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    root.scrollTo({ top: 0 });
-    const scroller = root.querySelector('.slotflow-scroll') as HTMLElement | null;
-    if (scroller) scroller.scrollTo({ top: 0 });
-    if (requireFullRead) {
-      // Re-arm: the new body might have its own overflow profile, and we
-      // want the player to see its start before the gate fires.
-      setGateEarned(false);
-    }
-  }, [titleText, bodyText, requireFullRead]);
 
   /**
    * How much vertical room the screen HUDs take at each edge.
@@ -893,6 +877,31 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       right: Math.round(Math.min(right, sideCeiling)),
     };
   }, [reservedHudRects, previewHeight, previewWidth, measuredH, measuredW, shortAndWide]);
+
+  // When the beat's body/title text changes, reset scroll back to the top
+  // and re-arm the gate. Otherwise the previous beat's scrollTop persists
+  // (player has read to the end → next beat starts mid-text instead of
+  // at the start of the new content).
+  //
+  // Also re-runs when the reserved HUD band changes. The reservation arrives
+  // from the host a beat-paint later than the text does, and padding appearing
+  // above the content makes the browser's scroll anchoring compensate — it
+  // holds what you were looking at steady by scrolling down, which on arrival
+  // means the beat opens part-way into its own first paragraph. Measured 128px
+  // in on an exported story. Whenever the amount of reserved space moves, the
+  // start of the content moves with it, and the start is what should be shown.
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    root.scrollTo({ top: 0 });
+    const scroller = root.querySelector('.slotflow-scroll') as HTMLElement | null;
+    if (scroller) scroller.scrollTo({ top: 0 });
+    if (requireFullRead) {
+      // Re-arm: the new body might have its own overflow profile, and we
+      // want the player to see its start before the gate fires.
+      setGateEarned(false);
+    }
+  }, [titleText, bodyText, requireFullRead, hudReserve.top, hudReserve.bottom, hudReserve.left, hudReserve.right]);
 
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
