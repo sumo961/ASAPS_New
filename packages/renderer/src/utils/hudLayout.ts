@@ -110,3 +110,24 @@ export function placementMap(placements: HudPlacement[]): Map<string, HudPlaceme
   for (const p of placements) m.set(p.id, p);
   return m;
 }
+
+/**
+ * Scale that fits (or covers) a stage inside the space available to it.
+ *
+ * Exported because the exported player draws its screen-HUD layer as a
+ * sibling of the renderer's stage rather than inside it — the two boxes have
+ * to agree about scale, and a second copy of this arithmetic is exactly how
+ * they would stop agreeing.
+ */
+export function computeStageFitScale(
+  available: { width: number; height: number },
+  stage: { width: number; height: number },
+  mode: 'fit' | 'cover' = 'fit',
+): number {
+  if (!stage.width || !stage.height || !available.width || !available.height) return 1;
+  const scaleX = available.width / stage.width;
+  const scaleY = available.height / stage.height;
+  const scale = mode === 'cover' ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY, 2);
+  // Very close to 1 renders as 1, to avoid sub-pixel letterboxing.
+  return scale > 0.99 && scale < 1.01 ? 1 : scale;
+}

@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
+import { computeStageFitScale } from '../utils/hudLayout';
 import type { Location, AnimationPath, SlotIntent } from '@asaps/core';
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
@@ -68,23 +69,12 @@ const ScaledStage: React.FC<ScaledStageProps> = ({
         if (parent) {
           const availableWidth = parent.clientWidth;
           const availableHeight = parent.clientHeight;
-          const scaleX = availableWidth / width;
-          const scaleY = availableHeight / height;
-
-          let newScale: number;
-          if (scalingMode === 'cover') {
-            // Cover mode: fill viewport entirely, cropping edges
-            newScale = Math.max(scaleX, scaleY);
-          } else {
-            // Fit mode: letterbox to fit entirely within viewport (allow up to 2x for larger screens)
-            newScale = Math.min(scaleX, scaleY, 2);
-          }
-
-          console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, mode: ${scalingMode}, scaleX: ${scaleX.toFixed(4)}, scaleY: ${scaleY.toFixed(4)}, scale: ${newScale.toFixed(4)}`);
-          // If very close to 1, use exactly 1 to avoid sub-pixel letterboxing
-          if (newScale > 0.99 && newScale < 1.01) {
-            newScale = 1;
-          }
+          const newScale = computeStageFitScale(
+            { width: availableWidth, height: availableHeight },
+            { width, height },
+            scalingMode,
+          );
+          console.log(`[ScaledStage] container: ${availableWidth}x${availableHeight}, stage: ${width}x${height}, mode: ${scalingMode}, scale: ${newScale.toFixed(4)}`);
           setScale(newScale);
         }
       }

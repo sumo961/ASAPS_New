@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -70,6 +70,19 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // Stage dimensions captured from the loaded story so the HUD overlay
   // can position screen-docked widgets correctly.
   const [stageDims, setStageDims] = useState<{ width: number; height: number } | null>(null);
+  // Size of the box the stage is fitted into — the HUD layer needs the same
+  // number the renderer's ScaledStage measures, so it observes the same node.
+  const [playerSize, setPlayerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const stageBoxRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = stageBoxRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const read = () => setPlayerSize({ width: el.clientWidth, height: el.clientHeight });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
   /* HUD explanation (overlay trigger) — mirrors the Preview Window. Beats
      carrying `explainHuds` annotate the live HUDs on entry and are held INERT
@@ -824,12 +837,28 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     if (!screenHud || !stageDims) return null;
     const { layout, palette, beatNow, theme } = screenHud;
     const showCallouts = (beatNow as any)?.type === 'explanation' || explainOverlayActive;
+    /*
+     * Match the renderer's ScaledStage exactly.
+     *
+     * The stage is scaled to fit its container and centred; this layer is a
+     * SIBLING of it, so drawing at raw stage pixels anchored top-left put the
+     * HUDs somewhere else entirely on any window where the scale is not 1 —
+     * which, in an exported story, is nearly every window. Same box, same
+     * centring, same scale, from the same helper.
+     */
+    const scale = computeStageFitScale(
+      { width: playerSize.width, height: playerSize.height },
+      stageDims,
+      mobileMode ? 'cover' : 'fit',
+    );
     return (
       <div
         style={{
           position: 'absolute',
-          left: 0, top: 0,
+          left: '50%', top: '50%',
           width: stageDims.width, height: stageDims.height,
+          transform: `translate(-50%, -50%) scale(${scale})`,
+          transformOrigin: 'center center',
           pointerEvents: 'none',
           zIndex: 40,
         }}
@@ -865,7 +894,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   return (
     <OrientationGate orientation={orientationPolicy}>
     <div className="asaps-player" style={containerStyle}>
-      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div ref={stageBoxRef} style={{ position: 'relative', width: '100%', height: '100%' }}>
         <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
         {renderMoodHudOverlay()}
       </div>

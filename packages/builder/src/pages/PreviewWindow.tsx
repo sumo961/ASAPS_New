@@ -307,6 +307,14 @@ export const PreviewWindow: React.FC = () => {
     null | { id: string; width: number; height: number; label: string }
   >(null);
   const [isAutoFit, setIsAutoFit] = useState(true);
+  /** Stage box currently on screen — the device preset when one is chosen. */
+  const activeStage = useMemo(
+    () => ({
+      width: previewViewport ? previewViewport.width : STAGE_WIDTH,
+      height: previewViewport ? previewViewport.height : STAGE_HEIGHT,
+    }),
+    [previewViewport],
+  );
   // Ref mirror so renderer-setup code (which runs outside React's render
   // cycle) always reads the current preset.
   const previewViewportRef = useRef<null | { id: string; width: number; height: number; label: string }>(null);
@@ -441,9 +449,14 @@ export const PreviewWindow: React.FC = () => {
     return buildScreenHudLayout({
       characters: hudChars,
       hudOverlays: previewDataRef.current?.settings?.hudOverlays,
-      stage: { width: STAGE_WIDTH, height: STAGE_HEIGHT },
+      // The stage a device preset actually renders at, not the authored size.
+      // Corner anchoring is relative to the stage box, so computing against
+      // 1024×768 while the box is 1280×800 left a top-right frame 266px from
+      // the edge instead of 10 — the further the preset is from the authored
+      // size, the further the HUD drifts.
+      stage: activeStage,
     });
-  }, [currentBeat, debugInfo, isRunning]);
+  }, [currentBeat, debugInfo, isRunning, activeStage]);
 
   /* HUD explanation — one mechanism, two triggers. The standalone `explanation`
      beat annotates behind its own text screen (its continue button advances, so
@@ -2867,7 +2880,7 @@ export const PreviewWindow: React.FC = () => {
               {screenHud && (
                 <ScreenHudLayer
                   layout={screenHud}
-                  stage={{ width: STAGE_WIDTH, height: STAGE_HEIGHT }}
+                  stage={activeStage}
                   palette={previewDataRef.current?.emotionPalette}
                   explanation={hudExplanation}
                 />
