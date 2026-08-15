@@ -176,43 +176,33 @@ function setupAutoUpdater(): void {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  // Event: Update available
+  /*
+   * Event: Update available.
+   *
+   * macOS used to be short-circuited straight to the releases page, because an
+   * unsigned app could neither download nor install an update reliably. Builds
+   * have been signed with a Developer ID and notarized since v0.9.86 — the CI
+   * job verifies both before publishing — so that workaround outlived its
+   * reason while the release notes went on promising working Mac auto-update.
+   * Both platforms now take the real path; the `error` handler below still
+   * falls back to the releases page if anything goes wrong.
+   */
   autoUpdater.on('update-available', (info: UpdateInfo) => {
     console.log('[AutoUpdater] Update available:', info.version);
 
-    // On macOS, skip download and go straight to releases page (download often fails for unsigned apps)
-    if (process.platform === 'darwin') {
-      dialog.showMessageBox(mainWindow!, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available!`,
-        detail: 'Click "Download Update" to open the releases page and download the latest DMG.',
-        buttons: ['Download Update', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then((result) => {
-        if (result.response === 0) {
-          const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
-          console.log('[AutoUpdater] Opening release page:', releaseUrl);
-          openExternalIfSafe(releaseUrl);
-        }
-      });
-    } else {
-      // On Windows, use the built-in download mechanism
-      dialog.showMessageBox(mainWindow!, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) is available!`,
-        detail: 'Would you like to download it now?',
-        buttons: ['Download Now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then((result) => {
-        if (result.response === 0) {
-          autoUpdater.downloadUpdate();
-        }
-      });
-    }
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available!`,
+      detail: 'Would you like to download it now?',
+      buttons: ['Download Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
   });
 
   // Event: Update not available
@@ -226,47 +216,29 @@ function setupAutoUpdater(): void {
     mainWindow?.webContents.send('update:download-progress', progress);
   });
 
-  // Event: Update downloaded
+  /*
+   * Event: Update downloaded. Same history as `update-available` above — the
+   * macOS branch here told the interactor to go and fetch a DMG by hand, which
+   * a signed, notarized build has no need to do.
+   */
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     console.log('[AutoUpdater] Update downloaded:', info.version);
 
-    // On macOS, quitAndInstall doesn't work reliably for unsigned apps
-    // Instead, open the releases page for manual download
-    if (process.platform === 'darwin') {
-      dialog.showMessageBox(mainWindow!, {
-        type: 'info',
-        title: 'Update Ready',
-        message: `Version ${info.version} is ready to install!`,
-        detail: 'Due to macOS security restrictions, please download the new version manually.\n\nClick "Open Downloads" to get the latest DMG, then drag it to your Applications folder to replace this version.',
-        buttons: ['Open Downloads', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then((result) => {
-        if (result.response === 0) {
-          // Open the GitHub releases page for the specific version
-          const releaseUrl = `https://github.com/sumo961/ASAPS_New/releases/tag/v${info.version}`;
-          console.log('[AutoUpdater] Opening release page:', releaseUrl);
-          openExternalIfSafe(releaseUrl);
-        }
-      });
-    } else {
-      // On Windows, quitAndInstall works fine
-      dialog.showMessageBox(mainWindow!, {
-        type: 'info',
-        title: 'Update Ready',
-        message: 'Update downloaded successfully!',
-        detail: 'The update will be installed when you restart the app. Would you like to restart now?',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      }).then((result) => {
-        if (result.response === 0) {
-          console.log('[AutoUpdater] User chose to restart now');
-          isUpdating = true;
-          autoUpdater.quitAndInstall(true, true);
-        }
-      });
-    }
+    dialog.showMessageBox(mainWindow!, {
+      type: 'info',
+      title: 'Update Ready',
+      message: `Version ${info.version} downloaded successfully!`,
+      detail: 'The update will be installed when you restart the app. Would you like to restart now?',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then((result) => {
+      if (result.response === 0) {
+        console.log('[AutoUpdater] User chose to restart now');
+        isUpdating = true;
+        autoUpdater.quitAndInstall(true, true);
+      }
+    });
   });
 
   // Event: Error
