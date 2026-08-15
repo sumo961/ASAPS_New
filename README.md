@@ -22,16 +22,26 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.89** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.89 adds counter binding**: a counter
-can now be a *display* rather than a mechanic. Bind one to a character's
-sentiment, emotion or mood and it becomes a read-only window onto that state,
-so a simple trust bar can front a full affect model instead of competing with
-it. Bipolar meters grow outward from zero, optional word ladders replace raw
-numbers, and HUD meter frames now name the character they belong to. A starter
-template and a worked example ship with it. Existing counters are untouched.
+Current release: **v0.9.90** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.90 makes HUDs and the stage aware of
+each other.** Screen-docked meter, inventory and mood frames now appear in the
+Visual Editor, so what you arrange is what plays; beat text is laid out clear
+of them instead of underneath; device-size presets scale to fit rather than
+cropping the corners the HUDs sit in; and an exported story keeps its HUDs
+aligned with the stage at any window size and flows them around the page's own
+language panel. On phone-landscape, choices wrap into two columns and content
+steps around a corner HUD rather than being pushed off the screen. Two new
+authoring warnings — a counter shown twice on one beat, and a HUD stack too
+tall for a small screen — flag what the runtime cannot fix for you.
 
-**v0.9.88** before it was a security release with no feature changes: the
+**v0.9.89** before it added counter binding: a counter can be a *display*
+rather than a mechanic. Bind one to a character's sentiment, emotion or mood
+and it becomes a read-only window onto that state, so a simple trust bar can
+front a full affect model instead of competing with it. Bipolar meters grow
+outward from zero, optional word ladders replace raw numbers, and HUD meter
+frames name the character they belong to. Existing counters are untouched.
+
+**v0.9.88** was a security release with no feature changes: the
 desktop runtime moved to **Electron 43**, external links became
 scheme-validated before being handed to the operating system, and the build
 toolchain moved to **vite 8** — open dependency alerts dropping from 39 to 9.
@@ -57,9 +67,10 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 
 ### Story Authoring
 - **Visual Story Builder**: Drag-and-drop graph editor for the story structure, plus a per-beat Visual Editor for in-beat layout (positioned text, dialogs, hotspots, props, characters, meters)
+- **HUD-Faithful Editing** *(new in v0.9.90)*: Screen-docked meter, inventory and mood frames are drawn in the Visual Editor in both layout modes, packed exactly as the runtime packs them, with beat text laid out clear of them. Two authoring warnings flag what the runtime cannot fix: a counter shown twice on one beat (HUD frame *and* placed meter), and a HUD stack too tall for a small screen
 - **27+ Beat Types**: Visible, invisible, AI-runtime, and experimental camera/AR beats (full catalog below)
 - **Project Browser** *(redesigned in v0.9.64)*: One welcome surface for "where do I go next?". Four create paths (Empty / Build from a prompt / Co-write with AI / Import), compact project cards with beat-count and character-count badges, drag-drop import, a Continue banner for the last session. In Electron, the Browser opens as a dedicated window at app launch; web build keeps the in-editor modal
-- **Real-time Preview Window**: Independent window with state-injection presets, InputText pre-fills, and a live red trace painted back onto the flowchart
+- **Real-time Preview Window**: Independent window with state-injection presets, InputText pre-fills, and a live red trace painted back onto the flowchart. Device-size presets (desktop / tablet / phone, either orientation) scale the stage to fit rather than cropping it *(fixed in v0.9.90)*
 - **Undo/Redo Everywhere**: Full command history including beat operations, character editor, global settings, and visual editor moves/resizes — with a clickable history panel
 - **Asset Manager**: Project-level library with per-element pickers for images, audio, video, and fonts; automatic missing-asset detection and relocation tools
 - **Backward Compatible**: Full support for legacy ASML story files (automatic migration of deprecated beat types and attributes)
@@ -67,7 +78,7 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 ### Rich Characters & Affect
 - **2D Mood Model**: Russell's circumplex (valence × arousal) with editable initial mood, runtime nudges, and an optional on-stage HUD
 - **Sentiments**: Directed emotional memories — characters feel `<emotion>` toward other entities with strength clamped to [-1, 1]
-- **Counter Binding** *(new in v0.9.89)*: A counter can display affect instead of storing a value — bind it to a sentiment, emotion level or mood and it becomes a read-only meter. Bipolar meters grow outward from zero (distrust reads as distrust, not "less trust"); optional word ladders replace numbers (*wary → trusting*); derived counters can be read in conditions but never assigned. HUD meter frames name the character they belong to
+- **Counter Binding** *(v0.9.89)*: A counter can display affect instead of storing a value — bind it to a sentiment, emotion level or mood and it becomes a read-only meter. Bipolar meters grow outward from zero (distrust reads as distrust, not "less trust"); optional word ladders replace numbers (*wary → trusting*); derived counters can be read in conditions but never assigned. HUD meter frames name the character they belong to
 - **Emotion Nodes**: Per-character runtime intensity for each emotion, decaying per beat. Author-editable emotion palette (default Ekman 6 + pride/shame/interest)
 - **Personality Traits**: Static Big Five trait bag per character that modulates emotion deltas. 10 psychology-grounded archetype presets (narcissist, anxious-introvert, conscientious-leader, free-spirit, recluse, hothead, peacekeeper, stoic, trickster, balanced)
 - **Goals + GAMYGDALA**: Authored goals with optional satisfaction predicates; runtime auto-fires pride/joy on `met` and shame/sadness on `failed`, scaled by goal priority and trait modulation
@@ -122,7 +133,7 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 
 ### Collaboration & Distribution
 - **Git VCS Integration**: Full Git inside the app — commit, push, pull, branch, merge, clone, history. Force-push option for rejection recovery; advisory beat-level editing locks for collaboration
-- **HTML Export**: Standalone playable HTML with splash screen, counter HUD, inventory icons, scrollable credits page, embedded TTS, language switcher
+- **HTML Export**: Standalone playable HTML with splash screen, counter HUD, inventory icons, scrollable credits page, embedded TTS, language switcher. HUDs stay anchored to the stage at any window size and flow around the page's own language panel *(fixed in v0.9.90)*
 - **Desktop Apps**: Pre-built macOS Universal (Intel + Apple Silicon) and Windows installers via GitHub Releases, with auto-update support
 - **ASML XML Format**: Standard format for interchange and version control — see [ASML File Format](#-asml-file-format) below
 - **Session Logging**: Exportable play-session traces (beat path, choices, AI outputs, branch decisions) from both the Preview Window and HTML exports

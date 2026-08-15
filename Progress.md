@@ -1,5 +1,186 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-15: HUDs and the stage they sit on (v0.9.90)
+
+### Overview
+
+A verification sweep of the counter-binding release turned into a run of layout
+fixes. The theme underneath all of them: **screen-docked HUDs and the stage
+content did not know about each other.** The HUD layer is drawn above the
+stage, the stage is laid out below it, and nothing in between reconciled the
+two — so meters covered text, text covered meters, and the editor showed
+neither.
+
+Every fix in this release was found by driving the running app and measuring
+the DOM, not by reading code. Several were found only because the previous fix
+made them visible.
+
+---
+
+### The Visual Editor now shows what plays
+
+`PositionedBeatView` mounts HUD frames from its `case 'character'` branch, so a
+character who is not standing on the stage got no HUD at all. The players never
+hit this — they mount screen-docked HUDs as a top-level layer. The editor never
+got that layer, so an author could configure four counters, see an empty
+canvas, and discover the HUD only by running the story.
+
+`ScreenHudLayer` extracts that layer so all three surfaces share one authority.
+The split is deliberate: `buildScreenHudLayout()` decides what exists and where
+it packs — plain data, no engine, no React — and the component draws the
+result. Hosts resolve their own values first, so the editor shares the layout
+without pretending a story is running.
+
+Both editor surfaces were missing it, in turn: the fixed-canvas editor first,
+then `VisualWorkspace`, which edits responsive beats and is the mode where the
+HUD reservation actually costs layout space.
+
+The editor also renders the same default text box and button the runtime falls
+back to — preview-only, never written back as authored positions — and HUD
+overlays now default to on.
+
+**Files modified:** `packages/renderer/src/components/ScreenHudLayer.tsx` (new),
+`packages/builder/src/components/visual/{VisualBeatEditor,VisualWorkspace}.tsx`,
+`packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`
+
+### Stage content reserves space against HUDs
+
+A mechanism existed — `hudBottomY` — but it was fed only by the top-centre
+countdown, on the reasoning written into its comment: corner HUDs are timer
+chips, too small to reach centred content. A four-counter character frame is
+not. Text was drawn under it, clipping the first word of every line.
+
+Both players and the editor now build their HUD layout before the stage renders
+and pass the packed boxes down as reserved rects. An element lifts only when it
+actually passes under one; bottom-anchored HUDs are skipped, since lifting away
+from one pushes content further in. Authored positions still win — this
+reserves space against a layer the author did not place and cannot move.
+
+Responsive mode needed a different shape: slot flow reflows, so the band
+becomes padding on the slot root and the column simply starts below it.
+
+**Files modified:** `packages/renderer/src/components/{PositionedBeatView,SlotFlowView}.tsx`,
+`packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/renderer/src/utils/useReservedHudRects.ts` (new)
+
+### Landscape: content beside the HUD, choices in two columns
+
+Choice buttons stack vertically by design — a column reads as a list of things
+you might say, a row reads as a toolbar. That holds while there is height to
+spend. At 740×360 four choices are ~200px of column against a 360px stage, so
+the list ran off the bottom while half the width sat empty.
+
+Short, wide stages now lay choices out 2×2 in reading order, and a narrow
+corner HUD is stepped *around* rather than under: the reserve becomes a side
+inset, so the column starts at the top and begins past the frame. Taller
+viewports are untouched.
+
+An intermediate attempt is worth recording as a wrong turn: skipping the
+reserve entirely for narrow corner HUDs, on the assumption that a centred
+column would not reach the corner. It does, and the text ran straight under the
+frame.
+
+### Device presets were cropped, not scaled
+
+Choosing a device preset in the Preview Window rendered the stage at full pixel
+size with no transform — only the no-preset branch scaled. Anything larger than
+the pane was cropped rather than shown smaller, and the crop landed on the
+corners where HUDs sit and the bottom where the action button sits. Desktop put
+the stage at x −176 with the whole HUD off-screen.
+
+Two causes: the fit scale was computed from the authored-size constants rather
+than the stage actually on screen, and its effect did not depend on the
+selected preset. Both branches now follow one rule — render at true pixel size,
+scale to fit.
+
+**Files modified:** `packages/builder/src/pages/PreviewWindow.tsx`
+
+### HUDs anchored to the stage that is actually drawn
+
+Two anchoring bugs, one per path.
+
+In the preview, the HUD layout was built against the authored-size constants
+while the stage box takes the preset's size. Corner anchoring is relative to
+that box: a top-right frame measured 10px from the right edge at 1024×768 and
+**266px** at Desktop's 1280×800.
+
+In the exported player, the HUD layer is a *sibling* of the renderer's stage.
+The renderer fits the stage into the window — centred, uniformly scaled — while
+the HUD layer drew at raw stage pixels anchored top-left. Those agree only at
+scale exactly 1, which in an exported story is the rare case.
+
+The fit arithmetic is now one exported function both call.
+
+**Files modified:** `packages/renderer/src/utils/hudLayout.ts`,
+`packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebPlayer.tsx`,
+`packages/builder/src/pages/PreviewWindow.tsx`
+
+### The exported page's own chrome is an obstacle
+
+An exported story pins a language panel to the window's top-right, outside the
+player's tree entirely — so a character meter frame docked there rendered
+underneath it. The packer already solves this shape for the global timer, which
+is not drawn by the HUD layer but still occupies its corner. Host chrome now
+enters the same box list, ahead of everything else, and is *measured* rather
+than declared so a panel that expands, collapses or never mounts reserves
+exactly what it occupies.
+
+**Files modified:** `packages/player-web/src/WebPlayer.tsx`,
+`packages/renderer/src/components/{ScreenHudLayer,HudExplanationLayer}.tsx`,
+`packages/renderer/src/utils/hudLayout.ts`
+
+### Two counters, one number — flagged, not prevented
+
+A counter can appear both in a character's HUD frame and as a placed meter on
+the same beat. Suppressing the frame row stopped the duplication but made the
+HUD change shape between beats — four rows on one screen, three on the next —
+which reads as "the counter vanished". That is worse than the redundancy.
+
+Both render. The editor flags it instead, as a **⚠ shown twice** badge on the
+element card whose tooltip names whose HUD the counter is also in. Only
+possible now that the editor draws HUDs at all.
+
+### A HUD stack too tall for the smallest screen
+
+Screen HUDs are a fixed pixel size regardless of device. Stack two or three in
+one corner and a short viewport has no room left for the beat. The runtime can
+only choose what to sacrifice, so the editor warns — **⚠ HUD stack tall** —
+when a corner passes 40% of a 740px portrait phone. Calibrated against measured
+results: one four-counter frame stays quiet, three frames warn.
+
+**Files modified:** `packages/builder/src/utils/{hudStackWarning,duplicateHudCounter}.ts` (new),
+`packages/builder/src/components/visual/{VisualPropertiesPanel,VisualBeatEditor,VisualWorkspace}.tsx`
+
+### Smaller fixes
+
+- **Placing one element emptied a beat.** Any authored location suppressed
+  every default, so an author who positioned one element lost the text box and
+  button. Reached only two of the seven beat types that fall back to defaults;
+  now all of them.
+- **A beat opened part-way into its own first paragraph.** The reservation
+  arrives a paint after the text, and the browser's scroll anchoring
+  compensates by scrolling down. The scroll reset now follows the reserve.
+- **The reservation was a race.** Its setter only stored a value while the host
+  computed it in an effect, so it applied a beat late or never — passing
+  whenever something unrelated forced a second render. Now an
+  initial-plus-subscribe pair, the contract the renderer already used for timer
+  state.
+
+### Verification
+
+Round 5 of the v0.9.89 plan (device/layout matrix) ran against a purpose-built
+fixture across two layout modes × six viewports, measured with a DOM harness
+rather than by eye. Two of its own measurement traps are recorded in
+`docs/Verification-Plan-v0.9.89.md`: walking up from a text node past the stage
+into page ancestors, and trusting `getBoundingClientRect()` for an element
+inside a scroller. Both produced false alarms before the harness was
+trustworthy. A third gap surfaced later — the harness compared elements against
+the stage and never against the visible pane, so a stage hanging off the edge
+of its container measured perfectly clean.
+
+5692 tests pass across core, renderer and builder.
+
+---
+
 ## 2026-08-11: Counter binding — meters that read affect state (v0.9.89)
 
 ### Overview
