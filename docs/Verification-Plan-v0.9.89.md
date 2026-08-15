@@ -29,7 +29,7 @@ The repo's own history supports the effort: every prior verification kit found a
 | Round 1c — Co-Designer | ✅ passed, 1 data-loss bug found | refused the bad ask, caught mid-apply (2026-08-13) |
 | Round 1d — beat suggestions | ✅ passed | multiChoice offered as the default (2026-08-13) |
 | Round 1e — dialog generation | ✅ passed clean | affect effects, correct target, no counter writes (2026-08-14) |
-| Round 2 — runtime of generated story | ⬜ | |
+| Round 2 — runtime of generated story | ⚠️ passed, 1 blocking bug found | all 6 meter checks pass; the story dead-ends at Decision 1 (2026-08-16) |
 | Round 3a — placed meter element in export | ✅ passed | live value + band in a real HTML export (2026-08-14) |
 | Round 3b — band phrases translated | ✅ passed | "vertrauensvoll" in an exported story (2026-08-14) |
 | Round 3b — placed-meter display | ✅ passed | all three overlaps fixed; see the HUD work in v0.9.90 |
@@ -152,16 +152,80 @@ The only surface that needed no fix.
 
 ---
 
-## Round 2 — Runtime of what Round 1 produced
+## Round 2 — Runtime of what Round 1 produced — ⚠️ PASSED, ONE BLOCKING BUG (2026-08-16)
 
-Play the generated story in the Preview Window (**close and reopen it after any rebuild**).
+Played `Someone Made Her Promises` in the Preview Window, measuring bar
+geometry rather than reading labels — the failure mode this round exists to
+catch (a bipolar meter remapped onto 0..100) looks perfectly plausible in text
+and is obvious in pixels.
 
-- [ ] Bound meters move from choices that never name a counter
-- [ ] Band phrases change at the right thresholds
-- [ ] A negative value grows the bar outward from the centre, not from the edge
-- [ ] Zero renders as an empty bar, never half-full
-- [ ] Two characters with screen-docked frames are distinguishable by name
-- [ ] A words-only meter (`showLevelMeter: false` + `numericFormat: 'band'`) shows no bar
+The story is a good fixture by accident: **33 affect effects across 12 choices
+and not one effect naming a counter**, so any meter movement is necessarily
+derived.
+
+- [x] Bound meters move from choices that never name a counter
+- [x] Band phrases change at the right thresholds
+- [x] A negative value grows the bar outward from the centre, not from the edge
+- [x] Zero renders as an empty bar, never half-full
+- [x] Two characters with screen-docked frames are distinguishable by name
+- [x] A words-only meter (`showLevelMeter: false` + `numericFormat: 'band'`) shows no bar
+
+### Measured
+
+Mara's trust, bands `[-100 "Braced to leave", -30 "Wary", 20 "Opening up", 60 "Trusting you"]`,
+seeded at −0.3. Track 107px, centre 53.5.
+
+| after | fill span | signed value | band |
+|---|---|---|---|
+| start (seed −0.3) | 37.7 → **53.5** | −29.5 | Wary |
+| "That should never have happened." | 48.2 → **53.5** | −9.9 | Wary |
+| "I can't promise I'm different." | **53.5** → 58.8 | +9.9 | Wary |
+| "You share only what you're comfortable with" | **53.5** → 66.7 | +24.7 | Opening up |
+| "This week I'll file an emergency…" | **53.5** → 77.2 | +44.3 | Opening up |
+
+Every fill terminates at the centre and grows outward — leftward while
+negative, rightward while positive, on the same bar as the value crosses zero.
+The band flips between +9.9 and +24.7, which is exactly the `from: 20`
+boundary. The seeded −30 landing on the `from: -30` boundary and reading
+"Wary" also confirms bands are inclusive at `from` — the thing a false alarm in
+Round 1a turned on.
+
+Zero was measured on a throwaway with the seed removed, since nothing in the
+story sits at exactly zero: **0.8px of fill at the centre** on a 107px track —
+the origin marker, not a value. A 0..100 remap would have drawn 53.5px.
+
+Marek supplies the last two: his frame is stacked in the same corner as Mara's
+and headed with his name, and his Respect counter (`showLevelMeter: false`,
+`numericFormat: 'band'`) renders **zero bars** — the phrase alone.
+
+### Blocking bug — the generated story dead-ends at Decision 1
+
+Three of the fifteen dialogTree leaf choices target **`beat_intake`, which does
+not exist**; the beats are numbered `beat_0…beat_15`. All three are `beat_3`'s
+exits, so every path through "Decision 1 — How you open" stops there. Clicking
+does nothing at all — no error, no movement. Round 1a called this story a pass
+because it was never played past its opening.
+
+`aiStoryValidator` **already catches this**. It walks dialogTree leaf targets
+and raises a `missing_beat` error for exactly this case, with a test covering
+it. The problem is what happens next in `App.tsx`:
+
+```js
+if (!validation.valid) {
+  console.warn('[App] AI story has validation errors:');
+  validation.errors.forEach(e => console.warn('  -', e.message));
+  // Continue importing despite errors - user can fix in builder
+}
+```
+
+The diagnosis is correct, complete, and written to a console the author will
+never open. The Twine and Ren'Py importers surface their validation errors in
+the UI; AI-generated stories do not. So the safety net fires silently and the
+author meets the fault mid-playthrough instead.
+
+That is the finding worth acting on — not the model inventing an id, which it
+will always occasionally do, but a validator whose output nobody sees.
+
 
 ---
 
