@@ -49,6 +49,9 @@ interface GraphEditorProps {
   highlightedBeatIds?: string[];
   /** Beats visited during the active Preview Window session — rendered as a red trace. */
   pwVisitedBeatIds?: string[];
+  /** beatId → the missing target it points at. Draws a ⚠ mark on the node so
+   *  the import banner's list has something to point at in the graph. */
+  brokenTargetsByBeatId?: Record<string, string>;
   /** Currently-active beat in the Preview Window — highlighted more prominently than past-visited beats. */
   pwCurrentBeatId?: string | null;
   onAutoLayout?: () => void;
@@ -117,6 +120,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onAutoLayoutCluster,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
+  brokenTargetsByBeatId,
   pwCurrentBeatId,
   onAutoLayout,
   onAddToContainer,
@@ -186,6 +190,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const pwCurrentBeatIdRef = useRef<string | null | undefined>(pwCurrentBeatId);
   pwCurrentBeatIdRef.current = pwCurrentBeatId;
 
+  // Same ref-mirror treatment: a broken-link mark must not make every node
+  // rebuild whenever the map identity changes.
+  const brokenTargetsRef = useRef<Record<string, string> | undefined>(brokenTargetsByBeatId);
+  brokenTargetsRef.current = brokenTargetsByBeatId;
+
   // DEBUG: Track initial mounting
   const mountRef = useRef(false);
 
@@ -231,6 +240,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
         pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
         pwCurrent: pwCurrentBeatIdRef.current === beat.id,
+        brokenTarget: brokenTargetsRef.current?.[beat.id],
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,

@@ -16,6 +16,10 @@ interface BeatNodeData {
   /** True for the beat currently executing in the Preview Window — painted
    *  more prominently than past-visited beats. */
   pwCurrent?: boolean;
+  /** A choice on this beat points at a beat that does not exist, so the story
+   *  stops here when played. Set from the import validator; see
+   *  ImportIssuesBanner for why this is surfaced rather than logged. */
+  brokenTarget?: string;
 }
 
 // Beat type icons
@@ -112,7 +116,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   return (
     <div
       className={`
-        px-3 py-2.5 rounded-lg shadow-lg
+        px-3 py-2.5 rounded-lg shadow-lg relative
         transition-all duration-200 cursor-pointer
         ${data.pwCurrent ? 'border-4 ring-4 ring-red-500 ring-opacity-70 animate-pulse-slow' : 'border-2'}
         ${isSelected && !data.highlighted && !data.pwVisited && !data.pwCurrent ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
@@ -126,8 +130,21 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         width: `${NODE_WIDTH}px`,
         backgroundColor: bgColor,
       }}
-      title={fullLabel}
+      title={data.brokenTarget
+        ? `${fullLabel}\n\n⚠ A choice here points at "${data.brokenTarget}", which is not a beat in this story — play stops at this beat.`
+        : fullLabel}
     >
+      {/* Broken-link mark. Sits above the node's own corner rather than inside
+          the label, so it survives the title being truncated. */}
+      {data.brokenTarget && (
+        <div
+          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-amber-400 border-2 border-white
+                     flex items-center justify-center text-[10px] leading-none shadow"
+          style={{ zIndex: 2 }}
+        >
+          ⚠
+        </div>
+      )}
       <Handle
         type="target"
         position={Position.Left}

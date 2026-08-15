@@ -61,6 +61,7 @@ import { SearchPanel } from './components/search';
 import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
+import { ImportIssuesBanner, type BrokenTarget } from './components/ImportIssuesBanner';
 import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { validateProjectAssets } from './utils/assetValidator';
 import { MissingAssetsDialog } from './components/settings/MissingAssetsDialog';
@@ -319,6 +320,23 @@ function App() {
   const [showHelperCommands, setShowHelperCommands] = useState(false);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   // Beats visited by the Preview Window (live trace, shown as red highlight on the flowchart).
+  /**
+   * What the validator found in the last imported story, kept so it can be
+   * shown. It used to go to console.warn and nothing else, which is how a
+   * generated story with three dead links passed a verification round — the
+   * diagnosis existed, in a place nobody looks.
+   */
+  const [importIssues, setImportIssues] = useState<{
+    brokenTargets: BrokenTarget[];
+    otherErrors: string[];
+  } | null>(null);
+  /** beatId → the missing target, for the ⚠ marks in the graph. */
+  const brokenTargetsByBeatId = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const b of importIssues?.brokenTargets || []) m[b.sourceBeatId] = b.target;
+    return Object.keys(m).length ? m : undefined;
+  }, [importIssues]);
+
   const [pwVisitedBeatIds, setPwVisitedBeatIds] = useState<string[]>([]);
   // The beat currently executing in the Preview Window — painted more
   // prominently on the flowchart than past-visited beats.
@@ -5289,7 +5307,20 @@ function App() {
       if (validation.missingBeatIds.length > 0) {
         console.warn('[App] Missing beat IDs:', validation.missingBeatIds.join(', '));
       }
-      // Continue importing despite errors - user can fix in builder
+      // The import still proceeds — a story with a few bad links is mostly good
+      // work — but the author is told, in the UI, which links are broken and
+      // which beats carry them. See ImportIssuesBanner.
+      const nameOf = (id: string) =>
+        (story.beats || []).find((b: any) => b.id === id)?.name as string | undefined;
+      const broken: BrokenTarget[] = validation.errors
+        .filter(e => e.category === 'missing_beat' && e.beatId && e.targetId)
+        .map(e => ({ sourceBeatId: e.beatId!, sourceBeatName: nameOf(e.beatId!), target: e.targetId! }));
+      const others = validation.errors
+        .filter(e => e.category !== 'missing_beat')
+        .map(e => e.message);
+      setImportIssues(broken.length || others.length ? { brokenTargets: broken, otherErrors: others } : null);
+    } else {
+      setImportIssues(null);
     }
     if (validation.warnings.length > 0) {
       console.warn('[App] AI story warnings:');
@@ -6358,6 +6389,20 @@ function App() {
         onOpenLayoutSettings={handleOpenSettings}
       />
 
+      {/* Import validation, said out loud rather than logged. Sits under the
+          header so it is the first thing seen after a generated story lands. */}
+      {importIssues && (
+        <ImportIssuesBanner
+          brokenTargets={importIssues.brokenTargets}
+          otherErrors={importIssues.otherErrors}
+          onDismiss={() => setImportIssues(null)}
+          onSelectBeat={(beatId) => {
+            const beat = state.beats.find(b => b.id === beatId);
+            if (beat) handleBeatSelect(beat);
+          }}
+        />
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           beats={state.beats}
@@ -6438,6 +6483,7 @@ function App() {
             highlightedBeatIds={highlightedBeatIds}
             pwVisitedBeatIds={pwVisitedBeatIds}
             pwCurrentBeatId={pwCurrentBeatId}
+            brokenTargetsByBeatId={brokenTargetsByBeatId}
             onAutoLayout={handleAutoLayout}
             onAutoLayoutCluster={(clusterId: string) => {
               // Auto-layout beats within a cluster using a simple grid

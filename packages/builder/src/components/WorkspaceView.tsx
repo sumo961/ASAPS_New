@@ -47,6 +47,8 @@ interface WorkspaceViewProps {
   highlightedBeatIds?: string[];
   /** Beats visited during the active Preview Window session — passed to the flowchart for the red trace overlay. */
   pwVisitedBeatIds?: string[];
+  /** beatId → missing target, for the graph's broken-link marks. */
+  brokenTargetsByBeatId?: Record<string, string>;
   /** Currently-active beat in the Preview Window — painted more prominently. */
   pwCurrentBeatId?: string | null;
   onAutoLayout?: () => void;
@@ -106,6 +108,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   globalSettings,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
+  brokenTargetsByBeatId,
   pwCurrentBeatId,
   onAutoLayout,
   onAutoLayoutCluster,
@@ -303,6 +306,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onTogglePalette={onTogglePalette}
               highlightedBeatIds={highlightedBeatIds}
               pwVisitedBeatIds={pwVisitedBeatIds}
+              brokenTargetsByBeatId={brokenTargetsByBeatId}
               pwCurrentBeatId={pwCurrentBeatId}
               onAutoLayout={onAutoLayout}
               onAutoLayoutCluster={onAutoLayoutCluster}

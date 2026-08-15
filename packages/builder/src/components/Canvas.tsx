@@ -32,6 +32,8 @@ interface CanvasProps {
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
   pwVisitedBeatIds?: string[];
+  /** beatId → missing target, for the graph's broken-link marks. */
+  brokenTargetsByBeatId?: Record<string, string>;
   pwCurrentBeatId?: string | null;
   onAutoLayout?: () => void;
   onAddToContainer?: (clusterId: string) => void;
@@ -77,6 +79,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onAutoLayoutCluster,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
+  brokenTargetsByBeatId,
   pwCurrentBeatId,
   onAutoLayout,
   onAddToContainer,
@@ -151,6 +154,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onAutoLayoutCluster={onAutoLayoutCluster}
           highlightedBeatIds={highlightedBeatIds}
           pwVisitedBeatIds={pwVisitedBeatIds}
+      brokenTargetsByBeatId={brokenTargetsByBeatId}
           pwCurrentBeatId={pwCurrentBeatId}
           onAutoLayout={onAutoLayout}
           onAddToContainer={onAddToContainer}
