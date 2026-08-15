@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -74,6 +74,18 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // number the renderer's ScaledStage measures, so it observes the same node.
   const [playerSize, setPlayerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const stageBoxRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * Boxes the surrounding page floats over the stage — in an exported story
+   * that is the language panel, pinned to the window's top-right and outside
+   * the player's own tree entirely. The HUD packer already flows character
+   * frames around the global timer; host chrome is the same kind of obstacle,
+   * and without it a top-right meter frame sits underneath the panel.
+   *
+   * Measured rather than declared, so a panel that expands, collapses or moves
+   * reserves what it currently occupies, and a story exported without
+   * translations reserves nothing.
+   */
+  const [chromeBoxes, setChromeBoxes] = useState<HudBox[]>([]);
   useEffect(() => {
     const el = stageBoxRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -83,6 +95,57 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const box = stageBoxRef.current;
+    if (!box || !stageDims) return;
+
+    const read = () => {
+      const host = box.getBoundingClientRect();
+      const scale = computeStageFitScale(
+        { width: box.clientWidth, height: box.clientHeight },
+        stageDims,
+        mobileMode ? 'cover' : 'fit',
+      );
+      // The stage is centred inside the host box; convert screen px back to
+      // stage px so the reservation is in the packer's own coordinates.
+      const originX = host.left + (host.width - stageDims.width * scale) / 2;
+      const originY = host.top + (host.height - stageDims.height * scale) / 2;
+
+      const found: HudBox[] = [];
+      document.querySelectorAll('.language-panel, [data-asaps-chrome]').forEach((node, i) => {
+        const r = (node as HTMLElement).getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        const x = (r.left - originX) / scale;
+        const y = (r.top - originY) / scale;
+        const w = r.width / scale;
+        const h = r.height / scale;
+        // Chrome sitting entirely outside the stage (letterbox margins) is not
+        // in anyone's way.
+        if (x + w <= 0 || y + h <= 0 || x >= stageDims.width || y >= stageDims.height) return;
+        const corner: HudCorner =
+          `${y + h / 2 < stageDims.height / 2 ? 'top' : 'bottom'}-${x + w / 2 < stageDims.width / 2 ? 'left' : 'right'}` as HudCorner;
+        found.push({ id: `chrome-${i}`, corner, width: Math.round(w), height: Math.round(h), kind: 'chrome' });
+      });
+
+      setChromeBoxes((prev) =>
+        prev.length === found.length && prev.every((p, i) =>
+          p.corner === found[i].corner && p.width === found[i].width && p.height === found[i].height)
+          ? prev
+          : found);
+    };
+
+    read();
+    const ro = new ResizeObserver(read);
+    document.querySelectorAll('.language-panel, [data-asaps-chrome]').forEach((n) => ro.observe(n));
+    if (stageBoxRef.current) ro.observe(stageBoxRef.current);
+    // The panel toggles between collapsed and expanded, which ResizeObserver
+    // catches, but it can also mount late — watch the tree for that.
+    const mo = new MutationObserver(read);
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, [stageDims, mobileMode, playerSize.width, playerSize.height]);
   const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
   /* HUD explanation (overlay trigger) — mirrors the Preview Window. Beats
      carrying `explainHuds` annotate the live HUDs on entry and are held INERT
@@ -773,6 +836,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
    */
   const screenHud = (() => {
     void hudTick;
+    void chromeBoxes;
     const player = playerRef.current;
     const ctx = player?.getEngine()?.getContext();
     const story = player?.getEngine()?.getStory();
@@ -826,6 +890,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         characters: hudChars,
         hudOverlays: gsNow?.hudOverlays,
         stage: stageDims,
+        extraBoxes: chromeBoxes,
       }),
       palette: (story as any).getEmotionPalette?.(),
       beatNow,

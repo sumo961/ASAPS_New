@@ -62,6 +62,12 @@ export interface ScreenHudLayoutInput {
   characters: ScreenHudCharacter[];
   /** globalSettings.hudOverlays — timer / countdown reserve their corners. */
   hudOverlays?: any;
+  /**
+   * Boxes the host draws itself and this layer must flow around — the exported
+   * player's language panel, for one. Same treatment as the global timer: not
+   * rendered here, but occupying its corner so character frames pack clear.
+   */
+  extraBoxes?: HudBox[];
   stage: { width: number; height: number };
 }
 
@@ -123,9 +129,10 @@ function inventoryHeightEstimate(frame: any, itemCount: number): number {
  * character frames must flow clear of them.
  */
 export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayout {
-  const { characters, hudOverlays, stage } = input;
+  const { characters, hudOverlays, stage, extraBoxes } = input;
   if (!characters || characters.length === 0) {
-    if (!hudOverlays?.timerHud?.enabled && !hudOverlays?.countdownMeter?.enabled) return EMPTY;
+    if (!hudOverlays?.timerHud?.enabled && !hudOverlays?.countdownMeter?.enabled
+        && !(extraBoxes && extraBoxes.length > 0)) return EMPTY;
   }
 
   const rails: Record<string, MoodRailEntry[]> = {};
@@ -165,7 +172,7 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
     }
   }
 
-  const boxes: HudBox[] = [];
+  const boxes: HudBox[] = [...(extraBoxes || [])];
   if (hudOverlays?.timerHud?.enabled) {
     boxes.push({
       id: '__timer', corner: toCorner(hudOverlays.timerHud.position), width: 160,

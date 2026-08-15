@@ -21,6 +21,9 @@ import type { HudKind } from '../utils/hudLayout';
 
 /** Built-in captions, phrased for a player rather than an author. */
 export const DEFAULT_HUD_CAPTIONS: Record<HudKind, string> = {
+  // Player chrome is reserved space, not part of the story — an explanation
+  // beat annotates what the author put on screen, so this stays unlabelled.
+  chrome: '',
   timer: 'The time in the story.',
   countdown: 'How long you have left.',
   meter: "A character's values as they change.",
@@ -69,7 +72,12 @@ export const HudExplanationLayer: React.FC<HudExplanationLayerProps> = ({
   fontFamily,
 }) => {
   const skip = new Set(skipKinds || []);
-  const annotated = boxes.filter((b) => !skip.has(b.kind) && placements.has(b.id));
+  // A box with no caption gets no callout — reserved player chrome occupies a
+  // corner but is not something an explanation beat should point at.
+  const annotated = boxes.filter(
+    (b) => !skip.has(b.kind) && placements.has(b.id)
+      && !!(captions?.[b.kind] || DEFAULT_HUD_CAPTIONS[b.kind]),
+  );
   if (annotated.length === 0) return null;
 
   const CALLOUT_W = 168;

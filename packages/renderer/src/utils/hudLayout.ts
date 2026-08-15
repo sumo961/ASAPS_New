@@ -19,7 +19,7 @@ export type HudCorner =
   | 'top-left' | 'top-right' | 'top-center'
   | 'bottom-left' | 'bottom-right' | 'bottom-center';
 
-export type HudKind = 'timer' | 'countdown' | 'meter' | 'inventory' | 'mood';
+export type HudKind = 'chrome' | 'timer' | 'countdown' | 'meter' | 'inventory' | 'mood';
 
 export interface HudBox {
   id: string;
@@ -43,9 +43,11 @@ export interface HudPlacement {
   top: number;
 }
 
-// Global time/counter readouts sit at the very edge; character frames after.
+// Player chrome sits at the very edge — it is not part of the story and the
+// interactor expects it where the app always puts it. Global time/counter
+// readouts next; character frames after those.
 const KIND_ORDER: Record<HudKind, number> = {
-  timer: 0, countdown: 1, meter: 2, inventory: 3, mood: 4,
+  chrome: -1, timer: 0, countdown: 1, meter: 2, inventory: 3, mood: 4,
 };
 
 /** Vertical band of a corner. */
