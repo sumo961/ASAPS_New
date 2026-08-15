@@ -813,8 +813,18 @@ export const PreviewWindow: React.FC = () => {
       const availableWidth = previewAreaRef.current.clientWidth - (padding * 2);
       const availableHeight = previewAreaRef.current.clientHeight - (padding * 2);
 
-      const scaleX = availableWidth / STAGE_WIDTH;
-      const scaleY = availableHeight / STAGE_HEIGHT;
+      // Fit the stage that is ACTUALLY on screen. A device preset replaces the
+      // authored stage size, and measuring the authored one instead left a
+      // 1280×800 or 768×1024 preset unscaled in a smaller pane — cropped, with
+      // the loss landing on the corners where screen HUDs sit and the bottom
+      // where the action button sits. "Fit window" looked right only because
+      // it happens to be the case where the two sizes agree.
+      const vp = previewViewportRef.current;
+      const activeWidth = vp ? vp.width : STAGE_WIDTH;
+      const activeHeight = vp ? vp.height : STAGE_HEIGHT;
+
+      const scaleX = availableWidth / activeWidth;
+      const scaleY = availableHeight / activeHeight;
       // Allow scaling up to fill available space (max 2x to avoid excessive pixelation)
       const newFitScale = Math.min(scaleX, scaleY, 2);
 
@@ -838,7 +848,7 @@ export const PreviewWindow: React.FC = () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
-  }, [isAutoFit, story]);
+  }, [isAutoFit, story, previewViewport]);
 
   // Initialize renderer
   useEffect(() => {
@@ -2812,8 +2822,8 @@ export const PreviewWindow: React.FC = () => {
               its wrapping changes. */}
           <div
             style={{
-              width: previewViewport ? previewViewport.width : STAGE_WIDTH * scale,
-              height: previewViewport ? previewViewport.height : STAGE_HEIGHT * scale,
+              width: (previewViewport ? previewViewport.width : STAGE_WIDTH) * scale,
+              height: (previewViewport ? previewViewport.height : STAGE_HEIGHT) * scale,
               flexShrink: 0,
               position: 'relative',
             }}
@@ -2822,13 +2832,13 @@ export const PreviewWindow: React.FC = () => {
               className={`relative bg-white shadow-lg transition-all duration-200 ${
                 (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
               }`}
-              style={previewViewport ? {
-                width: previewViewport.width,
-                height: previewViewport.height,
-                overflow: 'hidden',
-              } : {
-                width: STAGE_WIDTH,
-                height: STAGE_HEIGHT,
+              /* One sizing rule for both cases: render the stage at its true
+                 pixel size and scale it to fit. The preset branch used to skip
+                 the transform entirely, so anything larger than the pane was
+                 silently cropped rather than shown smaller. */
+              style={{
+                width: previewViewport ? previewViewport.width : STAGE_WIDTH,
+                height: previewViewport ? previewViewport.height : STAGE_HEIGHT,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
                 overflow: 'hidden',
