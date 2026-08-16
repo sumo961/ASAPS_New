@@ -1,5 +1,102 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-16: The release that fixes updating, and the walks that fork (v0.9.91)
+
+### Overview
+
+A small release with two user-visible fixes and one structural one, produced by
+finishing the v0.9.89 verification plan (Rounds 2 and 4) and acting on a
+retrospective of the Aug 7–16 window. The retrospective's finding was blunt:
+verification kept trailing release, and duplicated "walks" over story data kept
+turning into shipped bugs. This release closes the specific instances and adds
+tripwires so the next fork announces itself in CI instead of in a playthrough.
+
+### macOS auto-update actually updates
+
+Starting the app offered a trip to the releases page instead of updating. Both
+updater handlers branched on `darwin` and sent Mac users off to download a DMG
+by hand — workarounds written when builds were unsigned, outliving their reason
+by four releases while the release notes promised working auto-update. Both
+platforms now take the same path: ask, download, offer to restart.
+
+**The hop to this release is still manual.** The updater that runs during
+0.9.90→0.9.91 is 0.9.90's — the old code. The first automatic Mac update is
+0.9.91→0.9.92.
+
+**Files modified:** `apps/builder-desktop/src/main/index.ts`
+
+### Broken story links are shown, not logged
+
+Round 2 played the Round-1 generated story and it stopped dead at its first
+decision: three dialogTree choices pointed at a beat that did not exist. The
+validator had caught exactly this — and written it to `console.warn`, where no
+author looks. Worse, the MCP inject path never called the validator at all, so
+a story injected from Claude Desktop went in completely unchecked.
+
+Both import paths now share one validation reporter. The import still proceeds
+— a story with three bad links out of fifteen is mostly good work — but the
+author gets a dismissible banner naming each broken link ("3 choices lead
+nowhere … the story stops there when someone plays it"), a ⚠ mark on the
+affected beats in the graph, and click-to-select from banner row to beat. The
+banner is scoped to the story it was raised about rather than cleared by
+lifecycle events, because the import itself creates a project and a naive
+clear-on-switch would erase the banner in the same breath that raised it.
+
+**Files modified:** `packages/builder/src/components/ImportIssuesBanner.tsx` (new),
+`packages/builder/src/utils/{importIssuesVisible,duplicateHudCounter}.ts` (new),
+`packages/builder/src/components/graph/{BeatNode,GraphEditor}.tsx`,
+`packages/builder/src/components/{WorkspaceView,Canvas}.tsx`, `packages/builder/src/App.tsx`
+
+### One walk over "which beat points where" — it was seven
+
+"Which beat does this beat point at" was answered by six hand-rolled walks —
+two validators, layout, the AI response validator, and both import handlers —
+each knowing only the shapes it had personally been bitten by. Their
+disagreements were shipped bugs with a delay: validators blind to story-level
+connections (the Round-2 dead-end passed as VALID), importers disagreeing on
+spelling (`from`/`to` vs `source`/`target`), validators ignorant of the direct
+`trueTarget` format the builder itself writes, everyone but layout ignorant of
+hotspots, keypad fail targets and QR jumps.
+
+`utils/storyLinks.ts` is now the union — and the tripwire test written to
+guard it found a SEVENTH copy the manual survey had missed, in
+`AIService.autoFix`. Net −670 lines.
+
+**Files modified:** `packages/builder/src/utils/storyLinks.ts` (new),
+`packages/builder/src/utils/{aiStoryValidator,storyLogicValidator,TreeLayoutAlgorithm}.ts`,
+`packages/builder/src/services/{AIValidator,AIService}.ts`, `packages/builder/src/App.tsx`
+
+### Tripwires for the hand-maintained mirrors
+
+Two remaining "must be kept in sync" mirrors now have CI checks instead of
+comments: the MCP server's embedded AFFECT_CATALOG (byte-compare against core)
+and the translation extractor embedded in the export template (both extractors
+RUN against a one-beat-per-type fixture and their field families compared —
+the export side is type-gated, so a single-beat fixture proves nothing).
+
+The second tripwire failed its first honest run: inputImage's `fallbackValue`
+and videoBeat's caption cues were offered for translation at export but unknown
+to the shipped player, so a language switch silently lost them. Fixed. That
+makes every mirror tripwire written this session two-for-two against real
+drift.
+
+**Files modified:** `packages/builder/src/export/HtmlExporter.ts`,
+`packages/builder/src/utils/__tests__/{mirrorTripwires,storyLinks.tripwire}.test.ts` (new)
+
+### Verification
+
+Rounds 2 and 4 of the v0.9.89 plan completed — every round now has a result.
+Round 4 drove the MCP server over stdio (Claude Desktop not required; the
+Builder is the part that must be live) and proved an injected sentiment reaches
+a bound meter: seeded at −0.25, the meter reads "wary", not "neutral". Round 2
+measured bar geometry across a playthrough: fills terminate at the centre and
+grow outward in both directions, bands flip exactly at their thresholds, zero
+renders as a 0.8px origin marker, not a half-full bar.
+
+2490 builder / 583 renderer / 2663 core tests pass.
+
+---
+
 ## 2026-08-15: HUDs and the stage they sit on (v0.9.90)
 
 ### Overview

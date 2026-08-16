@@ -22,9 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.90** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.90 makes HUDs and the stage aware of
-each other.** Screen-docked meter, inventory and mood frames now appear in the
+Current release: **v0.9.91** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.91 fixes macOS auto-update** — the
+in-app updater now downloads and installs instead of sending you to the
+releases page (this hop still needs one manual download; from here on it is
+automatic). It also stops AI-generated and injected stories failing silently:
+broken links are shown in a banner and marked ⚠ in the graph, the same
+validation now runs on every import path, and translation of video captions
+and image-fallback text survives the export.
+
+**v0.9.90** made HUDs and the stage aware of
+each other: screen-docked meter, inventory and mood frames now appear in the
 Visual Editor, so what you arrange is what plays; beat text is laid out clear
 of them instead of underneath; device-size presets scale to fit rather than
 cropping the corners the HUDs sit in; and an exported story keeps its HUDs
