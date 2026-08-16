@@ -2544,6 +2544,8 @@ export class ReactRenderer extends BaseRenderer {
         const slotAutoExitMs = this.getState('slotAutoExitMs') as number | undefined;
         this.renderComponent(
           <SlotFlowView
+            markVisited={(this.getState('markVisited') as boolean) || false}
+            visitedChoiceIds={this.visitedChoiceIds}
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
@@ -3191,6 +3193,8 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            markVisited={(this.getState('markVisited') as boolean) || false}
+            visitedChoiceIds={this.visitedChoiceIds}
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
@@ -3462,6 +3466,8 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            markVisited={(this.getState('markVisited') as boolean) || false}
+            visitedChoiceIds={this.visitedChoiceIds}
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
@@ -3604,6 +3610,8 @@ export class ReactRenderer extends BaseRenderer {
         };
         this.renderComponent(
           <SlotFlowView
+            markVisited={(this.getState('markVisited') as boolean) || false}
+            visitedChoiceIds={this.visitedChoiceIds}
             reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
             onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}

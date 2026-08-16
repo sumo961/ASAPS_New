@@ -1,0 +1,427 @@
+{
+ "metadata": {
+  "exportVersion": "1.1.0",
+  "exportedAt": "2026-08-16T00:00:00.000Z",
+  "exportedBy": "ASAPS Builder",
+  "projectId": "template-museum-lamp",
+  "projectName": "The Oil Lamp — a museum story"
+ },
+ "project": {
+  "id": "template-museum-lamp",
+  "name": "The Oil Lamp — a museum story",
+  "description": "A one-object museum story in the Clean Editorial look: a hub that remembers where you have been, in-text links in the theme accent, and museum-label writing to replace with your own object.",
+  "story": {
+   "title": "The Oil Lamp",
+   "author": "ASAPS",
+   "beats": [
+    {
+     "id": "beat_title",
+     "name": "Title",
+     "type": "titleScreen",
+     "locations": [],
+     "x": 80,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_case",
+       "label": "Enter the gallery"
+      }
+     ],
+     "parameters": {
+      "title": "The Oil Lamp",
+      "subtitle": "One object, three ways of seeing it",
+      "buttonText": "Enter the gallery"
+     }
+    },
+    {
+     "id": "beat_case",
+     "name": "The case",
+     "type": "infoText",
+     "locations": [],
+     "x": 300,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_hub",
+       "label": "Look closer"
+      }
+     ],
+     "parameters": {
+      "text": "Room 4 is quiet. In the middle of it, a glass case holds a single small object: a clay oil lamp, about the size of your palm, the colour of dry earth. The label says it is around two thousand years old and gives it a number.\n\nThat is all the label says. But there is more than one way to look at a thing.",
+      "buttonText": "Look closer"
+     }
+    },
+    {
+     "id": "beat_hub",
+     "name": "Three ways of seeing",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 540,
+     "y": 260,
+     "connections": [],
+     "parameters": {
+      "markVisited": true,
+      "choices": [
+       {
+        "id": "see_maker",
+        "text": "The hands that made it",
+        "target": "beat_maker_1"
+       },
+       {
+        "id": "see_light",
+        "text": "The light it gave",
+        "target": "beat_light"
+       },
+       {
+        "id": "see_journey",
+        "text": "How it came to be here",
+        "target": "beat_journey_1"
+       },
+       {
+        "id": "leave",
+        "text": "Leave the gallery",
+        "target": "beat_leave"
+       }
+      ],
+      "question": "How will you look at it?"
+     }
+    },
+    {
+     "id": "beat_maker_1",
+     "name": "The maker — wheel",
+     "type": "infoText",
+     "locations": [],
+     "x": 800,
+     "y": 80,
+     "connections": [
+      {
+       "targetId": "beat_maker_2",
+       "label": "Turn it over"
+      }
+     ],
+     "parameters": {
+      "text": "Someone made this in an afternoon, between other lamps. It was thrown on a wheel — you can see the ridges where wet clay moved under fingers — then the nozzle was pinched out and a small handle pressed on. It was one of hundreds that month. Nobody thought of it as special, least of all the person making it.",
+      "buttonText": "Turn it over"
+     }
+    },
+    {
+     "id": "beat_maker_2",
+     "name": "The maker — thumbprint",
+     "type": "infoText",
+     "locations": [],
+     "x": 1040,
+     "y": 80,
+     "connections": [
+      {
+       "targetId": "beat_hub",
+       "label": "Back to the case"
+      }
+     ],
+     "parameters": {
+      "text": "On the base, just off centre, there is a thumbprint. Fired into the clay, so it has been there the whole two thousand years.\n\nIt is not a signature. It is the opposite of a signature — a mark left by someone who was not thinking about being remembered. Which is, of course, why it works.",
+      "buttonText": "Back to the case"
+     }
+    },
+    {
+     "id": "beat_light",
+     "name": "The light — evening",
+     "type": "hyperText",
+     "locations": [],
+     "x": 800,
+     "y": 260,
+     "connections": [],
+     "parameters": {
+      "text": "Filled with oil and lit at dusk, a lamp like this gave less light than your phone screen does now. Enough to eat by, to talk by, to find the doorway. The flame was the last thing moving in the room as the household went quiet, and beyond its small reach stood the dark.",
+      "hyperlinks": [
+       {
+        "word": "oil",
+        "targetBeatId": "beat_note_oil"
+       },
+       {
+        "word": "flame",
+        "targetBeatId": "beat_note_flame"
+       },
+       {
+        "word": "dark",
+        "targetBeatId": "beat_light_2"
+       }
+      ],
+      "allowMultipleClicks": false
+     }
+    },
+    {
+     "id": "beat_note_oil",
+     "name": "Note — the oil",
+     "type": "infoText",
+     "locations": [],
+     "x": 1040,
+     "y": 180,
+     "connections": [
+      {
+       "targetId": "beat_light_2",
+       "label": "Back to the evening"
+      }
+     ],
+     "parameters": {
+      "text": "Olive oil, mostly — the same oil the household cooked with. Lamplight was groceries. A family budgeted for light the way they budgeted for bread, and going to bed early was cheaper.",
+      "buttonText": "Back to the evening"
+     }
+    },
+    {
+     "id": "beat_note_flame",
+     "name": "Note — the flame",
+     "type": "infoText",
+     "locations": [],
+     "x": 1040,
+     "y": 300,
+     "connections": [
+      {
+       "targetId": "beat_light_2",
+       "label": "Back to the evening"
+      }
+     ],
+     "parameters": {
+      "text": "A wick of twisted flax, trimmed with the fingers. The flame stood about as tall as your thumbnail and had to be minded — too long a wick and it smoked, too short and it drowned. Keeping a lamp burning was a small, constant skill.",
+      "buttonText": "Back to the evening"
+     }
+    },
+    {
+     "id": "beat_light_2",
+     "name": "The light — night",
+     "type": "infoText",
+     "locations": [],
+     "x": 1280,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_hub",
+       "label": "Back to the case"
+      }
+     ],
+     "parameters": {
+      "text": "When the lamp was put out, the night was complete in a way few of us have experienced. This little object was the boundary line: on one side the household, on the other everything else.\n\nIt sat in the niche by the door for years. Nobody looked at it, the way you are looking at it now.",
+      "buttonText": "Back to the case"
+     }
+    },
+    {
+     "id": "beat_journey_1",
+     "name": "The journey — the find",
+     "type": "infoText",
+     "locations": [],
+     "x": 800,
+     "y": 440,
+     "connections": [
+      {
+       "targetId": "beat_journey_2",
+       "label": "And then?"
+      }
+     ],
+     "parameters": {
+      "text": "It was dug up in 1908, in a season when this kind of site gave up hundreds of small finds. It was listed in a notebook as \"lamp, common type\", packed in straw, and shipped. The notebook survives; the page is water-stained and the entry is one line long.",
+      "buttonText": "And then?"
+     }
+    },
+    {
+     "id": "beat_journey_2",
+     "name": "The journey — the question",
+     "type": "infoText",
+     "locations": [],
+     "x": 1040,
+     "y": 440,
+     "connections": [
+      {
+       "targetId": "beat_hub",
+       "label": "Back to the case"
+      }
+     ],
+     "parameters": {
+      "text": "Then: a dealer, an auction, a collector, a bequest, this case. Each step was legal by the rules of its day. Several would not be legal by the rules of ours.\n\nThe label does not tell this part of the story. Museums are still deciding how to. When you look at the lamp, you are also looking at every hand it passed through — including, now, the museum’s. Including yours.",
+      "buttonText": "Back to the case"
+     }
+    },
+    {
+     "id": "beat_leave",
+     "name": "Leaving",
+     "type": "infoText",
+     "locations": [],
+     "x": 800,
+     "y": 620,
+     "connections": [
+      {
+       "targetId": "beat_end",
+       "label": "Step outside"
+      }
+     ],
+     "parameters": {
+      "text": "You step back from the case. The lamp sits where it has sat all day, small and dry and patient.\n\nAn object is not one thing. It is a made thing, a used thing, and a taken thing, all at once — and which of those you see depends on how you choose to look. That choice is yours in every room of every museum, and outside them too.",
+      "buttonText": "Step outside"
+     }
+    },
+    {
+     "id": "beat_end",
+     "name": "The End",
+     "type": "endScreen",
+     "locations": [],
+     "x": 1040,
+     "y": 620,
+     "connections": [],
+     "parameters": {
+      "message": "One object, three ways of seeing.",
+      "showRestart": true,
+      "restartText": "Look again"
+     }
+    }
+   ],
+   "characters": [],
+   "connections": [],
+   "metadata": {
+    "title": "The Oil Lamp",
+    "author": "ASAPS",
+    "description": "One object, three ways of seeing it."
+   },
+   "settings": {},
+   "environment": {
+    "props": [],
+    "nodes": []
+   },
+   "clusters": [],
+   "containerBeatPositions": [],
+   "assets": [],
+   "globalSettings": {
+    "project": {
+     "width": 1024,
+     "height": 768,
+     "aspectRatio": "4:3",
+     "scalingMode": "fit",
+     "layoutMode": "responsive"
+    },
+    "colors": {
+     "pcolor": "#fffdf9",
+     "palpha": 100,
+     "ptextcolor": "#1c1a17",
+     "nonpcolor": "#fffdf9",
+     "nonpalpha": 100,
+     "nonptextcolor": "#1c1a17",
+     "bgColor": "#f7f4ee",
+     "textBoxBorder": "#c9c2b4"
+    },
+    "fonts": {
+     "titleFont": "Georgia, \"Times New Roman\", serif",
+     "textFont": "-apple-system, \"Segoe UI\", \"Helvetica Neue\", sans-serif",
+     "btnFont": "-apple-system, \"Segoe UI\", \"Helvetica Neue\", sans-serif",
+     "fontSize": {
+      "title": 44,
+      "text": 19,
+      "button": 17
+     }
+    },
+    "textbox": {
+     "radius": 3,
+     "padding": 28,
+     "borderWidth": 1,
+     "opacity": 100,
+     "position": "center",
+     "boxVisibility": "all"
+    },
+    "textEffects": {
+     "animation": "none",
+     "typewriterSpeed": 40,
+     "fadeInDuration": 250
+    },
+    "hotspots": {
+     "visible": true,
+     "labels": true,
+     "highlightColor": "#3d5a80",
+     "opacity": 18,
+     "showInPreview": "onHover",
+     "labelDisplay": "hover"
+    },
+    "sound": {
+     "backgroundMusic": "",
+     "backgroundVolume": 50,
+     "mute": false
+    },
+    "copyright": {
+     "notice": "",
+     "year": "2026",
+     "owner": ""
+    },
+    "debug": {
+     "firstbeat": "",
+     "showvals": false
+    }
+   }
+  },
+  "settings": {},
+  "assetIds": [],
+  "createdAt": "2026-08-16T00:00:00.000Z",
+  "modifiedAt": "2026-08-16T00:00:00.000Z",
+  "version": 1,
+  "globalSettings": {
+   "project": {
+    "width": 1024,
+    "height": 768,
+    "aspectRatio": "4:3",
+    "scalingMode": "fit",
+    "layoutMode": "responsive"
+   },
+   "colors": {
+    "pcolor": "#fffdf9",
+    "palpha": 100,
+    "ptextcolor": "#1c1a17",
+    "nonpcolor": "#fffdf9",
+    "nonpalpha": 100,
+    "nonptextcolor": "#1c1a17",
+    "bgColor": "#f7f4ee",
+    "textBoxBorder": "#c9c2b4"
+   },
+   "fonts": {
+    "titleFont": "Georgia, \"Times New Roman\", serif",
+    "textFont": "-apple-system, \"Segoe UI\", \"Helvetica Neue\", sans-serif",
+    "btnFont": "-apple-system, \"Segoe UI\", \"Helvetica Neue\", sans-serif",
+    "fontSize": {
+     "title": 44,
+     "text": 19,
+     "button": 17
+    }
+   },
+   "textbox": {
+    "radius": 3,
+    "padding": 28,
+    "borderWidth": 1,
+    "opacity": 100,
+    "position": "center",
+    "boxVisibility": "all"
+   },
+   "textEffects": {
+    "animation": "none",
+    "typewriterSpeed": 40,
+    "fadeInDuration": 250
+   },
+   "hotspots": {
+    "visible": true,
+    "labels": true,
+    "highlightColor": "#3d5a80",
+    "opacity": 18,
+    "showInPreview": "onHover",
+    "labelDisplay": "hover"
+   },
+   "sound": {
+    "backgroundMusic": "",
+    "backgroundVolume": 50,
+    "mute": false
+   },
+   "copyright": {
+    "notice": "",
+    "year": "2026",
+    "owner": ""
+   },
+   "debug": {
+    "firstbeat": "",
+    "showvals": false
+   }
+  },
+  "projectType": "template",
+  "themeId": "builtin-editorial"
+ }
+}

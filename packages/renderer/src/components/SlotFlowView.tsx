@@ -228,6 +228,15 @@ interface SlotFlowViewProps {
    */
   dynamicChoices?: { id: string; text: string }[];
   /**
+   * Mark-visited dimming for dynamic choices. The fixed-canvas path has done
+   * this since the feature shipped; slot mode silently ignored the setting —
+   * a responsive multiChoice hub never dimmed anything. Both flags flow from
+   * the beat: `markVisited` is the author's opt-in, `visitedChoiceIds` the
+   * per-choice history for this beat.
+   */
+  markVisited?: boolean;
+  visitedChoiceIds?: string[];
+  /**
    * Visual layout template for the slot composition. Drives the high-
    * level flex direction at the root:
    *   'stacked'      — speaker above body, body above action (default)
@@ -310,6 +319,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
   dynamicChoices,
+  markVisited = false,
+  visitedChoiceIds = [],
   layoutTemplate = 'stacked',
 }) => {
   const isConversation = layoutTemplate === 'conversation';
@@ -2121,9 +2132,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               {flowButtons.map(b => {
                 const actionSlotName = actionSlot?.name;
                 const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
+                // "Block and dim choices that lead to previously visited
+                // beats" — the schema's own words. Editor mode stays fully
+                // clickable: authors need to select the slot regardless.
+                const isVisited = !editorMode && markVisited && hasDynamicChoices
+                  && visitedChoiceIds.includes(b.id);
                 const handleClick = editorMode && onSlotSelect && actionSlotName
                   ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
-                  : b.onClick;
+                  : (isVisited ? undefined : b.onClick);
                 // Per-slot type/transform overrides apply to the whole
                 // action slot — all buttons inherit the same font,
                 // fontSize, rotation, width.
@@ -2138,9 +2154,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   <button
                     key={b.id}
                     className="slotflow-btn"
+                    disabled={isVisited}
+                    aria-disabled={isVisited || undefined}
                     onClick={handleClick}
                     style={{
                       ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
+                      ...(isVisited ? { opacity: 0.4, cursor: 'default' } : {}),
                       ...(editorMode ? { cursor: 'pointer' } : null),
                       ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                       ...(ovFont ? { fontFamily: ovFont } : null),
