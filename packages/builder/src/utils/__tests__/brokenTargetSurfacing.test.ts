@@ -69,3 +69,44 @@ describe('broken dialogTree targets reach the UI', () => {
     expect(r.errors.filter(e => e.category === 'missing_beat')).toHaveLength(0);
   });
 });
+
+/**
+ * A story arriving from outside carries its links in a top-level array — the
+ * shape `asaps_inject_story` advertises and Claude Desktop sends. The validator
+ * only read links hanging off beats, so an injected story reported
+ * "Connections: 0, Status: VALID" however many of its links pointed nowhere.
+ * The whole link graph went unchecked on the one path where the author has
+ * least visibility into what was generated.
+ */
+describe('story-level connections are validated too', () => {
+  const injected = (connections: unknown[]) => ({
+    beats: [
+      { id: 'r5_title', type: 'titleScreen', name: 'Title', parameters: {} },
+      { id: 'r5_text', type: 'infoText', name: 'What to look at', parameters: {} },
+    ],
+    connections,
+  });
+
+  it('catches a top-level connection pointing nowhere', () => {
+    const r = validateAIStory(injected([
+      { source: 'r5_title', target: 'r5_text' },
+      { source: 'r5_text', target: 'beat_intake' },
+    ]) as never);
+    const missing = r.errors.filter(e => e.category === 'missing_beat');
+    expect(missing).toHaveLength(1);
+    expect(missing[0].beatId).toBe('r5_text');
+    expect(missing[0].targetId).toBe('beat_intake');
+  });
+
+  it('counts them, so a valid injected story does not read as unconnected', () => {
+    // "Connections: 0" was the tell that nothing had been examined.
+    const r = validateAIStory(injected([{ source: 'r5_title', target: 'r5_text' }]) as never);
+    expect(r.errors.filter(e => e.category === 'missing_beat')).toHaveLength(0);
+    expect(r.stats?.connectionCount ?? r.connectionCount).toBe(1);
+  });
+
+  it('accepts the from/to spelling as well as source/target', () => {
+    const r = validateAIStory(injected([{ from: 'r5_title', to: 'nowhere_at_all' }]) as never);
+    expect(r.errors.some(e => e.category === 'missing_beat' && e.targetId === 'nowhere_at_all')).toBe(true);
+  });
+});

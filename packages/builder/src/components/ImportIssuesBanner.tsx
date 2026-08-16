@@ -50,7 +50,7 @@ export function ImportIssuesBanner({
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium">
             {n > 0
-              ? `${n} choice${n === 1 ? '' : 's'} lead nowhere`
+              ? `${n} choice${n === 1 ? ' leads' : 's lead'} nowhere`
               : 'This story imported with warnings'}
           </div>
           {n > 0 && (

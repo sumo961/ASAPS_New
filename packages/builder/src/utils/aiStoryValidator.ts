@@ -374,6 +374,29 @@ export function validateAIStory(story: any): ValidationResult {
     });
   });
 
+  /*
+   * Story-level connections.
+   *
+   * `extractTargetIds` reads links that hang off a beat, which is the shape a
+   * story has once the builder owns it. A story arriving from outside carries
+   * its links in a single top-level array instead — that is the shape
+   * `asaps_inject_story` advertises and the shape Claude Desktop sends. The
+   * validator saw none of them: an injected story reported "Connections: 0,
+   * Status: VALID" no matter how many of its links pointed nowhere, which is
+   * the whole link graph going unchecked on the one path where the author has
+   * least visibility into what was generated.
+   */
+  if (Array.isArray(story.connections)) {
+    story.connections.forEach((conn: any) => {
+      const source = conn.source ?? conn.from ?? conn.sourceId;
+      const target = conn.target ?? conn.to ?? conn.targetId;
+      if (!source || !target) return;
+      allTargets.push({ source, target });
+      connectionCount++;
+      beatsWithIncoming.add(target);
+    });
+  }
+
   // Check for missing beats
   allTargets.forEach(({ source, target }) => {
     if (!beatIds.has(target)) {

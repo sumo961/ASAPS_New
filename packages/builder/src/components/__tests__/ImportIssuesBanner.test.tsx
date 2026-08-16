@@ -19,6 +19,14 @@ const broken = [
 ];
 
 describe('ImportIssuesBanner', () => {
+  it('agrees its verb with the count', () => {
+    // "1 choice lead nowhere" shipped to a screenshot before anyone read it.
+    const { rerender } = render(<ImportIssuesBanner brokenTargets={[broken[0]]} onDismiss={() => {}} />);
+    expect(screen.getByText(/1 choice leads nowhere/i)).toBeTruthy();
+    rerender(<ImportIssuesBanner brokenTargets={broken} onDismiss={() => {}} />);
+    expect(screen.getByText(/3 choices lead nowhere/i)).toBeTruthy();
+  });
+
   it('says how many choices are broken, in play terms', () => {
     render(<ImportIssuesBanner brokenTargets={broken} onDismiss={() => {}} />);
     expect(screen.getByText(/3 choices lead nowhere/i)).toBeTruthy();

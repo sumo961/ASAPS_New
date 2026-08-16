@@ -330,6 +330,33 @@ function App() {
     brokenTargets: BrokenTarget[];
     otherErrors: string[];
   } | null>(null);
+  /**
+   * Run the story validator and put anything it found where the author can
+   * see it. Shared because there are two import paths — the in-app generator
+   * and the MCP/WebSocket inject — and only one of them validated at all. A
+   * story injected from Claude Desktop went in completely unchecked, which is
+   * how a probe with a link to a non-existent beat imported in silence.
+   */
+  const reportImportValidation = useCallback((story: any) => {
+    const validation = validateAIStory(story);
+    console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
+    if (validation.valid) {
+      setImportIssues(null);
+      return;
+    }
+    validation.errors.forEach(e => console.warn('[App] validation:', e.message));
+    validation.warnings.forEach(w => console.warn('[App] validation warning:', w.message));
+    const nameOf = (id: string) =>
+      (story.beats || []).find((b: any) => b.id === id)?.name as string | undefined;
+    const brokenTargets = validation.errors
+      .filter(e => e.category === 'missing_beat' && e.beatId && e.targetId)
+      .map(e => ({ sourceBeatId: e.beatId!, sourceBeatName: nameOf(e.beatId!), target: e.targetId! }));
+    const otherErrors = validation.errors
+      .filter(e => e.category !== 'missing_beat')
+      .map(e => e.message);
+    setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors } : null);
+  }, []);
+
   /** beatId → the missing target, for the ⚠ marks in the graph. */
   const brokenTargetsByBeatId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -1255,6 +1282,10 @@ function App() {
 
       const storyTitle = story.metadata?.title || 'Injected Story';
       console.log('[App] Received story via WebSocket:', storyTitle, 'injectionId:', injectionId);
+
+      // An injected story gets the same check as a generated one. This path
+      // used to skip validation entirely.
+      reportImportValidation(story);
 
       // Pause auto-save to prevent AI-generated content from being written
       // to the current directory project before the new project is created
@@ -5297,35 +5328,10 @@ function App() {
     // resumed after the new project is created (see createProject below).
     pauseAutoSave();
 
-    // Validate AI-generated story structure before import
-    const validation = validateAIStory(story);
-    console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
-
-    if (!validation.valid) {
-      console.warn('[App] AI story has validation errors:');
-      validation.errors.forEach(e => console.warn('  -', e.message));
-      if (validation.missingBeatIds.length > 0) {
-        console.warn('[App] Missing beat IDs:', validation.missingBeatIds.join(', '));
-      }
-      // The import still proceeds — a story with a few bad links is mostly good
-      // work — but the author is told, in the UI, which links are broken and
-      // which beats carry them. See ImportIssuesBanner.
-      const nameOf = (id: string) =>
-        (story.beats || []).find((b: any) => b.id === id)?.name as string | undefined;
-      const broken: BrokenTarget[] = validation.errors
-        .filter(e => e.category === 'missing_beat' && e.beatId && e.targetId)
-        .map(e => ({ sourceBeatId: e.beatId!, sourceBeatName: nameOf(e.beatId!), target: e.targetId! }));
-      const others = validation.errors
-        .filter(e => e.category !== 'missing_beat')
-        .map(e => e.message);
-      setImportIssues(broken.length || others.length ? { brokenTargets: broken, otherErrors: others } : null);
-    } else {
-      setImportIssues(null);
-    }
-    if (validation.warnings.length > 0) {
-      console.warn('[App] AI story warnings:');
-      validation.warnings.forEach(w => console.warn('  -', w.message));
-    }
+    // Validate AI-generated story structure before import. The import still
+    // proceeds — a story with a few bad links is mostly good work — but the
+    // author is told which links are broken and which beats carry them.
+    reportImportValidation(story);
 
     // Validate narrative logic (hub beats, state assumptions, undescribed items)
     const logicValidation = validateStoryLogic(story);
