@@ -23,6 +23,7 @@ import type {
   ChatWithToolsRequest,
   ChatWithToolsResponse,
 } from '../types/ai';
+import { beatLinks } from '../utils/storyLinks';
 import type {
   HelperCommandRequest,
   HelperCommandResponse,
@@ -1049,45 +1050,14 @@ export class AIService {
       'setTimer',
     ]);
 
-    // Build set of all beat IDs that are already targets
-    const targetedBeatIds = new Set<string>();
+    // Build set of all beat IDs that are already targets — via the one shared
+    // walk (storyLinks). This method carried the SEVENTH private copy of the
+    // link walk; the tripwire test found it after the first six were removed.
     const beatMap = new Map<string, any>();
-
-    for (const beat of response.beats) {
-      beatMap.set(beat.id, beat);
-
-      // Check connection parameter
-      if (beat.parameters?.connection?.target) {
-        targetedBeatIds.add(beat.parameters.connection.target);
-      }
-
-      // Check choices/props/dialogTree targets
-      const choices = beat.parameters?.choices || beat.parameters?.props || [];
-      for (const choice of choices) {
-        if (choice.target) targetedBeatIds.add(choice.target);
-      }
-
-      // Check dialogTree recursively
-      if (beat.parameters?.dialogTree) {
-        this.collectDialogTreeTargets(beat.parameters.dialogTree, targetedBeatIds);
-      }
-
-      // Check conditionBeat targets
-      if (beat.type === 'conditionBeat') {
-        if (beat.parameters?.trueTarget) targetedBeatIds.add(beat.parameters.trueTarget);
-        if (beat.parameters?.falseTarget) targetedBeatIds.add(beat.parameters.falseTarget);
-        if (beat.parameters?.trueConnection?.target) targetedBeatIds.add(beat.parameters.trueConnection.target);
-        if (beat.parameters?.falseConnection?.target) targetedBeatIds.add(beat.parameters.falseConnection.target);
-      }
-
-      // Check connections array
-      if (beat.connections && Array.isArray(beat.connections)) {
-        for (const conn of beat.connections) {
-          if (conn.targetId) targetedBeatIds.add(conn.targetId);
-          if ((conn as any).target) targetedBeatIds.add((conn as any).target);
-        }
-      }
-    }
+    for (const beat of response.beats) beatMap.set(beat.id, beat);
+    const targetedBeatIds = new Set<string>(
+      response.beats.flatMap((b: any) => beatLinks(b)).map((l) => l.target),
+    );
 
     // titleScreen always targets something so it's implicitly connected
     const titleScreen = response.beats.find(b => b.type === 'titleScreen');
@@ -1388,22 +1358,6 @@ export class AIService {
       console.warn(
         `[AIService.autoFix] Auto-converted ${fixCount} orphan bookmark reference(s) to baseline:'initial'`
       );
-    }
-  }
-
-  /**
-   * Helper to collect all targets from a dialogTree recursively
-   */
-  private collectDialogTreeTargets(node: any, targets: Set<string>): void {
-    if (!node) return;
-
-    if (node.choices && Array.isArray(node.choices)) {
-      for (const choice of node.choices) {
-        if (choice.target) targets.add(choice.target);
-        if (choice.dialogNode) {
-          this.collectDialogTreeTargets(choice.dialogNode, targets);
-        }
-      }
     }
   }
 

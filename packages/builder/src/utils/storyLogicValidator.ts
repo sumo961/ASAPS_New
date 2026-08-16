@@ -7,6 +7,8 @@
  * - Path analysis to detect convergence points that may have inconsistent narratives
  */
 
+import { beatTargetIds } from './storyLinks';
+
 export interface LogicIssue {
   type: 'error' | 'warning' | 'info';
   category: 'hub_state_assumption' | 'ungated_state_reference' | 'missing_condition_gate' | 'narrative_inconsistency' | 'undescribed_item';
@@ -57,91 +59,6 @@ const STATE_ASSUMPTION_PATTERNS = [
   { pattern: /(your|the) ([a-z]+\s)?(score|count|points?) (is|are|reach)/i, category: 'counter' },
   { pattern: /you('ve| have) (earned|accumulated|gained) (enough|sufficient)/i, category: 'counter' },
 ];
-
-/**
- * Extract all target IDs from a beat's parameters and connections
- */
-function extractTargetIds(beat: any): string[] {
-  const targets: string[] = [];
-
-  // From top-level connections array
-  if (beat.connections && Array.isArray(beat.connections)) {
-    beat.connections.forEach((conn: any) => {
-      if (conn.targetId) targets.push(conn.targetId);
-      if (conn.target) targets.push(conn.target);
-    });
-  }
-
-  const params = beat.parameters || {};
-
-  // Single connection (infoText, titleScreen, etc.)
-  if (params.connection?.target) {
-    targets.push(params.connection.target);
-  }
-
-  // Condition beat
-  if (params.trueConnection?.target) {
-    targets.push(params.trueConnection.target);
-  }
-  if (params.falseConnection?.target) {
-    targets.push(params.falseConnection.target);
-  }
-
-  // Choice-based beats (movementChoice, pickProp)
-  if (params.choices && Array.isArray(params.choices)) {
-    params.choices.forEach((choice: any) => {
-      if (choice.target) targets.push(choice.target);
-    });
-  }
-  if (params.props && Array.isArray(params.props)) {
-    params.props.forEach((prop: any) => {
-      if (prop.target) targets.push(prop.target);
-    });
-  }
-
-  // Dialog tree (recursive extraction)
-  if (params.dialogTree) {
-    extractDialogTargets(params.dialogTree, targets);
-  }
-
-  // Random target
-  if (params.targets && Array.isArray(params.targets)) {
-    params.targets.forEach((t: any) => {
-      if (t.targetId) targets.push(t.targetId);
-    });
-  }
-
-  // Set timer
-  if (params.timerTarget) {
-    targets.push(params.timerTarget);
-  }
-
-  // End screen restart
-  if (params.restartConnection?.target) {
-    targets.push(params.restartConnection.target);
-  }
-
-  return targets;
-}
-
-/**
- * Recursively extract targets from dialog tree
- */
-function extractDialogTargets(node: any, targets: string[]): void {
-  if (!node) return;
-
-  if (node.choices && Array.isArray(node.choices)) {
-    node.choices.forEach((choice: any) => {
-      if (choice.target) {
-        targets.push(choice.target);
-      }
-      // Recurse into nested dialog nodes
-      if (choice.dialogNode) {
-        extractDialogTargets(choice.dialogNode, targets);
-      }
-    });
-  }
-}
 
 /**
  * Extract text content from a beat for analysis
@@ -221,7 +138,7 @@ function buildIncomingPathsMap(beats: any[]): Map<string, string[]> {
 
   // Build incoming connections
   for (const beat of beats) {
-    const targets = extractTargetIds(beat);
+    const targets = beatTargetIds(beat);
     for (const target of targets) {
       const existing = incomingPaths.get(target) || [];
       if (!existing.includes(beat.id)) {

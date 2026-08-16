@@ -15,6 +15,7 @@ export {
 } from '@asaps/core';
 
 import { calculateTreeLayout, type LayoutEdge } from '@asaps/core';
+import { beatLinks, dedupeLinks } from './storyLinks';
 
 interface NodeData {
   id: string;
@@ -37,180 +38,15 @@ export function extractConnectionsFromBeats(
     parameters?: Record<string, any>;
   }>
 ): EdgeData[] {
-  const edges: EdgeData[] = [];
-  const seenEdges = new Set<string>();
-
-  const addEdge = (source: string, target: string) => {
-    const key = `${source}->${target}`;
-    if (!seenEdges.has(key)) {
-      seenEdges.add(key);
-      edges.push({ source, target });
-    }
-  };
-
-  // Helper to extract target from various formats
-  const extractTargetId = (target: any): string | null => {
-    if (!target) return null;
-    // Direct string target
-    if (typeof target === 'string') return target;
-    // Nested object with .next property (Claude Desktop format)
-    if (typeof target === 'object' && target.next) return target.next;
-    // Nested object with .target property
-    if (typeof target === 'object' && typeof target.target === 'string') return target.target;
-    return null;
-  };
-
-  // Helper to extract from dialogTree
-  // Supports multiple formats: direct targets, nested objects, and entries arrays
-  const extractDialogTreeTargets = (node: any, beatId: string): void => {
-    if (!node) return;
-
-    // Handle choices array
-    if (node.choices && Array.isArray(node.choices)) {
-      node.choices.forEach((choice: any) => {
-        // Extract target from various formats
-        const targetId = extractTargetId(choice.target);
-        if (targetId) {
-          addEdge(beatId, targetId);
-        }
-        // New format: dialogNode for nested dialog
-        if (choice.dialogNode) {
-          extractDialogTreeTargets(choice.dialogNode, beatId);
-        }
-        // Recurse into nested target objects that contain more dialog data
-        if (typeof choice.target === 'object' && choice.target && !choice.target.next) {
-          extractDialogTreeTargets(choice.target, beatId);
-        }
-      });
-    }
-
-    // Handle entries array (alternative dialog structure)
-    if (node.entries && Array.isArray(node.entries)) {
-      node.entries.forEach((entry: any) => {
-        if (entry.choices && Array.isArray(entry.choices)) {
-          entry.choices.forEach((choice: any) => {
-            const targetId = extractTargetId(choice.target);
-            if (targetId) {
-              addEdge(beatId, targetId);
-            }
-          });
-        }
-      });
-    }
-  };
-
-  beats.forEach((beat) => {
-    const params = beat.parameters || {};
-
-    // Single connection
-    if (params.connection?.target) {
-      addEdge(beat.id, params.connection.target);
-    }
-
-    // conditionBeat - supports both direct targets and connection objects
-    if (beat.type === 'conditionBeat') {
-      // Direct target format (preferred)
-      if (params.trueTarget) {
-        addEdge(beat.id, params.trueTarget);
-      }
-      if (params.falseTarget) {
-        addEdge(beat.id, params.falseTarget);
-      }
-      // Legacy connection object format
-      if (params.trueConnection?.target) {
-        addEdge(beat.id, params.trueConnection.target);
-      }
-      if (params.falseConnection?.target) {
-        addEdge(beat.id, params.falseConnection.target);
-      }
-    }
-
-    // dialogTree
-    if (beat.type === 'dialogTree' && params.dialogTree) {
-      extractDialogTreeTargets(params.dialogTree, beat.id);
-    }
-
-    // movementChoice
-    if (beat.type === 'movementChoice' && params.choices) {
-      params.choices.forEach((choice: any) => {
-        if (choice.target) {
-          addEdge(beat.id, choice.target);
-        }
-      });
-    }
-
-    // pickProp
-    if (beat.type === 'pickProp' && params.props) {
-      params.props.forEach((prop: any) => {
-        if (prop.target) {
-          addEdge(beat.id, prop.target);
-        }
-      });
-    }
-
-    // hyperText
-    if (beat.type === 'hyperText' && params.hyperlinks) {
-      params.hyperlinks.forEach((link: any) => {
-        if (link.targetBeatId) {
-          addEdge(beat.id, link.targetBeatId);
-        }
-      });
-    }
-
-    // randomTarget
-    if (beat.type === 'randomTarget' && params.choices) {
-      params.choices.forEach((choice: any) => {
-        const target = typeof choice === 'string' ? choice : choice.target;
-        if (target) {
-          addEdge(beat.id, target);
-        }
-      });
-    }
-
-    // endScreen restart
-    if (beat.type === 'endScreen' && params.restartConnection?.target) {
-      addEdge(beat.id, params.restartConnection.target);
-    }
-
-    // keypad failTarget
-    if (beat.type === 'keypad' && params.failTarget) {
-      addEdge(beat.id, params.failTarget);
-    }
-
-    // panorama hotspots
-    if (beat.type === 'panorama' && params.hotspots) {
-      params.hotspots.forEach((hs: any) => {
-        if (hs.target) {
-          addEdge(beat.id, hs.target);
-        }
-      });
-    }
-
-    // qrScan QR-jump targets — declared in the QR generator (printed
-    // asaps://beat/<id> codes). Counted as edges so the jumped-to beats are
-    // positioned by layout and not flagged unreachable when they're only
-    // reachable via a scanned code. (Rendered as dashed edges in GraphEditor.)
-    if (beat.type === 'qrScan' && Array.isArray(params.qrJumpTargets)) {
-      params.qrJumpTargets.forEach((target: any) => {
-        if (typeof target === 'string' && target) {
-          addEdge(beat.id, target);
-        }
-      });
-    }
-  });
-
-  return edges;
+  // One walk, shared with the validators and both importers — storyLinks.
+  // This file used to carry the RICHEST of the six hand-rolled copies (only
+  // layout knew about hotspots, keypad failTarget, QR jumps and the entries[]
+  // dialog shape), which meant beats reachable only those ways were "unreachable"
+  // to everything else. The union now lives in one place.
+  const links = beats.flatMap((beat) => beatLinks(beat));
+  return dedupeLinks(links).map((l) => ({ source: l.source, target: l.target }));
 }
 
-/**
- * Apply tree layout to story beats
- *
- * @param beats - Array of story beats with positions
- * @param options - Layout options
- * @param externalEdges - Optional external edges to include (from beat.getConnections())
- * @param startBeatId - Optional ID of the start beat (will be positioned first/at top)
- * @returns Map of beat id to new position
- */
 export function applyTreeLayoutToBeats(
   beats: Array<{
     id: string;

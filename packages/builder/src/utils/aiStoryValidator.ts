@@ -8,6 +8,8 @@
  * - Missing required fields
  */
 
+import { storyLinks } from './storyLinks';
+
 export interface ValidationIssue {
   type: 'error' | 'warning';
   category: 'missing_beat' | 'duplicate_id' | 'orphaned_beat' | 'missing_field' | 'invalid_structure' | 'unreachable_threshold';
@@ -27,91 +29,6 @@ export interface ValidationResult {
   beatCount: number;
   connectionCount: number;
   missingBeatIds: string[];
-}
-
-/**
- * Extract all target IDs from a beat's parameters and connections
- */
-function extractTargetIds(beat: any): string[] {
-  const targets: string[] = [];
-
-  // From top-level connections array
-  if (beat.connections && Array.isArray(beat.connections)) {
-    beat.connections.forEach((conn: any) => {
-      if (conn.targetId) targets.push(conn.targetId);
-      if (conn.target) targets.push(conn.target);
-    });
-  }
-
-  const params = beat.parameters || {};
-
-  // Single connection (infoText, titleScreen, etc.)
-  if (params.connection?.target) {
-    targets.push(params.connection.target);
-  }
-
-  // Condition beat
-  if (params.trueConnection?.target) {
-    targets.push(params.trueConnection.target);
-  }
-  if (params.falseConnection?.target) {
-    targets.push(params.falseConnection.target);
-  }
-
-  // Choice-based beats (movementChoice, pickProp)
-  if (params.choices && Array.isArray(params.choices)) {
-    params.choices.forEach((choice: any) => {
-      if (choice.target) targets.push(choice.target);
-    });
-  }
-  if (params.props && Array.isArray(params.props)) {
-    params.props.forEach((prop: any) => {
-      if (prop.target) targets.push(prop.target);
-    });
-  }
-
-  // Dialog tree (recursive extraction)
-  if (params.dialogTree) {
-    extractDialogTargets(params.dialogTree, targets);
-  }
-
-  // Random target
-  if (params.targets && Array.isArray(params.targets)) {
-    params.targets.forEach((t: any) => {
-      if (t.targetId) targets.push(t.targetId);
-    });
-  }
-
-  // Set timer
-  if (params.timerTarget) {
-    targets.push(params.timerTarget);
-  }
-
-  // End screen restart
-  if (params.restartConnection?.target) {
-    targets.push(params.restartConnection.target);
-  }
-
-  return targets;
-}
-
-/**
- * Recursively extract targets from dialog tree
- */
-function extractDialogTargets(node: any, targets: string[]): void {
-  if (!node) return;
-
-  if (node.choices && Array.isArray(node.choices)) {
-    node.choices.forEach((choice: any) => {
-      if (choice.target) {
-        targets.push(choice.target);
-      }
-      // Recurse into nested dialog nodes
-      if (choice.dialogNode) {
-        extractDialogTargets(choice.dialogNode, targets);
-      }
-    });
-  }
 }
 
 /**
@@ -360,42 +277,20 @@ export function validateAIStory(story: any): ValidationResult {
     });
   });
 
-  // Collect all targets and check they exist
-  const allTargets: Array<{ source: string; target: string }> = [];
+  // Collect all targets and check they exist.
+  //
+  // One walk, shared with layout and both importers — storyLinks. This
+  // validator used to carry its own copy, which read links off beats but not
+  // the story-level `connections` array, so an MCP-injected story reported
+  // "Connections: 0, VALID" while its links pointed nowhere.
+  const allTargets: Array<{ source: string; target: string }> = storyLinks(story)
+    .map((l) => ({ source: l.source, target: l.target }));
   const beatsWithIncoming = new Set<string>();
   let connectionCount = 0;
-
-  story.beats.forEach((beat: any) => {
-    const targets = extractTargetIds(beat);
-    targets.forEach(target => {
-      allTargets.push({ source: beat.id, target });
-      connectionCount++;
-      beatsWithIncoming.add(target);
-    });
+  allTargets.forEach(({ target }) => {
+    connectionCount++;
+    beatsWithIncoming.add(target);
   });
-
-  /*
-   * Story-level connections.
-   *
-   * `extractTargetIds` reads links that hang off a beat, which is the shape a
-   * story has once the builder owns it. A story arriving from outside carries
-   * its links in a single top-level array instead — that is the shape
-   * `asaps_inject_story` advertises and the shape Claude Desktop sends. The
-   * validator saw none of them: an injected story reported "Connections: 0,
-   * Status: VALID" no matter how many of its links pointed nowhere, which is
-   * the whole link graph going unchecked on the one path where the author has
-   * least visibility into what was generated.
-   */
-  if (Array.isArray(story.connections)) {
-    story.connections.forEach((conn: any) => {
-      const source = conn.source ?? conn.from ?? conn.sourceId;
-      const target = conn.target ?? conn.to ?? conn.targetId;
-      if (!source || !target) return;
-      allTargets.push({ source, target });
-      connectionCount++;
-      beatsWithIncoming.add(target);
-    });
-  }
 
   // Check for missing beats
   allTargets.forEach(({ source, target }) => {

@@ -5,6 +5,7 @@
  */
 
 import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, DialogGenerationResponse } from '../types/ai';
+import { beatLinks } from '../utils/storyLinks';
 
 /**
  * Load beat definitions schema.
@@ -460,74 +461,12 @@ export class AIValidator {
 
     // Check for unreachable beats (beats that nothing connects to)
     // Build set of all target beat IDs
-    const targetedBeatIds = new Set<string>();
-
-    // Helper function to recursively extract targets from dialogTree nodes
-    const extractDialogTreeTargets = (node: any, targets: Set<string>) => {
-      if (!node) return;
-      // Check if node itself has a target
-      if (node.target) targets.add(node.target);
-      if (node.targetId) targets.add(node.targetId);
-      // Check choices array
-      if (node.choices && Array.isArray(node.choices)) {
-        for (const choice of node.choices) {
-          if (choice.target) targets.add(choice.target);
-          if (choice.targetId) targets.add(choice.targetId);
-          // Recursively check nested dialogNode
-          if (choice.dialogNode) {
-            extractDialogTreeTargets(choice.dialogNode, targets);
-          }
-          // Also check if target is an object (nested node)
-          if (typeof choice.target === 'object') {
-            extractDialogTreeTargets(choice.target, targets);
-          }
-        }
-      }
-      // Check next node if present
-      if (node.next) {
-        if (typeof node.next === 'string') {
-          targets.add(node.next);
-        } else {
-          extractDialogTreeTargets(node.next, targets);
-        }
-      }
-    };
-
-    for (const beat of response.beats) {
-      // Add targets from connections array
-      if (beat.connections) {
-        for (const conn of beat.connections) {
-          targetedBeatIds.add(conn.targetId);
-        }
-      }
-      // Add targets from parameters (for beat types that store connections in params)
-      const params = beat.parameters || {};
-      if (params.defaultTarget) targetedBeatIds.add(params.defaultTarget);
-      if (params.trueTarget) targetedBeatIds.add(params.trueTarget);
-      if (params.falseTarget) targetedBeatIds.add(params.falseTarget);
-      if (params.trueConnection?.target) targetedBeatIds.add(params.trueConnection.target);
-      if (params.falseConnection?.target) targetedBeatIds.add(params.falseConnection.target);
-      if (params.target) targetedBeatIds.add(params.target);
-      if (params.connection?.target) targetedBeatIds.add(params.connection.target);
-      if (params.timerTarget) targetedBeatIds.add(params.timerTarget);
-      if (params.failTarget) targetedBeatIds.add(params.failTarget);
-      // Check choices arrays (movementChoice, pickProp, randomTarget)
-      const choices = params.choices || params.props || [];
-      for (const choice of choices) {
-        if (choice.target) targetedBeatIds.add(choice.target);
-        if (choice.targetId) targetedBeatIds.add(choice.targetId);
-      }
-      // Recursively extract targets from dialogTree (handles nested dialogNodes)
-      if (params.dialogTree) {
-        extractDialogTreeTargets(params.dialogTree, targetedBeatIds);
-      }
-      // Check hyperlinks for hyperText
-      if (params.hyperlinks) {
-        for (const link of params.hyperlinks) {
-          if (link.targetBeatId) targetedBeatIds.add(link.targetBeatId);
-        }
-      }
-    }
+    // One walk, shared with the validators, layout and both importers —
+    // storyLinks. This file's own copy missed keypad failTarget, hotspots and
+    // QR jumps, so beats reachable only those ways were reported unreachable.
+    const targetedBeatIds = new Set<string>(
+      response.beats.flatMap((b: any) => beatLinks(b)).map((l) => l.target),
+    );
 
     // Check each beat (except first) is reachable
     const unreachableBeats: string[] = [];

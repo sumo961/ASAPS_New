@@ -61,6 +61,7 @@ import { SearchPanel } from './components/search';
 import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
+import { storyLinks as storyLinksOf, dedupeLinks } from './utils/storyLinks';
 import { ImportIssuesBanner, type BrokenTarget } from './components/ImportIssuesBanner';
 import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { validateProjectAssets } from './utils/assetValidator';
@@ -1405,136 +1406,13 @@ function App() {
         });
       }
 
-      // Process connections (build connection list without state updates)
-      const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
-
-      // Helper to recursively extract targets from dialogTree
-      // Supports both new format (dialogNode) and old format (target as object)
-      const extractDialogTreeTargets = (node: any, beatId: string): void => {
-        if (!node) return;
-
-        // Check choices for targets
-        if (node.choices && Array.isArray(node.choices)) {
-          node.choices.forEach((choice: any) => {
-            // New format: target is string (beat ID)
-            if (typeof choice.target === 'string' && choice.target) {
-              connectionsToCreate.push({
-                source: beatId,
-                target: choice.target,
-                label: choice.text || 'Choice',
-              });
-            }
-            // New format: dialogNode for nested dialog
-            if (choice.dialogNode) {
-              extractDialogTreeTargets(choice.dialogNode, beatId);
-            }
-            // Old format: target as object (backward compatibility)
-            if (typeof choice.target === 'object' && choice.target) {
-              extractDialogTreeTargets(choice.target, beatId);
-            }
-          });
-        }
-      };
-
-      // Extract connections from beat parameters
-      if (story.beats && Array.isArray(story.beats)) {
-        story.beats.forEach((beatData: any) => {
-          // Single connection (infoText, titleScreen, etc.)
-          if (beatData.parameters?.connection?.target) {
-            connectionsToCreate.push({
-              source: beatData.id,
-              target: beatData.parameters.connection.target,
-            });
-          }
-
-          // conditionBeat true/false connections
-          if (beatData.type === 'conditionBeat') {
-            if (beatData.parameters?.trueConnection?.target) {
-              connectionsToCreate.push({
-                source: beatData.id,
-                target: beatData.parameters.trueConnection.target,
-                label: 'true',
-              });
-            }
-            if (beatData.parameters?.falseConnection?.target) {
-              connectionsToCreate.push({
-                source: beatData.id,
-                target: beatData.parameters.falseConnection.target,
-                label: 'false',
-              });
-            }
-          }
-
-          // dialogTree - extract targets from nested dialog structure
-          if (beatData.type === 'dialogTree' && beatData.parameters?.dialogTree) {
-            extractDialogTreeTargets(beatData.parameters.dialogTree, beatData.id);
-          }
-
-          // movementChoice - extract targets from choices array
-          if (beatData.type === 'movementChoice' && beatData.parameters?.choices) {
-            beatData.parameters.choices.forEach((choice: any) => {
-              if (choice.target) {
-                connectionsToCreate.push({
-                  source: beatData.id,
-                  target: choice.target,
-                  label: choice.text || choice.location || 'Choice',
-                });
-              }
-            });
-          }
-
-          // pickProp - extract targets from props array
-          if (beatData.type === 'pickProp' && beatData.parameters?.props) {
-            beatData.parameters.props.forEach((prop: any) => {
-              if (prop.target) {
-                connectionsToCreate.push({
-                  source: beatData.id,
-                  target: prop.target,
-                  label: prop.name || 'Prop',
-                });
-              }
-            });
-          }
-
-          // hyperText - extract targets from hyperlinks array
-          if (beatData.type === 'hyperText' && beatData.parameters?.hyperlinks) {
-            beatData.parameters.hyperlinks.forEach((link: any) => {
-              if (link.targetBeatId) {
-                connectionsToCreate.push({
-                  source: beatData.id,
-                  target: link.targetBeatId,
-                  label: link.word || 'Link',
-                });
-              }
-            });
-          }
-
-          // randomTarget - extract targets from choices array
-          if (beatData.type === 'randomTarget' && beatData.parameters?.choices) {
-            beatData.parameters.choices.forEach((choice: any, index: number) => {
-              const target = typeof choice === 'string' ? choice : choice.target;
-              if (target) {
-                connectionsToCreate.push({
-                  source: beatData.id,
-                  target: target,
-                  label: `Random ${index + 1}`,
-                });
-              }
-            });
-          }
-        });
-      }
-
-      // Also use top-level connections array
-      if (story.connections && Array.isArray(story.connections)) {
-        story.connections.forEach((conn: any) => {
-          connectionsToCreate.push({
-            source: conn.source || conn.sourceId || conn.from,
-            target: conn.target || conn.targetId || conn.to,
-            label: conn.label,
-          });
-        });
-      }
+      // Build the connection list from the one shared walk. This handler and
+      // the generation handler below each carried a private copy, and they
+      // disagreed with each other AND with the validators — see storyLinks.
+      const connectionsToCreate: Array<{ source: string; target: string; label?: string }> =
+        dedupeLinks(storyLinksOf(story)).map((l) => ({
+          source: l.source, target: l.target, ...(l.label ? { label: l.label } : {}),
+        }));
 
       // Handle characters if provided
       const storyCharacters = story.characters && Array.isArray(story.characters)
@@ -5567,103 +5445,14 @@ function App() {
       });
     }
 
-    // Add connections after all beats are created
-    // Collect connections from beat parameters (AI-generated format)
-    const connectionsToCreate: Array<{ source: string; target: string; label?: string }> = [];
-
-    if (story.beats && Array.isArray(story.beats)) {
-      story.beats.forEach((beatData: any) => {
-        // Check for connection in parameters (single-connection beats)
-        if (beatData.parameters?.connection?.target) {
-          connectionsToCreate.push({
-            source: beatData.id,
-            target: beatData.parameters.connection.target,
-          });
-        }
-        // Handle conditionBeat trueConnection/falseConnection
-        if (beatData.type === 'conditionBeat') {
-          if (beatData.parameters?.trueConnection?.target) {
-            connectionsToCreate.push({
-              source: beatData.id,
-              target: beatData.parameters.trueConnection.target,
-              label: 'true',
-            });
-          }
-          if (beatData.parameters?.falseConnection?.target) {
-            connectionsToCreate.push({
-              source: beatData.id,
-              target: beatData.parameters.falseConnection.target,
-              label: 'false',
-            });
-          }
-        }
-        // Handle dialogTree beats - recursively extract targets from nested structure
-        // DialogTree has targets embedded in dialogTree.choices[].target which can be:
-        // - A string beat ID to exit the dialog
-        // - A nested dialogNode object for more conversation
-        if (beatData.type === 'dialogTree' && beatData.parameters?.dialogTree) {
-          const extractDialogTreeTargets = (node: any, targets: Array<{ target: string; label: string }>) => {
-            if (!node || !node.choices) return;
-            node.choices.forEach((choice: any) => {
-              if (choice.target && typeof choice.target === 'string') {
-                // This is a beat ID exit point
-                targets.push({ target: choice.target, label: choice.text || 'Choice' });
-              }
-              // Recurse into nested dialog nodes
-              if (choice.dialogNode) {
-                extractDialogTreeTargets(choice.dialogNode, targets);
-              }
-            });
-          };
-
-          const dialogTargets: Array<{ target: string; label: string }> = [];
-          extractDialogTreeTargets(beatData.parameters.dialogTree, dialogTargets);
-          dialogTargets.forEach(({ target, label }) => {
-            connectionsToCreate.push({
-              source: beatData.id,
-              target,
-              label,
-            });
-          });
-        }
-        // Handle choice-based beats (movementChoice, pickProp)
-        // Extract connections from parameters.choices[] or parameters.props[]
-        // This is more reliable than depending on AI to duplicate targets in connections array
-        const choicesArray = beatData.parameters?.choices || beatData.parameters?.props || [];
-        if (Array.isArray(choicesArray) && choicesArray.length > 0) {
-          choicesArray.forEach((choice: any, index: number) => {
-            if (choice.target) {
-              connectionsToCreate.push({
-                source: beatData.id,
-                target: choice.target,
-                label: choice.text || choice.name || `Choice ${index + 1}`,
-              });
-            }
-          });
-        }
-        // Also check top-level connections array on the beat (fallback format)
-        // Skip if we already extracted from choices to avoid duplicates
-        if (beatData.connections && Array.isArray(beatData.connections) && choicesArray.length === 0) {
-          beatData.connections.forEach((conn: any) => {
-            connectionsToCreate.push({
-              source: beatData.id,
-              target: conn.targetId || conn.target,
-              label: conn.label,
-            });
-          });
-        }
-      });
-    }
-
-    // Also support top-level connections array (legacy format)
-    if (story.connections && Array.isArray(story.connections)) {
-      story.connections.forEach((conn: any) => {
-        connectionsToCreate.push({
-          source: conn.sourceId || conn.from,
-          target: conn.targetId || conn.to,
-        });
-      });
-    }
+    // Build the connection list from the one shared walk — same authority as
+    // the inject handler above, the validators and layout. This copy's private
+    // walk read story-level connections as from/to only, silently dropping the
+    // source/target spelling the inject path accepted.
+    const connectionsToCreate: Array<{ source: string; target: string; label?: string }> =
+      dedupeLinks(storyLinksOf(story)).map((l) => ({
+        source: l.source, target: l.target, ...(l.label ? { label: l.label } : {}),
+      }));
 
     // Create all connections with a delay to ensure state has updated
     if (connectionsToCreate.length > 0) {
