@@ -45,6 +45,22 @@
       "beats": 13,
       "characters": 0,
       "requiresAI": false
+    },
+    {
+      "id": "night-train",
+      "file": "night-train.asapst",
+      "title": "23:47 — a chat thriller",
+      "description": "A night train, a stranger’s phone on the seat opposite, and a thread you cannot put down. Keep Jo steady; choose her stop.",
+      "whatItShows": "The Dark Cinematic look, chat-bubble beats for scripted texting, and a live AI conversation in the middle — scripted bubbles hand off to the model and back for the ending you choose. The character dossier (traits, mood, texting style) is what makes the AI stay in voice.",
+      "tags": [
+        "chat fiction",
+        "AI conversation",
+        "cinematic look",
+        "thriller"
+      ],
+      "beats": 8,
+      "characters": 2,
+      "requiresAI": true
     }
   ]
 }

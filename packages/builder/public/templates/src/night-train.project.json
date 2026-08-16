@@ -1,0 +1,381 @@
+{
+ "metadata": {
+  "exportVersion": "1.1.0",
+  "exportedAt": "2026-08-16T00:00:00.000Z",
+  "exportedBy": "ASAPS Builder",
+  "projectId": "template-night-train",
+  "projectName": "23:47 — a chat thriller"
+ },
+ "project": {
+  "id": "template-night-train",
+  "name": "23:47 — a chat thriller",
+  "description": "A texting thriller in the Dark Cinematic look: scripted chat bubbles hand off to a live AI conversation and back for the ending you choose.",
+  "story": {
+   "title": "23:47",
+   "author": "ASAPS",
+   "beats": [
+    {
+     "id": "beat_title",
+     "name": "Title",
+     "type": "titleScreen",
+     "locations": [],
+     "x": 80,
+     "y": 300,
+     "connections": [
+      {
+       "targetId": "beat_chat1",
+       "label": "Open the thread"
+      }
+     ],
+     "parameters": {
+      "title": "23:47",
+      "subtitle": "a night-train story",
+      "buttonText": "Open the thread"
+     }
+    },
+    {
+     "id": "beat_chat1",
+     "name": "you awake",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 320,
+     "y": 300,
+     "connections": [],
+     "parameters": {
+      "question": "you awake",
+      "layoutTemplate": "chat-bubble",
+      "choices": [
+       {
+        "id": "c1_yes",
+        "text": "barely. what's up?",
+        "target": "beat_chat2"
+       },
+       {
+        "id": "c1_late",
+        "text": "it's midnight, jo.",
+        "target": "beat_chat2"
+       }
+      ]
+     },
+     "speaker": "Jo"
+    },
+    {
+     "id": "beat_chat2",
+     "name": "the phone",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 560,
+     "y": 300,
+     "connections": [],
+     "parameters": {
+      "question": "im on the 23:12 north. someone left a phone on the seat across from me. no bag no coat just the phone. it keeps lighting up",
+      "layoutTemplate": "chat-bubble",
+      "choices": [
+       {
+        "id": "c2_conductor",
+        "text": "so give it to the conductor?",
+        "target": "beat_chat3"
+       },
+       {
+        "id": "c2_dont",
+        "text": "don't touch it.",
+        "target": "beat_chat3"
+       }
+      ]
+     },
+     "speaker": "Jo"
+    },
+    {
+     "id": "beat_chat3",
+     "name": "the messages",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 800,
+     "y": 300,
+     "connections": [],
+     "parameters": {
+      "question": "that's the thing. i can see the lockscreen from here. the messages are about ME. what im wearing. that i got on at central. jo they know which carriage im in",
+      "layoutTemplate": "chat-bubble",
+      "choices": [
+       {
+        "id": "c3_off",
+        "text": "get off at the next stop. now.",
+        "target": "beat_talk"
+       },
+       {
+        "id": "c3_calm",
+        "text": "ok. stay with me. keep texting.",
+        "target": "beat_talk"
+       }
+      ]
+     },
+     "speaker": "Jo"
+    },
+    {
+     "id": "beat_talk",
+     "name": "Keep her talking",
+     "type": "aiConversation",
+     "locations": [],
+     "x": 1040,
+     "y": 300,
+     "connections": [
+      {
+       "targetId": "beat_decide",
+       "label": "The next stop"
+      }
+     ],
+     "parameters": {
+      "presentation": "chat",
+      "npcName": "jo",
+      "scenario": "Jo is on the last northbound night train, texting her sibling (the player) from carriage 3. On the empty seat across from her lies a phone that is not hers, and its lockscreen keeps lighting up with messages that describe Jo in real time — her coat, her seat, that she boarded at Central. About six other passengers are in the carriage. A man three rows down has not once looked at his own phone. The next stop is in a few minutes. The player is at home, on the other end of the thread, trying to keep Jo steady and decide what she should do.",
+      "npcPersonality": "Texts like a real person at midnight: lowercase, short bursts, sometimes two or three messages in a row, typos when frightened. Dry humour as a coping reflex that thins as fear rises. Never melodramatic. She notices concrete details (reflections in the window, the rhythm of the messages arriving). She will NOT resolve who is sending the messages — she does not know. If the player gives one firm, concrete instruction (get off, find the conductor, move carriage), she takes it and the panic recedes a notch.",
+      "openingLine": "ok. ok. six people in this carriage counting me. the man three rows down hasnt looked at his own phone once",
+      "maxTurns": 8,
+      "fallbackExitTarget": "beat_decide",
+      "systemInstructions": "Keep every message under 25 words. Escalate slowly: one new concrete detail per turn at most. Never reveal the sender. If the player is calm and specific, let Jo steady; if the player panics, Jo gets worse. Jo never decides on her own to leave the train or end the situation — whether to get off is decided together, after this conversation. If she is steadied, she says she will wait for the next stop and asks the player to stay on the phone."
+     }
+    },
+    {
+     "id": "beat_decide",
+     "name": "Next stop",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 1280,
+     "y": 300,
+     "connections": [],
+     "parameters": {
+      "question": "lights outside. next stop in 1 min. decide with me. off or on?",
+      "layoutTemplate": "chat-bubble",
+      "choices": [
+       {
+        "id": "d_off",
+        "text": "get off. i'll stay on the phone the whole way.",
+        "target": "beat_end_off"
+       },
+       {
+        "id": "d_stay",
+        "text": "stay on. more people, more light. find the conductor.",
+        "target": "beat_end_stay"
+       }
+      ]
+     },
+     "speaker": "Jo"
+    },
+    {
+     "id": "beat_end_off",
+     "name": "Off",
+     "type": "endScreen",
+     "locations": [],
+     "x": 1520,
+     "y": 200,
+     "connections": [],
+     "parameters": {
+      "message": "The platform is small and cold and hers alone. The train pulls away with the phone still on the seat, still lighting up for nobody.\n\n23:58 — jo: \"im out. station cafe is open. cab in 10. dont sleep yet ok\"",
+      "showRestart": true,
+      "restartText": "Read the thread again"
+     }
+    },
+    {
+     "id": "beat_end_stay",
+     "name": "On",
+     "type": "endScreen",
+     "locations": [],
+     "x": 1520,
+     "y": 400,
+     "connections": [],
+     "parameters": {
+      "message": "She walks the length of two carriages without hurrying, the way you told her to, and sits down across from the conductor. The phone stops lighting up somewhere before the river bridge. Nobody ever comes for it.\n\n00:31 — jo: \"home. deadbolt. tell you the rest tomorrow. thank you for staying up\"",
+      "showRestart": true,
+      "restartText": "Read the thread again"
+     }
+    }
+   ],
+   "characters": [
+    {
+     "id": "char_player",
+     "name": "you",
+     "displayName": "You",
+     "role": "player",
+     "counters": [],
+     "inventory": []
+    },
+    {
+     "id": "char_jo",
+     "name": "jo",
+     "displayName": "Jo",
+     "role": "npc",
+     "description": "Jo, 29, the player's younger sibling. Practical, funny, hates being fussed over — which is why her asking for company at midnight means it is real. On a night train with a stranger's phone on the seat opposite, its lockscreen describing her in real time.",
+     "traits": {
+      "openness": 0.6,
+      "conscientiousness": 0.5,
+      "extraversion": 0.45,
+      "agreeableness": 0.6,
+      "neuroticism": 0.65
+     },
+     "initialMood": {
+      "valence": -0.25,
+      "arousal": 0.55
+     },
+     "initialSentiments": [
+      {
+       "toEntityRef": "player",
+       "emotion": "trust",
+       "strength": 0.5
+      }
+     ],
+     "counters": [],
+     "inventory": []
+    }
+   ],
+   "connections": [],
+   "metadata": {
+    "title": "23:47",
+    "author": "ASAPS",
+    "description": "A night train, a stranger’s phone, and a thread you cannot put down."
+   },
+   "settings": {},
+   "environment": {
+    "props": [],
+    "nodes": []
+   },
+   "clusters": [],
+   "containerBeatPositions": [],
+   "assets": [],
+   "globalSettings": {
+    "project": {
+     "width": 1024,
+     "height": 768,
+     "aspectRatio": "4:3",
+     "scalingMode": "fit",
+     "layoutMode": "responsive"
+    },
+    "colors": {
+     "pcolor": "#1c2026",
+     "palpha": 100,
+     "ptextcolor": "#d7dbe0",
+     "nonpcolor": "#14171c",
+     "nonpalpha": 96,
+     "nonptextcolor": "#d7dbe0",
+     "bgColor": "#0b0d10",
+     "textBoxBorder": "#2e333b"
+    },
+    "fonts": {
+     "titleFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+     "textFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+     "btnFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+     "fontSize": {
+      "title": 46,
+      "text": 19,
+      "button": 16
+     }
+    },
+    "textbox": {
+     "radius": 2,
+     "padding": 24,
+     "borderWidth": 1,
+     "opacity": 96,
+     "position": "bottom",
+     "boxVisibility": "all"
+    },
+    "textEffects": {
+     "animation": "typewriter",
+     "typewriterSpeed": 30,
+     "fadeInDuration": 400
+    },
+    "hotspots": {
+     "visible": true,
+     "labels": false,
+     "highlightColor": "#d98e32",
+     "opacity": 22,
+     "showInPreview": "onHover",
+     "labelDisplay": "hover"
+    },
+    "sound": {
+     "backgroundMusic": "",
+     "backgroundVolume": 50,
+     "mute": false
+    },
+    "copyright": {
+     "notice": "",
+     "year": "2026",
+     "owner": ""
+    },
+    "debug": {
+     "firstbeat": "",
+     "showvals": false
+    }
+   }
+  },
+  "settings": {},
+  "assetIds": [],
+  "createdAt": "2026-08-16T00:00:00.000Z",
+  "modifiedAt": "2026-08-16T00:00:00.000Z",
+  "version": 1,
+  "globalSettings": {
+   "project": {
+    "width": 1024,
+    "height": 768,
+    "aspectRatio": "4:3",
+    "scalingMode": "fit",
+    "layoutMode": "responsive"
+   },
+   "colors": {
+    "pcolor": "#1c2026",
+    "palpha": 100,
+    "ptextcolor": "#d7dbe0",
+    "nonpcolor": "#14171c",
+    "nonpalpha": 96,
+    "nonptextcolor": "#d7dbe0",
+    "bgColor": "#0b0d10",
+    "textBoxBorder": "#2e333b"
+   },
+   "fonts": {
+    "titleFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+    "textFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+    "btnFont": "\"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif",
+    "fontSize": {
+     "title": 46,
+     "text": 19,
+     "button": 16
+    }
+   },
+   "textbox": {
+    "radius": 2,
+    "padding": 24,
+    "borderWidth": 1,
+    "opacity": 96,
+    "position": "bottom",
+    "boxVisibility": "all"
+   },
+   "textEffects": {
+    "animation": "typewriter",
+    "typewriterSpeed": 30,
+    "fadeInDuration": 400
+   },
+   "hotspots": {
+    "visible": true,
+    "labels": false,
+    "highlightColor": "#d98e32",
+    "opacity": 22,
+    "showInPreview": "onHover",
+    "labelDisplay": "hover"
+   },
+   "sound": {
+    "backgroundMusic": "",
+    "backgroundVolume": 50,
+    "mute": false
+   },
+   "copyright": {
+    "notice": "",
+    "year": "2026",
+    "owner": ""
+   },
+   "debug": {
+    "firstbeat": "",
+    "showvals": false
+   }
+  },
+  "projectType": "template",
+  "themeId": "builtin-cinematic"
+ }
+}
