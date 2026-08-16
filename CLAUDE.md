@@ -207,6 +207,32 @@ The system maintains backward compatibility with legacy ASML files:
 - Graceful handling of legacy attributes
 - Support for original ASML XML structure
 
+## Release Checklist (verify BEFORE tagging)
+
+The Aug 2026 retrospective found verification consistently trailing release:
+v0.9.89 shipped two days before its verification plan started, and the sweep
+then found ~20 user-visible bugs in the released build — including a hole in
+the release's headline feature. The rounds work; they have to run on the
+candidate, not on the aftermath.
+
+Before `git tag`:
+
+1. **Play a generated story end to end** in the Preview Window — not just its
+   opening. Round 2 of the v0.9.89 plan found a story that imported cleanly
+   and dead-ended at its first decision; Round 1 had "passed" it without
+   playing it.
+2. **Device-preset sweep**: the changed surface at Desktop / Tablet both /
+   Phone both, in both layout modes. Measure geometry (rects, overlap,
+   containment in the visible pane), don't eyeball. A stage hanging off its
+   pane measures "clean" against itself.
+3. **Export and open at a non-1:1 window** if anything touched the renderer,
+   HUDs, or the exporter. Scale ≠ 1 is the common case in the wild and the
+   rare case on a dev machine.
+4. **Suites green, tripwires included** — the mirror tripwires exist because
+   every "must be kept in sync" comment eventually lies.
+5. If the updater changed: remember the fix ships one release late — the hop
+   INTO the release runs the old updater. Say so in the notes.
+
 ## Coding Principles
 
 ### Prefer Signal-Based Over Time-Based Solutions
