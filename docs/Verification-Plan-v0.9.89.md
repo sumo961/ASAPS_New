@@ -435,3 +435,24 @@ Recommended follow-up (not built): now that the Visual Editor draws screen
 HUDs, it is the natural place to warn when a character's HUD stack exceeds a
 share of the project's smallest target viewport — the same "flag it while
 authoring" shape as the ⚠ shown twice badge, rather than a runtime override.
+
+---
+
+## What we keep — ✅ DONE (2026-08-16)
+
+The plan's original doctrine (the section was lost in an earlier edit of this
+file, restated here): generate a story, fix what breaks, and commit the
+**fixed** story as evidence under `examples/`, with CI tests pinning anything
+structural. A throwaway that proved something once and vanished is worth much
+less than a fixture that fails when the thing regresses.
+
+Done: the Round-1 story's three dead links (`beat_3` exits → `beat_intake`)
+were repaired to point at Decision 2, and the story ships as
+`packages/builder/public/examples/someone-made-her-promises.asaps.zip` in the
+real export envelope. `promisesFixture.test.ts` pins what it is evidence of:
+no dangling links (the Round-2 bug, held shut by `storyLinks` — the walk that
+bug produced), Mara's sentiment-bound bipolar banded meter with its −0.3 seed,
+Marek's words-only band counter, and the fact that not one choice effect names
+a counter — every meter movement in the story is derived from affect.
+
+With this, every round and every follow-up in this plan is closed.
