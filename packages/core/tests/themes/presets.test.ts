@@ -24,19 +24,50 @@ import {
   getBuiltInTheme,
   getBuiltInThemeIds,
   isBuiltInTheme,
+  EDITORIAL_THEME,
+  CINEMATIC_THEME,
+  PLAYFUL_THEME,
+  HIGH_CONTRAST_THEME,
 } from '../../src/themes/presets';
 
 describe('BUILT_IN_THEMES registry', () => {
-  it('has exactly three themes (VN + Twine + Point-and-Click)', () => {
-    expect(BUILT_IN_THEMES).toHaveLength(3);
+  it('has exactly seven themes (three classics + four 12b look presets)', () => {
+    expect(BUILT_IN_THEMES).toHaveLength(7);
   });
 
-  it('contains all three named theme exports', () => {
+  it('contains every named theme export', () => {
     // Pin that the catalog matches the named exports — easy
     // to forget to add a new theme to BUILT_IN_THEMES.
     expect(BUILT_IN_THEMES).toContain(VISUAL_NOVEL_THEME);
     expect(BUILT_IN_THEMES).toContain(TWINE_THEME);
     expect(BUILT_IN_THEMES).toContain(POINT_AND_CLICK_THEME);
+    expect(BUILT_IN_THEMES).toContain(EDITORIAL_THEME);
+    expect(BUILT_IN_THEMES).toContain(CINEMATIC_THEME);
+    expect(BUILT_IN_THEMES).toContain(PLAYFUL_THEME);
+    expect(BUILT_IN_THEMES).toContain(HIGH_CONTRAST_THEME);
+  });
+
+  it('the accessible preset commits to what it promises', () => {
+    // High Contrast is BUILT to WCAG rather than taste: nothing translucent,
+    // no motion, larger type. These are the properties an accessibility
+    // reviewer would check; a well-meaning restyle must not soften them.
+    const t = HIGH_CONTRAST_THEME;
+    const alphas = [
+      ...Object.values(t.colors).map((c: any) => c.alpha),
+      t.textBox.background.alpha, t.button.background.alpha,
+    ];
+    expect(alphas.every(a => a === 1)).toBe(true);
+    expect(t.effects.textAnimation).toBe('none');
+    expect(t.effects.sceneTransition).toBe('none');
+    expect(t.fonts.body.size).toBeGreaterThanOrEqual(22);
+    expect(t.button.transitionDuration).toBe(0);
+  });
+
+  it('Editorial is the light theme the catalog was missing', () => {
+    // Every pre-12b builtin was dark. A light ground is a real capability —
+    // museum/documentary stories read wrong on charcoal.
+    const bg = parseInt(EDITORIAL_THEME.colors.background.hex.slice(1), 16);
+    expect(bg).toBeGreaterThan(0xeeeeee);
   });
 
   it('every theme has a unique meta.id', () => {
