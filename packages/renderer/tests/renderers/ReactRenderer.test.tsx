@@ -202,3 +202,47 @@ describe('visual transitions (dissolve identity + direction + easing, v0.9.86)',
     expect(container.style.transition).toContain('transform 300ms ease-out');
   });
 });
+
+describe('consecutive XR map beats (GPS starter map → walk pair)', () => {
+  // A fake sensor service the test can push positions through.
+  const makeSensors = () => {
+    const watchers: Array<(r: { lat: number; lng: number }) => void> = [];
+    return {
+      watchLocation(cb: (r: { lat: number; lng: number }) => void) {
+        watchers.push(cb);
+        return () => {};
+      },
+      count() { return watchers.length; },
+      push(lat: number, lng: number) {
+        for (const w of [...watchers]) w({ lat, lng });
+      },
+    };
+  };
+
+  it('a trigger map after a display map still fires its arrival', async () => {
+    // Without a per-mount key the second <MapBeatLeaflet> reconciles into the
+    // FIRST one's instance and inherits resolvedRef=true from the display
+    // beat's Continue click — the geofence can then never fire and the walk
+    // beat waits forever while the status line says "At target ✓". Found live
+    // by the Ordinary Wonders template's map → walk pair; the GPS field kit's
+    // B_show → B_walk pair has the same shape on device.
+    const sensors = makeSensors();
+    (renderer as any).setState('sensorService', sensors);
+    const loc = [{ id: 'w1', name: 'Wonder', lat: 59.3326, lng: 18.0649, radiusMeters: 25 }];
+
+    const p1 = renderer.renderMap!({ mode: 'display', locations: loc, buttonText: 'Onward' });
+    await waitFor(() => {
+      const btn = [...container.querySelectorAll('button')].find(b => b.textContent === 'Onward');
+      expect(btn).toBeTruthy();
+      btn!.click();
+    });
+    await expect(p1).resolves.toMatchObject({ path: 'continue' });
+
+    const before = sensors.count();
+    const p2 = renderer.renderMap!({ mode: 'trigger-on-arrival', locations: loc });
+    // Wait until the fresh mount subscribes, then walk into the fence.
+    await waitFor(() => expect(sensors.count()).toBeGreaterThan(before));
+    sensors.push(59.3326, 18.0649);
+    await expect(p2).resolves.toMatchObject({ path: 'arrived', locationId: 'w1' });
+  });
+});

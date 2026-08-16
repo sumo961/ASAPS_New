@@ -173,3 +173,91 @@ describe('counter-displays template content', () => {
     }
   });
 });
+
+describe('ordinary-wonders template content (the GPS walk)', () => {
+  const data = JSON.parse(
+    readFileSync(join(templatesDir, 'src/ordinary-wonders.project.json'), 'utf-8'),
+  );
+  const story = data.project.story;
+  const beats = story.beats;
+
+  it('carries the template flag and the Playful theme', () => {
+    expect(data.project.projectType).toBe('template');
+    expect(data.project.themeId).toBe('builtin-playful');
+  });
+
+  it('is a connected graph including geofence and default targets', () => {
+    const ids = new Set(beats.map((b: any) => b.id));
+    for (const b of beats) {
+      for (const c of b.connections || []) {
+        expect(ids.has(c.targetId), `${b.id} → ${c.targetId} dangles`).toBe(true);
+      }
+      if (b.type === 'gpsLocation') {
+        expect(ids.has(b.parameters.defaultTarget), `${b.id} defaultTarget dangles`).toBe(true);
+        for (const e of b.parameters.xrLocations || []) {
+          if (e.target) expect(ids.has(e.target), `${b.id} geofence → ${e.target} dangles`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('contains NO authored coordinates — the walk works anywhere', () => {
+    // Same rule as the GPS field kit: capture + scatter around the live
+    // player, never a lat/lng someone typed in for their own street.
+    const flat = JSON.stringify(beats);
+    expect(flat).not.toMatch(/"lat"|"lng"|"fallbackLat"/);
+    const modes = beats.filter((b: any) => b.type === 'setGpsLocation').map((b: any) => b.parameters.mode);
+    expect(modes).toEqual(['capture', 'scatter']);
+    const scatter = beats.find((b: any) => b.type === 'setGpsLocation' && b.parameters.mode === 'scatter');
+    expect(scatter.parameters.centerSource).toBe('current');
+    expect(scatter.parameters.placement).toBe('walkable');
+  });
+
+  it('every geofence binds to a point set some setGpsLocation writes', () => {
+    const written = new Set(
+      beats.filter((b: any) => b.type === 'setGpsLocation').map((b: any) => b.parameters.pointName),
+    );
+    const bound = beats
+      .filter((b: any) => b.type === 'gpsLocation')
+      .flatMap((b: any) => (b.parameters.xrLocations || []).map((e: any) => e.pointName));
+    expect(bound.length).toBeGreaterThan(0);
+    for (const name of bound) expect(written.has(name), `no setGpsLocation writes '${name}'`).toBe(true);
+  });
+
+  it("orders the walk beat's honest skip exit FIRST in connections", () => {
+    // getNextBeat() takes the first unconditional connection — the AR-fixture
+    // field failure. Skipping the walk must never masquerade as arrival.
+    const walk = beats.find((b: any) => b.id === 'beat_walk');
+    expect(walk.connections[0].targetId).toBe('beat_desk');
+    expect(walk.parameters.defaultTarget).toBe('beat_desk');
+  });
+
+  it('echoes the named wonder only on the path where it was named', () => {
+    // ${wonderName} may appear only in beats reachable AFTER beat_name —
+    // the skip path never sets it and would render the literal placeholder.
+    const users = beats.filter((b: any) => JSON.stringify(b.parameters).includes('${wonderName}'));
+    expect(users.map((b: any) => b.id)).toEqual(['beat_entry']);
+    const input = beats.find((b: any) => b.type === 'inputText');
+    expect(input.parameters.variable).toBe('wonderName');
+    expect(input.parameters.saveToType).toBe('variable');
+  });
+
+  it('its GPS beats construct from the stored params without throwing', async () => {
+    const { SetGpsLocationBeat, GpsLocationBeat } = await import('@asaps/core');
+    for (const b of beats.filter((b: any) => b.type === 'setGpsLocation')) {
+      const beat = new SetGpsLocationBeat({ id: b.id, type: 'setGpsLocation', parameters: b.parameters });
+      expect(beat.getParameters().pointName).toBe(b.parameters.pointName);
+    }
+    for (const b of beats.filter((b: any) => b.type === 'gpsLocation')) {
+      const beat = new GpsLocationBeat({ id: b.id, type: 'gpsLocation', parameters: b.parameters } as any);
+      expect(beat.getParameters().mode).toBe(b.parameters.mode);
+    }
+  });
+
+  it('the .asapst zip matches the source JSON', async () => {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(readFileSync(join(templatesDir, 'ordinary-wonders.asapst')));
+    const inner = JSON.parse(await zip.file('project.json')!.async('text'));
+    expect(inner).toEqual(data);
+  });
+});

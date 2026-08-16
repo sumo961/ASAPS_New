@@ -1,66 +1,82 @@
 {
-  "templates": [
-    {
-      "id": "rehearsal-difficult-client",
-      "file": "rehearsal-difficult-client.asapst",
-      "title": "Rehearsal: The Difficult Client",
-      "description": "Practice a difficult client conversation with an AI-played character who arrives in a different disposition every session.",
-      "whatItShows": "One client, four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough — the AI conversation beat plus character variants doing rehearsal variety. Play it twice and compare.",
-      "tags": [
-        "AI conversation",
-        "disposition variants",
-        "training"
-      ],
-      "beats": 5,
-      "characters": 1,
-      "requiresAI": true
-    },
-    {
-      "id": "counter-displays",
-      "file": "counter-displays.asapst",
-      "title": "Counters that read affect",
-      "description": "A character whose meters mirror trust, fear and mood, plus choices whose effects move them. Replace the text; keep the wiring.",
-      "whatItShows": "Counter binding end to end: one ordinary counter beside three bound to sentiment, emotion level and mood. Bipolar meters grow outward from zero and show a phrase instead of a number. No choice writes to a counter — they change how the character feels, and the meters report it.",
-      "tags": [
-        "counters",
-        "affect",
-        "meters"
-      ],
-      "beats": 5,
-      "characters": 2,
-      "requiresAI": false
-    },
-    {
-      "id": "museum-lamp",
-      "file": "museum-lamp.asapst",
-      "title": "The Oil Lamp — a museum story",
-      "description": "One object, three ways of seeing it: as a made thing, a used thing, and a taken thing. Swap in your own object; keep the structure.",
-      "whatItShows": "The Clean Editorial look (the first light theme), a hub that dims paths you have already taken, and in-text hyperlinks in the theme accent. Text-first and asset-free — it plays well on anything.",
-      "tags": [
-        "museum",
-        "documentary",
-        "editorial look",
-        "hyperText"
-      ],
-      "beats": 13,
-      "characters": 0,
-      "requiresAI": false
-    },
-    {
-      "id": "night-train",
-      "file": "night-train.asapst",
-      "title": "23:47 — a chat thriller",
-      "description": "A night train, a stranger’s phone on the seat opposite, and a thread you cannot put down. Keep Jo steady; choose her stop.",
-      "whatItShows": "The Dark Cinematic look, chat-bubble beats for scripted texting, and a live AI conversation in the middle — scripted bubbles hand off to the model and back for the ending you choose. The character dossier (traits, mood, texting style) is what makes the AI stay in voice.",
-      "tags": [
-        "chat fiction",
-        "AI conversation",
-        "cinematic look",
-        "thriller"
-      ],
-      "beats": 8,
-      "characters": 2,
-      "requiresAI": true
-    }
-  ]
+ "templates": [
+  {
+   "id": "rehearsal-difficult-client",
+   "file": "rehearsal-difficult-client.asapst",
+   "title": "Rehearsal: The Difficult Client",
+   "description": "Practice a difficult client conversation with an AI-played character who arrives in a different disposition every session.",
+   "whatItShows": "One client, four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough — the AI conversation beat plus character variants doing rehearsal variety. Play it twice and compare.",
+   "tags": [
+    "AI conversation",
+    "disposition variants",
+    "training"
+   ],
+   "beats": 5,
+   "characters": 1,
+   "requiresAI": true
+  },
+  {
+   "id": "counter-displays",
+   "file": "counter-displays.asapst",
+   "title": "Counters that read affect",
+   "description": "A character whose meters mirror trust, fear and mood, plus choices whose effects move them. Replace the text; keep the wiring.",
+   "whatItShows": "Counter binding end to end: one ordinary counter beside three bound to sentiment, emotion level and mood. Bipolar meters grow outward from zero and show a phrase instead of a number. No choice writes to a counter — they change how the character feels, and the meters report it.",
+   "tags": [
+    "counters",
+    "affect",
+    "meters"
+   ],
+   "beats": 5,
+   "characters": 2,
+   "requiresAI": false
+  },
+  {
+   "id": "museum-lamp",
+   "file": "museum-lamp.asapst",
+   "title": "The Oil Lamp — a museum story",
+   "description": "One object, three ways of seeing it: as a made thing, a used thing, and a taken thing. Swap in your own object; keep the structure.",
+   "whatItShows": "The Clean Editorial look (the first light theme), a hub that dims paths you have already taken, and in-text hyperlinks in the theme accent. Text-first and asset-free — it plays well on anything.",
+   "tags": [
+    "museum",
+    "documentary",
+    "editorial look",
+    "hyperText"
+   ],
+   "beats": 13,
+   "characters": 0,
+   "requiresAI": false
+  },
+  {
+   "id": "night-train",
+   "file": "night-train.asapst",
+   "title": "23:47 — a chat thriller",
+   "description": "A night train, a stranger’s phone on the seat opposite, and a thread you cannot put down. Keep Jo steady; choose her stop.",
+   "whatItShows": "The Dark Cinematic look, chat-bubble beats for scripted texting, and a live AI conversation in the middle — scripted bubbles hand off to the model and back for the ending you choose. The character dossier (traits, mood, texting style) is what makes the AI stay in voice.",
+   "tags": [
+    "chat fiction",
+    "AI conversation",
+    "cinematic look",
+    "thriller"
+   ],
+   "beats": 8,
+   "characters": 2,
+   "requiresAI": true
+  },
+  {
+   "id": "ordinary-wonders",
+   "file": "ordinary-wonders.asapst",
+   "title": "Ordinary Wonders — a GPS walk",
+   "description": "A pocket expedition played outdoors: three wonders scattered within 150 m of wherever you stand. Walk to one, find what nobody else has noticed, and name it.",
+   "whatItShows": "The Playful look and the full GPS loop with no authored coordinates: capture your position, scatter walkable targets around it (OpenStreetMap), a display map, arrival geofences, and honest skip exits. The player's answer comes back by name via text interpolation.",
+   "tags": [
+    "GPS",
+    "outdoors",
+    "playful look",
+    "location"
+   ],
+   "beats": 12,
+   "characters": 0,
+   "requiresAI": false
+  }
+ ]
 }

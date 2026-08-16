@@ -927,6 +927,15 @@ export function backfillUnplacedDefaults(
 
 export class ReactRenderer extends BaseRenderer {
   private _root: ReactDOM.Root | null = null;
+  /**
+   * Per-mount key for the XR map views. Two map beats in a row (a display
+   * map into a trigger geofence — the GPS starter's map → walk pair, the
+   * field kit's B_show → B_walk) reconcile into the SAME component instance
+   * without a key, so the second beat inherits the first one's
+   * `resolvedRef = true` and its arrival trigger can never fire — the status
+   * line says "At target ✓" while the story waits forever.
+   */
+  private xrMapMountSeq = 0;
   protected resolveAction: ((value: string) => void) | null = null;  // Changed to protected
   private _originalHandleAction: ((id: string) => void) | null = null;  // Saved for cancellation
   private instanceId: string;
@@ -4384,6 +4393,7 @@ export class ReactRenderer extends BaseRenderer {
     return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
       this.renderComponent(
         <MapBeatLeaflet
+          key={`xr-map-${++this.xrMapMountSeq}`}
           mode={options.mode}
           locations={options.locations}
           text={options.text}
@@ -4438,6 +4448,7 @@ export class ReactRenderer extends BaseRenderer {
     return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
       this.renderComponent(
         <IndoorMapBeat
+          key={`xr-map-${++this.xrMapMountSeq}`}
           mode={options.mode}
           locations={options.locations}
           text={options.text}

@@ -19,8 +19,17 @@ describe('importIssuesVisible', () => {
     expect(importIssuesVisible(imported, [{ id: 'beat_0' }, { id: 'beat_1' }])).toBe(false);
   });
 
-  it('still shows if even one referenced beat survives an edit', () => {
-    expect(importIssuesVisible(imported, [{ id: 'r5_end' }])).toBe(true);
+  it('survives the author deleting a minority of the imported beats', () => {
+    expect(importIssuesVisible(imported, [{ id: 'r5_title' }, { id: 'r5_end' }])).toBe(true);
+  });
+
+  it('does NOT ride a single conventional id into an unrelated project', () => {
+    // Seen live: a night-train banner hanging over a freshly instantiated
+    // GPS template because both stories start at `beat_title`. One shared
+    // conventional id is coincidence, not identity.
+    const nightTrain = ['beat_title', 'beat_chat1', 'beat_chat2', 'beat_chat3', 'beat_decide'];
+    const gpsWalk = [{ id: 'beat_title' }, { id: 'beat_base' }, { id: 'beat_scatter' }, { id: 'beat_walk' }];
+    expect(importIssuesVisible(nightTrain, gpsWalk)).toBe(false);
   });
 
   it('shows nothing with no record of what was imported', () => {

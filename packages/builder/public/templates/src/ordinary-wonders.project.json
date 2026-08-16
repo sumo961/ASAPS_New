@@ -1,0 +1,440 @@
+{
+ "metadata": {
+  "exportVersion": "1.1.0",
+  "exportedAt": "2026-08-17T00:00:00.000Z",
+  "exportedBy": "ASAPS Builder",
+  "projectId": "template-ordinary-wonders",
+  "projectName": "Ordinary Wonders — a GPS walk"
+ },
+ "project": {
+  "id": "template-ordinary-wonders",
+  "name": "Ordinary Wonders — a GPS walk",
+  "description": "A pocket expedition in the Playful look: capture where you stand, scatter three walkable targets nearby, walk to one, and name what nobody else has noticed. Works anywhere — no authored coordinates.",
+  "story": {
+   "title": "Ordinary Wonders",
+   "author": "ASAPS",
+   "beats": [
+    {
+     "id": "beat_title",
+     "name": "Title",
+     "type": "titleScreen",
+     "locations": [],
+     "x": 80,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_brief",
+       "label": "Start"
+      }
+     ],
+     "parameters": {
+      "title": "Ordinary Wonders",
+      "author": "an expedition on foot",
+      "buttonText": "Boots on"
+     }
+    },
+    {
+     "id": "beat_brief",
+     "name": "The briefing",
+     "type": "infoText",
+     "locations": [],
+     "x": 310,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_base",
+       "label": "Continue"
+      }
+     ],
+     "parameters": {
+      "text": "Somewhere within a few minutes' walk of where you are standing, three wonders are hiding in plain sight. A crooked chimney. A door painted the wrong blue. A tree growing through a fence.\n\nNobody has ever catalogued them. That is your job now.\n\nThis story is played OUTDOORS, on foot. Allow location access when asked — the expedition cannot start without it. (It also needs internet, to drop your targets on streets and paths instead of inside strangers' kitchens.)",
+      "buttonText": "Establish base camp"
+     }
+    },
+    {
+     "id": "beat_base",
+     "name": "Base camp (capture)",
+     "type": "setGpsLocation",
+     "locations": [],
+     "x": 540,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_scatter",
+       "label": "Next"
+      }
+     ],
+     "parameters": {
+      "mode": "capture",
+      "pointName": "basecamp",
+      "pointRadiusMeters": 30
+     }
+    },
+    {
+     "id": "beat_scatter",
+     "name": "Scatter the wonders",
+     "type": "setGpsLocation",
+     "locations": [],
+     "x": 770,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_map",
+       "label": "Next"
+      }
+     ],
+     "parameters": {
+      "mode": "scatter",
+      "pointName": "wonders",
+      "count": 3,
+      "scatterRadiusMeters": 150,
+      "centerSource": "current",
+      "placement": "walkable",
+      "pointRadiusMeters": 25
+     }
+    },
+    {
+     "id": "beat_map",
+     "name": "The expedition map",
+     "type": "gpsLocation",
+     "locations": [],
+     "x": 1000,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_walk",
+       "label": "Continue"
+      }
+     ],
+     "parameters": {
+      "mode": "display",
+      "xrLocations": [
+       {
+        "id": "map_e",
+        "name": "A wonder (unconfirmed)",
+        "pointName": "wonders",
+        "target": "",
+        "radiusMeters": 25
+       }
+      ],
+      "defaultTarget": "beat_walk",
+      "text": "Three sightings, all within about 150 metres. Nobody knows what they are yet — that is what expeditions are for.\n\nPick whichever pin calls to you.",
+      "buttonText": "Begin the expedition"
+     }
+    },
+    {
+     "id": "beat_walk",
+     "name": "Walk to a wonder",
+     "type": "gpsLocation",
+     "locations": [],
+     "x": 1230,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_desk",
+       "label": "Abandoned"
+      },
+      {
+       "targetId": "beat_found",
+       "label": "Arrived"
+      }
+     ],
+     "parameters": {
+      "mode": "trigger-on-arrival",
+      "xrLocations": [
+       {
+        "id": "walk_e",
+        "name": "A wonder (unconfirmed)",
+        "pointName": "wonders",
+        "target": "beat_found",
+        "radiusMeters": 25
+       }
+      ],
+      "defaultTarget": "beat_desk",
+      "text": "Walk to any pin. Getting within 25 metres confirms the sighting automatically. Look up from the phone now and then — that is where the wonders are.",
+      "cancelButtonText": "Abandon expedition"
+     }
+    },
+    {
+     "id": "beat_found",
+     "name": "On site",
+     "type": "infoText",
+     "locations": [],
+     "x": 1460,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_name",
+       "label": "Continue"
+      }
+     ],
+     "parameters": {
+      "text": "Sighting confirmed. You are standing on it — or at least within 25 metres of it.\n\nNow the real fieldwork: turn around slowly, once. Find the thing here that ten thousand people have walked past and nobody has ever looked at. It exists. It always does.",
+      "buttonText": "I see it"
+     }
+    },
+    {
+     "id": "beat_name",
+     "name": "Name the wonder",
+     "type": "inputText",
+     "locations": [],
+     "x": 1690,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_entry",
+       "label": "Recorded"
+      }
+     ],
+     "parameters": {
+      "prompt": "Every wonder needs a name worthy of a field journal. Give it one:",
+      "saveToType": "variable",
+      "variable": "wonderName",
+      "placeholder": "The Leaning Bollard of Elm Street",
+      "required": true,
+      "buttonText": "Record it"
+     }
+    },
+    {
+     "id": "beat_entry",
+     "name": "Journal entry",
+     "type": "infoText",
+     "locations": [],
+     "x": 1920,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_return",
+       "label": "Head back"
+      }
+     ],
+     "parameters": {
+      "text": "Entered into the catalogue of ordinary wonders:\n\n“${wonderName}”\n\nFirst documented sighting: you, today, on foot.\n\nExpedition rule: one wonder per walk. The other two stay out there, which is excellent news for tomorrow.",
+      "buttonText": "Return to base camp"
+     }
+    },
+    {
+     "id": "beat_return",
+     "name": "Walk back to base",
+     "type": "gpsLocation",
+     "locations": [],
+     "x": 2150,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_debrief",
+       "label": "Home"
+      }
+     ],
+     "parameters": {
+      "mode": "trigger-on-arrival",
+      "xrLocations": [
+       {
+        "id": "ret_e",
+        "name": "Base camp",
+        "pointName": "basecamp",
+        "target": "beat_debrief",
+        "radiusMeters": 30
+       }
+      ],
+      "defaultTarget": "beat_debrief",
+      "text": "Head back to where you started. Base camp remembers where it is, even if you don't.",
+      "cancelButtonText": "I live here now"
+     }
+    },
+    {
+     "id": "beat_desk",
+     "name": "Rain day",
+     "type": "infoText",
+     "locations": [],
+     "x": 1460,
+     "y": 520,
+     "connections": [
+      {
+       "targetId": "beat_debrief",
+       "label": "Continue"
+      }
+     ],
+     "parameters": {
+      "text": "Expedition abandoned. Every field journal has a rain day.\n\nThe wonders keep. They are not going anywhere — that is rather the point of them.",
+      "buttonText": "Back to base"
+     }
+    },
+    {
+     "id": "beat_debrief",
+     "name": "Debrief",
+     "type": "endScreen",
+     "locations": [],
+     "x": 2380,
+     "y": 260,
+     "connections": [],
+     "parameters": {
+      "message": "Expedition complete.\n\nSame streets, different eyes. Restart tomorrow — the scatter never lands in the same place twice.",
+      "showRestart": true,
+      "showCredits": false
+     }
+    }
+   ],
+   "characters": [],
+   "connections": [],
+   "metadata": {
+    "title": "Ordinary Wonders",
+    "author": "ASAPS",
+    "description": "A GPS expedition on foot: three wonders scattered within 150 m of wherever you are standing."
+   },
+   "settings": {},
+   "environment": {
+    "props": [],
+    "nodes": []
+   },
+   "clusters": [],
+   "containerBeatPositions": [],
+   "assets": [],
+   "globalSettings": {
+    "project": {
+     "width": 1024,
+     "height": 768,
+     "aspectRatio": "4:3",
+     "scalingMode": "fit"
+    },
+    "colors": {
+     "pcolor": "#ff6b6b",
+     "palpha": 100,
+     "ptextcolor": "#ffffff",
+     "nonpcolor": "#f2fbfa",
+     "nonpalpha": 100,
+     "nonptextcolor": "#073b4c",
+     "bgColor": "#ffffff",
+     "textBoxBorder": "#073b4c"
+    },
+    "fonts": {
+     "titleFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+     "textFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+     "btnFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+     "fontSize": {
+      "title": 42,
+      "text": 20,
+      "button": 19
+     }
+    },
+    "textbox": {
+     "radius": 18,
+     "padding": 26,
+     "borderWidth": 2,
+     "opacity": 100,
+     "position": "center",
+     "boxVisibility": "all"
+    },
+    "textEffects": {
+     "animation": "none",
+     "typewriterSpeed": 40,
+     "fadeInDuration": 200
+    },
+    "hotspots": {
+     "visible": true,
+     "labels": true,
+     "highlightColor": "#06d6a0",
+     "opacity": 30,
+     "showInPreview": "visible",
+     "labelDisplay": "hover"
+    },
+    "sound": {
+     "backgroundMusic": "",
+     "backgroundVolume": 50,
+     "mute": false
+    },
+    "copyright": {
+     "notice": "",
+     "year": "2026",
+     "owner": ""
+    },
+    "debug": {
+     "firstbeat": "",
+     "showvals": false
+    },
+    "location": {
+     "mockLocation": {
+      "lat": 59.3326,
+      "lng": 18.0649
+     }
+    }
+   }
+  },
+  "settings": {},
+  "assetIds": [],
+  "createdAt": "2026-08-17T00:00:00.000Z",
+  "modifiedAt": "2026-08-17T00:00:00.000Z",
+  "version": 1,
+  "globalSettings": {
+   "project": {
+    "width": 1024,
+    "height": 768,
+    "aspectRatio": "4:3",
+    "scalingMode": "fit"
+   },
+   "colors": {
+    "pcolor": "#ff6b6b",
+    "palpha": 100,
+    "ptextcolor": "#ffffff",
+    "nonpcolor": "#f2fbfa",
+    "nonpalpha": 100,
+    "nonptextcolor": "#073b4c",
+    "bgColor": "#ffffff",
+    "textBoxBorder": "#073b4c"
+   },
+   "fonts": {
+    "titleFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+    "textFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+    "btnFont": "\"Trebuchet MS\", \"Segoe UI\", Verdana, sans-serif",
+    "fontSize": {
+     "title": 42,
+     "text": 20,
+     "button": 19
+    }
+   },
+   "textbox": {
+    "radius": 18,
+    "padding": 26,
+    "borderWidth": 2,
+    "opacity": 100,
+    "position": "center",
+    "boxVisibility": "all"
+   },
+   "textEffects": {
+    "animation": "none",
+    "typewriterSpeed": 40,
+    "fadeInDuration": 200
+   },
+   "hotspots": {
+    "visible": true,
+    "labels": true,
+    "highlightColor": "#06d6a0",
+    "opacity": 30,
+    "showInPreview": "visible",
+    "labelDisplay": "hover"
+   },
+   "sound": {
+    "backgroundMusic": "",
+    "backgroundVolume": 50,
+    "mute": false
+   },
+   "copyright": {
+    "notice": "",
+    "year": "2026",
+    "owner": ""
+   },
+   "debug": {
+    "firstbeat": "",
+    "showvals": false
+   },
+   "location": {
+    "mockLocation": {
+     "lat": 59.3326,
+     "lng": 18.0649
+    }
+   }
+  },
+  "projectType": "template",
+  "themeId": "builtin-playful"
+ }
+}
