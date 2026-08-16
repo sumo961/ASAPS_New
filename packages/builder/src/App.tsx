@@ -62,6 +62,7 @@ import { HelperCommandInput } from './components/ai/HelperCommandInput';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { storyLinks as storyLinksOf, dedupeLinks } from './utils/storyLinks';
+import { importIssuesVisible } from './utils/importIssuesVisible';
 import { ImportIssuesBanner, type BrokenTarget } from './components/ImportIssuesBanner';
 import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { validateProjectAssets } from './utils/assetValidator';
@@ -330,6 +331,9 @@ function App() {
   const [importIssues, setImportIssues] = useState<{
     brokenTargets: BrokenTarget[];
     otherErrors: string[];
+    /** Beat ids of the imported story — the banner is scoped to them, not
+     *  cleared by lifecycle events. See importIssuesVisible. */
+    beatIds: string[];
   } | null>(null);
   /**
    * Run the story validator and put anything it found where the author can
@@ -355,7 +359,8 @@ function App() {
     const otherErrors = validation.errors
       .filter(e => e.category !== 'missing_beat')
       .map(e => e.message);
-    setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors } : null);
+    const beatIds = (story.beats || []).map((b: any) => b.id).filter(Boolean);
+    setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors, beatIds } : null);
   }, []);
 
   /** beatId → the missing target, for the ⚠ marks in the graph. */
@@ -6186,7 +6191,7 @@ function App() {
 
       {/* Import validation, said out loud rather than logged. Sits under the
           header so it is the first thing seen after a generated story lands. */}
-      {importIssues && (
+      {importIssues && importIssuesVisible(importIssues.beatIds, state.beats) && (
         <ImportIssuesBanner
           brokenTargets={importIssues.brokenTargets}
           otherErrors={importIssues.otherErrors}

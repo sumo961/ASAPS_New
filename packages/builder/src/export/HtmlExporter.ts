@@ -527,7 +527,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             var prefix = P + '.beats.' + i;
             var fields = ['text', 'buttonText', 'prompt', 'question', 'message', 'title', 'author',
                           'restartText', 'creditsText', 'creditsPageTitle', 'creditsPageBody', 'creditsCloseText',
-                          'placeholder', 'clearButtonText', 'fallbackText',
+                          'placeholder', 'clearButtonText', 'fallbackText', 'fallbackValue',
                           'npcName', 'displayTemplate', 'errorMessage',
                           'openingLine', 'helperText', 'cancelButtonText', 'doneButtonText'];
             for (var f = 0; f < fields.length; f++) {
@@ -566,6 +566,15 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
             if (Array.isArray(params.hyperlinks)) {
               for (var j = 0; j < params.hyperlinks.length; j++) {
                 if (params.hyperlinks[j].word) strings[prefix + '.parameters.hyperlinks.' + j + '.word'] = params.hyperlinks[j].word;
+              }
+            }
+            // Video caption cues — translate into displayText; the "text"
+            // field stays the source-language matching key (mirrors
+            // StoryTranslator; a tripwire test compares the two extractors).
+            if (Array.isArray(params.captions)) {
+              for (var j = 0; j < params.captions.length; j++) {
+                var cueText = params.captions[j] && (params.captions[j].displayText || params.captions[j].text);
+                if (cueText) strings[prefix + '.parameters.captions.' + j + '.displayText'] = cueText;
               }
             }
             // AR anchor labels (rendered on the AR overlay)
