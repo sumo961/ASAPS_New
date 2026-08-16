@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { deserializeBeats, loadProjectData } from '../projectDeserializer';
+import { deserializeBeats, getDroppedBeats, loadProjectData } from '../projectDeserializer';
 import { BeatTypeRegistry } from '@asaps/core';
 import type { Project } from '../../storage/types';
 
@@ -515,6 +515,79 @@ describe('projectDeserializer', () => {
       const pickProp2 = beats2.find(b => b.id === '5')!;
       expect(pickProp2.connections).toHaveLength(3);
       expect(pickProp2.connections.map((c: any) => c.label)).toEqual(['sweets', 'knife', 'book']);
+    });
+  });
+
+  describe('dropped beats are recorded, not just logged', () => {
+    // The case that proved the gap: an aiConversation whose `directions` was
+    // authored as prose. It is an array of structured rules, so the
+    // constructor throws `.map is not a function`, the beat was silently
+    // skipped, and the story imported 7 of its 8 beats — the author found out
+    // at runtime as "Beat not found".
+    const proseDirections = {
+      id: 'beat_talk',
+      name: 'Keep her talking',
+      type: 'aiConversation',
+      parameters: {
+        npcName: 'Jo',
+        scenario: 'Night train',
+        directions: 'Be evasive about the suitcase.', // WRONG: must be an array
+      },
+    };
+
+    it('records the drop with id, name, type, and the constructor error', () => {
+      const beats = deserializeBeats([
+        { id: 'beat_a', name: 'A', type: 'infoText', parameters: { text: 'hi' } },
+        proseDirections,
+      ]);
+
+      expect(beats.map(b => b.id)).toEqual(['beat_a']);
+      const drops = getDroppedBeats();
+      expect(drops).toHaveLength(1);
+      expect(drops[0]).toMatchObject({
+        id: 'beat_talk',
+        name: 'Keep her talking',
+        type: 'aiConversation',
+      });
+      expect(drops[0].error).toMatch(/map is not a function/);
+    });
+
+    it('resets between runs — a clean load reports no stale drops', () => {
+      deserializeBeats([proseDirections]);
+      expect(getDroppedBeats()).toHaveLength(1);
+      deserializeBeats([{ id: 'beat_a', type: 'infoText', parameters: { text: 'hi' } }]);
+      expect(getDroppedBeats()).toEqual([]);
+    });
+
+    it('records beats missing type or id instead of vanishing them', () => {
+      deserializeBeats([{ name: 'Nameless shape', parameters: {} }]);
+      const drops = getDroppedBeats();
+      expect(drops).toHaveLength(1);
+      expect(drops[0].id).toBe('(no id)');
+      expect(drops[0].error).toMatch(/no type or no id/);
+    });
+
+    it('loadProjectData carries the drops out to the caller', () => {
+      const project = {
+        id: 'p1',
+        name: 'Night Train',
+        story: {
+          title: 'Night Train',
+          author: 'test',
+          beats: [
+            { id: 'beat_chat', type: 'infoText', parameters: { text: 'hello' },
+              connections: [{ targetId: 'beat_talk' }] },
+            proseDirections,
+          ],
+        },
+      } as unknown as Project;
+
+      const data = loadProjectData(project);
+      expect(data.beats.map(b => b.id)).toEqual(['beat_chat']);
+      expect(data.droppedBeats).toHaveLength(1);
+      expect(data.droppedBeats[0].id).toBe('beat_talk');
+      // The link that pointed at the dropped beat is now dangling — that is
+      // what turns a drop into the banner's BrokenTarget rows in App.
     });
   });
 });

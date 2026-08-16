@@ -294,7 +294,33 @@ function normalizeBeatType(type: string): string {
  * Deserialize beats from stored project data
  * Converts plain objects back into Beat class instances
  */
+/**
+ * A beat that failed to construct during deserialization.
+ *
+ * Until now this was a console.error and nothing else: the beat vanished, the
+ * story loaded one beat short, and the author met the loss at runtime as
+ * "Beat not found" — the same silent-failure shape as the unvalidated inject
+ * path. The concrete case that surfaced it: an aiConversation whose
+ * `directions` was authored as prose (it is an array of structured rules),
+ * throwing `.map is not a function` in the constructor; the template imported
+ * 7 of its 8 beats.
+ */
+export interface DroppedBeat {
+  id: string;
+  name?: string;
+  type?: string;
+  error: string;
+}
+
+let lastDroppedBeats: DroppedBeat[] = [];
+
+/** Drops recorded by the most recent deserializeBeats run. Read-only view. */
+export function getDroppedBeats(): DroppedBeat[] {
+  return lastDroppedBeats;
+}
+
 export function deserializeBeats(beatsData: any[]): Beat[] {
+  lastDroppedBeats = [];
   const registry = BeatTypeRegistry.getInstance();
   const beats: Beat[] = [];
 
@@ -312,6 +338,12 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
       // Ensure we have the required fields
       if (!beatData.type || !beatData.id) {
         console.warn('[deserializeBeats] Beat missing type or id:', beatData);
+        lastDroppedBeats.push({
+          id: String(beatData?.id ?? '(no id)'),
+          name: beatData?.name,
+          type: beatData?.type,
+          error: 'beat has no type or no id',
+        });
         continue;
       }
 
@@ -517,6 +549,12 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
       beats.push(beat);
     } catch (error) {
       console.error('[deserializeBeats] FAILED to deserialize beat:', beatData, error);
+      lastDroppedBeats.push({
+        id: String(beatData?.id ?? '(no id)'),
+        name: beatData?.name,
+        type: beatData?.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -538,6 +576,8 @@ export function loadProjectData(project: Project): {
   clusters: any[];
   connections: any[];
   containerBeatPositions: any[];
+  /** Beats that failed to construct and were skipped — surface these. */
+  droppedBeats: DroppedBeat[];
 } {
   console.log('[loadProjectData] Loading project:', project.id);
 
@@ -799,6 +839,7 @@ export function loadProjectData(project: Project): {
     characters,
     clusters,
     connections,
-    containerBeatPositions
+    containerBeatPositions,
+    droppedBeats: getDroppedBeats(),
   };
 }

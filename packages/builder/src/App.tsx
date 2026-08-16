@@ -363,6 +363,39 @@ function App() {
     setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors, beatIds } : null);
   }, []);
 
+  /**
+   * Surface beats that were DROPPED while loading a project — a beat whose
+   * constructor threw is skipped by deserializeBeats, and until now the only
+   * trace was a console.error. The story then loaded one beat short and the
+   * author met the loss at runtime as "Beat not found". (The case that proved
+   * it: an aiConversation whose `directions` was authored as prose instead of
+   * an array — `.map is not a function` in the constructor, 7 of 8 beats.)
+   *
+   * A dropped beat also strands every link that pointed at it, so those links
+   * become the banner's BrokenTarget rows and ⚠ marks via the same storyLinks
+   * walk the validators use — plus one line per drop saying WHY it is missing.
+   */
+  const reportDroppedBeats = useCallback((
+    dropped: Array<{ id: string; name?: string; type?: string; error: string }>,
+    serializedBeats: any[],
+    loadedBeats: ReadonlyArray<{ id: string }>,
+  ) => {
+    if (!dropped.length) return;
+    const droppedIds = new Set(dropped.map((d) => d.id));
+    const nameOf = (id: string) =>
+      serializedBeats.find((b: any) => b?.id === id)?.name as string | undefined;
+    const brokenTargets = dedupeLinks(storyLinksOf({ beats: serializedBeats }))
+      .filter((l) => droppedIds.has(l.target))
+      .map((l) => ({ sourceBeatId: l.source, sourceBeatName: nameOf(l.source), target: l.target }));
+    const otherErrors = dropped.map((d) =>
+      `Beat "${d.name || d.id}" (${d.type || 'unknown type'}) could not be loaded and was skipped — ${d.error}`);
+    setImportIssues({
+      brokenTargets,
+      otherErrors,
+      beatIds: loadedBeats.map((b) => b.id),
+    });
+  }, []);
+
   /** beatId → the missing target, for the ⚠ marks in the graph. */
   const brokenTargetsByBeatId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -2156,6 +2189,11 @@ function App() {
         // project's blob URLs to flash in panels that opened during the switch.
         setAssets([]);
         const projectData = loadProjectData(currentProject);
+        reportDroppedBeats(
+          projectData.droppedBeats,
+          (currentProject.story as any)?.beats || [],
+          projectData.beats,
+        );
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
           beats: projectData.beats.length,
@@ -2478,6 +2516,11 @@ function App() {
         setShowSearchPanel(false);
         setAssets([]);
         const projectData = loadProjectData(currentProject);
+        reportDroppedBeats(
+          projectData.droppedBeats,
+          (currentProject.story as any)?.beats || [],
+          projectData.beats,
+        );
         console.log('[App] >>> Loaded data:', {
           title: projectData.title,
           beats: projectData.beats.length,
