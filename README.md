@@ -22,16 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.92** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.92 adds four look presets and
-three starter templates** — Clean Editorial, Dark Cinematic, Playful, and
-High Contrast themes, each of the first three paired with a small complete
-story to gut and reuse: a museum story, a chat thriller with a live AI
-handoff, and a GPS walk that works anywhere (no authored coordinates). It
-also fixes a renderer hang when two map beats run back-to-back, reports
-beats that fail to load instead of dropping them silently, and dims visited
-choices in responsive layout. This should be the first release macOS
-auto-updates into by itself.
+Current release: **v0.9.93** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.93 makes text formatting a real
+contract**: bold/italic/strikethrough now render everywhere prose renders —
+responsive layouts, chat bubbles, and after typewriter reveals — with a
+formatting bar on prose fields, translation that preserves the markers, and
+AI generation that knows the syntax (and where not to use it). Dialog Tree
+nodes with nested exchanges now show their depth on the flowchart as a
+stacked card with phase dots, and the AI config explains which model fits
+which job — flagship for drafting, fast tier for the beats a player waits on.
+
+**v0.9.92** added four look presets and three starter templates (museum
+story, chat thriller, GPS walk), fixed a renderer hang on back-to-back map
+beats, and was the first release macOS auto-updated into by itself.
 
 **v0.9.91** fixed macOS auto-update and stopped AI-generated and injected
 stories failing silently: broken links are shown in a banner and marked ⚠ in

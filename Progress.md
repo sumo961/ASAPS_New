@@ -1,5 +1,110 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-18: Tier 3 complete — text that formats, graphs that tell the truth (v0.9.93)
+
+### Overview
+
+The whole of roadmap Tier 3 in one release, closed in a day against an audit
+that found much of item 8 already quietly shipped. The theme: contracts made
+visible. Markdown formatting existed for sixteen releases and formatted in
+exactly one place; now it renders everywhere prose renders, the authoring UI
+shows it, translation protects it, and the AI generator is taught it — in the
+same change, under a new standing rule. The flowchart stops flattening
+multi-exchange dialogs into one-liner-looking cards, and the AI config
+finally says which model fits which job.
+
+### Rich text is a contract now (Tier-3 item 9)
+
+`renderMarkdownLite` (bold/italic/strike, since v0.9.30) formatted only
+fixed-canvas text elements — responsive stories, chat bubbles, and every
+typewriter reveal showed raw asterisks. Now:
+
+- **SlotFlowView** formats titles and body text; **ChatDialogView** formats
+  bubbles. Buttons stay plain (labels are UI); hyperText bodies stay plain
+  (the link splitter matches literal words). Both are documented decisions.
+- **Fixed-canvas typewriter text never formatted at all** — the render branch
+  gated on the theme constant, so completed reveals kept markers forever.
+  Formatting now applies when the reveal finishes; regression tests pin both
+  positioned components and fail without the fix.
+- The advertised nesting example produced crossed tags; bold closers now skip
+  marker-runs so `**bold and *italic***` nests cleanly.
+- A **B/I/S̶ formatting bar** on prose fields (text, message, prompt — not
+  hyperText) wraps/unwraps the selection; the toggle is an involution; the
+  stored value stays plain text with markers.
+- The **translation prompt** protected `{{name}}` — a variable syntax ASAPS
+  never used. It now names the real `processText` forms (`${name}`, `$name$`,
+  `{name}`) and the markdown markers explicitly; the rule text is pinned.
+
+**Files modified:** `packages/renderer/src/utils/markdownLite.ts`,
+`packages/renderer/src/components/{SlotFlowView,ChatDialogView,PositionedBeatView}.tsx`,
+`packages/renderer/tests/markdownLite.test.ts` (new),
+`packages/builder/src/components/FormattingToolbar.tsx` (new),
+`packages/builder/src/components/SchemaFormGenerator.tsx`,
+`packages/builder/src/export/StoryTranslator.ts`, `docs/USER_GUIDE.md`
+
+### The AI generator learns it in the same change (+ standing rule)
+
+The formatting contract would have been invisible to generated stories — or
+worse, used where it renders literally. Taught in all four places, split by
+how each learns: schema descriptions in `core-beats.json` (single source via
+symlink; the MCP desktop server serves it live), and the three hand-written
+prompts (story generation with the where-NOT half, dialog generation,
+Co-Designer). A test pins both halves. CLAUDE.md now carries the standing
+rule: **a feature the AI could use updates the generation guidance in the
+same change** — with the file list and the reason (the condensed schema drops
+descriptions, so prompt prose is the only channel and it goes stale silently).
+
+**Files modified:** `beat-definitions/core-beats.json`,
+`packages/builder/src/services/prompts/{storyGenerationEnhanced,dialogGeneration}.ts`,
+`packages/builder/src/components/ai/codesigner/systemPrompt.ts`, `CLAUDE.md`
+
+### Which model for which job (Tier-3 item 10)
+
+One model setting serves every AI feature, and the features pull in opposite
+directions. A provider-aware "Which model for which job?" block under the
+config dialog's Model field, plus a per-function table in the User Guide:
+flagship for generation/Ideator/Co-Designer, fast tier for runtime beats (a
+player waits on every turn — twice as long on a phone in an export),
+flagship for the translation pass you ship, local models for conversation
+but not strict-JSON jobs.
+
+**Files modified:** `packages/builder/src/components/ai/AIConfigDialog.tsx`,
+`docs/USER_GUIDE.md`
+
+### Multi-phase dialogs show their depth (Tier-3 item 11)
+
+A dialog the player spends five exchanges inside looked identical to a
+one-liner on the graph. dialogTree nodes with nested exchanges now draw a
+stacked-card edge (box-shadow — node size stays fixed) and a phase-dot strip
+(capped at six, count in the tooltip); the Dialog Tree editor header carries
+the matching "N phases" chip. The counter walks every wild tree shape
+(dialogNode, object target, object next, entries[]), is cycle-guarded, and
+deliberately extracts no link targets — that job stays with storyLinks.
+aiDialogTree is untouched (its tree is runtime-generated).
+
+**Files modified:** `packages/builder/src/utils/dialogTreePhases.ts` (new),
+`packages/builder/src/components/graph/BeatNode.tsx`,
+`packages/builder/src/editors/DialogTreeEditor.tsx`, `docs/USER_GUIDE.md`
+
+### Character assistant audit closed (Tier-3 item 8)
+
+Closed as an audit rather than code: Big-5 archetype presets, the sprite
+template, and the helper's tracked-quantity offer had already shipped
+(Aug 9–11). The two remaining gaps are recorded as deliberate non-features —
+the helper doesn't author inventory (items are story machinery, not
+personality) or multi-state visuals (the runtime has no state-switching
+mechanism; helper-authored states would be scaffolding that renders
+nothing). Mood-driven visual states are noted as the real future feature.
+
+### Verified before tagging
+
+Toolbar wrap + responsive `<strong>` rendering + config-dialog hint + the
+3-phase node all verified live in the running builder; typewriter and
+map-key regressions verified by reverting the fix and watching the test
+fail. Suites: renderer 593, builder 2523, core 2665.
+
+---
+
 ## 2026-08-17: Four looks, three walks through them, and a map that fires (v0.9.92)
 
 ### Overview
