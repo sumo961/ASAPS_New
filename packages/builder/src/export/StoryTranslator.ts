@@ -577,7 +577,7 @@ function buildCharacterContext(projectData: any): string {
 /**
  * Build the translation system prompt with narrative context and conciseness guidance.
  */
-function buildTranslationPrompt(
+export function buildTranslationPrompt(
   targetLanguage: string,
   narrativeContext: string,
   batch: Record<string, string>,
@@ -610,7 +610,12 @@ function buildTranslationPrompt(
     prompt += `\n\nKeys ending with ".speaker" are character names or nicknames used in dialog. Translate them naturally (e.g., "Gran" → "Oma" in German, "Grandma" → "Abuela" in Spanish) or keep them as-is if they are proper names.`;
   }
 
-  prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve all {{variable}} references and template syntax exactly\n- Preserve any formatting markers\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
+  // The variable syntaxes are the ones the runtime's processText actually
+  // substitutes (${name}, $name$, {name}) — an earlier version of this rule
+  // named only {{name}}, a syntax ASAPS does not use, so the one protection
+  // that mattered was left to chance. The formatting markers are the
+  // markdown-lite subset the renderer formats.
+  prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve variable references EXACTLY as written, untranslated: \${name}, $name$, {name} — the name inside must stay in the source language or the substitution breaks\n- Preserve formatting markers exactly: **bold**, *italic*, ~~strikethrough~~ and \\n line breaks — translate the words inside the markers, keep the markers themselves\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
 
   return prompt;
 }

@@ -24,9 +24,14 @@ export function renderMarkdownLite(text: string): string {
 
   let html = escapeHtml(text);
 
-  // Bold: **text** or __text__
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  // Bold: **text** or __text__. The closer must not be followed by another
+  // marker character — otherwise "**bold and *italic***" closes the bold on
+  // the first two of the trailing THREE asterisks, stranding the italic's
+  // closer outside and producing crossed tags (<em> closing after
+  // </strong>). With the lookahead, the bold content extends to the true
+  // outer pair and the italic pass then nests cleanly inside it.
+  html = html.replace(/\*\*(.+?)\*\*(?!\*)/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__(?!_)/g, '<strong>$1</strong>');
 
   // Italic: *text* or _text_  (but not inside words for underscore)
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');

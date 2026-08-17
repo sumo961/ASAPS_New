@@ -33,6 +33,7 @@ import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from '.
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
+import { renderMarkdownLite } from '../utils/markdownLite';
 import { ImageInputElement } from './ImageInputElement';
 import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
@@ -1533,7 +1534,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                 }}
               >
-                {titleReveal.rendered}
+                {/* Markdown-lite (bold/italic/strike) — same contract as the
+                    fixed-canvas text elements. Mid-typewriter a not-yet-closed
+                    marker shows literally until its closer is revealed, which
+                    is the accepted fixed-mode behavior too. */}
+                <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(titleReveal.rendered) }} />
               </div>
             );
           })()}
@@ -1594,7 +1599,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       onLinkClick={onAction}
                       linkColor={theme.button?.backgroundColor}
                     />
-                  : bodyReveal.rendered}
+                  : /* Markdown-lite body — hyperText stays plain because the
+                       link splitter matches literal words in the authored
+                       text and markup inside a link word would break it. */
+                    <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(bodyReveal.rendered) }} />}
               </div>
             );
           })()}

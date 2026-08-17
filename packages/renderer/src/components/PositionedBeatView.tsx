@@ -3477,9 +3477,12 @@ const TextElement: React.FC<{
               width: '100%',
             }}
           >
-            {animation === 'typewriter' ? (
+            {animation === 'typewriter' && isAnimating ? (
               <>
-                {/* Revealed portion - visible */}
+                {/* Revealed portion - visible. Kept plain while typing —
+                    markdown applies when the reveal completes below.
+                    (`animation` is a theme constant, so gating on it alone
+                    left typewriter text with raw asterisks FOREVER.) */}
                 <span>{content.substring(0, revealedLength)}</span>
                 {/* Unrevealed portion - transparent (maintains spacing) */}
                 <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
@@ -4380,7 +4383,7 @@ const DialogElement: React.FC<{
           </div>
         )}
         <span style={{ display: 'block', width: '100%', textAlign: computedTextAlign }}>
-          {animation === 'typewriter' ? (
+          {animation === 'typewriter' && isAnimating ? (
             hyperlinks && hyperlinks.length > 0 && onAction ? (
               // For hypertext, just show the revealed portion (hyperlinks would be complex to handle with transparency)
               <HyperTextContent
@@ -4391,7 +4394,9 @@ const DialogElement: React.FC<{
               />
             ) : (
               <>
-                {/* Revealed portion - visible */}
+                {/* Revealed portion - visible, plain while typing — markdown
+                    applies when the reveal completes (gating on `animation`
+                    alone left typewriter text unformatted forever). */}
                 <span>{content.substring(0, revealedLength)}</span>
                 {/* Unrevealed portion - transparent (maintains spacing) */}
                 <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>

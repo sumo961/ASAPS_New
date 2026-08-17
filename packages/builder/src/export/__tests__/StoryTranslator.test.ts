@@ -703,3 +703,20 @@ describe('StoryTranslator', () => {
     });
   });
 });
+
+describe('translation prompt protects runtime syntax', () => {
+  // The rule block once named only {{name}} — a syntax ASAPS does not use —
+  // so the variable forms processText actually substitutes were unprotected,
+  // and the markdown-lite markers were covered only by a vague "any
+  // formatting markers". Pin the real contract.
+  it('names every variable form processText substitutes, and the markdown-lite markers', async () => {
+    const { buildTranslationPrompt } = await import('../StoryTranslator');
+    const prompt = buildTranslationPrompt('German', '', { 'b.parameters.text': 'Hi ${name}' }, '');
+    expect(prompt).toContain('${name}');
+    expect(prompt).toContain('$name$');
+    expect(prompt).toContain('{name}');
+    expect(prompt).toContain('**bold**');
+    expect(prompt).toContain('*italic*');
+    expect(prompt).toContain('~~strikethrough~~');
+  });
+});

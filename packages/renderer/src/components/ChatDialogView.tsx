@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { RenderThemeSettings } from './PositionedBeatView';
+import { renderMarkdownLite } from '../utils/markdownLite';
 
 /**
  * A single message in the chat dialog
@@ -249,7 +250,9 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
             }}
           >
-            {message.text}
+            {/* Markdown-lite in bubbles — *emphasis* is native to texting;
+                choice buttons below stay plain (labels are UI, not prose). */}
+            <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(message.text) }} />
           </div>
         </div>
       </div>

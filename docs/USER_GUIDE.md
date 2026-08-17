@@ -389,6 +389,22 @@ This is your workhorse for narration. Write descriptive text, the interactor rea
 - **Text** - Your narrative content
 - **Button Text** - What the continue button says ("Continue...", "What next?", "Onward!")
 
+**Formatting your text:** Narrative text fields support a small set of
+formatting marks — write them inline or select text and use the **B** / *I* /
+~~S~~ buttons above the field:
+
+| You type | The player sees |
+|----------|-----------------|
+| `**text**` | **bold** |
+| `*text*` | *italic* |
+| `~~text~~` | ~~strikethrough~~ |
+
+This works in body text, end-screen messages, input prompts, and chat
+bubbles — everywhere prose renders. Button labels stay plain (they're UI,
+not prose), and Hyper Text bodies stay plain so link words always match
+exactly. If you translate your story, the markers carry over — the words
+inside them get translated, the marks stay.
+
 **When to Use:** Scene descriptions, internal monologue, time jumps, exposition.
 
 **Example:**

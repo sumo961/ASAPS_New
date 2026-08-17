@@ -246,3 +246,42 @@ describe('consecutive XR map beats (GPS starter map → walk pair)', () => {
     await expect(p2).resolves.toMatchObject({ path: 'arrived', locationId: 'w1' });
   });
 });
+
+describe('markdown-lite after typewriter reveal', () => {
+  it('typewriter text formats its markdown once the reveal completes', async () => {
+    // The render branch used to gate on `animation === 'typewriter'` alone —
+    // a theme CONSTANT — so typewriter stories showed raw asterisks forever.
+    // Formatting must appear once isAnimating flips off.
+    const { DEFAULT_THEME } = await import('../../src/components/PositionedBeatView');
+    renderer.setTheme({
+      ...DEFAULT_THEME,
+      textEffects: { ...DEFAULT_THEME.textEffects, animation: 'typewriter', typewriterSpeed: 1000 },
+    } as any);
+    renderer.renderText('A **bold** claim.', 'Next');
+    await waitFor(() => {
+      const strong = container.querySelector('strong');
+      expect(strong?.textContent).toBe('bold');
+    }, { timeout: 4000 });
+    expect(container.textContent).not.toContain('**');
+  });
+
+  it('fixed-canvas typewriter formats after the reveal too', async () => {
+    // The positioned view keeps the plain revealed/transparent split WHILE
+    // typing (markers show literally), and must swap to the markdown branch
+    // when isAnimating flips off — gating on the theme constant alone left
+    // fixed-canvas typewriter text unformatted forever.
+    const { DEFAULT_THEME } = await import('../../src/components/PositionedBeatView');
+    renderer.setTheme({
+      ...DEFAULT_THEME,
+      textEffects: { ...DEFAULT_THEME.textEffects, animation: 'typewriter', typewriterSpeed: 1000 },
+    } as any);
+    // An author-positioned text location routes renderText to PositionedBeatView.
+    renderer.renderText('A **bold** claim.', 'Next', [
+      { id: 'text_1', name: 'Body', kind: 'text', x: 100, y: 100, width: 400, height: 200 } as any,
+    ]);
+    await waitFor(() => {
+      const strong = container.querySelector('strong');
+      expect(strong?.textContent).toBe('bold');
+    }, { timeout: 4000 });
+  });
+});

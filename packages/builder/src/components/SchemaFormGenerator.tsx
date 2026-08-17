@@ -6,6 +6,7 @@ import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableC
 import { CharacterRefField, type UsedName } from './characters/CharacterRefField';
 import { CounterOwnerPicker } from './CounterOwnerPicker';
 import { GpsPointCurator } from './visual/GpsPointCurator';
+import { FormattingToolbar } from './FormattingToolbar';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -251,6 +252,11 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
 
+  // Live textarea nodes for the prose fields that carry a formatting bar,
+  // keyed by parameter name — renderField runs inside a map, so per-field
+  // useRef calls are not an option.
+  const proseTextareaRefs = React.useRef<Record<string, HTMLTextAreaElement | null>>({});
+
   // Skip parameters that should be handled elsewhere (connections, complex types)
   // Note: 'operation' is handled inside the 'value' case for setVariable beats
   const skipParameters = ['connection', 'defaultConnection', 'trueConnection', 'falseConnection',
@@ -369,12 +375,26 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           const rows = paramDef.ui?.rows || (paramName === 'message' ? 2 : 4);
           const sourceHint = translationSourceHints?.[paramName];
           const showSourceHint = sourceHint != null && typeof sourceHint === 'string' && sourceHint !== value;
+          // Markdown-lite bar on the fields the renderer actually formats:
+          // body text, end-screen message, and input prompts. hyperText is
+          // excluded because its body stays plain (the hyperlink splitter
+          // matches literal words). Available in translation mode too — the
+          // translation must reproduce the source's markers.
+          const showFormatBar =
+            ['text', 'message', 'prompt'].includes(paramName) && beatType !== 'hyperText';
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
               </label>
+              {showFormatBar && (
+                <FormattingToolbar
+                  getTextarea={() => proseTextareaRefs.current[paramName] ?? null}
+                  onChange={(v) => onParameterChange(paramName, v)}
+                />
+              )}
               <textarea
+                ref={showFormatBar ? (el) => { proseTextareaRefs.current[paramName] = el; } : undefined}
                 value={value || paramDef.default || ''}
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
                 onBlur={paramName === 'npcPersonality' && onCharacterSync && parameters.npcName
