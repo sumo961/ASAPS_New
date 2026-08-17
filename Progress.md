@@ -1,5 +1,127 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-17: Four looks, three walks through them, and a map that fires (v0.9.92)
+
+### Overview
+
+Roadmap item 12b, whole: the theme catalog grows four looks and the template
+gallery grows three starters, each pairing a look with a mechanic worth
+stealing. Building and playing the starters end-to-end surfaced three real
+bugs — a renderer bug that would hang any story with two map beats in a row,
+a silent beat drop on project load, and a banner that haunted the wrong
+project — all fixed here with regression tests that fail without the fix.
+This is also the first release whose macOS hop should be automatic: the
+0.9.91 updater downloads and installs this one itself.
+
+### Four look presets
+
+The built-in theme catalog (3 entries since v0.9.48) gains **Clean Editorial**
+(the catalog's first light theme — warm paper, ink, outlined buttons),
+**Dark Cinematic** (near-black, tungsten accent, typewriter titles),
+**Playful** (coral pills, teal ink, generous radii), and **High Contrast**
+(an accessibility contract: full opacity everywhere, no text animation, no
+scene transitions, body ≥22). Tests pin each preset's promise — the
+accessible theme is tested against its contract, not its vibe.
+
+**Files modified:** `packages/core/src/themes/presets.ts`,
+`packages/core/tests/themes/presets.test.ts`
+
+### Three starter templates
+
+Each starter is a small complete story in one of the new looks, built to be
+gutted and reused:
+
+- **The Oil Lamp** (Editorial) — a museum story: one object, three ways of
+  seeing it. A hub that dims paths already taken (`markVisited`), in-text
+  hyperlinks in the theme accent, asset-free.
+- **23:47 — a chat thriller** (Cinematic) — scripted chat bubbles hand off to
+  a live AI conversation and back for the ending you choose. The character
+  dossier keeps the model in voice; a systemInstructions guardrail keeps the
+  handoff decision with the player.
+- **Ordinary Wonders** (Playful) — a GPS walk with **no authored
+  coordinates**: capture where the player stands, scatter three walkable
+  targets within 150 m (OpenStreetMap, uniform fallback offline), walk to
+  one, name what nobody else noticed — the name returns by interpolation —
+  walk back. A `mockLocation` makes the preview's Mock Sensors panel drive
+  it on a desk; live GPS rules on a device.
+
+All three were played end to end before shipping (the GPS walk via mock
+sensors through the arrival trigger; the chat thriller through a live model
+exchange). Content tests guard each one — graph connectivity, the GPS
+field-kit rules (no coordinates, honest skip exits first), and zip/source
+agreement.
+
+**Files modified:** `packages/builder/public/templates/*` (3 new .asapst +
+sources, index.json), `packages/builder/src/utils/__tests__/bundledTemplates.test.ts`
+
+### markVisited works in responsive layout
+
+The museum hub's dimming of taken paths worked only in fixed-canvas mode —
+`SlotFlowView` ignored the setting entirely, a silent no-op for every
+responsive story. Now both layout modes dim and disable visited choices
+(editor mode exempt).
+
+**Files modified:** `packages/renderer/src/components/SlotFlowView.tsx`,
+`packages/renderer/src/renderers/ReactRenderer.tsx`
+
+### Two XR map beats in a row no longer hang the story
+
+Found by playing the GPS starter: a display map flowing into a trigger
+geofence (the starter's map → walk pair, the GPS field kit's B_show → B_walk
+pair) reconciled into the **same** `MapBeatLeaflet` instance — no key, same
+element type, same position. The second beat inherited the first one's
+"already resolved" flag, so its arrival trigger could never fire: the status
+line said "At target ✓" while the story waited forever. Every renderer mount
+of `MapBeatLeaflet`/`IndoorMapBeat` now gets a fresh per-mount key; the
+regression test drives both beats through a fake sensor service and fails
+without the key. The web player bundle is regenerated so HTML exports carry
+the fix.
+
+**Files modified:** `packages/renderer/src/renderers/ReactRenderer.tsx`,
+`packages/renderer/tests/renderers/ReactRenderer.test.tsx`,
+`packages/builder/public/player-web.js`
+
+### Dropped beats are reported, not vanished
+
+A beat whose constructor throws during project load was silently skipped —
+`console.error` and nothing else. The story loaded one beat short and the
+author met the loss at runtime as "Beat not found" (the proving case: an
+aiConversation whose `directions` was authored as prose instead of an array;
+7 of 8 beats imported). `deserializeBeats` now records every drop,
+`loadProjectData` surfaces them, and the import-issues banner explains each
+one — links pointing at the dropped beat become the banner's broken-link rows
+and ⚠ graph marks, plus a line saying why the beat is missing.
+
+**Files modified:** `packages/builder/src/utils/projectDeserializer.ts`,
+`packages/builder/src/App.tsx`,
+`packages/builder/src/utils/__tests__/projectDeserializer.test.ts`
+
+### The banner stays with its own story
+
+The import-issues banner is scoped by beat ids rather than cleared on project
+switch (v0.9.91). Scoping by *any* shared id was too weak: a stale banner
+rode the conventional id `beat_title` from a broken project into a freshly
+instantiated template. Visibility now requires majority overlap — one
+coincidental id is not identity, and an author deleting a minority of
+imported beats mid-triage still keeps the banner.
+
+**Files modified:** `packages/builder/src/utils/importIssuesVisible.ts`,
+`packages/builder/src/utils/__tests__/importIssuesVisible.test.ts`
+
+### Verification before the tag
+
+Per the new release checklist (added to CLAUDE.md this cycle): starters
+played end to end; the new map surface measured across all five device
+presets (contained, status and controls in-pane, map ≥269 px even at phone
+landscape); an HTML export opened at a non-1:1 window (700×520 against the
+1024×768 stage) with theme and layout intact; suites green — core 2665,
+renderer 584, builder 2508, mirror tripwires included. The Round-1 generated
+story is preserved as a guarded example
+(`examples/someone-made-her-promises.asaps.zip`) with tests pinning its
+affect wiring.
+
+---
+
 ## 2026-08-16: The release that fixes updating, and the walks that fork (v0.9.91)
 
 ### Overview

@@ -22,14 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.91** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.91 fixes macOS auto-update** — the
-in-app updater now downloads and installs instead of sending you to the
-releases page (this hop still needs one manual download; from here on it is
-automatic). It also stops AI-generated and injected stories failing silently:
-broken links are shown in a banner and marked ⚠ in the graph, the same
-validation now runs on every import path, and translation of video captions
-and image-fallback text survives the export.
+Current release: **v0.9.92** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.92 adds four look presets and
+three starter templates** — Clean Editorial, Dark Cinematic, Playful, and
+High Contrast themes, each of the first three paired with a small complete
+story to gut and reuse: a museum story, a chat thriller with a live AI
+handoff, and a GPS walk that works anywhere (no authored coordinates). It
+also fixes a renderer hang when two map beats run back-to-back, reports
+beats that fail to load instead of dropping them silently, and dims visited
+choices in responsive layout. This should be the first release macOS
+auto-updates into by itself.
+
+**v0.9.91** fixed macOS auto-update and stopped AI-generated and injected
+stories failing silently: broken links are shown in a banner and marked ⚠ in
+the graph, and the same validation runs on every import path.
 
 **v0.9.90** made HUDs and the stage aware of
 each other: screen-docked meter, inventory and mood frames now appear in the
