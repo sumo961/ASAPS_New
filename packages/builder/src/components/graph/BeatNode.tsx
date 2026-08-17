@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Beat } from '@asaps/core';
 import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
 import { TranslationStaleIndicator } from '../translation/TranslationStaleIndicator';
+import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
 
 interface BeatNodeData {
   beat: Beat;
@@ -92,6 +93,18 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   const fullLabel = data.label || 'Unnamed Beat';
   const displayLabel = truncateTitle(fullLabel);
 
+  // Multi-phase dialogTrees: a dialog the player spends five exchanges inside
+  // used to look identical to a one-liner on the graph. Phases > 1 gets a
+  // stacked-card edge (box-shadow — costs no layout size) and a dot strip in
+  // the badge row. aiDialogTree generates its tree at runtime, so it has no
+  // authored phases to count.
+  const dialogPhases = data.type === 'dialogTree'
+    ? dialogTreePhaseCount(
+        (data.beat as any)?.dialogTree ?? (data.beat as any)?.getParameters?.()?.dialogTree,
+      )
+    : 0;
+  const isStacked = dialogPhases > 1;
+
   // Debug highlight (yellow) wins over PW trace (red), which wins over selected (cyan).
   // Within the PW trace, the CURRENT beat gets a deeper red and thicker ring than past-visited beats.
   const borderColor = data.highlighted
@@ -129,6 +142,15 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         borderColor,
         width: `${NODE_WIDTH}px`,
         backgroundColor: bgColor,
+        // Stacked-card edge for multi-phase dialogs: two card outlines peek
+        // out behind the bottom-right corner. Box-shadow renders outside the
+        // border box, so the node's footprint and the layout stay fixed.
+        ...(isStacked ? {
+          boxShadow:
+            `3px 3px 0 -1px ${bgColor}, 3px 3px 0 0 ${borderColor}, ` +
+            `6px 6px 0 -2px ${bgColor}, 6px 6px 0 -1px ${borderColor}, ` +
+            `0 10px 15px -3px rgb(0 0 0 / 0.1)`,
+        } : null),
       }}
       title={data.brokenTarget
         ? `${fullLabel}\n\n⚠ A choice here points at "${data.brokenTarget}", which is not a beat in this story — play stops at this beat.`
@@ -169,6 +191,24 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
           </div>
         </div>
       </div>
+
+      {/* Phase-dot strip: one dot per exchange inside this dialog (capped at
+          six, then a count). Details live in the Dialog Tree editor — the
+          node only says "there is more inside here than one card". */}
+      {isStacked && (
+        <div
+          className="flex items-center gap-1 mt-1.5"
+          style={{ lineHeight: '1' }}
+          title={`${dialogPhases} dialog phases — the conversation moves through ${dialogPhases} exchanges inside this beat. Open the Dialog Tree editor for the structure.`}
+        >
+          {Array.from({ length: Math.min(dialogPhases, 6) }, (_, i) => (
+            <span key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+          ))}
+          <span className="text-[10px] text-emerald-700 ml-0.5">
+            {dialogPhases > 6 ? `${dialogPhases} phases` : 'phases'}
+          </span>
+        </div>
+      )}
 
       {/* Show indicators for special properties */}
       {data.beat && (

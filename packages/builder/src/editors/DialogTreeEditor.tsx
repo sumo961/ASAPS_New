@@ -28,6 +28,7 @@ import type { DialogGenerationRequest } from '../types/ai';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
 import { TextFieldWithVariables } from './TextFieldWithVariables';
 import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
+import { dialogTreePhaseCount } from '../utils/dialogTreePhases';
 
 interface DialogNode {
   id: string;
@@ -1105,6 +1106,19 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           Dialog Tree Editor
+          {/* Same count the flowchart node's dot strip shows — the graph says
+              "there is more inside here"; this is where the more lives. */}
+          {(() => {
+            const phases = dialogTreePhaseCount(dialogTree);
+            return phases > 1 ? (
+              <span
+                className="text-[11px] font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5"
+                title="Exchanges the conversation moves through inside this one beat — the flowchart node shows these as a stacked edge with dots"
+              >
+                {phases} phases
+              </span>
+            ) : null;
+          })()}
         </h3>
         <div className="flex gap-1">
           <button
