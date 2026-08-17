@@ -1959,6 +1959,32 @@ The OpenAI provider defaults to **gpt-5.6-sol**, the current flagship. The GPT-5
 
 Leave the field empty to use the default. Older models (gpt-5.5, GPT-4o) keep working if you name them explicitly.
 
+### Which Model for Which Job?
+
+One model setting serves every AI feature in ASAPS, but the features have
+different demands — some run once while you wait, others run on every player
+turn. Pick for the job you're doing most right now, and switch when the job
+changes (the setting takes effect immediately; nothing needs restarting):
+
+| What you're doing | What matters | Good fit |
+|---|---|---|
+| **Story generation, Ideator, Co-Designer** | One-shot draft quality — you wait once, then work with the result | Flagship: `claude-opus-5` / `gpt-5.6-sol`. Reasoning **Auto** or higher; **Pro** mode for hard material |
+| **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto** |
+| **Translation** | Instruction-following (markers, variables, JSON) plus literary register, across big batches | Flagship for the pass you ship; the balanced tier is fine for drafts |
+| **Character helper, beat suggestions, transformations** | A structured proposal you review before accepting | The default tier is fine |
+
+Two things worth knowing:
+
+- **Runtime beats also run in exports.** Whatever model your exported story
+  uses (embedded key or classroom relay), the latency argument goes double on
+  a phone in the field — favor the fast tier for stories built around AI
+  conversation.
+- **Local models (Ollama) fit conversation best.** Small local models hold a
+  persona in an AI Conversation surprisingly well, but they struggle with the
+  strict JSON that story generation and translation require — expect retries
+  or failures there. If your hardware runs a larger model, name it; otherwise
+  use a cloud provider for generation and translation and go local for play.
+
 ### Reasoning Effort / Extended Thinking
 
 The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anthropic and *Reasoning effort (GPT-5)* on OpenAI) controls how much "thinking budget" the model is given before responding:
@@ -2253,7 +2279,11 @@ At runtime, one text is randomly selected from the main text plus all variations
 
 ## Rich Text Formatting
 
-Text boxes in ASAPS Modern support a lightweight markdown syntax for basic formatting. This works in any text field that displays to the interactor -- Info Text, Dialog Tree NPC lines, Duration Screen, and more.
+Text boxes in ASAPS Modern support a lightweight markdown syntax for basic formatting. This works in every prose surface the interactor reads — Info Text, Dialog Tree NPC lines, Duration Screen, end-screen messages, input prompts, and chat bubbles — in both fixed and responsive layout, including after a typewriter reveal finishes.
+
+You don't have to remember the syntax: prose fields in the Inspector carry a small **B** / *I* / ~~S~~ bar — select text and click to wrap or unwrap it.
+
+Two places deliberately stay plain: **button labels** (they're UI, not prose) and **Hyper Text bodies** (link words must match the text exactly, and markers would break the match). If you translate your story, the markers carry over — the words inside get translated, the marks stay.
 
 **Supported Syntax:**
 

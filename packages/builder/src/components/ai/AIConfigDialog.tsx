@@ -362,6 +362,33 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="mt-1 text-xs text-gray-500">{preset.modelHelp}</p>
+            {/* Per-function guidance — one model serves every AI feature, and
+                the features pull in opposite directions (a one-shot draft
+                wants the flagship; a player waiting mid-conversation wants
+                the fast tier). Say so where the model is chosen, not only in
+                the User Guide. */}
+            <details className="mt-2 text-xs text-gray-600">
+              <summary className="cursor-pointer text-purple-700 hover:text-purple-900 select-none">
+                Which model for which job?
+              </summary>
+              <div className="mt-1.5 space-y-1 pl-1">
+                <p>
+                  <span className="font-medium">Story generation, Ideator, Co-Designer:</span>{' '}
+                  the flagship pays off — {provider === 'openai' ? 'gpt-5.6-sol' : provider === 'claude' ? 'claude-opus-5' : 'your largest local model'}. You wait once, then work with the result.
+                </p>
+                <p>
+                  <span className="font-medium">Runtime AI beats</span> (AI Conversation, AI Dialog Tree, AI Condition):{' '}
+                  a player waits on every turn — favor the fast tier, {provider === 'openai' ? 'gpt-5.6-terra or -luna' : provider === 'claude' ? 'claude-sonnet-5' : 'a small local model holds a persona well'}, with reasoning off or Auto.
+                </p>
+                <p>
+                  <span className="font-medium">Translation:</span> use the flagship for the pass you ship — it has to preserve formatting markers and variables exactly.
+                  {provider === 'local' ? ' Small local models struggle with the strict JSON translation needs — prefer a cloud provider here.' : ''}
+                </p>
+                <p className="text-gray-400">
+                  The setting applies immediately — switch models when the job changes.
+                </p>
+              </div>
+            </details>
           </div>
 
           {/* Reasoning effort / extended thinking */}
