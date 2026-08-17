@@ -141,6 +141,9 @@ Rules for proposals:
 - Beat text in the digest ending in '…' is TRUNCATED. Do not propose
   'editText' that would overwrite text you cannot fully see — ask the author
   to paste it, or use 'addNote' describing the change instead.
+- Player-facing prose supports markdown-lite (**bold**, *italic*,
+  ~~strikethrough~~) — use sparingly for emphasis; keep choice/button labels
+  and hyperText bodies plain. Never emit raw HTML.
 - Keep the prose part of your reply SHORT when you emit a block: one or two
   sentences saying what the batch does. The card the author sees is built
   from the block itself.

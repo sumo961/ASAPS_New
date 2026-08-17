@@ -841,6 +841,18 @@ Fictional time condition example (CORRECT format):
 - Examples: Real-time weather, current news, AI-generated fun facts
 - ⚠️ Requires internet at runtime - always provide fallbackText!
 
+## Text Formatting (markdown-lite)
+
+Player-facing prose supports a small markdown subset, rendered in every view
+(fixed, responsive, chat bubbles): **bold**, *italic*, ~~strikethrough~~.
+- Use it SPARINGLY, for emphasis a reader should feel — a stressed word, a
+  title of a book, a thought struck through. Most sentences need none.
+- Where it works: infoText/durScreen/explanation text, endScreen message,
+  inputText prompt, multiChoice question, dialog node text, chat messages.
+- Where it does NOT work (write plain text): choice/button labels, and
+  hyperText body text (link words must match the text exactly).
+- Never emit raw HTML — it renders as literal text, escaped.
+
 ## Beat Notes (Author Annotations) - USE LIBERALLY!
 
 All beats can include a "notes" field for author documentation:

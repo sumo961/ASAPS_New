@@ -233,6 +233,31 @@ Before `git tag`:
 5. If the updater changed: remember the fix ships one release late — the hop
    INTO the release runs the old updater. Say so in the notes.
 
+## ⚠️ AI Generation Must Learn New Features IN THE SAME CHANGE
+
+When a change adds or alters something the AI generation paths could use —
+a new beat parameter, an effect type, a formatting capability, a character
+field, a runtime behavior an author would want generated stories to exploit —
+the AI-generation guidance is part of that change, not a follow-up:
+
+1. **Schema descriptions** (`beat-definitions/core-beats.json` — note
+   `packages/builder/public/beat-definitions/core-beats.json` is a symlink to
+   it): new/changed parameters get descriptions that teach the capability.
+   The MCP desktop server serves this schema live, so Claude Desktop learns
+   automatically. BUT:
+2. **Hand-written prompt guidance goes stale silently** — the builder's
+   condensed schema drops parameter descriptions, so the prose guidance in
+   these files is the only way the in-app generator learns:
+   - `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`
+   - `packages/builder/src/services/prompts/dialogGeneration.ts`
+   - `packages/builder/src/components/ai/codesigner/systemPrompt.ts`
+   - `packages/core/src/prompts/affectPrompt.ts` (affect features — has a
+     byte-compare mirror in `mcp-server-desktop/src/index.ts`; the tripwire
+     test enforces sync, arrow points core → server)
+3. The Aug 2026 precedent: dialog-layout guidance went stale for a month and
+   generated stories used a dead pattern. The fix commit (ef680757) exists
+   because this rule didn't.
+
 ## Coding Principles
 
 ### Prefer Signal-Based Over Time-Based Solutions

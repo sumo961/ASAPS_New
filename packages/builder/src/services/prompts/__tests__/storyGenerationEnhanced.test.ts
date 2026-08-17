@@ -519,4 +519,17 @@ describe('every beat type in the schema has authorial guidance', () => {
     expect(prompt).toMatch(/PROPOSE, do not emit/);
     expect(prompt).toMatch(/cannot run/);
   });
+
+  it('teaches markdown-lite — and where NOT to use it', () => {
+    // Item 9 made formatting a contract; the generator has to know both
+    // halves or it will bold button labels and break hyperText link words.
+    expect(prompt).toContain('markdown-lite');
+    expect(prompt).toMatch(/\*\*bold\*\*/);
+    expect(prompt).toMatch(/button labels/);
+    expect(prompt).toMatch(/hyperText body/);
+    // The schema descriptions carry the same contract for schema-driven
+    // consumers (MCP serves the schema live).
+    const desc = realSchema.beatTypes.infoText.parameters.text.description;
+    expect(desc).toContain('markdown-lite');
+  });
 });

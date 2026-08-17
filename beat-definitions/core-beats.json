@@ -524,7 +524,7 @@
           "type": "string",
           "required": true,
           "default": "",
-          "description": "Text content to display"
+          "description": "Text content to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "textVariations": {
           "type": "array<string>",
@@ -637,7 +637,7 @@
           "type": "string",
           "required": false,
           "default": "Here's what you'll see on screen.",
-          "description": "Intro text shown in the beat's own text box"
+          "description": "Intro text shown in the beat's own text box. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "buttonText": {
           "type": "string",
@@ -892,7 +892,7 @@
           "type": "string",
           "required": true,
           "default": "What do you say?",
-          "description": "Prompt text shown above the choice buttons"
+          "description": "Prompt text shown above the choice buttons. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "choices": {
           "type": "array<multiChoiceOption>",
@@ -1409,7 +1409,7 @@
           "type": "string",
           "required": false,
           "default": "The End",
-          "description": "Ending message"
+          "description": "Ending message. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "showRestart": {
           "type": "boolean",
@@ -2237,7 +2237,7 @@
           "type": "string",
           "required": true,
           "default": "",
-          "description": "Text to display"
+          "description": "Text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "textVariations": {
           "type": "array<string>",
@@ -2820,7 +2820,7 @@
           "type": "string",
           "required": true,
           "default": "Please enter your response:",
-          "description": "Question or prompt text to display"
+          "description": "Question or prompt text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
         "saveToType": {
           "type": "string",

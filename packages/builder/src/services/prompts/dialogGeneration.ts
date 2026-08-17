@@ -58,6 +58,11 @@ Respond with JSON in this exact structure:
   "reasoning": "Brief explanation"
 }
 
+## Text Formatting (markdown-lite)
+- Dialog node text may use **bold**, *italic*, ~~strikethrough~~ — sparingly, for emphasis a reader should feel
+- Choice text (the player's lines on buttons) stays PLAIN — no markers
+- Never emit raw HTML; it renders as literal escaped text
+
 ## Speaker & Character Rules
 - The "speaker" field on each dialogNode must match a character's **displayName** (e.g., "Jenkins", "Dr. Grey")
 - "Narrator" is the built-in default speaker (used when speaker is empty or set to "Narrator")
