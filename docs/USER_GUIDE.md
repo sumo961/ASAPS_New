@@ -2609,6 +2609,27 @@ This creates a natural voice-driven conversation flow, especially when combined 
 - Click **Save** or press **Ctrl/Cmd+S**
 - Saves to browser storage
 
+### Where Your Projects Live (and Why Backups Matter)
+
+In the **web app**, projects live in your browser's storage. That's what
+makes saving instant and automatic — but browser storage belongs to the
+browser: clearing site data removes your projects, and under storage
+pressure a browser may clean up on its own. ASAPS defends this two ways:
+
+- After your first save, ASAPS asks the browser to **protect its storage
+  from automatic cleanup**. The Project Browser's footer shows the result —
+  a storage line reading *"protected"* or *"not protected against cleanup —
+  keep backups"*, along with how full your browser storage is.
+- Project cards show a small amber **never backed up** / **backup outdated**
+  badge when a project you've recently worked on exists only in this
+  browser. **Export → Project (ZIP)** clears it — the exported file is your
+  real backup, safe from anything that happens to the browser.
+
+Neither of these replaces the habit: if a project matters, export it. In the
+**desktop app**, projects can also live as folders on disk (File → Save As
+Folder), where they're ordinary files — backed up by Time Machine or File
+History like everything else you care about.
+
 ### Export Options
 
 | Format | Description | Use Case |

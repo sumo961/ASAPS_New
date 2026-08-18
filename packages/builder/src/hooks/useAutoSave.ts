@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { ensurePersistentStorage } from '../utils/storagePersistence';
 import { getStorageManager } from '../storage/StorageManager';
 import type { Project } from '../storage/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -227,6 +228,12 @@ export function useAutoSave(
       setLastSaved(new Date());
       setStatus('saved');
       log('Save successful');
+
+      // First successful save is the engagement moment: ask the browser to
+      // protect this origin's storage from eviction (web only; Firefox shows
+      // a prompt, which is fair right after the user saved). Fire-and-forget
+      // and internally once-per-session.
+      void ensurePersistentStorage();
 
       // Reset to idle after 2 seconds (or pending if changes came in)
       savedTimeoutRef.current = window.setTimeout(() => {

@@ -615,6 +615,7 @@ export async function downloadProjectAsZip(
       const arrayBuffer = await blob.arrayBuffer();
       await window.electronAPI.fs.writeFile(result.filePath, new Uint8Array(arrayBuffer));
       console.log('[downloadProjectAsZip] File saved to:', result.filePath);
+      void getStorageManager().stampProjectExported(projectId);
     } else {
       // Browser fallback: use programmatic download
       const url = URL.createObjectURL(blob);
@@ -626,6 +627,9 @@ export async function downloadProjectAsZip(
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       console.log('[downloadProjectAsZip] Download initiated');
+      // Browser downloads can't confirm the user kept the file; stamping on
+      // initiation is the honest best-effort for the backup-staleness nudge.
+      void getStorageManager().stampProjectExported(projectId);
     }
   } catch (error) {
     console.error('[downloadProjectAsZip] Download failed:', error);

@@ -339,6 +339,11 @@ export interface Project {
   /** Storage format: 'directory' for folder-based, 'indexeddb' (default) for browser storage */
   storageFormat?: 'directory' | 'indexeddb';
 
+  /** When this project was last exported as a zip/template — the backup
+   *  staleness signal for the web build, where projects otherwise exist only
+   *  in evictable browser storage. Deliberately NOT bumped by edits. */
+  lastExportedAt?: Date | null;
+
   /** Origin remote URL, opportunistically detected from Git */
   vcsRemoteUrl?: string | null;
 

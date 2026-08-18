@@ -15,6 +15,8 @@ import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import { TemplateShelf } from './TemplateGallery';
 import type { Project } from '../storage/types';
 import { getProjectMeta } from '../utils/projectMeta';
+import { backupStaleness, getPersistenceState, type PersistenceState } from '../utils/storagePersistence';
+import { useStorageQuota } from '../hooks/useStorageQuota';
 
 export interface ProjectLibraryProps {
   /** Called when a project is selected to load */
@@ -423,7 +425,67 @@ const ProjectCard: React.FC<{
       <div className="flex items-center gap-1 text-xs text-gray-500">
         <Clock size={12} />
         <span>Modified {formatDate(project.modifiedAt)}</span>
+        {/* Backup-staleness rail (web only): this work exists ONLY in
+            evictable browser storage, and has for a while. Electron users
+            have profile storage + the folder-canonical direction; nudging
+            them here would be noise. */}
+        {!(window as any).electronAPI && (() => {
+          const staleness = backupStaleness(project);
+          if (staleness === 'fresh') return null;
+          return (
+            <span
+              className="ml-2 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700"
+              title={staleness === 'never-backed-up'
+                ? 'This project has never been exported — it exists only in this browser\u2019s storage. Open it and use Export \u2192 Project (ZIP) to keep a copy.'
+                : 'This project has changes newer than its last export. Open it and use Export \u2192 Project (ZIP) to refresh your backup.'}
+            >
+              {staleness === 'never-backed-up' ? 'never backed up' : 'backup outdated'}
+            </span>
+          );
+        })()}
       </div>
+    </div>
+  );
+};
+
+/**
+ * Storage-health line (web builds only): how full the origin's storage is,
+ * and whether the browser has agreed to protect it from eviction. This is
+ * the visible half of the persistent-storage guard — the quota machinery
+ * existed since the asset-quota work but nothing ever surfaced it.
+ */
+const StorageHealthLine: React.FC = () => {
+  const { quota } = useStorageQuota();
+  const [persistState, setPersistState] = useState<PersistenceState | null>(null);
+  useEffect(() => {
+    let live = true;
+    getPersistenceState().then((st) => { if (live) setPersistState(st); });
+    return () => { live = false; };
+  }, []);
+
+  if ((window as any).electronAPI) return null;
+  if (!quota?.supported) return null;
+
+  const pct = Math.round(quota.percentUsed);
+  const tight = quota.warningLevel === 'warning' || quota.warningLevel === 'critical' || quota.warningLevel === 'full';
+  const unprotectedStorage = persistState === 'denied' || persistState === 'unsupported';
+
+  return (
+    <div
+      className={`flex items-center gap-2 text-xs ${tight ? 'text-amber-700' : 'text-gray-400'}`}
+      title={`Projects in the web app live in this browser's storage. ${
+        persistState === 'persisted'
+          ? 'The browser has agreed to protect it from automatic cleanup.'
+          : 'The browser may clear it under storage pressure — keep backups via Export → Project (ZIP).'
+      }`}
+    >
+      <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+        tight ? 'bg-amber-500' : persistState === 'persisted' ? 'bg-emerald-500' : 'bg-gray-300'
+      }`} />
+      <span>
+        Browser storage {pct}% used
+        {persistState === 'persisted' ? ' · protected' : unprotectedStorage ? ' · not protected against cleanup — keep backups' : ''}
+      </span>
     </div>
   );
 };
@@ -1042,14 +1104,19 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
         </div>
 
         {/* Footer */}
-        {isModal && onClose && (
-          <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4">
+        {isModal && onClose ? (
+          <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+            <StorageHealthLine />
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
             >
               Close
             </button>
+          </div>
+        ) : (
+          <div className="px-6 py-3">
+            <StorageHealthLine />
           </div>
         )}
       </div>

@@ -155,6 +155,26 @@ export class StorageManager {
   }
 
   /**
+   * Record that a project was exported (zip/template), WITHOUT touching
+   * modifiedAt — a backup is not an edit, and updateProject's forced
+   * modifiedAt bump would make every backup look like one (and wreck the
+   * backup-staleness comparison, which is exactly modifiedAt vs this field).
+   */
+  async stampProjectExported(projectId: string): Promise<void> {
+    try {
+      const db = await this.getDb();
+      const project = await db.get('projects', projectId);
+      if (!project) return;
+      project.lastExportedAt = new Date();
+      await db.put('projects', project);
+      this.log('Project export stamped:', projectId);
+    } catch (error) {
+      // A failed stamp must never break the export that just succeeded.
+      this.logError('Failed to stamp project export', error);
+    }
+  }
+
+  /**
    * Delete a project and all its associated data
    */
   async deleteProject(projectId: string): Promise<StorageResult<void>> {
