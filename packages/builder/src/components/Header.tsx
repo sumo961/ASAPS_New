@@ -452,10 +452,10 @@ export const Header: React.FC<HeaderProps> = ({
                       setShowImportMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                    title="Convert an ASML XML file into a project"
+                    title="Convert an ASML 1.0 (XML) file into a project"
                   >
                     <FileText className="w-4 h-4" />
-                    ASML (XML)
+                    ASML 1.0 (XML)
                   </button>
                   {onImportTwine && (
                     <button
@@ -501,7 +501,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowExportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export project with assets as ZIP — the complete, native format"
+                      title="Export project with assets as ZIP — ASML 2.0 (JSON), the complete native format"
                     >
                       <Download className="w-4 h-4" />
                       Export Project (ZIP)
@@ -536,55 +536,59 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     </>
                   )}
-                  {/* Tier-5 item 14 (decision 2026-08-02, built 2026-08-18):
-                      ASML export is FROZEN as legacy. JSON (.asaps zip) is
-                      the native format; the ASML generator predates variants,
-                      stances, responsive slot layout, affect bindings and
-                      more, and none of it round-trips. Import stays fully
-                      supported — old files keep opening forever. The confirm
-                      spells out what a fresh ASML export would silently drop. */}
+                  {/* Tier-5 item 14 (decision 2026-08-02, built 2026-08-18,
+                      semantics corrected same day): ASML itself is NOT
+                      legacy — the native JSON project format IS ASML 2.0.
+                      What is frozen is ASML 1.0 (XML): its generator
+                      predates variants, stances, responsive slot layout,
+                      affect bindings and more, and none of it round-trips.
+                      Import of 1.0 files stays fully supported — old files
+                      keep opening forever. The confirm spells out what a
+                      fresh XML export would silently drop. */}
                   <div className="my-2 border-t border-gray-200" />
                   <div className="px-4 pt-1 pb-0.5 text-[10px] font-semibold tracking-wide text-gray-400">
-                    LEGACY — ASML DOES NOT CARRY NEWER FEATURES
+                    LEGACY — ASML 1.0 (XML)
                   </div>
                   <button
                     onClick={() => {
                       if (window.confirm(
-                        'ASML (XML) is a legacy format, kept for compatibility with the original ASAPS.\n\n'
-                        + 'An ASML export does NOT include newer features: character variants and stances, '
+                        'ASML 1.0 (XML) is the legacy serialization, kept for compatibility with the original ASAPS. '
+                        + 'ASAPS Modern\u2019s native format is ASML 2.0 (JSON), carried in the project zip.\n\n'
+                        + 'An XML export does NOT include newer features: character variants and stances, '
                         + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
                         + 'and more. Opening this file later will not restore them.\n\n'
-                        + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML anyway?'
+                        + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML 1.0 anyway?'
                       )) {
                         onExport();
                       }
                       setShowExportMenu(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                    title="Legacy: export as ASML XML — newer features are not included"
+                    title="Legacy: export as ASML 1.0 (XML) — newer features are not included"
                   >
                     <FileText className="w-4 h-4" />
-                    ASML (XML only)
+                    ASML 1.0 (XML only)
                   </button>
                   {onExportAsmlWithAssets && (
                     <button
                       onClick={() => {
                         if (window.confirm(
-                          'ASML (XML) is a legacy format, kept for compatibility with the original ASAPS.\n\n'
-                          + 'An ASML export does NOT include newer features: character variants and stances, '
+                          'ASML 1.0 (XML) is the legacy serialization, kept for compatibility with the original ASAPS. '
+                        + 'ASAPS Modern\u2019s native format is ASML 2.0 (JSON), carried in the project zip.\n\n'
+                          + 'An XML export does NOT include newer features: character variants and stances, '
                           + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
                           + 'and more. Opening this file later will not restore them.\n\n'
-                          + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML anyway?'
+                          + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML 1.0 anyway?'
                         )) {
                           onExportAsmlWithAssets();
                         }
                         setShowExportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Legacy: export ASML XML with asset folders — newer features are not included"
+                      title="Legacy: export ASML 1.0 (XML) with asset folders — newer features are not included"
                     >
                       <FileText className="w-4 h-4" />
-                      ASML with Assets
+                      ASML 1.0 with Assets
                     </button>
                   )}
                 </div>

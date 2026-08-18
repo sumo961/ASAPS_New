@@ -263,7 +263,7 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
-| **Export** | Dropdown: export as Project ZIP (complete, native), template (.asapst), standalone HTML — or legacy ASML (frozen format; a confirm explains what it can't carry) |
+| **Export** | Dropdown: export as Project ZIP (ASML 2.0 — JSON, complete and native), template (.asapst), standalone HTML — or legacy ASML 1.0 XML (frozen serialization; a confirm explains what it can't carry) |
 | **Tools** | Dropdown: Transformations, Merge DialogTrees |
 
 | Right Side | What it Does |
@@ -2615,7 +2615,7 @@ This creates a natural voice-driven conversation flow, especially when combined 
 |--------|-------------|----------|
 | ASAPS Project (.zip) | Complete project + all assets | Backups, sharing with collaborators |
 | ASAPS Template (.asapst) | Same zip, flagged as a template — anyone importing it gets their own fresh copy; the file itself is never edited | Distributing worked examples: classroom scenarios, reusable starting points |
-| ASML (.asml) — **legacy** | XML narrative structure only. **Frozen format**: newer features (character variants and stances, affect, responsive slot layout, counter bindings, themes) are NOT written and won't come back on re-import | Compatibility with the original ASAPS only — for backups and sharing use the Project zip |
+| ASML 1.0 (.asml, XML) — **legacy** | XML narrative structure only. **Frozen serialization**: newer features (character variants and stances, affect, responsive slot layout, counter bindings, themes) are NOT written and won't come back on re-import | Compatibility with the original ASAPS only — the Project zip carries ASML 2.0 (JSON), the native format |
 | HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |
 
 **Export as Template (.asapst).** Pick **Export → Export as Template (.asapst)** to turn the open project into a distributable template — like Word's `.dotx`. A lecturer can share a rehearsal scenario with a class this way: every student who imports (or double-clicks) the file gets their own independent copy to work in, and the master file stays pristine. See [Templates](#templates) in Part 1 for how templates behave on the receiving end.
@@ -2653,7 +2653,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Export Steps
 
 1. Click **Export** in the header to open the dropdown
-2. Choose format: Project (ZIP), Template (.asapst), or HTML — or a legacy ASML export from the bottom section (a confirm lists what ASML can't carry)
+2. Choose format: Project (ZIP), Template (.asapst), or HTML — or a legacy ASML 1.0 (XML) export from the bottom section (a confirm lists what the XML can't carry)
 3. Configure options if prompted
 4. Download the file
 
@@ -2663,7 +2663,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 
 - **ASAPS Project (.zip)** - Full project restore
 - **ASAPS Template (.asapst)** - Always instantiates a *fresh copy* as a new project — the template file itself is never opened or modified. Double-clicking a `.asapst` in the desktop app does the same. See [Templates](#templates).
-- **ASML (.asml)** - Story structure (may need asset re-linking)
+- **ASML 1.0 (.asml, XML)** - Story structure from the original ASAPS (may need asset re-linking)
 - **Twine/Twee** - Import from Twine (SugarCube format)
 
 *Note: Ren'Py theme import is available in **Settings** via the "Import Ren'Py" button.*
@@ -2671,11 +2671,11 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Import Steps
 
 1. Click **Open** in the header to open the dropdown
-2. For ASAPS's own files pick **Open Project File…** (`.asaps` / `.asapst` / zip); for conversions pick ASML (XML) or Twine (HTML) under *Import from other formats*
+2. For ASAPS's own files pick **Open Project File…** (`.asaps` / `.asapst` / zip); for conversions pick ASML 1.0 (XML) or Twine (HTML) under *Import from other formats*
 3. Select the file
 4. For asset-heavy imports, you'll be guided through asset mapping
 
-**ASML stays fully importable.** Freezing the ASML *export* changes nothing here — old `.asml` files keep opening, forever.
+**ASML 1.0 stays fully importable.** Freezing the XML *export* changes nothing here — old `.asml` files keep opening, forever. And to be precise about names: ASML didn't go away, it moved on. The JSON your project zip carries **is ASML 2.0** — same language, new serialization.
 
 ### Merging Two Stories (v0.9.71)
 
@@ -3456,7 +3456,7 @@ Quick reference for all beat types.
 
 # Appendix C: Glossary
 
-**ASML** - Advanced Stories Markup Language. The XML format for storing narrative systems.
+**ASML** - Advanced Stories Markup Language. The language for storing narrative systems: **ASML 2.0** is the native JSON serialization inside every project zip; **ASML 1.0** is the original XML, still importable but frozen for export.
 
 **Beat** - A potential moment in your narrative system. The atomic unit of IDN.
 

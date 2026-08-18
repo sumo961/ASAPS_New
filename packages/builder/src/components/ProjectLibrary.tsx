@@ -826,7 +826,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 <div className="text-sm font-semibold text-gray-900">Open a file</div>
                 <div className="text-xs text-gray-600 leading-snug">
                   .asaps · .asapst · zip — added to your projects and opened.
-                  (ASML and Twine convert via the header's Open menu.)
+                  (ASML 1.0 XML and Twine convert via the header's Open menu.)
                 </div>
               </button>
             </div>

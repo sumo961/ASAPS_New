@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ASPAS Modern is a TypeScript/JavaScript web application that modernizes the Advanced Story Authoring and Presentation System (ASAPS). It's an interactive narrative creation tool with a visual story builder, graph-based editor, and support for the ASML (Advanced Stories Markup Language) XML format.
+ASPAS Modern is a TypeScript/JavaScript web application that modernizes the Advanced Story Authoring and Presentation System (ASAPS). It's an interactive narrative creation tool with a visual story builder and graph-based editor. Its native format is ASML 2.0 — Advanced Stories Markup Language, JSON serialization, carried in .asaps project zips; the original ASML 1.0 (XML) remains importable but its export is frozen as legacy.
 
 ## Essential Commands
 
