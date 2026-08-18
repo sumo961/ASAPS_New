@@ -156,7 +156,7 @@ The full Project Browser opens with a **START A NEW PROJECT** row offering four 
 | 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Static) and orientation up front, then drops you into a brand-new empty project. Add beats from the palette to start building. |
 | ⚡ **Build from a prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
 | ✨ **Co-write with AI** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
-| 📥 **Import** | You have an existing `.asaps` zip or `.asml` file. Pick the file with the standard import dialog — same conflict-resolution flow as the toolbar Import button. (Browser-only — the **+ New** toolbar button picker omits this card by design.) |
+| 📥 **Open a file** | You have an existing `.asaps`, `.asapst`, or project zip. Pick it and it's added to your projects and opened — no separate "import" step to think about. Converting from other formats (ASML XML, Twine HTML) lives in the header's **Open** menu under *Import from other formats*. (Browser-only — the **+ New** toolbar button picker omits this card by design.) |
 
 If any of the AI-powered cards reads SOON, that just means no AI provider is configured yet — open **AI → Configure AI** to set one up and the cards light up.
 
@@ -188,7 +188,7 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 ### Drag-drop import
 
-The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to import · .asaps zip — will be added to your projects"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project. Dropping a `.asapst` template file works too — following template rules, it instantiates a fresh copy rather than importing the file in place.
+The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to open · .asaps · .asapst · zip — added to your projects and opened"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project. Dropping a `.asapst` template file works too — following template rules, it instantiates a fresh copy rather than importing the file in place.
 
 This is the fastest way to bring in a backup, a project a collaborator emailed you, or one of the sample projects shipped with ASAPS.
 
@@ -262,8 +262,8 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **+ New** | Direct create-project entry. Opens a compact picker with four cards (Empty project / Build from a prompt / Co-write with AI / Start from a template). Guarded by an unsaved-changes prompt so you don't lose work in flight. |
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
-| **Import** | Dropdown: import ASML, ZIP, or Twine files |
-| **Export** | Dropdown: export as ASML, ZIP, template (.asapst), or standalone HTML |
+| **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
+| **Export** | Dropdown: export as Project ZIP (complete, native), template (.asapst), standalone HTML — or legacy ASML (frozen format; a confirm explains what it can't carry) |
 | **Tools** | Dropdown: Transformations, Merge DialogTrees |
 
 | Right Side | What it Does |
@@ -2615,7 +2615,7 @@ This creates a natural voice-driven conversation flow, especially when combined 
 |--------|-------------|----------|
 | ASAPS Project (.zip) | Complete project + all assets | Backups, sharing with collaborators |
 | ASAPS Template (.asapst) | Same zip, flagged as a template — anyone importing it gets their own fresh copy; the file itself is never edited | Distributing worked examples: classroom scenarios, reusable starting points |
-| ASML (.asml) | XML narrative structure only | Version control, lightweight sharing |
+| ASML (.asml) — **legacy** | XML narrative structure only. **Frozen format**: newer features (character variants and stances, affect, responsive slot layout, counter bindings, themes) are NOT written and won't come back on re-import | Compatibility with the original ASAPS only — for backups and sharing use the Project zip |
 | HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |
 
 **Export as Template (.asapst).** Pick **Export → Export as Template (.asapst)** to turn the open project into a distributable template — like Word's `.dotx`. A lecturer can share a rehearsal scenario with a class this way: every student who imports (or double-clicks) the file gets their own independent copy to work in, and the master file stays pristine. See [Templates](#templates) in Part 1 for how templates behave on the receiving end.
@@ -2653,7 +2653,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Export Steps
 
 1. Click **Export** in the header to open the dropdown
-2. Choose format: ASML (XML only), ASML with Assets, Project (ZIP), Template (.asapst), or HTML
+2. Choose format: Project (ZIP), Template (.asapst), or HTML — or a legacy ASML export from the bottom section (a confirm lists what ASML can't carry)
 3. Configure options if prompted
 4. Download the file
 
@@ -2670,10 +2670,12 @@ When you host an HTML export online (rather than just double-clicking a single-f
 
 ### Import Steps
 
-1. Click **Import** in the header to open the dropdown
-2. Choose format: ASML (XML), Project (ZIP), or Twine (HTML)
+1. Click **Open** in the header to open the dropdown
+2. For ASAPS's own files pick **Open Project File…** (`.asaps` / `.asapst` / zip); for conversions pick ASML (XML) or Twine (HTML) under *Import from other formats*
 3. Select the file
 4. For asset-heavy imports, you'll be guided through asset mapping
+
+**ASML stays fully importable.** Freezing the ASML *export* changes nothing here — old `.asml` files keep opening, forever.
 
 ### Merging Two Stories (v0.9.71)
 

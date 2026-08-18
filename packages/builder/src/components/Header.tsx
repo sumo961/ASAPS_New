@@ -393,10 +393,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
               onClick={() => setShowImportMenu(!showImportMenu)}
-              title="Import"
+              title="Open project files, or import from other formats"
             >
               <Upload className="w-4 h-4" />
-              Import
+              Open
               <ChevronDown className="w-3 h-3" />
             </button>
 
@@ -406,18 +406,13 @@ export const Header: React.FC<HeaderProps> = ({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowImportMenu(false)}
                 />
-                <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  <button
-                    onClick={() => {
-                      onImport();
-                      setShowImportMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                    title="Import ASML XML file"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Import ASML (XML)
-                  </button>
+                {/* Tier-5 item 13 (decision 2026-08-02, built 2026-08-18):
+                    "Open" is for ASAPS's own files — they land in your
+                    projects transparently, no mental model of "importing"
+                    required. "Import" is reserved for format CONVERSIONS
+                    (ASML, Twine), where something genuinely gets translated.
+                    Merge is neither — it stays its own operation. */}
+                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
                   {onImportZip && (
                     <button
                       onClick={() => {
@@ -425,10 +420,13 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowImportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Import project from ZIP archive"
+                      title="Open an ASAPS project file — it's added to your projects and opened"
                     >
                       <Upload className="w-4 h-4" />
-                      Import Project (ZIP)
+                      <span>
+                        Open Project File…
+                        <span className="block text-[11px] text-gray-400">.asaps · .asapst · zip</span>
+                      </span>
                     </button>
                   )}
                   {onMergeStory && (
@@ -444,6 +442,21 @@ export const Header: React.FC<HeaderProps> = ({
                       Merge Story (.asaps)
                     </button>
                   )}
+                  <div className="my-1 border-t border-gray-100" />
+                  <div className="px-4 pt-1 pb-0.5 text-[10px] font-semibold tracking-wide text-gray-400">
+                    IMPORT FROM OTHER FORMATS
+                  </div>
+                  <button
+                    onClick={() => {
+                      onImport();
+                      setShowImportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                    title="Convert an ASML XML file into a project"
+                  >
+                    <FileText className="w-4 h-4" />
+                    ASML (XML)
+                  </button>
                   {onImportTwine && (
                     <button
                       onClick={() => {
@@ -451,10 +464,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowImportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Import Twine 2 story (SugarCube format)"
+                      title="Convert a Twine 2 story (SugarCube format) into a project"
                     >
                       <FileText className="w-4 h-4" />
-                      Import Twine (HTML)
+                      Twine (HTML)
                     </button>
                   )}
                 </div>
@@ -481,30 +494,6 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => setShowExportMenu(false)}
                 />
                 <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  <button
-                    onClick={() => {
-                      onExport();
-                      setShowExportMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                    title="Export as ASML XML file"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Export ASML (XML only)
-                  </button>
-                  {onExportAsmlWithAssets && (
-                    <button
-                      onClick={() => {
-                        onExportAsmlWithAssets();
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export ASML XML with organized asset folders"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Export ASML with Assets
-                    </button>
-                  )}
                   {onExportZip && (
                     <button
                       onClick={() => {
@@ -512,7 +501,7 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowExportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export project with assets as ZIP"
+                      title="Export project with assets as ZIP — the complete, native format"
                     >
                       <Download className="w-4 h-4" />
                       Export Project (ZIP)
@@ -546,6 +535,57 @@ export const Header: React.FC<HeaderProps> = ({
                         Export as HTML
                       </button>
                     </>
+                  )}
+                  {/* Tier-5 item 14 (decision 2026-08-02, built 2026-08-18):
+                      ASML export is FROZEN as legacy. JSON (.asaps zip) is
+                      the native format; the ASML generator predates variants,
+                      stances, responsive slot layout, affect bindings and
+                      more, and none of it round-trips. Import stays fully
+                      supported — old files keep opening forever. The confirm
+                      spells out what a fresh ASML export would silently drop. */}
+                  <div className="my-2 border-t border-gray-200" />
+                  <div className="px-4 pt-1 pb-0.5 text-[10px] font-semibold tracking-wide text-gray-400">
+                    LEGACY — ASML DOES NOT CARRY NEWER FEATURES
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(
+                        'ASML (XML) is a legacy format, kept for compatibility with the original ASAPS.\n\n'
+                        + 'An ASML export does NOT include newer features: character variants and stances, '
+                        + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
+                        + 'and more. Opening this file later will not restore them.\n\n'
+                        + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML anyway?'
+                      )) {
+                        onExport();
+                      }
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                    title="Legacy: export as ASML XML — newer features are not included"
+                  >
+                    <FileText className="w-4 h-4" />
+                    ASML (XML only)
+                  </button>
+                  {onExportAsmlWithAssets && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(
+                          'ASML (XML) is a legacy format, kept for compatibility with the original ASAPS.\n\n'
+                          + 'An ASML export does NOT include newer features: character variants and stances, '
+                          + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
+                          + 'and more. Opening this file later will not restore them.\n\n'
+                          + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML anyway?'
+                        )) {
+                          onExportAsmlWithAssets();
+                        }
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Legacy: export ASML XML with asset folders — newer features are not included"
+                    >
+                      <FileText className="w-4 h-4" />
+                      ASML with Assets
+                    </button>
                   )}
                 </div>
               </>

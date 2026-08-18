@@ -694,9 +694,9 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             aria-hidden="true"
           >
             <Download className="w-16 h-16 text-blue-500 mb-3" />
-            <div className="text-xl font-bold text-blue-700">Drop to import</div>
+            <div className="text-xl font-bold text-blue-700">Drop to open</div>
             <div className="text-sm text-blue-600 mt-2">
-              .asaps zip — will be added to your projects
+              .asaps · .asapst · zip — added to your projects and opened
             </div>
           </div>
         )}
@@ -823,9 +823,10 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white"
               >
                 <Download className="w-6 h-6 text-orange-500 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">Import</div>
+                <div className="text-sm font-semibold text-gray-900">Open a file</div>
                 <div className="text-xs text-gray-600 leading-snug">
-                  .asaps zip or ASML XML file
+                  .asaps · .asapst · zip — added to your projects and opened.
+                  (ASML and Twine convert via the header's Open menu.)
                 </div>
               </button>
             </div>
