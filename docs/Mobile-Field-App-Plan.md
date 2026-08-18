@@ -214,7 +214,34 @@ P0-P2 can run entirely on TestFlight + sideload; store submission becomes
 its own small workstream inside P3, with the reviewer mode and GenAI
 affordance as its two real deliverables beyond fastlane plumbing.
 
-## 7. Decisions requested
+## 7. Sustainability — the Pro tier (direction agreed 2026-08-19)
+
+The mobile-export capability becomes the project's funding boundary — shaped
+as a **service tier, not a SKU**. Decided direction:
+
+- **Everything in the repo stays source-available** under the existing
+  PolyForm Noncommercial license, including the mobile chassis. The generic
+  Field Player stays free. Nothing creative or scholarly ever sits behind
+  the paywall — students and researchers lose nothing.
+- **"Pro" is the productized deployment path**, priced per deployment or as
+  an annual institutional arrangement: the one-command branded build,
+  CI/fastlane templates, the signing and store-submission guide, the
+  reviewer-mode kit, priority help when a store rejects — and optionally,
+  later, a hosted build service. This matches where both the value and the
+  maintenance cost actually live (native toolchains churn yearly), and it
+  survives the thin technical moat: the product is convenience plus a
+  person, not secrecy. The noncommercial license provides the legal
+  backstop for commercial users.
+- **Support obligation exists only where someone pays for it** — the
+  free tier promises the community nothing about Xcode.
+- **Sequencing:** no price list before P0-P2 exist. The first one or two
+  institutional deployments run as **paid pilots** — an institution paying
+  for a project, not a license — to discover the real support burden and
+  normal institutional pricing. Before anything is announced with a price:
+  one conversation with the university's innovation office about IP and
+  invoicing.
+
+## 8. Decisions requested
 
 1. **Phase order** — AR-first (as argued) or LLM-first?
 2. **Generic Field Player vs per-story app** as the P0 target (plan assumes
