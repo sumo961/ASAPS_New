@@ -145,7 +145,76 @@ and its seam is already proven. Swappable if an AI-first deployment appears.
 - **VPS coverage** varies by deployment site — Tier 2 must always degrade
   to Tier 1 without authoring changes.
 
-## 6. Decisions requested
+## 6. Packaging & store release
+
+Capacitor's output *is* a native project — an Xcode workspace and a Gradle
+project live in the repo already (`apps/player-mobile/ios`, `/android`). So
+the build mechanics are the standard ones: iOS archive → App Store Connect,
+Android AAB → Play Console, both automatable with fastlane lanes in the
+existing GitHub Actions setup (macOS runners for iOS), version-stamped the
+same way the desktop builds are. The real questions are review policy and
+who signs what.
+
+### The generic Field Player (store-distributed)
+
+- **It's a document player, and that's a good category.** Stories are data
+  (ASML 2.0 JSON + assets), interpreted by the app — the same standing as an
+  ebook reader. No executable code is downloaded, so Apple's 2.5.2 doesn't
+  bite. Declare the `.asaps`/`.asapst` document types so Files-app and
+  share-sheet intake work.
+- **Model download is normal practice.** Offline-translation and
+  photo-ML apps fetch multi-GB models post-install on both stores. Plain
+  download from a project CDN into the app container is allowed; Play Asset
+  Delivery / On-Demand Resources are optimizations, not requirements.
+  Disclose size, default to Wi-Fi.
+- **The review walkthrough is the part people fail.** Reviewers sit in an
+  office; a story gated on walking 150 m can never be reached, and
+  unreachable content is a rejection. The answer is already in the codebase:
+  a **reviewer/demo mode** built on MockSensorService — a bundled demo story
+  plus a documented toggle that simulates the walk (and the AR view, over
+  the mock heading). This goes into P0's design, not bolted on at
+  submission time.
+- **Permissions & privacy labels:** camera, while-in-use location, motion —
+  each with an honest purpose string. The on-device LLM is a privacy asset
+  here: AI conversations never leave the phone, location is consumed on
+  device — the nutrition label can plausibly say "data not collected."
+- **Generative-AI policy:** both stores now have GenAI rules; Play expects a
+  way to flag offensive AI output. The AI-conversation view in the store
+  build needs a small "report response" affordance (logs locally / mailto),
+  plus Gemma's safety defaults. Cheap, but it must exist.
+- **Age rating** follows story content, not the engine; the generic player
+  rates for user-provided content (like a reader app).
+
+### Per-story branded apps (the "export as app" recipe)
+
+Here the constraint is **Apple Guideline 4.2.6/4.3**: apps generated from a
+template service must be **submitted by the content provider's own developer
+account**, and app-mill lookalikes get rejected wholesale. Play has parallel
+repetitive-content policies. So the recipe deliberately is:
+
+- ASAPS generates a ready-to-build native project (story baked in, icons,
+  splash, bundle id placeholders) — **the institution builds and submits it
+  under their own Apple/Play account.** ASAPS never publishes fleets of
+  story apps from one account.
+- Story updates without app updates: the branded app may refresh its story
+  bundle from the institution's URL (it's data, not code) with the baked-in
+  copy as offline fallback.
+
+### Field studies don't need the store at all
+
+The store is the *last* distribution ring, not the first:
+
+| Ring | iOS | Android |
+|---|---|---|
+| Study / pilot | **TestFlight** (10k external testers, 90-day builds) — ideal | **APK sideload** or Play internal testing |
+| Institution-internal | Ad Hoc (100 devices) / Apple Business Manager custom apps | Managed Play / direct APK |
+| Public | App Store review | Play production (note: new personal Play accounts must run a 12-tester closed test first — an organization account avoids this) |
+
+P0-P2 can run entirely on TestFlight + sideload; store submission becomes
+its own small workstream inside P3, with the reviewer mode and GenAI
+affordance as its two real deliverables beyond fastlane plumbing.
+
+## 7. Decisions requested
 
 1. **Phase order** — AR-first (as argued) or LLM-first?
 2. **Generic Field Player vs per-story app** as the P0 target (plan assumes
