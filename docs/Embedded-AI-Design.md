@@ -1,8 +1,12 @@
 # Embedded AI in the Desktop / Mobile Players — Design Document
 
-> **Status:** Design proposal for decision, per roadmap Tier-5 item 15
-> (parked until the relay shipped — it shipped in v0.9.86). No code yet.
-> **Decision owner:** Hartmut. The recommendation is at the end.
+> **Status:** Design proposal, per roadmap Tier-5 item 15. **Partially
+> superseded (2026-08-18):** Hartmut expanded the goal to a self-contained
+> mobile app with an embedded Gemma-class LLM plus geo-AR — see
+> `Mobile-Field-App-Plan.md`, which replaces this doc's "mobile: explicitly
+> parked" stance. The desktop recommendations below (Phase 0 Ollama probe,
+> Phase 1 bundled llama.cpp) remain valid and independent.
+> **Decision owner:** Hartmut.
 
 ## 1. The problem
 
