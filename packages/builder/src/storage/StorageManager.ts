@@ -175,6 +175,21 @@ export class StorageManager {
   }
 
   /**
+   * Flip a project's row to directory format after a successful migration —
+   * WITHOUT touching modifiedAt (a migration is not an edit; updateProject's
+   * forced bump would resort the whole library by migration order).
+   */
+  async stampProjectDirectory(projectId: string, directoryPath: string): Promise<void> {
+    const db = await this.getDb();
+    const project = await db.get('projects', projectId);
+    if (!project) throw new Error(`project ${projectId} not found`);
+    project.storageFormat = 'directory';
+    project.directoryPath = directoryPath;
+    await db.put('projects', project);
+    this.log('Project migrated to directory:', projectId, directoryPath);
+  }
+
+  /**
    * Delete a project and all its associated data
    */
   async deleteProject(projectId: string): Promise<StorageResult<void>> {

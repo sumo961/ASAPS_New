@@ -17,6 +17,8 @@ import type { Project } from '../storage/types';
 import { getProjectMeta } from '../utils/projectMeta';
 import { backupStaleness, getPersistenceState, type PersistenceState } from '../utils/storagePersistence';
 import { collectDroppedDirectory, rezipUnzippedProject } from '../utils/folderProjectImport';
+import { migrateLibraryToDisk } from '../utils/libraryMigration';
+import { isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
 import { useStorageQuota } from '../hooks/useStorageQuota';
 
 export interface ProjectLibraryProps {
@@ -488,6 +490,65 @@ const StorageHealthLine: React.FC = () => {
         {persistState === 'persisted' ? ' · protected' : unprotectedStorage ? ' · not protected against cleanup — keep backups' : ''}
       </span>
     </div>
+  );
+};
+
+/**
+ * Desktop-only: move every IndexedDB project to ~/Documents/ASAPS Projects
+ * as directory-format folders. Explicit by design — pre-existing projects
+ * never auto-adopt; only projects born after the inversion do.
+ */
+const MigrateLibraryButton: React.FC<{
+  storage: any;
+  currentProjectId?: string | null;
+  onDone: () => void;
+}> = ({ storage, currentProjectId, onDone }) => {
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+
+  if (!isElectronWithFS()) return null;
+
+  const run = async () => {
+    if (!window.confirm(
+      'Move your library to disk?\n\n'
+      + 'Every project stored in the app is written to ~/Documents/ASAPS Projects '
+      + 'as a folder of ordinary files (one file per beat — Time Machine, sync and git '
+      + 'all work on them). The app keeps using the folders from then on. Nothing is '
+      + 'deleted, and a project that fails to convert stays exactly where it was.\n\n'
+      + 'The currently open project is left in place — convert it with File → Save As Folder.'
+    )) return;
+    setBusy(true);
+    try {
+      const result = await migrateLibraryToDisk(storage, {
+        currentProjectId,
+        onProgress: (p) => setProgress(`${p.done}/${p.total} — ${p.currentName}`),
+      });
+      const lines = [`Moved ${result.migrated} project${result.migrated === 1 ? '' : 's'} to disk.`];
+      if (result.skippedCurrent) lines.push('The open project stays put — File → Save As Folder converts it.');
+      if (result.failures.length) {
+        lines.push(`${result.failures.length} failed and stayed in app storage:`);
+        for (const f of result.failures.slice(0, 5)) lines.push(`  • ${f.name}: ${f.error}`);
+      }
+      alert(lines.join('\n'));
+      onDone();
+    } catch (e) {
+      alert(`Migration failed: ${e instanceof Error ? e.message : 'unknown error'}`);
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={run}
+      disabled={busy}
+      className="text-xs text-gray-500 hover:text-gray-800 underline decoration-dotted disabled:opacity-60"
+      title="Write every stored project to ~/Documents/ASAPS Projects as folders of ordinary files, and use those from now on"
+    >
+      {busy ? (progress ? `Moving ${progress}` : 'Moving…') : 'Move library to disk…'}
+    </button>
   );
 };
 
@@ -1129,7 +1190,10 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
         {/* Footer */}
         {isModal && onClose ? (
           <div className="flex-shrink-0 border-t border-gray-200 px-6 py-4 flex items-center justify-between">
-            <StorageHealthLine />
+            <div className="flex items-center gap-4">
+              <StorageHealthLine />
+              <MigrateLibraryButton storage={storage} currentProjectId={currentProjectId} onDone={loadProjects} />
+            </div>
             <button
               onClick={onClose}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
@@ -1138,8 +1202,9 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             </button>
           </div>
         ) : (
-          <div className="px-6 py-3">
+          <div className="px-6 py-3 flex items-center gap-4">
             <StorageHealthLine />
+            <MigrateLibraryButton storage={storage} currentProjectId={currentProjectId} onDone={loadProjects} />
           </div>
         )}
       </div>
