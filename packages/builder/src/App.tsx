@@ -4267,6 +4267,20 @@ function App() {
   // Browser drag-drop zone, so the conflict-resolution + load-after-
   // import flow stays consistent across entry points.
   const handleImportZipFile = useCallback(async (file: File, importOptions?: { newName?: string }) => {
+    // A bare monolithic project.json (the zip's payload without the zip —
+    // hand-extracted, repo-pulled) wraps into an in-memory zip so the one
+    // battle-tested import pipeline handles it. Non-project JSON falls
+    // through and fails with the importer's own message.
+    if (/\.json$/i.test(file.name) && !/\.zip$/i.test(file.name)) {
+      const { wrapBareProjectJson } = await import('./utils/folderProjectImport');
+      const wrapped = await wrapBareProjectJson(file);
+      if (wrapped) {
+        file = wrapped;
+      } else {
+        alert(`"${file.name}" doesn't look like an ASAPS project export — expected the {metadata, project} JSON a project zip carries.`);
+        return;
+      }
+    }
     const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}) => {
       const result = await importProjectFromZip(file, options);
 
@@ -4311,7 +4325,7 @@ function App() {
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps.zip,.asapst';
+    input.accept = '.zip,.asaps.zip,.asapst,.json';
 
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];

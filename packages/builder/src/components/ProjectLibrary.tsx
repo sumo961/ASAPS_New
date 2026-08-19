@@ -654,8 +654,8 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     // surface a friendly error for non-zip payloads, but we filter
     // obvious mismatches here to fail fast.
     const name = file.name.toLowerCase();
-    if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip') && !name.endsWith('.asapst')) {
-      alert(`Only .zip / .asaps / .asapst files are supported for drag-drop import.\nReceived: ${file.name}`);
+    if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip') && !name.endsWith('.asapst') && !name.endsWith('.json')) {
+      alert(`Only .zip / .asaps / .asapst / project.json files are supported for drag-drop import.\nReceived: ${file.name}`);
       return;
     }
     await onImportZipFile!(file);

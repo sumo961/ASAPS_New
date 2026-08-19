@@ -2627,10 +2627,25 @@ pressure a browser may clean up on its own. ASAPS defends this two ways:
   browser. **Export → Project (ZIP)** clears it — the exported file is your
   real backup, safe from anything that happens to the browser.
 
-Neither of these replaces the habit: if a project matters, export it. In the
-**desktop app**, projects can also live as folders on disk (File → Save As
-Folder), where they're ordinary files — backed up by Time Machine or File
-History like everything else you care about.
+Neither of these replaces the habit: if a project matters, export it.
+
+**In the desktop app, new projects live as folders on disk automatically.**
+When you name a project, it lands in `~/Documents/ASAPS Projects/<name>/` as
+a folder of ordinary files — one file per beat — with no dialog and no step
+to remember. Time Machine and File History back them up like everything else
+you care about, and git works on them directly. Projects from before this
+change stay in app storage until you move them: the **Move library to
+disk…** link at the bottom of the Project Browser converts every stored
+project in one click (nothing is deleted; a project that fails to convert
+stays where it was). The currently open project converts via **File → Save
+As Folder**.
+
+Two folder-life details worth knowing: ASAPS writes files atomically, so a
+cloud-synced project folder never ships a half-written file to your other
+machines — but if you edit the *same* project on two machines at once, the
+sync service decides which edit survives. And if a project's files change
+outside the app while it's open (a sync pull, a git checkout, a text
+editor), ASAPS warns you once and tells you which copy wins if you save.
 
 ### Export Options
 

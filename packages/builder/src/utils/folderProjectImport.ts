@@ -146,3 +146,36 @@ export async function collectElectronDirectory(dirPath: string): Promise<FolderE
   await walk(dirPath, '');
   return out;
 }
+
+/**
+ * Wrap a BARE monolithic project.json — the zip's payload without the zip —
+ * into an importable in-memory zip. Safari unzips downloads into folders
+ * (handled by the folder paths above), but a project.json also travels
+ * alone: extracted by hand, pulled from a repo, or exported by a tool.
+ * Returns null when the JSON isn't a project export (caller keeps its own
+ * messaging); assets referenced by the story will be missing and the
+ * importer's existing missing-asset flow reports them.
+ */
+export async function wrapBareProjectJson(file: File): Promise<File | null> {
+  let parsed: any;
+  try {
+    // FileReader instead of Blob.text() — the latter is missing in some
+    // embedders (and jsdom test envs); the reader path works everywhere.
+    const text = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error);
+      r.readAsText(file);
+    });
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || !parsed.project || !parsed.metadata) return null;
+  const zip = new JSZip();
+  zip.file('project.json', JSON.stringify(parsed));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+  const base = (parsed.project.name || file.name.replace(/\.project\.json$|\.json$/i, '') || 'project')
+    .replace(/[/\\:*?"<>|]/g, ' ').trim() || 'project';
+  return new File([blob], `${base}.asaps.zip`, { type: 'application/zip' });
+}

@@ -67,3 +67,23 @@ describe('rezipUnzippedProject', () => {
     expect(file!.name).toBe('My Story.asaps.zip');
   });
 });
+
+describe('wrapBareProjectJson', () => {
+  it('wraps a monolithic export into an importable zip', async () => {
+    const { wrapBareProjectJson } = await import('../folderProjectImport');
+    const src = JSON.stringify({ metadata: { exportVersion: '1.1.0' }, project: { id: 'p1', name: 'Loose File Story' } });
+    const file = new File([src], 'night-train.project.json', { type: 'application/json' });
+    const wrapped = await wrapBareProjectJson(file);
+    expect(wrapped).not.toBeNull();
+    expect(wrapped!.name).toBe('Loose File Story.asaps.zip');
+    const zip = await JSZip.loadAsync(wrapped!);
+    const inner = JSON.parse(await zip.file('project.json')!.async('text'));
+    expect(inner.project.id).toBe('p1');
+  });
+
+  it('rejects JSON that is not a project export', async () => {
+    const { wrapBareProjectJson } = await import('../folderProjectImport');
+    expect(await wrapBareProjectJson(new File(['{"foo":1}'], 'foo.json'))).toBeNull();
+    expect(await wrapBareProjectJson(new File(['not json'], 'x.json'))).toBeNull();
+  });
+});
