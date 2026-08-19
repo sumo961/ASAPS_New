@@ -188,7 +188,9 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 ### Drag-drop import
 
-The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to open · .asaps · .asapst · zip — added to your projects and opened"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project. Dropping a `.asapst` template file works too — following template rules, it instantiates a fresh copy rather than importing the file in place.
+The Project Browser is also a giant drop target. Drag a `.asaps` zip from your desktop or downloads folder onto the Browser window — anywhere inside the modal works — and a blue dashed overlay reading *"Drop to open · .asaps · .asapst · zip — or an unzipped project folder"* confirms you've hit the right place. Release to import. Same conflict resolution flow as the toolbar Import button or the Import card. Once the import succeeds, the Browser dismisses itself so you can dive straight into the imported project. Dropping a `.asapst` template file works too — following template rules, it instantiates a fresh copy rather than importing the file in place.
+
+**Dropped an unzipped folder? Also fine.** macOS Safari auto-extracts downloaded zips, so a shared project often arrives as a *folder* rather than a `.asaps.zip`. Drop the folder — ASAPS recognizes an unzipped project (it looks for the `project.json` inside, even one level down) and imports it exactly as if the zip had survived. On the desktop app, **File → Open Project Folder** pointed at such a folder does the same. Template folders keep their template behavior — the flag inside the file decides, not the name.
 
 This is the fastest way to bring in a backup, a project a collaborator emailed you, or one of the sample projects shipped with ASAPS.
 

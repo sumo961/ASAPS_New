@@ -16,6 +16,7 @@ import { TemplateShelf } from './TemplateGallery';
 import type { Project } from '../storage/types';
 import { getProjectMeta } from '../utils/projectMeta';
 import { backupStaleness, getPersistenceState, type PersistenceState } from '../utils/storagePersistence';
+import { collectDroppedDirectory, rezipUnzippedProject } from '../utils/folderProjectImport';
 import { useStorageQuota } from '../hooks/useStorageQuota';
 
 export interface ProjectLibraryProps {
@@ -552,6 +553,28 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     if (!dragImportAvailable) return;
     e.preventDefault();
     setDragCounter(0);
+
+    // Folder drop — the Safari case. macOS Safari auto-extracts downloaded
+    // zips, so a shared .asaps.zip arrives as a FOLDER; re-zip it in memory
+    // and feed the same import pipeline as a real zip.
+    const entry = e.dataTransfer.items?.[0]?.webkitGetAsEntry?.();
+    if (entry?.isDirectory) {
+      try {
+        const files = await collectDroppedDirectory(entry as FileSystemDirectoryEntry);
+        const rezipped = await rezipUnzippedProject(files, entry.name);
+        if (!rezipped) {
+          alert(`"${entry.name}" doesn't look like an ASAPS project — no project.json found inside.`);
+          return;
+        }
+        await onImportZipFile!(rezipped);
+        if (isModal) onClose?.();
+      } catch (err) {
+        console.error('[ProjectLibrary] Folder drop failed:', err);
+        alert(`Could not read the dropped folder: ${err instanceof Error ? err.message : 'unknown error'}`);
+      }
+      return;
+    }
+
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     // Lenient extension check — the import flow's own validator will
@@ -758,7 +781,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             <Download className="w-16 h-16 text-blue-500 mb-3" />
             <div className="text-xl font-bold text-blue-700">Drop to open</div>
             <div className="text-sm text-blue-600 mt-2">
-              .asaps · .asapst · zip — added to your projects and opened
+              .asaps · .asapst · zip — or an unzipped project folder
             </div>
           </div>
         )}

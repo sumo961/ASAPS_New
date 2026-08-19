@@ -411,6 +411,9 @@ function App() {
   const [triggerNewProject, setTriggerNewProject] = useState(0);
   const [missingAssetsInfo, setMissingAssetsInfo] = useState<{ missing: import('@asaps/core').AssetManifestEntry[]; path: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  /** Latest zip-import handler for effects that mount before it exists
+   *  (the Electron menu listeners' unzipped-export fallback). */
+  const handleImportZipFileRef = useRef<((file: File, options?: { newName?: string }) => Promise<void>) | null>(null);
 
   // Cluster naming modal state (replaces prompt() for Electron compatibility)
   const [showClusterNameModal, setShowClusterNameModal] = useState(false);
@@ -961,6 +964,25 @@ function App() {
             await vcs.initialize(folderPath);
           }
         } else {
+          // Not directory-format — but it may be an UNZIPPED EXPORT (macOS
+          // Safari auto-extracts downloaded .asaps.zip files, leaving a
+          // folder with a monolithic project.json + asset subfolders).
+          // Re-zip it in memory and run the ordinary import-as-copy.
+          try {
+            const { collectElectronDirectory, rezipUnzippedProject } = await import('./utils/folderProjectImport');
+            const files = await collectElectronDirectory(folderPath);
+            const folderName = folderPath.split(/[\\/]/).filter(Boolean).pop() || 'project';
+            const rezipped = await rezipUnzippedProject(files, folderName);
+            if (rezipped) {
+              console.log('[Electron] Folder is an unzipped export — importing as a copy');
+              resumeAutoSaveAfterLoadRef.current = false;
+              resumeAutoSave();
+              await handleImportZipFileRef.current?.(rezipped);
+              return;
+            }
+          } catch (fallbackErr) {
+            console.warn('[Electron] Unzipped-export fallback failed:', fallbackErr);
+          }
           resumeAutoSaveAfterLoadRef.current = false;
           resumeAutoSave();
           alert('Failed to open project folder. Make sure it contains a valid ASAPS project.');
@@ -4284,6 +4306,7 @@ function App() {
       alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [loadProject]);
+  handleImportZipFileRef.current = handleImportZipFile;
 
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
