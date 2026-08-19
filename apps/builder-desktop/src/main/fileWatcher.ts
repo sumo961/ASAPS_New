@@ -44,6 +44,10 @@ export class FileWatcher {
         /(^|[/\\])\../, // hidden files (but we DO want .asaps/)
         '**/node_modules/**',
         '**/*.tmp',
+        // Atomic-write temp files (fs:write-file writes sibling temps and
+        // renames over the target) — the temp appearing must not read as an
+        // external change.
+        '**/*.asaps-tmp-*',
         '.git/**',
         '.p4/**',
         // Don't ignore .asaps/ since format.json is there

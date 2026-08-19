@@ -771,7 +771,21 @@ ipcMain.handle('fs:read-file', async (_, path: string) => {
 ipcMain.handle('fs:write-file', async (_, path: string, data: Buffer | string) => {
   console.log('[IPC:fs] write-file:', path, `(${typeof data === 'string' ? data.length + ' chars' : (data as any).length + ' bytes'})`);
   try {
-    await fs.writeFile(path, data);
+    // ATOMIC: write a sibling temp file, then rename over the target.
+    // Directory projects live in user-chosen folders — often iCloud- or
+    // Dropbox-synced — where a partially written project.json picked up by
+    // the sync daemon mid-write becomes a corrupt file on every OTHER
+    // machine. rename() within one directory is atomic on POSIX and libuv
+    // uses MOVEFILE_REPLACE_EXISTING on Windows, so readers (and sync
+    // daemons) only ever see the old file or the complete new one.
+    const tmp = `${path}.asaps-tmp-${process.pid}-${Date.now()}`;
+    await fs.writeFile(tmp, data);
+    try {
+      await fs.rename(tmp, path);
+    } catch (renameErr) {
+      await fs.unlink(tmp).catch(() => undefined);
+      throw renameErr;
+    }
   } catch (error: any) {
     console.error('[IPC:fs] write-file FAILED:', path, error.message);
     throw error;

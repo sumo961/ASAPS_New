@@ -183,6 +183,15 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const saveAsDirectoryRef = useRef<((dirPath: string) => Promise<boolean>) | null>(null);
   /** One adoption at a time; a failed adoption must not retry every save. */
   const adoptionAttemptedRef = useRef<Set<string>>(new Set());
+  /** External-change watcher teardown for the active directory project. */
+  const unwatchRef = useRef<(() => void) | null>(null);
+  /** Timestamp of our own last filesystem write — watcher events landing
+   *  within the suppression window after it are our own saves echoing back,
+   *  not an external edit. */
+  const lastOwnWriteRef = useRef<number>(0);
+  /** One external-change warning per project per session — the point is
+   *  awareness, not a nag on every sync-daemon touch. */
+  const externalWarnedRef = useRef<Set<string>>(new Set());
   // Track which asset IDs have already been written to the filesystem
   // so we can skip unchanged assets on subsequent saves
   const savedAssetIdsRef = useRef<Set<string>>(new Set());
@@ -274,6 +283,39 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * Called by useAutoSave after each successful IndexedDB save.
    * Loads project assets from IndexedDB and writes them alongside the JSON files.
    */
+  /**
+   * Watch a directory project for EXTERNAL edits — a synced folder pulling a
+   * colleague's changes, a text editor touching a beat file, git checkout.
+   * The adapter had watchForChanges since the directory format landed;
+   * nothing ever called it. Events within the suppression window after our
+   * own writes are our own saves echoing back and are ignored.
+   */
+  const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
+    unwatchRef.current?.();
+    unwatchRef.current = null;
+    try {
+      unwatchRef.current = adapter.watchForChanges((events) => {
+        if (Date.now() - lastOwnWriteRef.current < 5000) return;
+        if (externalWarnedRef.current.has(projectId)) return;
+        externalWarnedRef.current.add(projectId);
+        const files = events.slice(0, 3).map((e) => e.path).join(', ');
+        console.warn('[PersistenceContext] Project files changed OUTSIDE the app:', files);
+        window.dispatchEvent(new CustomEvent('asaps:externalProjectChange', {
+          detail: { projectId, files: events.map((e) => e.path) },
+        }));
+        alert(
+          'This project\u2019s files changed outside ASAPS (sync, git, or another editor).\n\n'
+          + `Changed: ${files}${events.length > 3 ? ` and ${events.length - 3} more` : ''}\n\n`
+          + 'Your open copy still shows the state from before the change. If the outside '
+          + 'edit matters, reopen the project from the library to load it \u2014 saving now '
+          + 'will overwrite the outside change.'
+        );
+      });
+    } catch (e) {
+      console.warn('[PersistenceContext] Could not start external-change watch:', e);
+    }
+  }, []);
+
   const handleAfterSave = useCallback(async (project: Project) => {
     // ---- Default-location adoption (storage inversion, desktop only) ----
     // A project born this session (created / generated / injected / imported)
@@ -328,6 +370,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     const adapter = directoryAdapterRef.current;
     if (!adapter || !adapter.getProjectPath()) return;
 
+    lastOwnWriteRef.current = Date.now();
     try {
       // Load assets from IndexedDB for this project
       let assetsToSave: import('../storage').StoredAsset[] | undefined;
@@ -508,6 +551,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           const adapter = new DirectoryAdapter();
           adapter.setProjectPath(dirPath);
           directoryAdapterRef.current = adapter;
+          startExternalWatch(adapter, loadedProject.id);
           savedAssetIdsRef.current = new Set();
           setProjectFormat('directory');
           setProjectPath(dirPath);
@@ -987,6 +1031,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       project.storageFormat = 'directory';
 
       directoryAdapterRef.current = adapter;
+      startExternalWatch(adapter, project.id);
       savedAssetIdsRef.current = new Set(); // Reset saved asset tracking for new project
       currentProjectRef.current = project;
       setCurrentProject(project);
@@ -1065,9 +1110,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       const adapter = new DirectoryAdapter();
       adapter.setProjectPath(dirPath);
+      lastOwnWriteRef.current = Date.now();
       await adapter.saveProject(projectToSave, assets);
 
       directoryAdapterRef.current = adapter;
+      startExternalWatch(adapter, projectToSave.id);
       savedAssetIdsRef.current = new Set(assets?.map((a) => a.id) || []);
       setProjectFormat('directory');
       setProjectPath(dirPath);
@@ -1093,7 +1140,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to save as directory:', error);
       return false;
     }
-  }, [storage, syncCallback]);
+  }, [storage, syncCallback, startExternalWatch]);
   saveAsDirectoryRef.current = saveAsDirectory;
 
   /**

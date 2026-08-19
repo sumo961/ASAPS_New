@@ -519,6 +519,18 @@ const MigrateLibraryButton: React.FC<{
     )) return;
     setBusy(true);
     try {
+      const documents = await (window as any).electronAPI.app.getPath('documents');
+      const { isLikelySyncedPath } = await import('../utils/newProjectRegistry');
+      if (isLikelySyncedPath(documents)) {
+        // Advice, not a gate: atomic writes make synced folders workable,
+        // but simultaneous edits from two machines still race at the sync
+        // layer, and the author should know which world they are in.
+        if (!window.confirm(
+          'Heads up: your Documents folder appears to be inside a cloud-synced location.\n\n'
+          + 'Project folders there sync like any other files — handy for backup, but if the same '
+          + 'project is edited on two machines at once, the sync service decides what survives.\n\nContinue?'
+        )) { setBusy(false); return; }
+      }
       const result = await migrateLibraryToDisk(storage, {
         currentProjectId,
         onProgress: (p) => setProgress(`${p.done}/${p.total} — ${p.currentName}`),

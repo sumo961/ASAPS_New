@@ -48,3 +48,13 @@ export function sanitizeFolderName(name: string): string {
   if (!cleaned || WINDOWS_RESERVED.test(cleaned)) return `Project ${cleaned}`.trim();
   return cleaned;
 }
+
+/**
+ * Heuristic: does this path live inside a cloud-synced folder? Path markers
+ * only — macOS's "Desktop & Documents" iCloud sync is invisible in the path,
+ * which is exactly why the fs bridge writes atomically (temp + rename)
+ * regardless. This check powers ADVICE, not behavior.
+ */
+export function isLikelySyncedPath(path: string): boolean {
+  return /Mobile Documents|com~apple~CloudDocs|Dropbox|Google Drive|OneDrive|Yandex\.Disk|pCloud/i.test(path);
+}
