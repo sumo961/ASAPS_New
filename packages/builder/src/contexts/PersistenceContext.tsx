@@ -14,6 +14,7 @@ import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
 import { DirectoryAdapter, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
+import { markProjectNew, consumeProjectNew, sanitizeFolderName } from '../utils/newProjectRegistry';
 import { findUniqueProjectName } from '../utils/uniqueProjectName';
 
 // ============================================================================
@@ -177,6 +178,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const [projectFormat, setProjectFormat] = useState<ProjectFormat>('indexeddb');
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const directoryAdapterRef = useRef<DirectoryAdapter | null>(null);
+  /** Latest saveAsDirectory — handleAfterSave is defined before it and needs
+   *  it for default-location adoption. */
+  const saveAsDirectoryRef = useRef<((dirPath: string) => Promise<boolean>) | null>(null);
+  /** One adoption at a time; a failed adoption must not retry every save. */
+  const adoptionAttemptedRef = useRef<Set<string>>(new Set());
   // Track which asset IDs have already been written to the filesystem
   // so we can skip unchanged assets on subsequent saves
   const savedAssetIdsRef = useRef<Set<string>>(new Set());
@@ -269,6 +275,56 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * Loads project assets from IndexedDB and writes them alongside the JSON files.
    */
   const handleAfterSave = useCallback(async (project: Project) => {
+    // ---- Default-location adoption (storage inversion, desktop only) ----
+    // A project born this session (created / generated / injected / imported)
+    // becomes folder-canonical at ~/Documents/ASAPS Projects/<name>/ on its
+    // first NAMED save — silently, the GarageBand move. Untitled projects
+    // wait until they have a real name (they are freely discarded);
+    // pre-existing library projects never adopt here (explicit migration
+    // covers them).
+    if (
+      isElectronWithFS() &&
+      !directoryAdapterRef.current &&
+      project.storageFormat !== 'directory' &&
+      project.name &&
+      // The untitled state, not the name sentinel: 'Untitled Project' is only
+      // one of the spellings (the Empty-project flow names its scratch
+      // project after the default story title). Adopting an untitled project
+      // would mint a folder from a name the author never chose — the live
+      // test produced "My Interactive Story/" while the author typed
+      // "Inversion Test Alpha" into the save dialog moments later.
+      !isUntitledProjectRef.current &&
+      // Only the project the author is actually IN adopts — a late save of a
+      // just-replaced scratch project must not race its named descendant.
+      project.id === (currentProjectRef.current?.id ?? project.id) &&
+      !adoptionAttemptedRef.current.has(project.id) &&
+      consumeProjectNew(project.id)
+    ) {
+      adoptionAttemptedRef.current.add(project.id);
+      try {
+        const api = (window as any).electronAPI;
+        const documents: string = await api.app.getPath('documents');
+        const baseDir = `${documents}/ASAPS Projects`;
+        await api.fs.mkdir(baseDir).catch(() => undefined);
+        const folderBase = sanitizeFolderName(project.name);
+        let dirPath = `${baseDir}/${folderBase}`;
+        for (let i = 2; await api.fs.exists(dirPath); i++) {
+          dirPath = `${baseDir}/${folderBase} ${i}`;
+        }
+        const ok = await saveAsDirectoryRef.current?.(dirPath);
+        if (ok) {
+          console.log('[PersistenceContext] New project adopted into default location:', dirPath);
+        } else {
+          console.warn('[PersistenceContext] Default-location adoption failed — project stays in browser storage');
+        }
+      } catch (e) {
+        // Adoption is an upgrade, never a gate: the IndexedDB save that just
+        // succeeded remains the project's home if the filesystem says no.
+        console.warn('[PersistenceContext] Default-location adoption error:', e);
+      }
+      return;
+    }
+
     const adapter = directoryAdapterRef.current;
     if (!adapter || !adapter.getProjectPath()) return;
 
@@ -576,7 +632,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         throw result.error || new Error('Failed to create project');
       }
 
-      // Reset directory format state — new projects are always IndexedDB-based
+      // Born this session — eligible for default-location folder adoption on
+      // its first named save (the storage-inversion rule for NEW projects).
+      markProjectNew(newProjectId);
+
+      // Reset directory format state — new projects start as IndexedDB and
+      // are adopted into a folder by the save pipeline.
       setProjectFormat('indexeddb');
       setProjectPath(null);
       directoryAdapterRef.current = null;
@@ -848,6 +909,15 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         throw result.error || new Error('Failed to save project');
       }
 
+      // The named descendant of an untitled project is also born-this-session
+      // — and it REPLACES the scratch project in the adoption line. Unmark
+      // the scratch: leaving it marked let any late auto-save of the old
+      // project adopt a folder named after the scratch title the author
+      // never chose (live test: "My Interactive Story/" while the author had
+      // just typed "Inversion Test Alpha").
+      consumeProjectNew(projectToSave.id);
+      markProjectNew(newProjectId);
+
       // CRITICAL: Migrate assets from old project to new project BEFORE deleting old project
       // This ensures assets are associated with the new project ID
       try {
@@ -1024,6 +1094,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       return false;
     }
   }, [storage, syncCallback]);
+  saveAsDirectoryRef.current = saveAsDirectory;
 
   /**
    * Clear untitled project state (mark as not untitled)

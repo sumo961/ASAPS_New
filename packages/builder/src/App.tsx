@@ -4975,13 +4975,20 @@ function App() {
         return;
       }
 
+      // ONE-NAME MODEL: the dialog is a project-name edit point, so the
+      // story title must follow — the model syncs name from title on every
+      // save, and a dialog that only renamed the project was silently
+      // reverted by the next sync (found live: typed "Inversion Test
+      // Alpha", row said "My Interactive Story" a second later). Same
+      // convergence rule as the Browser card's rename-in-place.
+      actions.setTitle(name);
       await saveCurrent(name, description);
       alert('Project saved successfully!');
     } catch (error) {
       console.error('Failed to save project:', error);
       alert('Failed to save project. Please try again.');
     }
-  }, [saveCurrent, currentProject, createProject, syncProjectData, setIsUntitledProject, storage]);
+  }, [saveCurrent, currentProject, createProject, syncProjectData, setIsUntitledProject, storage, actions]);
 
   /**
    * Handle closing Save Project dialog

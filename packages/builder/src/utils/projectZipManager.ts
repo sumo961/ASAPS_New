@@ -8,6 +8,7 @@
 import JSZip from 'jszip';
 import { v4 as uuidv4 } from 'uuid';
 import { getStorageManager } from '../storage/StorageManager';
+import { markProjectNew } from './newProjectRegistry';
 import type { Project, StoredAsset, AssetType } from '../storage/types';
 
 /**
@@ -560,6 +561,10 @@ export async function importProjectFromZip(
       await storage.updateProject(project);
     } else {
       await storage.createProject(project);
+
+      // Imported = born this session: eligible for default-location folder
+      // adoption on desktop, exactly like a freshly created project.
+      markProjectNew(projectId);
     }
 
     console.log('[importProjectFromZip] Project imported successfully:', {
