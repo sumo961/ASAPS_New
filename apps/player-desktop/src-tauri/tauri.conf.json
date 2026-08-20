@@ -60,9 +60,12 @@
     },
     "fileAssociations": [
       {
-        "ext": ["asaps", "asaps.zip"],
+        "ext": [
+          "asaps"
+        ],
         "mimeType": "application/x-asaps-story",
-        "description": "ASAPS Story File"
+        "description": "ASAPS Story File",
+        "role": "Viewer"
       }
     ]
   },

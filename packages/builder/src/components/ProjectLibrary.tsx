@@ -439,8 +439,8 @@ const ProjectCard: React.FC<{
             <span
               className="ml-2 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700"
               title={staleness === 'never-backed-up'
-                ? 'This project has never been exported — it exists only in this browser\u2019s storage. Open it and use Export \u2192 Project (ZIP) to keep a copy.'
-                : 'This project has changes newer than its last export. Open it and use Export \u2192 Project (ZIP) to refresh your backup.'}
+                ? 'This project has never been exported — it exists only in this browser\u2019s storage. Open it and use Export \u2192 Project (.asaps) to keep a copy.'
+                : 'This project has changes newer than its last export. Open it and use Export \u2192 Project (.asaps) to refresh your backup.'}
             >
               {staleness === 'never-backed-up' ? 'never backed up' : 'backup outdated'}
             </span>
@@ -479,7 +479,7 @@ const StorageHealthLine: React.FC = () => {
       title={`Projects in the web app live in this browser's storage. ${
         persistState === 'persisted'
           ? 'The browser has agreed to protect it from automatic cleanup.'
-          : 'The browser may clear it under storage pressure — keep backups via Export → Project (ZIP).'
+          : 'The browser may clear it under storage pressure — keep backups via Export → Project (.asaps).'
       }`}
     >
       <span className={`inline-block w-1.5 h-1.5 rounded-full ${

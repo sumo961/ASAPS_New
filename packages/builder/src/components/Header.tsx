@@ -501,10 +501,10 @@ export const Header: React.FC<HeaderProps> = ({
                         setShowExportMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export project with assets as ZIP — ASML 2.0 (JSON), the complete native format"
+                      title="Export the complete project as one .asaps file — ASML 2.0, double-clickable, everything included"
                     >
                       <Download className="w-4 h-4" />
-                      Export Project (ZIP)
+                      Export Project (.asaps)
                     </button>
                   )}
                   {onExportTemplate && (
@@ -557,7 +557,7 @@ export const Header: React.FC<HeaderProps> = ({
                         + 'An XML export does NOT include newer features: character variants and stances, '
                         + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
                         + 'and more. Opening this file later will not restore them.\n\n'
-                        + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML 1.0 anyway?'
+                        + 'For a complete copy of your project, use "Export Project (.asaps)".\n\nExport ASML 1.0 anyway?'
                       )) {
                         onExport();
                       }
@@ -578,7 +578,7 @@ export const Header: React.FC<HeaderProps> = ({
                           + 'An XML export does NOT include newer features: character variants and stances, '
                           + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
                           + 'and more. Opening this file later will not restore them.\n\n'
-                          + 'For a complete copy of your project, use "Export Project (ZIP)".\n\nExport ASML 1.0 anyway?'
+                          + 'For a complete copy of your project, use "Export Project (.asaps)".\n\nExport ASML 1.0 anyway?'
                         )) {
                           onExportAsmlWithAssets();
                         }

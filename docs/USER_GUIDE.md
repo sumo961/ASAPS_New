@@ -2517,7 +2517,7 @@ ASAPS ships a set of small, importable **verification kits** for the device-faci
 | **AR Scene — Verification** | Marker tracking with a printable marker page and the compiled `.mind` tracker already bundled — no external compile step |
 | **Indoor Location — Verification** | A generated floor plan with a three-beacon venue, driven by the Mock Sensors beacon sliders — no Bluetooth hardware needed |
 
-The kits live in the `examples/` folder of the ASAPS distribution (in the repository: `packages/builder/public/examples/`, with a README and per-kit pass/fail criteria in `docs/TESTING_EXPERIMENTAL_BEATS.md`). Import any kit via **Import → Project (ZIP)** and run it in Preview or an HTML export on the target device.
+The kits live in the `examples/` folder of the ASAPS distribution (in the repository: `packages/builder/public/examples/`, with a README and per-kit pass/fail criteria in `docs/TESTING_EXPERIMENTAL_BEATS.md`). Import any kit via **Open → Open Project File…** and run it in Preview or an HTML export on the target device.
 
 ## Text-to-Speech (TTS)
 
@@ -2624,7 +2624,7 @@ pressure a browser may clean up on its own. ASAPS defends this two ways:
   keep backups"*, along with how full your browser storage is.
 - Project cards show a small amber **never backed up** / **backup outdated**
   badge when a project you've recently worked on exists only in this
-  browser. **Export → Project (ZIP)** clears it — the exported file is your
+  browser. **Export → Project (.asaps)** clears it — the exported file is your
   real backup, safe from anything that happens to the browser.
 
 Neither of these replaces the habit: if a project matters, export it.
@@ -2691,7 +2691,7 @@ When you host an HTML export online (rather than just double-clicking a single-f
 ### Export Steps
 
 1. Click **Export** in the header to open the dropdown
-2. Choose format: Project (ZIP), Template (.asapst), or HTML — or a legacy ASML 1.0 (XML) export from the bottom section (a confirm lists what the XML can't carry)
+2. Choose format: Project (.asaps), Template (.asapst), or HTML — or a legacy ASML 1.0 (XML) export from the bottom section (a confirm lists what the XML can't carry)
 3. Configure options if prompted
 4. Download the file
 
@@ -3696,7 +3696,7 @@ It doesn't — it sits at *zero*, and zero is where you put it. On a `Min: 0` ra
 
 - Check the [README](../README.md) for technical details
 - Report issues at [GitHub Issues](https://github.com/sumo961/ASAPS_New)
-- Sample projects ship as ZIP files in the project library — open one and use **Import → Import Project (ZIP)** to learn techniques. The canonical demonstration of the affect stack (variants, choice effects, mood-gated endings) is **Standing Beside Alex**.
+- Sample projects ship as ZIP files in the project library — open one and use **Open → Open Project File…** to learn techniques. The canonical demonstration of the affect stack (variants, choice effects, mood-gated endings) is **Standing Beside Alex**.
 
 ---
 

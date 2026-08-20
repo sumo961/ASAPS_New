@@ -135,13 +135,17 @@
         "ext": "asaps",
         "name": "ASAPS Project",
         "description": "ASAPS Story Project",
-        "mimeType": "application/x-asaps-project"
+        "mimeType": "application/x-asaps-project",
+        "role": "Editor",
+        "rank": "Owner"
       },
       {
         "ext": "asapst",
         "name": "ASAPS Template",
         "description": "ASAPS Story Template - opening creates a new project copy",
-        "mimeType": "application/x-asaps-template"
+        "mimeType": "application/x-asaps-template",
+        "role": "Editor",
+        "rank": "Owner"
       }
     ]
   }
