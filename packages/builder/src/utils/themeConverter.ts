@@ -326,6 +326,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       animation: textEffects.animation,
       typewriterSpeed: textEffects.typewriterSpeed,
       fadeInDuration: textEffects.fadeInDuration,
+      typewriterGranularity: textEffects.typewriterGranularity,
     },
     hotspot: {
       highlightColor: hotspots.highlightColor || '#ffff00',

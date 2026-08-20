@@ -64,6 +64,7 @@ interface GlobalSettings {
   textEffects: {
     animation: 'none' | 'typewriter' | 'fade';
     typewriterSpeed: number; // Characters per second
+    typewriterGranularity?: 'letter' | 'word' | 'line';
     fadeInDuration: number;   // Milliseconds
   };
   hotspots: {
@@ -1893,19 +1894,39 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </div>
 
                 {settings.textEffects.animation === 'typewriter' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">
-                      Typewriter Speed (characters/second)
-                    </label>
-                    <input
-                      type="number"
-                      value={settings.textEffects.typewriterSpeed}
-                      onChange={(e) => handleChange('textEffects', 'typewriterSpeed', parseInt(e.target.value))}
-                      min="1"
-                      max="100"
-                      className="w-full px-3 py-2 border rounded"
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Typewriter Speed (characters/second)
+                      </label>
+                      <input
+                        type="number"
+                        value={settings.textEffects.typewriterSpeed}
+                        onChange={(e) => handleChange('textEffects', 'typewriterSpeed', parseInt(e.target.value))}
+                        min="1"
+                        max="100"
+                        className="w-full px-3 py-2 border rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                        Reveal By
+                      </label>
+                      <select
+                        value={settings.textEffects.typewriterGranularity ?? 'letter'}
+                        onChange={(e) => handleChange('textEffects', 'typewriterGranularity', e.target.value)}
+                        className="w-full px-3 py-2 border rounded"
+                      >
+                        <option value="letter">Letter (classic)</option>
+                        <option value="word">Word</option>
+                        <option value="line">Line</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Words and lines pop in whole. Speed and total duration stay
+                        the same — only the rhythm changes.
+                      </p>
+                    </div>
+                  </>
                 )}
 
                 {settings.textEffects.animation === 'fade' && (

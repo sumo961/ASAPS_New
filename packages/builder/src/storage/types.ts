@@ -93,6 +93,9 @@ export interface GlobalSettings {
     animation: 'none' | 'typewriter' | 'fade';
     typewriterSpeed: number; // Characters per second
     fadeInDuration: number;   // Milliseconds
+    /** Typewriter reveal unit — letters (classic), whole words, or whole
+     *  lines. Optional; absent means 'letter' (all pre-existing projects). */
+    typewriterGranularity?: 'letter' | 'word' | 'line';
   };
   hotspots: {
     visible: boolean;

@@ -34,6 +34,7 @@ import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
 import { renderMarkdownLite } from '../utils/markdownLite';
+import { revealBoundary, type TypewriterGranularity } from '../utils/typewriterGranularity';
 import { ImageInputElement } from './ImageInputElement';
 import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
@@ -415,8 +416,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const effectiveTextAnim = reducedMotion ? 'none' : textAnim;
-  const titleReveal = useTextReveal(titleText, effectiveTextAnim, typewriterSpeed, fadeInMs);
-  const bodyReveal = useTextReveal(bodyText, effectiveTextAnim, typewriterSpeed, fadeInMs);
+  const typewriterGranularity = theme.textEffects?.typewriterGranularity ?? 'letter';
+  const titleReveal = useTextReveal(titleText, effectiveTextAnim, typewriterSpeed, fadeInMs, typewriterGranularity);
+  const bodyReveal = useTextReveal(bodyText, effectiveTextAnim, typewriterSpeed, fadeInMs, typewriterGranularity);
 
   // ── preferredLines honoring for the title (soft) ──────────────────────
   // The author can ask a title to be N lines. We bias toward it with a
@@ -2368,7 +2370,8 @@ function useTextReveal(
   text: string,
   animation: 'none' | 'typewriter' | 'fade',
   speed: number,
-  fadeInMs: number
+  fadeInMs: number,
+  granularity: TypewriterGranularity = 'letter'
 ): { rendered: string; fadeStyle: React.CSSProperties } {
   const [shown, setShown] = React.useState<string>(
     animation === 'typewriter' ? '' : text
@@ -2385,11 +2388,13 @@ function useTextReveal(
     const msPerChar = 1000 / Math.max(1, speed);
     const handle = window.setInterval(() => {
       i += 1;
-      setShown(text.slice(0, i));
+      // Clock is per-character; the VISIBLE text snaps to the last completed
+      // word/line, so speed and duration are identical across granularities.
+      setShown(text.slice(0, revealBoundary(text, i, granularity)));
       if (i >= text.length) window.clearInterval(handle);
     }, msPerChar);
     return () => window.clearInterval(handle);
-  }, [text, animation, speed]);
+  }, [text, animation, speed, granularity]);
   const fadeStyle: React.CSSProperties =
     animation === 'fade' && text
       ? { animation: `slotflow-text-fade-in ${fadeInMs}ms ease-in both` }

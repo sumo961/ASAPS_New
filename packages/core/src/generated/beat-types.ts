@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-08-17T18:43:24.274Z
+ * Generated: 2026-08-20T17:12:31.313Z
  */
 
 // ============================================
@@ -164,7 +164,7 @@ export interface TitleScreenParameters {
  * Connection Type: single
  */
 export interface InfoTextParameters {
-  /** Text content to display */
+  /** Text content to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
   textVariations?: String[] | undefined;
@@ -188,7 +188,7 @@ export interface InfoTextParameters {
  * Connection Type: single
  */
 export interface ExplanationParameters {
-  /** Intro text shown in the beat's own text box */
+  /** Intro text shown in the beat's own text box. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   text?: string | undefined;
   /** Continue button text (also used as connection label) */
   buttonText?: string | undefined;
@@ -244,7 +244,7 @@ export interface DialogTreeParameters {
  * Connection Type: multiple
  */
 export interface MultiChoiceParameters {
-  /** Prompt text shown above the choice buttons */
+  /** Prompt text shown above the choice buttons. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   question: string;
   /** Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices). */
   choices: MultiChoiceOption[];
@@ -354,7 +354,7 @@ export interface EndScreenParameters {
   slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
   slotAnimations?: Object | undefined;
-  /** Ending message */
+  /** Ending message. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   message?: string | undefined;
   /** Show restart button */
   showRestart?: boolean | undefined;
@@ -526,7 +526,7 @@ export interface DurScreenParameters {
   slotIntent?: Object | undefined;
   /** Responsive motion intent for slot-mode rendering (P3-anim). Per-slot enter/exit/emphasis presets resolved against the slot's responsive box — survives reflow/orientation. Distinct from the legacy `animations` (AnimationPath[] over absolute x/y). Absent → no animation. P3-anim-1 supports the 'fade' enter preset; further presets land per the P3-anim phasing in project_responsive_layout_system memory. */
   slotAnimations?: Object | undefined;
-  /** Text to display */
+  /** Text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   text: string;
   /** Optional array of text variations. Combined with main text for random selection at runtime. */
   textVariations?: String[] | undefined;
@@ -678,7 +678,7 @@ export interface IndoorLocationParameters {
  * Connection Type: single
  */
 export interface InputTextParameters {
-  /** Question or prompt text to display */
+  /** Question or prompt text to display. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel. */
   prompt: string;
   /** Save input to: 'variable', 'characterName', or 'counter' */
   saveToType: string;

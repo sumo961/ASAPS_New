@@ -17,6 +17,7 @@ import { KeypadElement } from './KeypadElement';
 import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
 import { renderMarkdownLite } from '../utils/markdownLite';
+import { revealBoundary } from '../utils/typewriterGranularity';
 
 // Default stage dimensions (can be overridden by project settings)
 const DEFAULT_STAGE_WIDTH = 1024;
@@ -477,6 +478,10 @@ export interface RenderThemeSettings {
     animation: 'none' | 'typewriter' | 'fade';
     typewriterSpeed: number;  // Characters per second
     fadeInDuration: number;    // Milliseconds
+    /** Reveal unit for typewriter: classic letters (default), whole words,
+     *  or whole lines. The clock stays character-based, so speed and total
+     *  duration are identical across granularities. */
+    typewriterGranularity?: 'letter' | 'word' | 'line';
   };
   /** Hotspot styling */
   hotspot?: {
@@ -3478,15 +3483,22 @@ const TextElement: React.FC<{
             }}
           >
             {animation === 'typewriter' && isAnimating ? (
-              <>
-                {/* Revealed portion - visible. Kept plain while typing —
-                    markdown applies when the reveal completes below.
-                    (`animation` is a theme constant, so gating on it alone
-                    left typewriter text with raw asterisks FOREVER.) */}
-                <span>{content.substring(0, revealedLength)}</span>
-                {/* Unrevealed portion - transparent (maintains spacing) */}
-                <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
-              </>
+              (() => {
+                // Snap the visible split to the granularity boundary — words
+                // or lines pop in whole; the clock stays character-based.
+                const cut = revealBoundary(content, revealedLength, theme.textEffects?.typewriterGranularity);
+                return (
+                  <>
+                    {/* Revealed portion - visible. Kept plain while typing —
+                        markdown applies when the reveal completes below.
+                        (`animation` is a theme constant, so gating on it alone
+                        left typewriter text with raw asterisks FOREVER.) */}
+                    <span>{content.substring(0, cut)}</span>
+                    {/* Unrevealed portion - transparent (maintains spacing) */}
+                    <span style={{ color: 'transparent' }}>{content.substring(cut)}</span>
+                  </>
+                );
+              })()
             ) : (
               <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
             )}
@@ -4393,14 +4405,19 @@ const DialogElement: React.FC<{
                 themeLinkColor={theme.button?.backgroundColor}
               />
             ) : (
-              <>
-                {/* Revealed portion - visible, plain while typing — markdown
-                    applies when the reveal completes (gating on `animation`
-                    alone left typewriter text unformatted forever). */}
-                <span>{content.substring(0, revealedLength)}</span>
-                {/* Unrevealed portion - transparent (maintains spacing) */}
-                <span style={{ color: 'transparent' }}>{content.substring(revealedLength)}</span>
-              </>
+              (() => {
+                const cut = revealBoundary(content, revealedLength, theme.textEffects?.typewriterGranularity);
+                return (
+                  <>
+                    {/* Revealed portion - visible, plain while typing — markdown
+                        applies when the reveal completes (gating on `animation`
+                        alone left typewriter text unformatted forever). */}
+                    <span>{content.substring(0, cut)}</span>
+                    {/* Unrevealed portion - transparent (maintains spacing) */}
+                    <span style={{ color: 'transparent' }}>{content.substring(cut)}</span>
+                  </>
+                );
+              })()
             )
           ) : (
             hyperlinks && hyperlinks.length > 0 && onAction ? (
