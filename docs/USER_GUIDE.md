@@ -2651,7 +2651,7 @@ editor), ASAPS warns you once and tells you which copy wins if you save.
 
 | Format | Description | Use Case |
 |--------|-------------|----------|
-| ASAPS Project (.zip) | Complete project + all assets | Backups, sharing with collaborators |
+| ASAPS Project (.asaps) | Complete project + all assets — one file (a zip inside, but the `.asaps` extension means double-clicking opens it in ASAPS, Safari doesn't auto-extract it, and Windows doesn't offer the zip viewer) | Backups, sharing with collaborators |
 | ASAPS Template (.asapst) | Same zip, flagged as a template — anyone importing it gets their own fresh copy; the file itself is never edited | Distributing worked examples: classroom scenarios, reusable starting points |
 | ASML 1.0 (.asml, XML) — **legacy** | XML narrative structure only. **Frozen serialization**: newer features (character variants and stances, affect, responsive slot layout, counter bindings, themes) are NOT written and won't come back on re-import | Compatibility with the original ASAPS only — the Project zip carries ASML 2.0 (JSON), the native format |
 | HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |

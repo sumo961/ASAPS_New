@@ -80,14 +80,23 @@ sync, and version**. Three properties are load-bearing:
 | Carrier | Shape | Role |
 |---|---|---|
 | **Project folder** (this spec) | decomposed, one beat per file | the working format on desktop; git-able, shell-proof |
-| `.asaps` zip | single `project.json` (monolithic) + asset folders | interchange/backup snapshot; import always instantiates |
+| `.asaps` file | a zip carrying single `project.json` (monolithic) + asset folders; named `.asaps` (not `.asaps.zip`) so the OS routes double-clicks to ASAPS and download managers don't auto-extract it | interchange/backup snapshot; import always instantiates |
 | `.asapst` | same zip + `projectType: "template"` flag | distributable master; import always copies, flag decides (not extension) |
 | Browser library (IndexedDB) | app-managed rows | web build's working store; export to zip is its backup path |
 
-Conversions: zip → folder (open/import), folder → zip (Export Project),
+Conversions: file → folder (open/import), folder → file (Export Project),
 library → folder (Move library to disk / automatic adoption of new
 projects). ASML 1.0 (XML) remains import-only legacy and is not part of
 this contract.
+
+**The working folder is deliberately NOT a bundle.** macOS could dress the
+project folder as a document (LSTypeIsPackage), but Windows has no bundle
+concept — the same project would read as a file on one OS and a folder on
+the other, and the `.asaps` extension would mean two different things (live
+folder vs zip snapshot) depending on where you look. Worse, the bundle
+illusion fights this format's core virtue: per-beat files exist so authors,
+diffs, and version control can SEE inside. The folder stays a plain,
+transparent folder; the one-file experience is the `.asaps` snapshot's job.
 
 ## 6. Versioning
 

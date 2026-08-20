@@ -4311,7 +4311,7 @@ function App() {
   const handleImportZip = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps.zip,.asapst,.json';
+    input.accept = '.zip,.asaps,.asaps.zip,.asapst,.json';
 
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];

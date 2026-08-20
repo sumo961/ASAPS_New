@@ -736,9 +736,9 @@ async function handleSaveAsFolder(): Promise<void> {
 async function handleSaveAs(): Promise<void> {
   const result = await dialog.showSaveDialog(mainWindow!, {
     filters: [
-      { name: 'ASAPS Project', extensions: ['asaps.zip'] },
+      { name: 'ASAPS Project', extensions: ['asaps'] },
     ],
-    defaultPath: currentProjectPath || 'untitled.asaps.zip',
+    defaultPath: currentProjectPath || 'untitled.asaps',
   });
 
   if (!result.canceled && result.filePath) {

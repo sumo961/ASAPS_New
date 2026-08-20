@@ -638,7 +638,12 @@ export async function downloadProjectAsZip(
     const asTemplate = options?.asTemplate === true;
     const blob = await exportProjectAsZip(projectId, asTemplate ? { asTemplate: true } : undefined);
     const safeName = projectName.replace(/[^a-z0-9]/gi, '_');
-    const filename = asTemplate ? `${safeName}.asapst` : `${safeName}.asaps.zip`;
+    // '.asaps', not '.asaps.zip' (2026-08-20): the last extension wins on
+    // every OS, so '.asaps.zip' files double-clicked as zips, Safari
+    // auto-extracted them on download (the unzipped-folder import exists
+    // because of it), and the registered '.asaps' file association had no
+    // producer. The bytes are unchanged — it is still a zip inside.
+    const filename = asTemplate ? `${safeName}.asapst` : `${safeName}.asaps`;
 
     // Check if we're in Electron
     if (window.electronAPI?.dialog?.save) {
@@ -648,7 +653,7 @@ export async function downloadProjectAsZip(
         filters: [
           asTemplate
             ? { name: 'ASAPS Template', extensions: ['asapst'] }
-            : { name: 'ASAPS Project', extensions: ['asaps.zip'] },
+            : { name: 'ASAPS Project', extensions: ['asaps'] },
         ],
       });
 

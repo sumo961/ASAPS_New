@@ -97,7 +97,7 @@ export interface PersistenceAdapter {
 export function detectProjectFormat(source: string): ProjectFormat {
   // Directory format: path to a folder containing .asaps/format.json
   // This is detected asynchronously, so we check by extension/pattern
-  if (source.endsWith('.asaps.zip') || source.endsWith('.zip')) {
+  if (source.endsWith('.asaps.zip') || source.endsWith('.zip') || source.endsWith('.asaps')) {
     return 'zip';
   }
 
