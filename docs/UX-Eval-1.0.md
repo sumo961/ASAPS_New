@@ -285,7 +285,266 @@ Effects-behind-Advanced trap by letting specific high-value sections
 (Effects) claim basic-tier placement regardless of mode.
 
 ## 2. Journey findings
-_pending_
+
+### 2.1 Student first session (novice comprehension)
+
+**The headline: the untitled/named split is an invisible load-bearing
+state machine, and it can eat a first session.** Four findings are the
+same fault from four sides:
+
+1. **Untitled work is never auto-saved** — `getProjectData` throws for
+   untitled projects (PersistenceContext.tsx:229-237); the only surface
+   is a red toolbar chip quoting the raw exception, "Cannot auto-save
+   untitled project" (SaveStatus.tsx:106-112). **⌘S makes it worse**: the
+   Electron File→Save calls `saveNow()` directly (App.tsx:898-901) →
+   same throw, NO naming dialog. And the close guard doesn't fire —
+   `beforeunload` only checks `pending|saving`, not `error`
+   (useAutoSave.ts:390-400). A student can lose the whole session with
+   no dialog at any point.
+2. **Old untitled projects are deleted at boot, silently** —
+   App.tsx:2064-2081 keeps the newest 'Untitled Project' and
+   `deleteProject()`s the rest, no confirm.
+3. **"Empty project" means two different things** — StartWindow's tile
+   (copy: "Pick layout up front" — false, no dialog shown) creates
+   untitled + seeds a 3-beat starter story; the editor's +New →
+   NewProjectDialog (the best copy in the app) creates a NAMED project
+   which loads **zero beats** (gate at App.tsx:2196). The careful
+   student who fills in the form gets a blank grid with no empty state
+   (GraphEditor has no zero-node branch); the one who skips it gets a
+   working story.
+4. **Required-field validation is dead code** — `validateBeat` +
+   red banner exist (Inspector.tsx:1230-1299, 1734-1746) but the only
+   caller `handleSave` (:1545) is never invoked. Empty "Text *" ships a
+   blank screen silently.
+
+**Preview = the author's flagged concern, confirmed with a mechanism:**
+- **Preview auto-attaches to the selected beat** — App.tsx:4459 passes
+  `beatId: selectedBeat?.id`, and a beat is essentially always selected
+  (dropping/clicking selects). So the novice's "press play" always lands
+  in start-from-beat mode: amber overlay "Click to preview from
+  Introduction", plus the state picker headed "How did the player arrive
+  here?" / "12 paths → 7 unique states" — a state-space reasoning model
+  presented unprompted for a 3-beat story. One-line fix candidate: don't
+  pass beatId on plain open.
+- **Debug panel ON by default, ~40% of the window** (useState(true) at
+  PreviewWindow.tsx:347) showing affect, seeded-visited-beats,
+  JSON.stringify'd variables — before anything runs. Toggle = one of SIX
+  unlabelled icon toggles bottom-right.
+
+**Interaction dead ends:**
+- **Palette tiles are drag-only** (no onClick, BeatPalette.tsx:374-417);
+  the Sidebar's `onAddBeat` prop is destructured and never used
+  (Sidebar.tsx:12,29) — App wires it into a void. Clicking the most
+  natural first gesture does nothing, silently.
+- **The graph looks like a node editor but can't connect** — no
+  `onConnect` on ReactFlow, `isConnectable={false}` on both handles;
+  branching actually lives in Inspector dropdowns (3 different models by
+  beat type). Context menu advertises ⌘D/⌘C/⌘V/⌫ that don't exist while
+  `deleteKeyCode={null}`.
+- **DialogTreeEditor's Conditions/Effects toolbar toggles gate nothing**
+  (state flipped, never read) — novice concludes broken.
+
+**False signposting:** BeatSuggestions' keyless message says "Configure
+an AI provider in **Settings**" — the 12-tab Settings modal has NO AI
+tab (config lives in AI ▾ → Configure AI). Every beat, every keyless
+user. VCSStatusBar invites a media-studies student to *install git*
+once their project is folder-adopted.
+
+**Attention economics:** the most saturated control on first launch is
+purple "Add Cluster" (the least useful first action); the template shelf
+(the BEST novice affordance — "The Oil Lamp… swap in your own object")
+ranks BELOW the create row; 34 palette tiles show at once incl. 12
+AI/EXP tiles a keyless student can't run; vocabulary used before any
+definition: beat, cluster, Flowchart, Responsive layout, HUD.
+
+**Bright spots worth protecting:** NewProjectDialog copy (best in app),
+Info Text ordered first in palette, drop-selects-beat + Inspector fills,
+Preview button signposting, SaveProjectDialog itself, LAST PROJECT /
+"Continue editing →" resume banner.
+
+### 2.2 Returning author, ~40-beat story (both axes)
+
+**The headline: "show this choice only if…" — the most common branching
+mechanic in interactive narrative — has no UI.** `dialogChoice.conditions`
+/ `multiChoiceOption.conditions` / `movementOption.conditions` exist in
+the schema AND run in the engine (DialogTreeBeat.ts:793-794,
+MultiChoiceBeat.ts:161-162), but no live editor writes them; the
+DialogTreeEditor's "Toggle Conditions" toolbar button colours itself and
+gates nothing (the §1.5 dead toggle — someone built the button, never
+the panel). Authors are pushed to three mismatched surfaces: Condition
+Check beat ("Condition Type", default 'counter'), Requirements
+(redirect-on-arrival, default 'inventory' — different default, same
+session), Effects (write-only). Gating one door = ~16 steps + two
+invisible beats. The condition template library covers ONLY affect — not
+one inventory/variable/counter preset.
+
+**Silent graph corrosion:** deleting a beat filters `connections` but
+never scrubs choice/dialogNode/trueTarget/defaultTarget ids inside OTHER
+beats' parameters (useStoryBuilder.ts:300-311); neither delete confirm
+mentions inbound links; and `setImportIssues` has exactly two callers —
+import validation and dropped-beats — so **no edit ever re-validates**.
+Broken targets from a delete are invisible until Debug → Reachability
+(a panel this persona has never opened) or a live playthrough.
+
+**Portrait heartbreak chain (steps 2→3, the app's most common two-step):**
+- "Browse Existing Assets" under Speaker Portrait calls
+  `setShowAssetPicker('default')` → writes `visual.defaultImage`, NOT the
+  portrait (CharacterEditor.tsx:387 vs :1890-1895). Silent wrong-field
+  bug; the identical button 45 lines down is correct.
+- Then the uploaded portrait renders ONLY if global
+  `speakerDisplay.showGraphics` is on — **default false**, switch labeled
+  "Show speaker portraits" in Settings → *Effects* (tab tooltip: "Text
+  animations…"). No per-beat override exists (unlike showNames), no
+  surface mentions the suppression. Work done, invisible, zero feedback.
+- CharacterEditor's inline picker (the §1.1 duplication) has NO upload
+  control — empty grid dead-end on asset-less projects. Third picker
+  detail: AssetSelectionModal's filter accepts any image but its upload
+  `accept` is still `.jpg,.jpeg` for backgrounds (:260), as is
+  AssetManager's Backgrounds button — a PNG background imports one door
+  and greys out in another.
+
+**Media has three doors that do NOT lead to the same place:** music =
+Inspector "Background Sound" (on every beat); image = Visual Editor tab
+only (whitelist, tab vanishes for non-visual beats); library = header
+Assets (assigns nothing). No background-image field next to Background
+Sound where symmetry demands it.
+
+**Variables: three creation doors, one declarative.** Settings→Variables
+(tab 10 of 12) promises "will appear in dropdowns" — true only for
+variables created there; SmartNameDropdown "+ New..." mints undeclared
+names; the used-in-story union is applied ONLY in RequirementsEditor
+(Inspector.tsx:5190+), not ChoiceEffectsEditor/DialogTreeEditor — a
+variable minted on choice A is invisible in choice B's dropdown; typos
+mint silent duplicates.
+
+**Share a draft: the labels point the wrong way.** No export item says
+play/share/browser. The right answer ("Export as HTML") is described as
+"for web embedding" — developer language; the wrong answer (.asaps,
+"double-clickable, everything included") reads like sharing but needs
+ASAPS installed. Inside the HTML dialog, the friend-sendable mode
+(Single File) is not the default. Backup badges point at the same
+mislabeled menu item with a second meaning.
+
+**Save → unsolicited git.** Silent folder adoption (correct) makes
+VCSStatusBar render "Set up Git" or "⚠ Git not found + Install Git" —
+no dismiss, no opt-in — telling a VCS-naive author that software is
+missing, as a consequence of pressing Save.
+
+**Preview from this persona's seat:** the start-from-beat state picker
+is EXCELLENT and exactly what they need — mislabeled. "Select state
+(12)" on an amber (=warning-coloured) dropdown; "state" is not their
+word ("Start as if the player had…" is). And the debug panel shows all
+variables but lets them edit nothing — every "what if" costs a full
+restart; the StoryContext setters already exist, only inputs are
+missing.
+
+**Other findings:** Settings modal is all-or-nothing save across 12 tabs
+with no live preview; applying a theme overwrites current settings
+unwarned; three verbs for "open my story" (Continue editing / Browse
+all projects… / Open Project File…); "Last project" = last OPENED not
+last edited; cluster assignment is one-at-a-time drag for 40 beats (no
+multi-select→assign); external-change alert is good text in a blocking
+OK-only modal that names an action it doesn't offer, throttled to once
+(later collisions silent); CharacterRefField is hardcoded dark-styled
+inside light panels; Effects behind Advanced on multiChoice but always
+visible on dialogTree — the author HAS seen Effects and now "multiChoice
+doesn't support them".
+
+**Cross-cutting root cause (feeds §3):** the schema knows things the
+builder doesn't render. Conditions exist unrendered; there's no
+`ui.tier`; the Inspector hand-maintains the logic-beat suppression list
+twice and the custom-editor exclusion list twice. The advanced-mode
+decision and the choice-conditions gap are the same decision.
+
+### 2.3 Expert / pro efficiency (frequency × cost)
+
+**Two real bugs found (beyond UX):**
+1. **⌘Z is bound twice and rewinds the undo pointer by two.**
+   `useCommandManager` defaults `enableKeyboardShortcuts: true`; both
+   App.tsx:2944 AND UndoRedoToolbar (Header.tsx:368, no options) register
+   window listeners on the same singleton; `CommandManager.undo()` has no
+   re-entrancy guard and decrements `currentIndex` after an await — one
+   press undoes one command's effect but skips a second on the stack.
+   Neither handler checks `document.activeElement` (the guard exists in
+   VisualBeatEditor.tsx:449 — just not on the undo path). Fix: one prop
+   (`enableKeyboardShortcuts={false}` on the toolbar) + focus guard.
+2. **Every VCS success clears the undo history — including commit.**
+   App.tsx:3707 `getCommandManager().clear()` on ANY `success` event;
+   VCSStatusProvider emits success for commit/push/stage/unstage.
+   Committing every 10 minutes (the good habit) destroys undo every 10
+   minutes. Fix: allowlist tree-rewriting ops only (pull/stashPop/reset/
+   merge/checkout).
+
+**Keyboard reality:** 22 real bindings, one dead (⌘⇧K Transformations —
+shadowed by the Electron VCS-Push accelerator, while two tooltips still
+advertise it). The graph's core loop (add/duplicate/delete/connect,
+150-250 ops/hour) is 100% mouse: GraphEditor has ZERO keydown listeners,
+`deleteKeyCode={null}`, palette tiles drag-only — while the context menu
+prints ⌘D/⌘C/⌘V/⌫ keycaps. All the handlers exist and are wired; only
+the listener is missing. ⌘K Commit opens the panel but the literal
+comment `/* focus commit input */` IS the implementation; no ⌘⏎ submit.
+
+**Corrections to earlier sections:** multi-select DOES exist and is good
+(shift-marquee, group drag, drop-N-into-cluster all work — 2 drags to
+move 10 beats between clusters; completely undiscoverable). Effects are
+behind Advanced on 3 beat surfaces, not 4 (pickProp is NOT gated; the
+User Guide apology names the wrong beat). Toolbar Save on named projects
+is silent — the success alerts live on export/template/import paths.
+
+**The iteration-loop killer:** every edit wipes the Preview's selected
+path state. Story arrives with a new object identity on each 300ms
+STORY_UPDATE; the preset effect is keyed on `[story, startBeatId]` and
+does `setSelectedPreset(null)` + full path re-enumeration
+(PreviewWindow.tsx:728-774). Edit→verify with a chosen "arrived with the
+key" state = re-pick every single time, ~40×/session. Fix: key on
+startBeatId + story digest (utils/storyDigest.ts exists). Otherwise the
+loop is GOOD: live 300ms updates to both Preview and Debug windows,
+click-beat-arms-preview, auto-select single path, Space to run — ~5
+interactions to "play from beat 23 with the key".
+
+**Confirmation tax measured:** ~45-48 blocking native dialogs/hour in a
+heavy session; ~2 earn modality. 30 beat-delete confirms (undo exists!),
+16 success alerts (VCSToast bus shipped and idle), click-again pattern
+already shipped in ProjectLibrary. Target ≈2/hour.
+
+**Search & Replace silently incomplete:** SearchService covers 5 fields;
+never searches `prompt` (11 beat types!), `question`, `choices[].text`,
+`cancelButtonText`, `textVariations`; `speaker` reaches search only on
+beat types whose getParameters exposes it. Replace applies ONLY to
+`type === 'beat'` matches — character/variable/counter matches are
+displayed, counted in "Replace Selected (N)", silently skipped.
+Transformations (HelperCommandFilter) covers more fields + preview +
+case handling — the strictly better tool is the buried one (2 clicks
+behind Tools ▾, dead shortcut, 600ms artificial spinner minimum, panel
+closes after every apply).
+
+**Debug loop last mile unimplemented:** DebugWindow findings highlight
+but don't select or center (App.tsx:615-618) — a beat 3000px off-screen
+changes colour. Search results DO select (handleNavigateToBeat,
+App.tsx:5967); debug should reuse it + setCenter. Tab verdicts:
+Reachability earns its complexity; Story Logic is the most actionable
+surface in the app (only place proposing fixes); Path Analysis is
+partly write-only (backward explorer + 1830-line tree view feed no
+decision) — the "overwhelms experts" surface, confirmed.
+
+**Persistence deserts:** nothing disclosure-related persists (23
+localStorage keys = geometry + device toggles only); all six windows
+have hardcoded bounds (no getBounds save despite app-settings.json
+existing); WorkspaceView tab, Settings tab (12!), DebugWindow tab,
+ProjectLibrary sort/view all reset. StoryGenerator re-asks 5 settings
+every run while `globalSettings.ai` exists with no UI; Ideator and
+Co-Designer persist sessions perfectly — the asymmetry is invisible.
+Recents dropdown caps at 5 (effectively 4) for a 30-project author.
+
+**Free wins list (15 items, each ≤ a few lines):** graph shortcuts the
+menu already promises; ⌘⏎ + autoFocus commit; rebind Transformations;
+⌘, + menu item for Story Settings; ⌘⇧D Debug / ⌘⇧C Characters; import
++ correct KeyboardShortcutsModal, bind `?`; persist showAdvanced,
+workspace tab, settings tab, debug tab, library sort; window bounds in
+app-settings.json; seed StoryGenerator from globalSettings.ai; delete
+MIN_DISPLAY_TIME + keep panel open; narrow the VCS undo-clear;
+UndoRedoToolbar shortcut prop; maxRecentProjects 5→12; route
+HIGHLIGHT_BEAT through handleNavigateToBeat.
 
 ## 3. Structural questions
 _pending_
