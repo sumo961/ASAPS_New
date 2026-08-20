@@ -1,6 +1,7 @@
 import type { Beat } from '@asaps/core';
 import type { Character } from '../types/character';
 import type { Asset } from '../components/assets/AssetManager';
+import { SEARCHABLE_TEXT_FIELDS } from '../utils/searchableTextFields';
 
 /**
  * Represents a single search match in the project
@@ -247,9 +248,9 @@ export class SearchService {
       this.searchInDialogNode(params.dialogTree, pattern, matches, context, 'dialogTree');
     }
 
-    // Search in text fields common to various beat types
-    const textFields = ['text', 'title', 'buttonText', 'author', 'speaker'];
-    for (const field of textFields) {
+    // Search in text fields common to various beat types — the shared list,
+    // so Search & Replace and Transformations cover the same text.
+    for (const field of SEARCHABLE_TEXT_FIELDS) {
       if (params[field] && typeof params[field] === 'string') {
         this.findMatches(params[field], pattern, (matchStart, matchEnd, value) => {
           matches.push({
@@ -263,6 +264,80 @@ export class SearchService {
           });
         });
       }
+    }
+
+    // Top-level speaker: several beat types keep `speaker` on the Beat
+    // itself without exposing it through getParameters, so a character
+    // rename silently missed exactly those types. Only when the params copy
+    // is absent, to avoid double matches.
+    const topLevelSpeaker = (beat as any).speaker;
+    if (!params.speaker && topLevelSpeaker && typeof topLevelSpeaker === 'string') {
+      this.findMatches(topLevelSpeaker, pattern, (matchStart, matchEnd, value) => {
+        matches.push({
+          type: 'beat',
+          id: beat.id,
+          field: 'speaker',
+          value,
+          matchStart,
+          matchEnd,
+          context,
+        });
+      });
+    }
+
+    // Choice labels (multiChoice / movementChoice / pickProp props share the
+    // shape) and text variations — indexed paths so replace can write back
+    // through the same nested-path applier the flat fields use.
+    if (Array.isArray(params.choices)) {
+      params.choices.forEach((choice: any, i: number) => {
+        if (choice?.text && typeof choice.text === 'string') {
+          this.findMatches(choice.text, pattern, (matchStart, matchEnd, value) => {
+            matches.push({
+              type: 'beat',
+              id: beat.id,
+              field: `choices[${i}].text`,
+              value,
+              matchStart,
+              matchEnd,
+              context,
+            });
+          });
+        }
+      });
+    }
+    if (Array.isArray(params.props)) {
+      params.props.forEach((prop: any, i: number) => {
+        if (prop?.text && typeof prop.text === 'string') {
+          this.findMatches(prop.text, pattern, (matchStart, matchEnd, value) => {
+            matches.push({
+              type: 'beat',
+              id: beat.id,
+              field: `props[${i}].text`,
+              value,
+              matchStart,
+              matchEnd,
+              context,
+            });
+          });
+        }
+      });
+    }
+    if (Array.isArray(params.textVariations)) {
+      params.textVariations.forEach((variation: any, i: number) => {
+        if (typeof variation === 'string' && variation) {
+          this.findMatches(variation, pattern, (matchStart, matchEnd, value) => {
+            matches.push({
+              type: 'beat',
+              id: beat.id,
+              field: `textVariations[${i}]`,
+              value,
+              matchStart,
+              matchEnd,
+              context,
+            });
+          });
+        }
+      });
     }
   }
 

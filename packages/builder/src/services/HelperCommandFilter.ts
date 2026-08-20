@@ -6,6 +6,7 @@
  */
 
 import type { Beat, Cluster, Location, ContainerBeatPosition } from '@asaps/core';
+import { SEARCHABLE_TEXT_FIELDS } from '../utils/searchableTextFields';
 import type {
   ElementSelector,
   SelectorFilters,
@@ -469,33 +470,35 @@ export class HelperCommandFilter {
     const result: { field: string; text: string }[] = [];
     const params = beat.getParameters();
 
-    // Common text fields
-    if (params.text) {
-      result.push({ field: 'text', text: params.text });
+    // Flat text fields — the shared list, so Transformations and Search &
+    // Replace cover the same text (they used to diverge silently).
+    for (const field of SEARCHABLE_TEXT_FIELDS) {
+      if (params[field] && typeof params[field] === 'string') {
+        result.push({ field, text: params[field] });
+      }
     }
-    if (params.title) {
-      result.push({ field: 'title', text: params.title });
+
+    // Choice / prop labels and text variations
+    if (Array.isArray(params.choices)) {
+      params.choices.forEach((choice: any, i: number) => {
+        if (choice?.text && typeof choice.text === 'string') {
+          result.push({ field: `choices[${i}].text`, text: choice.text });
+        }
+      });
     }
-    if (params.message) {
-      result.push({ field: 'message', text: params.message });
+    if (Array.isArray(params.props)) {
+      params.props.forEach((prop: any, i: number) => {
+        if (prop?.text && typeof prop.text === 'string') {
+          result.push({ field: `props[${i}].text`, text: prop.text });
+        }
+      });
     }
-    if (params.buttonText) {
-      result.push({ field: 'buttonText', text: params.buttonText });
-    }
-    if (params.author) {
-      result.push({ field: 'author', text: params.author });
-    }
-    // inputText beat uses 'prompt' for its text content
-    if (params.prompt) {
-      result.push({ field: 'prompt', text: params.prompt });
-    }
-    // hyperText and other beats may use 'content'
-    if (params.content && typeof params.content === 'string') {
-      result.push({ field: 'content', text: params.content });
-    }
-    // description field used by various beats
-    if (params.description) {
-      result.push({ field: 'description', text: params.description });
+    if (Array.isArray(params.textVariations)) {
+      params.textVariations.forEach((variation: any, i: number) => {
+        if (typeof variation === 'string' && variation) {
+          result.push({ field: `textVariations[${i}]`, text: variation });
+        }
+      });
     }
 
     // Dialog tree text

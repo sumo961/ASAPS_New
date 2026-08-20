@@ -107,9 +107,14 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
     });
   };
 
-  // Select all results
+  // Select all REPLACEABLE results. Replace only writes into beats —
+  // character/variable/counter/asset matches used to be selected and counted
+  // in "Replace Selected (N)" and then silently skipped, which read as a
+  // completed rename when it wasn't.
   const selectAllResults = () => {
-    setSelectedResults(new Set(results.map((_, i) => i)));
+    setSelectedResults(new Set(
+      results.map((m, i) => (m.type === 'beat' && m.context.beatId ? i : -1)).filter(i => i >= 0)
+    ));
   };
 
   // Clear selection
@@ -354,12 +359,16 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
                 <input
                   type="checkbox"
                   checked={selectedResults.has(index)}
+                  disabled={match.type !== 'beat' || !match.context.beatId}
+                  title={match.type !== 'beat' || !match.context.beatId
+                    ? 'Read-only match — replace only edits beat text'
+                    : undefined}
                   onChange={(e) => {
                     e.stopPropagation();
                     toggleResultSelection(index);
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-1 rounded border-gray-300"
+                  className="mt-1 rounded border-gray-300 disabled:opacity-40"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">

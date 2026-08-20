@@ -625,9 +625,32 @@ export class HelperCommandExecutor {
             // Skip location fields - they're handled separately
             continue;
           } else {
-            // Regular text fields (text, title, message, etc.)
-            updatesParams[field] = transformed;
-            oldParams[field] = text;
+            // Indexed/nested paths (choices[0].text, props[1].text,
+            // textVariations[2]) write through the path into a cloned root —
+            // a flat `updatesParams["choices[0].text"]` would create a
+            // literal key instead of editing the array.
+            const parts = field.split(/\.|\[|\]/).filter(Boolean);
+            if (parts.length > 1) {
+              const root = parts[0];
+              if (!(root in updatesParams)) {
+                updatesParams[root] = JSON.parse(JSON.stringify(params[root]));
+                oldParams[root] = params[root];
+              }
+              let cur: any = updatesParams[root];
+              for (let i = 1; i < parts.length - 1; i++) {
+                const k = isNaN(Number(parts[i])) ? parts[i] : Number(parts[i]);
+                cur = cur?.[k];
+              }
+              const last = parts[parts.length - 1];
+              const lk = isNaN(Number(last)) ? last : Number(last);
+              if (cur && cur[lk] === text) {
+                cur[lk] = transformed;
+              }
+            } else {
+              // Regular text fields (text, title, message, etc.)
+              updatesParams[field] = transformed;
+              oldParams[field] = text;
+            }
           }
           hasChanges = true;
         }

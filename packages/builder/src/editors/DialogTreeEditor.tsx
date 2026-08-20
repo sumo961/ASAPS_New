@@ -164,8 +164,6 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   // can see where the canvas is at a glance.
   const [canvasFocusedNodeId, setCanvasFocusedNodeId] = useState<string>('root');
   const [editingNode, setEditingNode] = useState<{node: DialogNode, path: string[]} | null>(null);
-  const [showConditions, setShowConditions] = useState(false);
-  const [showEffects, setShowEffects] = useState(false);
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [aiScene, setAiScene] = useState('');
@@ -1139,20 +1137,11 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               <Maximize2 className="w-4 h-4" />
             }
           </button>
-          <button
-            onClick={() => setShowConditions(!showConditions)}
-            className={`p-1 rounded ${showConditions ? 'bg-yellow-100' : 'hover:bg-gray-100'}`}
-            title="Toggle Conditions"
-          >
-            <AlertCircle className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowEffects(!showEffects)}
-            className={`p-1 rounded ${showEffects ? 'bg-purple-100' : 'hover:bg-gray-100'}`}
-            title="Toggle Effects"
-          >
-            <Zap className="w-4 h-4" />
-          </button>
+          {/* The Conditions/Effects toggle buttons that used to live here
+              gated NOTHING — their state was read only to colour the button.
+              Removed rather than left lying (effects are always visible on
+              choices below; per-choice conditions get a real editor in the
+              planned "Show only if…" work). */}
         </div>
       </div>
       

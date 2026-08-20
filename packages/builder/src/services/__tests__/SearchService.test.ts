@@ -110,3 +110,64 @@ describe('match offsets + createReplacements', () => {
     expect(typeof reps[0].apply).toBe('function');
   });
 });
+
+describe('field coverage (shared SEARCHABLE_TEXT_FIELDS list)', () => {
+  // The old hand-maintained 5-field list silently missed `prompt` (used by
+  // 11 beat types), `question`, `cancelButtonText`, choice labels, and text
+  // variations — a "renamed everywhere" pass quietly wasn't. These pin the
+  // widened coverage.
+  it('finds text in prompt, question, and cancelButtonText', () => {
+    svc.setData({
+      beats: [beat({
+        getParameters: () => ({
+          prompt: 'Ask the Prince a question',
+          question: 'Trust the Prince?',
+          cancelButtonText: 'Leave the Prince',
+        }),
+      })],
+    });
+    const m = svc.search('Prince');
+    const fields = m.map((x) => x.field).sort();
+    expect(fields).toEqual(['cancelButtonText', 'prompt', 'question']);
+  });
+
+  it('finds choice labels and prop labels with indexed replace paths', () => {
+    svc.setData({
+      beats: [beat({
+        type: 'multiChoice',
+        getParameters: () => ({
+          choices: [{ text: 'Follow the Prince' }, { text: 'Run away' }],
+          props: [{ text: 'The Prince statue' }],
+        }),
+      })],
+    });
+    const m = svc.search('Prince');
+    expect(m.map((x) => x.field).sort()).toEqual(['choices[0].text', 'props[0].text']);
+  });
+
+  it('finds text variations with indexed paths', () => {
+    svc.setData({
+      beats: [beat({
+        getParameters: () => ({ textVariations: ['A dull day', 'The Prince arrives'] }),
+      })],
+    });
+    const m = svc.search('Prince');
+    expect(m.map((x) => x.field)).toEqual(['textVariations[1]']);
+  });
+
+  it('finds a top-level speaker that getParameters does not expose', () => {
+    svc.setData({
+      beats: [beat({ speaker: 'Prince', getParameters: () => ({ text: 'Hello.' }) })],
+    });
+    const m = svc.search('Prince');
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ type: 'beat', field: 'speaker', value: 'Prince' });
+  });
+
+  it('does not double-match speaker when parameters expose it too', () => {
+    svc.setData({
+      beats: [beat({ speaker: 'Prince', getParameters: () => ({ speaker: 'Prince' }) })],
+    });
+    expect(svc.search('Prince')).toHaveLength(1);
+  });
+});
