@@ -531,7 +531,7 @@ function createMenu(): void {
           click: () => handleOpenProject(),
         },
         {
-          label: 'Open Project Folder (VCS)...',
+          label: 'Open Project Folder...',
           click: () => handleOpenProjectFolder(),
         },
         {
@@ -549,13 +549,24 @@ function createMenu(): void {
           click: () => mainWindow?.webContents.send('menu:save'),
         },
         {
-          label: 'Save As...',
+          // Writes a .asaps snapshot to a chosen location; the working copy
+          // (library row or project folder) stays where it is. Named for
+          // what it does — post-inversion, "Save As" would wrongly suggest
+          // re-homing the project.
+          label: 'Save a Copy (.asaps)...',
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => handleSaveAs(),
         },
         {
-          label: 'Save As Folder (VCS)...',
+          label: 'Save As Folder...',
           click: () => handleSaveAsFolder(),
+        },
+        {
+          // The hallmark affordance of folder projects: the files are RIGHT
+          // THERE. Renderer answers with the active project's folder (or
+          // explains that this project still lives in app storage).
+          label: process.platform === 'darwin' ? 'Reveal Project in Finder' : 'Show Project in Explorer',
+          click: () => mainWindow?.webContents.send('menu:reveal-project'),
         },
         { type: 'separator' },
         {
@@ -692,7 +703,7 @@ async function handleOpenProject(): Promise<void> {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
-      { name: 'ASAPS Projects', extensions: ['asaps', 'asaps.zip', 'zip'] },
+      { name: 'ASAPS Projects', extensions: ['asaps', 'asapst', 'zip', 'json'] },
       { name: 'All Files', extensions: ['*'] },
     ],
   });
@@ -1036,6 +1047,10 @@ ipcMain.handle('dialog:message', async (_, options: Electron.MessageBoxOptions) 
 
 ipcMain.handle('shell:open-external', async (_, url: string) => {
   openExternalIfSafe(url);
+});
+
+ipcMain.handle('shell:show-item-in-folder', async (_, path: string) => {
+  shell.showItemInFolder(path);
 });
 
 ipcMain.handle('app:get-path', async (_, name: string) => {

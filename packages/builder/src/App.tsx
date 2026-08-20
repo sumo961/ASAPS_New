@@ -131,6 +131,7 @@ declare global {
       onProjectSaveAs: (callback: (path: string) => void) => () => void;
       onProjectOpenFolder?: (callback: (path: string) => void) => () => void;
       onProjectSaveAsFolder?: (callback: (path: string) => void) => () => void;
+      onMenuRevealProject?: (callback: () => void) => () => void;
       onStoryInject?: (callback: (data: any) => void) => () => void;
       onVCSCommit?: (callback: () => void) => () => void;
       onVCSPush?: (callback: () => void) => () => void;
@@ -1025,6 +1026,19 @@ function App() {
     });
 
     // Cleanup
+    // Reveal the active folder project in Finder/Explorer — the hallmark
+    // affordance of folder projects. Library-stored projects get an honest
+    // explanation instead of a silent no-op.
+    const unsubscribeReveal = window.electronAPI.onMenuRevealProject?.(() => {
+      const proj = currentProjectRef2.current;
+      const dir = proj?.directoryPath;
+      if (dir) {
+        (window.electronAPI as any).shell?.showItemInFolder?.(dir);
+      } else {
+        alert('This project lives in the app\u2019s own storage, not in a folder yet.\n\nUse File \u2192 Save As Folder\u2026 to give it one, or run "Move library to disk" in the Project Browser.');
+      }
+    });
+
     return () => {
       unsubscribeOpen();
       unsubscribeSave();
@@ -1033,6 +1047,7 @@ function App() {
       unsubscribeNew();
       unsubscribeOpenFolder?.();
       unsubscribeSaveAsFolder?.();
+      unsubscribeReveal?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadProject, saveNow, saveCurrent, openDirectoryProject, saveAsDirectory]);

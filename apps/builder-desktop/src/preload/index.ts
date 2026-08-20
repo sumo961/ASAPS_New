@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Shell operations
   shell: {
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
+    showItemInFolder: (path: string) => ipcRenderer.invoke('shell:show-item-in-folder', path),
   },
 
   // App operations
@@ -74,6 +75,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onMenuNewProject: (callback: () => void) => {
     ipcRenderer.on('menu:new-project', callback);
     return () => ipcRenderer.removeListener('menu:new-project', callback);
+  },
+  onMenuRevealProject: (callback: () => void) => {
+    ipcRenderer.on('menu:reveal-project', callback);
+    return () => ipcRenderer.removeListener('menu:reveal-project', callback);
   },
   onMenuSave: (callback: () => void) => {
     ipcRenderer.on('menu:save', callback);
