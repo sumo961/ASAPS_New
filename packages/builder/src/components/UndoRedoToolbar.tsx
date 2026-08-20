@@ -61,7 +61,9 @@ export const UndoRedoToolbar: React.FC<UndoRedoToolbarProps> = ({
     stats,
     manager,
     clear,
-  } = useCommandManager(options);
+  // App.tsx owns the ⌘Z/⌘⇧Z window listener — registering a second one here
+  // made a single keypress run undo twice on the shared singleton.
+  } = useCommandManager({ managerOptions: options, enableKeyboardShortcuts: false });
 
   const shortcuts = useCommandKeyboardShortcuts();
   const [showHistory, setShowHistory] = useState(false);

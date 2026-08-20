@@ -39,6 +39,13 @@ export type BeatVCSStatus = 'added' | 'modified' | 'deleted' | 'conflict' | 'loc
 export interface VCSEvent {
   type: 'success' | 'error' | 'info';
   message: string;
+  /**
+   * True when the operation changed project files on disk (pull, stash,
+   * revert, reset, clean, p4 sync/revert). Consumers that reload state or
+   * clear undo history must key on this — commit/stage/push leave the
+   * working tree untouched and must not invalidate editor state.
+   */
+  treeRewritten?: boolean;
 }
 
 /** Persistent log entry for VCS operations */
@@ -607,7 +614,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
     suppressBehindRef.current = false;
     const result = await gitPull(requirePath(), rebase);
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
@@ -626,35 +633,35 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const stashChanges = useCallback(async (message?: string) => {
     const result = await gitStash(requirePath(), message);
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
   const stashPopChanges = useCallback(async () => {
     const result = await gitStashPop(requirePath());
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
   const revertFilesOp = useCallback(async (filePaths: string[]) => {
     const result = await gitRevertFiles(requirePath(), filePaths);
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
   const resetHardOp = useCallback(async (commitHash: string) => {
     const result = await gitResetHard(requirePath(), commitHash);
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
   const cleanUntrackedFilesOp = useCallback(async (filePaths?: string[]) => {
     const result = await gitClean(requirePath(), filePaths);
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
@@ -666,7 +673,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
       suppressBehindRef.current = true;
     }
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
@@ -717,7 +724,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const p4SyncLatest = useCallback(async () => {
     const result = await p4Sync(requirePath());
     await refresh();
-    emitEvent({ type: result.success ? 'success' : 'error', message: result.message });
+    emitEvent({ type: result.success ? 'success' : 'error', message: result.message, treeRewritten: result.success });
     return result;
   }, [refresh, emitEvent]);
 
@@ -731,7 +738,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
   const p4RevertFile = useCallback(async (filePath: string) => {
     const result = await p4Revert(filePath, requirePath());
     await refresh();
-    emitEvent({ type: result ? 'success' : 'error', message: result ? `Reverted ${filePath}` : 'Failed to revert' });
+    emitEvent({ type: result ? 'success' : 'error', message: result ? `Reverted ${filePath}` : 'Failed to revert', treeRewritten: !!result });
     return result;
   }, [refresh, emitEvent]);
 

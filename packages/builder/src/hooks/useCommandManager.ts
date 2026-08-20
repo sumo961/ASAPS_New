@@ -138,6 +138,18 @@ export function useCommandManager(
     }
 
     const handleKeyDown = async (event: KeyboardEvent) => {
+      // Text fields own their native undo — a project-level undo firing on
+      // top of a text-field revert destroys work invisibly.
+      const target = event.target as HTMLElement | null;
+      if (target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      )) {
+        return;
+      }
+
       // Check for Ctrl+Z or Cmd+Z (undo)
       if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault();

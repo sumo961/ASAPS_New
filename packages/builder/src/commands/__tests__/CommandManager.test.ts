@@ -142,3 +142,53 @@ describe('subscribe + stats', () => {
     expect(s).toMatchObject({ totalCommands: 1, currentIndex: -1, canUndo: false, canRedo: true, undoCount: 0, redoCount: 1 });
   });
 });
+
+describe('concurrent undo/redo (double-bound shortcut regression)', () => {
+  // Two window keydown listeners once shared this singleton: one ⌘Z press
+  // entered undo() twice, both read the same history slot, and the pointer
+  // rewound by two — silently skipping a command. The isApplying guard must
+  // make the second concurrent entrant a no-op.
+  it('two concurrent undo() calls undo exactly one command', async () => {
+    const a = makeCmd('a');
+    const b = makeCmd('b');
+    await mgr.execute(a);
+    await mgr.execute(b);
+
+    const results = await Promise.all([mgr.undo(), mgr.undo()]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(b.undo).toHaveBeenCalledOnce();
+    expect(a.undo).not.toHaveBeenCalled();
+    expect(mgr.getCurrentIndex()).toBe(0);
+    expect(mgr.getUndoCommand()).toBe(a);
+  });
+
+  it('two concurrent redo() calls redo exactly one command', async () => {
+    const a = makeCmd('a');
+    const b = makeCmd('b');
+    await mgr.execute(a);
+    await mgr.execute(b);
+    await mgr.undo();
+    await mgr.undo();
+
+    const results = await Promise.all([mgr.redo(), mgr.redo()]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(a.redo).toHaveBeenCalledOnce();
+    expect(b.redo).not.toHaveBeenCalled();
+    expect(mgr.getCurrentIndex()).toBe(0);
+  });
+
+  it('sequential undo after a concurrent pair still works', async () => {
+    const a = makeCmd('a');
+    const b = makeCmd('b');
+    await mgr.execute(a);
+    await mgr.execute(b);
+    await Promise.all([mgr.undo(), mgr.undo()]);
+
+    const ok = await mgr.undo();
+    expect(ok).toBe(true);
+    expect(a.undo).toHaveBeenCalledOnce();
+    expect(mgr.canUndo()).toBe(false);
+  });
+});

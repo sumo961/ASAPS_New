@@ -35,6 +35,9 @@ export interface CommandManagerOptions {
 export class CommandManager {
   private history: Command[] = [];
   private currentIndex: number = -1;
+  // Guards the async gap in undo/redo: two concurrent entrants would both
+  // read the same history slot, then move currentIndex twice.
+  private isApplying: boolean = false;
   private options: Required<CommandManagerOptions>;
   private autoSaveTimeout: number | null = null;
   private listeners: Set<() => void> = new Set();
@@ -97,11 +100,13 @@ export class CommandManager {
    * Undo the last command
    */
   async undo(): Promise<boolean> {
+    if (this.isApplying) return false;
     if (!this.canUndo()) {
       this.log('Cannot undo - no commands to undo');
       return false;
     }
 
+    this.isApplying = true;
     try {
       const command = this.history[this.currentIndex];
       await command.undo();
@@ -114,6 +119,8 @@ export class CommandManager {
     } catch (error) {
       console.error('[CommandManager] Failed to undo command:', error);
       return false;
+    } finally {
+      this.isApplying = false;
     }
   }
 
@@ -121,11 +128,13 @@ export class CommandManager {
    * Redo the next command
    */
   async redo(): Promise<boolean> {
+    if (this.isApplying) return false;
     if (!this.canRedo()) {
       this.log('Cannot redo - no commands to redo');
       return false;
     }
 
+    this.isApplying = true;
     try {
       const command = this.history[this.currentIndex + 1];
       await command.redo();
@@ -138,6 +147,8 @@ export class CommandManager {
     } catch (error) {
       console.error('[CommandManager] Failed to redo command:', error);
       return false;
+    } finally {
+      this.isApplying = false;
     }
   }
 
