@@ -9,6 +9,7 @@ import JSZip from 'jszip';
 import { v4 as uuidv4 } from 'uuid';
 import { getStorageManager } from '../storage/StorageManager';
 import { markProjectNew } from './newProjectRegistry';
+import { findUniqueProjectName } from './uniqueProjectName';
 import type { Project, StoredAsset, AssetType } from '../storage/types';
 
 /**
@@ -470,6 +471,27 @@ export async function importProjectFromZip(
       // alter authored story content, so this stays template-scoped).
       if (isTemplate && projectData.project.story?.metadata) {
         projectData.project.story.metadata.title = options.newName;
+      }
+    }
+
+    // NAME uniqueness for rows being CREATED. The conflict flow above only
+    // catches ID collisions — a recovered story dump (fresh id every import)
+    // or any import under a never-seen id sails past it and lands a
+    // duplicate NAME in the library. Same convention as createProject:
+    // findUniqueProjectName against the existing library.
+    if (!exists) {
+      try {
+        const listResult = await storage.listProjects();
+        if (listResult.success && Array.isArray(listResult.data)) {
+          const existingNames = listResult.data.map((p: any) => p.name);
+          const unique = findUniqueProjectName(projectData.project.name, existingNames);
+          if (unique !== projectData.project.name) {
+            console.log(`[importProjectFromZip] Name "${projectData.project.name}" already in library; using "${unique}"`);
+            projectData.project.name = unique;
+          }
+        }
+      } catch (e) {
+        console.warn('[importProjectFromZip] Name-uniqueness check failed (continuing):', e);
       }
     }
 

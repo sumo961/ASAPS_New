@@ -12,7 +12,8 @@ const { mockStorageInstance } = vi.hoisted(() => ({
     createAsset: vi.fn(),
     createProject: vi.fn(),
     updateProject: vi.fn(),
-    projectExists: vi.fn()
+    projectExists: vi.fn(),
+    listProjects: vi.fn()
   }
 }));
 
@@ -39,6 +40,7 @@ describe('projectZipManager', () => {
   let testAssets: StoredAsset[];
 
   beforeEach(() => {
+    mockStorageInstance.listProjects.mockResolvedValue({ success: true, data: [] });
     // Reset mocks
     vi.clearAllMocks();
 
@@ -294,6 +296,33 @@ describe('projectZipManager', () => {
       expect(result.success).toBe(true);
       expect(result.projectId).toBe('original-id');
       expect(mockStorage.createProject).toHaveBeenCalled();
+    });
+
+    it('uniquifies the NAME when a different project already uses it', async () => {
+      // The id-conflict flow only catches ID collisions — a recovered story
+      // dump (fresh id every import) sailed past it and landed a duplicate
+      // name in the library.
+      const zip = new JSZip();
+      zip.file('project.json', JSON.stringify({
+        metadata: { exportVersion: '1.1.0', projectId: 'fresh-id', projectName: 'The Interview' },
+        project: {
+          id: 'fresh-id', name: 'The Interview', createdAt: new Date(), modifiedAt: new Date(),
+          version: '1.0.0', settings: {}, story: { beats: [], metadata: { title: 'The Interview' } },
+        },
+      }));
+      const file = new File([await zip.generateAsync({ type: 'blob' })], 'recovered.asaps.zip');
+
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.listProjects.mockResolvedValue({
+        success: true,
+        data: [{ id: 'other-id', name: 'The Interview' }],
+      });
+
+      const result = await importProjectFromZip(file, { generateNewId: false });
+      expect(result.success).toBe(true);
+      const created = mockStorage.createProject.mock.calls.at(-1)![0];
+      expect(created.name).toBe('The Interview 1');
     });
 
     it('should generate new ID when requested', async () => {
