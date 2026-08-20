@@ -171,11 +171,46 @@ export async function wrapBareProjectJson(file: File): Promise<File | null> {
   } catch {
     return null;
   }
-  if (!parsed || typeof parsed !== 'object' || !parsed.project || !parsed.metadata) return null;
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  let payload: any = null;
+  if (parsed.project && parsed.metadata) {
+    // The zip's own payload — a complete export.
+    payload = parsed;
+  } else if (parsed.story && Array.isArray(parsed.story.beats)) {
+    // A story-bearing dump — generation debug files (story-debug-*.json:
+    // {title, status, beatCount, errors, story}) carry a full story worth
+    // recovering as a project. Synthesize the export envelope around it.
+    const title = parsed.title || parsed.story?.metadata?.title || 'Recovered Story';
+    const now = new Date().toISOString();
+    payload = {
+      metadata: {
+        exportVersion: '1.1.0',
+        exportedAt: now,
+        exportedBy: 'ASAPS Builder (recovered from JSON dump)',
+        projectId: `recovered-${Date.now()}`,
+        projectName: title,
+      },
+      project: {
+        id: `recovered-${Date.now()}`,
+        name: title,
+        description: 'Recovered from a JSON story dump',
+        story: parsed.story,
+        settings: {},
+        assetIds: [],
+        createdAt: now,
+        modifiedAt: now,
+        version: 1,
+      },
+    };
+  } else {
+    return null;
+  }
+
   const zip = new JSZip();
-  zip.file('project.json', JSON.stringify(parsed));
+  zip.file('project.json', JSON.stringify(payload));
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
-  const base = (parsed.project.name || file.name.replace(/\.project\.json$|\.json$/i, '') || 'project')
+  const base = (payload.project.name || file.name.replace(/\.project\.json$|\.json$/i, '') || 'project')
     .replace(/[/\\:*?"<>|]/g, ' ').trim() || 'project';
   return new File([blob], `${base}.asaps.zip`, { type: 'application/zip' });
 }

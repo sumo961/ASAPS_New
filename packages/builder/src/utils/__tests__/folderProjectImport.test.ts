@@ -87,3 +87,25 @@ describe('wrapBareProjectJson', () => {
     expect(await wrapBareProjectJson(new File(['not json'], 'x.json'))).toBeNull();
   });
 });
+
+describe('wrapBareProjectJson — story-bearing dumps', () => {
+  it('recovers a project from a generation debug dump', async () => {
+    const { wrapBareProjectJson } = await import('../folderProjectImport');
+    const dump = JSON.stringify({
+      title: 'The Interview', status: 'ok', beatCount: 3, errors: [], warnings: [],
+      story: { metadata: { title: 'The Interview' }, beats: [{ id: 'b0', type: 'titleScreen', parameters: {} }] },
+    });
+    const wrapped = await wrapBareProjectJson(new File([dump], 'story-debug-123.json'));
+    expect(wrapped).not.toBeNull();
+    expect(wrapped!.name).toBe('The Interview.asaps.zip');
+    const zip = await JSZip.loadAsync(wrapped!);
+    const inner = JSON.parse(await zip.file('project.json')!.async('text'));
+    expect(inner.project.story.beats).toHaveLength(1);
+    expect(inner.metadata.exportedBy).toContain('recovered');
+  });
+
+  it('still rejects JSON with neither shape', async () => {
+    const { wrapBareProjectJson } = await import('../folderProjectImport');
+    expect(await wrapBareProjectJson(new File(['{"story": "not an object"}'], 'x.json'))).toBeNull();
+  });
+});

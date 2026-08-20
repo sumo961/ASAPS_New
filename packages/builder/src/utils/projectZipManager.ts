@@ -388,6 +388,25 @@ export async function importProjectFromZip(
   const storage = getStorageManager();
 
   try {
+    // A bare monolithic project.json — the zip's payload without the zip —
+    // wraps into an in-memory zip HERE, inside the pipeline, so every entry
+    // point gets it (App's handlers, the START WINDOW's own import path,
+    // the ZipAdapter). The first cut wrapped only in App.handleImportZipFile
+    // and the start window sailed straight past it into JSZip's
+    // "can't find end of central directory" error.
+    if (/\.json$/i.test(zipFile.name) && !/\.zip$/i.test(zipFile.name)) {
+      const { wrapBareProjectJson } = await import('./folderProjectImport');
+      const wrapped = await wrapBareProjectJson(zipFile);
+      if (!wrapped) {
+        throw new Error(
+          `"${zipFile.name}" is not an ASAPS project export. A project JSON carries `
+          + `{ metadata, project } at the top level — debug dumps (story-debug-*.json) `
+          + `and other JSON files can't be opened as projects.`
+        );
+      }
+      zipFile = wrapped;
+    }
+
     console.log('[importProjectFromZip] Loading ZIP file:', zipFile.name);
 
     // Load ZIP

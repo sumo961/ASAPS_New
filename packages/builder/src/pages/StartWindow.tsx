@@ -113,7 +113,7 @@ export const StartWindow: React.FC = () => {
   const handleImportClick = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps';
+    input.accept = '.zip,.asaps,.asaps.zip,.asapst,.json';
     input.onchange = () => {
       const file = input.files?.[0];
       if (file) void handleImportFile(file);
