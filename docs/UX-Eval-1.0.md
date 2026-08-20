@@ -759,7 +759,19 @@ create row · "Add Cluster" demoted · Save button = ⌘S unified.
 | B11 | **Character naming + editor tiering** (Name/Display Name; Basic tab leads with name+portrait, not ID prose; stat-machine tabs behind tier) | §2.2 step 2 |
 | B12 | **Rename-character referential integrity** (link speaker fields by id, or transactional rename via the existing relink machinery) | §2.3 worst bulk story |
 
-### 4.D Decisions for Hartmut (genuinely open)
+### 4.D Decisions for Hartmut — DECIDED 2026-08-21
+
+> 1. **Hartmut's own design, implemented + live-verified (68e8af20):**
+>    explicit start-mode segmented control in the PW — "From the
+>    beginning" (default) / "From «beat»" with live label; selected mode
+>    arms + shows the state picker and keeps the selection-driven expert
+>    loop. 2. **B — implemented (68e8af20):** confirm only when links
+>    break, naming them. 3. **A** — tier is an AUTHOR preference
+>    (localStorage), first-run prompt only seeds it; the Inspector
+>    toggle remains the permanent switch; no per-project scoping →
+>    build with B2. 4. **Merge** (one "Find & Change" on ⌘F) → B10.
+>    5. **C** (quiet "Track versions" affordance; git vocabulary only
+>    after opt-in) → B9. 6. **Delete — done (68e8af20).**
 
 1. **Preview auto-attach**: keep click-beat-arms-preview for everyone
    (fix = labeling only) or plain-open-plays-from-start (novice default,
