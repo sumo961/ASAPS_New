@@ -699,6 +699,14 @@ found the three places it was never applied.
 Severity scale: ⛔ data-loss/blocker · 🔴 core-flow failure · 🟠 major
 friction · 🟡 polish. Effort: S (≤1 day) / M (days) / L (week+).
 
+> **Status 2026-08-21:** A1 ✅ (resolved by RESTORATION, not patching —
+> git archaeology showed untitled auto-save + auto-raised naming dialog
+> existed until commit 845fbe2e (2025-11-25) removed them undocumented;
+> restored with content-aware pristine skip, sentinel-name preservation,
+> recover-don't-delete cleanup, 3-way interception; live-verified,
+> commit 14a9e081). A2+A3 ✅ (6ee16844, regression-tested).
+> A6+A7+A8 ✅ (153a20a7). Remaining: A4, A5, A9-A12 + quick-wins batch.
+
 ### 4.A Bugs to fix now (not UX decisions — just wrong)
 
 | # | Finding | Sev | Effort |
