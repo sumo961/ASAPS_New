@@ -257,7 +257,10 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
 
   // Get file accept string based on subType
   const getFileAccept = () => {
-    if (assetSubType === 'background') return '.jpg,.jpeg';
+    // Any image works as a background — must match the browse filter above,
+    // which already accepts JPG/PNG/WebP/SVG (the old JPG-only accept made
+    // the same PNG selectable from the grid but greyed out in the dialog).
+    if (assetSubType === 'background') return 'image/*';
     if (assetSubType === 'character' || assetSubType === 'prop') return '.png';
     if (assetSubType === 'sfx' || assetSubType === 'sound') return 'audio/*';
     if (assetType === 'video') return 'video/*';

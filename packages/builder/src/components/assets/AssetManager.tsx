@@ -388,7 +388,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
             <button
               onClick={() => backgroundInputRef.current?.click()}
               className="flex-1 flex flex-col items-center justify-center px-2 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Import Backgrounds (JPG/JPEG only)"
+              title="Import Backgrounds (any image format)"
             >
               <Mountain className="w-4 h-4 mb-1 text-green-600" />
               <span className="text-xs text-gray-600">Backgrounds</span>
@@ -465,7 +465,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e, 'background')}
           className="hidden"
-          accept=".jpg,.jpeg"
+          accept="image/*"
         />
         <input
           ref={videoInputRef}

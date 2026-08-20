@@ -384,7 +384,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         {assets.length > 0 && !resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets) && (
           <div className="mt-3 pt-3 border-t border-gray-200">
             <button
-              onClick={() => setShowAssetPicker('default')}
+              onClick={() => setShowAssetPicker('portrait')}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
             >
               <Grid className="w-4 h-4" />
@@ -1892,6 +1892,11 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                       setEditedCharacter({
                         ...editedCharacter,
                         visual: { ...editedCharacter.visual, defaultImage: asset.url, defaultAssetId: asset.id }
+                      });
+                    } else if (showAssetPicker === 'portrait') {
+                      setEditedCharacter({
+                        ...editedCharacter,
+                        portrait: { image: asset.url, assetId: asset.id }
                       });
                     } else if (showAssetPicker === 'spritesheet') {
                       const newVisual = { ...editedCharacter.visual };
