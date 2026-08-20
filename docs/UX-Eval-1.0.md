@@ -546,8 +546,230 @@ MIN_DISPLAY_TIME + keep panel open; narrow the VCS undo-clear;
 UndoRedoToolbar shortcut prop; maxRecentProjects 5→12; route
 HIGHLIGHT_BEAT through handleNavigateToBeat.
 
-## 3. Structural questions
-_pending_
+## 3. Structural questions (answered on journey evidence)
+
+### 3.1 Advanced mode: per-beat vs global → **global persisted tier + schema `ui.tier` (hybrid c)**
+
+The question was "per-beat as we have it vs global." The premise fell:
+per-beat does not exist — today it's ONE non-keyed panel boolean, sticky
+across beat switches, reset by every deselect (and every delete
+deselects). Nobody chose this; it's an accident of component lifetime.
+The journey evidence is unanimous:
+- Novices never find Effects (gated on 3 beat surfaces; the trap the UG
+  apologises for — naming the wrong beat).
+- Experts pay ≈60 interactions/hour re-enabling a mode they never want
+  off.
+- The SAME editor (ChoiceEffectsEditor) is gated on multiChoice and
+  ungated on dialogTree — so the disclosure difference carries no
+  information; it's noise.
+
+Decision shape: one **persisted, global** "Show advanced options"
+preference (author-scoped, localStorage, consistent with the five
+geometry keys that persist today) + **`ui.tier` in the beat schema** so
+tiering is data, not hardcoded lists. Effects declares `tier: basic`.
+Per-beat scoping is dropped: no journey produced a case where an author
+wants advanced ON for beat 7 and OFF for beat 8; what they want is
+"advanced on for me" (expert) or "off until I'm ready" (novice).
+This also retires the twice-maintained suppression/exclusion lists in
+the Inspector — the schema-driven principle from CLAUDE.md applied to
+disclosure.
+
+### 3.2 App vs project preferences → **three explicit scopes**
+
+Today's 18 localStorage keys + 2 app-settings keys + 19 GlobalSettings
+sections mix three different kinds of state. The model that resolves
+every §1.2 misplacement:
+
+| Scope | Lives in | Examples | Rule |
+|---|---|---|---|
+| **Machine** | app-settings.json (Electron) / localStorage (web) | API keys, window bounds, MCP, TTS *device* mute | "About this computer" |
+| **Author preference** | persisted UI state | advanced tier, active tabs, sort orders, panel widths | "How I like the editor" — never affects output |
+| **Project** | project files | everything a player sees or an export contains: fonts, colors, uiStrings, AI generation defaults, **export TTS** | "Travels with the story" |
+
+The litmus test that decides every future case: **if two authors opening
+the same project could see different players/exports, the setting is in
+the wrong scope.** Current violations, each now with a destination:
+`asaps_tts_enabled` deciding exported artifacts → project (export
+dialog); story presets keyed by title in device storage → project files
+keyed by id; API keys in localStorage → machine store (+ classroom
+provisioning path); `globalSettings.ai` with no UI → project AI tab
+seeding StoryGenerator; two competing GlobalSettings types → one
+canonical type in storage/types.ts.
+
+UI consequence: the Settings modal is currently 12 tabs of *project*
+settings opened by a button labeled just "Settings", while app-level
+config hides in AI ▾/TTS ▾/STT ▾ dropdowns. Rename the modal **Story
+Settings** (⌘, + menu item), add an **App Preferences** surface for the
+machine scope (keys, devices, updates, MCP) — ending "Settings means
+two things" (§1.4) and giving BeatSuggestions' broken pointer a true
+target.
+
+### 3.3 Terminology → one name per concept (canonical glossary)
+
+Journey-confirmed collisions, with proposed canon:
+- **Open**: "Continue editing" / "Browse all projects…" / "Open Project
+  File…" → canon: **Open** (library) and **Open File…** (disk); the
+  library is the default door.
+- **Share/Export**: the share action must say what it does — "Export
+  as playable web page (HTML)" with Single File default labeled "one
+  file — easiest to send"; .asaps described as "project file (needs
+  ASAPS)". "Relay" is a key-hosting mode, not an export.
+- **Character naming**: "Code Name" (editor) vs `name` (combobox) vs
+  frozen ID paragraph as the first thing in the Basic tab → canon:
+  **Name** + **Display Name**, ID demoted to a footer detail.
+- **Conditions vocabulary**: "Condition Type" / "Requirements" /
+  "Effects" defaults disagree (counter vs inventory) → canon: choices
+  get **"Show only if…"**; beat-level gate stays **Requirements**;
+  writes stay **Effects**.
+- **Preview state**: "Select state (12)" / "How did the player arrive
+  here?" → canon: **"Start as if the player had…"** — and not
+  amber/warning-styled.
+- **AI surfaces**: Ideator="Ideate", picker says "Co-write with AI",
+  StoryGenerator="Generate Story" vs "Build from a prompt" → canon: use
+  the picker's task language everywhere; the tool names are subtitles.
+- **Transformations** (Tools ▾) — the app's most powerful bulk editor,
+  named like a math feature → canon: **"Bulk Edit (AI)"** or fold Search
+  & Replace + Transformations into ONE "Find & Change" surface (the
+  strictly-better tool absorbs the discoverable one's slot).
+
+### 3.4 Header & entry points → invert the inversion
+
+Rule: **doors proportional to frequency.** Create-paths exist in 3
+implementations and 9-10 doors; workhorses (Assets, Debug, Settings,
+Characters) have one door and no shortcuts; menu bar lacks Settings
+entirely while ⌘S silently diverges from the Save button. Decisions:
+- ONE create surface (NewProjectPicker) that all doors open — delete
+  the other two implementations (ProjectLibrary cards, StartWindow cards
+  render the same component).
+- Menu-bar parity: every toolbar workhorse gets a menu item + shortcut
+  (⌘, Settings; ⌘⇧D Debug; ⌘⇧C Characters); ⌘S on untitled opens the
+  naming dialog (same path as the button).
+- Graph gets the four shortcuts its context menu already advertises.
+- The 34-tile palette gets type-ahead quick-add (keystroke → filter →
+  Enter connects to selection) — the single highest-leverage expert
+  addition, and novice-safe (tiles stay).
+
+### 3.5 Modal-vs-panel policy
+
+Evidence: ~50 modals, character flow stacks 3-4 deep, four asset
+pickers, three "name this project" dialogs, two right-edge slide-ins
+sharing one screen slot with no mutual exclusion. Policy:
+- **Modals are for decisions, panels for work.** Anything the author
+  works IN for minutes (CharacterEditor, DialogTree expanded editor,
+  AssetManager) should not stack on other modals.
+- **One asset picker** (AssetSelectionModal) mounted everywhere; the
+  CharacterEditor inline picker (no upload, wrong-field bug) and the
+  AssetManager's JPG-only background button are retired.
+- **One name-project dialog**; Header's 2-way confirm is replaced by the
+  already-built 3-way SaveUnsavedWorkDialog.
+- SearchPanel + HelperCommandInput become one exclusive right-rail slot
+  (or one merged surface per §3.3).
+- The §1.1 dead list (12 surfaces incl. StoryPreview ~1200 lines) is
+  deleted outright — none is reachable, two document wrong shortcuts.
+
+### 3.6 Blocking-dialog elimination
+
+Target ≈2 modal interruptions/hour (from ~45). Ban native alert() /
+confirm() app-wide (lint rule). Routing: 16 success alerts → the
+shipped toast bus (VCSToast generalized); small destructive confirms →
+the shipped click-again pattern; beat deletes → NO confirm (undo exists)
++ "Deleted 'X' · Undo" toast; delete-with-inbound-links confirm becomes
+informative ("3 choices in 2 beats point here and will break") — the
+one confirm that EARNS its modality today doesn't exist. Keep true
+modals only for: git history rewrites, layout-mode switch, workspace
+replacement, permanent multi-file deletion. External-change alert →
+non-blocking banner with a "Reload from disk" action (the event for it
+already exists with zero listeners).
+
+### 3.7 Cross-cutting root cause: the schema knows what the builder doesn't render
+
+One decision underlies #1 findings in two journeys: capabilities
+live in the schema and engine but die before reaching the UI —
+`dialogChoice.conditions` (runtime-complete, no editor), `ui.tier`
+(missing, forcing hardcoded gates), validation (validateBeat dead;
+import-only issue reporting; delete never revalidates). The 1.0
+principle: **every schema capability either has a rendered surface or
+an explicit "not exposed" annotation; validation runs continuously on
+the story graph, not once at import.** This is the same
+schema-driven-over-hardcoded principle already in CLAUDE.md — the eval
+found the three places it was never applied.
 
 ## 4. Synthesis
-_pending_
+
+Severity scale: ⛔ data-loss/blocker · 🔴 core-flow failure · 🟠 major
+friction · 🟡 polish. Effort: S (≤1 day) / M (days) / L (week+).
+
+### 4.A Bugs to fix now (not UX decisions — just wrong)
+
+| # | Finding | Sev | Effort |
+|---|---|---|---|
+| A1 | Untitled data-loss chain: ⌘S throws instead of naming; close guard ignores `error` status; boot deletes old untitled projects silently | ⛔ | S |
+| A2 | ⌘Z double-bound, rewinds undo pointer by two; no input-focus guard | ⛔ | S |
+| A3 | VCS success (incl. commit/stage) clears undo history | ⛔ | S |
+| A4 | Delete strands choice targets; no edit-time revalidation feeds ImportIssuesBanner | 🔴 | M |
+| A5 | validateBeat + red banner = dead code; empty required fields ship silently | 🔴 | S |
+| A6 | Portrait "Browse Existing Assets" writes `visual.defaultImage` (wrong field) | 🔴 | S |
+| A7 | Background upload `accept=.jpg,.jpeg` contradicts the any-image filter (2 sites) | 🟠 | S |
+| A8 | BeatSuggestions points keyless users at "Settings" — which has no AI tab | 🟠 | S |
+| A9 | Fictional context-menu accelerators (⌘D/⌘C/⌘V/⌫ printed, none bound) | 🟠 | S |
+| A10 | Dead DialogTreeEditor Conditions/Effects toggles (until #B1 fills them) | 🟠 | S |
+| A11 | Variable dropdowns: used-in-story union missing from ChoiceEffects/DialogTree paths | 🟠 | S |
+| A12 | Search misses `prompt`/`question`/`choices[].text`/`cancelButtonText`; replace silently skips non-beat matches | 🟠 | M |
+
+### 4.B Quick wins (small, no design debate)
+
+Graph shortcuts (the menu's promises) + palette type-ahead add ·
+persist showAdvanced/workspace tab/settings tab/debug tab/library sort ·
+window bounds → app-settings.json · commit box autoFocus + ⌘⏎ · rebind
+Transformations off dead ⌘⇧K, fix 2 stale tooltips · ⌘, + menu items
+for Settings/Debug/Characters · maxRecentProjects 5→12 · HIGHLIGHT_BEAT
+→ select+center · preview path-state survives edits (digest-keyed) ·
+drop MIN_DISPLAY_TIME + keep panel open · seed StoryGenerator from
+globalSettings.ai · KeyboardShortcutsModal imported with TRUE table,
+bound to `?` · delete the 12 dead surfaces · template shelf above
+create row · "Add Cluster" demoted · Save button = ⌘S unified.
+
+### 4.C Restructure proposals (design work; mockups → decision sheet)
+
+| # | Proposal | Resolves |
+|---|---|---|
+| B1 | **"Show only if…" per-choice conditions UI** (reuse RequirementsEditor rows) + inventory/variable/counter templates | The #1 authoring gap |
+| B2 | **Disclosure = persisted global tier + schema ui.tier**; Effects → basic | §3.1 |
+| B3 | **Three-scope settings** (Story Settings ⌘, / App Preferences / author prefs); canonical GlobalSettings type; export-affecting device toggles → project | §3.2, §1.2 |
+| B4 | **Alert/confirm elimination** per §3.6 routing table (lint-enforced) | ~45/hr → ~2/hr |
+| B5 | **Untitled-state visibility**: canvas affordance "not saved yet — name it", replacing the exception-string chip; empty-state for blank canvas; both Empty doors behave identically (seed + name) | §2.1 findings 1-3 |
+| B6 | **Export menu rewrite** (share language, Single File default) + backup badge pointing at the same, now-honest item | §2.2 |
+| B7 | **One asset system**: single picker, Background Image beside Background Sound, one accept-rule | §2.2, §3.5 |
+| B8 | **Preview novice face**: debug rail off by default w/ labeled toggle; plain open ≠ start-from-beat; "Start as if…" labeling; editable state values (setters exist) | The debug-legibility flagship |
+| B9 | **VCS opt-in**: no git vocabulary (or "not found" warnings) until the author asks; reframe as "Track versions" | §2.2 finding 8 |
+| B10 | **One bulk-edit surface** (Search & Replace ⊂ Transformations), shared field list with SearchService | §2.3 |
+| B11 | **Character naming + editor tiering** (Name/Display Name; Basic tab leads with name+portrait, not ID prose; stat-machine tabs behind tier) | §2.2 step 2 |
+| B12 | **Rename-character referential integrity** (link speaker fields by id, or transactional rename via the existing relink machinery) | §2.3 worst bulk story |
+
+### 4.D Decisions for Hartmut (genuinely open)
+
+1. **Preview auto-attach**: keep click-beat-arms-preview for everyone
+   (fix = labeling only) or plain-open-plays-from-start (novice default,
+   arming stays via selection while open)? B8 assumes the latter.
+2. **Beat-delete confirm**: remove entirely (undo + toast) vs keep only
+   when inbound links break? §3.6 proposes the latter.
+3. **Advanced tier default for NEW installs**: off (novice-first) with
+   a first-run "show everything" prompt, or on?
+4. **Search/Transformations merge** (B10): one surface or two with a
+   shared engine? Merge is cleaner but changes a learned ⌘F habit.
+5. **VCS opt-in trigger** (B9): Preferences flag, first-save question,
+   or visible-but-quiet "Track versions" affordance?
+6. **StoryPreview deletion** (~1200 lines): confirm no planned use
+   before the dead-surface sweep removes it.
+
+### 4.E Sequencing recommendation
+
+1. **4.A bugs** (A1-A3 first: data loss) — releasable alone.
+2. **4.B quick wins** — one release, huge felt improvement, zero
+   design risk.
+3. **B1 + B8** — the two flagship authoring gaps (conditions UI, debug
+   legibility), each its own release.
+4. **B2-B4** (tier system, settings scopes, dialog elimination) — the
+   structural 1.0 work.
+5. Remaining B-items ride subsequent releases; B12 pairs with the
+   character-arc work already planned.
