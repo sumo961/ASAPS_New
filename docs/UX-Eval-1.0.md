@@ -705,7 +705,12 @@ friction · 🟡 polish. Effort: S (≤1 day) / M (days) / L (week+).
 > restored with content-aware pristine skip, sentinel-name preservation,
 > recover-don't-delete cleanup, 3-way interception; live-verified,
 > commit 14a9e081). A2+A3 ✅ (6ee16844, regression-tested).
-> A6+A7+A8 ✅ (153a20a7). Remaining: A4, A5, A9-A12 + quick-wins batch.
+> A6+A7+A8 ✅ (153a20a7). A4+A5+A9 ✅ (1a1964b5: live validation,
+> delete-triggered link revalidation with self-healing banner+⚠ marks,
+> impact sentence in delete confirms, graph ⌘D/⌘C/⌘V/⌫ — live-verified).
+> A10-A12 ✅ (shared SEARCHABLE_TEXT_FIELDS + indexed choice/variation
+> coverage + honest replace; dead toggles removed; variable-dropdown
+> union Inspector-wide). **All §4.A bugs closed. Next: §4.B quick wins.**
 
 ### 4.A Bugs to fix now (not UX decisions — just wrong)
 
