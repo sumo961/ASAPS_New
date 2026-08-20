@@ -1149,21 +1149,17 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
           break;
         case 'delete':
+          // Confirm ONLY when the delete breaks links elsewhere — a clean
+          // delete is undoable (⌘Z) and needs no interruption.
           if (multiTarget && onBeatsDelete) {
             const impact = describeDeleteImpact?.(multiTarget);
-            const confirmDelete = window.confirm(
-              `Delete ${multiTarget.length} selected beats?${impact ? `\n\n${impact}` : ''}`
-            );
-            if (confirmDelete) {
+            if (!impact || window.confirm(`Delete ${multiTarget.length} selected beats?\n\n${impact}`)) {
               onBeatsDelete(multiTarget);
             }
           } else if (contextMenu.beatId && onBeatDelete) {
             const beat = beats.find(b => b.id === contextMenu.beatId);
             const impact = describeDeleteImpact?.([contextMenu.beatId]);
-            const confirmDelete = window.confirm(
-              `Delete beat "${beat?.name || contextMenu.beatId}"?${impact ? `\n\n${impact}` : ''}`
-            );
-            if (confirmDelete) {
+            if (!impact || window.confirm(`Delete beat "${beat?.name || contextMenu.beatId}"?\n\n${impact}`)) {
               onBeatDelete(contextMenu.beatId);
             }
           }
@@ -1314,14 +1310,14 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       if (multi && onBeatsDelete) {
         event.preventDefault();
         const impact = describeDeleteImpact?.(multi);
-        if (window.confirm(`Delete ${multi.length} selected beats?${impact ? `\n\n${impact}` : ''}`)) {
+        if (!impact || window.confirm(`Delete ${multi.length} selected beats?\n\n${impact}`)) {
           onBeatsDelete(multi);
         }
       } else if (singleId && onBeatDelete) {
         event.preventDefault();
         const beat = beats.find(b => b.id === singleId);
         const impact = describeDeleteImpact?.([singleId]);
-        if (window.confirm(`Delete beat "${beat?.name || singleId}"?${impact ? `\n\n${impact}` : ''}`)) {
+        if (!impact || window.confirm(`Delete beat "${beat?.name || singleId}"?\n\n${impact}`)) {
           onBeatDelete(singleId);
         }
       }

@@ -1691,8 +1691,10 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const handleDelete = () => {
+    // Confirm ONLY when the delete breaks links elsewhere — a clean delete
+    // is undoable (⌘Z) and needs no interruption.
     const impact = describeDeleteImpact?.([beat.id]);
-    if (window.confirm(`Are you sure you want to delete "${beat.name}"?${impact ? `\n\n${impact}` : ''}`)) {
+    if (!impact || window.confirm(`Delete "${beat.name}"?\n\n${impact}`)) {
       onDelete(beat.id);
     }
   };

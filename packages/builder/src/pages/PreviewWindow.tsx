@@ -294,6 +294,17 @@ export const PreviewWindow: React.FC = () => {
      becomes the nuisance it was meant to prevent. */
   const [explainAcknowledged, setExplainAcknowledged] = useState<Record<string, boolean>>({});
   const [startBeatId, setStartBeatId] = useState<string | null>(null);
+  // Mid-story starts are an explicit MODE, not an inference from editor
+  // selection. 'beginning' (default): the play button plays the story from
+  // the top; clicking beats in the editor only updates the second start
+  // button's label. 'selected': the expert loop — the editor's selection
+  // arms the preview live and the "start as if…" state picker appears.
+  const [startMode, setStartMode] = useState<'beginning' | 'selected'>('beginning');
+  const startModeRef = useRef(startMode);
+  startModeRef.current = startMode;
+  /** The editor's currently-selected beat, tracked regardless of mode so the
+   *  "From «beat»" button always names the live selection. */
+  const [editorSelectedBeatId, setEditorSelectedBeatId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [fitScale, setFitScale] = useState(1);
   // Phase 1 — viewport preset. `null` = no override; the stage takes
@@ -535,19 +546,25 @@ export const PreviewWindow: React.FC = () => {
             setPreviewData(message.payload);
             setConnectionStatus('connected');
 
-            // On first load (no story running), show "waiting to start" state
+            // The editor's selection is always tracked (it names the
+            // "From «beat»" button) but only ARMS the preview in
+            // selected-beat mode.
+            if (payloadBeatId != null) {
+              setEditorSelectedBeatId(String(payloadBeatId));
+            }
+
+            // On first load (no story running), show "waiting to start" at
+            // the BEGINNING. Opening the preview used to silently adopt the
+            // editor's selected beat as the start — and a beat is essentially
+            // always selected, so every plain open landed in start-from-beat
+            // mode. Mid-story starts are now the explicit 'selected' mode.
             if (!hasAutoStarted.current) {
-              // Use the selected beat if one was explicitly provided, otherwise fall back to the story's first beat
-              const targetBeatId = payloadBeatId != null ? payloadBeatId : firstBeatId;
-              if (targetBeatId != null) {
-                setStartBeatId(String(targetBeatId));
-              }
-              console.log('[PreviewWindow] STORY_UPDATE: first load, showing wait state for:', targetBeatId);
+              console.log('[PreviewWindow] STORY_UPDATE: first load, waiting to start from beginning');
               hasAutoStarted.current = true;
               setIsWaitingToStart(true);
             }
-            // If already initialized, only update startBeatId if explicitly provided
-            else if (payloadBeatId && !isWaitingToStart && !isRunning && !isPaused) {
+            // In selected-beat mode, an idle preview follows the editor's selection
+            else if (payloadBeatId && startModeRef.current === 'selected' && !isWaitingToStart && !isRunning && !isPaused) {
               console.log('[PreviewWindow] STORY_UPDATE: beat changed to:', payloadBeatId);
               setStartBeatId(payloadBeatId);
               setIsWaitingToStart(true);
@@ -559,6 +576,12 @@ export const PreviewWindow: React.FC = () => {
         case 'NAVIGATE_TO_BEAT':
           if (message.payload?.beatId) {
             console.log('[PreviewWindow] NAVIGATE_TO_BEAT:', message.payload.beatId);
+            // Always remember the selection for the "From «beat»" button…
+            setEditorSelectedBeatId(message.payload.beatId);
+            // …but only re-arm the preview in selected-beat mode. In
+            // from-the-beginning mode, clicking around the editor must never
+            // hijack the play state.
+            if (startModeRef.current !== 'selected') break;
             // Track this as a manual navigation to prevent STORY_UPDATE from overwriting
             navigatedBeatIdRef.current = message.payload.beatId;
             setStartBeatId(message.payload.beatId);
@@ -2362,6 +2385,7 @@ export const PreviewWindow: React.FC = () => {
           setIsWaitingToStart(false);
           navigatedBeatIdRef.current = null;
           setStartBeatId(null);
+          setStartMode('beginning');
         } else if (isRunning || isPaused) {
           stopPreview();
         }
@@ -2475,31 +2499,77 @@ export const PreviewWindow: React.FC = () => {
             Preview: {story.getMetadata().title}
           </h1>
 
-          {/* Beat selection dropdown */}
+          {/* Start mode — an explicit, prominent choice: play from the
+              beginning (default) or from a chosen beat. Mid-story starts
+              never happen by inference anymore. */}
           {!isRunning && (
-            <div className="relative">
+            <div className="relative flex items-stretch rounded border border-gray-300 overflow-hidden">
+              <button
+                onClick={() => {
+                  setStartMode('beginning');
+                  navigatedBeatIdRef.current = null;
+                  setStartBeatId(null);
+                }}
+                className={`px-3 py-1.5 text-sm flex items-center gap-1.5 ${
+                  startMode === 'beginning'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+                title="Play the story from its first beat"
+              >
+                <Play className="w-3 h-3" />
+                From the beginning
+              </button>
+              <button
+                onClick={() => {
+                  const target = editorSelectedBeatId && story.getBeat(editorSelectedBeatId)
+                    ? editorSelectedBeatId
+                    : null;
+                  if (target) {
+                    setStartMode('selected');
+                    navigatedBeatIdRef.current = null;
+                    setStartBeatId(target);
+                    setIsWaitingToStart(true);
+                  } else {
+                    setShowBeatMenu(!showBeatMenu);
+                  }
+                }}
+                className={`px-3 py-1.5 text-sm border-l border-gray-300 flex items-center gap-1.5 ${
+                  startMode === 'selected'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+                title="Play from a beat mid-story — the selected beat in the editor, or pick one"
+              >
+                <span className="max-w-44 truncate">
+                  {startMode === 'selected' && startBeatId
+                    ? `From "${story.getBeat(startBeatId)?.name || startBeatId}"`
+                    : editorSelectedBeatId && story.getBeat(editorSelectedBeatId)
+                      ? `From "${story.getBeat(editorSelectedBeatId)?.name}"`
+                      : 'From a beat…'}
+                </span>
+              </button>
               <button
                 onClick={() => setShowBeatMenu(!showBeatMenu)}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-2"
+                className={`px-1.5 border-l border-gray-300 ${
+                  startMode === 'selected' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+                title="Pick any beat to start from"
               >
-                <span className="max-w-40 truncate">
-                  {startBeatId ? story.getBeat(startBeatId)?.name || startBeatId : 'Start from beginning'}
-                </span>
                 <ChevronDown className="w-3 h-3" />
               </button>
               {showBeatMenu && (
                 <div className="absolute left-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  <button
-                    onClick={() => { navigatedBeatIdRef.current = null; setStartBeatId(null); setShowBeatMenu(false); }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${!startBeatId ? 'bg-blue-50 text-blue-700' : ''}`}
-                  >
-                    <div className="font-medium">Start from beginning</div>
-                  </button>
-                  <div className="border-t border-gray-200" />
                   {story.getAllBeats().map((beat) => (
                     <button
                       key={beat.id}
-                      onClick={() => { navigatedBeatIdRef.current = null; setStartBeatId(beat.id); setShowBeatMenu(false); }}
+                      onClick={() => {
+                        setStartMode('selected');
+                        navigatedBeatIdRef.current = null;
+                        setStartBeatId(beat.id);
+                        setIsWaitingToStart(true);
+                        setShowBeatMenu(false);
+                      }}
                       className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${startBeatId === beat.id ? 'bg-blue-50 text-blue-700' : ''}`}
                     >
                       <div className="font-medium truncate">{beat.name}</div>
@@ -2719,6 +2789,7 @@ export const PreviewWindow: React.FC = () => {
                   setIsWaitingToStart(false);
                   navigatedBeatIdRef.current = null;
                   setStartBeatId(null);
+                  setStartMode('beginning');
                 }}
                 className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
               >
@@ -2913,7 +2984,9 @@ export const PreviewWindow: React.FC = () => {
                 >
                   <div className="bg-black/80 text-white px-6 py-3 rounded-lg text-base flex items-center gap-3 shadow-lg">
                     <Play className="w-5 h-5" />
-                    Click to preview from {story?.getBeat(startBeatId || '')?.name || 'this beat'}
+                    {startBeatId
+                      ? `Click to preview from "${story?.getBeat(startBeatId)?.name || startBeatId}"`
+                      : 'Click to play from the beginning'}
                   </div>
                 </div>
               )}

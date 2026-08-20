@@ -6,7 +6,6 @@ import { initializeLocationsFromSchema } from './utils/SchemaLocationInitializer
 import { Sidebar } from './components/Sidebar';
 import { WorkspaceView } from './components/WorkspaceView';
 import { Inspector } from './components/Inspector';
-import { StoryPreview } from './components/preview/StoryPreview';
 import { PreviewWindow } from './pages/PreviewWindow';
 import { DebugWindow } from './pages/DebugWindow';
 import { IdeatorWindow } from './pages/IdeatorWindow';
@@ -308,7 +307,6 @@ function App() {
 
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
   const [beatRefreshKey, setBeatRefreshKey] = useState(0); // Increments to force visual editor refresh
-  const [showPreview, setShowPreview] = useState(false);
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
@@ -4417,22 +4415,6 @@ function App() {
     input.click();
   }, [handleImportZipFile]);
 
-  const handlePreview = useCallback(() => {
-    if (state.beats.length === 0) {
-      alert('Please add some beats to your story first!');
-      return;
-    }
-    // Pause auto-save while preview is open to prevent interruptions
-    pauseAutoSave();
-    setShowPreview(true);
-  }, [state.beats, pauseAutoSave]);
-
-  const handleClosePreview = useCallback(() => {
-    setShowPreview(false);
-    // Resume auto-save after preview is closed
-    resumeAutoSave();
-  }, [resumeAutoSave]);
-
   // Serialize story data for preview window
   const getSerializedStoryData = useCallback(() => {
     // Serialize beats with all their data
@@ -4536,6 +4518,9 @@ function App() {
         emotionPalette: emotionPalette,
         traitModulations: traitModulations,
         themeAssets: themeAssets,
+        // The selection still travels (it names the preview's "From «beat»"
+        // button) but no longer decides the start mode — plain open plays
+        // from the beginning.
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
       });
@@ -6643,45 +6628,6 @@ function App() {
         onViewDiff={(filePath) => setDiffViewerFile(filePath)}
       />
 
-      {/* Preview Modal */}
-      {showPreview && (
-        <StoryPreview
-          story={getStoryForPreview()}
-          assets={assets}
-          characters={characters}
-          settings={globalSettings}
-          themeAssets={themeAssets}
-          onClose={handleClosePreview}
-          loadAssetBlob={async (assetIdOrUrl: string) => {
-            // Skip invalid asset IDs
-            if (!assetIdOrUrl || assetIdOrUrl === 'undefined') {
-              return null;
-            }
-
-            try {
-              const storage = getStorageAdapter();
-
-              // First try to load by asset ID directly
-              let blob = await storage.loadAsset(assetIdOrUrl);
-              if (blob) return blob;
-
-              // If not found and it looks like a blob URL, search assets by URL (legacy fallback)
-              if (assetIdOrUrl.startsWith('blob:')) {
-                const matchingAsset = assets.find(a => a.url === assetIdOrUrl);
-                if (matchingAsset) {
-                  blob = await storage.loadAsset(matchingAsset.id);
-                  if (blob) return blob;
-                }
-              }
-
-              return null;
-            } catch (error) {
-              console.warn(`[App loadAssetBlob] Error loading asset: ${assetIdOrUrl}`, error);
-              return null;
-            }
-          }}
-        />
-      )}
 
       {/* Character Manager Modal */}
       {showCharacterManager && (
