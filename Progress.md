@@ -1,5 +1,138 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-20: Where projects live — the storage inversion (v0.9.94)
+
+### Overview
+
+The most structural release since v0.9.86: it changes where projects live.
+On desktop, projects are now folders of ordinary files by default —
+readable, diffable, syncable, and proof against any future change of app
+shell, because IndexedDB is an engine-private database that dies with its
+shell while files are forever. Around that inversion: project exports
+became double-clickable `.asaps` files, every intake gap closed (unzipped
+folders, bare JSON, recovered debug dumps), the web build got an eviction
+guard, and the File menu learned to speak the new world. Everything was
+human-verified end to end on macOS and Windows (via Parallels) — a
+three-pass verification that itself caught five real bugs, all fixed here.
+
+### The storage inversion (desktop)
+
+- **New projects live in `~/Documents/ASAPS Projects/<name>/`** — created
+  silently on the first named save (the GarageBand move: default location,
+  never a dialog). Applies to created, generated, injected, and imported
+  projects alike; untitled scratch projects stay folderless until named;
+  pre-existing library projects are untouched.
+- **Move library to disk** — one explicit click in the Project Browser
+  converts every stored project to a folder and flips its row; nothing is
+  deleted, failures leave projects where they were, the open project is
+  skipped (File → Save As Folder covers it).
+- **The folder format is the ASML 2.0 contract**
+  (docs/ASML-2.0-Project-Folder-Spec.md): one file per beat, deterministic
+  serialization (zero-diff resave — what makes git *useful*), no
+  app-private state. The working folder is deliberately NOT a macOS bundle
+  — Windows has no bundle concept, and the format's virtue is that you can
+  see inside.
+- **Synced-folder safety**: all writes are atomic (sibling temp + rename),
+  so a sync daemon never ships a half-written file; external edits (sync
+  pull, git checkout, text editor) trigger a once-per-project warning that
+  names the files and says which copy wins on save; migrating into a
+  visibly synced location gets an advisory.
+- Adoption caught three bugs live before commit, including a pre-existing
+  one: the Save Project dialog never learned the one-name model and had
+  its rename silently reverted by the next sync.
+
+**Files modified:** `packages/builder/src/contexts/PersistenceContext.tsx`,
+`packages/builder/src/utils/{newProjectRegistry,libraryMigration}.ts` (new),
+`packages/builder/src/storage/StorageManager.ts`,
+`apps/builder-desktop/src/main/{index,fileWatcher}.ts`,
+`docs/ASML-2.0-Project-Folder-Spec.md` (new)
+
+### .asaps — the extension that behaves
+
+Project exports are now `<name>.asaps` instead of `<name>.asaps.zip`. Same
+bytes (a zip inside), but the last extension wins on every OS — so
+double-click now opens ASAPS instead of the zip viewer, Safari stops
+auto-extracting downloads (the root cause of shared projects arriving as
+folders), and the long-registered `.asaps` association finally has a
+producer. The Builder declares itself Editor/Owner of `.asaps`/`.asapst`;
+the Tauri Player is demoted to Viewer so authoring machines open the
+Builder (the Player association previously tied and could win the
+double-click). Windows Explorer double-click of `.asaps` and `.asapst`
+verified in Parallels — closing a test item open since v0.9.79.
+
+**Files modified:** `packages/builder/src/utils/projectZipManager.ts`,
+`apps/builder-desktop/package.json` (fileAssociations),
+`apps/player-desktop/src-tauri/tauri.conf.json`
+
+### Every intake gap closed
+
+- **Unzipped project folders** import like the zips they were (drop or
+  File → Open Project Folder) — re-zipped in memory and fed to the one
+  battle-tested pipeline.
+- **Bare `project.json`** files open everywhere files do; the wrap lives
+  inside the import pipeline itself after the start window's own import
+  path was found bypassing the first implementation.
+- **Story-bearing debug dumps** (story-debug-*.json) import as recovered
+  projects — a debug artifact became a recovery path.
+- **Duplicate names caught, not just duplicate ids**: imports that create
+  a new row uniquify their name with the app-wide convention.
+
+**Files modified:** `packages/builder/src/utils/folderProjectImport.ts` (new),
+`packages/builder/src/utils/projectZipManager.ts`,
+`packages/builder/src/components/ProjectLibrary.tsx`, `packages/builder/src/App.tsx`
+
+### Open vs Import, and ASML 1.0/2.0
+
+The header button is **Open**: ASAPS's own files at the top ("added to
+your projects and opened" — no import mental model), ASML 1.0 (XML) and
+Twine under "Import from other formats" where something genuinely
+converts. ASML itself is not legacy — the native JSON *is* ASML 2.0; what
+is frozen is the 1.0 XML serialization, whose export now sits in a legacy
+section behind a confirm naming exactly what it silently drops. Import of
+1.0 files stays supported forever.
+
+**Files modified:** `packages/builder/src/components/Header.tsx`,
+`packages/builder/src/components/ProjectLibrary.tsx`, `docs/USER_GUIDE.md`, `CLAUDE.md`
+
+### Web build: eviction guard + backup rail
+
+Browser storage is deletable storage, and there was no defense:
+`navigator.storage.persist()` now fires after the first save (the
+engagement moment), the Project Browser footer shows storage health
+("protected" / "not protected against cleanup — keep backups"), and
+library cards carry a **never backed up / backup outdated** badge for
+active work that exists only in this browser — gated by grace period and a
+90-day dormancy window so it flags the work someone would cry over, not
+the whole library. Exports stamp `lastExportedAt` without touching
+`modifiedAt` (a backup is not an edit).
+
+**Files modified:** `packages/builder/src/utils/storagePersistence.ts` (new),
+`packages/builder/src/hooks/useAutoSave.ts`, `packages/builder/src/storage/StorageManager.ts`,
+`packages/builder/src/components/ProjectLibrary.tsx`
+
+### The File menu speaks post-inversion
+
+"Open Project Folder…" and "Save As Folder…" lose their (VCS) qualifiers —
+folders are the norm now. "Save As…" becomes "Save a Copy (.asaps)…"
+(that's what it does; the working copy stays put). New: **Reveal Project
+in Finder / Show Project in Explorer**, with an honest pointer for
+projects still in app storage. Open-dialog filters accept `.asapst` and
+`.json`.
+
+**Files modified:** `apps/builder-desktop/src/main/index.ts`,
+`apps/builder-desktop/src/preload/index.ts`, `packages/builder/src/App.tsx`
+
+### Design docs (decisions pending or recorded)
+
+- **Mobile Field App plan** (docs/Mobile-Field-App-Plan.md): self-contained
+  iOS/Android player with embedded Gemma-class LLM + two-tier geo-AR,
+  phased P0-P3, packaging/store-release strategy, and the sustainability
+  direction — Pro as a service tier, not a SKU.
+- **Embedded AI design** (docs/Embedded-AI-Design.md): desktop-side
+  recommendations (Ollama probe, bundled llama.cpp) — the fifth transport.
+
+---
+
 ## 2026-08-18: Tier 3 complete — text that formats, graphs that tell the truth (v0.9.93)
 
 ### Overview

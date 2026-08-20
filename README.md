@@ -22,19 +22,23 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.93** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.93 makes text formatting a real
-contract**: bold/italic/strikethrough now render everywhere prose renders —
-responsive layouts, chat bubbles, and after typewriter reveals — with a
-formatting bar on prose fields, translation that preserves the markers, and
-AI generation that knows the syntax (and where not to use it). Dialog Tree
-nodes with nested exchanges now show their depth on the flowchart as a
-stacked card with phase dots, and the AI config explains which model fits
-which job — flagship for drafting, fast tier for the beats a player waits on.
+Current release: **v0.9.94** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.94 changes where projects live.**
+On desktop, new projects are folders of ordinary files in
+`~/Documents/ASAPS Projects/` — one file per beat, readable, git-able,
+backed up by Time Machine like everything else — created silently on the
+first named save, with a one-click "Move library to disk" for existing
+projects and safety rails for synced folders (atomic writes,
+external-change warnings). Project exports are now double-clickable
+`.asaps` files (no more zip-viewer hijacking or Safari auto-extraction),
+every import gap is closed (unzipped folders, bare project.json, recovered
+debug dumps, duplicate-name handling), and the web build finally asks the
+browser to protect its storage — with backup badges for work that exists
+only in one browser.
 
-**v0.9.92** added four look presets and three starter templates (museum
-story, chat thriller, GPS walk), fixed a renderer hang on back-to-back map
-beats, and was the first release macOS auto-updated into by itself.
+**v0.9.93** made text formatting a real contract (markdown-lite everywhere
+prose renders, with a formatting bar and translation-safe markers) and gave
+multi-phase Dialog Trees their depth on the flowchart.
 
 **v0.9.91** fixed macOS auto-update and stopped AI-generated and injected
 stories failing silently: broken links are shown in a banner and marked ⚠ in
