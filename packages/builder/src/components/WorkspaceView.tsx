@@ -67,6 +67,7 @@ interface WorkspaceViewProps {
   onBeatDuplicate?: (beatId: string) => void;
   onBeatsDuplicate?: (beatIds: string[]) => void;
   onBeatDelete?: (beatId: string) => void;
+  describeDeleteImpact?: (beatIds: string[]) => string | null;
   onBeatsDelete?: (beatIds: string[]) => void;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
@@ -124,6 +125,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onBeatDuplicate,
   onBeatsDuplicate,
   onBeatDelete,
+  describeDeleteImpact,
   onBeatsDelete,
   onBeatCopy,
   onBeatPaste,
@@ -320,6 +322,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onBeatDuplicate={onBeatDuplicate}
               onBeatsDuplicate={onBeatsDuplicate}
               onBeatDelete={onBeatDelete}
+              describeDeleteImpact={describeDeleteImpact}
               onBeatsDelete={onBeatsDelete}
               onBeatCopy={onBeatCopy}
               onBeatPaste={onBeatPaste}

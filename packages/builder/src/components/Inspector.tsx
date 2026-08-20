@@ -127,6 +127,8 @@ interface InspectorProps {
   beat: Beat | null;
   onUpdate: (beatId: string, updates: Partial<Beat>) => void;
   onDelete: (beatId: string) => void;
+  /** One sentence naming what a delete would break — appended to the confirm. */
+  describeDeleteImpact?: (beatIds: string[]) => string | null;
   allBeats?: Beat[];
   onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
@@ -184,6 +186,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   beat,
   onUpdate,
   onDelete,
+  describeDeleteImpact,
   allBeats = [],
   onConnect,
   onDisconnect,
@@ -356,9 +359,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   // Get available counters, variables, and inventory items for dropdowns.
   // These are the declared sets (from characters + globalSettings).
-  const availableCounters = useAvailableCounters(characters);
-  const availableVariables = useAvailableVariables(globalSettings || null);
-  const availableInventoryItems = useAvailableInventoryItems(characters);
+  const declaredCounters = useAvailableCounters(characters);
+  const declaredVariables = useAvailableVariables(globalSettings || null);
+  const declaredInventoryItems = useAvailableInventoryItems(characters);
 
   // Many stories (including AI-generated ones) reference items/counters/variables
   // without declaring them up-front on a character or in global settings. Scan
@@ -368,6 +371,47 @@ export const Inspector: React.FC<InspectorProps> = ({
     () => extractStoryStateReferences(allBeats as any),
     [allBeats],
   );
+
+  // The declared ∪ used-in-story union is the Inspector-wide working set.
+  // It used to be built ad hoc only for the RequirementsEditor, so a variable
+  // minted via an Effects "+ New..." on one choice was invisible in every
+  // other dropdown — and a typo minted a silent twin.
+  const availableCounters = useMemo(() => {
+    const declared = new Set(declaredCounters.map(c => c.name));
+    return [
+      ...declaredCounters,
+      ...[...storyStateRefs.counters].filter(n => !declared.has(n))
+        .map(name => ({
+          name,
+          displayName: `${name} (used in story)`,
+          characterId: '',
+          characterName: '',
+          fullName: `${name} (used in story)`,
+        })),
+    ];
+  }, [declaredCounters, storyStateRefs]);
+  const availableVariables = useMemo(() => {
+    const declared = new Set(declaredVariables.map(v => v.name));
+    return [
+      ...declaredVariables,
+      ...[...storyStateRefs.variables].filter(n => !declared.has(n))
+        .map(name => ({ name, type: 'string' as const, description: 'used in story' })),
+    ];
+  }, [declaredVariables, storyStateRefs]);
+  const availableInventoryItems = useMemo(() => {
+    const declared = new Set(declaredInventoryItems.map(i => i.name));
+    return [
+      ...declaredInventoryItems,
+      ...[...storyStateRefs.items].filter(n => !declared.has(n))
+        .map(name => ({
+          name,
+          displayName: `${name} (used in story)`,
+          characterId: '',
+          characterName: '',
+          fullName: `${name} (used in story)`,
+        })),
+    ];
+  }, [declaredInventoryItems, storyStateRefs]);
 
   // Free-text speaker / character names used elsewhere in the project — feeds
   // the "Used names" section of the new <CharacterRefField> combobox.
@@ -1294,9 +1338,15 @@ export const Inspector: React.FC<InspectorProps> = ({
         errors.push('Connection is required');
       }
     }
-    
+
     return errors;
   };
+
+  // Validation runs LIVE on every render. The inspector auto-applies edits
+  // (there is no save button on this path), so gating validation on a manual
+  // save meant it never ran — empty required fields shipped a blank screen
+  // with no warning anywhere.
+  const liveValidationErrors = validateBeat();
 
   const handleChange = (field: string, value: any) => {
     const updatedBeat = {
@@ -1641,7 +1691,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete "${beat.name}"?`)) {
+    const impact = describeDeleteImpact?.([beat.id]);
+    if (window.confirm(`Are you sure you want to delete "${beat.name}"?${impact ? `\n\n${impact}` : ''}`)) {
       onDelete(beat.id);
     }
   };
@@ -1731,13 +1782,13 @@ export const Inspector: React.FC<InspectorProps> = ({
         )}
 
         {/* Validation Errors */}
-        {validationErrors.length > 0 && (
+        {liveValidationErrors.length > 0 && (
           <div className="flex-shrink-0 p-3 bg-red-50 border-b border-red-200">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
               <div className="text-sm text-red-700">
                 <div className="font-medium mb-1">Please fix the following:</div>
-                {validationErrors.map((error, i) => (
+                {liveValidationErrors.map((error, i) => (
                   <div key={i} className="text-xs">• {error}</div>
                 ))}
               </div>

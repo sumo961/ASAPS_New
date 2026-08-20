@@ -47,6 +47,7 @@ interface CanvasProps {
   onBeatDuplicate?: (beatId: string) => void;
   onBeatsDuplicate?: (beatIds: string[]) => void;
   onBeatDelete?: (beatId: string) => void;
+  describeDeleteImpact?: (beatIds: string[]) => string | null;
   onBeatsDelete?: (beatIds: string[]) => void;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
@@ -91,6 +92,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onBeatDuplicate,
   onBeatsDuplicate,
   onBeatDelete,
+  describeDeleteImpact,
   onBeatsDelete,
   onBeatCopy,
   onBeatPaste,
@@ -166,6 +168,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onBeatDuplicate={onBeatDuplicate}
           onBeatsDuplicate={onBeatsDuplicate}
           onBeatDelete={onBeatDelete}
+          describeDeleteImpact={describeDeleteImpact}
           onBeatsDelete={onBeatsDelete}
           onBeatCopy={onBeatCopy}
           onBeatPaste={onBeatPaste}

@@ -68,6 +68,9 @@ interface GraphEditorProps {
   /** Multi-selection actions — receive every selected beat id */
   onBeatsDuplicate?: (beatIds: string[]) => void;
   onBeatsDelete?: (beatIds: string[]) => void;
+  /** One sentence naming what a delete would break ("3 links in 2 other
+   *  beats point here and will break.") — appended to the delete confirm. */
+  describeDeleteImpact?: (beatIds: string[]) => string | null;
   onBeatCopy?: (beatId: string) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
@@ -131,6 +134,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onSetClusterSharedVisuals,
   onBeatDuplicate,
   onBeatDelete,
+  describeDeleteImpact,
   onBeatsDuplicate,
   onBeatsDelete,
   onBeatCopy,
@@ -1146,13 +1150,19 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           break;
         case 'delete':
           if (multiTarget && onBeatsDelete) {
-            const confirmDelete = window.confirm(`Delete ${multiTarget.length} selected beats?`);
+            const impact = describeDeleteImpact?.(multiTarget);
+            const confirmDelete = window.confirm(
+              `Delete ${multiTarget.length} selected beats?${impact ? `\n\n${impact}` : ''}`
+            );
             if (confirmDelete) {
               onBeatsDelete(multiTarget);
             }
           } else if (contextMenu.beatId && onBeatDelete) {
             const beat = beats.find(b => b.id === contextMenu.beatId);
-            const confirmDelete = window.confirm(`Delete beat "${beat?.name || contextMenu.beatId}"?`);
+            const impact = describeDeleteImpact?.([contextMenu.beatId]);
+            const confirmDelete = window.confirm(
+              `Delete beat "${beat?.name || contextMenu.beatId}"?${impact ? `\n\n${impact}` : ''}`
+            );
             if (confirmDelete) {
               onBeatDelete(contextMenu.beatId);
             }
@@ -1161,7 +1171,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       }
       closeContextMenu();
     },
-    [contextMenu, beats, multiSelectedIds, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, onBeatsDelete, closeContextMenu]
+    [contextMenu, beats, multiSelectedIds, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, onBeatsDelete, describeDeleteImpact, closeContextMenu]
   );
 
   // Handle node drag. With a multi-selection ReactFlow drags the whole
@@ -1265,8 +1275,61 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     }
   }, [reactFlowInstance]);
 
+  // The context menu has advertised ⌘D / ⌘C / ⌘V / ⌫ since it was built —
+  // this handler is the implementation it promised. Scoped to the graph
+  // (bubbling from ReactFlow's focusable nodes/pane), so text fields and
+  // other panels keep their native shortcuts.
+  const handleGraphKeyDown = useCallback((event: React.KeyboardEvent) => {
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SELECT' ||
+      target.isContentEditable
+    ) return;
+
+    const mod = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
+    const multi = multiSelectedIds.length > 1 ? multiSelectedIds : null;
+    const singleId = selectedBeat?.id ?? (multiSelectedIds.length === 1 ? multiSelectedIds[0] : null);
+
+    if (mod && key === 'd') {
+      if (multi && onBeatsDuplicate) { event.preventDefault(); onBeatsDuplicate(multi); }
+      else if (singleId && onBeatDuplicate) { event.preventDefault(); onBeatDuplicate(singleId); }
+    } else if (mod && key === 'c') {
+      // Real text selections keep native copy
+      if (window.getSelection()?.toString()) return;
+      if (singleId && onBeatCopy) { event.preventDefault(); onBeatCopy(singleId); }
+    } else if (mod && key === 'v') {
+      if (hasBeatClipboard && onBeatPaste && reactFlowInstance) {
+        event.preventDefault();
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const pos = reactFlowInstance.screenToFlowPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        });
+        onBeatPaste(pos);
+      }
+    } else if ((event.key === 'Backspace' || event.key === 'Delete') && !mod) {
+      if (multi && onBeatsDelete) {
+        event.preventDefault();
+        const impact = describeDeleteImpact?.(multi);
+        if (window.confirm(`Delete ${multi.length} selected beats?${impact ? `\n\n${impact}` : ''}`)) {
+          onBeatsDelete(multi);
+        }
+      } else if (singleId && onBeatDelete) {
+        event.preventDefault();
+        const beat = beats.find(b => b.id === singleId);
+        const impact = describeDeleteImpact?.([singleId]);
+        if (window.confirm(`Delete beat "${beat?.name || singleId}"?${impact ? `\n\n${impact}` : ''}`)) {
+          onBeatDelete(singleId);
+        }
+      }
+    }
+  }, [multiSelectedIds, selectedBeat, beats, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, hasBeatClipboard, onBeatDelete, onBeatsDelete, describeDeleteImpact, reactFlowInstance]);
+
   return (
-    <div className="w-full h-full" style={{ position: 'relative' }}>
+    <div className="w-full h-full" style={{ position: 'relative' }} onKeyDown={handleGraphKeyDown}>
       {/* Clean minimal viewport - prepare for final render test */}
       <ReactFlow
         nodes={nodesState}

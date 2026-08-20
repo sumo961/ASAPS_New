@@ -397,12 +397,44 @@ function App() {
     });
   }, []);
 
-  /** beatId → the missing target, for the ⚠ marks in the graph. */
+  /**
+   * Deleting a beat scrubs the top-level connections array but never the
+   * targets stored inside OTHER beats' parameters (choices, dialog nodes,
+   * true/false targets) — those dangle silently, and until now the banner's
+   * only feeders were the two import paths. Recompute after every delete so
+   * the breakage surfaces the moment it happens, through the same banner and
+   * ⚠ marks. Import-time prose (otherErrors) is preserved; link rows are
+   * always freshly derived from the story as it stands.
+   */
+  const reportBrokenLinksAfterDelete = useCallback((remaining: ReadonlyArray<any>) => {
+    const ids = new Set(remaining.map((b) => b.id));
+    const serialized = remaining.map((b: any) => (typeof b.toJSON === 'function' ? b.toJSON() : b));
+    const brokenTargets = dedupeLinks(storyLinksOf({ beats: serialized }))
+      .filter((l) => !ids.has(l.target))
+      .map((l) => ({
+        sourceBeatId: l.source,
+        sourceBeatName: remaining.find((b) => b.id === l.source)?.name as string | undefined,
+        target: l.target,
+      }));
+    setImportIssues(prev => {
+      if (brokenTargets.length) {
+        return { brokenTargets, otherErrors: prev?.otherErrors ?? [], beatIds: remaining.map((b) => b.id) };
+      }
+      return prev && prev.otherErrors.length ? { ...prev, brokenTargets: [] } : null;
+    });
+  }, []);
+
+  /** beatId → the missing target, for the ⚠ marks in the graph. Rows whose
+   *  target exists again (undo, re-import, manual fix) drop out on their own. */
   const brokenTargetsByBeatId = useMemo(() => {
+    const existing = new Set(state.beats.map(b => b.id));
     const m: Record<string, string> = {};
-    for (const b of importIssues?.brokenTargets || []) m[b.sourceBeatId] = b.target;
+    for (const b of importIssues?.brokenTargets || []) {
+      if (!existing.has(b.target)) m[b.sourceBeatId] = b.target;
+    }
     return Object.keys(m).length ? m : undefined;
-  }, [importIssues]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importIssues, state.beats]);
 
   const [pwVisitedBeatIds, setPwVisitedBeatIds] = useState<string[]>([]);
   // The beat currently executing in the Preview Window — painted more
@@ -2973,6 +3005,20 @@ function App() {
     onCommandExecuted: handleCommandExecuted,
   });
 
+  /** One sentence for delete confirms naming what would break — links from
+   *  OTHER beats' choices/dialog nodes/targets into the doomed set. */
+  const describeDeleteImpact = useCallback((beatIds: string[]): string | null => {
+    const idSet = new Set(beatIds);
+    const serialized = state.beats.map((b: any) => (typeof b.toJSON === 'function' ? b.toJSON() : b));
+    const inbound = dedupeLinks(storyLinksOf({ beats: serialized }))
+      .filter(l => idSet.has(l.target) && !idSet.has(l.source));
+    if (!inbound.length) return null;
+    const sources = new Set(inbound.map(l => l.source));
+    const links = inbound.length === 1 ? '1 link' : `${inbound.length} links`;
+    const beatsTxt = sources.size === 1 ? '1 other beat' : `${sources.size} other beats`;
+    return `${links} in ${beatsTxt} point${inbound.length === 1 ? 's' : ''} here and will break.`;
+  }, [state.beats]);
+
   const handleBeatDelete = useCallback((beatId: string) => {
     const beatToDelete = state.beats.find(b => b.id === beatId);
     if (!beatToDelete) return;
@@ -2981,7 +3027,8 @@ function App() {
     getCommandManager().execute(cmd);
     setSelectedBeat(null);
     markChanged();
-  }, [state.beats, markChanged]);
+    reportBrokenLinksAfterDelete(state.beats.filter(b => b.id !== beatId));
+  }, [state.beats, markChanged, reportBrokenLinksAfterDelete]);
 
   const handleBeatAdd = useCallback((type: string, position: { x: number; y: number }) => {
     // addBeat creates AND adds to state in one step, so we record the command
@@ -3060,7 +3107,8 @@ function App() {
     }
     setSelectedBeat(null);
     markChanged();
-  }, [state.beats, markChanged]);
+    reportBrokenLinksAfterDelete(state.beats.filter(b => !idSet.has(b.id)));
+  }, [state.beats, markChanged, reportBrokenLinksAfterDelete]);
 
   const handleBeatCopy = useCallback((beatId: string) => {
     const beat = state.beats.find(b => b.id === beatId);
@@ -6057,6 +6105,13 @@ function App() {
       return;
     }
 
+    // Top-level speaker (beat types that don't mirror it into parameters) —
+    // the search finds it on the Beat itself, so replace writes there too.
+    if (field === 'speaker' && params.speaker === undefined && (beat as any).speaker === oldValue) {
+      actions.updateBeat(beatId, { speaker: newValue } as Partial<Beat>);
+      return;
+    }
+
     // Clone params and update the nested value
     const updatedParams = JSON.parse(JSON.stringify(params));
     if (setNestedValue(updatedParams, field, newValue)) {
@@ -6314,9 +6369,15 @@ function App() {
 
       {/* Import validation, said out loud rather than logged. Sits under the
           header so it is the first thing seen after a generated story lands. */}
-      {importIssues && importIssuesVisible(importIssues.beatIds, state.beats) && (
+      {importIssues && importIssuesVisible(importIssues.beatIds, state.beats) && (() => {
+        // Rows whose target exists again (undo, manual fix) drop out — same
+        // self-healing rule as the graph's ⚠ marks.
+        const existing = new Set(state.beats.map(b => b.id));
+        const liveBroken = importIssues.brokenTargets.filter(b => !existing.has(b.target));
+        if (!liveBroken.length && !importIssues.otherErrors.length) return null;
+        return (
         <ImportIssuesBanner
-          brokenTargets={importIssues.brokenTargets}
+          brokenTargets={liveBroken}
           otherErrors={importIssues.otherErrors}
           onDismiss={() => setImportIssues(null)}
           onSelectBeat={(beatId) => {
@@ -6324,7 +6385,8 @@ function App() {
             if (beat) handleBeatSelect(beat);
           }}
         />
-      )}
+        );
+      })()}
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -6503,6 +6565,7 @@ function App() {
             themeAssets={themeAssets}
             onBeatDuplicate={handleBeatDuplicate}
             onBeatDelete={handleBeatDelete}
+            describeDeleteImpact={describeDeleteImpact}
             onBeatsDuplicate={handleBeatsDuplicate}
             onBeatsDelete={handleBeatsDelete}
             onBeatCopy={handleBeatCopy}
@@ -6519,6 +6582,7 @@ function App() {
               beat={selectedBeat}
               onUpdate={handleBeatUpdate}
               onDelete={handleBeatDelete}
+              describeDeleteImpact={describeDeleteImpact}
               allBeats={state.beats}
               onConnect={actions.connectBeats}
               onDisconnect={actions.disconnectBeats}
