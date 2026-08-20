@@ -814,6 +814,8 @@ function App() {
   const vcs = useVCSStatus();
   const vcsRef = useRef(vcs);
   vcsRef.current = vcs;
+  const isUntitledProjectRef = useRef(isUntitledProject);
+  isUntitledProjectRef.current = isUntitledProject;
   const currentProjectRef2 = useRef(currentProject);
   currentProjectRef2.current = currentProject;
   const stateTitleRef = useRef(state.title);
@@ -897,7 +899,14 @@ function App() {
     // Handle Save from File menu
     const unsubscribeSave = window.electronAPI.onMenuSave(() => {
       console.log('[Electron] Save requested from menu');
-      saveNow();
+      // ⌘S on an untitled project must open the naming dialog, exactly like
+      // the toolbar Save button — saveNow() would throw and the work would
+      // stay unsaved with only an error chip to show for it.
+      if (isUntitledProjectRef.current || !currentProjectRef2.current) {
+        setShowSaveProjectDialog(true);
+      } else {
+        saveNow();
+      }
     });
 
     // Handle Export from File menu
@@ -2068,15 +2077,30 @@ function App() {
             console.log('[App] Found', untitledProjects.length, 'untitled projects');
 
             if (untitledProjects.length > 0) {
-              // Delete all but the most recent untitled project
+              // Clean up all but the most recent untitled project — but never
+              // silently delete one that shows evidence of work: more beats
+              // than the 3-beat starter seed, or a re-save after creation.
+              // Those get renamed so they surface in the library instead.
               if (untitledProjects.length > 1) {
                 console.log('[App] Cleaning up', untitledProjects.length - 1, 'old untitled projects');
                 for (let i = 1; i < untitledProjects.length; i++) {
+                  const stale = untitledProjects[i];
                   try {
-                    await storage.deleteProject(untitledProjects[i].id);
-                    console.log('[App] Deleted old untitled project:', untitledProjects[i].id);
+                    // Stored rows hold serialized story JSON, not Story instances.
+                    const staleStory = stale.story as unknown as { beats?: unknown[] } | undefined;
+                    const beatCount = Array.isArray(staleStory?.beats) ? staleStory.beats.length : 0;
+                    const savedAfterCreation =
+                      new Date(stale.modifiedAt).getTime() - new Date(stale.createdAt).getTime() > 5000;
+                    if (beatCount > 3 || savedAfterCreation) {
+                      const date = new Date(stale.modifiedAt).toISOString().slice(0, 10);
+                      await storage.updateProject({ ...stale, name: `Recovered story (${date})` });
+                      console.log('[App] Preserved old untitled project as recovered:', stale.id);
+                    } else {
+                      await storage.deleteProject(stale.id);
+                      console.log('[App] Deleted pristine old untitled project:', stale.id);
+                    }
                   } catch (e) {
-                    console.warn('[App] Failed to delete old untitled project:', e);
+                    console.warn('[App] Failed to clean up old untitled project:', e);
                   }
                 }
               }
@@ -2787,9 +2811,13 @@ function App() {
           translationActions.clearTranslations();
         }
 
-        setIsUntitledProject(false);
+        // Derive untitled-ness from the loaded row, same as the
+        // project-switch branch: untitled rows persist real work now
+        // (restored auto-save), so "loaded from storage" no longer
+        // implies "named".
+        setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
-        console.log('[App] >>> isUntitledProject set to:', false);
+        console.log('[App] >>> isUntitledProject set to:', currentProject.name === 'Untitled Project');
       }
     } catch (error) {
       console.error('[App] >>> FAILED to load project:', error);
@@ -3693,6 +3721,10 @@ function App() {
     let syncTimer: ReturnType<typeof setTimeout> | null = null;
     const unsub = vcsCtx.onEvent((event) => {
       if (event.type !== 'success') return;
+      // Only operations that changed files on disk invalidate editor state.
+      // commit/stage/push leave the working tree untouched — clearing undo
+      // or re-reading translations for them destroys work for no reason.
+      if (!event.treeRewritten) return;
 
       // After git reset, skip the entire post-VCS handler — the load effect
       // handles translation loading correctly, and re-reading from disk here
@@ -3702,8 +3734,8 @@ function App() {
         return;
       }
 
-      // Clear undo history after VCS operations (pull, stash pop, etc.)
-      // because the project state on disk has changed externally
+      // Clear undo history because the project state on disk has changed
+      // externally (pull, stash pop, revert, reset, clean, p4 sync).
       getCommandManager().clear();
 
       if (syncTimer) clearTimeout(syncTimer);
@@ -5175,43 +5207,46 @@ function App() {
       return false; // Not intercepted, let Header proceed
     }
 
-    // If it's an untitled project with real changes, show save dialog
-    if (isUntitledProject && hasUnsavedChanges) {
+    // Any untitled project with real content gets the naming offer when the
+    // author is about to leave it — not just when changes are pending.
+    // Auto-save keeps untitled work in an "Untitled Project" row, so without
+    // this the work survives but only ever resurfaces as a recovered row.
+    if (isUntitledProject) {
       setShowSaveDialog(true);
       setPendingAction(action);
       return true; // Intercepted
     }
     return false; // Not intercepted, let Header proceed
-  }, [isUntitledProject, hasUnsavedChanges, isDefaultEmptyProject, discardUntitled]);
+  }, [isUntitledProject, isDefaultEmptyProject, discardUntitled]);
 
   const handleSaveUnsavedWork = useCallback(async () => {
-    // Save current work as a named project
-    try {
-      // Generate a name with timestamp
-      const timestamp = new Date().toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-      const projectName = `Saved Project (${timestamp})`;
-
-      await saveCurrent(projectName, 'Auto-saved from unsaved changes dialog');
-      // Project is now saved as named project
-      // Clear the dialog and pending action
-      setShowSaveDialog(false);
-      setPendingAction('');
-    } catch (error) {
-      console.error('Failed to save project:', error);
-      alert('Failed to save project. Please try again.');
-    }
-  }, [saveCurrent]);
-
-  const handleDiscardUnsavedWork = useCallback(() => {
-    // Clear the dialog and pending action
+    // Hand off to the real naming dialog — the author picks the name, and
+    // the named save runs the normal path (one-name model, folder adoption).
     setShowSaveDialog(false);
     setPendingAction('');
+    setShowSaveProjectDialog(true);
   }, []);
+
+  const handleDiscardUnsavedWork = useCallback(async () => {
+    // Discard means discard: delete the untitled row, then put the editor
+    // back on a fresh scratch project (same state as a cold start).
+    setShowSaveDialog(false);
+    setPendingAction('');
+    try {
+      await discardUntitled();
+      // Clear the in-memory story BEFORE creating the fresh scratch project —
+      // the load effect saves current beats into a new untitled project, so
+      // leaving them in place would resurrect the story we just discarded.
+      actions.clearStory();
+      // Forget the discarded project so the load effect treats the fresh
+      // scratch as a cold boot (seed the starter story), not as a project
+      // switch (which would load the empty row as a blank grid).
+      loadedProjectIdRef.current = null;
+      await createProject('Untitled Project', 'Auto-saved untitled work');
+    } catch (error) {
+      console.error('[App] Failed to discard untitled project:', error);
+    }
+  }, [discardUntitled, actions, createProject]);
 
   const handleCancelSaveDialog = useCallback(() => {
     // Just close the dialog, don't execute any action

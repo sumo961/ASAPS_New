@@ -102,14 +102,18 @@ async function validateDirectoryPath(dirPath: string): Promise<boolean> {
 }
 
 /**
- * Check if a project is a default/empty project (3 default beats: titleScreen, infoText, endScreen)
- * These shouldn't be auto-saved as they clutter the project library
- * EXCEPTION: If the project has a custom name (not "Untitled Project"), it's saveable
- * because the user explicitly named it
+ * Check if a project is a PRISTINE default project — the untouched 3-beat
+ * starter seed (titleScreen, infoText, endScreen with their seeded texts).
+ * Only these are skipped by auto-save, so untouched scratch projects don't
+ * clutter the project library. The moment the author edits ANYTHING —
+ * a beat's text, a title, adds a fourth beat — the project stops being
+ * "default" and auto-saves like any other, named or not. (This content
+ * check is what lets untitled projects auto-save again: the pre-Nov-2025
+ * regime saved untitled work, and blocking it wholesale to fight library
+ * clutter silently made untitled sessions memory-only.)
  */
 const isDefaultProject = (project: Project): boolean => {
-  // CRITICAL FIX: If the project has a custom name, it's NOT a default project
-  // The user explicitly saved it with a name, so they want it preserved
+  // A custom name is an explicit save — never treat as default
   if (project.name && project.name !== 'Untitled Project') {
     return false;
   }
@@ -134,7 +138,21 @@ const isDefaultProject = (project: Project): boolean => {
   const defaultTypes = ['endScreen', 'infoText', 'titleScreen'];
 
   // Check if the types match the default pattern
-  return JSON.stringify(types) === JSON.stringify(defaultTypes);
+  if (JSON.stringify(types) !== JSON.stringify(defaultTypes)) return false;
+
+  // Types alone aren't enough — an edited seed still has 3 beats. Compare
+  // the seeded texts (useStoryBuilder.initializeStory): any divergence
+  // means the author wrote something worth saving.
+  const paramsOf = (b: any) =>
+    b?.parameters ?? (typeof b?.getParameters === 'function' ? b.getParameters() : {});
+  const titleBeat = beats.find((b: any) => b.type === 'titleScreen');
+  const infoBeat = beats.find((b: any) => b.type === 'infoText');
+  const titleParams = paramsOf(titleBeat);
+  const infoParams = paramsOf(infoBeat);
+  return (
+    titleParams?.title === 'My Interactive Story' &&
+    infoParams?.text === 'Welcome to your interactive story. This is where your narrative begins...'
+  );
 };
 
 // ============================================================================
@@ -226,21 +244,17 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       throw new Error('No current project');
     }
 
-    // CRITICAL FIX: For untitled projects, throw error to prevent auto-save
-    // This forces the user to manually save (which opens Save Project dialog)
-    // Check BOTH the ref AND the actual project name for robustness
-    // The project name check is the authoritative source - if it's named, it's saveable
-    const isActuallyUntitled = projectToUse.name === 'Untitled Project';
-    if (isActuallyUntitled) {
-      console.log('[PersistenceContext] getProjectData - BLOCKING auto-save for untitled project:', projectToUse.name);
-      throw new Error('Cannot auto-save untitled project');
-    }
-
-    // Sync ref with actual project name in case they got out of sync
-    if (isUntitledProjectRef.current !== isActuallyUntitled) {
-      console.log('[PersistenceContext] getProjectData - Syncing isUntitledProjectRef:', isActuallyUntitled);
-      isUntitledProjectRef.current = isActuallyUntitled;
-    }
+    // Untitled projects auto-save like any other (restored 2026-08: the
+    // Nov-2025 blanket block made untitled sessions memory-only, which
+    // could lose a whole first session). Library clutter from untouched
+    // scratch projects is prevented by the isDefaultProject content check
+    // below, and desktop folder adoption still waits for a real name
+    // (handleAfterSave guards on isUntitledProjectRef before consuming
+    // the born-this-session mark). NOTE: untitled-ness is deliberately NOT
+    // re-derived from the project name here — it is state, set at load and
+    // cleared only by an explicit named save. Name-sniffing flipped the ref
+    // false whenever anything renamed the row, re-opening the
+    // adopt-a-folder-from-the-wrong-name bug.
 
     // Sync project data before retrieving if sync callback is registered
     // This ensures current beats, characters, etc. are saved to the project story
@@ -257,8 +271,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     // These clutter the project library with empty projects
     // NOTE: Check AFTER sync so we check the actual current beats, not stale data
     if (isDefaultProject(finalProject)) {
-      console.log('[PersistenceContext] getProjectData - Skipping auto-save for empty default project:', finalProject.name);
-      throw new Error('Cannot auto-save empty default project');
+      console.log('[PersistenceContext] getProjectData - Skipping auto-save for pristine default project:', finalProject.name);
+      // null = "nothing worth saving" — useAutoSave treats it as a clean
+      // skip (status back to idle), NOT an error. A pristine scratch
+      // project must not paint a red error chip.
+      return null;
     }
 
     const story = (finalProject as any).story;
@@ -505,15 +522,26 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       // This prevents stale error/pending states from persisting
       cancelPending();
 
-      // CRITICAL: If currently on an untitled project, discard it before loading new one
-      // This prevents accumulation of "Untitled Project" entries in storage
-      const currentProj = currentProjectRef.current;
+      // If currently on an untitled project, clean up before loading the new
+      // one — but only DELETE it when it's the pristine starter seed. An
+      // untitled project with real content is auto-saved work: leave its row
+      // in place (boot cleanup surfaces it as a recovered project) instead of
+      // destroying it because the author looked at another project.
+      let currentProj = currentProjectRef.current;
       if (currentProj && currentProj.name === 'Untitled Project' && isUntitledProjectRef.current) {
-        console.log('[PersistenceProvider] Discarding untitled project before loading:', currentProj.id);
-        try {
-          await storage.deleteProject(currentProj.id);
-        } catch (e) {
-          console.warn('[PersistenceProvider] Failed to delete untitled project:', e);
+        // Sync in-memory edits into the ref first — the pristine check must
+        // see the beats as they are NOW, not as of the last debounced save.
+        try { syncCallback?.(); } catch { /* sync is best-effort here */ }
+        currentProj = currentProjectRef.current ?? currentProj;
+        if (isDefaultProject(currentProj)) {
+          console.log('[PersistenceProvider] Discarding pristine untitled project before loading:', currentProj.id);
+          try {
+            await storage.deleteProject(currentProj.id);
+          } catch (e) {
+            console.warn('[PersistenceProvider] Failed to delete untitled project:', e);
+          }
+        } else {
+          console.log('[PersistenceProvider] Keeping auto-saved untitled work before loading:', currentProj.id);
         }
         // Clear untitled state
         isUntitledProjectRef.current = false;
@@ -609,7 +637,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending]);
+  }, [storage, commandManager, cancelPending, syncCallback]);
 
   /**
    * Create a new project
@@ -841,7 +869,14 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     const nameFollowsTitle =
       typeof nextTitle === 'string' &&
       nextTitle.trim().length > 0 &&
-      nextTitle !== projectToUpdate.name;
+      nextTitle !== projectToUpdate.name &&
+      // Scratch projects keep the 'Untitled Project' sentinel until the
+      // author explicitly names them. Following the story title here would
+      // rename the auto-saved row to the default title ("My Interactive
+      // Story"), hiding it from untitled cleanup and flipping the untitled
+      // ref that gates desktop folder adoption.
+      !isUntitledProjectRef.current &&
+      projectToUpdate.name !== 'Untitled Project';
 
     const updatedProject = {
       ...projectToUpdate,

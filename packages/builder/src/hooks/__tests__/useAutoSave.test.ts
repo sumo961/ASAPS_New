@@ -142,3 +142,34 @@ describe('useAutoSave', () => {
     expect(onAfterSave).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }));
   });
 });
+
+describe('null projectData (pristine-default skip)', () => {
+  // getProjectData returns null when there is nothing worth saving (the
+  // untouched 3-beat starter). That must be a clean skip back to idle —
+  // never an error chip, and nothing written to storage. This contract is
+  // what allows untitled projects to auto-save again (restored 2026-08):
+  // pristine scratch is filtered by content, not by the untitled name.
+  it('saveNow with null data goes back to idle without touching storage', async () => {
+    const { result } = renderHook(() => useAutoSave(() => null));
+
+    await act(async () => { await result.current.saveNow(); });
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.error).toBeNull();
+    expect(storage.getProject).not.toHaveBeenCalled();
+    expect(storage.updateProject).not.toHaveBeenCalled();
+  });
+
+  it('a debounced save with null data clears pending without an error', async () => {
+    const { result } = renderHook(() => useAutoSave(() => null, { delay: 1000 }));
+
+    act(() => result.current.markChanged());
+    expect(result.current.status).toBe('pending');
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1100); });
+
+    expect(result.current.status).toBe('idle');
+    expect(result.current.error).toBeNull();
+    expect(storage.updateProject).not.toHaveBeenCalled();
+  });
+});

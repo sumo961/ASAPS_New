@@ -347,6 +347,10 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={() => {
+              // Untitled project with real changes → the 3-way naming dialog
+              // (Save / Discard / Cancel) via the App-side interceptor, not a
+              // 2-way confirm that can't express "discard".
+              if (onInterceptNewProject && onInterceptNewProject()) return;
               if (hasUnsavedChanges && onSave) {
                 const proceed = window.confirm(
                   'You have unsaved changes in the current project. Save them before continuing?\n\nOK to save and continue, Cancel to stay here.'

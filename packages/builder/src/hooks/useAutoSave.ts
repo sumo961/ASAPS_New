@@ -110,7 +110,9 @@ export interface UseAutoSaveReturn {
  * ```
  */
 export function useAutoSave(
-  projectData: () => Partial<Project> & { id: string },
+  // Returning null means "nothing worth saving right now" (e.g. a pristine
+  // default project) — treated as a clean skip back to idle, never an error.
+  projectData: () => (Partial<Project> & { id: string }) | null,
   options: AutoSaveOptions = {}
 ): UseAutoSaveReturn {
   const {
@@ -160,6 +162,13 @@ export function useAutoSave(
     try {
       const storage = getStorageManager();
       const data = projectData();
+
+      if (!data) {
+        // Clean skip — nothing worth saving (pristine default project).
+        log('Nothing to save, skipping');
+        setStatus('idle');
+        return;
+      }
 
       log('Saving project:', data.id);
 
@@ -388,9 +397,13 @@ export function useAutoSave(
     if (!enabled) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (status === 'pending' || status === 'saving') {
-        // Attempt synchronous save (best effort)
-        performSave(false);
+      // 'error' counts as unsaved: an untitled project's autosave lands here
+      // (it always throws), and closing without a warning loses the session.
+      if (status === 'pending' || status === 'saving' || status === 'error') {
+        if (status !== 'error') {
+          // Attempt synchronous save (best effort)
+          performSave(false);
+        }
 
         // Show confirmation dialog
         e.preventDefault();

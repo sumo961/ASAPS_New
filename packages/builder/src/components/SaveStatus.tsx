@@ -106,7 +106,11 @@ function getStatusInfo(status: SaveStatusType, lastSaved: Date | null, error?: E
     case 'error':
       return {
         icon: AlertCircle,
-        text: error?.message || 'Save failed',
+        // The untitled-project autosave "error" is really an instruction —
+        // say what to do, not what threw.
+        text: error?.message?.includes('untitled')
+          ? 'Not saved yet — click Save to name this project'
+          : (error?.message || 'Save failed'),
         color: 'text-red-600',
         bgColor: 'bg-red-50',
       };
