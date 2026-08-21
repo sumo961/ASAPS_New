@@ -431,6 +431,11 @@ export function getCommandManager(options?: CommandManagerOptions): CommandManag
   if (!commandManagerInstance) {
     commandManagerInstance = new CommandManager(options);
   }
+  if (typeof window !== 'undefined' && (import.meta as any).env?.DEV) {
+    // Dev-only: HMR can leave probes holding parallel module instances —
+    // this is the one true singleton for debugging.
+    (window as any).__asapsCommandManager = commandManagerInstance;
+  }
   return commandManagerInstance;
 }
 

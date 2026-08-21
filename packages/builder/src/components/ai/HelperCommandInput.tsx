@@ -126,7 +126,10 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   onChangesApplied,
 }) => {
   const { isConfigured, error: aiError } = useAI();
-  const { execute: executeCommand } = useCommandManager();
+  // App.tsx owns the ⌘Z/⌘⇧Z window listener — a bare useCommandManager()
+  // defaults shortcuts ON and silently registers a second one (the same
+  // double-undo class of bug as the UndoRedoToolbar's).
+  const { execute: executeCommand } = useCommandManager({ enableKeyboardShortcuts: false });
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
