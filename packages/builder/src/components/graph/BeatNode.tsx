@@ -202,7 +202,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
               e.stopPropagation();
               data.onToggleDialogExpand!(data.beat.id);
             }}
-            className="text-gray-600 hover:text-gray-900 text-base leading-none px-1 -ml-1"
+            className="text-emerald-700 hover:text-emerald-900 text-xl font-bold leading-none px-1 py-0.5 -ml-1.5 rounded hover:bg-emerald-100"
             title="Expand — show the internal dialog structure in the flowchart"
           >
             ▸

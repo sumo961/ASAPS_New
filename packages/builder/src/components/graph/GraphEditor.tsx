@@ -425,7 +425,40 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       };
     });
 
-    return [...beatNodes, ...clusterNodes];
+    // B1b v2 — make room: an expanded dialog pushes its neighbors aside
+    // (right of it → right; below it → down) instead of overlapping them.
+    // Visual-only: stored beat positions are untouched, so collapsing
+    // restores the original layout exactly.
+    const grownContainers = beatNodes.filter(n => n.type === 'dialogContainer');
+    const allNodes = [...beatNodes, ...clusterNodes];
+    if (grownContainers.length) {
+      const shift = new Map<string, { dx: number; dy: number }>();
+      const APPROX_H = 90;
+      for (const g of [...grownContainers].sort((a, b) => a.position.x - b.position.x)) {
+        const W = Number((g.style as any)?.width ?? 0);
+        const H = Number((g.style as any)?.height ?? 0);
+        const dx = Math.max(0, W - 160);
+        const dy = Math.max(0, H - APPROX_H);
+        const gx = g.position.x;
+        const gy = g.position.y;
+        for (const n of allNodes) {
+          if (n.id === g.id || (n as any).parentNode) continue;
+          const s = shift.get(n.id) ?? { dx: 0, dy: 0 };
+          const nx = n.position.x + s.dx;
+          const ny = n.position.y + s.dy;
+          const vOverlap = ny + APPROX_H > gy && ny < gy + H;
+          const hOverlap = nx + 160 > gx && nx < gx + W;
+          if (nx > gx && vOverlap) s.dx += dx;
+          else if (ny > gy && hOverlap) s.dy += dy;
+          if (s.dx || s.dy) shift.set(n.id, s);
+        }
+      }
+      for (const n of allNodes) {
+        const s = shift.get(n.id);
+        if (s) n.position = { x: n.position.x + s.dx, y: n.position.y + s.dy };
+      }
+    }
+    return allNodes;
 
     // return totalNodes; // Uncomment to go back to normal
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array

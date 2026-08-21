@@ -25,13 +25,14 @@ export const DialogContainerNode = memo<NodeProps<DialogContainerNodeData>>(({ d
   const isSelected = selected || data.selected;
   return (
     <div
-      className={`w-full h-full rounded-xl border-2 ${
+      className={`w-full h-full rounded-xl border-2 shadow-lg ${
         data.highlighted
-          ? 'border-yellow-500 bg-yellow-50/60 ring-4 ring-yellow-400 ring-opacity-70'
+          ? 'border-yellow-500 bg-yellow-50 ring-4 ring-yellow-400 ring-opacity-70'
           : isSelected
-            ? 'border-cyan-500 bg-cyan-50/40 ring-4 ring-cyan-400'
-            : 'border-emerald-300 bg-emerald-50/30'
+            ? 'border-cyan-500 bg-cyan-50 ring-4 ring-cyan-400'
+            : 'border-emerald-400 bg-emerald-50'
       }`}
+      title="This dialog's structure — shown in the flowchart, edited in the Dialog editor (click to open it in the Inspector)."
     >
       <Handle
         type="target"
@@ -49,19 +50,21 @@ export const DialogContainerNode = memo<NodeProps<DialogContainerNodeData>>(({ d
             e.stopPropagation();
             data.onToggleDialogExpand?.(data.beatId);
           }}
-          className="text-gray-600 hover:text-gray-900 text-base leading-none px-1"
+          className="text-emerald-700 hover:text-emerald-900 text-xl font-bold leading-none px-1.5 py-0.5 rounded hover:bg-emerald-100"
           title="Collapse — back to the compact beat node"
         >
           ▾
         </button>
         <span className="text-lg" aria-hidden>🌳</span>
         <span className="font-semibold text-sm text-gray-800 truncate">{data.label}</span>
-        <span
-          className="ml-auto text-[10px] text-gray-500 flex-shrink-0"
-          title="The structure is shown read-only — open the Dialog editor in the Inspector to change it."
-        >
-          read-only{data.truncated ? ' · partial' : ''}
-        </span>
+        {data.truncated && (
+          <span
+            className="ml-auto text-[10px] text-gray-500 flex-shrink-0"
+            title="Deep levels are folded — open the Dialog editor for the full tree."
+          >
+            partial view
+          </span>
+        )}
       </div>
       {/* The beat-level source handle stays for non-choice edges
           (defaultTarget etc.); exits leave from the child nodes. */}

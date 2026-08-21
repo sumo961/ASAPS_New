@@ -108,6 +108,8 @@ export const CustomEdge: React.FC<EdgeProps> = ({
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               fontSize: 12,
               pointerEvents: 'all',
+              // Guard labels must clear the elevated dialog children (z 21)
+              ...(data?.guardSummary ? { zIndex: 22 } : {}),
             }}
             className="nodrag nopan"
           >
