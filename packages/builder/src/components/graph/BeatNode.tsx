@@ -1,11 +1,9 @@
-import React, { memo, useEffect } from 'react';
-import { Handle, Position, NodeProps, useUpdateNodeInternals } from 'reactflow';
+import React, { memo } from 'react';
+import { Handle, Position, NodeProps } from 'reactflow';
 import { Beat } from '@asaps/core';
 import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
 import { TranslationStaleIndicator } from '../translation/TranslationStaleIndicator';
 import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
-import { dialogTreeOutline } from '../../utils/dialogTreeOutline';
-import { summarizeConditions } from '../../utils/conditionSummary';
 
 interface BeatNodeData {
   beat: Beat;
@@ -71,23 +69,15 @@ const truncateTitle = (title: string, maxLength: number = MAX_TITLE_LENGTH): str
   return title.substring(0, maxLength - 1) + '…';
 };
 
-export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) => {
-  // B1b — disclosure expansion: the internal tree renders INSIDE the node,
-  // read-only, with a source handle per exit row so outgoing edges leave
-  // from the exact choice that produces them. Hooks live above the
-  // missing-data early returns (hooks must run unconditionally).
+export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
+  // B1b — the ▸ trigger on collapsed dialogTree nodes. The expanded form is
+  // a separate dialogContainer node with real child nodes (cluster-style);
+  // this component never renders the internals itself.
   const dialogTreeParam = data?.dialogTree
     ?? (data?.type === 'dialogTree'
       ? ((data.beat as any)?.dialogTree ?? (data.beat as any)?.getParameters?.()?.dialogTree)
       : undefined);
   const canExpandDialog = data?.type === 'dialogTree' && !!dialogTreeParam && !!data?.onToggleDialogExpand;
-  const dialogExpanded = !!data?.dialogExpanded && canExpandDialog;
-  const outline = dialogExpanded ? dialogTreeOutline(dialogTreeParam) : null;
-  const updateNodeInternals = useUpdateNodeInternals();
-  useEffect(() => {
-    // New/removed exit handles must be re-measured or edges detach.
-    updateNodeInternals(id);
-  }, [dialogExpanded, outline?.rows.length, id, updateNodeInternals]);
 
   // Safety checks - handle missing or invalid data
   if (!data) {
@@ -165,7 +155,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
       `}
       style={{
         borderColor,
-        width: dialogExpanded ? '380px' : `${NODE_WIDTH}px`,
+        width: `${NODE_WIDTH}px`,
         backgroundColor: bgColor,
         // Stacked-card edge for multi-phase dialogs: two card outlines peek
         // out behind the bottom-right corner. Box-shadow renders outside the
@@ -213,11 +203,9 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
               data.onToggleDialogExpand!(data.beat.id);
             }}
             className="text-gray-600 hover:text-gray-900 text-base leading-none px-1 -ml-1"
-            title={dialogExpanded
-              ? 'Collapse — hide the internal dialog'
-              : 'Expand — show the internal dialog structure in the flowchart'}
+            title="Expand — show the internal dialog structure in the flowchart"
           >
-            {dialogExpanded ? '▾' : '▸'}
+            ▸
           </button>
         )}
         <span className="text-lg" title={data.type}>{icon}</span>
@@ -246,72 +234,6 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
           <span className="text-[10px] text-emerald-700 ml-0.5">
             {dialogPhases > 6 ? `${dialogPhases} phases` : 'phases'}
           </span>
-        </div>
-      )}
-
-      {/* B1b — the internal dialog, visible in the flowchart. NPC rows show
-          speaker+text, choice rows show guards (◇) exactly as the top-level
-          edges do, and exit rows carry the source handle their edge leaves
-          from. Clicking an NPC row focuses that node in the Dialog editor. */}
-      {dialogExpanded && outline && (
-        <div className="mt-2 border-t border-gray-200 pt-1.5 space-y-0.5 nodrag" style={{ cursor: 'default' }}>
-          {outline.rows.map((row) => (
-            <div
-              key={row.pathId}
-              className={`relative flex items-start gap-1 rounded px-1 py-0.5 text-xs leading-snug ${
-                row.kind === 'npc' ? 'bg-emerald-50' : 'bg-white'
-              }`}
-              style={{ marginLeft: `${Math.min(row.depth, 4) * 10}px` }}
-              // Clicks bubble to the node → beat selection → the Dialog
-              // editor opens in the Inspector. Per-node deep focus is B1c.
-              title={row.kind === 'npc'
-                ? `${row.speaker ? row.speaker + ': ' : ''}${row.text}`
-                : row.text}
-            >
-              {row.kind === 'npc' ? (
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-semibold text-emerald-800">{row.speaker || 'NPC'}:</span>{' '}
-                  <span className="text-gray-700">{row.text}</span>
-                </span>
-              ) : (
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="text-gray-400">▪</span>{' '}
-                  <span className="text-gray-800">{row.text}</span>
-                  {row.conditions && (
-                    <span className="text-violet-700"> ◇ {summarizeConditions(row.conditions)}</span>
-                  )}
-                </span>
-              )}
-              {row.exitTarget && row.exitTarget !== '__self__' && (
-                <span className="flex-shrink-0 text-sky-700" title={`Exits to "${data.beatNames?.[row.exitTarget] ?? row.exitTarget}"`}>
-                  → {(data.beatNames?.[row.exitTarget] ?? row.exitTarget).slice(0, 12)}
-                </span>
-              )}
-              {row.exitTarget === '__self__' && (
-                <span className="flex-shrink-0 text-gray-400" title="Loops back to the start of this dialog">↩</span>
-              )}
-              {row.exitTarget && row.exitTarget !== '__self__' && (
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={row.pathId}
-                  isConnectable={false}
-                  style={{
-                    position: 'absolute',
-                    right: -14 - Math.min(row.depth, 4) * 10,
-                    top: '50%',
-                    background: '#0ea5e9',
-                    width: 8,
-                    height: 8,
-                    border: '2px solid white',
-                  }}
-                />
-              )}
-            </div>
-          ))}
-          {outline.truncated && (
-            <div className="text-xs text-gray-400 pl-1">… more inside — open the Dialog editor</div>
-          )}
         </div>
       )}
 

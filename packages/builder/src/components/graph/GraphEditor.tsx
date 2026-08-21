@@ -19,10 +19,12 @@ import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { BeatNode } from './BeatNode';
 import { CustomEdge } from './CustomEdge';
 import { ClusterContainerNode } from './ClusterContainerNode';
+import { DialogContainerNode } from './DialogContainerNode';
+import { DialogInternalNode } from './DialogInternalNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { summarizeConditions } from '../../utils/conditionSummary';
-import { dialogTreeOutline } from '../../utils/dialogTreeOutline';
+import { dialogTreeLayout } from '../../utils/dialogTreeLayout';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -85,6 +87,9 @@ interface GraphEditorProps {
 const nodeTypes: NodeTypes = {
   beat: BeatNode,
   cluster: ClusterContainerNode,
+  // B1b v2 — expanded dialogTree: container + internal exchange/choice nodes
+  dialogContainer: DialogContainerNode,
+  dialogInternal: DialogInternalNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -250,31 +255,86 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     const beatNamesById: Record<string, string> = {};
     for (const b of beats) beatNamesById[b.id] = b.name;
 
-    const beatNodes = unclusteredBeats.map((beat) => ({
-      id: beat.id,
-      type: 'beat',
-      position: { x: beat.x || 0, y: beat.y || 0 },
-      data: {
-        beat,
-        label: beat.name,
-        type: beat.type,
-        selected: selectedBeat?.id === beat.id,
-        color: beatTypeColors[beat.type] || '#94a3b8',
-        highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
-        pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
-        pwCurrent: pwCurrentBeatIdRef.current === beat.id,
-        brokenTarget: brokenTargetsRef.current?.[beat.id],
-        // B1b — dialogTree disclosure expansion
-        ...(beat.type === 'dialogTree' ? {
-          dialogTree: (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree,
-          dialogExpanded: expandedDialogs.has(beat.id),
-          onToggleDialogExpand: toggleDialogExpand,
-          beatNames: beatNamesById,
-        } : {}),
-      },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-    }));
+    const beatNodes = unclusteredBeats.flatMap((beat): Node[] => {
+      // B1b v2 — expanded dialogTree renders CLUSTER-STYLE: a container node
+      // (same id, so inbound edges and position carry over) plus the dialog's
+      // exchanges/choices as real, read-only child nodes. Their edges are
+      // built in the edges memo from the same layout.
+      if (beat.type === 'dialogTree' && expandedDialogs.has(beat.id)) {
+        const tree = (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree;
+        if (tree) {
+          const layout = dialogTreeLayout(tree);
+          const container: Node = {
+            id: beat.id,
+            type: 'dialogContainer',
+            position: { x: beat.x || 0, y: beat.y || 0 },
+            // Expanded dialogs float above neighboring beats (focus overlay) —
+            // growing in place would otherwise interleave with whatever the
+            // author had placed to the right.
+            zIndex: 20,
+            style: { width: layout.width, height: layout.height },
+            data: {
+              beatId: beat.id,
+              label: beat.name,
+              selected: selectedBeat?.id === beat.id,
+              highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
+              onToggleDialogExpand: toggleDialogExpand,
+              truncated: layout.truncated,
+              // Fingerprint field — expansion must reach the node sync
+              dialogExpanded: true,
+            },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          };
+          const children: Node[] = layout.nodes.map((row) => ({
+            id: `dlg:${beat.id}:${row.pathId}`,
+            type: 'dialogInternal',
+            position: { x: row.x, y: row.y },
+            zIndex: 21,
+            parentNode: beat.id,
+            extent: 'parent' as const,
+            draggable: false,
+            selectable: false,
+            connectable: false,
+            data: {
+              kind: row.kind,
+              speaker: row.speaker,
+              text: row.text,
+              isRoot: row.pathId === 'root',
+              hasGuard: !!row.conditions,
+            },
+            sourcePosition: Position.Right,
+            targetPosition: Position.Left,
+          }));
+          return [container, ...children];
+        }
+      }
+      return [{
+        id: beat.id,
+        type: 'beat',
+        position: { x: beat.x || 0, y: beat.y || 0 },
+        data: {
+          beat,
+          label: beat.name,
+          type: beat.type,
+          selected: selectedBeat?.id === beat.id,
+          color: beatTypeColors[beat.type] || '#94a3b8',
+          highlighted: highlightedBeatIdsRef.current?.has(beat.id) ?? false,
+          pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
+          pwCurrent: pwCurrentBeatIdRef.current === beat.id,
+          brokenTarget: brokenTargetsRef.current?.[beat.id],
+          // B1b — dialogTree disclosure trigger on the collapsed node
+          ...(beat.type === 'dialogTree' ? {
+            dialogTree: (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree,
+            dialogExpanded: false,
+            onToggleDialogExpand: toggleDialogExpand,
+            beatNames: beatNamesById,
+          } : {}),
+        },
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+      }];
+    });
 
     // Convert clusters to ReactFlow nodes with typed data
     const clusterNodes = clusters.map((cluster): Node => {
@@ -741,23 +801,44 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       // such handles. Guarded exits keep the ◇ treatment on the edge.
       if (dialogExpandedHere) {
         const tree = params.dialogTree ?? (beat as any).dialogTree;
-        const outline = dialogTreeOutline(tree);
-        outline.exits.forEach((exit) => {
-          const guardSummary = exit.conditions
-            ? summarizeConditions(exit.conditions, (bid: string) => beats.find(b => b.id === bid)?.name)
+        const layout = dialogTreeLayout(tree);
+        const childId = (pathId: string) => `dlg:${beat.id}:${pathId}`;
+
+        // Structural edges INSIDE the container — real edges between real
+        // nodes, so guards read exactly like top-level guarded edges.
+        layout.internalEdges.forEach((ie) => {
+          const guardSummary = ie.conditions
+            ? summarizeConditions(ie.conditions, (bid: string) => beats.find(b => b.id === bid)?.name)
             : null;
-          const edge = createEdge(beat.id, exit.exitTarget!, {
-            id: `dlgexit-${beat.id}-${exit.pathId}`,
+          const isLoop = ie.targetPath === 'root' && ie.sourcePath !== 'root';
+          const edgeId = `dlgedge-${beat.id}-${ie.sourcePath}-${ie.targetPath}`;
+          if (!edgeIds.has(edgeId)) {
+            edgeIds.add(edgeId);
+            allEdges.push({
+              id: edgeId,
+              source: childId(ie.sourcePath),
+              target: childId(ie.targetPath!),
+              type: 'custom',
+              zIndex: 21,
+              markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
+              style: {
+                stroke: guardSummary ? '#8b5cf6' : isLoop ? '#cbd5e1' : '#94a3b8',
+                strokeWidth: 1.25,
+                ...(guardSummary || isLoop ? { strokeDasharray: '5 3' } : {}),
+              },
+              data: guardSummary ? { guardSummary } : undefined,
+            } as Edge);
+          }
+        });
+
+        // Exits — from the child node that produces them to the target beat.
+        layout.exitEdges.forEach((ee) => {
+          const edge = createEdge(childId(ee.sourcePath), ee.exitTarget!, {
+            id: `dlgexit-${beat.id}-${ee.sourcePath}`,
             type: 'custom',
-            sourceHandle: exit.pathId,
-            label: '',
+            zIndex: 20,
             markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-            style: {
-              stroke: guardSummary ? '#8b5cf6' : '#0ea5e9',
-              strokeWidth: 1.5,
-              ...(guardSummary ? { strokeDasharray: '6 3' } : {}),
-            },
-            data: { guardSummary },
+            style: { stroke: '#0ea5e9', strokeWidth: 1.5 },
           });
           if (edge && !edgeIds.has(edge.id)) {
             edgeIds.add(edge.id);
@@ -1131,8 +1212,18 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             onClusterSelect(cluster);
           }
         }
+      } else if (node.type === 'dialogInternal') {
+        // A dialog's internal node — selection routes to the parent beat
+        // (the Dialog editor opens in the Inspector). Per-node deep focus
+        // is B1c.
+        const parentBeatId = (node as any).parentNode ?? String(node.id).split(':')[1];
+        const beat = beats.find((b) => b.id === parentBeatId);
+        if (beat) {
+          onBeatSelect(beat);
+        }
       } else {
-        // Handle beat node clicks
+        // Handle beat node clicks (incl. the dialogContainer, which keeps
+        // the beat's id)
         const beat = beats.find((b) => b.id === node.id);
         if (beat) {
           onBeatSelect(beat);
