@@ -322,7 +322,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onAddCluster && (
           <button
             onClick={handleCreateCluster}
-            className="w-full mt-2 p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center gap-2"
+            className="w-full mt-2 p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-100 hover:text-gray-800 transition-colors flex items-center justify-center gap-2"
             title="Create a cluster to organize related beats into groups. Clusters help keep complex stories manageable."
           >
             <FolderPlus className="w-4 h-4" />

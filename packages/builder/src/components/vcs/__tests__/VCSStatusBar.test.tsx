@@ -59,7 +59,7 @@ describe('VCSStatusBar', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('shows "Set up Git" button when no VCS detected but project is open', () => {
+  it('shows the quiet "Track versions" affordance when no VCS detected (B9: git vocabulary only after opt-in)', () => {
     mockVCSState.initialized = true;
     mockVCSState.type = 'none';
     mockVCSState.projectPath = '/some/project';
@@ -67,10 +67,27 @@ describe('VCSStatusBar', () => {
     const onInitRepo = vi.fn();
     render(<VCSStatusBar onInitRepo={onInitRepo} />);
 
-    const btn = screen.getByText('Set up Git');
+    const btn = screen.getByText('Track versions');
     expect(btn).toBeDefined();
     fireEvent.click(btn);
     expect(onInitRepo).toHaveBeenCalled();
+  });
+
+  it('shows the same quiet affordance when git is not installed — never an unsolicited warning', () => {
+    mockVCSState.initialized = true;
+    mockVCSState.type = 'none';
+    mockVCSState.gitNotInstalled = true;
+    mockVCSState.projectPath = '/some/project';
+
+    render(<VCSStatusBar onInitRepo={vi.fn()} />);
+
+    expect(screen.getByText('Track versions')).toBeDefined();
+    expect(screen.queryByText(/Git not found/)).toBeNull();
+    expect(screen.queryByText(/Install Git/)).toBeNull();
+
+    // This suite resets mock fields manually per test — undo our flag so
+    // later tests exercise the with-repo states.
+    mockVCSState.gitNotInstalled = false;
   });
 
   it('renders Git status bar with branch name', () => {

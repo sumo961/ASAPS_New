@@ -52,6 +52,7 @@ import { normalizeGlobalSettings } from './utils/themeConverter';
 import { notifyIfCorrupted } from './utils/projectRepair';
 import { downloadProjectAsZip, importProjectFromZip, getProjectDataForExport } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
@@ -317,6 +318,7 @@ function App() {
   const [showAssetManager, setShowAssetManager] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
   const [showSaveProjectDialog, setShowSaveProjectDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -606,6 +608,14 @@ function App() {
   // Keyboard shortcut for search (Ctrl+F)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ? opens the shortcuts overview (outside text fields)
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+        const t = e.target as HTMLElement;
+        if (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA' && !t.isContentEditable) {
+          e.preventDefault();
+          setShowShortcutsModal(prev => !prev);
+        }
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowSearchPanel(prev => !prev);
@@ -6840,6 +6850,12 @@ function App() {
         onClose={handleCloseSaveProjectDialog}
         onSave={handleSaveProjectConfirmed}
         currentName={state.title}
+      />
+
+      {/* Keyboard shortcuts overview — bound to ? */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
       />
 
       {/* Save Unsaved Work Dialog */}

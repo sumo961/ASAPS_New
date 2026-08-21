@@ -915,6 +915,25 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             );
           })()}
 
+          {/* Template shelf FIRST: for a first-run author, "The Oil Lamp —
+              swap in your own object" is a better opening move than a blank
+              grid; the create paths follow. */}
+          {/* Template shelf — worked examples instantiated as copies via the
+              zip-import pipeline. Full cards while the library is small (the
+              first-run audience that needs the showcase), a slim line once
+              it's established. */}
+          {onImportZipFile && (
+            <TemplateShelf
+              projectCount={projects.length}
+              onUseTemplate={async (file, _meta, name) => {
+                await onImportZipFile(file, name ? { newName: name } : undefined);
+                // Same nudge as the drag-drop path: the import switched the
+                // editor behind the modal to the new project.
+                if (isModal) onClose?.();
+              }}
+            />
+          )}
+
           {/* Start a new project — four create paths. Empty + Import are
               wired to existing flows; Prompt + Ideator are surfaced now
               so the layout is final, with disabled affordances until the
@@ -990,22 +1009,6 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
               </button>
             </div>
           </div>
-
-          {/* Template shelf — worked examples instantiated as copies via the
-              zip-import pipeline. Full cards while the library is small (the
-              first-run audience that needs the showcase), a slim line once
-              it's established. */}
-          {onImportZipFile && (
-            <TemplateShelf
-              projectCount={projects.length}
-              onUseTemplate={async (file, _meta, name) => {
-                await onImportZipFile(file, name ? { newName: name } : undefined);
-                // Same nudge as the drag-drop path: the import switched the
-                // editor behind the modal to the new project.
-                if (isModal) onClose?.();
-              }}
-            />
-          )}
 
           {/* Search and controls */}
           <div className="flex items-center gap-4">

@@ -5,7 +5,6 @@ import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
 import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
-import { AssetSelector } from './assets/AssetSelector';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
 import { SchemaFormGenerator } from './SchemaFormGenerator';
 import { BeatSuggestions } from './ai/BeatSuggestions';

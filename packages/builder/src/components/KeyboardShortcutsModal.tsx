@@ -13,23 +13,44 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ 
   const modKey = isMac ? '⌘' : 'Ctrl';
 
   const shortcuts = [
-    { category: 'Beat Operations', items: [
+    { category: 'Flowchart', items: [
+      { keys: `${modKey} + D`, action: 'Duplicate selected beat(s)' },
       { keys: `${modKey} + C`, action: 'Copy selected beat' },
-      { keys: `${modKey} + X`, action: 'Cut selected beat' },
-      { keys: `${modKey} + V`, action: 'Paste beat' },
-      { keys: `${modKey} + D`, action: 'Duplicate selected beat' },
-      { keys: 'Delete / Backspace', action: 'Delete selected beat' },
+      { keys: `${modKey} + V`, action: 'Paste beat (at viewport center)' },
+      { keys: 'Delete / Backspace', action: 'Delete selected beat(s) — confirms only when links would break' },
+      { keys: 'Shift + drag', action: 'Multi-select beats (marquee); ⌘/Ctrl-click adds' },
     ]},
-    { category: 'View Controls', items: [
-      { keys: 'Space', action: 'Toggle sidebar collapse' },
-      { keys: 'P', action: 'Toggle palette collapse' },
-      { keys: 'I', action: 'Toggle inspector expand' },
+    { category: 'Project', items: [
+      { keys: `${modKey} + N`, action: 'New project' },
+      { keys: `${modKey} + O`, action: 'Open project…' },
+      { keys: `${modKey} + S`, action: 'Save (untitled projects: opens the naming dialog)' },
+      { keys: `${modKey} + Shift + S`, action: 'Save a copy (.asaps)…' },
+      { keys: `${modKey} + E`, action: 'Export project' },
     ]},
-    { category: 'Story Actions', items: [
-      { keys: `${modKey} + S`, action: 'Export story' },
-      { keys: `${modKey} + O`, action: 'Import story' },
-      { keys: `${modKey} + P`, action: 'Preview story' },
-      { keys: `${modKey} + ,`, action: 'Open settings' },
+    { category: 'Windows & panels', items: [
+      { keys: `${modKey} + Shift + P`, action: 'Preview window' },
+      { keys: `${modKey} + Shift + D`, action: 'Debug tools' },
+      { keys: `${modKey} + Shift + C`, action: 'Characters' },
+      { keys: `${modKey} + ,`, action: 'Story settings' },
+      { keys: `${modKey} + F`, action: 'Search & replace' },
+      { keys: `${modKey} + Shift + F`, action: 'Transformations (bulk edit)' },
+      { keys: `${modKey} + Shift + A`, action: 'Auto-arrange beats' },
+      { keys: '?', action: 'This overview' },
+    ]},
+    { category: 'Editing', items: [
+      { keys: `${modKey} + Z`, action: 'Undo' },
+      { keys: `${modKey} + Shift + Z / ${modKey} + Y`, action: 'Redo' },
+      { keys: 'Arrows / Shift + arrows', action: 'Nudge element 1px / 10px (Visual Editor)' },
+    ]},
+    { category: 'Version control', items: [
+      { keys: `${modKey} + K`, action: 'Commit… (focuses the message box; ⌘⏎ commits)' },
+      { keys: `${modKey} + Shift + K / L`, action: 'Push / Pull' },
+      { keys: `${modKey} + Shift + G`, action: 'Toggle the VCS panel' },
+    ]},
+    { category: 'Preview window', items: [
+      { keys: 'Space', action: 'Start / pause / resume' },
+      { keys: 'Esc', action: 'Stop, or cancel a pending start' },
+      { keys: `${modKey} + I`, action: 'Toggle inventory' },
     ]},
   ];
 
