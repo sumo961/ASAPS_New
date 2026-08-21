@@ -16,6 +16,7 @@ import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems
 import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import { extractStoryStateReferences } from '../utils/storyStateExtraction';
 import { getUiTier, setUiTier, shouldOfferTierChoice, markTierChoiceOffered } from '../utils/uiTier';
+import { ChoiceConditionsEditor } from '../editors/ChoiceConditionsEditor';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
@@ -98,6 +99,7 @@ function diffDialogTreeTranslations(
 
 // Type definitions
 interface ChoiceWithCounter {
+  conditions?: import('@asaps/core').Condition[];
   id: string;
   text: string;
   displayText?: string;  // Translated label for display
@@ -109,6 +111,7 @@ interface ChoiceWithCounter {
 }
 
 interface PropWithEffect {
+  conditions?: import('@asaps/core').Condition[];
   id: string;
   name: string;
   displayName?: string;  // Translated name for display
@@ -3974,6 +3977,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
 
+                          {/* Guard (B1a): shown on this choice's edge in the flowchart */}
+                          <div className="p-2 bg-violet-50/60 rounded">
+                            <ChoiceConditionsEditor
+                              value={hotspot.conditions}
+                              onChange={(conds) => handleUpdateHotspot(index, 'conditions', conds)}
+                              allBeats={allBeats}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                            />
+                          </div>
                           {/* Effects are basic-tier (B2): the write side of a
                               choice is core authoring, and gating it here while
                               dialogTree showed it ungated carried no signal. */}
@@ -4267,6 +4281,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                           
+                          {/* Guard (B1a): shown on this choice's edge in the flowchart */}
+                          <div className="p-2 bg-violet-50/60 rounded">
+                            <ChoiceConditionsEditor
+                              value={choice.conditions}
+                              onChange={(conds) => handleUpdateChoice(index, 'conditions', conds)}
+                              allBeats={allBeats}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                            />
+                          </div>
                           {/* Effects are basic-tier (B2) — see the hotspot note. */}
                           {(
                             <div className="p-2 bg-blue-50 rounded space-y-2">
@@ -4886,6 +4911,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                           
+                          {/* Guard (B1a): shown on this prop's edge in the flowchart */}
+                          <div className="p-2 bg-violet-50/60 rounded">
+                            <ChoiceConditionsEditor
+                              value={prop.conditions}
+                              onChange={(conds) => handleUpdateProp(index, 'conditions', conds)}
+                              allBeats={allBeats}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                            />
+                          </div>
                           {/* Effects (counter/variable only — inventory handled inherently by pickProp) */}
                           <div className="p-2 bg-blue-50 rounded space-y-2">
                             <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>

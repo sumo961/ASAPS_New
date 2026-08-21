@@ -26,6 +26,7 @@ import { useAI } from '../hooks/useAI';
 import { CharacterRefField } from '../components/characters/CharacterRefField';
 import type { DialogGenerationRequest } from '../types/ai';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
+import { ChoiceConditionsEditor } from './ChoiceConditionsEditor';
 import { TextFieldWithVariables } from './TextFieldWithVariables';
 import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 import { dialogTreePhaseCount } from '../utils/dialogTreePhases';
@@ -55,12 +56,10 @@ interface DialogChoice {
   soundEffect?: string;  // Sound to play when choice is selected
 }
 
-interface Condition {
-  type: 'variable' | 'counter' | 'inventory' | 'visitedBeat';
-  operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
-  left: string;
-  right: any;
-}
+// The engine's Condition (the runtime evaluates choice.conditions with
+// StoryContext.checkCondition) — a narrower local clone used to live here
+// and drifted from the canonical shape.
+type Condition = import('@asaps/core').Condition;
 
 interface CounterOption {
   name: string;
@@ -797,6 +796,18 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         </p>
                       )}
 
+                      {/* Guard (B1a): the choice is offered only when every
+                          condition holds — same editor as multiChoice. */}
+                      <div className="mt-2">
+                        <ChoiceConditionsEditor
+                          value={choice.conditions}
+                          onChange={(conds) => updateChoiceAtPath(path, index, { conditions: conds })}
+                          allBeats={allBeats}
+                          availableCounters={effectCounters}
+                          availableVariables={effectVariables}
+                          availableInventoryItems={effectInventoryItems}
+                        />
+                      </div>
                       {/* Effects editor (counters, variables, inventory) */}
                       <div className="mt-2">
                         <span className="text-xs text-gray-600">Effects:</span>

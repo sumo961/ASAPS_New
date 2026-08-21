@@ -111,8 +111,17 @@ export const CustomEdge: React.FC<EdgeProps> = ({
             }}
             className="nodrag nopan"
           >
-            <div className="bg-white px-2 py-1 rounded border border-gray-300 shadow-sm">
-              {data?.condition ? (
+            <div
+              className={`bg-white px-2 py-1 rounded border shadow-sm ${data?.guardSummary ? 'border-violet-300' : 'border-gray-300'}`}
+              title={data?.guardSummary ? `Shown only if: ${data.guardSummary}` : undefined}
+            >
+              {data?.guardSummary ? (
+                // Guarded choice (B1a) — the condition reads on the edge it gates
+                <div className="flex flex-col items-start">
+                  <span className="text-xs text-gray-700">{label}</span>
+                  <span className="text-[10px] text-violet-700">◇ {data.guardSummary}</span>
+                </div>
+              ) : data?.condition ? (
                 <div className="flex items-center gap-1">
                   <span className="text-yellow-600">⚡</span>
                   <span className="font-mono text-xs">{label}</span>

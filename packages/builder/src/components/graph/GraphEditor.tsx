@@ -21,6 +21,7 @@ import { CustomEdge } from './CustomEdge';
 import { ClusterContainerNode } from './ClusterContainerNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
+import { summarizeConditions } from '../../utils/conditionSummary';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -703,22 +704,34 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
       // Add connections with unique IDs, resolving cluster boundaries
       connections.forEach((connection) => {
+        // Guarded choice (B1a): choice.conditions travels on the connection
+        // (MultiChoice/MovementChoice/PickProp getConnections). The guard is
+        // rendered ON the edge it gates — dashed violet + ◇ + summary —
+        // "logic visible where it acts".
+        const guardConds = Array.isArray(connection.condition) && connection.condition.length > 0
+          ? connection.condition
+          : null;
+        const guardSummary = guardConds
+          ? summarizeConditions(guardConds, (id: string) => beats.find(b => b.id === id)?.name)
+          : null;
         const edge = createEdge(beat.id, connection.targetId, {
           id: `conn-${beat.id}-${connection.targetId}`,
           type: 'custom',
-          animated: connection.condition !== undefined,
-          label: connection.label || (connection.condition ? '?' : ''),
+          animated: connection.condition !== undefined && !guardConds,
+          label: connection.label || (connection.condition && !guardConds ? '?' : ''),
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 20,
             height: 20,
           },
           style: {
-            stroke: connection.condition ? '#fbbf24' : '#64748b',
+            stroke: guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : '#64748b',
             strokeWidth: 2,
+            ...(guardConds ? { strokeDasharray: '6 3' } : {}),
           },
           data: {
-            condition: connection.condition,
+            condition: guardConds ? undefined : connection.condition,
+            guardSummary,
           },
         });
 
