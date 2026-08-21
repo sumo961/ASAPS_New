@@ -18,7 +18,6 @@
  */
 import React from 'react';
 import { ProjectLibrary } from '../components/ProjectLibrary';
-import { useProject } from '../contexts/PersistenceContext';
 import { importProjectFromZip } from '../utils/projectZipManager';
 
 // macOS Electron uses `titleBarStyle: 'hiddenInset'` which puts the
@@ -62,7 +61,6 @@ function dispatchPick(intent: StartIntent) {
 const LAST_PROJECT_KEY = 'asaps-last-project-id';
 
 export const StartWindow: React.FC = () => {
-  const { create: createProject } = useProject();
   // Read the last-session project id so the Continue banner can
   // surface it. The full Project metadata is fetched by ProjectLibrary
   // during its listProjects sweep; we just need the id to flag it.
@@ -73,19 +71,11 @@ export const StartWindow: React.FC = () => {
   // Empty path — create a fresh project right here in the start
   // window's storage context (same IndexedDB) and hand the new id
   // to the editor.
-  const handleEmpty = async () => {
-    try {
-      const newId = await createProject('Untitled Project', undefined);
-      if (newId) {
-        dispatchPick({ openProject: newId });
-      } else {
-        dispatchPick({ createEmpty: true });
-      }
-    } catch (err) {
-      console.warn('[StartWindow] createProject failed; deferring to editor', err);
-      dispatchPick({ createEmpty: true });
-    }
-  };
+  // Empty ALWAYS routes to the editor's New Project dialog — the same door
+  // as + New → Empty. This tile used to silently create an untitled scratch
+  // instead (two doors, two behaviors, and the tile's "pick layout up
+  // front" promise was false on this one).
+  const handleEmpty = () => dispatchPick({ createEmpty: true });
 
   const handlePrompt = () => dispatchPick({ openStoryGen: true });
   const handleIdeator = () => dispatchPick({ openIdeator: true });

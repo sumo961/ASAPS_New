@@ -53,6 +53,7 @@ import { notifyIfCorrupted } from './utils/projectRepair';
 import { downloadProjectAsZip, importProjectFromZip, getProjectDataForExport } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { isProjectNew } from './utils/newProjectRegistry';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
@@ -2577,6 +2578,16 @@ function App() {
 
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
+
+        // Unify the two Empty doors (eval §2.1 #3): a dialog-created project
+        // used to load as a BLANK grid while the scratch path got the
+        // 3-beat starter. Born-this-session + zero beats = fresh creation →
+        // seed the starter story; the title stays the name the author typed.
+        if (beatsRef.current.length === 0 && isProjectNew(currentProject.id)) {
+          console.log('[App] >>> Seeding starter story into fresh named project');
+          initializeStory();
+          actions.setTitle(currentProject.name);
+        }
         console.log('[App] >>> Project switch complete');
       } else if (isNewUntitledProject && beatsRef.current.length > 0) {
         // New untitled project AND beats have been created - save current story state to it
@@ -2887,6 +2898,16 @@ function App() {
         setIsUntitledProject(currentProject.name === 'Untitled Project');
         loadedProjectIdRef.current = currentProject.id;
         console.log('[App] >>> isUntitledProject set to:', currentProject.name === 'Untitled Project');
+        // Unify the two Empty doors (eval §2.1 #3): a dialog-created project
+        // used to load as a BLANK grid while the scratch path got the
+        // 3-beat starter. Born-this-session + zero beats = fresh creation →
+        // seed the starter story; the title stays the name the author typed.
+        if (beatsRef.current.length === 0 && isProjectNew(currentProject.id)) {
+          console.log('[App] >>> Seeding starter story into fresh named project');
+          initializeStory();
+          actions.setTitle(currentProject.name);
+        }
+
       }
     } catch (error) {
       console.error('[App] >>> FAILED to load project:', error);
