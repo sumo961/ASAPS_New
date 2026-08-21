@@ -16,7 +16,10 @@ export interface DialogInternalNodeData {
   text: string;
   /** Root exchange — the loop target for '↩' choices. */
   isRoot?: boolean;
-  hasGuard?: boolean;
+  /** "has key · trust ≥ 2" — rendered as a ◇ chip on the card (the edge
+   *  keeps the dashed-violet stroke; a midpoint pill would collide with
+   *  neighboring cards in the tight column layout). */
+  guardSummary?: string;
 }
 
 export const DialogInternalNode = memo<NodeProps<DialogInternalNodeData>>(({ data }) => {
@@ -26,7 +29,9 @@ export const DialogInternalNode = memo<NodeProps<DialogInternalNodeData>>(({ dat
       className={`rounded-md border text-xs leading-snug px-2 py-1 shadow-sm overflow-hidden ${
         isNpc
           ? 'bg-emerald-50 border-emerald-300'
-          : 'bg-white border-gray-300'
+          : data.guardSummary
+            ? 'bg-white border-violet-300'
+            : 'bg-white border-gray-300'
       }`}
       style={{ width: DLG_NODE_W, height: DLG_NODE_H }}
       title={isNpc ? `${data.speaker ? data.speaker + ': ' : ''}${data.text}` : data.text}
@@ -43,9 +48,19 @@ export const DialogInternalNode = memo<NodeProps<DialogInternalNodeData>>(({ dat
           <div className="text-gray-700 truncate">{data.text}</div>
         </>
       ) : (
-        <div className="flex items-start gap-1 h-full">
-          <span className="text-gray-400">▪</span>
-          <span className="text-gray-800 line-clamp-2">{data.text}</span>
+        <div className="flex flex-col h-full justify-center">
+          <div className="flex items-start gap-1">
+            <span className="text-gray-400">▪</span>
+            <span className={`text-gray-800 ${data.guardSummary ? 'truncate' : 'line-clamp-2'}`}>{data.text}</span>
+          </div>
+          {data.guardSummary && (
+            <div
+              className="text-[10px] text-violet-700 truncate pl-3.5"
+              title={`Shown only if: ${data.guardSummary}`}
+            >
+              ◇ {data.guardSummary}
+            </div>
+          )}
         </div>
       )}
       <Handle

@@ -301,7 +301,12 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
               speaker: row.speaker,
               text: row.text,
               isRoot: row.pathId === 'root',
-              hasGuard: !!row.conditions,
+              // The guard renders ON the card — between 175px columns an
+              // edge-midpoint pill inevitably collides with the next node.
+              // The edge keeps the dashed-violet stroke as the signal.
+              guardSummary: row.conditions
+                ? summarizeConditions(row.conditions, (bid: string) => beats.find(b => b.id === bid)?.name)
+                : undefined,
             },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
@@ -856,10 +861,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
               markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12 },
               style: {
                 stroke: guardSummary ? '#8b5cf6' : isLoop ? '#cbd5e1' : '#94a3b8',
-                strokeWidth: 1.25,
+                strokeWidth: guardSummary ? 1.75 : 1.25,
                 ...(guardSummary || isLoop ? { strokeDasharray: '5 3' } : {}),
               },
-              data: guardSummary ? { guardSummary } : undefined,
+              // No label pill inside the container — the ◇ text lives on the
+              // guarded card where there is room (see DialogInternalNode).
             } as Edge);
           }
         });
