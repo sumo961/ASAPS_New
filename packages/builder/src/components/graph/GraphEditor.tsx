@@ -290,7 +290,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             id: `dlg:${beat.id}:${row.pathId}`,
             type: 'dialogInternal',
             position: { x: row.x, y: row.y },
-            zIndex: 21,
+            zIndex: 22,
             parentNode: beat.id,
             extent: 'parent' as const,
             draggable: false,
@@ -1537,6 +1537,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onNodeDragStop={onNodeDragStop}
         onSelectionChange={onSelectionChange}
         multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
+        // Selection elevation (+1000) would lift an opaque expanded dialog
+        // above its own internal-edge layers; explicit zIndex tiers on the
+        // dialog nodes/edges handle stacking instead.
+        elevateNodesOnSelect={false}
         deleteKeyCode={null}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
