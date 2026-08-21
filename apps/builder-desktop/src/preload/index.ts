@@ -84,6 +84,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:save', callback);
     return () => ipcRenderer.removeListener('menu:save', callback);
   },
+  onMenuStorySettings: (callback: () => void) => {
+    ipcRenderer.on('menu:story-settings', callback);
+    return () => ipcRenderer.removeListener('menu:story-settings', callback);
+  },
+  onMenuCharacters: (callback: () => void) => {
+    ipcRenderer.on('menu:characters', callback);
+    return () => ipcRenderer.removeListener('menu:characters', callback);
+  },
+  onMenuDebug: (callback: () => void) => {
+    ipcRenderer.on('menu:debug', callback);
+    return () => ipcRenderer.removeListener('menu:debug', callback);
+  },
   onMenuExport: (callback: () => void) => {
     ipcRenderer.on('menu:export', callback);
     return () => ipcRenderer.removeListener('menu:export', callback);
@@ -377,6 +389,9 @@ declare global {
       onMcpSettingChanged: (callback: (enabled: boolean) => void) => () => void;
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
+      onMenuStorySettings?: (callback: () => void) => () => void;
+      onMenuCharacters?: (callback: () => void) => () => void;
+      onMenuDebug?: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
       onMenuAutoArrange: (callback: () => void) => () => void;
       onProjectOpen: (callback: (path: string) => void) => () => void;

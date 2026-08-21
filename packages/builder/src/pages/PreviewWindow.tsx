@@ -748,11 +748,23 @@ export const PreviewWindow: React.FC = () => {
 
   // Note: hasAutoStarted is now only used to track if we've shown the initial "waiting to start" state
 
+  // Stable fingerprint of a preset's game state, so an equivalent preset can
+  // be recognized across regenerations. Key order is normalized.
+  const presetStateSignature = (p: { state: StatePreset['state'] }): string => {
+    const sortObj = (o: Record<string, any> | undefined) =>
+      Object.fromEntries(Object.entries(o ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+    return JSON.stringify({
+      v: sortObj(p.state.variables),
+      c: sortObj(p.state.counters),
+      i: [...(p.state.inventory ?? [])].sort(),
+      b: [...(p.state.visitedBeats ?? [])].sort(),
+    });
+  };
+
   // Auto-generate presets when story or start beat changes
   useEffect(() => {
-    setSelectedPreset(null);
-
     if (!story || !startBeatId) {
+      setSelectedPreset(null);
       setGeneratedPresets([]);
       setTotalPathCount(0);
       return;
@@ -761,6 +773,7 @@ export const PreviewWindow: React.FC = () => {
     // Check if this is the first beat - no paths needed
     const firstBeatId = story.getMetadata().firstBeatId;
     if (startBeatId === firstBeatId) {
+      setSelectedPreset(null);
       setGeneratedPresets([]);
       setTotalPathCount(0);
       return;
@@ -776,16 +789,25 @@ export const PreviewWindow: React.FC = () => {
         setTotalPathCount(result.totalPaths);
         console.log('[PreviewWindow] Generated', result.presets.length, 'unique states from', result.totalPaths, 'paths for beat:', startBeatId);
 
-        // Auto-select first preset if there's only one path
-        if (result.presets.length === 1) {
-          const preset: StatePreset = {
-            ...result.presets[0].preset,
-            id: 'auto_0',
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString(),
-          };
-          setSelectedPreset(preset);
-        }
+        // Preserve the author's chosen state across story edits — the core
+        // expert loop is edit → verify, and wiping the selection on every
+        // 300ms STORY_UPDATE forced a re-pick per iteration (~40×/session).
+        // Keep it as long as an equivalent state still exists in the
+        // regenerated set; otherwise fall back to the old behavior.
+        setSelectedPreset(prev => {
+          if (prev && result.presets.some(p => presetStateSignature(p.preset) === presetStateSignature(prev))) {
+            return prev;
+          }
+          if (result.presets.length === 1) {
+            return {
+              ...result.presets[0].preset,
+              id: 'auto_0',
+              createdAt: new Date().toISOString(),
+              modifiedAt: new Date().toISOString(),
+            };
+          }
+          return null;
+        });
       } catch (error) {
         console.error('[PreviewWindow] Failed to generate presets:', error);
         setGeneratedPresets([]);
@@ -794,6 +816,7 @@ export const PreviewWindow: React.FC = () => {
         setIsGeneratingPresets(false);
       }
     }, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story, startBeatId]);
 
   // Manual refresh handler for the refresh button

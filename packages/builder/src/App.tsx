@@ -121,6 +121,9 @@ declare global {
       };
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
+      onMenuStorySettings?: (callback: () => void) => () => void;
+      onMenuCharacters?: (callback: () => void) => () => void;
+      onMenuDebug?: (callback: () => void) => () => void;
       onMenuExport: (callback: () => void) => () => void;
       onMenuAutoArrange: (callback: () => void) => () => void;
       onMcpSettingChanged?: (callback: (enabled: boolean) => void) => () => void;
@@ -855,6 +858,9 @@ function App() {
   vcsRef.current = vcs;
   const isUntitledProjectRef = useRef(isUntitledProject);
   isUntitledProjectRef.current = isUntitledProject;
+  // Menu-bar bridge for the debug window — the handler is defined later in
+  // the file; the early Electron-menu effect calls through this ref.
+  const openDebugPanelRef = useRef<() => void>(() => {});
   const currentProjectRef2 = useRef(currentProject);
   currentProjectRef2.current = currentProject;
   const stateTitleRef = useRef(state.title);
@@ -934,6 +940,17 @@ function App() {
         if (path) handleProjectOpenPath(path);
       })
       .catch(() => {});
+
+    // Menu-bar parity for toolbar workhorses (UX eval §3.4)
+    const unsubscribeStorySettings = window.electronAPI.onMenuStorySettings?.(() => {
+      setShowSettings(true);
+    });
+    const unsubscribeCharacters = window.electronAPI.onMenuCharacters?.(() => {
+      setShowCharacterManager(true);
+    });
+    const unsubscribeDebug = window.electronAPI.onMenuDebug?.(() => {
+      openDebugPanelRef.current();
+    });
 
     // Handle Save from File menu
     const unsubscribeSave = window.electronAPI.onMenuSave(() => {
@@ -1090,6 +1107,9 @@ function App() {
     return () => {
       unsubscribeOpen();
       unsubscribeSave();
+      unsubscribeStorySettings?.();
+      unsubscribeCharacters?.();
+      unsubscribeDebug?.();
       unsubscribeExport();
       unsubscribeSaveAs();
       unsubscribeNew();
@@ -3740,7 +3760,11 @@ function App() {
       unsubs.push(api.onVCSTogglePanel(() => setVcsPanelOpen(prev => !prev)));
     }
     if (api?.onVCSCommit) {
-      unsubs.push(api.onVCSCommit(() => { setVcsPanelOpen(true); /* focus commit input */ }));
+      unsubs.push(api.onVCSCommit(() => {
+        setVcsPanelOpen(true);
+        // Focus lands after the panel mounts; the tab listens for this event.
+        setTimeout(() => window.dispatchEvent(new Event('asaps:focusCommitInput')), 150);
+      }));
     }
     if (api?.onVCSPush && vcsCtx) {
       unsubs.push(api.onVCSPush(() => { vcsCtx.push(); }));
@@ -6029,6 +6053,7 @@ function App() {
     debugWindowManager.open(storyData);
     setShowDebugPanel(true); // kept for backwards-compatible state tracking
   }, [getSerializedStoryData]);
+  openDebugPanelRef.current = handleOpenDebugPanel;
 
   /**
    * Handle closing debug panel (close the pop-out and clear any trace highlight).

@@ -128,6 +128,9 @@ if (!gotTheLock) {
 interface AppSettings {
   mcpEnabled: boolean;
   autoUpdateEnabled: boolean;
+  /** Last-known bounds per window kind — restored at create so a
+   *  multi-monitor layout survives relaunch. */
+  windowBounds?: Record<string, { x?: number; y?: number; width: number; height: number }>;
 }
 
 const defaultSettings: AppSettings = {
@@ -163,6 +166,33 @@ function saveAppSettings(settings: AppSettings): void {
 }
 
 let appSettings = loadAppSettings();
+
+/** Restore persisted bounds for a window kind, falling back to defaults.
+ *  Off-screen positions (monitor unplugged) are discarded by Electron's
+ *  own visibility handling on setBounds-at-create; width/height are
+ *  clamped to the given minimums. */
+function boundsFor(kind: string, defaults: { width: number; height: number }, minWidth = 400, minHeight = 300): { width: number; height: number; x?: number; y?: number } {
+  const saved = appSettings.windowBounds?.[kind];
+  if (!saved) return defaults;
+  return {
+    width: Math.max(minWidth, saved.width || defaults.width),
+    height: Math.max(minHeight, saved.height || defaults.height),
+    ...(typeof saved.x === 'number' && typeof saved.y === 'number' ? { x: saved.x, y: saved.y } : {}),
+  };
+}
+
+/** Persist bounds on close (debounce-free: close is rare). */
+function trackBounds(win: Electron.BrowserWindow, kind: string): void {
+  win.on('close', () => {
+    try {
+      const b = win.getBounds();
+      appSettings.windowBounds = { ...(appSettings.windowBounds ?? {}), [kind]: b };
+      saveAppSettings(appSettings);
+    } catch {
+      /* window already destroyed — keep old bounds */
+    }
+  });
+}
 
 // Auto-updater setup
 function setupAutoUpdater(): void {
@@ -331,8 +361,7 @@ function createWindow(intent?: Record<string, string>): void {
     return;
   }
   mainWindow = new BrowserWindow({
-    width: 1800,
-    height: 950,
+    ...boundsFor('main', { width: 1800, height: 950 }, 1550, 800),
     minWidth: 1550,
     minHeight: 800,
     webPreferences: {
@@ -384,6 +413,7 @@ function createWindow(intent?: Record<string, string>): void {
     return { action: 'deny' };
   });
 
+  trackBounds(mainWindow, 'main');
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -402,8 +432,7 @@ function createStartWindow(): void {
   }
 
   startWindow = new BrowserWindow({
-    width: 1100,
-    height: 800,
+    ...boundsFor('start', { width: 1100, height: 800 }, 900, 600),
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
@@ -436,6 +465,7 @@ function createStartWindow(): void {
     return { action: 'deny' };
   });
 
+  trackBounds(startWindow, 'start');
   startWindow.on('closed', () => {
     startWindow = null;
   });
@@ -611,6 +641,24 @@ function createMenu(): void {
           label: 'Auto-arrange Beats',
           accelerator: 'CmdOrCtrl+Shift+A',
           click: () => mainWindow?.webContents.send('menu:auto-arrange'),
+        },
+        { type: 'separator' },
+        // Menu-bar parity for toolbar workhorses (UX eval §3.4): Story
+        // Settings had NO menu item and no shortcut at all.
+        {
+          label: 'Story Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => mainWindow?.webContents.send('menu:story-settings'),
+        },
+        {
+          label: 'Characters',
+          accelerator: 'CmdOrCtrl+Shift+C',
+          click: () => mainWindow?.webContents.send('menu:characters'),
+        },
+        {
+          label: 'Debug Tools',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click: () => mainWindow?.webContents.send('menu:debug'),
         },
         { type: 'separator' },
         { role: 'togglefullscreen' },
@@ -1095,10 +1143,8 @@ function createPreviewWindow(): void {
   const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
 
   previewWindow = new BrowserWindow({
-    width: 1200,
-    height: 900,
-    x: mainBounds.x + 50,
-    y: mainBounds.y + 50,
+    ...{ x: mainBounds.x + 50, y: mainBounds.y + 50 },
+    ...boundsFor('preview', { width: 1200, height: 900 }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -1128,6 +1174,7 @@ function createPreviewWindow(): void {
   }
 
   // Notify main window when preview is closed
+  trackBounds(previewWindow, 'preview');
   previewWindow.on('closed', () => {
     previewWindow = null;
     mainWindow?.webContents.send('preview:closed');
@@ -1192,10 +1239,8 @@ function createDebugWindow(): void {
   const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
 
   debugWindow = new BrowserWindow({
-    width: 900,
-    height: 800,
-    x: mainBounds.x + 80,
-    y: mainBounds.y + 80,
+    ...{ x: mainBounds.x + 80, y: mainBounds.y + 80 },
+    ...boundsFor('debug', { width: 900, height: 800 }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -1219,6 +1264,7 @@ function createDebugWindow(): void {
     });
   }
 
+  trackBounds(debugWindow, 'debug');
   debugWindow.on('closed', () => {
     debugWindow = null;
     mainWindow?.webContents.send('debug:closed');
@@ -1283,10 +1329,8 @@ function createIdeatorWindow(options: { projectTitle?: string; projectId?: strin
   const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
 
   ideatorWindow = new BrowserWindow({
-    width: 900,
-    height: 800,
-    x: mainBounds.x + 80,
-    y: mainBounds.y + 80,
+    ...{ x: mainBounds.x + 80, y: mainBounds.y + 80 },
+    ...boundsFor('ideator', { width: 900, height: 800 }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -1318,6 +1362,7 @@ function createIdeatorWindow(options: { projectTitle?: string; projectId?: strin
     });
   }
 
+  trackBounds(ideatorWindow, 'ideator');
   ideatorWindow.on('closed', () => {
     ideatorWindow = null;
     mainWindow?.webContents.send('ideator:closed');
@@ -1372,10 +1417,8 @@ function createCoDesignerWindow(options: { projectTitle?: string } = {}): void {
   const mainBounds = mainWindow?.getBounds() || { x: 100, y: 100 };
 
   codesignerWindow = new BrowserWindow({
-    width: 900,
-    height: 800,
-    x: mainBounds.x + 110,
-    y: mainBounds.y + 110,
+    ...{ x: mainBounds.x + 110, y: mainBounds.y + 110 },
+    ...boundsFor('codesigner', { width: 900, height: 800 }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -1404,6 +1447,7 @@ function createCoDesignerWindow(options: { projectTitle?: string } = {}): void {
     });
   }
 
+  trackBounds(codesignerWindow, 'codesigner');
   codesignerWindow.on('closed', () => {
     codesignerWindow = null;
     mainWindow?.webContents.send('codesigner:closed');

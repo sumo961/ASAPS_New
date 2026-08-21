@@ -24,6 +24,15 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
   const vcs = useVCSStatus();
   const translationState = useTranslationState();
   const [commitMessage, setCommitMessage] = useState('');
+  const commitInputRef = useRef<HTMLTextAreaElement | null>(null);
+  // ⌘K (menu: Version Control → Commit…) opens the panel and asks for focus
+  // via this event — completing the '/* focus commit input */' the App-side
+  // handler shipped as a comment.
+  useEffect(() => {
+    const focus = () => commitInputRef.current?.focus();
+    window.addEventListener('asaps:focusCommitInput', focus);
+    return () => window.removeEventListener('asaps:focusCommitInput', focus);
+  }, []);
   const [isCommitting, setIsCommitting] = useState(false);
   const [showIdentityForm, setShowIdentityForm] = useState(false);
   const [identityName, setIdentityName] = useState('');
@@ -334,9 +343,19 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
       {(staged.length > 0 || unstaged.length > 0) && (
         <div style={{ borderTop: '1px solid #334155', padding: 8, flexShrink: 0 }}>
           <textarea
+            ref={commitInputRef}
+            autoFocus
             value={commitMessage}
             onChange={e => setCommitMessage(e.target.value)}
-            placeholder="Enter commit message to enable commit..."
+            onKeyDown={e => {
+              // Cmd/Ctrl+Enter commits — a keyboard-driven commit needed two
+              // mouse trips (focus the box, click the button) before this.
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                handleCommit();
+              }
+            }}
+            placeholder="Enter commit message to enable commit... (⌘⏎ to commit)"
             style={{
               width: '100%',
               height: 48,

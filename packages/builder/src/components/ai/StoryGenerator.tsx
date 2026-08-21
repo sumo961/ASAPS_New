@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Sparkles, Loader2, AlertCircle, BookOpen, X, Cpu, Info } from 'lucide-react';
 import { useAI } from '../../hooks/useAI';
 import type { StoryGenerationRequest } from '../../types/ai';
+import { usePersistedState } from '../../utils/persistedState';
 
 export interface StoryGeneratorProps {
   /** Whether dialog is open */
@@ -31,14 +32,17 @@ export const StoryGenerator: React.FC<StoryGeneratorProps> = ({
   const { isConfigured, isGenerating, error, generateStory, clearError, cancelGeneration, currentProvider, generationProgress } = useAI();
 
   const [prompt, setPrompt] = useState('');
-  const [genre, setGenre] = useState<string>('');
-  const [length, setLength] = useState<'short' | 'medium' | 'long'>('medium');
-  const [complexity, setComplexity] = useState<'linear' | 'moderate' | 'complex'>('moderate');
-  const [includeAIBeats, setIncludeAIBeats] = useState(false);
+  // Generation settings persist as "last used" (author-scoped) — an author
+  // who always works long/complex re-picked three dropdowns and a checkbox
+  // on every single run.
+  const [genre, setGenre] = usePersistedState<string>('asaps_ui_storygen_genre', '');
+  const [length, setLength] = usePersistedState<'short' | 'medium' | 'long'>('asaps_ui_storygen_length', 'medium');
+  const [complexity, setComplexity] = usePersistedState<'linear' | 'moderate' | 'complex'>('asaps_ui_storygen_complexity', 'moderate');
+  const [includeAIBeats, setIncludeAIBeats] = usePersistedState<boolean>('asaps_ui_storygen_aibeats', false);
   // v0.9.46+ — affect depth dial. 'auto' lets the AI read the prompt
   // and pick a tier; explicit tiers force the depth regardless of prompt.
   // See packages/core/src/prompts/affectPrompt.ts for tier definitions.
-  const [affectDepth, setAffectDepth] = useState<'auto' | 'sparse' | 'standard' | 'rich'>('auto');
+  const [affectDepth, setAffectDepth] = usePersistedState<'auto' | 'sparse' | 'standard' | 'rich'>('asaps_ui_storygen_affect', 'auto');
 
   /**
    * Generate story from prompt
