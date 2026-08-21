@@ -22,6 +22,7 @@ import { ClusterContainerNode } from './ClusterContainerNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { summarizeConditions } from '../../utils/conditionSummary';
+import { dialogTreeOutline } from '../../utils/dialogTreeOutline';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -160,6 +161,19 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Ids of all currently multi-selected beat nodes (ReactFlow selection:
   // shift+drag marquee on the pane, or cmd/ctrl/shift+click on nodes).
   const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+
+  // B1b — dialogTree disclosure expansion (session-scoped). Expanded beats
+  // render their internal tree inside the node; their outgoing edges leave
+  // from per-exit handles instead of the node's main source handle.
+  const [expandedDialogs, setExpandedDialogs] = useState<Set<string>>(new Set());
+  const toggleDialogExpand = useCallback((beatId: string) => {
+    setExpandedDialogs(prev => {
+      const next = new Set(prev);
+      if (next.has(beatId)) next.delete(beatId);
+      else next.add(beatId);
+      return next;
+    });
+  }, []);
   const onSelectionChange = useCallback(
     ({ nodes: selNodes }: { nodes: Node[] }) => {
       setMultiSelectedIds(selNodes.filter(n => n.type === 'beat').map(n => n.id));
@@ -232,6 +246,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       }
     }
 
+    // B1b: names for the expanded dialog's exit chips (built once per memo run)
+    const beatNamesById: Record<string, string> = {};
+    for (const b of beats) beatNamesById[b.id] = b.name;
+
     const beatNodes = unclusteredBeats.map((beat) => ({
       id: beat.id,
       type: 'beat',
@@ -246,6 +264,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
         pwCurrent: pwCurrentBeatIdRef.current === beat.id,
         brokenTarget: brokenTargetsRef.current?.[beat.id],
+        // B1b — dialogTree disclosure expansion
+        ...(beat.type === 'dialogTree' ? {
+          dialogTree: (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree,
+          dialogExpanded: expandedDialogs.has(beat.id),
+          onToggleDialogExpand: toggleDialogExpand,
+          beatNames: beatNamesById,
+        } : {}),
       },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
@@ -346,7 +371,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
-  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound]);
+  }, [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(() => {
@@ -401,6 +426,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     beats.forEach((beat) => {
       // Get beat parameters for special handling
       const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+
+      // B1b — when a dialogTree is expanded (and rendered as its own node,
+      // i.e. not resolved into a cluster container), its outgoing edges are
+      // emitted ONLY from the per-exit handles below; both legacy dialog
+      // edge emitters are suppressed to avoid doubled edges.
+      const dialogExpandedHere =
+        beat.type === 'dialogTree' && expandedDialogs.has(beat.id) && !getBeatCluster(beat.id);
       
       // Special handling for setTimer beats - show timer target in red
       if (beat.type === 'setTimer' && params.timerTarget) {
@@ -514,7 +546,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         return null;
       };
 
-      if (beat.type === 'dialogTree' && params.dialogTree) {
+      if (beat.type === 'dialogTree' && params.dialogTree && !dialogExpandedHere) {
         const addDialogChoiceEdge = (choice: any, index: number, prefix: string) => {
           const target = extractTarget(choice);
           if (target) {
@@ -702,8 +734,40 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         console.log(`[GraphEditor] Beat ${beat.id} (${beat.type}): connections=${connections.length}, defaultTarget=${beat.defaultTarget}`);
       }
 
+      // B1b — expanded dialogTree: outgoing edges leave from the per-exit
+      // handles inside the node (sourceHandle = outline pathId), so each
+      // edge visibly originates from the choice that produces it. Only for
+      // unclustered beats — a beat resolved into a cluster container has no
+      // such handles. Guarded exits keep the ◇ treatment on the edge.
+      if (dialogExpandedHere) {
+        const tree = params.dialogTree ?? (beat as any).dialogTree;
+        const outline = dialogTreeOutline(tree);
+        outline.exits.forEach((exit) => {
+          const guardSummary = exit.conditions
+            ? summarizeConditions(exit.conditions, (bid: string) => beats.find(b => b.id === bid)?.name)
+            : null;
+          const edge = createEdge(beat.id, exit.exitTarget!, {
+            id: `dlgexit-${beat.id}-${exit.pathId}`,
+            type: 'custom',
+            sourceHandle: exit.pathId,
+            label: '',
+            markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+            style: {
+              stroke: guardSummary ? '#8b5cf6' : '#0ea5e9',
+              strokeWidth: 1.5,
+              ...(guardSummary ? { strokeDasharray: '6 3' } : {}),
+            },
+            data: { guardSummary },
+          });
+          if (edge && !edgeIds.has(edge.id)) {
+            edgeIds.add(edge.id);
+            allEdges.push(edge);
+          }
+        });
+      }
+
       // Add connections with unique IDs, resolving cluster boundaries
-      connections.forEach((connection) => {
+      if (!dialogExpandedHere) connections.forEach((connection) => {
         // Guarded choice (B1a): choice.conditions travels on the connection
         // (MultiChoice/MovementChoice/PickProp getConnections). The guard is
         // rendered ON the edge it gates — dashed violet + ◇ + summary —
@@ -837,7 +901,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     });
 
     return allEdges;
-  }, [beats]);
+  }, [beats, expandedDialogs]);
 
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
@@ -869,7 +933,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // Build a fingerprint of the nodes: IDs + positions + selection state
     // Include selectedBeatId for cluster nodes so beat selection across clusters propagates
     const fingerprint = nodes.map(n =>
-      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.selectedBeatId || ''}`
+      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${n.data?.selectedBeatId || ''}`
     ).join('|');
 
     if (fingerprint === prevNodeIdsRef.current) {

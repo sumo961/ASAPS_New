@@ -100,7 +100,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   return (
     <>
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} />
-      {label && (
+      {(label || data?.guardSummary) && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -118,7 +118,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
               {data?.guardSummary ? (
                 // Guarded choice (B1a) — the condition reads on the edge it gates
                 <div className="flex flex-col items-start">
-                  <span className="text-xs text-gray-700">{label}</span>
+                  {label ? <span className="text-xs text-gray-700">{label}</span> : null}
                   <span className="text-[10px] text-violet-700">◇ {data.guardSummary}</span>
                 </div>
               ) : data?.condition ? (
