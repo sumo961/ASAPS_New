@@ -165,7 +165,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
       `}
       style={{
         borderColor,
-        width: dialogExpanded ? '340px' : `${NODE_WIDTH}px`,
+        width: dialogExpanded ? '380px' : `${NODE_WIDTH}px`,
         backgroundColor: bgColor,
         // Stacked-card edge for multi-phase dialogs: two card outlines peek
         // out behind the bottom-right corner. Box-shadow renders outside the
@@ -212,7 +212,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
               e.stopPropagation();
               data.onToggleDialogExpand!(data.beat.id);
             }}
-            className="text-gray-500 hover:text-gray-800 text-xs leading-none px-0.5"
+            className="text-gray-600 hover:text-gray-900 text-base leading-none px-1 -ml-1"
             title={dialogExpanded
               ? 'Collapse — hide the internal dialog'
               : 'Expand — show the internal dialog structure in the flowchart'}
@@ -258,7 +258,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
           {outline.rows.map((row) => (
             <div
               key={row.pathId}
-              className={`relative flex items-start gap-1 rounded px-1 py-0.5 text-[10px] leading-tight ${
+              className={`relative flex items-start gap-1 rounded px-1 py-0.5 text-xs leading-snug ${
                 row.kind === 'npc' ? 'bg-emerald-50' : 'bg-white'
               }`}
               style={{ marginLeft: `${Math.min(row.depth, 4) * 10}px` }}
@@ -310,7 +310,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ id, data, selected }) =
             </div>
           ))}
           {outline.truncated && (
-            <div className="text-[10px] text-gray-400 pl-1">… more inside — open the Dialog editor</div>
+            <div className="text-xs text-gray-400 pl-1">… more inside — open the Dialog editor</div>
           )}
         </div>
       )}

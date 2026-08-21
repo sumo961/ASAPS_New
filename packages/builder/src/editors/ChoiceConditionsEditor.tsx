@@ -42,7 +42,7 @@ interface ChoiceConditionsEditorProps {
 type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat';
 
 const GATE_TYPES: Array<{ value: GateType; label: string }> = [
-  { value: 'inventory', label: 'has item' },
+  { value: 'inventory', label: 'item' },
   { value: 'variable', label: 'variable' },
   { value: 'counter', label: 'counter' },
   { value: 'visitedBeat', label: 'visited beat' },
