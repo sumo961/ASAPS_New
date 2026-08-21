@@ -627,7 +627,7 @@ export const Header: React.FC<HeaderProps> = ({
                           setShowToolsMenu(false);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                        title="Bulk transformation commands (Ctrl+Shift+K)"
+                        title="Bulk transformation commands (Ctrl+Shift+F)"
                       >
                         <Wand2 className="w-4 h-4" />
                         Transformations

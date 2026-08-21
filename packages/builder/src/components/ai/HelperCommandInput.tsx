@@ -370,9 +370,6 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   const applyChanges = useCallback(async () => {
     if (!parsedAction || !preview) return;
 
-    const startTime = Date.now();
-    const MIN_DISPLAY_TIME = 600; // Minimum time to show loading overlay (ms)
-
     setIsApplying(true);
     setError(null);
 
@@ -419,19 +416,14 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
         onChangesApplied(Array.from(affectedBeatIds));
       }
 
-      // Ensure minimum display time for the loading overlay
-      const elapsed = Date.now() - startTime;
-      if (elapsed < MIN_DISPLAY_TIME) {
-        await new Promise(resolve => setTimeout(resolve, MIN_DISPLAY_TIME - elapsed));
-      }
-
-      // Reset state and close
+      // Reset for the next command but KEEP THE PANEL OPEN — bulk editing
+      // is a session, not a one-shot; closing after every apply forced a
+      // reopen per command (plus a 600ms artificial spinner minimum, gone).
       setCommand('');
       setParsedAction(null);
       setPreview(null);
       setConversation([]);
       setIsApplying(false);
-      onClose();
 
     } catch (err) {
       console.error('Failed to execute command:', err);
@@ -756,7 +748,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
       <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between text-xs text-gray-500">
           <span>Beats: {beats.length} | Clusters: {clusters.length}</span>
-          <span>Ctrl+Shift+K to toggle | Ctrl+Z to undo</span>
+          <span>Ctrl+Shift+F to toggle | Ctrl+Z to undo</span>
         </div>
       </div>
     </div>

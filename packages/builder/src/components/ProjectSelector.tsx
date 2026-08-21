@@ -32,7 +32,7 @@ export interface ProjectSelectorProps {
  */
 export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
   onOpenLibrary,
-  maxRecentProjects = 5,
+  maxRecentProjects = 12,
   showLibraryButton = true,
   compact = false,
 }) => {

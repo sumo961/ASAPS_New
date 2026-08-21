@@ -20,6 +20,7 @@ import { collectDroppedDirectory, rezipUnzippedProject } from '../utils/folderPr
 import { migrateLibraryToDisk } from '../utils/libraryMigration';
 import { isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
 import { useStorageQuota } from '../hooks/useStorageQuota';
+import { usePersistedState } from '../utils/persistedState';
 
 export interface ProjectLibraryProps {
   /** Called when a project is selected to load */
@@ -587,8 +588,8 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'modified' | 'created' | 'name'>('modified');
+  const [viewMode, setViewMode] = usePersistedState<'grid' | 'list'>('asaps_ui_library_view', 'grid');
+  const [sortBy, setSortBy] = usePersistedState<'modified' | 'created' | 'name'>('asaps_ui_library_sort', 'modified');
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);

@@ -21,6 +21,7 @@ import type {
   StoryWarning,
 } from '@asaps/core';
 import { PathTreeView } from './PathTreeView';
+import { usePersistedState } from '../../utils/persistedState';
 
 interface PathVisualizationProps {
   story: Story;
@@ -33,7 +34,7 @@ export const PathVisualization: React.FC<PathVisualizationProps> = ({
 }) => {
   const [queryInput, setQueryInput] = useState('');
   const [selectedOutcome, setSelectedOutcome] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<'forward' | 'backward' | 'tree'>('forward');
+  const [viewMode, setViewMode] = usePersistedState<'forward' | 'backward' | 'tree'>('asaps_ui_path_view', 'forward');
   const [selectedBackwardBeat, setSelectedBackwardBeat] = useState<string | null>(null);
   const [expandedBackwardPath, setExpandedBackwardPath] = useState<number | null>(null);
 

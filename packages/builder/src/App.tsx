@@ -607,8 +607,10 @@ function App() {
         e.preventDefault();
         setShowSearchPanel(prev => !prev);
       }
-      // Ctrl/Cmd+Shift+K: Toggle AI Helper Commands
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'k') {
+      // Ctrl/Cmd+Shift+F: Toggle Transformations (bulk edit). Was Cmd+Shift+K,
+      // which Electron's VCS-Push menu accelerator shadowed — the binding was
+      // dead on desktop while two tooltips advertised it.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         setShowHelperCommands(prev => !prev);
       }
@@ -644,7 +646,14 @@ function App() {
     });
     const unsubHighlights = debugWindowManager.subscribeToHighlights(evt => {
       if (evt.kind === 'path') setHighlightedBeatIds(evt.beatIds);
-      else if (evt.kind === 'beat') setHighlightedBeatIds([evt.beatId]);
+      else if (evt.kind === 'beat') {
+        setHighlightedBeatIds([evt.beatId]);
+        // Highlight-only turned three good debug reports into wall art: the
+        // beat changed colour 3000px off-screen. Selecting it opens the
+        // Inspector AND centers the canvas (GraphEditor's selection effect).
+        const beat = beatsRef.current.find(b => b.id === evt.beatId);
+        if (beat) setSelectedBeat(beat);
+      }
       else setHighlightedBeatIds([]);
     });
     return () => {

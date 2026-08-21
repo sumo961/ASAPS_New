@@ -7,6 +7,7 @@ import { Map, Palette, Share2 } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from './settings/GlobalSettingsInspector';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
+import { usePersistedState } from '../utils/persistedState';
 
 interface WorkspaceViewProps {
   projectId?: string;
@@ -135,7 +136,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onRevertBeat,
   onUpdateVenueBeacons,
 }) => {
-  const [activeView, setActiveView] = React.useState<'flowchart' | 'visual' | 'knowledgeGraph'>('flowchart');
+  // Persisted: the workspace tab an author lives in shouldn't reset each launch
+  const [activeView, setActiveView] = usePersistedState<'flowchart' | 'visual' | 'knowledgeGraph'>('asaps_ui_workspace_view', 'flowchart');
 
   const showKnowledgeGraph = globalSettings?.features?.showKnowledgeGraph === true;
 

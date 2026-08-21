@@ -18,12 +18,13 @@ import { PathVisualization } from '../components/debug/PathVisualization';
 import { LogicValidationReport } from '../components/debug/LogicValidationReport';
 import type { DebugMessage } from '../services/DebugWindowManager';
 import type { SerializedStoryData } from '../services/PreviewWindowManager';
+import { usePersistedState } from '../utils/persistedState';
 
 type Tab = 'reachability' | 'paths' | 'logic';
 
 export const DebugWindow: React.FC = () => {
   const [storyData, setStoryData] = useState<SerializedStoryData | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('reachability');
+  const [activeTab, setActiveTab] = usePersistedState<Tab>('asaps_ui_debug_tab', 'reachability');
 
   // Listen for STORY_UPDATE messages; ping the opener so it knows we're ready.
   // In Electron the preload exposes the same transport via IPC.

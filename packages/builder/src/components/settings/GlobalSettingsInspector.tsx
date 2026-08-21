@@ -11,6 +11,7 @@ import { validateProjectAssets, type AssetValidationResult } from '../../utils/a
 import { MissingAssetsDialog } from './MissingAssetsDialog';
 import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
+import { usePersistedState } from '../../utils/persistedState';
 
 interface GlobalSettings {
   project: {
@@ -242,7 +243,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     }
     return initialSettings;
   });
-  const [activeTab, setActiveTab] = useState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'translation' | 'debug'>('project');
+  // Persisted: twelve tabs, and every open used to land on tab 1
+  const [activeTab, setActiveTab] = usePersistedState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'translation' | 'debug'>('asaps_ui_settings_tab', 'project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
