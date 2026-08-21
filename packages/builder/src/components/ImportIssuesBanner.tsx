@@ -29,13 +29,17 @@ export interface ImportIssuesBannerProps {
   brokenTargets: BrokenTarget[];
   /** Other validation errors worth showing, already phrased for a person. */
   otherErrors?: string[];
+  /** Where the breakage came from — the copy differs: an import "went
+   *  through with warnings", an edit "broke links just now (undo fixes it)".
+   *  Defaults to 'import' for the two original feeders. */
+  context?: 'import' | 'edit';
   onDismiss: () => void;
   /** Focus a beat in the graph when its row is clicked. */
   onSelectBeat?: (beatId: string) => void;
 }
 
 export function ImportIssuesBanner({
-  brokenTargets, otherErrors = [], onDismiss, onSelectBeat,
+  brokenTargets, otherErrors = [], context = 'import', onDismiss, onSelectBeat,
 }: ImportIssuesBannerProps) {
   const [expanded, setExpanded] = useState(true);
   if (brokenTargets.length === 0 && otherErrors.length === 0) return null;
@@ -58,8 +62,9 @@ export function ImportIssuesBanner({
               {/* Say what the interactor will experience, not what the data looks
                   like — "points at a missing beat" means nothing until you have
                   watched a story stop dead. */}
-              They point at a beat that does not exist, so the story stops there
-              when someone plays it. The rest of the story imported normally
+              {context === 'edit'
+                ? 'They point at a beat that was just deleted, so the story stops there when someone plays it. Undo restores the beat; or retarget the choices'
+                : 'They point at a beat that does not exist, so the story stops there when someone plays it. The rest of the story imported normally'}
               {beatsAffected > 0 && ` — ${beatsAffected} beat${beatsAffected === 1 ? ' is' : 's are'} marked ⚠ in the graph`}.
             </div>
           )}

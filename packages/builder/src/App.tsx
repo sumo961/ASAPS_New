@@ -422,7 +422,7 @@ function App() {
       }));
     setImportIssues(prev => {
       if (brokenTargets.length) {
-        return { brokenTargets, otherErrors: prev?.otherErrors ?? [], beatIds: remaining.map((b) => b.id) };
+        return { brokenTargets, otherErrors: prev?.otherErrors ?? [], beatIds: remaining.map((b) => b.id), context: 'edit' as const };
       }
       return prev && prev.otherErrors.length ? { ...prev, brokenTargets: [] } : null;
     });
@@ -6429,6 +6429,7 @@ function App() {
         <ImportIssuesBanner
           brokenTargets={liveBroken}
           otherErrors={importIssues.otherErrors}
+          context={(importIssues as any).context ?? 'import'}
           onDismiss={() => setImportIssues(null)}
           onSelectBeat={(beatId) => {
             const beat = state.beats.find(b => b.id === beatId);
