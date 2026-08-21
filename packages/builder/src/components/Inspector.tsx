@@ -15,6 +15,7 @@ import type { Character } from '../types/character';
 import { useAvailableCounters, useAvailableVariables, useAvailableInventoryItems } from '../hooks/useAvailableCountersAndVariables';
 import { resolveLayoutMode } from '../utils/projectLayoutMode';
 import { extractStoryStateReferences } from '../utils/storyStateExtraction';
+import { getUiTier, setUiTier, shouldOfferTierChoice, markTierChoiceOffered } from '../utils/uiTier';
 import { resolveTranslatedSpeakerName } from '../utils/speakerUtils';
 import { useUsedNames } from './characters/useUsedNames';
 import { ChoiceEffectsEditor } from '../editors/ChoiceEffectsEditor';
@@ -209,7 +210,14 @@ export const Inspector: React.FC<InspectorProps> = ({
 }) => {
   const [localBeat, setLocalBeat] = useState<any>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  // Disclosure tier — a persisted AUTHOR preference (B2). The old per-panel
+  // boolean reset on every deselect; experts re-enabled it ~20 times/hour.
+  const [showAdvanced, setShowAdvancedState] = useState<boolean>(() => getUiTier() === 'advanced');
+  const setShowAdvanced = useCallback((next: boolean) => {
+    setShowAdvancedState(next);
+    setUiTier(next ? 'advanced' : 'basic');
+  }, []);
+  const [offerTierChoice, setOfferTierChoice] = useState<boolean>(() => shouldOfferTierChoice());
   const [showNotes, setShowNotes] = useState(false);
   const [showRequirements, setShowRequirements] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -1910,6 +1918,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                  beat.type !== 'panorama' && beat.type !== 'updateAffect' &&
                  beat.type !== 'gpsLocation' && beat.type !== 'indoorLocation' && (
                   <SchemaFormGenerator
+                    uiTier={showAdvanced ? 'advanced' : 'basic'}
                     beatType={beat.type}
                     beatDefinition={getBeatDefinition(beat.type)}
                     parameters={localBeat.parameters}
@@ -1943,6 +1952,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   if (Object.keys(speakerParams).length === 0) return null;
                   return (
                     <SchemaFormGenerator
+                    uiTier={showAdvanced ? 'advanced' : 'basic'}
                       beatType={beat.type}
                       beatDefinition={{ ...def, parameters: speakerParams }}
                       parameters={localBeat.parameters}
@@ -3964,7 +3974,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
 
-                          {showAdvanced && (
+                          {/* Effects are basic-tier (B2): the write side of a
+                              choice is core authoring, and gating it here while
+                              dialogTree showed it ungated carried no signal. */}
+                          {(
                             <div className="p-2 bg-blue-50 rounded space-y-2">
                               <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
                               <ChoiceEffectsEditor
@@ -4254,7 +4267,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                           
-                          {showAdvanced && (
+                          {/* Effects are basic-tier (B2) — see the hotspot note. */}
+                          {(
                             <div className="p-2 bg-blue-50 rounded space-y-2">
                               <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
                               <ChoiceEffectsEditor
@@ -5293,6 +5307,43 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
                   )}
                 </div>
+
+                {/* One-time tier seed: the choice only sets the initial value —
+                    the toggle below is the permanent switch. */}
+                {offerTierChoice && (
+                  <div className="border-t pt-4">
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900 space-y-2">
+                      <div className="font-medium">Choose your detail level</div>
+                      <p className="text-xs text-blue-800">
+                        Show every option on all beats, or keep advanced ones tucked
+                        behind this panel's toggle. You can switch any time — the
+                        choice is remembered.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            markTierChoiceOffered();
+                            setOfferTierChoice(false);
+                            setShowAdvanced(true);
+                          }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                        >
+                          Show everything
+                        </button>
+                        <button
+                          onClick={() => {
+                            markTierChoiceOffered();
+                            setOfferTierChoice(false);
+                            setShowAdvanced(false);
+                          }}
+                          className="px-3 py-1.5 bg-white border border-blue-300 text-blue-700 text-xs rounded hover:bg-blue-100"
+                        >
+                          Keep it simple
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Advanced Settings Toggle - only for visible beats (not logic/invisible beats) */}
                 {!['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (

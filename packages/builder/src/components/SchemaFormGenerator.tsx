@@ -43,6 +43,10 @@ interface ParameterDefinition {
     hint?: string;
     // Conditional visibility - only show when another field has the specified value
     dependsOn?: { field: string; value: any };
+    /** Disclosure tier (B2). 'advanced' fields render only when the author's
+     * persisted tier preference is advanced. Omit (or 'basic') = always shown.
+     * Editor-only metadata — no runtime or AI-generation meaning. */
+    tier?: 'basic' | 'advanced';
     // Visual grouping - fields sharing the same group render inside a bordered container
     group?: string;
     // Scope:
@@ -85,6 +89,10 @@ interface SchemaFormGeneratorProps {
   translationSourceHints?: Record<string, any>;
   // Full character objects for npc-character control (sync personality, etc.)
   characterObjects?: Array<{ id: string; name: string; displayName?: string; role?: string; description?: string }>;
+  /** The author's disclosure tier — schema fields with ui.tier 'advanced'
+   * are hidden unless this is 'advanced'. Defaults to showing everything
+   * (callers that don't know about tiers keep their old behavior). */
+  uiTier?: 'basic' | 'advanced';
   // Callback to sync NPC name/personality back to character definitions
   onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   // Top-level beat properties (speaker, showSpeaker) — values read from here, not parameters
@@ -242,6 +250,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   customRenderers = {},
   translationSourceHints,
   characterObjects = [],
+  uiTier,
   onCharacterSync,
   beatProperties = {},
   onBeatPropertyChange,
@@ -275,6 +284,11 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
 
     // Skip fields marked as hidden in schema
     if (paramDef.ui?.hidden) {
+      return null;
+    }
+
+    // Skip advanced-tier fields when the author's tier is basic (B2)
+    if (paramDef.ui?.tier === 'advanced' && uiTier === 'basic') {
       return null;
     }
 

@@ -470,6 +470,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -587,6 +588,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -722,6 +724,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -839,6 +842,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -966,6 +970,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -1084,6 +1089,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -1187,6 +1193,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -1356,6 +1363,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -1605,6 +1613,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -1836,6 +1845,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -2298,6 +2308,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -2922,6 +2933,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3088,6 +3100,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3247,6 +3260,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3402,6 +3416,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3629,6 +3644,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3779,6 +3795,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -3897,6 +3914,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -4042,6 +4060,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -4342,6 +4361,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -4646,6 +4666,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -4822,6 +4843,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -4995,6 +5017,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
@@ -5447,6 +5470,7 @@
             "control": "checkbox",
             "label": "Explain HUDs on entry",
             "group": "Explanation",
+            "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
         }
