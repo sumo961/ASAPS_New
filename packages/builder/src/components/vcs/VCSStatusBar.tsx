@@ -29,44 +29,12 @@ export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onToggleP
   const vcs = useVCSStatus();
   const [showConflictDialog, setShowConflictDialog] = useState(false);
 
-  // Show "Git not found" warning when git binary is missing for a directory project
-  if (vcs && vcs.initialized && vcs.gitNotInstalled && vcs.projectPath) {
-    return (
-      <div
-        className="vcs-status-bar"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '2px 8px',
-          fontSize: '12px',
-          color: '#fbbf24',
-          borderLeft: '1px solid #334155',
-        }}
-      >
-        <span style={{ fontSize: '11px' }} title="Git is not installed on this system">
-          {'\u26A0'} Git not found
-        </span>
-        <a
-          href="https://git-scm.com/downloads"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: '#60a5fa',
-            fontSize: '11px',
-            textDecoration: 'underline',
-            cursor: 'pointer',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          Install Git
-        </a>
-      </div>
-    );
-  }
-
-  // Show "Set up Version Control" when project is open but no VCS detected
-  if (vcs && vcs.initialized && vcs.type === 'none' && vcs.projectPath) {
+  // No repo yet (whether or not git is even installed): ONE quiet,
+  // plain-language affordance. Pressing Save used to escalate to
+  // "\u26A0 Git not found + Install Git" for authors who never asked for
+  // version control — git vocabulary now starts only after this click
+  // (the setup flow explains tooling, including installation if needed).
+  if (vcs && vcs.initialized && vcs.projectPath && (vcs.type === 'none' || vcs.gitNotInstalled)) {
     return (
       <div
         className="vcs-status-bar"
@@ -84,18 +52,18 @@ export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onToggleP
           onClick={onInitRepo}
           style={{
             background: 'none',
-            border: '1px solid #334155',
-            color: '#60a5fa',
+            border: 'none',
+            color: '#94a3b8',
             cursor: 'pointer',
-            padding: '2px 8px',
+            padding: '2px 6px',
             borderRadius: 3,
             fontSize: '11px',
             lineHeight: '16px',
             whiteSpace: 'nowrap',
           }}
-          title="Initialize a Git repository for this project"
+          title="Keep a history of this project's changes and back it up to a server \u2014 optional, uses Git under the hood"
         >
-          Set up Git
+          Track versions
         </button>
       </div>
     );

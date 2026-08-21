@@ -28,6 +28,7 @@ import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
 import { CharacterAffectPanel } from '../components/characters/CharacterAffectPanel';
 import { MockSensorPanel } from '../components/preview/MockSensorPanel';
+import { usePersistedState } from '../utils/persistedState';
 import {
   createRuntimeAIService,
   createProxyTransport,
@@ -355,7 +356,10 @@ export const PreviewWindow: React.FC = () => {
   const [showInputTextModal, setShowInputTextModal] = useState(false);
   const [pendingInputTextBeats, setPendingInputTextBeats] = useState<InputTextBeatInfo[]>([]);
   const [pendingPreset, setPendingPreset] = useState<StatePreset | null>(null);
-  const [showDebugPanel, setShowDebugPanel] = useState(true);
+  // Debug rail: OFF by default (the eval's flagship legibility finding —
+  // ~40% of the window went to a variable dump before anything ran) and
+  // persisted, so authors who live in it keep it with one click ever.
+  const [showDebugPanel, setShowDebugPanel] = usePersistedState<boolean>('asaps_ui_pw_debug', false);
   // True while an explainHuds beat is showing its callouts unacknowledged.
   const explainOverlayActive = !!(
     currentBeat && (currentBeat as any).explainHuds && !explainAcknowledged[currentBeat.id]
@@ -2611,10 +2615,10 @@ export const PreviewWindow: React.FC = () => {
                 onClick={() => setShowPresetMenu(!showPresetMenu)}
                 className={`px-3 py-1.5 text-sm border rounded hover:bg-gray-50 flex items-center gap-2 ${
                   generatedPresets.length > 0 && !selectedPreset
-                    ? 'border-amber-400 bg-amber-50'
+                    ? 'border-violet-400 bg-violet-50 text-violet-800'
                     : 'border-gray-300'
                 }`}
-                title="Select how the player arrived at this beat"
+                title="Start as if the player had already made a particular journey to this beat"
               >
                 <Database className="w-3 h-3" />
                 <span className="max-w-40 truncate">
@@ -2623,7 +2627,7 @@ export const PreviewWindow: React.FC = () => {
                   ) : selectedPreset ? (
                     selectedPreset.name.replace(/^.*? - /, '') // Show just the path part
                   ) : generatedPresets.length > 0 ? (
-                    `Select state (${generatedPresets.length})`
+                    `Start as if\u2026 (${generatedPresets.length})`
                   ) : (
                     'No paths found'
                   )}
@@ -3355,11 +3359,12 @@ export const PreviewWindow: React.FC = () => {
           </button>
           <div className="w-px h-5 bg-gray-400 mx-1" />
           <button
-            onClick={() => setShowDebugPanel(prev => !prev)}
-            className={`p-1.5 rounded flex items-center gap-1 text-sm ${showDebugPanel ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-300'}`}
-            title={showDebugPanel ? 'Hide Debug Panel' : 'Show Debug Panel'}
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            className={`px-2 py-1.5 rounded flex items-center gap-1.5 text-sm font-medium ${showDebugPanel ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:bg-gray-300'}`}
+            title={showDebugPanel ? 'Hide the debug panel (state, variables, visited beats)' : 'Show the debug panel (state, variables, visited beats)'}
           >
             {showDebugPanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            <span>Debug</span>
           </button>
           <div className="w-px h-5 bg-gray-400 mx-1" />
           <div className="text-xs text-gray-500">
