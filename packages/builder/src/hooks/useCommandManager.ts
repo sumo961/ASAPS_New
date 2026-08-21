@@ -93,9 +93,18 @@ export function useCommandManager(
   options?: UseCommandManagerOptions | CommandManagerOptions,
   enableKeyboardShortcuts: boolean = true
 ): UseCommandManagerReturn {
-  // Handle both old and new options format for backwards compatibility
-  const hookOptions: UseCommandManagerOptions = options && 'managerOptions' in options
-    ? options
+  // Handle both old and new options format for backwards compatibility.
+  // ANY hook-level key marks the new form — keying on 'managerOptions'
+  // alone made `useCommandManager({ enableKeyboardShortcuts: false })`
+  // silently fall into the legacy branch (flag ignored, shortcuts ON),
+  // which is precisely how a duplicate ⌘Z listener shipped twice.
+  const isHookForm = !!options && (
+    'managerOptions' in options ||
+    'enableKeyboardShortcuts' in options ||
+    'onCommandExecuted' in options
+  );
+  const hookOptions: UseCommandManagerOptions = isHookForm
+    ? (options as UseCommandManagerOptions)
     : { managerOptions: options as CommandManagerOptions | undefined, enableKeyboardShortcuts };
 
   const {
@@ -131,7 +140,12 @@ export function useCommandManager(
     return unsubscribe;
   }, [manager, forceUpdate]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts. SINGLE-OWNER RULE: exactly one mounted consumer may
+  // enable these (App.tsx). The manager's re-entrancy guard CANNOT protect
+  // against duplicate listeners — the browser runs a microtask checkpoint
+  // between listeners of the same event, so the first listener's async undo
+  // fully completes (guard released) before the second one runs. Verified
+  // live: one trusted keydown, two successful undos, 13ms apart.
   useEffect(() => {
     if (!enableShortcuts) {
       return;

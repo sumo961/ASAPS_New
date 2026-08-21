@@ -136,3 +136,37 @@ describe('useCommandKeyboardShortcuts', () => {
     expect(result.current.redoAlt).toMatch(/Y$/);
   });
 });
+
+describe('keyboard-shortcut registration (single-owner rule)', () => {
+  // The ⌘Z double-undo shipped TWICE through the same hole: the options
+  // shim keyed on 'managerOptions' alone, so { enableKeyboardShortcuts:
+  // false } fell into the legacy branch and the flag was ignored. The
+  // manager's re-entrancy guard cannot save us — browsers run a microtask
+  // checkpoint between listeners of one event, so the first listener's
+  // async undo completes (guard released) before the second runs. These
+  // tests count REAL keydown registrations per argument form.
+  const countKeydownRegistrations = (hookArg?: any) => {
+    const spy = vi.spyOn(window, 'addEventListener');
+    const { unmount } = renderHook(() => useCommandManager(hookArg));
+    const count = spy.mock.calls.filter(([type]) => type === 'keydown').length;
+    unmount();
+    spy.mockRestore();
+    return count;
+  };
+
+  it('default form registers the shortcut listener', () => {
+    expect(countKeydownRegistrations(undefined)).toBe(1);
+  });
+
+  it('{ enableKeyboardShortcuts: false } alone is honored (the shipped footgun)', () => {
+    expect(countKeydownRegistrations({ enableKeyboardShortcuts: false })).toBe(0);
+  });
+
+  it('{ managerOptions, enableKeyboardShortcuts: false } is honored', () => {
+    expect(countKeydownRegistrations({ managerOptions: undefined, enableKeyboardShortcuts: false })).toBe(0);
+  });
+
+  it('{ onCommandExecuted } counts as hook form and registers by default', () => {
+    expect(countKeydownRegistrations({ onCommandExecuted: () => {} })).toBe(1);
+  });
+});
