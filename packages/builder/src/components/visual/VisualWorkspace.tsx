@@ -3801,6 +3801,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const questionText = params.question || '';
       const hasQuestion = elements.some((e: VisualElement) =>
         e.name?.toLowerCase().includes('question') ||
+        // Legacy ASML imports bake the question box as a location named
+        // 'text' with EMPTY content — the renderer fills it by NAME at
+        // render time (PositionedBeatView: "check both 'question' name AND
+        // 'text' name"). This check must use the same rule, or we
+        // synthesize a second question box next to the baked one.
+        e.name?.toLowerCase() === 'text' ||
         // Also match text/dialog elements that already contain the question content
         ((e.type === 'text' || e.type === 'dialog') && e.text && questionText && e.text === questionText)
       );

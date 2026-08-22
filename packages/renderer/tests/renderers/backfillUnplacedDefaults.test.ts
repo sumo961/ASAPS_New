@@ -49,6 +49,56 @@ describe('backfillUnplacedDefaults', () => {
   });
 });
 
+describe('legacy ASML text locations count as placed (name matching)', () => {
+  // Red Riding Hood regression (2026-08): legacy imports bake the beat's main
+  // text into a location NAMED 'text' with KIND 'text', filled by name at
+  // render time. The schema default for the same box is kind 'dialog', so
+  // kind-matching alone re-added a duplicate question/text box in both the
+  // Visual Editor and the preview.
+  const named = (kind: string, name: string): Location =>
+    ({ kind, name, x: 0, y: 0, width: 10, height: 10 } as Location);
+
+  it('does not duplicate a movementChoice question over a legacy text location', () => {
+    // movementChoice_7.json: locations text(kind text) + hotspots + characters;
+    // default is name 'Question', kind 'dialog'.
+    const authored = [
+      named('text', 'text'),
+      named('hotspot', 'tree'),
+      named('hotspot', 'path'),
+      named('character', 'wolf'),
+      named('character', 'Red'),
+    ];
+    const out = backfillUnplacedDefaults([named('dialog', 'Question')], authored);
+    expect(out).toBe(authored);
+  });
+
+  it('does not duplicate a durScreen text over a legacy text location', () => {
+    // durScreen_9.json: locations text(kind text) + character; default is
+    // name 'Text', kind 'dialog' — same name, different kind.
+    const authored = [named('text', 'text'), named('character', 'Red')];
+    const out = backfillUnplacedDefaults([named('dialog', 'Text')], authored);
+    expect(out).toBe(authored);
+  });
+
+  it('matches names case-insensitively', () => {
+    const authored = [named('text', 'Prompt')];
+    const out = backfillUnplacedDefaults([named('dialog', 'prompt')], authored);
+    expect(out).toBe(authored);
+  });
+
+  it('still backfills text-kind defaults whose name was never placed', () => {
+    // aiSummary-style beat: a placed title (kind text) must not suppress the
+    // summary body (kind dialog, different name).
+    const authored = [named('text', 'Title')];
+    const out = backfillUnplacedDefaults(
+      [named('text', 'Title'), named('dialog', 'Summary'), named('button', 'Restart Button')],
+      authored,
+    );
+    expect(out.map((l) => l.name)).toContain('Summary');
+    expect(out.map((l) => l.name)).toContain('Restart Button');
+  });
+});
+
 describe('backfilled defaults do not land on authored elements', () => {
   const at = (kind: string, x: number, y: number, w = 100, h = 40): Location =>
     ({ kind, name: kind, x, y, width: w, height: h } as Location);

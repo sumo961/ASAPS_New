@@ -884,9 +884,11 @@ function mergeWithFreePositioned(
  * verbatim and always wins; anything they never placed falls back to its
  * schema default so the beat still says what it has to say.
  *
- * Matching is by `kind`: placing one text box means the author is laying out
- * text and no default text is added, but it leaves buttons alone. Free
- * positioned kinds (character / prop) are excluded because they are an
+ * Matching is by `kind`, then by name: placing one text box means the author
+ * is laying out text and no default text is added, but it leaves buttons
+ * alone. Name matching (incl. the legacy 'text' alias) catches legacy imports
+ * whose text location has kind 'text' where the schema default is 'dialog'.
+ * Free positioned kinds (character / prop) are excluded because they are an
  * overlay, not layout, and are merged separately.
  */
 export function backfillUnplacedDefaults(
@@ -896,7 +898,20 @@ export function backfillUnplacedDefaults(
   if (!authored || authored.length === 0) return defaults;
   const layoutAuthored = authored.filter((l) => !FREE_POSITIONED_KINDS.has(l.kind ?? ''));
   const placedKinds = new Set(layoutAuthored.map((l) => l.kind ?? ''));
-  const missing = defaults.filter((d) => !placedKinds.has(d.kind ?? ''));
+  const authoredNames = new Set(layoutAuthored.map((l) => (l.name ?? '').toLowerCase()));
+  // Legacy ASML imports bake a beat's main text into a location literally
+  // named 'text' with kind 'text', filled BY NAME at render time (see
+  // PositionedBeatView's question/'text' rule). The modern schema calls that
+  // same box 'question'/'prompt'/'text' with kind 'dialog', so kind-matching
+  // alone concludes no text was placed and re-adds a second copy of the
+  // beat's text on top of the authored one. A default also counts as placed
+  // when an authored location carries its name — or the legacy 'text' alias.
+  const placedByName = (d: Location) => {
+    const name = (d.name ?? '').toLowerCase();
+    if (authoredNames.has(name)) return true;
+    return (name === 'question' || name === 'prompt') && authoredNames.has('text');
+  };
+  const missing = defaults.filter((d) => !placedKinds.has(d.kind ?? '') && !placedByName(d));
   if (missing.length === 0) return authored;
 
   // A backfilled default carries no authored position, so it must not land on
