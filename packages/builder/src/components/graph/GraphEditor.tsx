@@ -22,6 +22,7 @@ import { DialogInternalNode } from './DialogInternalNode';
 import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
+import { CLUSTER_HEADER_H } from './graphStyle';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -247,22 +248,18 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
 
   // Convert beat connections to ReactFlow edges
-  const edges = useMemo(() => buildGraphEdges({ beats, expandedDialogs }), [beats, expandedDialogs]);
+  const edges = useMemo(
+    () => buildGraphEdges({ beats, clusters, expandedDialogs }),
+    // clusters is a dep because collapse state changes edge endpoints.
+    [beats, clusters, expandedDialogs]
+  );
 
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
 
-  // When a beat inside a cluster is selected, clear ReactFlow's internal node selection
-  // to prevent both a cluster beat and an unclustered node appearing selected.
-  useEffect(() => {
-    if (selectedBeat?.cluster) {
-      setNodes((prev) =>
-        prev.some((n) => n.selected)
-          ? prev.map((n) => n.selected ? { ...n, selected: false } : n)
-          : prev
-      );
-    }
-  }, [selectedBeat, setNodes]);
+  // (The old "clear ReactFlow selection when a clustered beat is selected"
+  // workaround is gone: clustered beats ARE ReactFlow nodes now, so there is
+  // only one selection system.)
 
   // Track previous beats count to detect when project is loaded
   const prevBeatsLengthRef = useRef(beats.length);
@@ -276,10 +273,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
   // Update nodes when beats change
   useEffect(() => {
-    // Build a fingerprint of the nodes: IDs + positions + selection state
-    // Include selectedBeatId for cluster nodes so beat selection across clusters propagates
+    // Build a fingerprint of the nodes: IDs + positions + selection state.
+    // parentNode + hidden cover cluster membership changes (drop/eject) and
+    // collapse — without them the graph would not re-sync on those events.
     const fingerprint = nodes.map(n =>
-      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${n.data?.selectedBeatId || ''}`
+      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}`
     ).join('|');
 
     if (fingerprint === prevNodeIdsRef.current) {
@@ -331,14 +329,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     }
   }, [nodesState.length, reactFlowInstance]);
 
-  // Efficiently update node highlighting without full rebuild
-  // This effect updates both beat nodes and cluster nodes when highlightedBeatIdsSet changes
+  // Efficiently update node highlighting without full rebuild. Clustered
+  // beats are type 'beat' nodes too now, so this single pass covers them —
+  // the old highlightVersion memo-buster for cluster nodes is gone.
   useEffect(() => {
-    // Generate a version key to force cluster re-renders
-    const highlightVersion = highlightedBeatIdsSet
-      ? Array.from(highlightedBeatIdsSet).sort().join(',')
-      : '';
-
     setNodes((currentNodes) => {
       return currentNodes.map((node) => {
         if (node.type === 'beat') {
@@ -349,18 +343,6 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
               data: {
                 ...node.data,
                 highlighted: isHighlighted,
-              },
-            };
-          }
-        }
-        // For cluster nodes, update the highlightVersion to trigger re-render
-        if (node.type === 'cluster') {
-          if (node.data.highlightVersion !== highlightVersion) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                highlightVersion,
               },
             };
           }
@@ -465,14 +447,14 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       if (node.type === 'cluster') {
         const cluster = clusters.find((c) => c.id === node.id);
         if (cluster) {
-          // Check if this is an expand/collapse click by looking at the target
           const target = event.target as HTMLElement;
-          const isButtonClick = target.closest('button') !== null;
-
-          if (isButtonClick) {
-            // Handle expand/collapse button click
+          if (target.closest('.cluster-collapse-btn')) {
+            // Explicit collapse/expand control. (The old any-<button>
+            // heuristic toggled the cluster for EVERY header button; now
+            // that popover buttons stopPropagation, only the marked control
+            // ever reaches here — keep it as a fallback for tests/JSDOM.)
             onClusterExpandCollapse(cluster.id);
-          } else {
+          } else if (!target.closest('button')) {
             // Handle cluster selection
             onClusterSelect(cluster);
           }
@@ -611,9 +593,27 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     (event: React.MouseEvent, node: Node, draggedNodes?: Node[]) => {
       const dragged = draggedNodes && draggedNodes.length > 0 ? draggedNodes : [node];
 
+      const snap20 = (v: number) => Math.round(v / 20) * 20;
+
       for (const n of dragged) {
         if (n.type === 'cluster') {
           onClusterMove(n.id, n.position.x, n.position.y);
+          continue;
+        }
+
+        // Clustered child — its position is PARENT-relative, so it must
+        // never reach onBeatMove (top-level coords) or the drop hit test.
+        // Persist content-relative (−header), 20px-snapped, clamped ≥ 0.
+        // Not routed through the undoable MoveBeatCommand: in-container
+        // moves were never undoable before either (follow-up).
+        const parentId = (n as any).parentNode as string | undefined;
+        if (parentId && clusters.some(c => c.id === parentId)) {
+          onBeatInContainerMove(
+            n.id,
+            parentId,
+            Math.max(0, snap20(n.position.x)),
+            Math.max(0, snap20(n.position.y - CLUSTER_HEADER_H)),
+          );
           continue;
         }
 
@@ -637,13 +637,21 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             const beatObj = beats.find(b => b.id === n.id);
             if (beatObj?.cluster !== cluster.id) {
               onDropBeatToCluster(n.id, cluster.id);
+              // Land the beat where it was dropped, not on the default grid
+              // slot: store the content-relative position (−header).
+              onBeatInContainerMove(
+                n.id,
+                cluster.id,
+                Math.max(0, snap20(dropX - cx)),
+                Math.max(0, snap20(dropY - cy - CLUSTER_HEADER_H)),
+              );
             }
             break;
           }
         }
       }
     },
-    [onBeatMove, onClusterMove, onDropBeatToCluster, clusters, beats]
+    [onBeatMove, onClusterMove, onBeatInContainerMove, onDropBeatToCluster, clusters, beats]
   );
 
 // Handle drop to add new beats

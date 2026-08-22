@@ -28,6 +28,9 @@ interface BeatNodeData {
   dialogExpanded?: boolean;
   onToggleDialogExpand?: (beatId: string) => void;
   beatNames?: Record<string, string>;
+  /** Present only when this beat renders as a cluster child — hover ⏏
+   *  returns it to the top level (extent:'parent' blocks drag-out). */
+  onEjectFromCluster?: (beatId: string) => void;
 }
 
 
@@ -117,7 +120,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   return (
     <div
       className={`
-        px-3 py-2.5 rounded-lg shadow-lg relative
+        px-3 py-2.5 rounded-lg shadow-lg relative group/beatnode
         transition-all duration-200 cursor-pointer
         ${data.pwCurrent ? 'border-4 ring-4 ring-red-500 ring-opacity-70 animate-pulse-slow' : 'border-2'}
         ${isSelected && !data.highlighted && !data.pwVisited && !data.pwCurrent ? 'bg-cyan-50 ring-4 ring-cyan-400 border-cyan-500' : ''}
@@ -144,6 +147,26 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         ? `${fullLabel}\n\n⚠ A choice here points at "${data.brokenTarget}", which is not a beat in this story — play stops at this beat.`
         : fullLabel}
     >
+      {/* Eject from cluster (hover-revealed). Top-LEFT corner — the ⚠ broken
+          mark owns top-right. Children are clamped by extent:'parent', so
+          this button is the way back to the top level. */}
+      {data.onEjectFromCluster && (
+        <button
+          className="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-white border border-gray-300 text-gray-500 shadow
+                     opacity-0 hover:opacity-100 group-hover/beatnode:opacity-100 transition-opacity
+                     flex items-center justify-center text-[10px] leading-none
+                     hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-300 nodrag"
+          style={{ zIndex: 2 }}
+          title="Remove from cluster (beat stays in the story)"
+          onClick={(e) => {
+            e.stopPropagation();
+            data.onEjectFromCluster!(data.beat.id);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          ⏏
+        </button>
+      )}
       {/* Broken-link mark. Sits above the node's own corner rather than inside
           the label, so it survives the title being truncated. */}
       {data.brokenTarget && (

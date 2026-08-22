@@ -15,7 +15,7 @@ import { Node, Edge, MarkerType, Position } from 'reactflow';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { summarizeConditions } from '../../utils/conditionSummary';
 import { dialogTreeLayout } from '../../utils/dialogTreeLayout';
-import { beatTypeColors } from './graphStyle';
+import { beatTypeColors, CLUSTER_HEADER_H } from './graphStyle';
 
 interface Asset {
   id: string;
@@ -60,6 +60,9 @@ export interface GraphNodesInput {
 
 export interface GraphEdgesInput {
   beats: Beat[];
+  /** Needed for collapse-aware endpoint resolution: beats in an expanded
+   *  cluster are real child nodes; in a collapsed one they dock at the frame. */
+  clusters: Cluster[];
   expandedDialogs: Set<string>;
 }
 
@@ -122,19 +125,71 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
     const beatNamesById: Record<string, string> = {};
     for (const b of beats) beatNamesById[b.id] = b.name;
 
-    const beatNodes = unclusteredBeats.flatMap((beat): Node[] => {
+    // Per-cluster running index for the default grid slots — beats without a
+    // stored in-container position land on the classic 2-column grid.
+    const clusterIndexByBeat = new Map<string, number>();
+    {
+      const counters = new Map<string, number>();
+      for (const b of beats) {
+        if (b.cluster && knownClusterIds.has(b.cluster)) {
+          const i = counters.get(b.cluster) ?? 0;
+          clusterIndexByBeat.set(b.id, i);
+          counters.set(b.cluster, i + 1);
+        }
+      }
+    }
+
+    // ONE beat-node constructor for top-level AND clustered beats — the point
+    // of the cluster unification. A clustered beat is the same BeatNode,
+    // parented to its cluster frame and positioned in parent coordinates.
+    // (The hand-rendered card path in ClusterContainerNode kept missing
+    // features BeatNode gained; see the Red Story dialogTree-▸ gap.)
+    const beatToNodes = (beat: Beat): Node[] => {
+      const parentCluster =
+        beat.cluster && beat.cluster !== 'undefined' && knownClusterIds.has(beat.cluster)
+          ? clusters.find(c => c.id === beat.cluster)
+          : undefined;
+
+      let position: { x: number; y: number };
+      const parentProps: Partial<Node> = {};
+      if (parentCluster) {
+        const stored = containerBeatPositions.find(
+          p => p.beatId === beat.id && p.clusterId === parentCluster.id
+        );
+        const idx = clusterIndexByBeat.get(beat.id) ?? 0;
+        // Stored positions are CONTENT-relative (below the header bar);
+        // ReactFlow children are parent-top-left-relative → +header here,
+        // −header when persisting a drag. Disk format unchanged.
+        const content = stored?.position ?? {
+          x: 20 + (idx % 2) * 200,
+          y: 20 + Math.floor(idx / 2) * 110,
+        };
+        position = { x: content.x, y: content.y + CLUSTER_HEADER_H };
+        parentProps.parentNode = parentCluster.id;
+        parentProps.extent = 'parent';
+        parentProps.zIndex = 10;
+        // Collapsed cluster: children stay in the node array (stable
+        // fingerprint/selection) but hidden; their edges re-target to the
+        // frame in buildGraphEdges.
+        if (!parentCluster.isExpanded) parentProps.hidden = true;
+      } else {
+        position = { x: beat.x || 0, y: beat.y || 0 };
+      }
+
       // B1b v2 — expanded dialogTree renders CLUSTER-STYLE: a container node
       // (same id, so inbound edges and position carry over) plus the dialog's
       // exchanges/choices as real, read-only child nodes. Their edges are
       // built in the edges memo from the same layout.
-      if (beat.type === 'dialogTree' && expandedDialogs.has(beat.id)) {
+      // (Clustered dialogTrees expand in Phase 3 of the unification — until
+      // then they get no trigger, so no dead ▸.)
+      if (!parentCluster && beat.type === 'dialogTree' && expandedDialogs.has(beat.id)) {
         const tree = (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree;
         if (tree) {
           const layout = dialogTreeLayout(tree);
           const container: Node = {
             id: beat.id,
             type: 'dialogContainer',
-            position: { x: beat.x || 0, y: beat.y || 0 },
+            position,
             // Expanded dialogs float above neighboring beats (focus overlay) —
             // growing in place would otherwise interleave with whatever the
             // author had placed to the right.
@@ -184,7 +239,8 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
       return [{
         id: beat.id,
         type: 'beat',
-        position: { x: beat.x || 0, y: beat.y || 0 },
+        position,
+        ...parentProps,
         data: {
           beat,
           label: beat.name,
@@ -195,8 +251,12 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
           pwVisited: pwVisitedBeatIdsRef.current?.has(beat.id) ?? false,
           pwCurrent: pwCurrentBeatIdRef.current === beat.id,
           brokenTarget: brokenTargetsRef.current?.[beat.id],
+          // Clustered beats carry the eject affordance the old card had.
+          ...(parentCluster && onRemoveBeatFromCluster
+            ? { onEjectFromCluster: onRemoveBeatFromCluster }
+            : {}),
           // B1b — dialogTree disclosure trigger on the collapsed node
-          ...(beat.type === 'dialogTree' ? {
+          ...(beat.type === 'dialogTree' && !parentCluster ? {
             dialogTree: (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree,
             dialogExpanded: false,
             onToggleDialogExpand: toggleDialogExpand,
@@ -206,77 +266,35 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
       }];
-    });
+    };
 
-    // Convert clusters to ReactFlow nodes with typed data
+    const beatNodes = unclusteredBeats.flatMap(beatToNodes);
+    const clusteredChildNodes = beats
+      .filter(b => b.cluster && b.cluster !== 'undefined' && knownClusterIds.has(b.cluster))
+      .flatMap(beatToNodes);
+
+    // Cluster frames. The frame renders header + map background + resize +
+    // drop target ONLY — its beats are the real child nodes above.
     const clusterNodes = clusters.map((cluster): Node => {
-      // Calculate actual beat count for this cluster
-      const beatsInThisCluster = beats.filter(beat => beat.cluster === cluster.id);
-      const containedBeatCount = beatsInThisCluster.length;
-
-      // Get actual positions from containerBeatPositions, or generate default positions
-      // Include actual beat objects for rendering connections inside the cluster
-      const containerBeats = beatsInThisCluster.map((beat, index) => {
-        // Look for existing position
-        const existingPosition = containerBeatPositions.find(
-          pos => pos.beatId === beat.id && pos.clusterId === cluster.id
-        );
-
-        if (existingPosition) {
-          return {
-            ...existingPosition,
-            beat, // Include the actual beat object
-            mapStyle: existingPosition.mapStyle || {
-              icon: '📍',
-              color: '#3b82f6',
-              size: 'medium' as const,
-              label: beat.name.substring(0, 10)
-            }
-          };
-        }
-
-        // Default position - 2-column grid with proper spacing to avoid overlap
-        // NODE_WIDTH is 160, NODE_HEIGHT is 80, so use 180x100 spacing
-        return {
-          beatId: beat.id,
-          clusterId: cluster.id,
-          beat, // Include the actual beat object
-          position: {
-            x: 20 + (index % 2) * 200,
-            y: 20 + Math.floor(index / 2) * 110,
-            z: index
-          },
-          mapStyle: {
-            icon: '📍',
-            color: '#3b82f6',
-            size: 'medium' as const,
-            label: beat.name.substring(0, 10)
-          }
-        };
-      });
+      const containedBeatCount = beats.filter(beat => beat.cluster === cluster.id).length;
 
       return {
         id: cluster.id,
         type: 'cluster',
         position: { x: cluster.containerPosition.x, y: cluster.containerPosition.y },
+        // Only the header moves the frame — the body is canvas for children.
+        dragHandle: '.cluster-drag-handle',
         data: {
           cluster,
           selected: selectedCluster?.id === cluster.id,
           expanded: cluster.isExpanded,
           containedBeatCount: containedBeatCount,
-          containedBeats: containerBeats,
           color: cluster.color || '#6366f1',
-          onAddToContainer: onAddToContainer || (() => {}),
           onRemoveContainer: onRemoveCluster || (() => {}),
           onExpandCollapse: onClusterExpandCollapse || (() => {}),
-          onBeatInContainerMove: onBeatInContainerMove,
           onDropBeatToCluster: onDropBeatToCluster,
-          onRemoveBeatFromCluster: onRemoveBeatFromCluster,
           onClusterResize: onClusterResize,
           onAutoLayoutCluster: onAutoLayoutCluster,
-          onBeatSelect: onBeatSelect,
-          selectedBeatId: selectedBeat?.id || null, // Pass selected beat ID for highlighting
-          allBeats: beats, // Pass all beats for external connection calculation
           // Map background - use ref to get current assets without triggering re-render
           mapAssetUrl: cluster.mapAssetId ? assetsRef.current.find(a => a.id === cluster.mapAssetId)?.url : undefined,
           onSetClusterMap: onSetClusterMap,
@@ -286,9 +304,6 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
           onSetClusterSharedVisuals: onSetClusterSharedVisuals,
           // Pass a getter function for assets to avoid embedding the whole array in node data
           getAssets,
-          // Pass getter for highlighted beat IDs to avoid embedding in node data and prevent re-renders
-          // Use getter function to access the ref so cluster nodes get the current value without being dependencies
-          getHighlightedBeatIds,
         },
         style: {
           width: cluster.containerBounds.width,
@@ -302,7 +317,8 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
     // Visual-only: stored beat positions are untouched, so collapsing
     // restores the original layout exactly.
     const grownContainers = beatNodes.filter(n => n.type === 'dialogContainer');
-    const allNodes = [...beatNodes, ...clusterNodes];
+    // Hard ReactFlow invariant: parents precede their children in the array.
+    const allNodes = [...beatNodes, ...clusterNodes, ...clusteredChildNodes];
     if (grownContainers.length) {
       const shift = new Map<string, { dx: number; dy: number }>();
       const APPROX_H = 90;
@@ -334,49 +350,55 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
 }
 
 export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
-  const { beats, expandedDialogs } = input;
+  const { beats, clusters, expandedDialogs } = input;
 
     const allEdges: Edge[] = [];
     const edgeIds = new Set<string>(); // Track edge IDs to prevent duplicates
 
-    // Helper to get the cluster ID a beat belongs to (or null if unclustered)
-    const getBeatCluster = (beatId: string): string | null => {
-      const beat = beats.find(b => b.id === beatId);
-      return beat?.cluster || null;
+    const clusterById = new Map(clusters.map(c => [c.id, c]));
+    const beatById = new Map(beats.map(b => [b.id, b]));
+
+    // The EXISTING cluster a beat belongs to (orphaned refs → null, so the
+    // beat is treated as the standalone node it actually renders as).
+    const getBeatCluster = (beatId: string): Cluster | null => {
+      const clusterId = beatById.get(beatId)?.cluster;
+      if (!clusterId || clusterId === 'undefined') return null;
+      return clusterById.get(clusterId) ?? null;
     };
 
-    // Helper to resolve the actual node ID for an edge endpoint
-    // If beat is in a cluster, return the cluster ID; otherwise return the beat ID
+    // Endpoint resolution, collapse-aware: beats in an EXPANDED cluster are
+    // real child nodes and keep their own id; beats in a collapsed cluster
+    // resolve to the frame so their edges dock at the pill.
     const resolveNodeId = (beatId: string): string => {
-      const clusterId = getBeatCluster(beatId);
-      return clusterId || beatId;
+      const cluster = getBeatCluster(beatId);
+      if (!cluster) return beatId;
+      return cluster.isExpanded ? beatId : cluster.id;
     };
 
-    // Helper to create an edge with proper source/target resolution
-    // Returns null if the edge would be internal to a cluster (both endpoints in same cluster)
+    // Helper to create an edge with proper source/target resolution.
+    // Returns null when both endpoints resolve to the same node (a beat
+    // self-loop, or both beats inside one COLLAPSED cluster).
     const createEdge = (
       sourceId: string,
       targetId: string,
       edgeProps: Partial<Edge>
     ): Edge | null => {
-      const sourceCluster = getBeatCluster(sourceId);
-      const targetCluster = getBeatCluster(targetId);
-
-      // Skip edges that are internal to the same cluster
-      if (sourceCluster && targetCluster && sourceCluster === targetCluster) {
-        return null;
-      }
-
-      // Resolve to cluster nodes if needed
       const resolvedSource = resolveNodeId(sourceId);
       const resolvedTarget = resolveNodeId(targetId);
 
-      // Skip self-loops (can happen if both endpoints resolve to same cluster)
       if (resolvedSource === resolvedTarget) {
         return null;
       }
 
+      // Edges touching a clustered child must render above the opaque
+      // cluster frame (frame z 0, children z 10; RF's default edge layer
+      // sits below nodes). Callers with their own tier (dialog edges) win.
+      const touchesClusteredChild =
+        (resolvedSource === sourceId && !!getBeatCluster(sourceId)) ||
+        (resolvedTarget === targetId && !!getBeatCluster(targetId));
+
       return {
+        ...(touchesClusteredChild ? { zIndex: 5 } : {}),
         id: `${resolvedSource}-to-${resolvedTarget}-${edgeProps.id || ''}`,
         source: resolvedSource,
         target: resolvedTarget,
@@ -398,12 +420,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
       // Special handling for setTimer beats - show timer target in red
       if (beat.type === 'setTimer' && params.timerTarget) {
         const timerEdgeId = `${beat.id}-timer-${params.timerTarget}`;
-        if (!edgeIds.has(timerEdgeId)) {
-          edgeIds.add(timerEdgeId);
-          allEdges.push({
+        const edge = createEdge(beat.id, params.timerTarget, {
             id: timerEdgeId,
-            source: beat.id,
-            target: params.timerTarget,
             type: 'custom',
             animated: false,
             label: 'Timer Target',
@@ -421,6 +439,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
               isTimer: true,
             },
           });
+        if (edge && !edgeIds.has(edge.id)) {
+          edgeIds.add(edge.id);
+          allEdges.push(edge);
         }
       }
       
@@ -429,12 +450,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         params.choices.forEach((choice: any, index: number) => {
           if (choice.target) {
             const choiceEdgeId = `${beat.id}-choice-${choice.target}`;
-            if (!edgeIds.has(choiceEdgeId)) {
-              edgeIds.add(choiceEdgeId);
-              allEdges.push({
+            const edge = createEdge(beat.id, choice.target, {
                 id: choiceEdgeId,
-                source: beat.id,
-                target: choice.target,
                 type: 'custom',
                 animated: false,
                 label: `Random ${index + 1}`,
@@ -451,6 +468,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isRandom: true,
                 },
               });
+            if (edge && !edgeIds.has(edge.id)) {
+              edgeIds.add(edge.id);
+              allEdges.push(edge);
             }
           }
         });
@@ -462,12 +482,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
           if (choice.target) {
             // Include index to ensure unique IDs even when multiple choices target the same beat
             const choiceEdgeId = `${beat.id}-movement-${index}-${choice.target}`;
-            if (!edgeIds.has(choiceEdgeId)) {
-              edgeIds.add(choiceEdgeId);
-              allEdges.push({
+            const edge = createEdge(beat.id, choice.target, {
                 id: choiceEdgeId,
-                source: beat.id,
-                target: choice.target,
                 type: 'custom',
                 animated: false,
                 label: choice.text || choice.location || `Location ${index + 1}`,
@@ -485,6 +501,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isMovement: true,
                 },
               });
+            if (edge && !edgeIds.has(edge.id)) {
+              edgeIds.add(edge.id);
+              allEdges.push(edge);
             }
           }
         });
@@ -512,12 +531,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
           const target = extractTarget(choice);
           if (target) {
             const choiceEdgeId = `${beat.id}-dialog-${prefix}-${index}-${target}`;
-            if (!edgeIds.has(choiceEdgeId)) {
-              edgeIds.add(choiceEdgeId);
-              allEdges.push({
+            const edge = createEdge(beat.id, target, {
                 id: choiceEdgeId,
-                source: beat.id,
-                target: target,
                 type: 'custom',
                 animated: false,
                 label: choice.text || `Choice ${index + 1}`,
@@ -534,6 +549,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isDialog: true,
                 },
               });
+            if (edge && !edgeIds.has(edge.id)) {
+              edgeIds.add(edge.id);
+              allEdges.push(edge);
             }
           }
         };
@@ -562,12 +580,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         params.props.forEach((prop: any, index: number) => {
           if (prop.target) {
             const propEdgeId = `${beat.id}-prop-${index}-${prop.target}`;
-            if (!edgeIds.has(propEdgeId)) {
-              edgeIds.add(propEdgeId);
-              allEdges.push({
+            const edge = createEdge(beat.id, prop.target, {
                 id: propEdgeId,
-                source: beat.id,
-                target: prop.target,
                 type: 'custom',
                 animated: false,
                 label: prop.name || `Prop ${index + 1}`,
@@ -584,6 +598,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isProp: true,
                 },
               });
+            if (edge && !edgeIds.has(edge.id)) {
+              edgeIds.add(edge.id);
+              allEdges.push(edge);
             }
           }
         });
@@ -593,12 +610,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
       if (beat.type === 'conditionBeat') {
         if (params.trueTarget) {
           const trueEdgeId = `${beat.id}-true-${params.trueTarget}`;
-          if (!edgeIds.has(trueEdgeId)) {
-            edgeIds.add(trueEdgeId);
-            allEdges.push({
+          const edge = createEdge(beat.id, params.trueTarget, {
               id: trueEdgeId,
-              source: beat.id,
-              target: params.trueTarget,
               type: 'custom',
               animated: false,
               label: 'True',
@@ -616,16 +629,15 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                 branch: 'true',
               },
             });
+          if (edge && !edgeIds.has(edge.id)) {
+            edgeIds.add(edge.id);
+            allEdges.push(edge);
           }
         }
         if (params.falseTarget) {
           const falseEdgeId = `${beat.id}-false-${params.falseTarget}`;
-          if (!edgeIds.has(falseEdgeId)) {
-            edgeIds.add(falseEdgeId);
-            allEdges.push({
+          const edge = createEdge(beat.id, params.falseTarget, {
               id: falseEdgeId,
-              source: beat.id,
-              target: params.falseTarget,
               type: 'custom',
               animated: false,
               label: 'False',
@@ -643,6 +655,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                 branch: 'false',
               },
             });
+          if (edge && !edgeIds.has(edge.id)) {
+            edgeIds.add(edge.id);
+            allEdges.push(edge);
           }
         }
       }
@@ -652,12 +667,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         params.hyperlinks.forEach((link: any, index: number) => {
           if (link.targetBeatId) {
             const linkEdgeId = `${beat.id}-hyperlink-${index}-${link.targetBeatId}`;
-            if (!edgeIds.has(linkEdgeId)) {
-              edgeIds.add(linkEdgeId);
-              allEdges.push({
+            const edge = createEdge(beat.id, link.targetBeatId, {
                 id: linkEdgeId,
-                source: beat.id,
-                target: link.targetBeatId,
                 type: 'custom',
                 animated: false,
                 label: link.word || `Link ${index + 1}`,
@@ -674,6 +685,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
                   isHyperlink: true,
                 },
               });
+            if (edge && !edgeIds.has(edge.id)) {
+              edgeIds.add(edge.id);
+              allEdges.push(edge);
             }
           }
         });

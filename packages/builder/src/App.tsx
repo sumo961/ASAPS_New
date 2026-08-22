@@ -3643,9 +3643,13 @@ function App() {
           minY = Math.min(minY, pos.y);
         });
 
-        // Shift all positions so minimum is at (40, 60) - cluster internal padding
+        // Shift all positions so minimum is at (40, 40) — cluster internal
+        // padding in CONTENT-relative coordinates (the stored convention:
+        // y = 0 is just below the header bar). The old value of 60 baked a
+        // header allowance into the stored y, double-counting the header
+        // once the graph renders children parent-relative (+header itself).
         const INTERNAL_PADDING_X = 40;
-        const INTERNAL_PADDING_Y = 60; // Account for cluster header
+        const INTERNAL_PADDING_Y = 40;
         const shiftX = INTERNAL_PADDING_X - minX;
         const shiftY = INTERNAL_PADDING_Y - minY;
 

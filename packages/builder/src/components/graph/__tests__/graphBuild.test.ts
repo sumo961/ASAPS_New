@@ -1,11 +1,11 @@
 /**
  * graphBuild — the single source of graph nodes and edges.
  *
- * Phase 1 of the cluster unification: these tests pin the behavior of the
- * extracted build functions so the Phase 2 switch (clustered beats as real
- * ReactFlow children) changes exactly what it means to change and nothing
- * else. Cases marked [Phase 2 inverts] document today's dual-path behavior
- * on purpose.
+ * These tests pin the conversion rules of the cluster unification: clustered
+ * beats are real ReactFlow child nodes (parentNode/extent, +header position
+ * conversion, hidden-on-collapse), and every edge is a real edge with
+ * collapse-aware endpoint resolution. If a second rendering path ever grows
+ * back, these are the tripwire.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { buildGraphNodes, buildGraphEdges, GraphNodesInput } from '../graphBuild';
@@ -108,17 +108,42 @@ describe('buildGraphNodes', () => {
     }
   });
 
-  it('[Phase 2 inverts] hides clustered beats inside the cluster node data', () => {
+  it('renders clustered beats as real child nodes of the cluster frame', () => {
     const nodes = buildGraphNodes(nodesInput({
       beats: [beat({ id: 'b1', cluster: 'c1' }), beat({ id: 'b2' })],
       clusters: [cluster()],
     }));
-    const ids = nodes.map(n => n.id);
-    expect(ids).toContain('b2');
-    expect(ids).toContain('c1');
-    expect(ids).not.toContain('b1'); // clustered beat is NOT a real node today
-    const clusterNode = nodes.find(n => n.id === 'c1')!;
-    expect(clusterNode.data.containedBeats.map((b: any) => b.beatId)).toEqual(['b1']);
+    const child = nodes.find(n => n.id === 'b1')!;
+    expect(child.type).toBe('beat');
+    expect((child as any).parentNode).toBe('c1');
+    expect((child as any).extent).toBe('parent');
+    expect(child.hidden).toBeUndefined();
+    expect(typeof child.data.onEjectFromCluster).toBe('function');
+    // top-level beats carry no eject affordance
+    expect(nodes.find(n => n.id === 'b2')!.data.onEjectFromCluster).toBeUndefined();
+    // hard ReactFlow invariant: the parent frame precedes its children
+    expect(nodes.findIndex(n => n.id === 'c1')).toBeLessThan(nodes.findIndex(n => n.id === 'b1'));
+  });
+
+  it('converts stored content-relative positions to parent-relative (+header)', () => {
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [beat({ id: 'b1', cluster: 'c1' })],
+      clusters: [cluster()],
+      containerBeatPositions: [
+        { beatId: 'b1', clusterId: 'c1', position: { x: 111, y: 222, z: 0 } } as any,
+      ],
+    }));
+    expect(nodes.find(n => n.id === 'b1')!.position).toEqual({ x: 111, y: 222 + 40 });
+  });
+
+  it('hides children (not drops them) when their cluster is collapsed', () => {
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [beat({ id: 'b1', cluster: 'c1' })],
+      clusters: [cluster({ isExpanded: false })],
+    }));
+    const child = nodes.find(n => n.id === 'b1')!;
+    expect(child.hidden).toBe(true);
+    expect((child as any).parentNode).toBe('c1');
   });
 
   it('renders beats standalone when their cluster does not exist (defensive)', () => {
@@ -139,9 +164,9 @@ describe('buildGraphNodes', () => {
         { beatId: 'b1', clusterId: 'c1', position: { x: 111, y: 222, z: 0 } } as any,
       ],
     }));
-    const contained = nodes.find(n => n.id === 'c1')!.data.containedBeats;
-    expect(contained[0].position).toMatchObject({ x: 111, y: 222 });
-    expect(contained[1].position).toMatchObject({ x: 20 + 200, y: 20 }); // grid slot 1
+    expect(nodes.find(n => n.id === 'b1')!.position).toEqual({ x: 111, y: 222 + 40 });
+    // grid slot 1 (index 1 in this cluster), +header conversion
+    expect(nodes.find(n => n.id === 'b2')!.position).toEqual({ x: 20 + 200, y: 20 + 40 });
   });
 
   it('sets collapsed cluster height to the 40px pill', () => {
@@ -159,33 +184,80 @@ describe('buildGraphEdges', () => {
         beat({ id: 'b1', connections: [{ targetId: 'b2', label: 'go' }] }),
         beat({ id: 'b2' }),
       ],
+      clusters: [],
       expandedDialogs: new Set(),
     });
     expect(edges).toHaveLength(1);
     expect(edges[0]).toMatchObject({ source: 'b1', target: 'b2', label: 'go' });
   });
 
-  it('[Phase 2 inverts] skips edges internal to one cluster', () => {
+  it('emits real edges between beats inside one EXPANDED cluster', () => {
     const edges = buildGraphEdges({
       beats: [
         beat({ id: 'b1', cluster: 'c1', connections: [{ targetId: 'b2' }] }),
         beat({ id: 'b2', cluster: 'c1' }),
       ],
+      clusters: [cluster()],
+      expandedDialogs: new Set(),
+    });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: 'b1', target: 'b2' });
+    // must render above the opaque cluster frame
+    expect((edges[0] as any).zIndex).toBe(5);
+  });
+
+  it('drops edges internal to one COLLAPSED cluster (both dock at the pill)', () => {
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'b1', cluster: 'c1', connections: [{ targetId: 'b2' }] }),
+        beat({ id: 'b2', cluster: 'c1' }),
+      ],
+      clusters: [cluster({ isExpanded: false })],
       expandedDialogs: new Set(),
     });
     expect(edges).toHaveLength(0);
   });
 
-  it('[Phase 2 inverts] collapses cross-cluster endpoints onto the cluster frames', () => {
+  it('resolves endpoints per cluster collapse state', () => {
     const edges = buildGraphEdges({
       beats: [
         beat({ id: 'b1', cluster: 'c1', connections: [{ targetId: 'b2' }] }),
         beat({ id: 'b2', cluster: 'c2' }),
       ],
+      clusters: [cluster(), cluster({ id: 'c2', isExpanded: false })],
       expandedDialogs: new Set(),
     });
     expect(edges).toHaveLength(1);
-    expect(edges[0]).toMatchObject({ source: 'c1', target: 'c2' });
+    // expanded source keeps the beat id; collapsed target docks at the frame
+    expect(edges[0]).toMatchObject({ source: 'b1', target: 'c2' });
+  });
+
+  it('treats orphaned cluster refs as unclustered in edge resolution', () => {
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'b1', cluster: 'ghost', connections: [{ targetId: 'b2' }] }),
+        beat({ id: 'b2' }),
+      ],
+      clusters: [],
+      expandedDialogs: new Set(),
+    });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: 'b1', target: 'b2' });
+  });
+
+  it('routes special-kind edges (conditionBeat) through cluster resolution too', () => {
+    // Pre-unification these bypassed createEdge and silently vanished for
+    // clustered beats; now every kind is collapse-aware.
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'q1', cluster: 'c1', type: 'conditionBeat', params: { trueTarget: 't1' } }),
+        beat({ id: 't1', cluster: 'c1' }),
+      ],
+      clusters: [cluster()],
+      expandedDialogs: new Set(),
+    });
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: 'q1', target: 't1', label: 'True' });
   });
 
   it('emits conditionBeat true/false branch edges', () => {
@@ -195,6 +267,7 @@ describe('buildGraphEdges', () => {
         beat({ id: 't1' }),
         beat({ id: 'f1' }),
       ],
+      clusters: [],
       expandedDialogs: new Set(),
     });
     expect(edges.map(e => e.label).sort()).toEqual(['False', 'True']);
@@ -210,6 +283,7 @@ describe('buildGraphEdges', () => {
         beat({ id: 'x1' }),
         beat({ id: 'x2' }),
       ],
+      clusters: [],
       expandedDialogs: new Set(),
     });
     expect(edges.map(e => e.label)).toEqual(['North', 'South']);
@@ -221,6 +295,7 @@ describe('buildGraphEdges', () => {
         beat({ id: 'd1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } }),
         beat({ id: 'b9' }),
       ],
+      clusters: [],
       expandedDialogs: new Set(),
     });
     expect(edges.length).toBe(2);
@@ -233,6 +308,7 @@ describe('buildGraphEdges', () => {
         beat({ id: 'd1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } }),
         beat({ id: 'b9' }),
       ],
+      clusters: [],
       expandedDialogs: new Set(['d1']),
     });
     const exits = edges.filter(e => e.id.startsWith('dlgexit-'));
@@ -248,6 +324,7 @@ describe('buildGraphEdges', () => {
   it('emits defaultTarget edges', () => {
     const edges = buildGraphEdges({
       beats: [beat({ id: 'b1', defaultTarget: 'b2' }), beat({ id: 'b2' })],
+      clusters: [],
       expandedDialogs: new Set(),
     });
     expect(edges[0]).toMatchObject({ label: 'default', source: 'b1', target: 'b2' });
