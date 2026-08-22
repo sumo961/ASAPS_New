@@ -169,3 +169,44 @@ describe('dedupeLinks', () => {
     expect(deduped[0].label).toBe('Go');
   });
 });
+
+describe('stale serialized connections on dialogTree beats', () => {
+  // Red Story regression (2026-08): legacy ASML imports left the ORIGINAL
+  // pre-conversion targets in the beat's top-level `connections` array while
+  // the live tree pointed elsewhere. The tree is the runtime authority
+  // (DialogTreeBeat.getConnections overrides), so beatLinks must ignore the
+  // stale array — it produced 14 phantom "choices lead nowhere" rows on any
+  // delete.
+  it('ignores top-level connections when a dialogTree carries a real tree', () => {
+    const beat = {
+      id: 'd1',
+      type: 'dialogTree',
+      connections: [{ targetId: '12', label: 'stale' }],
+      parameters: {
+        dialogTree: {
+          id: 'root',
+          text: 'Hi',
+          choices: [{ id: '1', text: 'Go', target: '13' }],
+        },
+      },
+    };
+    const targets = beatLinks(beat).map((l) => l.target);
+    expect(targets).toContain('13');
+    expect(targets).not.toContain('12');
+  });
+
+  it('still reads connections for dialogTree beats WITHOUT a tree', () => {
+    const beat = {
+      id: 'd1',
+      type: 'dialogTree',
+      connections: [{ targetId: 'x1' }],
+      parameters: {},
+    };
+    expect(beatLinks(beat).map((l) => l.target)).toContain('x1');
+  });
+
+  it('still reads connections for non-dialog beats', () => {
+    const beat = { id: 'b1', type: 'infoText', connections: [{ targetId: 'x1' }], parameters: {} };
+    expect(beatLinks(beat).map((l) => l.target)).toContain('x1');
+  });
+});

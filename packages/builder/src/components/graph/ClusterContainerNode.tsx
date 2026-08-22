@@ -34,7 +34,7 @@ interface ClusterContainerNodeData {
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   mapAssetUrl?: string;
-  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
   /** Live getter so the map/sound popovers see the current asset list. */
@@ -312,6 +312,28 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                         </div>
 
                         <div className="mb-3">
+                          <label className="text-xs text-gray-600 block mb-1">Fit</label>
+                          <div className="flex gap-1">
+                            {(['natural', 'cover', 'contain'] as const).map((fit) => (
+                              <button
+                                key={fit}
+                                onClick={() => {
+                                  onSetClusterMap(cluster.id, cluster.mapAssetId || null, cluster.mapScale, cluster.mapOpacity, fit);
+                                }}
+                                className={`flex-1 px-2 py-1 rounded text-xs capitalize border transition-colors ${
+                                  (cluster.mapFit ?? 'natural') === fit
+                                    ? 'bg-blue-500 text-white border-blue-500'
+                                    : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+                                }`}
+                              >
+                                {fit}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {(cluster.mapFit ?? 'natural') === 'natural' && (
+                        <div className="mb-3">
                           <label className="text-xs text-gray-600 block mb-1">
                             Scale: {Math.round((cluster.mapScale || 1) * 100)}%
                           </label>
@@ -327,6 +349,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                           />
                         </div>
+                        )}
 
                         <div className="mb-3">
                           <label className="text-xs text-gray-600 block mb-1">
@@ -607,7 +630,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
             backgroundSize: '20px 20px',
           }}
         >
-          {/* Background map image */}
+          {/* Background map image. Fit modes: 'natural' keeps the
+              historical top-left placement at mapScale; 'cover'/'contain'
+              fill the content area via object-fit. */}
           {mapAssetUrl && (
             <img
               src={mapAssetUrl}
@@ -617,10 +642,18 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
               style={{
                 top: 0,
                 left: 0,
-                transformOrigin: '0 0',
-                transform: `scale(${cluster.mapScale || 1})`,
                 opacity: cluster.mapOpacity ?? 0.5,
                 zIndex: 0,
+                ...((cluster.mapFit ?? 'natural') === 'natural'
+                  ? {
+                      transformOrigin: '0 0',
+                      transform: `scale(${cluster.mapScale || 1})`,
+                    }
+                  : {
+                      width: '100%',
+                      height: '100%',
+                      objectFit: cluster.mapFit as 'cover' | 'contain',
+                    }),
               }}
             />
           )}

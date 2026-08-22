@@ -57,7 +57,7 @@ interface WorkspaceViewProps {
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
-  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   /** Update the indoor venue's beacons array (forwarded to VisualWorkspace for XRFloorPlanEditor). */

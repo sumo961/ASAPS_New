@@ -60,7 +60,7 @@ interface GraphEditorProps {
   onRemoveCluster?: (clusterId: string) => void;
   // Asset lookup for cluster backgrounds and sounds
   assets?: Asset[];
-  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   // Beat actions for context menu
@@ -278,7 +278,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // to state but never re-synced to the node — the picker looked dead.
     const fingerprint = nodes.map(n => {
       const clusterExtra = n.type === 'cluster'
-        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
+        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
         : '';
       return `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
     }).join('|');

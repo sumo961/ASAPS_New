@@ -61,7 +61,7 @@ interface StoryBuilderActions {
   addCluster: (cluster: Cluster) => void;
   removeCluster: (clusterId: string) => void;
   renameCluster: (clusterId: string, name: string) => void;
-  setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  setClusterMap: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   setClusterSound: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   setClusterSharedVisuals: (clusterId: string, sharedVisuals: SharedVisualContent | undefined) => void;
   exportStory: (assets?: any[], characters?: any[]) => string;
@@ -1107,8 +1107,8 @@ export function useStoryBuilder() {
   }, []);
 
   // Set cluster background map
-  const setClusterMap = useCallback((clusterId: string, assetId: string | null, scale?: number, opacity?: number) => {
-    console.log('[useStoryBuilder] Setting cluster map', clusterId, assetId, scale, opacity);
+  const setClusterMap = useCallback((clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => {
+    console.log('[useStoryBuilder] Setting cluster map', clusterId, assetId, scale, opacity, fit);
     setState(prev => ({
       ...prev,
       clusters: prev.clusters.map(cluster =>
@@ -1118,6 +1118,8 @@ export function useStoryBuilder() {
               mapAssetId: assetId || undefined,
               mapScale: scale,
               mapOpacity: opacity,
+              // fit omitted = keep what the cluster had (sliders pass through)
+              mapFit: fit ?? cluster.mapFit,
             }
           : cluster
       ),

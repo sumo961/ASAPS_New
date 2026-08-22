@@ -124,7 +124,15 @@ export function beatLinks(beat: any): StoryLink[] {
   const id = beat.id;
 
   // Top-level connections array — targetId (builder-native) or target.
-  if (Array.isArray(beat.connections)) {
+  // EXCEPT for dialogTree beats that carry a real tree: there the tree is
+  // the single authority (DialogTreeBeat.getConnections overrides and the
+  // engine navigates the tree), and the top-level array is a serialized
+  // cache that goes stale. Legacy ASML imports proved it: Red Story's
+  // dialogTree files still carried pre-conversion targets (12/14/16) in
+  // `connections` while the live tree pointed at 13/15/17 — deleting any
+  // beat then surfaced 14 phantom "choices lead nowhere" rows.
+  const treeIsAuthority = beat.type === 'dialogTree' && !!(beat.parameters || {}).dialogTree;
+  if (!treeIsAuthority && Array.isArray(beat.connections)) {
     for (const conn of beat.connections) {
       if (!conn) continue;
       push(out, id, conn.targetId ?? conn.target, 'beat-connections', conn.label);

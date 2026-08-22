@@ -33,7 +33,7 @@ export interface GraphNodeCallbacks {
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
-  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   /** Live getter — the cluster popovers read assets at open time. */

@@ -40,7 +40,7 @@ interface CanvasProps {
   onRemoveCluster?: (clusterId: string) => void;
   // Cluster background images
   assets?: Asset[];
-  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
+  onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   // Beat actions for context menu

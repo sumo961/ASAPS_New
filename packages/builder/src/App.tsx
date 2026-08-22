@@ -6628,9 +6628,9 @@ function App() {
                 markChanged();
               }
             }}
-            onSetClusterMap={(clusterId: string, assetId: string | null, scale?: number, opacity?: number) => {
+            onSetClusterMap={(clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => {
               if (actions.setClusterMap) {
-                actions.setClusterMap(clusterId, assetId, scale, opacity);
+                actions.setClusterMap(clusterId, assetId, scale, opacity, fit);
                 markChanged();
               }
             }}

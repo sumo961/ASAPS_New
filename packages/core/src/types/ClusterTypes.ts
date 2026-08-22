@@ -44,6 +44,10 @@ export interface Cluster {
   mapAssetId?: string;
   mapScale?: number;    // Independent scale for background image (0.1-3.0, default 1.0)
   mapOpacity?: number;  // Background image opacity (0-1, default 0.5)
+  /** How the image fills the frame: 'natural' (top-left at mapScale, the
+   *  historical behavior), 'cover' (fill, may crop), 'contain' (letterbox).
+   *  Defaults to 'natural' when absent. */
+  mapFit?: 'natural' | 'cover' | 'contain';
 
   // Visual theming
   color?: string;
