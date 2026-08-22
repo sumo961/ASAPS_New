@@ -23,7 +23,7 @@ interface WorkspaceViewProps {
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
   onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd: (type: string, position: { x: number; y: number }) => void;
+  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove?: (beatId: string, clusterId: string, x: number, y: number) => void;

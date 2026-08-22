@@ -15,7 +15,7 @@ import { Node, Edge, MarkerType, Position } from 'reactflow';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { summarizeConditions } from '../../utils/conditionSummary';
 import { dialogTreeLayout } from '../../utils/dialogTreeLayout';
-import { beatTypeColors, CLUSTER_HEADER_H } from './graphStyle';
+import { beatTypeColors, CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
 
 interface Asset {
   id: string;
@@ -312,8 +312,10 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
           getAssets,
         },
         style: {
-          width: cluster.containerBounds.width,
-          height: cluster.isExpanded ? cluster.containerBounds.height : 40,
+          width: Math.max(cluster.containerBounds.width || 0, MIN_CLUSTER_W),
+          height: cluster.isExpanded
+            ? Math.max(cluster.containerBounds.height || 0, MIN_CLUSTER_H)
+            : 40,
         },
       };
     });
@@ -806,7 +808,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
             type: 'custom',
             zIndex: 20,
             markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-            style: { stroke: '#0ea5e9', strokeWidth: 1.5 },
+            // Same weight as regular beat connections — an expanded dialog's
+            // exits ARE the beat's outgoing edges, they must not thin out.
+            style: { stroke: '#0ea5e9', strokeWidth: 2 },
           });
           if (edge && !edgeIds.has(edge.id)) {
             edgeIds.add(edge.id);

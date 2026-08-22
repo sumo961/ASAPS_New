@@ -3091,12 +3091,18 @@ function App() {
     reportBrokenLinksAfterDelete(state.beats.filter(b => b.id !== beatId));
   }, [state.beats, markChanged, reportBrokenLinksAfterDelete]);
 
-  const handleBeatAdd = useCallback((type: string, position: { x: number; y: number }) => {
+  const handleBeatAdd = useCallback((type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => {
     // addBeat creates AND adds to state in one step, so we record the command
     // without executing it (the beat is already in state)
     const newBeat = actions.addBeat(type, position);
     const cmd = new AddBeatCommand(newBeat, stableMutations.current);
     getCommandManager().pushWithoutExecute(cmd);
+    // Palette drop landed inside an expanded cluster: the beat is born a
+    // member, positioned at the drop point (content-relative coords).
+    if (cluster) {
+      actions.moveBeatToCluster?.(newBeat.id, cluster.clusterId);
+      actions.moveBeatInContainer?.(newBeat.id, cluster.clusterId, cluster.x, cluster.y);
+    }
     setSelectedBeat(newBeat);
     markChanged();
   }, [actions, markChanged]);

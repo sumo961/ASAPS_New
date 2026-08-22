@@ -1,4 +1,5 @@
 import React, { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { Cluster, SharedVisualContent } from '@asaps/core';
 import { CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
@@ -72,6 +73,15 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const [showMapSettings, setShowMapSettings] = useState(false);
   const [showSoundSettings, setShowSoundSettings] = useState(false);
   const [showSharedVisualsSettings, setShowSharedVisualsSettings] = useState(false);
+  // Popovers render in a body PORTAL: cluster children are sibling ReactFlow
+  // nodes with a higher z-index than the frame, so an in-frame popover was
+  // drawn UNDER the beats it hovered over. Fixed-position + portal escapes
+  // the node stacking entirely.
+  const [popAnchor, setPopAnchor] = useState<{ top: number; right: number } | null>(null);
+  const anchorFrom = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setPopAnchor({ top: r.bottom + 6, right: window.innerWidth - r.right });
+  };
   const mapSettingsRef = useRef<HTMLDivElement>(null);
   const soundSettingsRef = useRef<HTMLDivElement>(null);
 
@@ -225,7 +235,11 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
           ${selected ? 'border-blue-500 ring-2 ring-blue-300' : 'border-indigo-300'}
           ${isDragOver ? 'border-green-500' : ''}
         `}
-        style={{ width: containerWidth, backgroundColor: 'white' }}
+        // Fill the ReactFlow node wrapper: its size comes from the node's
+        // style in graphBuild — stored bounds normally, GROWN when an
+        // expanded dialog makes room. Re-reading stored bounds here kept the
+        // drawn box at the old size while the wrapper grew around it.
+        style={{ width: '100%', height: '100%', backgroundColor: 'white' }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -267,6 +281,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    anchorFrom(e);
+                    setShowSoundSettings(false);
+                    setShowSharedVisualsSettings(false);
                     setShowMapSettings(!showMapSettings);
                   }}
                   className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
@@ -278,9 +295,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 </button>
 
                 {/* Map settings popover */}
-                {showMapSettings && (
+                {showMapSettings && popAnchor && createPortal(
                   <div
-                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[300px]"
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-3 min-w-[300px]"
+                    style={{ top: popAnchor.top, right: popAnchor.right, zIndex: 10000 }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="text-sm font-medium text-gray-700 mb-2">Background Image</div>
@@ -378,7 +396,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                         })()}
                       </div>
                     )}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             )}
@@ -389,6 +408,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    anchorFrom(e);
+                    setShowMapSettings(false);
+                    setShowSharedVisualsSettings(false);
                     setShowSoundSettings(!showSoundSettings);
                   }}
                   className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
@@ -400,9 +422,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 </button>
 
                 {/* Sound settings popover */}
-                {showSoundSettings && (
+                {showSoundSettings && popAnchor && createPortal(
                   <div
-                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[200px]"
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-3 min-w-[200px]"
+                    style={{ top: popAnchor.top, right: popAnchor.right, zIndex: 10000 }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="text-sm font-medium text-gray-700 mb-2">Ambient Sound</div>
@@ -487,7 +510,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                         })()}
                       </div>
                     )}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             )}
@@ -498,6 +522,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    anchorFrom(e);
+                    setShowMapSettings(false);
+                    setShowSoundSettings(false);
                     setShowSharedVisualsSettings(!showSharedVisualsSettings);
                   }}
                   className={`w-6 h-6 rounded shadow-sm transition-colors flex items-center justify-center text-xs ${
@@ -509,9 +536,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 </button>
 
                 {/* Shared visuals settings popover */}
-                {showSharedVisualsSettings && (
+                {showSharedVisualsSettings && popAnchor && createPortal(
                   <div
-                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[220px]"
+                    className="fixed bg-white rounded-lg shadow-xl border border-gray-200 p-3 min-w-[220px]"
+                    style={{ top: popAnchor.top, right: popAnchor.right, zIndex: 10000 }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="text-sm font-medium text-gray-700 mb-2">Shared Visual Content</div>
@@ -544,7 +572,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                         </div>
                       </div>
                     )}
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             )}
@@ -571,7 +600,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
         <div
           className={`relative overflow-hidden ${isDragOver ? 'bg-green-50' : 'bg-gray-50'}`}
           style={{
-            height: contentHeight,
+            height: `calc(100% - ${HEADER_HEIGHT}px)`,
             backgroundImage: mapAssetUrl ? 'none' : 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
             backgroundSize: '20px 20px',
           }}

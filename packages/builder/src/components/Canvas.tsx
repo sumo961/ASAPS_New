@@ -20,7 +20,7 @@ interface CanvasProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd?: (type: string, position: { x: number; y: number }) => void;
+  onBeatAdd?: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
   onClusterExpandCollapse?: (clusterId: string) => void;
   onClusterMove?: (clusterId: string, x: number, y: number) => void;
   paletteCollapsed?: boolean;
@@ -105,9 +105,9 @@ export const Canvas: React.FC<CanvasProps> = ({
     onBeatMove(beatId, { x, y });
   };
 
-  const handleBeatAdd = (type: string, position: { x: number; y: number }) => {
+  const handleBeatAdd = (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => {
     if (onBeatAdd) {
-      onBeatAdd(type, position);
+      onBeatAdd(type, position, cluster);
     }
   };
 

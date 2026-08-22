@@ -39,7 +39,7 @@ interface GraphEditorProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, x: number, y: number) => void;
   onClusterSelect: (cluster: Cluster | null) => void;
-  onBeatAdd: (type: string, position: { x: number; y: number }) => void;
+  onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
   onClusterExpandCollapse: (clusterId: string) => void;
   onClusterMove: (clusterId: string, x: number, y: number) => void;
   onBeatInContainerMove: (beatId: string, clusterId: string, x: number, y: number) => void;
@@ -679,6 +679,28 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
       const beatType = event.dataTransfer.getData('beatType');
       if (!beatType) return;
+
+      // A palette drop INSIDE an expanded cluster creates the beat AS A
+      // MEMBER at the drop point. Creating it top-level put the new node
+      // UNDER the frame (frame z 0, top-level beat z default) — it looked
+      // like the beat vanished "behind" the cluster.
+      const snap20 = (v: number) => Math.round(v / 20) * 20;
+      for (const cluster of clusters) {
+        if (!cluster.isExpanded) continue;
+        const cx = cluster.containerPosition?.x ?? 0;
+        const cy = cluster.containerPosition?.y ?? 0;
+        const cw = cluster.containerBounds?.width ?? 0;
+        const ch = cluster.containerBounds?.height ?? 0;
+        if (cw <= 0 || ch <= 0) continue;
+        if (position.x >= cx && position.x <= cx + cw && position.y >= cy && position.y <= cy + ch) {
+          onBeatAdd(beatType, position, {
+            clusterId: cluster.id,
+            x: Math.max(0, snap20(position.x - cx)),
+            y: Math.max(0, snap20(position.y - cy - CLUSTER_HEADER_H)),
+          });
+          return;
+        }
+      }
 
       onBeatAdd(beatType, position);
     },
