@@ -146,6 +146,50 @@ describe('buildGraphNodes', () => {
     expect((child as any).parentNode).toBe('c1');
   });
 
+  it('gives CLUSTERED dialogTree beats the expansion trigger too', () => {
+    // The Red Story gap that started the unification: all its dialogTrees
+    // are clustered and the hand-rendered cards had no ▸.
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } })],
+      clusters: [cluster()],
+    }));
+    const node = nodes.find(n => n.id === 'd1')!;
+    expect(node.data.dialogTree).toBe(SMALL_TREE);
+    expect(typeof node.data.onToggleDialogExpand).toBe('function');
+  });
+
+  it('expands a clustered dialogTree as a nested sub-flow (cluster → container → cards)', () => {
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } })],
+      clusters: [cluster()],
+      expandedDialogs: new Set(['d1']),
+    }));
+    const container = nodes.find(n => n.id === 'd1')!;
+    expect(container.type).toBe('dialogContainer');
+    expect((container as any).parentNode).toBe('c1');
+    expect((container as any).extent).toBeUndefined(); // may float past the frame
+    const cards = nodes.filter(n => n.type === 'dialogInternal');
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) expect((card as any).parentNode).toBe('d1');
+    // ancestor ordering: cluster before container before cards
+    const iCluster = nodes.findIndex(n => n.id === 'c1');
+    const iContainer = nodes.indexOf(container);
+    expect(iCluster).toBeLessThan(iContainer);
+    expect(iContainer).toBeLessThan(nodes.indexOf(cards[0]));
+  });
+
+  it('hides an expanded dialog (container AND cards) when its cluster collapses', () => {
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } })],
+      clusters: [cluster({ isExpanded: false })],
+      expandedDialogs: new Set(['d1']),
+    }));
+    expect(nodes.find(n => n.id === 'd1')!.hidden).toBe(true);
+    for (const card of nodes.filter(n => n.type === 'dialogInternal')) {
+      expect(card.hidden).toBe(true);
+    }
+  });
+
   it('renders beats standalone when their cluster does not exist (defensive)', () => {
     const nodes = buildGraphNodes(nodesInput({
       beats: [beat({ id: 'b1', cluster: 'ghost' })],
@@ -319,6 +363,38 @@ describe('buildGraphEdges', () => {
     }
     // the collapsed-form beat-level dialog edges must be suppressed
     expect(edges.some(e => e.source === 'd1' && (e.data as any)?.isDialog)).toBe(false);
+  });
+
+  it('routes an expanded CLUSTERED dialogTree through per-exit edges', () => {
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } }),
+        beat({ id: 'b9' }),
+      ],
+      clusters: [cluster()],
+      expandedDialogs: new Set(['d1']),
+    });
+    const exits = edges.filter(e => e.id.includes('dlgexit-'));
+    expect(exits.length).toBeGreaterThan(0);
+    for (const e of exits) expect(e.source.startsWith('dlg:d1:')).toBe(true);
+    expect(edges.some(e => (e.data as any)?.isDialog)).toBe(false);
+  });
+
+  it('falls back to pill-docked beat edges when the expanded dialog sits in a collapsed cluster', () => {
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } }),
+        beat({ id: 'b9' }),
+      ],
+      clusters: [cluster({ isExpanded: false })],
+      expandedDialogs: new Set(['d1']),
+    });
+    // no per-exit edges (they'd hang off hidden cards) …
+    expect(edges.some(e => e.id.includes('dlgexit-'))).toBe(false);
+    // … instead the legacy dialog-choice edges dock at the cluster pill
+    const dialogEdges = edges.filter(e => (e.data as any)?.isDialog);
+    expect(dialogEdges.length).toBe(2);
+    for (const e of dialogEdges) expect(e.source).toBe('c1');
   });
 
   it('emits defaultTarget edges', () => {

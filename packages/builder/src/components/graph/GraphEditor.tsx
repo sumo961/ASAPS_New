@@ -390,53 +390,25 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     });
   }, [pwCurrentBeatId, setNodes]);
 
-  // Auto-center and zoom on selected beat for better visibility
+  // Auto-center and zoom on selected beat for better visibility. Clustered
+  // beats are real nodes now — positionAbsolute already folds the parent
+  // frame in, so the manual cluster-position reconstruction is gone. A beat
+  // hidden inside a COLLAPSED cluster has no useful own position; center on
+  // its cluster frame instead.
   useEffect(() => {
     if (!reactFlowInstance || !selectedBeat) return;
 
-    // Find the node in ReactFlow
     const node = reactFlowInstance.getNode(selectedBeat.id);
-    if (!node) {
-      // Beat might be inside a cluster - find the cluster and beat position within it
-      const clusterId = selectedBeat.cluster;
-      if (clusterId) {
-        const clusterNode = reactFlowInstance.getNode(clusterId);
-        if (clusterNode) {
-          // Find beat's position within the cluster from containerBeatPositions
-          const beatPosition = containerBeatPositions.find(bp => bp.beatId === selectedBeat.id);
+    const target = node?.hidden
+      ? reactFlowInstance.getNode(selectedBeat.cluster ?? '')
+      : node;
+    if (!target) return;
 
-          if (beatPosition?.position) {
-            // Calculate absolute position: cluster position + beat position within cluster
-            // Add 40px for cluster header height
-            const HEADER_HEIGHT = 40;
-            const NODE_WIDTH = 160;
-            const NODE_HEIGHT = 80;
-
-            const absoluteX = clusterNode.position.x + beatPosition.position.x + (NODE_WIDTH / 2);
-            const absoluteY = clusterNode.position.y + HEADER_HEIGHT + beatPosition.position.y + (NODE_HEIGHT / 2);
-
-            reactFlowInstance.setCenter(absoluteX, absoluteY, { zoom: 0.8, duration: 300 });
-          } else {
-            // Fallback: center on cluster if beat position not found
-            reactFlowInstance.setCenter(
-              clusterNode.position.x + (clusterNode.style?.width ? Number(clusterNode.style.width) / 2 : 200),
-              clusterNode.position.y + (clusterNode.style?.height ? Number(clusterNode.style.height) / 2 : 100),
-              { zoom: 0.8, duration: 300 }
-            );
-          }
-        }
-      }
-      return;
-    }
-
-    // Center on the selected beat node at 80% zoom
-    // Node width ~160, height ~80, so center offset is 80, 40
-    reactFlowInstance.setCenter(
-      node.position.x + 80,
-      node.position.y + 40,
-      { zoom: 0.8, duration: 300 }
-    );
-  }, [selectedBeat?.id, reactFlowInstance, containerBeatPositions]);
+    const pos = (target as any).positionAbsolute ?? target.position;
+    const w = target.width ?? (target.style?.width ? Number(target.style.width) : 160);
+    const h = target.height ?? (target.style?.height ? Number(target.style.height) : 80);
+    reactFlowInstance.setCenter(pos.x + w / 2, pos.y + h / 2, { zoom: 0.8, duration: 300 });
+  }, [selectedBeat?.id, reactFlowInstance]);
 
   // Handle node click
   const onNodeClick = useCallback(

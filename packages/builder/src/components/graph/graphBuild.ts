@@ -179,17 +179,24 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
       // B1b v2 — expanded dialogTree renders CLUSTER-STYLE: a container node
       // (same id, so inbound edges and position carry over) plus the dialog's
       // exchanges/choices as real, read-only child nodes. Their edges are
-      // built in the edges memo from the same layout.
-      // (Clustered dialogTrees expand in Phase 3 of the unification — until
-      // then they get no trigger, so no dead ▸.)
-      if (!parentCluster && beat.type === 'dialogTree' && expandedDialogs.has(beat.id)) {
+      // built in the edges memo from the same layout. Works identically for
+      // clustered dialogTrees — the container just becomes a child of the
+      // cluster frame (same sub-flow mechanic, one level deeper). A collapsed
+      // cluster hides the whole expansion with it.
+      if (beat.type === 'dialogTree' && expandedDialogs.has(beat.id)) {
         const tree = (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree;
         if (tree) {
           const layout = dialogTreeLayout(tree);
+          const hiddenInCluster = parentCluster && !parentCluster.isExpanded;
           const container: Node = {
             id: beat.id,
             type: 'dialogContainer',
             position,
+            // In-cluster: parented to the frame but WITHOUT extent — the
+            // expanded tree may be larger than the frame and floats over
+            // its edge rather than being clamped into it.
+            ...(parentCluster ? { parentNode: parentCluster.id } : {}),
+            ...(hiddenInCluster ? { hidden: true } : {}),
             // Expanded dialogs float above neighboring beats (focus overlay) —
             // growing in place would otherwise interleave with whatever the
             // author had placed to the right.
@@ -215,6 +222,9 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
             zIndex: 22,
             parentNode: beat.id,
             extent: 'parent' as const,
+            // hidden does not cascade in ReactFlow — a collapsed cluster
+            // must hide the dialog's grandchildren explicitly.
+            ...(hiddenInCluster ? { hidden: true } : {}),
             draggable: false,
             selectable: false,
             connectable: false,
@@ -256,7 +266,8 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
             ? { onEjectFromCluster: onRemoveBeatFromCluster }
             : {}),
           // B1b — dialogTree disclosure trigger on the collapsed node
-          ...(beat.type === 'dialogTree' && !parentCluster ? {
+          // (clustered dialogTrees included — same mechanic, nested)
+          ...(beat.type === 'dialogTree' ? {
             dialogTree: (beat as any).getParameters?.()?.dialogTree ?? (beat as any).dialogTree,
             dialogExpanded: false,
             onToggleDialogExpand: toggleDialogExpand,
@@ -410,12 +421,16 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
       // Get beat parameters for special handling
       const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
 
-      // B1b — when a dialogTree is expanded (and rendered as its own node,
-      // i.e. not resolved into a cluster container), its outgoing edges are
+      // B1b — when a dialogTree is expanded AND its expansion is visible
+      // (top-level, or inside an EXPANDED cluster), its outgoing edges are
       // emitted ONLY from the per-exit handles below; both legacy dialog
-      // edge emitters are suppressed to avoid doubled edges.
+      // edge emitters are suppressed to avoid doubled edges. Inside a
+      // COLLAPSED cluster the expansion is hidden, so the legacy emitters
+      // run and dock the edges at the cluster pill as usual.
+      const beatClusterHere = getBeatCluster(beat.id);
       const dialogExpandedHere =
-        beat.type === 'dialogTree' && expandedDialogs.has(beat.id) && !getBeatCluster(beat.id);
+        beat.type === 'dialogTree' && expandedDialogs.has(beat.id) &&
+        (!beatClusterHere || beatClusterHere.isExpanded);
       
       // Special handling for setTimer beats - show timer target in red
       if (beat.type === 'setTimer' && params.timerTarget) {
