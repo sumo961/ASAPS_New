@@ -280,7 +280,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                 {/* Map settings popover */}
                 {showMapSettings && (
                   <div
-                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[200px]"
+                    className="absolute top-8 right-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50 min-w-[300px]"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="text-sm font-medium text-gray-700 mb-2">Background Image</div>
@@ -353,7 +353,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                           return (
                             <div>
                               <div className="mb-2 text-gray-600">Select an image:</div>
-                              <div className="grid grid-cols-3 gap-1 max-h-[150px] overflow-y-auto">
+                              <div className="grid grid-cols-4 gap-1.5 max-h-[280px] overflow-y-auto">
                                 {imageAssets.map(asset => (
                                   <button
                                     key={asset.id}
@@ -362,7 +362,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
                                         onSetClusterMap(cluster.id, asset.id, 1, 0.5);
                                       }
                                     }}
-                                    className="w-12 h-12 rounded border border-gray-200 overflow-hidden hover:border-blue-500 hover:ring-2 hover:ring-blue-200 transition-all"
+                                    className="w-16 h-16 rounded border border-gray-200 overflow-hidden hover:border-blue-500 hover:ring-2 hover:ring-blue-200 transition-all"
                                     title={asset.name || asset.id}
                                   >
                                     <img

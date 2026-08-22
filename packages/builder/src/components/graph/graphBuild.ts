@@ -352,6 +352,48 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
         if (s) n.position = { x: n.position.x + s.dx, y: n.position.y + s.dy };
       }
     }
+
+    // Make room INSIDE clusters too: an expanded dialog pushes its SIBLING
+    // beats aside (same parent, parent-relative coords, same right/down
+    // rule), and the frame grows VISUALLY (style only — stored bounds are
+    // untouched, so collapsing the dialog restores the frame exactly).
+    // Without the growth, shifted siblings would hang outside the frame.
+    const grownInClusters = clusteredChildNodes.filter(
+      n => n.type === 'dialogContainer' && !n.hidden
+    );
+    {
+      const APPROX_H = 90;
+      for (const g of [...grownInClusters].sort((a, b) => a.position.x - b.position.x)) {
+        const parentId = (g as any).parentNode as string;
+        const W = Number((g.style as any)?.width ?? 0);
+        const H = Number((g.style as any)?.height ?? 0);
+        const dx = Math.max(0, W - 160);
+        const dy = Math.max(0, H - APPROX_H);
+        const gx = g.position.x;
+        const gy = g.position.y;
+        let maxX = gx + W;
+        let maxY = gy + H;
+        for (const n of clusteredChildNodes) {
+          if (n === g || (n as any).parentNode !== parentId || n.hidden) continue;
+          const nx = n.position.x;
+          const ny = n.position.y;
+          const vOverlap = ny + APPROX_H > gy && ny < gy + H;
+          const hOverlap = nx + 160 > gx && nx < gx + W;
+          if (nx > gx && vOverlap) n.position = { x: nx + dx, y: ny };
+          else if (ny > gy && hOverlap) n.position = { x: nx, y: ny + dy };
+          maxX = Math.max(maxX, n.position.x + 160);
+          maxY = Math.max(maxY, n.position.y + APPROX_H);
+        }
+        const frame = clusterNodes.find(c => c.id === parentId);
+        if (frame?.style) {
+          frame.style = {
+            ...frame.style,
+            width: Math.max(Number((frame.style as any).width ?? 0), maxX + 20),
+            height: Math.max(Number((frame.style as any).height ?? 0), maxY + 20),
+          };
+        }
+      }
+    }
     return allNodes;
 }
 

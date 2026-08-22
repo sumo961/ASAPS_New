@@ -178,6 +178,30 @@ describe('buildGraphNodes', () => {
     expect(iContainer).toBeLessThan(nodes.indexOf(cards[0]));
   });
 
+  it('pushes sibling beats aside and grows the frame when a clustered dialog expands', () => {
+    const nodes = buildGraphNodes(nodesInput({
+      beats: [
+        beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } }),
+        beat({ id: 'b2', cluster: 'c1' }),
+      ],
+      clusters: [cluster()],
+      containerBeatPositions: [
+        { beatId: 'd1', clusterId: 'c1', position: { x: 20, y: 20, z: 0 } } as any,
+        // directly right of the dialog, vertically overlapping it
+        { beatId: 'b2', clusterId: 'c1', position: { x: 220, y: 20, z: 0 } } as any,
+      ],
+      expandedDialogs: new Set(['d1']),
+    }));
+    const container = nodes.find(n => n.id === 'd1')!;
+    const sibling = nodes.find(n => n.id === 'b2')!;
+    const W = Number((container.style as any).width);
+    // sibling shifted right by the container's growth beyond a normal node
+    expect(sibling.position.x).toBe(220 + Math.max(0, W - 160));
+    // frame grew (style only) to keep the shifted sibling inside
+    const frame = nodes.find(n => n.id === 'c1')!;
+    expect(Number((frame.style as any).width)).toBeGreaterThanOrEqual(sibling.position.x + 160 + 20);
+  });
+
   it('hides an expanded dialog (container AND cards) when its cluster collapses', () => {
     const nodes = buildGraphNodes(nodesInput({
       beats: [beat({ id: 'd1', cluster: 'c1', type: 'dialogTree', params: { dialogTree: SMALL_TREE } })],

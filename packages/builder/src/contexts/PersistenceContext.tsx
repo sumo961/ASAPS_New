@@ -421,6 +421,13 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       }
     } catch (err) {
       console.error('[PersistenceContext] Failed to save to filesystem:', err);
+    } finally {
+      // Stamp the END of the write too. A large save (93-beat project, asset
+      // batch) can take longer than the suppression window measured from its
+      // START — the tail of our own write then arrived "outside" the window
+      // and fired the external-change alert on our own save. Measured from
+      // the end, the window only has to cover chokidar's settle+debounce.
+      lastOwnWriteRef.current = Date.now();
     }
   }, [storage, debug]);
 
@@ -1147,6 +1154,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       adapter.setProjectPath(dirPath);
       lastOwnWriteRef.current = Date.now();
       await adapter.saveProject(projectToSave, assets);
+      // End-of-write stamp — see handleAfterSave for why both ends matter.
+      lastOwnWriteRef.current = Date.now();
 
       directoryAdapterRef.current = adapter;
       startExternalWatch(adapter, projectToSave.id);
@@ -1258,7 +1267,9 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     const adapter = directoryAdapterRef.current;
     if (!adapter || !adapter.getProjectPath()) return;
     try {
+      lastOwnWriteRef.current = Date.now();
       await adapter.deleteAsset(assetId);
+      lastOwnWriteRef.current = Date.now();
       // The asset id is no longer "saved" — drop from the optimisation set
       // so a future re-add of the same id (re-imported) actually writes again.
       savedAssetIdsRef.current.delete(assetId);

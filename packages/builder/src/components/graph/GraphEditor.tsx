@@ -272,9 +272,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // Build a fingerprint of the nodes: IDs + positions + selection state.
     // parentNode + hidden cover cluster membership changes (drop/eject) and
     // collapse — without them the graph would not re-sync on those events.
-    const fingerprint = nodes.map(n =>
-      `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}`
-    ).join('|');
+    // Cluster frames additionally fingerprint their visible data (name, map,
+    // sound, shared visuals, size): the frame renders straight from
+    // data.cluster, so a map assigned in the popover was otherwise applied
+    // to state but never re-synced to the node — the picker looked dead.
+    const fingerprint = nodes.map(n => {
+      const clusterExtra = n.type === 'cluster'
+        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
+        : '';
+      return `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
+    }).join('|');
 
     if (fingerprint === prevNodeIdsRef.current) {
       // Nodes haven't meaningfully changed — skip setNodes to protect ReactFlow state
@@ -622,22 +629,60 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     [onBeatMove, onClusterMove, onBeatInContainerMove, onDropBeatToCluster, clusters, beats]
   );
 
-// Handle drop to add new beats
+// Handle drop: existing beats (from the sidebar) into clusters, and new
+  // beats from the palette. Beat drops are handled HERE, on the wrapper,
+  // because the element under the cursor over a cluster is usually one of
+  // its child beat nodes — which is a DOM sibling of the frame, not a
+  // descendant, so the frame's own drop handler never fires for it. A
+  // flow-coordinate hit test is independent of DOM routing entirely.
+  // (The collapsed pill keeps its own handler — it has no overlaying
+  // children, and its body IS the drop target.)
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
-
-      const beatType = event.dataTransfer.getData('beatType');
-      if (!beatType || !reactFlowInstance) return;
+      if (!reactFlowInstance) return;
 
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
 
+      const beatId = event.dataTransfer.getData('text/beatId') || event.dataTransfer.getData('beatId');
+      if (beatId) {
+        const snap20 = (v: number) => Math.round(v / 20) * 20;
+        for (const cluster of clusters) {
+          if (!cluster.isExpanded) continue;
+          const cx = cluster.containerPosition?.x ?? 0;
+          const cy = cluster.containerPosition?.y ?? 0;
+          const cw = cluster.containerBounds?.width ?? 0;
+          const ch = cluster.containerBounds?.height ?? 0;
+          if (cw <= 0 || ch <= 0) continue;
+          if (position.x >= cx && position.x <= cx + cw && position.y >= cy && position.y <= cy + ch) {
+            const beatObj = beats.find(b => b.id === beatId);
+            if (beatObj?.cluster !== cluster.id) {
+              onDropBeatToCluster?.(beatId, cluster.id);
+            }
+            // Land where dropped (content-relative, −header), also when the
+            // beat was already a member — a sidebar drag is a positioning
+            // gesture either way.
+            onBeatInContainerMove(
+              beatId,
+              cluster.id,
+              Math.max(0, snap20(position.x - cx)),
+              Math.max(0, snap20(position.y - cy - CLUSTER_HEADER_H)),
+            );
+            return;
+          }
+        }
+        return; // beat drag that missed every cluster: no-op
+      }
+
+      const beatType = event.dataTransfer.getData('beatType');
+      if (!beatType) return;
+
       onBeatAdd(beatType, position);
     },
-    [reactFlowInstance, onBeatAdd]
+    [reactFlowInstance, onBeatAdd, clusters, beats, onDropBeatToCluster, onBeatInContainerMove]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {

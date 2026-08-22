@@ -74,7 +74,8 @@ import { useAIDebug } from './hooks/useAIDebug';
 import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
-import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
@@ -308,6 +309,8 @@ function App() {
       translationActionsRef.current?.removeBeatTranslations(id);
     },
     moveBeat: (id, pos) => actions.moveBeat(id, pos),
+    moveBeatInContainer: (id, clusterId, x, y) => actions.moveBeatInContainer?.(id, clusterId, x, y),
+    resizeCluster: (id, w, h) => actions.resizeCluster?.(id, w, h),
   };
 
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
@@ -6495,10 +6498,22 @@ function App() {
               }
             }}
             onBeatInContainerMove={(beatId: string, clusterId: string, x: number, y: number) => {
-              if (actions.moveBeatInContainer) {
-                actions.moveBeatInContainer(beatId, clusterId, x, y);
-                markChanged();
+              if (!actions.moveBeatInContainer) return;
+              // Undoable (cluster-unification follow-up). Old position =
+              // stored, else the default grid slot the beat rendered on.
+              const stored = state.containerBeatPositions?.find(
+                p => p.beatId === beatId && p.clusterId === clusterId
+              );
+              let oldPos = stored ? { x: stored.position.x, y: stored.position.y } : null;
+              if (!oldPos) {
+                const idx = state.beats.filter(b => b.cluster === clusterId).findIndex(b => b.id === beatId);
+                const i = Math.max(0, idx);
+                oldPos = { x: 20 + (i % 2) * 200, y: 20 + Math.floor(i / 2) * 110 };
               }
+              if (oldPos.x === x && oldPos.y === y) return; // no-op move
+              const cmd = new MoveBeatInContainerCommand(beatId, clusterId, oldPos, { x, y }, stableMutations.current);
+              getCommandManager().execute(cmd);
+              markChanged();
             }}
             onDropBeatToCluster={(beatId: string, clusterId: string) => {
               if (actions.moveBeatToCluster) {
@@ -6542,6 +6557,10 @@ function App() {
               // Calculate grid layout
               const beatsPerRow = Math.max(1, Math.floor((maxWidth + gap) / (nodeWidth + gap)));
 
+              // One undoable batch: every move + the frame growth. Before
+              // this, the grid button silently rearranged a whole cluster
+              // with no way back.
+              const commands: (MoveBeatInContainerCommand | ResizeClusterCommand)[] = [];
               let maxRight = 0;
               let maxBottom = 0;
               clusterBeats.forEach((beat, index) => {
@@ -6552,21 +6571,38 @@ function App() {
                 maxRight = Math.max(maxRight, x + nodeWidth);
                 maxBottom = Math.max(maxBottom, y + nodeHeight);
 
-                if (actions.moveBeatInContainer) {
-                  actions.moveBeatInContainer(beat.id, clusterId, x, y);
+                const stored = state.containerBeatPositions?.find(
+                  p => p.beatId === beat.id && p.clusterId === clusterId
+                );
+                const oldPos = stored
+                  ? { x: stored.position.x, y: stored.position.y }
+                  : { x: 20 + (index % 2) * 200, y: 20 + Math.floor(index / 2) * 110 };
+                if (oldPos.x !== x || oldPos.y !== y) {
+                  commands.push(new MoveBeatInContainerCommand(beat.id, clusterId, oldPos, { x, y }, stableMutations.current));
                 }
               });
 
               // Grow the container to fit the grid just laid out (40px
               // header + bottom padding); never shrink below the author's
               // width so the grid columns stay stable.
-              if (actions.resizeCluster) {
-                const width = Math.max(cluster.containerBounds?.width || 0, maxRight + padding);
-                const height = Math.max(cluster.containerBounds?.height || 0, 40 + maxBottom + padding);
-                actions.resizeCluster(clusterId, width, height);
+              const oldBounds = {
+                width: cluster.containerBounds?.width || 0,
+                height: cluster.containerBounds?.height || 0,
+              };
+              const newBounds = {
+                width: Math.max(oldBounds.width, maxRight + padding),
+                height: Math.max(oldBounds.height, 40 + maxBottom + padding),
+              };
+              if (newBounds.width !== oldBounds.width || newBounds.height !== oldBounds.height) {
+                commands.push(new ResizeClusterCommand(clusterId, oldBounds, newBounds, stableMutations.current));
               }
 
-              markChanged();
+              if (commands.length > 0) {
+                getCommandManager().execute(
+                  new BatchCommand(commands, `Arrange cluster "${cluster.name}"`)
+                );
+                markChanged();
+              }
               console.log(`[App] Auto-arranged ${clusterBeats.length} beats in cluster ${cluster.name}`);
             }}
             // The "+ Beat" affordance lives in the sidebar palette — letting
