@@ -4,6 +4,7 @@ import { Beat } from '@asaps/core';
 import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
 import { TranslationStaleIndicator } from '../translation/TranslationStaleIndicator';
 import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
+import { beatTypeIcons, DEFAULT_BEAT_ICON } from './graphStyle';
 
 interface BeatNodeData {
   beat: Beat;
@@ -29,34 +30,6 @@ interface BeatNodeData {
   beatNames?: Record<string, string>;
 }
 
-// Beat type icons
-const beatTypeIcons: Record<string, string> = {
-  // Visible beats
-  titleScreen: '🎬',
-  infoText: '📝',
-  dialogTree: '🌳',
-  conversationChoice: '💬',
-  movementChoice: '🚶',
-  pickProp: '🎒',
-  videoBeat: '🎥',
-  durScreen: '⏳',
-  inputText: '✏️',
-  hyperText: '🔗',
-  endScreen: '🏁',
-  panorama: '🌐',
-  // Logic beats
-  setVariable: '🔧',
-  conditionBeat: '❓',
-  condition: '❓',
-  randomTarget: '🎲',
-  setTimer: '⏱️',
-  addRemoveInventory: '📦',
-  // AI beats
-  onlineContent: '🌐',
-  aiDialogTree: '🤖',
-  aiCondition: '🧠',
-  aiSummary: '📊',
-};
 
 // Fixed node dimensions for consistent layout
 const NODE_WIDTH = 160;
@@ -100,7 +73,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
     );
   }
 
-  const icon = beatTypeIcons[data.type] || '📄';
+  const icon = beatTypeIcons[data.type] || DEFAULT_BEAT_ICON;
   
   // Determine if this node is truly selected (either ReactFlow selected or data.selected)
   const isSelected = selected || data.selected;
