@@ -225,7 +225,9 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
 
   // EXPANDED VIEW — frame only; the beats render as ReactFlow child nodes.
   return (
-    <div className="relative">
+    // Root must adopt the RF wrapper's size — the frame below is 100%/100%,
+    // and against an auto-height root it collapses to just the header.
+    <div className="relative" style={{ width: '100%', height: '100%' }}>
       <Handle type="target" position={Position.Left} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
       <Handle type="source" position={Position.Right} style={{ background: '#6366f1', border: '2px solid white', width: 12, height: 12 }} />
 
