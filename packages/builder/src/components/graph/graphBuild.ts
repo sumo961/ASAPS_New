@@ -32,15 +32,12 @@ export interface GraphNodeCallbacks {
   onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
-  onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number) => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
   /** Live getter — the cluster popovers read assets at open time. */
   getAssets: () => Asset[];
-  /** Live getter — cluster highlight state reads the current set. */
-  getHighlightedBeatIds: () => Set<string> | null;
 }
 
 export interface GraphNodesInput {
@@ -84,13 +81,11 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
     onRemoveBeatFromCluster,
     onClusterResize,
     onAutoLayoutCluster,
-    onAddToContainer,
     onRemoveCluster,
     onSetClusterMap,
     onSetClusterSound,
     onSetClusterSharedVisuals,
     getAssets,
-    getHighlightedBeatIds,
   } = input.callbacks;
   // Ref-shaped shims: the body below was moved verbatim from GraphEditor's
   // useMemo, where these were refs read at memo-execution time. Snapshot

@@ -9,14 +9,16 @@
  * overflow the box — the classic symptom in AI-generated stories.
  */
 
+import { CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from '../components/graph/graphStyle';
+
 const GRID_STEP_Y = 110;
 const NODE_HEIGHT = 80;
 const PADDING = 20;
-const HEADER_HEIGHT = 40;
+const HEADER_HEIGHT = CLUSTER_HEADER_H;
 
-/** Minimum sensible container, matches the app's historical defaults. */
-export const MIN_CLUSTER_WIDTH = 400;
-export const MIN_CLUSTER_HEIGHT = 300;
+/** Minimum sensible container — shared with the frame's clamp (graphStyle). */
+export const MIN_CLUSTER_WIDTH = MIN_CLUSTER_W;
+export const MIN_CLUSTER_HEIGHT = MIN_CLUSTER_H;
 
 /**
  * The container size needed to show `memberCount` beats on the default

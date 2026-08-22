@@ -19,7 +19,6 @@ import { CustomEdge } from './CustomEdge';
 import { ClusterContainerNode } from './ClusterContainerNode';
 import { DialogContainerNode } from './DialogContainerNode';
 import { DialogInternalNode } from './DialogInternalNode';
-import { ContainerConnectionEdge } from './ContainerConnectionEdge';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
 import { CLUSTER_HEADER_H } from './graphStyle';
@@ -92,7 +91,6 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
   custom: CustomEdge,
-  containerConnection: ContainerConnectionEdge,
 };
 
 export const GraphEditor: React.FC<GraphEditorProps> = ({
@@ -234,18 +232,16 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       onRemoveBeatFromCluster,
       onClusterResize,
       onAutoLayoutCluster,
-      onAddToContainer,
       onRemoveCluster,
       onSetClusterMap,
       onSetClusterSound,
       onSetClusterSharedVisuals,
       getAssets: () => assetsRef.current,
-      getHighlightedBeatIds: () => highlightedBeatIdsRef.current,
     },
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
-  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onAddToContainer, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
+  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(

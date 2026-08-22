@@ -68,3 +68,9 @@ export const CLUSTER_HEADER_H = 40;
 
 /** Grid snap for in-cluster beat positions. */
 export const GRID_SNAP = 20;
+
+/** Minimum cluster frame size. One constant for the frame's clamp AND
+ *  clusterAutosize's grow-only floor — they disagreed (500 vs 400) before
+ *  the unification. */
+export const MIN_CLUSTER_W = 400;
+export const MIN_CLUSTER_H = 300;

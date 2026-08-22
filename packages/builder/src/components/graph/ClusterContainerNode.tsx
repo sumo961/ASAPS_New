@@ -1,7 +1,7 @@
 import React, { memo, useState, useCallback, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { Cluster, SharedVisualContent } from '@asaps/core';
-import { CLUSTER_HEADER_H } from './graphStyle';
+import { CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
 
 /**
  * ClusterContainerNode — the cluster FRAME.
@@ -41,8 +41,8 @@ interface ClusterContainerNodeData {
 }
 
 const HEADER_HEIGHT = CLUSTER_HEADER_H;
-const MIN_CONTAINER_WIDTH = 500;
-const MIN_CONTAINER_HEIGHT = 300;
+const MIN_CONTAINER_WIDTH = MIN_CLUSTER_W;
+const MIN_CONTAINER_HEIGHT = MIN_CLUSTER_H;
 
 export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   data,
