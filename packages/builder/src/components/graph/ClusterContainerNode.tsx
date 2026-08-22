@@ -146,10 +146,15 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     });
   }, [containerWidth, containerHeight]);
 
-  // Drag-drop from outside (sidebar)
+  // Drag-drop visuals. The EXPANDED frame does not handle drop payloads
+  // itself anymore — whether a drop lands on the frame body or on one of the
+  // (sibling-node) beats over it, the event must reach the SAME handler, and
+  // that is GraphEditor's wrapper onDrop with its flow-coordinate hit test.
+  // When this component swallowed body drops (stopPropagation + beatId-only
+  // logic), palette drops worked over beats but silently died over the frame
+  // body — "very inconsistent" was literally which pixel the drop hit.
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); // mark as valid drop target (bubbles on to the wrapper)
     setIsDragOver(true);
   }, []);
 
@@ -157,6 +162,14 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     setIsDragOver(false);
   }, []);
 
+  /** Expanded frame: visuals only — the wrapper handles the payload. */
+  const handleDropExpanded = useCallback(() => {
+    setIsDragOver(false);
+  }, []);
+
+  /** Collapsed pill: the wrapper's hit test skips collapsed clusters, so the
+   *  pill handles existing-beat drops itself (its body has no overlaying
+   *  children, the old path is sound here). */
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -244,7 +257,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
         style={{ width: '100%', height: '100%', backgroundColor: 'white' }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDrop={handleDropExpanded}
       >
         {/* Header — the frame's drag handle (see dragHandle in graphBuild.ts) */}
         <div className="cluster-drag-handle flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 border-b border-indigo-200 cursor-move" style={{ height: HEADER_HEIGHT }}>
