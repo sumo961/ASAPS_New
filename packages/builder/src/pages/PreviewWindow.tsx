@@ -1148,14 +1148,30 @@ export const PreviewWindow: React.FC = () => {
           return null;
         }
 
-        // Build prop asset map from PickProp beats (uses fresh asset data from ref)
+        // Build prop asset + label maps from PickProp beats (fresh asset data
+        // from ref). The LABEL map is how a runtime-acquired item without an
+        // authored character-item record still gets a display name: the
+        // granting beat's prop.displayName — which the translation flow
+        // already extracts and applies (beat:N.parameters.props.M.displayName)
+        // — instead of the raw matching key ('knife' in a Persian story).
         const propAssetMap = new Map<string, string>();
+        const propLabelMap = new Map<string, string>();
+        const propDescMap = new Map<string, string>();
         if (story) {
           const allBeats = story.getAllBeats();
           for (const beat of allBeats) {
             if (beat.type === 'pickProp') {
               const props = (beat as any).props || [];
               for (const prop of props) {
+                if (prop.name && (prop.displayName || prop.displayText)) {
+                  const label = prop.displayName || prop.displayText;
+                  propLabelMap.set(prop.name, label);
+                  propLabelMap.set(prop.name.toLowerCase(), label);
+                }
+                if (prop.name && prop.description) {
+                  propDescMap.set(prop.name, prop.description);
+                  propDescMap.set(prop.name.toLowerCase(), prop.description);
+                }
                 if (prop.name && prop.assetId) {
                   const asset = pd?.assets?.find(a => a.id === prop.assetId);
                   if (asset?.url) {
@@ -1199,8 +1215,8 @@ export const PreviewWindow: React.FC = () => {
           return {
             id: entry.name,
             name: entry.name,
-            displayName: entry.name,
-            description: '',
+            displayName: propLabelMap.get(entry.name) || propLabelMap.get(entry.name.toLowerCase()) || entry.name,
+            description: propDescMap.get(entry.name) || propDescMap.get(entry.name.toLowerCase()) || '',
             icon: propIcon,
             quantity: entry.quantity,
             category: '',
