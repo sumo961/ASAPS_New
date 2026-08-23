@@ -31,12 +31,20 @@ function VCSBridge({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The Preview Window is a second full app instance in its own window. It
+// must never WRITE the project (its autosave raced the main window's) and
+// must never WATCH it either — with both windows armed, the main window's
+// own autosave looked like an external change to the PW's watcher and
+// raised the "files changed outside ASAPS" alert with ~120 files listed.
+const isPreviewWindow = typeof window !== 'undefined' && window.location.hash === '#/preview-window';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <PersistenceProvider
-      autoSave={true}
+      autoSave={!isPreviewWindow}
       autoSaveDelay={30000}
       debug={true}
+      passive={isPreviewWindow}
     >
       <TranslationProvider>
         <VCSBridge>

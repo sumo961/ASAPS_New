@@ -3165,8 +3165,25 @@ export const PreviewWindow: React.FC = () => {
                     <div className="text-sm font-medium text-gray-600 mb-2">Counters</div>
                     <div className="space-y-2">
                       {Object.entries(debugInfo.counters).map(([key, value]) => {
-                        // Find counter definition from characters in previewData
-                        const counterDef = previewData?.characters?.flatMap(c => c.counters || []).find(c => c.name === key);
+                        // Scoped counters arrive as '<bucketKey>.<name>' where the
+                        // bucket key is the character ID (char_0). Resolve the
+                        // owning character so the label uses their real code name
+                        // (red.aggressive — the documented reference syntax) and
+                        // the counter DEFINITION is found again (it lives on the
+                        // character; a raw-key lookup matched nothing, which also
+                        // silently dropped the level-meter bars).
+                        const dot = key.lastIndexOf('.');
+                        const ownerKey = dot > 0 ? key.slice(0, dot) : null;
+                        const counterName = dot > 0 ? key.slice(dot + 1) : key;
+                        const ownerChar = ownerKey
+                          ? previewData?.characters?.find(c => c.id === ownerKey || (c as any).name === ownerKey)
+                          : null;
+                        const counterDef = ownerChar
+                          ? (ownerChar.counters || []).find(c => c.name === counterName)
+                          : previewData?.characters?.flatMap(c => c.counters || []).find(c => c.name === key);
+                        const label = ownerChar
+                          ? `${(ownerChar as any).name || ownerChar.id}.${counterName}`
+                          : (counterDef?.displayName || key);
                         const showMeter = counterDef?.showLevelMeter;
                         const orientation = counterDef?.levelMeterOrientation || 'horizontal';
                         const color = counterDef?.color || '#3B82F6';
@@ -3177,7 +3194,7 @@ export const PreviewWindow: React.FC = () => {
                         return (
                           <div key={key} className="text-xs">
                             <div className="flex items-center justify-between">
-                              <span className="font-mono text-gray-600">{counterDef?.displayName || key}:</span>
+                              <span className="font-mono text-gray-600">{label}:</span>
                               <span className="font-bold">{value as number}</span>
                             </div>
                             {showMeter && (

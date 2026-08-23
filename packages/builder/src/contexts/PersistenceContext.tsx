@@ -173,6 +173,9 @@ export interface PersistenceProviderProps {
 
   /** Enable debug logging */
   debug?: boolean;
+  /** Read-only instance (Preview Window): never writes the project folder,
+   *  never arms the external-change watcher. */
+  passive?: boolean;
 }
 
 export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
@@ -181,6 +184,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   autoSave = true,
   autoSaveDelay = 30000,
   debug = false,
+  passive = false,
 }) => {
   // State
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -308,6 +312,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * own writes are our own saves echoing back and are ignored.
    */
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
+    // A passive instance (Preview Window) never watches: with two windows
+    // armed, the main window's own autosave read as an "external" change
+    // to the preview's watcher and raised the alert on untouched projects.
+    if (passive) return;
     unwatchRef.current?.();
     unwatchRef.current = null;
     try {
@@ -331,9 +339,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     } catch (e) {
       console.warn('[PersistenceContext] Could not start external-change watch:', e);
     }
-  }, []);
+  }, [passive]);
 
   const handleAfterSave = useCallback(async (project: Project) => {
+    // Passive instance: IndexedDB persistence may proceed upstream, but the
+    // project FOLDER belongs to the main window — never write or adopt.
+    if (passive) return;
     // ---- Default-location adoption (storage inversion, desktop only) ----
     // A project born this session (created / generated / injected / imported)
     // becomes folder-canonical at ~/Documents/ASAPS Projects/<name>/ on its
@@ -429,7 +440,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       // the end, the window only has to cover chokidar's settle+debounce.
       lastOwnWriteRef.current = Date.now();
     }
-  }, [storage, debug]);
+  }, [storage, debug, passive]);
 
   /**
    * Auto-save hook
