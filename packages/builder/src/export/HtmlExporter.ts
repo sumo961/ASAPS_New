@@ -1104,6 +1104,10 @@ async function createStoryZipFromData(originalZipBlob: Blob, translatedProjectDa
       path === `${folder}/` || path.startsWith(`${folder}/`)
     );
     if (isAssetBinary) continue;
+    // The staged translation RESOURCES are authoring data — this zip IS one
+    // applied language; carrying all resources duplicated ~1MB into every
+    // language entry for nothing.
+    if (path === 'translations/' || path.startsWith('translations/')) continue;
     if (file.dir) {
       newZip.folder(path);
     } else {
@@ -1115,7 +1119,9 @@ async function createStoryZipFromData(originalZipBlob: Blob, translatedProjectDa
   // Add translated project.json
   newZip.file('project.json', JSON.stringify(translatedProjectData, null, 2));
 
-  return newZip.generateAsync({ type: 'blob' });
+  // DEFLATE matters here: the payload is pure JSON (compresses ~5x). The
+  // asset zips gain little (media is pre-compressed), but this one is text.
+  return newZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 }
 
 /**

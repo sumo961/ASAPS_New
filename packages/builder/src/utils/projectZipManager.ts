@@ -186,7 +186,9 @@ export async function exportProjectAsZip(
   }
 
   // Generate ZIP blob
-  const blob = await zip.generateAsync({ type: 'blob' });
+  // DEFLATE: the JSON entries (project.json, translation resources)
+  // compress ~5x; already-compressed media passes through nearly unchanged.
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 
   console.log('[exportProjectAsZip] ZIP created, size:', blob.size);
   return blob;
