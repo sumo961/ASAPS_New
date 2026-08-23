@@ -477,6 +477,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     setTotalStrings(0);
 
     try {
+      const failures: { count: number; lastError: unknown } = { count: 0, lastError: null };
       const updated = await updateTranslationResource(
         projectData,
         existing,
@@ -487,6 +488,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
           setGenerationProgress(
             `Translating ${existing.languageName}: ${progress.stringsTranslated}/${progress.totalStrings} strings`
           );
+        },
+        undefined,
+        (err, batchKeys) => {
+          failures.count += batchKeys.length;
+          failures.lastError = err;
         }
       );
 
@@ -501,10 +507,24 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       setGenerationProgress('');
       setStringsTranslated(0);
       setTotalStrings(0);
+
+      // Partial results are already merged above — say so instead of looking
+      // like the run silently died and reverted.
+      if (failures.count > 0) {
+        const msg = failures.lastError instanceof Error ? failures.lastError.message : String(failures.lastError);
+        alert(
+          `Translation partially completed: ${failures.count} string(s) could not be translated and remain marked untranslated.\n\n` +
+          `Last error: ${msg}\n\nRun Continue again to retry the remaining strings.`
+        );
+      }
     } catch (error) {
       console.error('[TranslationContext] Continue translation failed:', error);
       setGenerationProgress(
         error instanceof Error ? `Error: ${error.message}` : 'Translation failed'
+      );
+      alert(
+        'Translation failed before any strings could be translated: ' +
+        (error instanceof Error ? error.message : String(error))
       );
     } finally {
       setIsGenerating(false);

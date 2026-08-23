@@ -1083,7 +1083,12 @@ export async function updateTranslationResource(
   existingResource: TranslationResource,
   aiConfig: TranslationAIConfig,
   onProgress?: ProgressCallback,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** Called once per FAILED batch (AI error, parse error). The loop keeps
+   *  going: completed batches are merged and returned, failed keys stay
+   *  'untranslated' for the next Continue. Without this, one bad batch threw
+   *  the whole run away — progress climbed, then snapped back. */
+  onBatchError?: (error: unknown, batchKeys: string[]) => void
 ): Promise<TranslationResource> {
   // 1. Extract current source strings and convert to ID-based keys
   const positionalStrings = extractTranslatableStrings(projectData);
@@ -1146,9 +1151,19 @@ export async function updateTranslationResource(
       batch[key] = subset[key];
     }
 
-    const batchTranslations = await translateBatch(
-      batch, resource.languageName, aiConfig, signal, narrativeContext, charContext
-    );
+    let batchTranslations: Record<string, string>;
+    try {
+      batchTranslations = await translateBatch(
+        batch, resource.languageName, aiConfig, signal, narrativeContext, charContext
+      );
+    } catch (err) {
+      // Cancellation aborts the run (caller decides what to keep); any other
+      // failure skips THIS batch only — everything already merged survives.
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      console.error(`[StoryTranslator] Batch failed (${batchKeys.length} strings), continuing:`, err);
+      onBatchError?.(err, batchKeys);
+      continue;
+    }
 
     // 6. Merge translations back
     for (const [key, value] of Object.entries(batchTranslations)) {
