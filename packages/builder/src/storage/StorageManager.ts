@@ -425,10 +425,38 @@ export class StorageManager {
       const storedAssets: StoredAsset[] = [];
       const assetsStore = tx.objectStore('assets');
 
+      // Phase 1 — everything that touches the open transaction. An await on
+      // anything OTHER than the store auto-closes an IndexedDB transaction,
+      // so filesystem reads must wait until this loop is done.
+      const rows: Array<{ metadata: any; blob: Blob | null }> = [];
       for (const metadata of metadataList) {
         // Load blob from assets store (v2 uses same store for small assets)
         const assetData = await assetsStore.get(metadata.id);
-        if (assetData?.blob) {
+        rows.push({ metadata, blob: assetData?.blob || null });
+      }
+
+      // Phase 2 — folder-canonical projects (storage inversion): the binary
+      // lives in the project directory, registered as location 'filesystem'
+      // with no IndexedDB blob. Skipping these silently exported ZERO assets
+      // from Electron while the same project exported fine from a browser
+      // profile that still had old IndexedDB copies.
+      for (const row of rows) {
+        const metadata = row.metadata;
+        let blob = row.blob;
+
+        if (!blob && metadata.location === 'filesystem' && metadata.path) {
+          try {
+            const api = (window as any).electronAPI;
+            if (api?.fs?.readFile) {
+              const buffer = await api.fs.readFile(metadata.path);
+              blob = new Blob([buffer], { type: metadata.mimeType });
+            }
+          } catch (e) {
+            this.logError(`Failed to read filesystem asset ${metadata.id} (${metadata.filename})`, e);
+          }
+        }
+
+        if (blob) {
           // Convert v2 metadata + blob to StoredAsset format
           const storedAsset: StoredAsset = {
             id: metadata.id,
@@ -437,7 +465,7 @@ export class StorageManager {
             filename: metadata.filename,
             mimeType: metadata.mimeType,
             size: metadata.size,
-            blob: assetData.blob,
+            blob,
             uploadedAt: new Date(metadata.uploadedAt),
             lastUsedAt: new Date(),
             metadata: (metadata as any).metadata || {},
