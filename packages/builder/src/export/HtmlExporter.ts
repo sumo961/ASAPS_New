@@ -396,6 +396,9 @@ const ENHANCED_MULTI_LANGUAGE_TEMPLATE = `<!DOCTYPE html>
           var ttsLang = (lang === 'original') ? window.ASAPS_CONFIG.ttsLanguage : lang;
           window._asapsPlayerInstance = ASAPSPlayer.init('#player', {
             story: storySource,
+            // Translated zips are slim (JSONs only) — the original zip is
+            // the shared asset pool.
+            assetBase: (lang === 'original') ? undefined : window.ASAPS_CONFIG.storyData,
             enableAI: window.ASAPS_CONFIG.enableAI,
             mobileMode: mobileMode,
             mobileFontScale: effectiveFontScale,
@@ -1082,15 +1085,25 @@ export async function previewStoryZip(projectId: string, startBeatId?: string): 
  * Create a story ZIP from in-memory project data (for translated stories).
  * Re-packages the original ZIP but replaces project.json with translated data.
  */
+/** Asset binary folders (mirror of the player's AssetResolver list). */
+const ASSET_BINARY_FOLDERS = ['assets', 'backgrounds', 'characters', 'props', 'audio', 'sounds', 'videos', 'fonts', 'nodes', 'other'];
+
 async function createStoryZipFromData(originalZipBlob: Blob, translatedProjectData: any): Promise<Blob> {
   const originalZip = await JSZip.loadAsync(originalZipBlob);
 
-  // Create new ZIP with same structure
+  // Create new ZIP with same structure — MINUS the asset binaries. Every
+  // language shares one asset pool; only the JSONs differ per language.
+  // The player merges the original zip back in as the asset fallback
+  // (AssetResolver.fallbackZip). Duplicating binaries per language made a
+  // 12-language export weigh 170MB for ~9MB of real content.
   const newZip = new JSZip();
 
-  // Copy all files from original except project.json
   for (const [path, file] of Object.entries(originalZip.files)) {
     if (path === 'project.json') continue;
+    const isAssetBinary = ASSET_BINARY_FOLDERS.some(folder =>
+      path === `${folder}/` || path.startsWith(`${folder}/`)
+    );
+    if (isAssetBinary) continue;
     if (file.dir) {
       newZip.folder(path);
     } else {

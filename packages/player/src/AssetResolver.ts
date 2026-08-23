@@ -25,16 +25,24 @@ export interface LoadedAsset extends AssetInfo {
  */
 export class AssetResolver {
   private zip: JSZip | null = null;
+  /** Asset fallback: a second zip consulted for files the primary lacks.
+   *  Multi-language exports ship the binaries ONCE (the original story zip)
+   *  and per-language zips carry only the JSONs — without this, every
+   *  language duplicated every image and sound (a 12-language export
+   *  weighed 170MB for 9MB of actual content). */
+  private fallbackZip: JSZip | null = null;
   private loadedAssets: Map<string, LoadedAsset> = new Map();
   private assetManifest: Map<string, AssetInfo> = new Map();
   private storyData: any = null;
 
   /**
-   * Load a story from a ZIP file
+   * Load a story from a ZIP file. `fallbackZipData` (optional) provides
+   * asset binaries for entries missing from the primary zip.
    */
-  async loadFromZip(zipData: ArrayBuffer | Blob | File): Promise<any> {
+  async loadFromZip(zipData: ArrayBuffer | Blob | File, fallbackZipData?: ArrayBuffer | Blob | File): Promise<any> {
     // Load the ZIP
     this.zip = await JSZip.loadAsync(zipData);
+    this.fallbackZip = fallbackZipData ? await JSZip.loadAsync(fallbackZipData) : null;
 
     // Find and parse the story file (project.json or story.xml)
     let storyFile = this.zip.file('project.json');
@@ -78,6 +86,12 @@ export class AssetResolver {
    */
   private async buildAssetManifest(): Promise<void> {
     if (!this.zip) return;
+    this.scanZipForAssets(this.zip);
+    // Fallback zip fills in what the primary lacks (primary always wins).
+    if (this.fallbackZip) this.scanZipForAssets(this.fallbackZip);
+  }
+
+  private scanZipForAssets(zip: JSZip): void {
 
     // Must cover every folder projectZipManager writes. 'videos' slipped
     // through unnoticed because video files also pass isMediaFile(); 'other'
@@ -86,8 +100,9 @@ export class AssetResolver {
     // back to screen-space anchors ("No marker asset configured").
     const assetFolders = ['assets', 'backgrounds', 'characters', 'props', 'audio', 'sounds', 'videos', 'fonts', 'nodes', 'other'];
 
-    for (const [path, file] of Object.entries(this.zip.files)) {
+    for (const [path, file] of Object.entries(zip.files)) {
       if (file.dir) continue;
+      if (this.assetManifest.has(path)) continue; // primary zip wins
 
       // Check if file is in an asset folder
       const isAsset = assetFolders.some(folder =>
@@ -189,7 +204,7 @@ export class AssetResolver {
       throw new Error('No ZIP loaded');
     }
 
-    const file = this.zip.file(info.path);
+    const file = this.zip.file(info.path) || this.fallbackZip?.file(info.path);
     if (!file) {
       throw new Error(`Asset not found in ZIP: ${info.path}`);
     }
@@ -280,6 +295,7 @@ export class AssetResolver {
     this.loadedAssets.clear();
     this.assetManifest.clear();
     this.zip = null;
+    this.fallbackZip = null;
     this.storyData = null;
   }
 }

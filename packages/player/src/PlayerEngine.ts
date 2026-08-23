@@ -303,10 +303,11 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   /**
    * Load a story from a ZIP file, Blob, or ArrayBuffer
    */
-  async loadStory(data: File | Blob | ArrayBuffer): Promise<void> {
+  async loadStory(data: File | Blob | ArrayBuffer, assetFallback?: File | Blob | ArrayBuffer): Promise<void> {
     try {
-      // Load and parse the ZIP
-      const storyData = await this.assetResolver.loadFromZip(data);
+      // Load and parse the ZIP (assetFallback: shared binaries for slim
+      // per-language zips — see AssetResolver.fallbackZip)
+      const storyData = await this.assetResolver.loadFromZip(data, assetFallback);
 
       // Create or get the story
       let story: Story;

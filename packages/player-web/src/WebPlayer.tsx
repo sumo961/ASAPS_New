@@ -14,6 +14,10 @@ import { WebSTTService } from './WebSTTProvider';
 export interface WebPlayerProps {
   /** Story data as ArrayBuffer, base64 string, or URL */
   story: ArrayBuffer | string;
+  /** Asset fallback zip (data URI / base64 / ArrayBuffer): shared binaries
+   *  for slim per-language zips — multi-language exports embed all assets
+   *  ONCE and each language zip carries only the JSONs. */
+  assetBase?: ArrayBuffer | string;
   /** Width of the player (default: '100%') */
   width?: string | number;
   /** Height of the player (default: '100%') */
@@ -44,6 +48,7 @@ const SPLASH_DURATION = 2000;
 
 export const WebPlayer: React.FC<WebPlayerProps> = ({
   story,
+  assetBase,
   width = '100%',
   height = '100%',
   enableAI = true,
@@ -478,9 +483,25 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         });
         playerRef.current = player;
 
-        // Load the story
+        // Load the story (with shared asset base when provided)
         console.log('[WebPlayer] Loading story...');
-        await player.loadStory(storyData);
+        let assetBaseData: ArrayBuffer | undefined;
+        if (assetBase) {
+          try {
+            if (typeof assetBase === 'string') {
+              const b64 = assetBase.startsWith('data:') ? assetBase.split(',')[1] : assetBase;
+              const bin = atob(b64);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              assetBaseData = bytes.buffer;
+            } else {
+              assetBaseData = assetBase;
+            }
+          } catch (e) {
+            console.warn('[WebPlayer] Could not decode assetBase, continuing without it:', e);
+          }
+        }
+        await player.loadStory(storyData, assetBaseData);
         console.log('[WebPlayer] Story loaded successfully');
 
         // Set up stage dimensions
