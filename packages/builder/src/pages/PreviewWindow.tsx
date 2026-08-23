@@ -10,6 +10,7 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, M
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
+import { harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
 import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
@@ -1148,80 +1149,18 @@ export const PreviewWindow: React.FC = () => {
           return null;
         }
 
-        // Build prop asset + label maps from PickProp beats (fresh asset data
-        // from ref). The LABEL map is how a runtime-acquired item without an
-        // authored character-item record still gets a display name: the
-        // granting beat's prop.displayName — which the translation flow
-        // already extracts and applies (beat:N.parameters.props.M.displayName)
-        // — instead of the raw matching key ('knife' in a Persian story).
-        const propAssetMap = new Map<string, string>();
-        const propLabelMap = new Map<string, string>();
-        const propDescMap = new Map<string, string>();
-        if (story) {
-          const allBeats = story.getAllBeats();
-          for (const beat of allBeats) {
-            if (beat.type === 'pickProp') {
-              const props = (beat as any).props || [];
-              for (const prop of props) {
-                if (prop.name && (prop.displayName || prop.displayText)) {
-                  const label = prop.displayName || prop.displayText;
-                  propLabelMap.set(prop.name, label);
-                  propLabelMap.set(prop.name.toLowerCase(), label);
-                }
-                if (prop.name && prop.description) {
-                  propDescMap.set(prop.name, prop.description);
-                  propDescMap.set(prop.name.toLowerCase(), prop.description);
-                }
-                if (prop.name && prop.assetId) {
-                  const asset = pd?.assets?.find(a => a.id === prop.assetId);
-                  if (asset?.url) {
-                    propAssetMap.set(prop.name, asset.url);
-                    propAssetMap.set(prop.name.toLowerCase(), asset.url);
-                  }
-                }
-              }
-              // Also check beat locations for prop graphics
-              const locations = Array.from(beat.locations?.values?.() || []);
-              for (const loc of locations) {
-                if ((loc as any).kind === 'prop' && (loc as any).name && (loc as any).assetId) {
-                  const asset = pd?.assets?.find(a => a.id === (loc as any).assetId);
-                  if (asset?.url) {
-                    propAssetMap.set((loc as any).name, asset.url);
-                    propAssetMap.set((loc as any).name.toLowerCase(), asset.url);
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Build item data
-        const itemDefinitions = character.inventory || [];
-        const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
-          const definition = itemDefinitions.find((def: any) => def.name === entry.name);
-          if (definition) {
-            const icon = definition.icon || propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
-            return {
-              id: definition.id,
-              name: definition.name,
-              displayName: definition.displayName,
-              description: definition.description || '',
-              icon,
-              quantity: entry.quantity,
-              category: definition.category || '',
-            };
-          }
-          const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
-          return {
-            id: entry.name,
-            name: entry.name,
-            displayName: propLabelMap.get(entry.name) || propLabelMap.get(entry.name.toLowerCase()) || entry.name,
-            description: propDescMap.get(entry.name) || propDescMap.get(entry.name.toLowerCase()) || '',
-            icon: propIcon,
-            quantity: entry.quantity,
-            category: '',
-          };
-        });
+        // Shared with the exported web player — ONE implementation of
+        // "runtime pickup → HUD item" (icons + translated labels from the
+        // granting pickProp beat; authored character items win).
+        const harvest = harvestPickPropData(
+          story ? story.getAllBeats() : [],
+          (assetId: string) => pd?.assets?.find(a => a.id === assetId)?.url,
+        );
+        const itemData = buildRuntimeInventoryItems(
+          runtimeInventory,
+          character.inventory || [],
+          harvest,
+        );
 
         return {
           items: itemData,

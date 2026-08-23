@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner , harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -398,6 +398,34 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         };
         const renderer = new ReactRenderer(context);
         rendererRef.current = renderer;
+
+        // Character-anchored inventory frames — parity with the Preview
+        // Window: runtime-acquired items render with translated labels (the
+        // granting pickProp beat's displayName travels through the language
+        // resources; the item NAME stays the untranslated matching key).
+        // Shared implementation: @asaps/renderer runtimeInventory.
+        (renderer as any).setCharacterInventoryResolver?.((characterId: string) => {
+          const chars = (story as any).getCharacters?.() || [];
+          const character = chars.find((c: any) => c.id === characterId);
+          if (!character || !character.inventoryFrame) return null;
+
+          const isPlayer = character.role === 'player';
+          const ctxAny = context as any;
+          const runtimeInventory = isPlayer
+            ? (ctxAny.getInventoryEntries?.() || [])
+            : (ctxAny.getState?.().characterInventories?.[character.name] || []);
+          if (!runtimeInventory.length) return null;
+
+          const assetsList = (story as any).getAssets?.() || [];
+          const harvest = harvestPickPropData(
+            (story as any).getAllBeats?.() || [],
+            (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url,
+          );
+          return {
+            items: buildRuntimeInventoryItems(runtimeInventory, character.inventory || [], harvest),
+            config: character.inventoryFrame,
+          };
+        });
 
         // Configure mobile display mode (cover scaling)
         if (mobileMode) {
