@@ -80,6 +80,33 @@ describe('legacy ASML text locations count as placed (name matching)', () => {
     expect(out).toBe(authored);
   });
 
+  it('does not duplicate pickProp buttons over same-named authored props', () => {
+    // pickProp_5.json: props baked as locations NAMED like the props (kind
+    // 'prop'); the schema default generates a BUTTON per prop with the same
+    // name. Three phantom buttons rendered next to the real clickable props.
+    const authored = [
+      named('text', 'text'),
+      named('prop', 'knife'),
+      named('prop', 'sweets'),
+      named('prop', 'book'),
+    ];
+    const out = backfillUnplacedDefaults(
+      [named('dialog', 'Question'), named('button', 'sweets'), named('button', 'knife'), named('button', 'book')],
+      authored,
+    );
+    expect(out).toBe(authored);
+  });
+
+  it('still backfills a button whose name has no authored counterpart', () => {
+    const authored = [named('text', 'text'), named('prop', 'sweets')];
+    const out = backfillUnplacedDefaults(
+      [named('button', 'sweets'), named('button', 'lantern')],
+      authored,
+    );
+    expect(out.map((l) => l.name)).toContain('lantern');
+    expect(out.filter((l) => l.name === 'sweets')).toHaveLength(1);
+  });
+
   it('matches names case-insensitively', () => {
     const authored = [named('text', 'Prompt')];
     const out = backfillUnplacedDefaults([named('dialog', 'prompt')], authored);

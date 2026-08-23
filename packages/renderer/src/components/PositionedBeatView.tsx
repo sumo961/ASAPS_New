@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
 import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
+import { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_BEAT_TYPES } from '../utils/legacyTextAlias';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
@@ -5811,8 +5812,10 @@ function getContentForLocation(
     }
   }
   
-  // Question text for Movement and PickProp - check both 'question' name AND 'text' name
-  if (nameLower.includes('question') || (nameLower === 'text' && (beatType === 'movementChoice' || beatType === 'pickProp'))) {
+  // Question text for Movement and PickProp — the legacy 'text' location IS
+  // the question box for these beat types (see utils/legacyTextAlias.ts, the
+  // one definition of this convention).
+  if (nameLower.includes('question') || (nameLower === LEGACY_TEXT_LOCATION_NAME && TEXT_ALIAS_BEAT_TYPES.includes(beatType))) {
     return content.question || content.text || '';
   }
   

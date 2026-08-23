@@ -26,7 +26,7 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME } from '@asaps/renderer';
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
@@ -3803,10 +3803,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         e.name?.toLowerCase().includes('question') ||
         // Legacy ASML imports bake the question box as a location named
         // 'text' with EMPTY content — the renderer fills it by NAME at
-        // render time (PositionedBeatView: "check both 'question' name AND
-        // 'text' name"). This check must use the same rule, or we
-        // synthesize a second question box next to the baked one.
-        e.name?.toLowerCase() === 'text' ||
+        // render time. Same rule as PositionedBeatView's fill and the
+        // default backfill — defined once in @asaps/renderer's
+        // legacyTextAlias module.
+        e.name?.toLowerCase() === LEGACY_TEXT_LOCATION_NAME ||
         // Also match text/dialog elements that already contain the question content
         ((e.type === 'text' || e.type === 'dialog') && e.text && questionText && e.text === questionText)
       );

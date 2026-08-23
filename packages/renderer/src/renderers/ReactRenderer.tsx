@@ -11,6 +11,7 @@ import type { MeterCounterData, MeterFrameConfig } from '../components/Character
 import type { InventoryItemData, InventoryFrameConfig } from '../components/CharacterInventoryFrame';
 import { ChatDialogView, type ChatMessage } from '../components/ChatDialogView';
 import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
+import { isTextAliasSlot, LEGACY_TEXT_LOCATION_NAME } from '../utils/legacyTextAlias';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
 import { HudOverlaysLayer } from '../components/HudOverlaysLayer';
@@ -898,7 +899,13 @@ export function backfillUnplacedDefaults(
   if (!authored || authored.length === 0) return defaults;
   const layoutAuthored = authored.filter((l) => !FREE_POSITIONED_KINDS.has(l.kind ?? ''));
   const placedKinds = new Set(layoutAuthored.map((l) => l.kind ?? ''));
-  const authoredNames = new Set(layoutAuthored.map((l) => (l.name ?? '').toLowerCase()));
+  // Names come from ALL authored locations, free-positioned included: a
+  // legacy pickProp bakes each prop as a location NAMED like the prop
+  // ('sweets', kind 'prop') and the schema default is a BUTTON of the same
+  // name — the button is that prop's fallback twin, not missing layout.
+  // (Kind matching stays layout-only: a placed character must not suppress
+  // default text.)
+  const authoredNames = new Set(authored.map((l) => (l.name ?? '').toLowerCase()));
   // Legacy ASML imports bake a beat's main text into a location literally
   // named 'text' with kind 'text', filled BY NAME at render time (see
   // PositionedBeatView's question/'text' rule). The modern schema calls that
@@ -909,7 +916,7 @@ export function backfillUnplacedDefaults(
   const placedByName = (d: Location) => {
     const name = (d.name ?? '').toLowerCase();
     if (authoredNames.has(name)) return true;
-    return (name === 'question' || name === 'prompt') && authoredNames.has('text');
+    return isTextAliasSlot(name) && authoredNames.has(LEGACY_TEXT_LOCATION_NAME);
   };
   const missing = defaults.filter((d) => !placedKinds.has(d.kind ?? '') && !placedByName(d));
   if (missing.length === 0) return authored;
