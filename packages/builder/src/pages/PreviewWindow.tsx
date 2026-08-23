@@ -9,7 +9,7 @@ import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMe
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
-import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, type UIStringKey } from '@asaps/core';
+import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
 import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
@@ -174,6 +174,8 @@ interface PreviewData {
   traitModulations?: import('@asaps/core').TraitEmotionWeight[];
   themeAssets?: any;
   activeLanguage?: string | null;
+  /** Staged uiStrings translations for the active language (offline path). */
+  uiStrings?: Record<string, string> | null;
 }
 
 /** Convert a BCP 47 language code to a readable language name (e.g., 'es' → 'Spanish') */
@@ -1499,7 +1501,18 @@ export const PreviewWindow: React.FC = () => {
         setUIStrings(null);
         loadingTranslationsRef.current = new Map();
       }
-      if (previewData.activeLanguage && aiServiceAdapter) {
+      // Staged translations first: a language staged via the translation UI
+      // carries the uiStrings catalog in its resource, so the renderer chrome
+      // (Inventory title, placeholders, default buttons) translates WITHOUT
+      // an AI provider. The AI path below remains the fallback for languages
+      // with nothing staged.
+      const stagedUi = previewData.activeLanguage ? previewData.uiStrings : null;
+      if (stagedUi && Object.keys(stagedUi).length > 0) {
+        setUIStrings(stagedUi as any);
+        loadingTranslationsRef.current = buildLoadingTranslationMap();
+        console.log(`[PreviewWindow] UI strings installed from staged translation (${Object.keys(stagedUi).length} entries)`);
+      }
+      if (previewData.activeLanguage && aiServiceAdapter && !stagedUi) {
         // Use the raw (unwrapped) adapter for translating UI strings — the language directive
         // would interfere since we're explicitly asking for a specific target language
         const rawAdapter = createAIServiceAdapter();
@@ -1513,7 +1526,9 @@ export const PreviewWindow: React.FC = () => {
               console.log(`[PreviewWindow] UI-string translations ready (${byEnglish.size} entries)`);
             });
         }
+      }
 
+      if (previewData.activeLanguage) {
         // Wrap renderer methods to substitute translated messages and UI strings
         const renderer = rendererRef.current;
         const t = loadingTranslationsRef;

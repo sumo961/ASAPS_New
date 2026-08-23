@@ -61,6 +61,9 @@ export interface PreviewMessage {
     textDirection?: 'ltr' | 'rtl';
     /** Active language code for AI response generation (e.g., 'es', 'de') */
     activeLanguage?: string | null;
+    /** Staged renderer-chrome translations (uiStrings catalog) for the
+     *  active language — applied via setUIStrings, no AI needed. */
+    uiStrings?: Record<string, string> | null;
     /** Beat IDs visited during the current preview session */
     visitedBeats?: string[];
     /** Currently-active beat (painted more prominently than past-visited beats) */

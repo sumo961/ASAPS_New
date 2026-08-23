@@ -3839,6 +3839,21 @@ function App() {
   // This handles both cases:
   //   - Translations already loaded: sync staleness against updated source
   //   - No translations loaded yet: load newly pulled translation files from disk
+
+  /** Translated renderer-chrome strings staged in a language resource
+   *  (project.globalSettings.uiStrings.*) — lets the Preview Window show a
+   *  translated "Inventory" title etc. WITHOUT an AI provider. */
+  const stagedUiStringsFrom = (resource: any): Record<string, string> | null => {
+    const prefix = 'project.globalSettings.uiStrings.';
+    const out: Record<string, string> = {};
+    for (const [k, entry] of Object.entries((resource?.strings ?? {}) as Record<string, any>)) {
+      if (!k.startsWith(prefix)) continue;
+      const v = typeof entry === 'string' ? entry : entry?.value;
+      if (typeof v === 'string' && v) out[k.slice(prefix.length)] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  };
+
   useEffect(() => {
     if (!vcsCtx) return;
     let syncTimer: ReturnType<typeof setTimeout> | null = null;
@@ -4600,6 +4615,9 @@ function App() {
         // from the beginning.
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
+        uiStrings: translationState.activeLanguage
+          ? stagedUiStringsFrom(translationState.translations.find(t => t.languageCode === translationState.activeLanguage))
+          : null,
       });
     }
   }, [state.beats, selectedBeat, assets, characters, emotionPalette, traitModulations, themeAssets, getSerializedStoryData, globalSettings, translationState.activeLanguage, translationState.translations]);
@@ -4654,6 +4672,9 @@ function App() {
         themeAssets: themeAssets,
         beatId: selectedBeat?.id,
         activeLanguage: translationState.activeLanguage ?? null,
+        uiStrings: translationState.activeLanguage
+          ? stagedUiStringsFrom(translationState.translations.find(t => t.languageCode === translationState.activeLanguage))
+          : null,
       });
       console.log('[App] Sent auto-reload update to preview window');
     }, 300);
