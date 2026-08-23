@@ -476,6 +476,10 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           // Counter HUD (screen-docked meter frames) lives in the same
           // overlay — re-render it when counters move.
           context.on('counterChanged', bumpHud);
+          // Owned counters (bare names resolved to their unique owning
+          // character) emit characterCounterChanged — the HUD must refresh
+          // on those too, or owned meters only move on beat transitions.
+          context.on('characterCounterChanged', bumpHud);
           // Beat changes flip HUD suppression (title screens are chrome-free),
           // so the overlay must repaint on every transition too.
           context.on('beatChanged', bumpHud);
@@ -690,6 +694,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
           // Wire countdown meter updates to counter events
           context.on('counterChanged', updateCountdownMeter);
+          context.on('characterCounterChanged', updateCountdownMeter);
           updateCountdownMeter();
 
           // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),

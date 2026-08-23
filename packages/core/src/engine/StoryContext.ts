@@ -513,16 +513,59 @@ export class StoryContext extends EventEmitter {
     this.emit('geoPointsChanged', { name, points: this.state.geoPoints[name] });
   }
 
+  /**
+   * Owner resolution for BARE counter names. Legacy stories (and plenty of
+   * current authoring) define a counter ON a character — Red's 'aggressive'
+   * — while their effects and conditions reference it by bare name, because
+   * they predate scoped counters. Routing those bare references to the
+   * global store meant the writes landed where no meter looks: the debug
+   * rail showed the value climbing while Red's HUD sat at its seeded zero.
+   *
+   * Rule: a bare name routes to a character's scoped store iff EXACTLY ONE
+   * character defines a counter of that name. No owner or several owners ⇒
+   * the historical story-global behavior, unchanged. Resolution is by
+   * DEFINITION (the character's authored counters), never by runtime value,
+   * and is cached — the character roster does not change mid-run.
+   */
+  private implicitCounterOwnerCache = new Map<string, string | null>();
+
+  private resolveImplicitCounterOwner(name: string): string | null {
+    if (!this.story) return null;
+    const cached = this.implicitCounterOwnerCache.get(name);
+    if (cached !== undefined) return cached;
+    const characters = (this.story as any).getCharacters?.() as any[] | undefined;
+    let owner: string | null = null;
+    if (Array.isArray(characters)) {
+      const owners = characters.filter((ch) =>
+        Array.isArray(ch?.counters) && ch.counters.some((c: any) => c?.name === name));
+      if (owners.length === 1) owner = owners[0].id ?? owners[0].name ?? null;
+    }
+    this.implicitCounterOwnerCache.set(name, owner);
+    return owner;
+  }
+
   getCounter(name: string): number {
+    const owner = this.resolveImplicitCounterOwner(name);
+    if (owner) return this.getCharacterCounter(owner, name);
     return this.state.counters[name] || 0;
   }
 
   setCounter(name: string, value: number): void {
+    const owner = this.resolveImplicitCounterOwner(name);
+    if (owner) {
+      this.setCharacterCounter(owner, name, value);
+      return;
+    }
     this.state.counters[name] = value;
     this.emit('counterChanged', { name, value });
   }
 
   incrementCounter(name: string, value: number = 1): void {
+    const owner = this.resolveImplicitCounterOwner(name);
+    if (owner) {
+      this.incrementCharacterCounter(owner, name, value);
+      return;
+    }
     this.state.counters[name] = (this.state.counters[name] || 0) + value;
     this.emit('counterChanged', { name, value: this.state.counters[name] });
   }
@@ -1984,9 +2027,12 @@ export class StoryContext extends EventEmitter {
         // (mirrors setVariable's owner model); omitted ⇒ story-global,
         // unchanged.
         const ctrOwner = (condition as any).character as string | undefined;
+        // Bare names go through getCounter, which routes to the unique
+        // owning character's scoped store when one exists — conditions must
+        // read where the effects write.
         leftValue = ctrOwner
           ? this.getCharacterCounter(ctrOwner, varName)
-          : this.state.counters[varName] || 0;
+          : this.getCounter(varName);
         // Ensure rightValue is numeric for counter comparisons (guards against undefined/NaN)
         if (rightValue === undefined || rightValue === null || Number.isNaN(Number(rightValue))) {
           rightValue = 0;

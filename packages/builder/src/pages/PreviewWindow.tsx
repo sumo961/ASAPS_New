@@ -1750,11 +1750,20 @@ export const PreviewWindow: React.FC = () => {
           ? [...visitedBeats, currentBeatId]
           : visitedBeats;
 
+        // Scoped counters join the debug list under their documented
+        // reference syntax (red.friendly) so owned counters stay visible.
+        const displayCounters: Record<string, number> = { ...counters };
+        for (const [ownerKey, scopedMap] of Object.entries(charCountersRef.current)) {
+          for (const [cName, cVal] of Object.entries(scopedMap)) {
+            displayCounters[`${ownerKey}.${cName}`] = cVal;
+          }
+        }
+
         setDebugInfo({
           visitedBeats,
           seededBeats: Array.from(seededBeatsRef.current),
           variables,
-          counters,
+          counters: displayCounters,
           inventory: ctx.getInventoryEntries(),
           timers,
         });
@@ -1853,6 +1862,10 @@ export const PreviewWindow: React.FC = () => {
       // Subscribe to context events for state updates
       context.on('variableChanged', updateDebugInfo);
       context.on('counterChanged', updateDebugInfo);
+      // Owned counters (bare names resolved to their unique owning
+      // character, and explicit owners) emit characterCounterChanged —
+      // without this the HUD meters only refreshed on beat transitions.
+      context.on('characterCounterChanged', updateDebugInfo);
       context.on('inventoryChanged', updateDebugInfo);
       context.on('reset', updateDebugInfo);
       context.on('selectiveReset', updateDebugInfo);
@@ -2011,6 +2024,7 @@ export const PreviewWindow: React.FC = () => {
 
       // Wire countdown meter updates to counter events
       context.on('counterChanged', updateCountdownMeter);
+      context.on('characterCounterChanged', updateCountdownMeter);
       // Initial counter meter state
       updateCountdownMeter();
 

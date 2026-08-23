@@ -132,9 +132,18 @@ describe('Character-scoped counters', () => {
       expect(context.checkCondition(cond({ character: 'granny' }).condition)).toBe(true);
     });
 
-    it('reads the global counter when character is omitted', () => {
+    it('reads the owning character when omitted and exactly ONE character defines the counter', () => {
+      // Implicit-owner resolution (Red Story fix): the author defined the
+      // counter ON the character; bare references route there so
+      // conditions read where the effects write.
       const context = new StoryContext(undefined, makeStory([wolf]));
-      // global health defaults to 0 (<50 → true), independent of wolf.health=100
+      // wolf.health=100 (<50 → false) — the bare name resolves to wolf
+      expect(context.checkCondition(cond({}).condition)).toBe(false);
+    });
+
+    it('reads the global counter when omitted and ownership is ambiguous', () => {
+      const context = new StoryContext(undefined, makeStory([wolf, granny]));
+      // both define health → global store (0 < 50 → true)
       expect(context.checkCondition(cond({}).condition)).toBe(true);
     });
 
@@ -191,7 +200,10 @@ describe('Character-scoped counters', () => {
       const ctx = new StoryContext(undefined, makeStory([wolf]));
       ctx.applyEffect({ type: 'setCounter', target: 'health', value: 7, character: 'wolf' } as any);
       expect(ctx.getCharacterCounter('wolf', 'health')).toBe(7);
-      expect(ctx.getCounter('health')).toBe(0);
+      // the raw GLOBAL store stays untouched; getCounter() now routes the
+      // bare name to wolf (unique owner) and legitimately reads 7
+      expect(ctx.getCounters()['health']).toBeUndefined();
+      expect(ctx.getCounter('health')).toBe(7);
     });
 
     it('omitted owner is the unchanged global path', () => {
