@@ -811,7 +811,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
         onSelectionChange={onSelectionChange}
-        multiSelectionKeyCode={['Meta', 'Control', 'Shift']}
+        // Shift belongs to the MARQUEE (drag a selection box on the pane);
+        // while it also sat in multiSelectionKeyCode, the click-add binding
+        // won and the box never appeared. ⌘/Ctrl-click adds to a selection.
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode={['Meta', 'Control']}
         // Selection elevation (+1000) would lift an opaque expanded dialog
         // above its own internal-edge layers; explicit zIndex tiers on the
         // dialog nodes/edges handle stacking instead.

@@ -3159,6 +3159,13 @@ function App() {
     // mergeBeats appends the instances AND extracts their connections into
     // state in one update (same path the story-merge uses).
     actions.mergeBeats(newBeats);
+    // One undoable step for the whole group — the beats are already in
+    // state, so record without executing (same pattern as single ⌘D).
+    // Without this, multi-duplicate was invisible to undo entirely.
+    const dupCommands = newBeats.map(b => new AddBeatCommand(b, stableMutations.current));
+    getCommandManager().pushWithoutExecute(
+      new BatchCommand(dupCommands, `Duplicate ${newBeats.length} beats`)
+    );
     setSelectedBeat(newBeats[0]);
     markChanged();
   }, [actions, state.beats, markChanged]);
