@@ -46,3 +46,10 @@
     }
   }
 }
+/* Flowchart: after a marquee completes, keep the SELECTION but not the
+   group-box overlay ReactFlow draws around it — group-drag still works by
+   dragging any selected node. (Hartmut: "the rectangle should disappear
+   when the drag ends while the selection stays.") */
+.react-flow__nodesselection-rect {
+  display: none;
+}
