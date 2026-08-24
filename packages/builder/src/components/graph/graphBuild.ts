@@ -316,6 +316,12 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
           height: cluster.isExpanded
             ? Math.max(cluster.containerBounds.height || 0, MIN_CLUSTER_H)
             : 40,
+          // The expanded frame BODY is canvas: pane gestures (pan, marquee,
+          // click) pass through it. Only the header and the resize handle
+          // re-enable pointer events (ClusterContainerNode). Without this, a
+          // frame covering the viewport made panning and marquee impossible
+          // "inside" a cluster. The collapsed pill stays fully interactive.
+          ...(cluster.isExpanded ? { pointerEvents: 'none' as const } : {}),
         },
       };
     });

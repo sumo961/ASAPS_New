@@ -259,8 +259,10 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
         onDragLeave={handleDragLeave}
         onDrop={handleDropExpanded}
       >
-        {/* Header — the frame's drag handle (see dragHandle in graphBuild.ts) */}
-        <div className="cluster-drag-handle flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 border-b border-indigo-200 cursor-move" style={{ height: HEADER_HEIGHT }}>
+        {/* Header — the frame's drag handle (see dragHandle in graphBuild.ts).
+            The node wrapper is pointer-events:none (body = canvas); the
+            header opts back in so its buttons and frame-dragging work. */}
+        <div className="cluster-drag-handle flex items-center justify-between px-3 py-2 bg-gradient-to-r from-indigo-100 to-purple-100 border-b border-indigo-200 cursor-move" style={{ height: HEADER_HEIGHT, pointerEvents: 'all' }}>
           <div className="flex items-center gap-2">
             <button
               onClick={handleExpandCollapse}
@@ -698,13 +700,14 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
             </div>
           )}
 
-          {/* Resize Handle */}
+          {/* Resize Handle — opts back into pointer events (see header note) */}
           <div
             className="nodrag absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
             style={{
               background: 'linear-gradient(135deg, transparent 50%, #6366f1 50%)',
               borderBottomRightRadius: '0.5rem',
               zIndex: 2,
+              pointerEvents: 'all',
             }}
             onMouseDown={handleResizeMouseDown}
             title="Drag to resize"

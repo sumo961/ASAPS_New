@@ -3127,22 +3127,17 @@ function App() {
     const beat = state.beats.find(b => b.id === beatId);
     if (!beat) return;
 
-    const position = {
-      x: (beat.x || 0) + 30,
-      y: (beat.y || 0) + 30,
-    };
-
-    const newBeat = actions.addBeat(beat.type, position, {
-      name: `${beat.name} (Copy)`,
-    });
-
-    // Copy parameters if possible
-    if (newBeat && typeof beat.getParameters === 'function') {
-      const params = beat.getParameters();
-      actions.updateBeat(newBeat.id, { parameters: params } as Partial<Beat>);
-    }
-
-    setSelectedBeat(newBeat);
+    // Same machinery as multi-duplicate. The old single path copied
+    // PARAMETERS only — the connections array and defaultTarget were
+    // silently dropped, so param-carried links (dialog choices, condition
+    // branches) survived duplication while plain connections vanished:
+    // "sometimes has links, sometimes not".
+    const { clones } = cloneBeatsForDuplicate([beat], state.beats.map(b => b.id));
+    const newBeats = deserializeBeats(clones);
+    if (newBeats.length === 0) return;
+    actions.mergeBeats(newBeats);
+    getCommandManager().pushWithoutExecute(new AddBeatCommand(newBeats[0], stableMutations.current));
+    setSelectedBeat(newBeats[0]);
     markChanged();
   }, [actions, state.beats, markChanged]);
 
