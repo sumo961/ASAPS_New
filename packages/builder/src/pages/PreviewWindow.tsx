@@ -2570,7 +2570,7 @@ export const PreviewWindow: React.FC = () => {
                 <ChevronDown className="w-3 h-3" />
               </button>
               {showBeatMenu && (
-                <div className="absolute left-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-[100]">
+                <div className="absolute right-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-[100]">
                   {story.getAllBeats().map((beat) => (
                     <button
                       key={beat.id}
