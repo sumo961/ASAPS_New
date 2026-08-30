@@ -153,7 +153,7 @@ describe('GitAdapter Advanced Operations', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toContain('Initialized');
-      expect(runCommand).toHaveBeenCalledWith('git', ['init'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['-c', 'init.defaultBranch=main', 'init'], '/project');
       expect(exists).toHaveBeenCalledWith('/project/.gitignore');
       expect(writeFile).toHaveBeenCalledWith('/project/.gitignore', expect.stringContaining('.DS_Store'));
     });

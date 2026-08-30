@@ -32,6 +32,11 @@ vi.mock('../GitAdapter', () => ({
   gitDetectMergeState: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('../GitInitHelper', () => ({
+  ensureLocalGitIdentity: vi.fn().mockResolvedValue(undefined),
+  makeInitialCommit: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../PerforceAdapter', () => ({
   getP4Status: vi.fn().mockResolvedValue({
     openedFiles: [],
@@ -49,7 +54,8 @@ vi.mock('../PerforceAdapter', () => ({
 
 // Import mocked modules
 import { detectVCS } from '../VCSDetector';
-import { getGitStatus, getChangedFiles } from '../GitAdapter';
+import { getGitStatus, getChangedFiles, gitInit } from '../GitAdapter';
+import { makeInitialCommit } from '../GitInitHelper';
 import { getP4Status } from '../PerforceAdapter';
 
 describe('VCSStatusProvider', () => {
@@ -109,6 +115,36 @@ describe('VCSStatusProvider', () => {
     expect(value.isDirty).toBe(true);
     expect(value.changedFileCount).toBe(1);
     expect(value.projectPath).toBe('/project/path');
+  });
+
+  it('initRepo ("Track versions") flips a no-repo project to git without a reload and saves a first version', async () => {
+    // First detection: no repo (status bar shows "Track versions").
+    vi.mocked(detectVCS).mockResolvedValueOnce({ type: 'none' });
+    (window as any).electronAPI = {
+      fs: {
+        runCommand: vi.fn().mockResolvedValue({ stdout: 'x', stderr: '', exitCode: 0 }),
+      },
+      isElectron: true,
+    };
+
+    let value: any;
+    render(
+      <VCSStatusProvider>
+        <VCSReader onValue={(v) => { value = v; }} />
+      </VCSStatusProvider>
+    );
+    await act(async () => { await value.initialize('/project/path'); });
+    expect(value.type).toBe('none');
+
+    // After git init the SAME provider must re-detect, not trust its cache.
+    vi.mocked(detectVCS).mockResolvedValue({ type: 'git', branch: 'main', repoRoot: '/project/path' });
+    await act(async () => { await value.initRepo(); });
+
+    expect(gitInit).toHaveBeenCalledWith('/project/path');
+    expect(makeInitialCommit).toHaveBeenCalledWith(expect.any(Function), '/project/path', expect.any(Function), 'First version');
+    expect(value.type).toBe('git');
+    expect(value.branch).toBe('main');
+    delete (window as any).electronAPI;
   });
 
   it('clears state correctly', async () => {

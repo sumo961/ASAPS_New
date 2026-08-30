@@ -18,6 +18,7 @@ import {
   gitResetHard, gitClean, gitResetHardAndClean,
   type GitFileStatus, type GitOperationResult,
 } from './GitAdapter';
+import { ensureLocalGitIdentity, makeInitialCommit } from './GitInitHelper';
 import {
   readRemoteLocks, acquireLock, releaseLock, releaseAllLocks,
   getRemoteLocksForOthers,
@@ -28,6 +29,34 @@ import {
   p4Submit, p4Sync, p4Edit, p4Revert, p4Lock, p4Unlock,
   type P4OperationResult,
 } from './PerforceAdapter';
+
+/**
+ * Identity + first commit for a repo that "Track versions" just created.
+ * Reuses GitInitHelper (gh-derived identity). If no identity can be derived
+ * (no gh, no global config — the VCS-naive author this flow exists for), fall
+ * back to a LOCAL-repo-only identity from the OS login so the commit succeeds;
+ * nothing machine-wide is touched.
+ */
+async function saveFirstVersion(projectPath: string): Promise<{ ok: boolean; error?: string }> {
+  const runCmd = window.electronAPI?.fs?.runCommand;
+  if (!runCmd) return { ok: false, error: 'not running in the desktop app' };
+  const log = (s: string) => { if (s.trim()) console.log('[VCS] first version:', s.trim()); };
+  try {
+    await ensureLocalGitIdentity(runCmd, projectPath, log);
+    const name = await runCmd('git', ['config', 'user.name'], projectPath, 5000);
+    const email = await runCmd('git', ['config', 'user.email'], projectPath, 5000);
+    if (name.exitCode !== 0 || !name.stdout.trim() || email.exitCode !== 0 || !email.stdout.trim()) {
+      const who = await runCmd('whoami', [], projectPath, 5000);
+      const login = (who.stdout || '').trim() || 'author';
+      if (name.exitCode !== 0 || !name.stdout.trim()) await runCmd('git', ['config', 'user.name', login], projectPath, 5000);
+      if (email.exitCode !== 0 || !email.stdout.trim()) await runCmd('git', ['config', 'user.email', `${login}@localhost`], projectPath, 5000);
+    }
+    await makeInitialCommit(runCmd, projectPath, log, 'First version');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message.split('\n')[0] : String(e) };
+  }
+}
 
 // ============================================================================
 // Types
@@ -553,9 +582,24 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
         return remoteResult;
       }
     }
-    // Re-detect VCS and refresh state now that git is initialized
+    // Save the first version right away. Without it the changed-files badge
+    // would show EVERY file as "new" until the author's first manual commit,
+    // which contradicts the plain-language promise of "Track versions"
+    // (changed since your last version). Best effort: if it fails, tracking
+    // is still on — the author just starts with an all-new badge.
+    const firstVersion = await saveFirstVersion(path);
+    // Re-detect VCS now that git is initialized — refresh() caches the type
+    // from its first run, and that cached 'none' kept the status bar on
+    // "Track versions" after a successful init until the next reload.
+    cachedVCSTypeRef.current = null;
     await refresh();
-    emitEvent({ type: 'success', message: remoteUrl ? 'Initialized Git repository with remote' : 'Initialized Git repository' });
+    const where = remoteUrl ? ' (with a server to back up to)' : '';
+    emitEvent({
+      type: firstVersion.ok ? 'success' : 'info',
+      message: firstVersion.ok
+        ? `Version tracking is on${where} — first version saved`
+        : `Version tracking is on${where}, but the first version could not be saved: ${firstVersion.error}`,
+    });
     return result;
   }, [refresh, emitEvent]);
 

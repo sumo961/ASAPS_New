@@ -585,7 +585,10 @@ function joinPath(base: string, ...parts: string[]): string {
 /** Initialize a new git repository and create a default .gitignore */
 export async function gitInit(projectPath: string): Promise<GitOperationResult> {
   const run = getRunCommand();
-  const result = await run('git', ['init'], projectPath);
+  // Same default branch as the GitHub-creation flows (GitInitHelper): a
+  // repo that starts on 'master' collides with 'main' the moment a remote
+  // is added later. `-c init.defaultBranch` is a silent no-op on Git < 2.28.
+  const result = await run('git', ['-c', 'init.defaultBranch=main', 'init'], projectPath);
   if (result.exitCode !== 0) {
     return { success: false, message: result.stderr.trim() };
   }
