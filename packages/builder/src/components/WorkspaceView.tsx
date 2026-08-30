@@ -291,6 +291,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
         ) : (
           <div className="h-full w-full">
             <Canvas
+              projectId={projectId}
               beats={beats}
               connections={connections}
               clusters={clusters}

@@ -11,6 +11,8 @@ interface Asset {
 }
 
 interface CanvasProps {
+  /** Keys per-project UI state (graph viewport) — not story data. */
+  projectId?: string;
   beats: Beat[];
   connections: any[];
   clusters: Cluster[];
@@ -86,6 +88,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onAddToContainer,
   onRemoveCluster,
   assets = [],
+  projectId,
   onSetClusterMap,
   onSetClusterSound,
   onSetClusterSharedVisuals,
@@ -138,6 +141,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       {/* Main Canvas - Fixed height issue */}
       <div className="flex-1 h-full bg-gray-50">
         <GraphEditor
+          projectId={projectId}
           beats={beats}
           clusters={clusters}
           containerBeatPositions={containerBeatPositions}

@@ -31,6 +31,8 @@ interface Asset {
 }
 
 interface GraphEditorProps {
+  /** Keys the persisted viewport (zoom/pan) per project. */
+  projectId?: string;
   beats: Beat[];
   clusters: Cluster[];
   containerBeatPositions?: ContainerBeatPosition[];
@@ -93,6 +95,30 @@ const edgeTypes: EdgeTypes = {
   custom: CustomEdge,
 };
 
+const VIEWPORT_KEY_PREFIX = 'asaps.graphViewport.';
+type SavedViewport = { x: number; y: number; zoom: number };
+
+export function readSavedViewport(projectId?: string): SavedViewport | null {
+  if (!projectId) return null;
+  try {
+    const raw = localStorage.getItem(VIEWPORT_KEY_PREFIX + projectId);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return Number.isFinite(v?.x) && Number.isFinite(v?.y) && Number.isFinite(v?.zoom) && v.zoom > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveViewport(projectId: string | undefined, viewport: SavedViewport): void {
+  if (!projectId) return;
+  try {
+    localStorage.setItem(VIEWPORT_KEY_PREFIX + projectId, JSON.stringify({ x: viewport.x, y: viewport.y, zoom: viewport.zoom }));
+  } catch {
+    /* storage unavailable — viewport memory is a convenience */
+  }
+}
+
 export const GraphEditor: React.FC<GraphEditorProps> = ({
   beats,
   clusters,
@@ -118,6 +144,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onAddToContainer,
   onRemoveCluster,
   assets = [],
+  projectId,
   onSetClusterMap,
   onSetClusterSound,
   onSetClusterSharedVisuals,
@@ -172,6 +199,18 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // The cluster nodes will access assets via ref for the popover, which updates on render
   const assetsRef = useRef(assets);
   assetsRef.current = assets;
+  // Cluster map backgrounds resolve to URLs through the asset list, which on a
+  // cold start arrives AFTER the first node build. Only this derived key (not
+  // the whole asset list) is a node-build dependency, so a late-resolving map
+  // re-syncs without rebuilding nodes on every unrelated asset change.
+  const clusterMapUrlKey = useMemo(
+    () => clusters.map(c => (c.mapAssetId ? assets.find(a => a.id === c.mapAssetId)?.url || '' : '')).join('|'),
+    [clusters, assets],
+  );
+
+  // Per-project viewport memory (zoom + pan) — UI state in localStorage, never
+  // in the project file, so looking around does not dirty the VCS diff.
+  const savedViewportRef = useRef(readSavedViewport(projectId));
 
   // Memoize highlightedBeatIds as a Set to avoid creating new Sets on every render
   // This is critical for performance - prevents O(n) lookups and unnecessary object creation
@@ -241,7 +280,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Note: assets and highlightedBeatIds are intentionally NOT in dependency array
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
-  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- clusterMapUrlKey stands in for `assets`
+  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, clusterMapUrlKey, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(
@@ -278,7 +318,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // to state but never re-synced to the node — the picker looked dead.
     const fingerprint = nodes.map(n => {
       const clusterExtra = n.type === 'cluster'
-        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
+        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.mapAssetUrl || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
         : '';
       return `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
     }).join('|');
@@ -325,9 +365,15 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     if (pendingFitViewRef.current && reactFlowInstance && nodesState.length > 0) {
       // Use requestAnimationFrame to ensure DOM has been painted
       requestAnimationFrame(() => {
-        reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
+        const saved = savedViewportRef.current;
+        if (saved) {
+          reactFlowInstance.setViewport(saved, { duration: 0 });
+          console.log('[GraphEditor] Restored saved viewport after project load');
+        } else {
+          reactFlowInstance.fitView({ padding: 0.2, maxZoom: 1, duration: 300 });
+          console.log('[GraphEditor] Auto fitView completed after project load');
+        }
         pendingFitViewRef.current = false;
-        console.log('[GraphEditor] Auto fitView completed after project load');
       });
     }
   }, [nodesState.length, reactFlowInstance]);
@@ -833,6 +879,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
           console.log('🎯 ReactFlow ready');
         }}
+        onMoveEnd={(_, viewport) => {
+          savedViewportRef.current = viewport;
+          saveViewport(projectId, viewport);
+        }}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
@@ -840,7 +890,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         attributionPosition="bottom-left"
         minZoom={0.05}
         maxZoom={4}
-        fitView
+        fitView={!savedViewportRef.current}
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
       >
         <Background color="#aaa" gap={16} />
