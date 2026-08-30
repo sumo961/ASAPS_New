@@ -3,8 +3,7 @@ import {
   gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
   gitStash, gitStashPop, gitListStashes, gitLog, gitDiff,
   gitListBranches, gitSwitchBranch, gitCreateBranch, gitMerge,
-  gitRevertFiles, gitGetConflicts, gitResolveConflict,
-} from '../GitAdapter';
+  gitRevertFiles, gitGetConflicts, gitResolveConflict, NO_REMOTE_MESSAGE } from '../GitAdapter';
 
 function createMockElectronAPI(runCommand: any) {
   return {
@@ -94,6 +93,19 @@ describe('GitAdapter Operations', () => {
   });
 
   describe('gitPush', () => {
+    it('explains a local-only repo in plain language instead of leaking git stderr', async () => {
+      const runCommand = vi.fn().mockResolvedValueOnce({
+        stdout: '',
+        stderr: 'fatal: No configured push destination.\nEither specify the URL from the command-line or\nconfigure a remote repository using\n\n    git remote add <name> <url>',
+        exitCode: 128,
+      });
+      (window as any).electronAPI = createMockElectronAPI(runCommand);
+      const result = await gitPush('/project');
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(NO_REMOTE_MESSAGE);
+      expect(result.message).not.toMatch(/git remote add|fatal/);
+    });
+
     it('pushes successfully', async () => {
       const runCommand = vi.fn().mockResolvedValueOnce({
         stdout: '',

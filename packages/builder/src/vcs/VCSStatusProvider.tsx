@@ -11,7 +11,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { detectVCS, type VCSType } from './VCSDetector';
 import {
   getGitStatus, getChangedFiles,
-  gitInit, gitAddRemote,
+  gitInit, gitAddRemote, gitListRemotes,
   gitStage, gitUnstage, gitCommit, gitPush, gitForcePush, gitPull, gitFetch,
   gitStash, gitStashPop, gitRevertFiles, gitGetConflicts,
   gitDetectMergeState, gitConfigGet,
@@ -104,6 +104,9 @@ export interface VCSState {
   changedFiles: Set<string>;
   /** Number of changed files */
   changedFileCount: number;
+  /** Whether any remote is configured (Git). False = history lives on this
+   *  computer only; push/pull UI must not be offered. */
+  hasRemote: boolean;
   /** Commits ahead of remote (Git) */
   ahead: number;
   /** Commits behind remote (Git) */
@@ -220,6 +223,7 @@ const defaultState: VCSState = {
   branch: null,
   changedFiles: new Set(),
   changedFileCount: 0,
+  hasRemote: false,
   ahead: 0,
   behind: 0,
   isDirty: false,
@@ -341,11 +345,12 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
 
       if (vcsType === 'git') {
         // Run git queries in parallel to minimize IPC round-trips
-        const [status, changed, conflicts, mergeState] = await Promise.all([
+        const [status, changed, conflicts, mergeState, remotes] = await Promise.all([
           getGitStatus(path),
           getChangedFiles(path),
           gitGetConflicts(path),
           gitDetectMergeState(path),
+          gitListRemotes(path).catch(() => []),
         ]);
 
         // Fetch remote editing locks (non-blocking — don't fail refresh on error)
@@ -369,6 +374,7 @@ export const VCSStatusProvider: React.FC<VCSProviderProps> = ({ children, onBefo
           branch: status.branch,
           changedFiles: new Set(changed),
           changedFileCount: status.files.length,
+          hasRemote: remotes.length > 0,
           ahead: status.ahead,
           behind: suppressBehindRef.current ? 0 : status.behind,
           isDirty: status.isDirty,

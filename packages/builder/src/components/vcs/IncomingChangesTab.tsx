@@ -61,6 +61,19 @@ export const IncomingChangesTab: React.FC = () => {
 
   if (!vcs) return null;
 
+  if (!vcs.hasRemote) {
+    return (
+      <div style={{ padding: 12, color: '#cbd5e1', fontSize: 13, lineHeight: 1.5 }}>
+        <p style={{ margin: 0 }}>
+          This project's history is kept on this computer only.
+        </p>
+        <p style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: 12 }}>
+          To back it up to a server or work with others, add a server under the Branches tab. Nothing is shared until you do.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: 12, color: '#cbd5e1' }}>
       {/* Ahead/Behind summary */}

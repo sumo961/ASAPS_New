@@ -20,6 +20,7 @@ vi.mock('../GitAdapter', () => ({
   gitGetConflicts: vi.fn().mockResolvedValue([]),
   gitInit: vi.fn().mockResolvedValue({ success: true, message: 'Initialized' }),
   gitAddRemote: vi.fn().mockResolvedValue({ success: true, message: 'Added remote' }),
+  gitListRemotes: vi.fn().mockResolvedValue([]),
   gitStage: vi.fn().mockResolvedValue({ success: true }),
   gitUnstage: vi.fn().mockResolvedValue({ success: true }),
   gitCommit: vi.fn().mockResolvedValue({ success: true }),
@@ -54,7 +55,7 @@ vi.mock('../PerforceAdapter', () => ({
 
 // Import mocked modules
 import { detectVCS } from '../VCSDetector';
-import { getGitStatus, getChangedFiles, gitInit } from '../GitAdapter';
+import { getGitStatus, getChangedFiles, gitInit, gitListRemotes } from '../GitAdapter';
 import { makeInitialCommit } from '../GitInitHelper';
 import { getP4Status } from '../PerforceAdapter';
 
@@ -144,6 +145,12 @@ describe('VCSStatusProvider', () => {
     expect(makeInitialCommit).toHaveBeenCalledWith(expect.any(Function), '/project/path', expect.any(Function), 'First version');
     expect(value.type).toBe('git');
     expect(value.branch).toBe('main');
+    // Local-only: no server, so push/pull UI must stay hidden.
+    expect(value.hasRemote).toBe(false);
+
+    vi.mocked(gitListRemotes).mockResolvedValueOnce([{ name: 'origin', url: 'https://example.com/me/story.git' }]);
+    await act(async () => { await value.refresh(); });
+    expect(value.hasRemote).toBe(true);
     delete (window as any).electronAPI;
   });
 

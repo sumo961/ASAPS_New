@@ -264,6 +264,16 @@ export async function gitCommit(projectPath: string, message: string): Promise<G
   };
 }
 
+/** Plain-language replacement for git's "no remote" failures. The raw text
+ *  ("fatal: No configured push destination … git remote add <name> <url>")
+ *  reached authors who chose "On this computer only" in Track versions. */
+export const NO_REMOTE_MESSAGE =
+  "This project's history is kept on this computer only. To back it up or sync, add a server under Branches.";
+
+function isNoRemoteError(stderr: string): boolean {
+  return /No configured push destination|does not appear to be a git repository|no such remote|There is no tracking information/i.test(stderr);
+}
+
 /** Push to remote. Automatically sets upstream on first push. */
 export async function gitPush(projectPath: string): Promise<GitOperationResult> {
   const run = getRunCommand();
@@ -275,15 +285,19 @@ export async function gitPush(projectPath: string): Promise<GitOperationResult> 
 
   // If no upstream is set, get current branch and push with -u
   const errMsg = result.stderr.trim();
+  if (errMsg.includes('No configured push destination')) {
+    return { success: false, message: NO_REMOTE_MESSAGE };
+  }
   if (errMsg.includes('no tracking information') || errMsg.includes('has no upstream branch')) {
     const branchResult = await run('git', ['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
     const branch = branchResult.stdout.trim() || 'main';
     const retryResult = await run('git', ['push', '-u', 'origin', branch], projectPath);
+    const retryErr = retryResult.stderr.trim();
     return {
       success: retryResult.exitCode === 0,
       message: retryResult.exitCode === 0
         ? retryResult.stderr.trim() || `Pushed and set upstream to origin/${branch}`
-        : retryResult.stderr.trim(),
+        : isNoRemoteError(retryErr) ? NO_REMOTE_MESSAGE : retryErr,
     };
   }
 
@@ -340,11 +354,11 @@ export async function gitPull(projectPath: string, rebase = false): Promise<GitO
       success: retryResult.exitCode === 0,
       message: retryResult.exitCode === 0
         ? retryResult.stdout.trim() || `Pulled from origin/${branch} and set upstream`
-        : retryResult.stderr.trim(),
+        : isNoRemoteError(retryResult.stderr) ? NO_REMOTE_MESSAGE : retryResult.stderr.trim(),
     };
   }
 
-  return { success: false, message: errMsg };
+  return { success: false, message: isNoRemoteError(errMsg) ? NO_REMOTE_MESSAGE : errMsg };
 }
 
 /** Fetch from remote */

@@ -438,6 +438,7 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
             >
               {isCommitting ? 'Committing...' : staged.length > 0 ? 'Commit' : 'Commit All'}
             </button>
+            {vcs.hasRemote && (
             <button
               onClick={handleCommitAndPush}
               disabled={!commitMessage.trim() || isCommitting}
@@ -449,6 +450,7 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
             >
               {staged.length > 0 ? 'Commit & Push' : 'Commit All & Push'}
             </button>
+            )}
           </div>
           )}
         </div>
