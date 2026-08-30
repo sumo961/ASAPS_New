@@ -622,7 +622,9 @@ function App() {
           setShowShortcutsModal(prev => !prev);
         }
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      // ⌃⌘F is macOS fullscreen (Electron's togglefullscreen role); the
+      // ctrl||meta test swallowed it and opened Search instead.
+      if ((e.ctrlKey || e.metaKey) && !(e.ctrlKey && e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowSearchPanel(prev => !prev);
       }
