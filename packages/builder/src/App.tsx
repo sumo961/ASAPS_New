@@ -124,6 +124,8 @@ declare global {
       };
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
+      onMenuUndo?: (callback: () => void) => () => void;
+      onMenuRedo?: (callback: () => void) => () => void;
       onMenuStorySettings?: (callback: () => void) => () => void;
       onMenuCharacters?: (callback: () => void) => () => void;
       onMenuDebug?: (callback: () => void) => () => void;
@@ -3062,9 +3064,30 @@ function App() {
 
   // Command manager hook - provides global Ctrl+Z/Ctrl+Shift+Z keyboard shortcuts for undo/redo
   // Must be called after handleCommandExecuted is defined
-  useCommandManager({
+  const { undo: undoStoryCommand, redo: redoStoryCommand } = useCommandManager({
     onCommandExecuted: handleCommandExecuted,
   });
+
+  // Edit → Undo/Redo from the Electron menu bar. Same split as the ⌘Z
+  // keystroke in useCommandManager: a focused text field keeps its native
+  // undo (the old 'undo' role behavior); anything else undoes the story.
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.onMenuUndo || !api?.onMenuRedo) return;
+    const isEditable = () => {
+      const el = document.activeElement as HTMLElement | null;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    };
+    const offUndo = api.onMenuUndo(() => {
+      if (isEditable()) { document.execCommand('undo'); return; }
+      void undoStoryCommand();
+    });
+    const offRedo = api.onMenuRedo(() => {
+      if (isEditable()) { document.execCommand('redo'); return; }
+      void redoStoryCommand();
+    });
+    return () => { offUndo(); offRedo(); };
+  }, [undoStoryCommand, redoStoryCommand]);
 
   /** One sentence for delete confirms naming what would break — links from
    *  OTHER beats' choices/dialog nodes/targets into the doomed set. */

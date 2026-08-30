@@ -613,8 +613,23 @@ function createMenu(): void {
     {
       label: 'Edit',
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        // Story-level undo, not the webContents' text-field undo that the
+        // 'undo' role gives: Edit → Undo used to do nothing to the graph.
+        // The keystroke itself stays with the renderer (useCommandManager
+        // guards text fields and drives the command stack); the menu item
+        // only DISPLAYS the accelerator on macOS so ⌘Z is not fired twice.
+        // On Windows/Linux the accelerator is omitted (registerAccelerator
+        // is macOS-only) — the renderer still handles Ctrl+Z / Ctrl+Y.
+        {
+          label: 'Undo',
+          ...(isMac ? { accelerator: 'CmdOrCtrl+Z', registerAccelerator: false } : {}),
+          click: () => mainWindow?.webContents.send('menu:undo'),
+        },
+        {
+          label: 'Redo',
+          ...(isMac ? { accelerator: 'Shift+CmdOrCtrl+Z', registerAccelerator: false } : {}),
+          click: () => mainWindow?.webContents.send('menu:redo'),
+        },
         { type: 'separator' },
         { role: 'cut' },
         { role: 'copy' },

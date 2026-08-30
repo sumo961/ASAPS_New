@@ -84,6 +84,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('menu:save', callback);
     return () => ipcRenderer.removeListener('menu:save', callback);
   },
+  onMenuUndo: (callback: () => void) => {
+    ipcRenderer.on('menu:undo', callback);
+    return () => ipcRenderer.removeListener('menu:undo', callback);
+  },
+  onMenuRedo: (callback: () => void) => {
+    ipcRenderer.on('menu:redo', callback);
+    return () => ipcRenderer.removeListener('menu:redo', callback);
+  },
   onMenuStorySettings: (callback: () => void) => {
     ipcRenderer.on('menu:story-settings', callback);
     return () => ipcRenderer.removeListener('menu:story-settings', callback);
@@ -389,6 +397,8 @@ declare global {
       onMcpSettingChanged: (callback: (enabled: boolean) => void) => () => void;
       onMenuNewProject: (callback: () => void) => () => void;
       onMenuSave: (callback: () => void) => () => void;
+      onMenuUndo?: (callback: () => void) => () => void;
+      onMenuRedo?: (callback: () => void) => () => void;
       onMenuStorySettings?: (callback: () => void) => () => void;
       onMenuCharacters?: (callback: () => void) => () => void;
       onMenuDebug?: (callback: () => void) => () => void;
