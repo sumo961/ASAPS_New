@@ -119,6 +119,25 @@ export interface AnimationPath {
   /** Global easing function (CSS easing string, can be overridden per waypoint) */
   easing?: string;
 
+  /**
+   * Coordinate basis for percent waypoints (decision C, 2026-08-31 —
+   * docs/Responsive-Background-Animation-Design.md):
+   *
+   * - `'stage'` (default, and the behavior of every pre-anchor path):
+   *   percent resolves against the layout box the element layer occupies.
+   *   Under `contain` that box IS the letterboxed image rect, so paths
+   *   already track the image; under `cover` it is the cropped viewport
+   *   box, so paths drift off their background targets.
+   * - `'image'`: percent resolves against the TRUE image rect — under
+   *   cover an oversize rect with negative offsets — so a path drawn to
+   *   a feature of the background ends on that feature on every device.
+   *   Identical to 'stage' under contain.
+   *
+   * Fixed-canvas mode ignores the anchor: stage and background scale
+   * together there, so paths are already crop-coherent.
+   */
+  anchor?: 'stage' | 'image';
+
   /** Whether animation should loop continuously */
   loop?: boolean;
 
@@ -184,6 +203,18 @@ export interface AnimationState {
 }
 
 /**
+ * The true image rect an image-anchored animation resolves against,
+ * in the element layer's own coordinate space. Under cover this is
+ * larger than the layer with negative x/y (the cropped overflow).
+ */
+export interface ImageAnchorRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
  * Options for playing an animation
  */
 export interface AnimationPlayOptions {
@@ -210,4 +241,12 @@ export interface AnimationPlayOptions {
   stage?:
     | { width: number; height: number }
     | (() => { width: number; height: number } | null);
+
+  /**
+   * True image rect for `anchor: 'image'` paths, relative to the same
+   * box `stage` describes. Function form is re-resolved every frame
+   * (survives resize/orientation). When absent, image-anchored paths
+   * fall back to the stage box — i.e. behave as 'stage'.
+   */
+  imageRect?: ImageAnchorRect | (() => ImageAnchorRect | null) | null;
 }

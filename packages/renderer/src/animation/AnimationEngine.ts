@@ -203,11 +203,24 @@ export class AnimationEngine {
     // without restarting. Object form snapshots once at play-time.
     const stageOpt = this.options.stage;
     const stage = typeof stageOpt === 'function' ? stageOpt() : (stageOpt ?? null);
+    // Image-anchored paths (anchor: 'image') resolve against the TRUE
+    // image rect when the host supplied one — under cover that rect is
+    // oversize with negative offsets, so waypoints keep pointing at
+    // their background features. No imageRect ⇒ graceful 'stage'
+    // behavior (fixed mode, hosts that predate the option).
+    let box: { width: number; height: number; offsetX?: number; offsetY?: number } | null = stage;
+    if (this.animationState.animation.anchor === 'image') {
+      const irOpt = this.options.imageRect;
+      const ir = typeof irOpt === 'function' ? irOpt() : (irOpt ?? null);
+      if (ir && ir.width && ir.height) {
+        box = { width: ir.width, height: ir.height, offsetX: ir.x, offsetY: ir.y };
+      }
+    }
     const position = calculatePositionAtTime(
       this.animationState.animation.waypoints,
       this.animationState.currentTime,
       this.animationState.animation.type,
-      stage,
+      box,
     );
 
     if (position) {

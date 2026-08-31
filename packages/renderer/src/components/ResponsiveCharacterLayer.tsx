@@ -70,6 +70,12 @@ export interface ResponsiveCharacterLayerProps {
   selectedElementName?: string;
   /** Fired when the author clicks a sprite in editor mode. */
   onElementSelect?: (locationName: string) => void;
+  /** TRUE image rect in this layer's coordinate space, re-resolved per
+   *  frame, for `anchor: 'image'` paths. Under contain the host layer
+   *  already IS the image rect, so this returns {0,0,w,h}; under cover
+   *  it is oversize with negative offsets. Absent ⇒ image-anchored
+   *  paths behave as stage-anchored. */
+  imageRectFn?: () => { x: number; y: number; width: number; height: number } | null;
 }
 
 interface AnimatedPosition {
@@ -101,6 +107,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
   editorMode,
   selectedElementName,
   onElementSelect,
+  imageRectFn,
 }, ref) => {
   // Animated-position map, keyed by location.name (which legacy
   // AnimationPath.elementId matches against).
@@ -108,6 +115,12 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
   // Per-character active sprite-frame index. Driven by the cycler
   // effect below; resets when the segment's frames array changes.
   const [spriteFrameIdx, setSpriteFrameIdx] = useState<Record<string, number>>({});
+
+  // Latest imageRectFn — the engine's play options capture a closure at
+  // play time; routing through a ref keeps mid-animation re-renders (new
+  // fn identity per render) feeding the SAME running animation.
+  const imageRectFnRef = useRef<typeof imageRectFn>(imageRectFn);
+  imageRectFnRef.current = imageRectFn;
 
   // Container ref so we can size percent coords against the live box.
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -167,6 +180,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
     for (const anim of relevantAnimations) {
       manager.play(anim.id, anim, {
         stage: () => stageSizeRef.current,
+        imageRect: () => imageRectFnRef.current?.() ?? null,
         onUpdate: (state) => {
           setAnimatedPositions(prev => ({
             ...prev,
@@ -231,6 +245,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
       return new Promise<void>(resolve => {
         manager.play(anim.id, anim, {
           stage: () => stageSizeRef.current,
+          imageRect: () => imageRectFnRef.current?.() ?? null,
           onUpdate: (state) => {
             setAnimatedPositions(prev => ({
               ...prev,

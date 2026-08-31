@@ -277,12 +277,18 @@ export function interpolateSegment(
  */
 export function resolveWaypoint(
   wp: AnimationWaypoint,
-  stage?: { width: number; height: number } | null,
+  stage?: { width: number; height: number; offsetX?: number; offsetY?: number } | null,
 ): AnimationWaypoint {
   if (!stage || !stage.width || !stage.height) return wp;
+  // offsetX/offsetY shift the resolution box's origin — image-anchored
+  // paths pass the TRUE image rect, which under cover starts above/left
+  // of the element layer (negative offsets). Offsets apply only to the
+  // percent branch: pixel fallbacks are fixed-mode/legacy stage coords
+  // and have no business riding an image origin.
   const resolveCoord = (p?: number, fallback?: number, axis?: 'x' | 'y') =>
     typeof p === 'number'
       ? (p / 100) * (axis === 'x' ? stage.width : stage.height)
+        + (axis === 'x' ? (stage.offsetX ?? 0) : (stage.offsetY ?? 0))
       : (fallback ?? 0);
   const x = resolveCoord(wp.xPercent, wp.x, 'x');
   const y = resolveCoord(wp.yPercent, wp.y, 'y');
@@ -319,7 +325,7 @@ export function calculatePositionAtTime(
   waypoints: AnimationWaypoint[],
   currentTime: number,
   interpolationType: 'linear' | 'bezier',
-  stage?: { width: number; height: number } | null,
+  stage?: { width: number; height: number; offsetX?: number; offsetY?: number } | null,
 ): { x: number; y: number; scale?: number; rotation?: number; opacity?: number; flipX?: boolean; flipY?: boolean; spriteAnimation?: string; spriteFrames?: number[]; spriteFrameDuration?: number } | null {
   if (stage && stage.width && stage.height) {
     waypoints = waypoints.map(wp => resolveWaypoint(wp, stage));

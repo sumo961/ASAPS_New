@@ -175,6 +175,30 @@ export function imageRectPx(
   }
 }
 
+/**
+ * TRUE image rect for anchoring (image-anchored animation paths).
+ * Unlike imageRectPx — whose cover branch approximates the rect as the
+ * full container because hotspots accept that — this returns the real
+ * cover rect: oversize, centered, negative x/y for the cropped
+ * overflow. Contain matches imageRectPx exactly.
+ */
+export function imageAnchorRectPx(
+  imgAspect: number,
+  boxW: number,
+  boxH: number,
+  fit: 'contain' | 'cover',
+): { x: number; y: number; width: number; height: number } {
+  if (!imgAspect || !boxW || !boxH) return { x: 0, y: 0, width: boxW, height: boxH };
+  if (fit === 'contain') return imageRectPx(imgAspect, boxW, boxH, fit);
+  const boxAspect = boxW / boxH;
+  if (imgAspect > boxAspect) {
+    const scaledW = boxH * imgAspect;
+    return { x: (boxW - scaledW) / 2, y: 0, width: scaledW, height: boxH };
+  }
+  const scaledH = boxW / imgAspect;
+  return { x: 0, y: (boxH - scaledH) / 2, width: boxW, height: scaledH };
+}
+
 let spatialUidCounter = 0;
 
 /**
@@ -391,6 +415,23 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     };
   }, []);
   const imgInsets = imageRectInsets(imgAspect, containerSize.w, containerSize.h, objectFit);
+  // TRUE image rect for image-anchored animation paths, expressed in the
+  // character layer's own space (that layer is positioned at imgInsets, so
+  // under contain this is a no-op {0,0,w,h}; under cover it is the oversize
+  // rect whose negative offsets carry paths to cropped-off image features).
+  const imageAnchorRectRef = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  {
+    const R = imageAnchorRectPx(imgAspect, containerSize.w, containerSize.h, objectFit);
+    // The layer's own pixel rect: the letterboxed rect under contain, the
+    // full container under cover (imageRectPx's documented cover behavior).
+    const layer = imageRectPx(imgAspect, containerSize.w, containerSize.h, objectFit);
+    imageAnchorRectRef.current = {
+      x: R.x - layer.x,
+      y: R.y - layer.y,
+      width: R.width,
+      height: R.height,
+    };
+  }
 
   /**
    * Phase 3.3 — pick the best image source for this container.
@@ -911,6 +952,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
         >
           <ResponsiveCharacterLayer
             ref={rclRef}
+            imageRectFn={() => imageAnchorRectRef.current}
             locations={characterLocations}
             animations={animations}
             characterResolver={characterResolver}
