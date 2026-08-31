@@ -241,12 +241,28 @@ as a **service tier, not a SKU**. Decided direction:
   one conversation with the university's innovation office about IP and
   invoicing.
 
-## 8. Decisions requested
+## 8. Decisions requested — DECIDED 2026-08-31 (Hartmut)
 
 1. **Phase order** — AR-first (as argued) or LLM-first?
+   → **AR-first.**
 2. **Generic Field Player vs per-story app** as the P0 target (plan assumes
    generic first).
+   → **Generic first.**
 3. **Gemma commitment** — bless Gemma 3n as the family (→ MediaPipe spike
    first), or keep the runtime model-agnostic (→ llama.cpp spike first)?
+   → **Model-agnostic; llama.cpp plugin spike.** Rationale: Gemma 4 already
+   exists — blessing a model version is a treadmill; the transport stays
+   OpenAI-chat-shaped either way.
 4. **Tier-1 geo-AR in HTML exports too** — it's nearly free once the
    renderer view exists; include in P1 or hold for the app?
+   → **Defer to P1-exit/P2, with a degradation ladder.** Assessment:
+   Android Chrome is solid over HTTPS; iOS Safari means three stacked
+   permission prompts (motion access is tap-gated via
+   `DeviceOrientationEvent.requestPermission()`) and no true fullscreen;
+   and `file://` blocks `getUserMedia` entirely, so HTML field stories
+   MUST be hosted (relay export covers it). Ship order: prove the ladder
+   in the app first — Tier 2 (ARCore) → Tier 1 (webview) → the existing
+   gpsLocation map rendering when camera/compass are unavailable or
+   denied. The ladder is needed in-app anyway for permission denials;
+   HTML inclusion afterwards is a capability gate + map fallback + one
+   export-dialog note ("AR scenes need the story hosted online").
