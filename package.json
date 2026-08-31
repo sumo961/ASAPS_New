@@ -56,7 +56,10 @@
   },
   "_overridesComment": "Security pins for transitive deps with no in-range parent fix.",
   "overrides": {
-    "shell-quote": "1.9.0"
+    "shell-quote": "1.9.0",
+    "xcode": {
+      "uuid": ">=11.1.1"
+    }
   },
   "dependencies": {
     "jszip": "^3.10.1"

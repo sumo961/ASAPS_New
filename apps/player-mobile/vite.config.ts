@@ -18,9 +18,11 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor': ['react', 'react-dom'],
-          'player': ['@asaps/core', '@asaps/player', '@asaps/renderer'],
+        // Function form: Vite 8's rolldown bundler rejects the object form
+        // ("manualChunks is not a function") — broken since the vite→8 bump.
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'vendor';
+          if (id.includes('@asaps/core') || id.includes('@asaps/player') || id.includes('@asaps/renderer')) return 'player';
         },
       },
     },
