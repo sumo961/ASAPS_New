@@ -7,6 +7,8 @@ import type { Asset } from '../assets/AssetManager';
 
 interface SearchPanelProps {
   isOpen: boolean;
+  /** Rendered inside FindChangePanel: no own shell or title row. */
+  embedded?: boolean;
   onClose: () => void;
   beats: Beat[];
   characters: Character[];
@@ -19,6 +21,7 @@ interface SearchPanelProps {
 
 export const SearchPanel: React.FC<SearchPanelProps> = ({
   isOpen,
+  embedded,
   onClose,
   beats,
   characters,
@@ -186,9 +189,15 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 w-96 bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+    <div
+      className={embedded
+        ? 'h-full w-full bg-white flex flex-col'
+        : 'fixed right-0 top-0 bottom-0 w-96 bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col'}
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       {/* Header - pt-10 pushes below Electron's macOS title bar drag region */}
-      <div className="flex-shrink-0 p-4 pt-10 border-b border-gray-200">
+      <div className={embedded ? 'flex-shrink-0 p-4 border-b border-gray-200' : 'flex-shrink-0 p-4 pt-10 border-b border-gray-200'}>
+        {!embedded && (
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Search & Replace</h2>
           <button
@@ -199,6 +208,7 @@ export const SearchPanel: React.FC<SearchPanelProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+        )}
 
         {/* Search Input */}
         <div className="relative">

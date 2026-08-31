@@ -627,10 +627,10 @@ export const Header: React.FC<HeaderProps> = ({
                           setShowToolsMenu(false);
                         }}
                         className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                        title="Bulk transformation commands (Ctrl+Shift+F)"
+                        title="AI bulk transformations — the Change tab of Find & Change (Ctrl+Shift+F)"
                       >
                         <Wand2 className="w-4 h-4" />
-                        Transformations
+                        Change with AI
                       </button>
                     )}
                     {onMergeDialogTrees && (
@@ -663,10 +663,10 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'bg-slate-500 text-white hover:bg-slate-600'
               }`}
               onClick={onSearch}
-              title="Search & replace text across all beats (Cmd+F)"
+              title="Find & replace, and AI bulk changes (Cmd+F)"
             >
               <Search className="w-4 h-4" />
-              Search
+              Find &amp; Change
             </button>
           )}
 

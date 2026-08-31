@@ -60,6 +60,7 @@ import { getStorageAdapter } from './storage/HybridStorageAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { SearchPanel } from './components/search';
 import { HelperCommandInput } from './components/ai/HelperCommandInput';
+import { FindChangePanel } from './components/FindChangePanel';
 import { applyTreeLayoutToBeats, applyClusterAwareTreeLayout, ClusterAwareLayoutResult } from './utils/TreeLayoutAlgorithm';
 import { validateAIStory, formatValidationResult } from './utils/aiStoryValidator';
 import { storyLinks as storyLinksOf, dedupeLinks } from './utils/storyLinks';
@@ -329,8 +330,9 @@ function App() {
   const [showSaveProjectDialog, setShowSaveProjectDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>('');
   const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
-  const [showHelperCommands, setShowHelperCommands] = useState(false);
+  // Find & Change (B10): ONE bulk-edit surface. `null` = closed; otherwise
+  // the active tab. ⌘F lands on Find, ⌘⇧F on Change with AI.
+  const [findChange, setFindChange] = useState<null | 'find' | 'change'>(null);
   const [highlightedBeatIds, setHighlightedBeatIds] = useState<string[]>([]);
   // Beats visited by the Preview Window (live trace, shown as red highlight on the flowchart).
   /**
@@ -627,14 +629,14 @@ function App() {
       // ctrl||meta test swallowed it and opened Search instead.
       if ((e.ctrlKey || e.metaKey) && !(e.ctrlKey && e.metaKey) && e.key === 'f') {
         e.preventDefault();
-        setShowSearchPanel(prev => !prev);
+        setFindChange(prev => (prev === 'find' ? null : 'find'));
       }
       // Ctrl/Cmd+Shift+F: Toggle Transformations (bulk edit). Was Cmd+Shift+K,
       // which Electron's VCS-Push menu accelerator shadowed — the binding was
       // dead on desktop while two tooltips advertised it.
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
-        setShowHelperCommands(prev => !prev);
+        setFindChange(prev => (prev === 'change' ? null : 'change'));
       }
       };
     window.addEventListener('keydown', handleKeyDown);
@@ -2322,7 +2324,7 @@ function App() {
         setShowAssetManager(false);
         setShowSettings(false);
         setShowDebugPanel(false);
-        setShowSearchPanel(false);
+        setFindChange(null);
         // Clear assets immediately — async loadAssets() below replaces them
         // for the new project, but the gap was long enough for the previous
         // project's blob URLs to flash in panels that opened during the switch.
@@ -2662,7 +2664,7 @@ function App() {
         setShowAssetManager(false);
         setShowSettings(false);
         setShowDebugPanel(false);
-        setShowSearchPanel(false);
+        setFindChange(null);
         setAssets([]);
         const projectData = loadProjectData(currentProject);
         reportDroppedBeats(
@@ -6444,8 +6446,8 @@ function App() {
         onAssets={handleOpenAssetManager}
         onSettings={handleOpenSettings}
         onDebug={handleOpenDebugPanel}
-        onSearch={() => setShowSearchPanel(prev => !prev)}
-        searchPanelOpen={showSearchPanel}
+        onSearch={() => setFindChange(prev => (prev === 'find' ? null : 'find'))}
+        searchPanelOpen={findChange === 'find'}
         onSave={handleSave}
         onInterceptNewProject={() => handleShowSaveDialog('newProject')}
         onInterceptProjectLibrary={() => handleShowSaveDialog('projectLibrary')}
@@ -6459,7 +6461,7 @@ function App() {
         hasUnsavedChanges={hasUnsavedChanges}
         currentProjectId={currentProject?.id}
         onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
-        onHelperCommands={() => setShowHelperCommands(true)}
+        onHelperCommands={() => setFindChange('change')}
         onExportHtml={() => setShowHtmlExportDialog(true)}
         vcsPanelOpen={vcsPanelOpen}
         onToggleVCSPanel={() => setVcsPanelOpen(prev => !prev)}
@@ -6945,31 +6947,41 @@ function App() {
       {/* Debug Tools now render in a separate pop-out window (see DebugWindow.tsx).
           Nothing to render inline. The open/close button still lives in the header. */}
 
-      {/* Search Panel */}
-      <SearchPanel
-        isOpen={showSearchPanel}
-        onClose={() => setShowSearchPanel(false)}
-        beats={state.beats}
-        characters={characters}
-        assets={assets}
-        metadata={{ title: state.title, author: state.author }}
-        onNavigateToBeat={handleNavigateToBeat}
-        onNavigateToCharacter={handleNavigateToCharacter}
-        onReplaceInBeat={handleReplaceInBeat}
-      />
-
-      {/* Transformation Commands Panel */}
-      <HelperCommandInput
-        isOpen={showHelperCommands}
-        onClose={() => setShowHelperCommands(false)}
-        beats={state.beats}
-        clusters={state.clusters}
-        containerBeatPositions={state.containerBeatPositions}
-        assets={assets.map(a => ({ id: a.id, name: a.name, type: a.type }))}
-        characterNames={characters.map(c => c.name)}
-        onUpdateBeat={actions.updateBeat}
-        onDeleteBeat={actions.deleteBeat}
-        onChangesApplied={handleTransformationChangesApplied}
+      {/* Find & Change — one bulk-edit surface (B10) */}
+      <FindChangePanel
+        isOpen={findChange !== null}
+        tab={findChange ?? 'find'}
+        onTabChange={(tab) => setFindChange(tab)}
+        onClose={() => setFindChange(null)}
+        findContent={
+          <SearchPanel
+            embedded
+            isOpen={findChange === 'find'}
+            onClose={() => setFindChange(null)}
+            beats={state.beats}
+            characters={characters}
+            assets={assets}
+            metadata={{ title: state.title, author: state.author }}
+            onNavigateToBeat={handleNavigateToBeat}
+            onNavigateToCharacter={handleNavigateToCharacter}
+            onReplaceInBeat={handleReplaceInBeat}
+          />
+        }
+        changeContent={
+          <HelperCommandInput
+            embedded
+            isOpen={findChange === 'change'}
+            onClose={() => setFindChange(null)}
+            beats={state.beats}
+            clusters={state.clusters}
+            containerBeatPositions={state.containerBeatPositions}
+            assets={assets.map(a => ({ id: a.id, name: a.name, type: a.type }))}
+            characterNames={characters.map(c => c.name)}
+            onUpdateBeat={actions.updateBeat}
+            onDeleteBeat={actions.deleteBeat}
+            onChangesApplied={handleTransformationChangesApplied}
+          />
+        }
       />
 
       {/* Save Project Dialog */}

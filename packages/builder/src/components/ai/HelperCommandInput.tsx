@@ -80,6 +80,8 @@ interface ConversationMessage {
 export interface HelperCommandInputProps {
   /** Whether the panel is open */
   isOpen: boolean;
+  /** Rendered inside FindChangePanel: no own shell or title row. */
+  embedded?: boolean;
 
   /** Close panel callback */
   onClose: () => void;
@@ -114,6 +116,7 @@ export interface HelperCommandInputProps {
 
 export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   isOpen,
+  embedded,
   onClose,
   beats,
   clusters,
@@ -495,7 +498,12 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
   const waitingForClarification = lastAssistantMessage?.needsClarification;
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+    <div
+      className={embedded
+        ? 'relative h-full w-full bg-white flex flex-col'
+        : 'fixed right-0 top-0 bottom-0 w-[480px] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col'}
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       {/* Applying Changes Overlay */}
       {isApplying && (
         <div className="absolute inset-0 bg-white/90 z-50 flex flex-col items-center justify-center">
@@ -508,7 +516,8 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
       )}
 
       {/* Header */}
-      <div className="flex-shrink-0 p-4 pt-10 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+      <div className={embedded ? 'flex-shrink-0 p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50' : 'flex-shrink-0 p-4 pt-10 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50'}>
+        {!embedded && (
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Wand2 className="w-5 h-5 text-purple-600" />
@@ -522,6 +531,7 @@ export const HelperCommandInput: React.FC<HelperCommandInputProps> = ({
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+        )}
         <p className="text-sm text-gray-600">
           Use natural language to make bulk changes to your story. Complex changes (e.g., context-aware text) require AI - smaller local models via Ollama work fine.
         </p>
