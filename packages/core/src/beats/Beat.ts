@@ -181,6 +181,13 @@ export abstract class Beat {
       // performAction; same value, harmless).
       renderer.setState('spatialFit', this.spatialFit);
 
+      // Fixed-frame island (decision C, 2026-08-31): a beat whose
+      // parameters carry fixedFrame keeps its authored aspect on
+      // cover-mode players (letterboxed instead of cropped). Set on
+      // EVERY beat — including false — so one island can't leak its
+      // letterboxing into the next beat (the spatialFit rule).
+      renderer.setState('fixedFrame', !!(this.getParameters() as any)?.fixedFrame);
+
       // Set animations in renderer state for path animations
       if (this.animations && this.animations.length > 0) {
         console.log(`[Beat.execute] Setting animations in renderer state:`, this.animations.length, this.animations);

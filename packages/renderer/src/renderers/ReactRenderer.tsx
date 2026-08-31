@@ -1550,7 +1550,10 @@ export class ReactRenderer extends BaseRenderer {
       const stageWidth = this.context.width;
       const stageHeight = this.context.height;
       const disableScaling = this.getState('disableScaling') as boolean | undefined;
-      const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
+      // Fixed-frame island: the beat asked to keep its authored shape —
+      // letterbox (fit) even where the player would cover-crop.
+      const fixedFrame = this.getState('fixedFrame') as boolean | undefined;
+      const scalingMode = this.mobileMode && !fixedFrame ? 'cover' as const : 'fit' as const;
       const useMobileBg = this.mobileMode && scalingMode === 'cover';
 
       // Get STT and TTS services from renderer state (set by PreviewWindow/WebPlayer)
@@ -2648,7 +2651,10 @@ export class ReactRenderer extends BaseRenderer {
       const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
       // Determine scaling mode for mobile
-      const scalingMode = this.mobileMode ? 'cover' as const : 'fit' as const;
+      // Fixed-frame island: the beat asked to keep its authored shape —
+      // letterbox (fit) even where the player would cover-crop.
+      const fixedFrame = this.getState('fixedFrame') as boolean | undefined;
+      const scalingMode = this.mobileMode && !fixedFrame ? 'cover' as const : 'fit' as const;
       const useMobileBg = this.mobileMode && scalingMode === 'cover';
 
       this.renderComponent(

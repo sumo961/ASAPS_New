@@ -106,7 +106,10 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
       return initialAnimation;
     }
 
-    // Create new animation with default values
+    // Create new animation with default values. Anchor default per
+    // decision 2 (2026-08-31): a beat WITH a background image anchors new
+    // paths to the image, so they end on their background features on
+    // every device; without one there is nothing to anchor to.
     return {
       id: `anim-${Date.now()}`,
       name: `Animation ${Date.now()}`,
@@ -117,6 +120,7 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
       loop: false,
       autoPlay: true,
       trigger: 'onLoad',
+      anchor: backgroundUrl ? 'image' : 'stage',
     };
   });
 
@@ -554,7 +558,27 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
   };
 
   const handleSave = () => {
-    onSave(animation);
+    // The canvas edits pixel coords; percent is what the responsive and
+    // image-anchored resolvers consume. Derive percent from pixels at
+    // save so both stay true after any edit (the migrator's job, done
+    // continuously). Background fills the authored stage, so percent of
+    // stage ≡ percent of image at authoring time.
+    const pct = (v: number, dim: number) => (dim > 0 ? (v / dim) * 100 : 0);
+    const withPercent = {
+      ...animation,
+      waypoints: animation.waypoints.map(wp => ({
+        ...wp,
+        xPercent: pct(wp.x, stageWidth),
+        yPercent: pct(wp.y, stageHeight),
+        controlPoint1: wp.controlPoint1
+          ? { ...wp.controlPoint1, xPercent: pct(wp.controlPoint1.x, stageWidth), yPercent: pct(wp.controlPoint1.y, stageHeight) }
+          : wp.controlPoint1,
+        controlPoint2: wp.controlPoint2
+          ? { ...wp.controlPoint2, xPercent: pct(wp.controlPoint2.x, stageWidth), yPercent: pct(wp.controlPoint2.y, stageHeight) }
+          : wp.controlPoint2,
+      })),
+    };
+    onSave(withPercent);
   };
 
   // Ref to track if timeline change is from user interaction
@@ -620,7 +644,7 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
           <div className="flex-1 flex flex-col p-4 overflow-auto">
             {/* Animation settings */}
             <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200">
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-4 gap-4 text-sm">
                 <div>
                   <label className="block text-gray-700 mb-1">Type</label>
                   <select
@@ -650,6 +674,22 @@ export const AnimationPathEditor: React.FC<AnimationPathEditorProps> = ({
                     <option value="onLoad">On Load</option>
                     <option value="onClick">On Click</option>
                     <option value="onVariable">On Variable</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 mb-1" title="What the path follows when the screen shape changes. 'Background image' keeps waypoints on their image features on every device (a path to the door ends at the door, even when a phone crops the image). 'Screen' keeps them at fixed fractions of the visible stage.">
+                    Anchored to
+                  </label>
+                  <select
+                    value={animation.anchor === 'image' ? 'image' : 'stage'}
+                    onChange={(e) =>
+                      setAnimation({ ...animation, anchor: e.target.value as 'stage' | 'image' })
+                    }
+                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                  >
+                    <option value="image">Background image</option>
+                    <option value="stage">Screen</option>
                   </select>
                 </div>
 

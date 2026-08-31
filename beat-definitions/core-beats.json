@@ -473,6 +473,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -590,6 +600,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -727,6 +747,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -844,6 +874,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -973,6 +1013,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -1092,6 +1142,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -1195,6 +1255,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -1365,6 +1435,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -1616,6 +1696,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -1847,6 +1937,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -2310,6 +2410,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -2936,6 +3046,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -3103,6 +3223,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -3263,6 +3393,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -3418,6 +3558,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -3647,6 +3797,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "permissions": [
@@ -3798,6 +3958,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "permissions": [
@@ -3916,6 +4086,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -4062,6 +4242,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -4363,6 +4553,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -4669,6 +4869,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -4846,6 +5056,16 @@
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
           }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
         }
       },
       "locations": [
@@ -5019,6 +5239,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },
@@ -5472,6 +5702,16 @@
             "group": "Explanation",
             "tier": "advanced",
             "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
           }
         }
       },

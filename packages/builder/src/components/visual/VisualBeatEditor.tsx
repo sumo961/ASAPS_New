@@ -24,6 +24,7 @@ import {
   Ungroup,
   Eye,
   LayoutGrid,
+  Smartphone,
 } from 'lucide-react';
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
@@ -390,6 +391,11 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const [zoom, setZoomInternal] = useState(initialZoom ?? 1);
   const setZoom = (z: number) => { setZoomInternal(z); onZoomChange?.(z); };
   const [showGrid, setShowGrid] = useState(true);
+  // Phone-crop preview (decision 5, 2026-08-31): draws the region of the
+  // authored stage a cover-mode phone actually keeps — one frame per
+  // common portrait aspect. Teaches the crop problem at a glance while
+  // placing elements and drawing image-anchored paths.
+  const [showPhoneCrop, setShowPhoneCrop] = useState(false);
   const activeBoxVisibility = boxVisibility || 'all';
   const [tool, setTool] = useState<'select' | 'hotspot' | 'text' | 'character' | 'prop'>('select');
 
@@ -1103,6 +1109,13 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
           <Layers className="w-4 h-4" />
         </button>
         <button
+          onClick={() => setShowPhoneCrop(!showPhoneCrop)}
+          className={`p-2 rounded text-xs font-medium ${showPhoneCrop ? 'bg-violet-100 text-violet-700' : 'hover:bg-gray-100 text-gray-400'}`}
+          title="Phone crop preview — outline what a portrait phone keeps of this stage (cover mode)"
+        >
+          <Smartphone className="w-4 h-4" />
+        </button>
+        <button
           onClick={() => setSnappingEnabled(!snappingEnabled)}
           className={`p-2 rounded ${snappingEnabled ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-400'}`}
           title={snappingEnabled ? 'Snapping On' : 'Snapping Off'}
@@ -1353,6 +1366,56 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                 height: `${stageHeight}px`,
               }}
             >
+              {/* Phone-crop preview frames: centered cover-visible region
+                  for common portrait aspects. Percent-based so they ride
+                  the VE zoom. */}
+              {showPhoneCrop && (
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 40 }}>
+                  {([
+                    { label: '9:16', aspect: 9 / 16, color: '#7c3aed' },
+                    { label: '9:19.5', aspect: 9 / 19.5, color: '#a78bfa' },
+                  ]).map(({ label, aspect, color }) => {
+                    const stageAspect = stageWidth / stageHeight;
+                    // Cover keeps the full shorter-relative dimension: the
+                    // visible region has the phone's aspect, centered.
+                    const w = stageAspect > aspect ? stageHeight * aspect : stageWidth;
+                    const h = stageAspect > aspect ? stageHeight : stageWidth / aspect;
+                    const left = ((stageWidth - w) / 2 / stageWidth) * 100;
+                    const top = ((stageHeight - h) / 2 / stageHeight) * 100;
+                    return (
+                      <div
+                        key={label}
+                        style={{
+                          position: 'absolute',
+                          left: `${left}%`,
+                          top: `${Math.max(0, top)}%`,
+                          width: `${(w / stageWidth) * 100}%`,
+                          height: `${Math.min(100, (h / stageHeight) * 100)}%`,
+                          border: `2px dashed ${color}`,
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            left: 4,
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            color,
+                            background: 'rgba(255,255,255,0.75)',
+                            padding: '0 3px',
+                            borderRadius: 2,
+                          }}
+                        >
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Grid overlay */}
               {showGrid && (
                 <div
