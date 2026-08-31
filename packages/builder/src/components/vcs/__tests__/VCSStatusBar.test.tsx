@@ -73,6 +73,33 @@ describe('VCSStatusBar', () => {
     expect(onInitRepo).toHaveBeenCalled();
   });
 
+  it('pulses the affordance once ever, then stays quiet (discoverability hint)', () => {
+    const store = new Map<string, string>();
+    const shim = {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => { store.set(k, String(v)); },
+      removeItem: (k: string) => { store.delete(k); },
+      clear: () => store.clear(),
+      key: (i: number) => [...store.keys()][i] ?? null,
+      get length() { return store.size; },
+    };
+    Object.defineProperty(window, 'localStorage', { value: shim, configurable: true });
+
+    mockVCSState.initialized = true;
+    mockVCSState.type = 'none';
+    mockVCSState.projectPath = '/some/project';
+
+    // First-ever appearance: pulse class present, flag written.
+    const first = render(<VCSStatusBar onInitRepo={vi.fn()} />);
+    expect(screen.getByText('Track versions').className).toContain('vcs-track-versions-hint');
+    expect(store.get('asaps.trackVersionsHintShown')).toBe('1');
+    first.unmount();
+
+    // Every later appearance: quiet.
+    render(<VCSStatusBar onInitRepo={vi.fn()} />);
+    expect(screen.getByText('Track versions').className).not.toContain('vcs-track-versions-hint');
+  });
+
   it('shows the same quiet affordance when git is not installed — never an unsolicited warning', () => {
     mockVCSState.initialized = true;
     mockVCSState.type = 'none';

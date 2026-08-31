@@ -53,3 +53,24 @@
 .react-flow__nodesselection-rect {
   display: none;
 }
+
+/* One-time discoverability pulse for the status bar's quiet "Track versions"
+   affordance (VCSStatusBar). Three gentle pulses toward the violet the app
+   uses for offers, then the animation ends and the label settles back to
+   its quiet grey. Applied only on the first-ever appearance. */
+@keyframes vcs-track-versions-pulse {
+  0%, 100% {
+    color: #94a3b8;
+    text-shadow: none;
+    background-color: transparent;
+  }
+  50% {
+    color: #a78bfa;
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.55);
+    background-color: rgba(167, 139, 250, 0.12);
+  }
+}
+.vcs-track-versions-hint {
+  animation: vcs-track-versions-pulse 1.6s ease-in-out 3;
+  border-radius: 3px;
+}

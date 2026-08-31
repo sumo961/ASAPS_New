@@ -684,6 +684,14 @@ function createMenu(): void {
     {
       label: 'Version Control',
       submenu: [
+        // Second door to the status bar's quiet "Track versions" affordance
+        // (B9 follow-up): opens the plain-language dialog when the project
+        // has no repo yet, the VCS panel when it does.
+        {
+          label: 'Track Versions\u2026',
+          click: () => mainWindow?.webContents.send('vcs:track-versions'),
+        },
+        { type: 'separator' },
         {
           label: 'Commit...',
           accelerator: 'CmdOrCtrl+K',

@@ -12,7 +12,7 @@
  * a button to open the MergeConflictDialog.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { MergeConflictDialog } from './MergeConflictDialog';
 
@@ -25,16 +25,38 @@ interface VCSStatusBarProps {
   onInitRepo?: () => void;
 }
 
+const TRACK_VERSIONS_HINT_KEY = 'asaps.trackVersionsHintShown';
+
 export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onTogglePanel, onInitRepo }) => {
   const vcs = useVCSStatus();
   const [showConflictDialog, setShowConflictDialog] = useState(false);
+  // One-time discoverability pulse on the quiet "Track versions" affordance —
+  // the author it exists for (VCS-naive) is the least likely to spot a grey
+  // label. Pulses a few times the FIRST time it ever appears, then never again
+  // on this machine (localStorage flag).
+  const [hintActive] = useState(() => {
+    try {
+      return !window.localStorage.getItem(TRACK_VERSIONS_HINT_KEY);
+    } catch {
+      return false;
+    }
+  });
+  const offerVisible = !!(vcs && vcs.initialized && vcs.projectPath && (vcs.type === 'none' || vcs.gitNotInstalled));
+  useEffect(() => {
+    if (!offerVisible || !hintActive) return;
+    try {
+      window.localStorage.setItem(TRACK_VERSIONS_HINT_KEY, '1');
+    } catch {
+      /* storage unavailable — the hint just repeats next launch */
+    }
+  }, [offerVisible, hintActive]);
 
   // No repo yet (whether or not git is even installed): ONE quiet,
   // plain-language affordance. Pressing Save used to escalate to
   // "\u26A0 Git not found + Install Git" for authors who never asked for
   // version control — git vocabulary now starts only after this click
   // (the setup flow explains tooling, including installation if needed).
-  if (vcs && vcs.initialized && vcs.projectPath && (vcs.type === 'none' || vcs.gitNotInstalled)) {
+  if (offerVisible) {
     return (
       <div
         className="vcs-status-bar"
@@ -50,6 +72,7 @@ export const VCSStatusBar: React.FC<VCSStatusBarProps> = ({ panelOpen, onToggleP
       >
         <button
           onClick={onInitRepo}
+          className={hintActive ? 'vcs-track-versions-hint' : undefined}
           style={{
             background: 'none',
             border: 'none',

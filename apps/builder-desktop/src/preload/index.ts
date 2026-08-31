@@ -297,6 +297,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // VCS menu events
+  onVCSTrackVersions: (callback: () => void) => {
+    ipcRenderer.on('vcs:track-versions', callback);
+    return () => ipcRenderer.removeListener('vcs:track-versions', callback);
+  },
   onVCSCommit: (callback: () => void) => {
     ipcRenderer.on('vcs:commit', callback);
     return () => ipcRenderer.removeListener('vcs:commit', callback);
@@ -433,6 +437,7 @@ declare global {
       onDebugClosed: (callback: () => void) => () => void;
       onDebugMessageToMain: (callback: (message: any) => void) => () => void;
       onStoryInject: (callback: (data: any) => void) => () => void;
+      onVCSTrackVersions?: (callback: () => void) => () => void;
       onVCSCommit: (callback: () => void) => () => void;
       onVCSPush: (callback: () => void) => () => void;
       onVCSPull: (callback: () => void) => () => void;

@@ -140,6 +140,7 @@ declare global {
       onProjectSaveAsFolder?: (callback: (path: string) => void) => () => void;
       onMenuRevealProject?: (callback: () => void) => () => void;
       onStoryInject?: (callback: (data: any) => void) => () => void;
+      onVCSTrackVersions?: (callback: () => void) => () => void;
       onVCSCommit?: (callback: () => void) => () => void;
       onVCSPush?: (callback: () => void) => () => void;
       onVCSPull?: (callback: () => void) => () => void;
@@ -3829,6 +3830,17 @@ function App() {
 
     if (api?.onVCSTogglePanel) {
       unsubs.push(api.onVCSTogglePanel(() => setVcsPanelOpen(prev => !prev)));
+    }
+    if (api?.onVCSTrackVersions) {
+      unsubs.push(api.onVCSTrackVersions(() => {
+        // No repo yet (and a folder to init in) → the plain-language dialog;
+        // already tracking → the panel. Mirrors the status-bar affordance.
+        if (vcsCtx && vcsCtx.projectPath && (vcsCtx.type === 'none' || vcsCtx.gitNotInstalled)) {
+          setShowGitInitDialog(true);
+        } else {
+          setVcsPanelOpen(true);
+        }
+      }));
     }
     if (api?.onVCSCommit) {
       unsubs.push(api.onVCSCommit(() => {
