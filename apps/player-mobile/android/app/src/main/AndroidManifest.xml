@@ -22,6 +22,34 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Open .asaps / .asapst stories from Files, mail, share sheets.
+                 Content URIs rarely carry a useful MIME type for custom
+                 extensions, so match on pathPattern for file/content schemes.
+                 Capacitor's @capacitor/app surfaces these as appUrlOpen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\.asaps" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\.asapst" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\.asaps" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\.asapst" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\..*\\.asaps" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\..*\\..*\\.asaps" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\..*\\.asapst" />
+                <data android:scheme="file" android:host="*" android:pathPattern=".*\\..*\\..*\\.asapst" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\.asaps" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\..*\\.asaps" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\.asapst" />
+                <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\..*\\.asapst" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-asaps-project" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" android:host="*" android:pathPattern=".*\\.asaps" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -38,4 +66,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Field App P0: GPS beats (gpsLocation / geoPoints) read position via
+         the webview's navigator.geolocation; Capacitor forwards the webview
+         prompt to these runtime permissions. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- qrScan / inputImage beats and P1 geo-AR use getUserMedia in the
+         webview; Android requires the app-level permission for the WebView's
+         PermissionRequest to be grantable. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { Filesystem } from '@capacitor/filesystem';
+import { Geolocation } from '@capacitor/geolocation';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { PlayerEngine } from '@asaps/player';
 import { ReactRenderer, type RenderContext } from '@asaps/renderer';
@@ -171,6 +174,28 @@ const App: React.FC = () => {
       });
       playerRef.current = player;
 
+      // Field App P0: prime native sensor permissions BEFORE the story
+      // starts. The webview's navigator.geolocation only prompts once the
+      // app-level permission exists; asking up front (and only for stories
+      // that actually use location) avoids the field-test trap where a GPS
+      // beat silently reports nothing because the OS prompt never appeared.
+      player.on('storyLoaded', (story: any) => {
+        try {
+          const beats: any[] = story?.getAllBeats?.() ?? [];
+          const usesLocation = beats.some(b =>
+            ['gpsLocation', 'setGpsLocation', 'geoArScene'].includes(b?.type));
+          if (usesLocation && Capacitor.isNativePlatform()) {
+            Geolocation.requestPermissions().then(status => {
+              if (status.location === 'denied') {
+                console.warn('[FieldPlayer] Location permission denied — GPS scenes will not trigger.');
+              }
+            }).catch(err => console.warn('[FieldPlayer] Location permission request failed:', err));
+          }
+        } catch (err) {
+          console.warn('[FieldPlayer] Permission priming skipped:', err);
+        }
+      });
+
       // Load and start
       await player.loadStory(data);
       await player.start();
@@ -204,17 +229,56 @@ const App: React.FC = () => {
     }
   }, [haptic, aiSettings]);
 
+  // Open .asaps / .asapst handed to the app (Files "Open in", share sheet,
+  // double-tap) — both the cold-start launch URL and warm appUrlOpen events.
+  // Filesystem.readFile handles content:// (Android) and file:// (iOS Inbox)
+  // URIs and returns base64; decode to an ArrayBuffer for the player.
+  const openFromUri = useCallback(async (uri: string) => {
+    try {
+      const res = await Filesystem.readFile({ path: uri });
+      const b64 = res.data as string;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const name = decodeURIComponent(uri.split('/').pop() || 'Story')
+        .replace(/\.(asaps|asapst)$/i, '');
+      await openStory(bytes.buffer, name);
+    } catch (err) {
+      console.error('[FieldPlayer] Could not open handed file:', uri, err);
+      setError('Could not open that story file.');
+      setAppState('error');
+    }
+  }, [openStory]);
+  const openFromUriRef = useRef(openFromUri);
+  openFromUriRef.current = openFromUri;
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let removed = false;
+    const sub = CapApp.addListener('appUrlOpen', ({ url }) => {
+      if (/\.(asaps|asapst)$/i.test(url.split('?')[0])) void openFromUriRef.current(url);
+    });
+    CapApp.getLaunchUrl().then(launch => {
+      if (launch?.url && /\.(asaps|asapst)$/i.test(launch.url.split('?')[0])) {
+        void openFromUriRef.current(launch.url);
+      }
+    }).catch(() => {});
+    return () => {
+      if (!removed) { removed = true; sub.then(h => h.remove()); }
+    };
+  }, []);
+
   const handleImport = useCallback(async () => {
     await haptic();
 
     // Use file input for importing
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps,.asaps.zip';
+    input.accept = '.zip,.asaps,.asapst,.asaps.zip';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        await openStory(file, file.name.replace(/\.(asaps\.)?zip$/, ''));
+        await openStory(file, file.name.replace(/\.(asaps|asapst|zip|asaps\.zip)$/i, ''));
       }
     };
     input.click();

@@ -45,5 +45,74 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Stories can react to where you are — location is used only while you play a story with location scenes, and never leaves your device.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Some stories use the camera for QR codes, photos, or augmented-reality scenes.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Augmented-reality story scenes use the compass and motion sensors to place markers around you.</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>ASAPS Story</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.asaps.story</string>
+				<string>com.asaps.template</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.asaps.story</string>
+			<key>UTTypeDescription</key>
+			<string>ASAPS Story Project</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>asaps</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-asaps-project</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.asaps.template</string>
+			<key>UTTypeDescription</key>
+			<string>ASAPS Story Template</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>asapst</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-asaps-template</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>
