@@ -276,6 +276,45 @@ async function preTranslateUIStrings(
   }
 }
 
+/**
+ * B8 (debug-legibility flagship, final piece): state values in the debug
+ * rail are EDITABLE — the engine setters existed all along, the rail just
+ * never offered inputs. Commit on Enter or blur, Escape reverts; the
+ * variableChanged/counterChanged events the rail and every HUD already
+ * subscribe to do the propagation.
+ */
+const DebugValueInput: React.FC<{
+  display: string;
+  numeric?: boolean;
+  onCommit: (raw: string) => void;
+  className?: string;
+}> = ({ display, numeric, onCommit, className }) => (
+  <input
+    // Re-key on external value change so engine-driven updates refresh the
+    // field, while keystrokes never fight a controlled re-render.
+    key={display}
+    type={numeric ? 'number' : 'text'}
+    defaultValue={display}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+      if (e.key === 'Escape') {
+        (e.target as HTMLInputElement).value = display;
+        (e.target as HTMLInputElement).blur();
+      }
+      e.stopPropagation();
+    }}
+    onBlur={(e) => {
+      const raw = e.target.value.trim();
+      if (raw !== display && raw !== '') onCommit(raw);
+    }}
+    className={
+      'font-mono text-xs bg-transparent border border-transparent rounded px-1 text-right ' +
+      'hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none ' +
+      (className || '')
+    }
+  />
+);
+
 export const PreviewWindow: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [story, setStory] = useState<Story | null>(null);
@@ -3120,9 +3159,21 @@ export const PreviewWindow: React.FC = () => {
                     <div className="text-sm font-medium text-gray-600 mb-2">Variables</div>
                     <div className="space-y-1">
                       {Object.entries(debugInfo.variables).map(([key, value]) => (
-                        <div key={key} className="text-xs">
+                        <div key={key} className="text-xs flex items-center justify-between gap-2">
                           <span className="font-mono text-gray-600">{key}:</span>
-                          <span className="ml-2">{JSON.stringify(value)}</span>
+                          <DebugValueInput
+                            display={JSON.stringify(value)}
+                            onCommit={(raw) => {
+                              const ctx = engineRef.current?.getContext();
+                              if (!ctx) return;
+                              // JSON first (numbers, booleans, quoted strings,
+                              // null); bare words fall back to plain strings.
+                              let parsed: any = raw;
+                              try { parsed = JSON.parse(raw); } catch { /* string */ }
+                              ctx.setVariable(key, parsed);
+                            }}
+                            className="w-24"
+                          />
                         </div>
                       ))}
                     </div>
@@ -3165,7 +3216,25 @@ export const PreviewWindow: React.FC = () => {
                           <div key={key} className="text-xs">
                             <div className="flex items-center justify-between">
                               <span className="font-mono text-gray-600">{label}:</span>
-                              <span className="font-bold">{value as number}</span>
+                              <DebugValueInput
+                                display={String(value as number)}
+                                numeric
+                                onCommit={(raw) => {
+                                  const num = Number(raw);
+                                  if (!Number.isFinite(num)) return;
+                                  const ctx = engineRef.current?.getContext();
+                                  if (!ctx) return;
+                                  // Dotted keys are character-scoped; bare keys
+                                  // go through setCounter, whose implicit-owner
+                                  // routing matches how the value is read.
+                                  if (ownerKey) {
+                                    (ctx as any).setCharacterCounter?.(ownerKey, counterName, num);
+                                  } else {
+                                    ctx.setCounter(key, num);
+                                  }
+                                }}
+                                className="w-16 font-bold"
+                              />
                             </div>
                             {showMeter && (
                               orientation === 'horizontal' ? (
