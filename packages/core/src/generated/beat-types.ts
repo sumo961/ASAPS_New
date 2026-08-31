@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-08-23T20:44:38.637Z
+ * Generated: 2026-08-31T09:27:04.526Z
  */
 
 // ============================================
@@ -156,6 +156,8 @@ export interface TitleScreenParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -180,6 +182,8 @@ export interface InfoTextParameters {
   slotAnimations?: Object | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -208,6 +212,8 @@ export interface ExplanationParameters {
   slotAnimations?: Object | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -236,6 +242,8 @@ export interface DialogTreeParameters {
   spatialFit?: string | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -260,6 +268,8 @@ export interface MultiChoiceParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -286,6 +296,8 @@ export interface MovementChoiceParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -310,6 +322,8 @@ export interface PickPropParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -342,6 +356,8 @@ export interface VideoBeatParameters {
   connection?: Connection | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -396,6 +412,8 @@ export interface EndScreenParameters {
   connection?: Connection | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -432,6 +450,8 @@ export interface PanoramaParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -540,6 +560,8 @@ export interface DurScreenParameters {
   connection?: Connection | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -710,6 +732,8 @@ export interface InputTextParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -742,6 +766,8 @@ export interface InputImageParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -784,6 +810,8 @@ export interface KeypadParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -816,6 +844,8 @@ export interface QrScanParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -842,6 +872,8 @@ export interface ArBeatParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -870,6 +902,8 @@ export interface WebViewParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -894,6 +928,8 @@ export interface HyperTextParameters {
   showSpeaker?: boolean | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -930,6 +966,8 @@ export interface OnlineContentParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -988,6 +1026,8 @@ export interface AiDialogTreeParameters {
   choiceDelay?: number | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -1054,6 +1094,8 @@ export interface AiSummaryParameters {
   creditsCloseText?: string | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -1090,6 +1132,8 @@ export interface AiInfoTextParameters {
   connection: Connection;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -1126,6 +1170,8 @@ export interface AiDurScreenParameters {
   connection?: Connection | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 /**
@@ -1166,6 +1212,8 @@ export interface AiConversationParameters {
   systemInstructions?: string | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
   explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
 }
 
 // ============================================
