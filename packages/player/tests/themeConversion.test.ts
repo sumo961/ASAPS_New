@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// (PlayerEngine imports the renderer barrel, which evaluates Leaflet — a
+// browser-only module that touches `window` at import time.)
 /**
  * Tests for the PLAYER's copy of convertGlobalSettingsToTheme — the one
  * exported stories actually run. It is a hand-maintained duplicate of the
