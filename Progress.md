@@ -1,5 +1,110 @@
 # ASAPS Modern - Progress Log
 
+## 2026-08-31: The verification release — everything checked, everything fixed (v0.9.95)
+
+### Overview
+
+Sixty-four commits, one discipline: this release is the product of running
+the verification rounds ON the candidate instead of after it (the v0.9.89
+lesson). A UX evaluation (docs/UX-Eval-1.0.md) drove a wave of structural
+fixes; the graph editor's two rendering worlds became one; and a nine-section
+live verification pass in the desktop app — real mouse input, measured
+geometry, cold starts — closed with every finding fixed and committed. The
+headline changes: dialog trees and their choice logic are finally visible on
+the flowchart, clustered beats are real ReactFlow citizens, multi-language
+exports shrank from 170 MB to ~40 MB, and version control now speaks the
+author's language from the first click.
+
+### Graph editor unification — one rendering path
+
+Clustered beats used to be pictures of beats painted inside a frame; now
+they are real ReactFlow nodes parented to the frame — same rendering,
+dragging, selection, and connection behavior everywhere. Around that:
+dialogTree beats expand in place into their question/choice structure
+(B1b), including inside clusters; choice guards render on the edge they
+gate (B1a); marquee selection exists (and survives release); multi-select
+duplicate is undoable; single ⌘D keeps links; cluster frames grow to make
+room; background maps get natural/cover/contain fit modes, render on cold
+start, and palette drops land where they're dropped. The flowchart
+remembers zoom and pan per project (localStorage, deliberately not in the
+project file — looking around never dirties a VCS diff).
+
+**Files modified:** `packages/builder/src/components/graph/{graphBuild.ts,graphStyle.ts,graphViewportMemory.ts}` (new),
+`GraphEditor.tsx`, `ClusterContainerNode.tsx`, `packages/builder/src/App.tsx`,
+`packages/builder/src/commands/BeatCommands.ts`
+
+### Version control in the author's language
+
+The quiet "Track versions" affordance now opens a plain-language two-choice
+dialog — "On this computer only" (default) vs "Also back up to a server" —
+and saves a First version immediately, so the changed-files badge means
+"changed since your last version" from the first second. Local-only
+projects never see Push/Pull or raw git errors; the Incoming tab explains
+instead. A Version Control → Track Versions… menu item is the second door,
+and the status-bar label pulses once ever for discoverability. Edit → Undo
+and Redo in the app menu now drive the story's command stack (they were
+text-field undo), and the ⌘Z double-fire family is fully dead.
+
+**Files modified:** `packages/builder/src/components/vcs/{GitInitDialog,VCSStatusBar,PendingChangesTab,IncomingChangesTab}.tsx`,
+`packages/builder/src/vcs/{VCSStatusProvider.tsx,GitAdapter.ts}`,
+`apps/builder-desktop/src/main/index.ts`, `apps/builder-desktop/src/preload/index.ts`
+
+### Translation & export — smaller, complete, honest
+
+Multi-language HTML exports deduplicate assets across languages (170 MB →
+~40 MB), include filesystem-located assets from folder-canonical projects
+(the desktop export previously shipped without graphics), and stop
+duplicating translation resources. Translation runs keep completed batches
+when one batch fails instead of discarding everything at 90%. Inventory
+item labels translate — in the Preview Window and the exported player alike —
+and runtime-acquired items use the granting prop's display name. The
+Preview Window applies staged translations without needing an AI provider.
+
+**Files modified:** `packages/builder/src/export/{HtmlExporter,StoryTranslator}.ts`,
+`packages/builder/src/contexts/TranslationContext.tsx`, `packages/builder/src/storage/StorageManager.ts`,
+`packages/player/src/AssetResolver.ts`, `packages/player-web/src/WebPlayer.tsx`,
+`packages/renderer/src/utils/runtimeInventory.ts` (new)
+
+### UX evaluation follow-through
+
+The four-phase UX eval (novice/returning/expert journeys) landed: inspector
+disclosure tiers with a persisted author preference (B2), an explicit
+start-mode choice in the Preview Window plus impact-gated delete confirms,
+debug legibility (rail off by default, labeled toggle, "Start as if…"),
+shortcuts overview on '?', both Empty-state doors leading to the naming
+dialog, live beat validation with edit-time broken-link detection, honest
+search/replace coverage, and the A-series data-loss fixes (untitled
+auto-save restoration among them). Preview state survives edits; windows
+remember their bounds.
+
+**Files modified:** `packages/builder/src/pages/PreviewWindow.tsx`,
+`packages/builder/src/components/inspector/*`, `packages/builder/src/utils/storyLinks.ts`,
+`docs/UX-Eval-1.0.md` (new)
+
+### Engine & content
+
+Typewriter text reveals by letter, word, or line. Bare counter names route
+to their unique owning character (the editor↔setVariable disconnect).
+Legacy text-location aliasing has one home (`legacyTextAlias.ts`) — no more
+duplicate text boxes or phantom pickProp buttons in imported ASML 1.0
+projects.
+
+**Files modified:** `packages/core/src/engine/StoryContext.ts`,
+`packages/renderer/src/utils/legacyTextAlias.ts` (new),
+`packages/renderer/src/renderers/ReactRenderer.tsx`
+
+### Platform notes
+
+- `.asaps` double-click: machines with the old Tauri Player installed may
+  still open the Player until this Builder version is installed (it claims
+  Owner rank; the stale pairing tied at "Default"). One-time local fix:
+  Finder → Open With → ASAPS Builder → Always.
+- macOS fullscreen is ⌃⌘F (system standard); ⌘K is Commit, ⌘F is search —
+  and ⌃⌘F no longer opens search by accident.
+
+---
+
+
 ## 2026-08-20: Where projects live — the storage inversion (v0.9.94)
 
 ### Overview

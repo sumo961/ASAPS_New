@@ -22,8 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.94** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.94 changes where projects live.**
+Current release: **v0.9.95** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.95 is the verification release**:
+dialog trees open up on the flowchart with their choice logic visible on the
+edges, clustered beats behave exactly like free beats (one rendering path),
+multi-language exports shrank from 170 MB to ~40 MB with translated
+inventories, and version control speaks plain language — "Track versions"
+sets up local-only history in one click, saves a First version immediately,
+and never shows a git error to an author who chose to keep history on their
+own machine. The flowchart remembers your zoom per project; cluster maps
+render on cold start; menu Undo finally undoes the story.
+
+**v0.9.94** changed where projects live.
 On desktop, new projects are folders of ordinary files in
 `~/Documents/ASAPS Projects/` — one file per beat, readable, git-able,
 backed up by Time Machine like everything else — created silently on the
