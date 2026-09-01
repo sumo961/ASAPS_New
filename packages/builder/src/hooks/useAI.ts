@@ -31,6 +31,12 @@ export interface SavedAIConfig {
   provider: 'claude' | 'openai';
   apiKey: string;
   model?: string;
+  /** Optional model override for RUNTIME AI (in-story beats: AI Dialog
+   *  Tree, AI Conversation, AI Condition, ai-query onlineContent) in the
+   *  Preview Window and exported players. Unset = same as `model`.
+   *  Authoring jobs (story generation, Ideator, transformations,
+   *  translation) always use `model`. */
+  runtimeModel?: string;
   baseUrl?: string;
   maxTokens?: number;
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -84,6 +90,26 @@ export function clearSavedAIConfig(): void {
  */
 export function getSavedAIConfig(): SavedAIConfig | null {
   return loadSavedConfig();
+}
+
+/** Merge a partial update into the saved config (e.g. runtimeModel, which
+ *  configure()'s positional signature doesn't carry). No-op when nothing
+ *  is saved yet. */
+export function updateSavedAIConfig(partial: Partial<SavedAIConfig>): void {
+  const current = loadSavedConfig();
+  if (!current) return;
+  const merged: SavedAIConfig = { ...current, ...partial };
+  // An explicit undefined clears the field rather than writing 'undefined'.
+  for (const [k, v] of Object.entries(partial)) {
+    if (v === undefined) delete (merged as any)[k];
+  }
+  saveConfig(merged);
+}
+
+/** The model runtime AI beats should use: the runtime override when set,
+ *  else the authoring model. */
+export function getRuntimeAIModel(config: SavedAIConfig | null): string | undefined {
+  return config?.runtimeModel || config?.model;
 }
 
 /**

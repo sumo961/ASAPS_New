@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Key, Sparkles, CheckCircle, AlertCircle, Server, Trash2, Search } from 'lucide-react';
+import { updateSavedAIConfig } from '../../hooks/useAI';
 import { useAI, getSavedAIConfig, clearSavedAIConfig } from '../../hooks/useAI';
 import {
   getSavedBraveApiKey,
@@ -95,6 +96,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
   );
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [runtimeModel, setRuntimeModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
   const [reasoningEffort, setReasoningEffort] = useState<
@@ -123,6 +125,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
         setProvider(savedProviderType as ProviderType);
         setApiKey(savedConfig.apiKey || '');
         setModel(savedConfig.model || '');
+        setRuntimeModel(savedConfig.runtimeModel || '');
         setBaseUrl(savedConfig.baseUrl || '');
         setMaxTokens(savedConfig.maxTokens?.toString() || '');
         setReasoningEffort(savedConfig.reasoningEffort || '');
@@ -154,6 +157,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
     }
     // Clear other fields when switching providers
     setModel('');
+    setRuntimeModel('');
     setReasoningEffort('');
     setApiKey('');
   };
@@ -190,6 +194,10 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
       // Persist (or clear) the Brave Search key alongside the AI config.
       saveBraveApiKey(braveApiKey);
 
+      // configure()'s positional signature predates the runtime override —
+      // merge it into the saved config afterwards (undefined clears it).
+      updateSavedAIConfig({ runtimeModel: runtimeModel.trim() || undefined });
+
       setSuccess(true);
 
       // Persist non-secret settings to project globalSettings for VCS
@@ -198,6 +206,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           provider: actualProvider,
           providerType: provider,
           ...(model ? { model } : {}),
+          ...(runtimeModel.trim() ? { runtimeModel: runtimeModel.trim() } : {}),
           ...(baseUrl ? { baseUrl } : {}),
           ...(maxTokensNum ? { maxTokens: maxTokensNum } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -220,6 +229,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
     clearSavedBraveApiKey();
     setApiKey('');
     setModel('');
+    setRuntimeModel('');
     setBaseUrl('');
     setMaxTokens('');
     setReasoningEffort('');
@@ -389,6 +399,28 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
                 </p>
               </div>
             </details>
+
+            {/* Runtime model override — the measured case (2026-09-01,
+                Environmental Choices dialog trees): the best authoring
+                model is not the best in-story model; players wait live. */}
+            <div className="mt-3">
+              <label htmlFor="runtimeModel" className="block text-sm font-medium text-gray-700 mb-2">
+                Model for in-story AI <span className="text-gray-400">(Optional)</span>
+              </label>
+              <input
+                id="runtimeModel"
+                type="text"
+                value={runtimeModel}
+                onChange={(e) => setRuntimeModel(e.target.value)}
+                placeholder="Same as the model above"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Used while a story plays — AI Dialog Tree, AI Conversation, AI Condition — in the
+                Preview Window and in exported players. Authoring tools keep using the model above.
+                {provider === 'claude' ? ' Measured on dialog trees: claude-opus-4-8 was both fastest and best here.' : ''}
+              </p>
+            </div>
           </div>
 
           {/* Reasoning effort / extended thinking */}

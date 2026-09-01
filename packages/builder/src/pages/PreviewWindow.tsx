@@ -138,7 +138,9 @@ function createAIServiceAdapter(): IAIService | null {
         });
     return createRuntimeAIService({
       family: 'anthropic',
-      model: savedConfig.model,
+      // Runtime override first — the authoring flagship is measurably the
+      // wrong model for a player waiting mid-story (see AI settings).
+      model: savedConfig.runtimeModel || savedConfig.model,
       transport,
       logPrefix: '[PreviewWindow]',
     });
@@ -157,7 +159,7 @@ function createAIServiceAdapter(): IAIService | null {
       });
   return createRuntimeAIService({
     family: 'openai',
-    model: savedConfig.model,
+    model: savedConfig.runtimeModel || savedConfig.model,
     transport,
     logPrefix: '[PreviewWindow]',
   });

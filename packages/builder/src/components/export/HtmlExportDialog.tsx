@@ -117,10 +117,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         setAiProvider(mappedProvider);
         if (globalConfig.apiKey) setAiApiKey(globalConfig.apiKey);
         if (globalConfig.baseUrl) setAiBaseUrl(globalConfig.baseUrl);
-        if (globalConfig.model) setAiModel(globalConfig.model);
+        // Exported players are RUNTIME — prefer the runtime override.
+        const exportModel = globalConfig.runtimeModel || globalConfig.model;
+        if (exportModel) setAiModel(exportModel);
         setUsingGlobalConfig(true);
         // Show advanced options if model or baseUrl were set
-        if (globalConfig.model || globalConfig.baseUrl) {
+        if (globalConfig.runtimeModel || globalConfig.model || globalConfig.baseUrl) {
           setShowAdvanced(true);
         }
       }

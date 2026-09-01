@@ -39,7 +39,7 @@ vi.mock('../../services', () => ({
   OpenAIProvider: class { name = 'openai'; configure = vi.fn(); },
 }));
 
-import { useAI, getSavedAIConfig, clearSavedAIConfig } from '../useAI';
+import { useAI, getSavedAIConfig, clearSavedAIConfig, updateSavedAIConfig, getRuntimeAIModel } from '../useAI';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -154,5 +154,22 @@ describe('cancel + clearError', () => {
     expect(result.current.error).toBeTruthy();
     act(() => result.current.clearError());
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe('runtime model override', () => {
+  it('merges runtimeModel into the saved config and resolves with fallback', () => {
+    localStorage.setItem('asaps_ai_config', JSON.stringify({ provider: 'claude', apiKey: 'k', model: 'claude-opus-5' }));
+    updateSavedAIConfig({ runtimeModel: 'claude-opus-4-8' });
+    const cfg = getSavedAIConfig();
+    expect(cfg?.runtimeModel).toBe('claude-opus-4-8');
+    expect(cfg?.model).toBe('claude-opus-5');
+    expect(getRuntimeAIModel(cfg)).toBe('claude-opus-4-8');
+    // Clearing the override falls back to the authoring model.
+    updateSavedAIConfig({ runtimeModel: undefined });
+    const cleared = getSavedAIConfig();
+    expect(cleared?.runtimeModel).toBeUndefined();
+    expect(getRuntimeAIModel(cleared)).toBe('claude-opus-5');
+    expect(getRuntimeAIModel(null)).toBeUndefined();
   });
 });
