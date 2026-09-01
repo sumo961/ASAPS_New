@@ -319,3 +319,44 @@ describe('transports (fetch wire contracts)', () => {
     expect(init.headers['Authorization']).toBe('Bearer ollama');
   });
 });
+
+describe('direct transports stream by default', () => {
+  it('anthropic direct sends stream:true and reassembles SSE to the plain shape', async () => {
+    const { createDirectAnthropicTransport } = await import('../../src/ai/runtimeAdapter');
+    let sentBody: any = null;
+    const sse = [
+      'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hel"}}\n\n',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"lo"}}\n\n',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}\n\n',
+      'data: {"type":"message_stop"}\n\n',
+    ].join('');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: any, init: any) => {
+      sentBody = JSON.parse(init.body);
+      return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    }) as any;
+    try {
+      const transport = createDirectAnthropicTransport({ apiKey: 'k' });
+      const result = await transport({ model: 'claude-opus-4-8', max_tokens: 100, messages: [] });
+      expect(sentBody.stream).toBe(true);
+      const text = (result.content || []).find((c: any) => c.type === 'text')?.text;
+      expect(text).toBe('hello');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  it('a JSON response (server ignored stream flag) still parses', async () => {
+    const { createDirectOpenAITransport } = await import('../../src/ai/runtimeAdapter');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({ choices: [{ message: { content: 'x' } }] }), { status: 200, headers: { 'content-type': 'application/json' } })) as any;
+    try {
+      const transport = createDirectOpenAITransport({ apiKey: 'k' });
+      const result = await transport({ model: 'm', messages: [] });
+      expect(result.choices[0].message.content).toBe('x');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+});

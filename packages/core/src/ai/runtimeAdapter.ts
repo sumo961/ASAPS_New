@@ -65,6 +65,13 @@ export function createDirectAnthropicTransport(options: {
     : 'https://api.anthropic.com/v1/messages';
 
   return async (body) => {
+    // Stream by default and reassemble to the non-streaming shape (the relay
+    // transport's pattern). Streaming does not make generation faster — it
+    // removes the timeout class where a 1-2 minute dialog-tree generation
+    // holds a silent connection open (browser/webview/gateway limits), and
+    // TTFB proves the request is alive. Opt out per-request with stream:false.
+    const wantStream = (body as any).stream !== false;
+    const sendBody = wantStream ? { ...body, stream: true } : body;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -73,7 +80,7 @@ export function createDirectAnthropicTransport(options: {
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(sendBody),
     });
 
     if (!response.ok) {
@@ -81,6 +88,10 @@ export function createDirectAnthropicTransport(options: {
       throw new Error(`Anthropic API error: ${response.status} - ${error}`);
     }
 
+    const contentType = response.headers?.get?.('content-type') ?? '';
+    if (wantStream && contentType.includes('text/event-stream')) {
+      return reassembleAnthropicStream(response);
+    }
     return response.json();
   };
 }
@@ -98,13 +109,19 @@ export function createDirectOpenAITransport(options: {
     : 'https://api.openai.com/v1/chat/completions';
 
   return async (body) => {
+    // Same stream-by-default + reassemble contract as the Anthropic direct
+    // transport. Local servers (Ollama, llama.cpp) speak SSE for stream:true
+    // too; a server that ignores the flag and returns JSON is handled by the
+    // content-type check below.
+    const wantStream = (body as any).stream !== false;
+    const sendBody = wantStream ? { ...body, stream: true } : body;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${options.apiKey || ''}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(sendBody),
     });
 
     if (!response.ok) {
@@ -112,6 +129,10 @@ export function createDirectOpenAITransport(options: {
       throw new Error(`OpenAI API error: ${response.status} - ${error}`);
     }
 
+    const contentType = response.headers?.get?.('content-type') ?? '';
+    if (wantStream && contentType.includes('text/event-stream')) {
+      return reassembleOpenAIStream(response);
+    }
     return response.json();
   };
 }

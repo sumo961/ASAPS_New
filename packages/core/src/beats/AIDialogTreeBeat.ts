@@ -45,6 +45,11 @@ export interface AIDialogTreeBeatParams {
 
   /** Maximum conversation turns */
   maxTurns?: number;
+  /** Cap on player choices per node AFTER the opening turn (1-4). Tree size
+   *  — and generation time — grow exponentially with branching: at 5 turns,
+   *  3 choices/turn ≈ 40+ nodes (~2 min to generate), 2 choices/turn halves
+   *  that. Unset = the model's judgment (2-3). */
+  maxChoicesPerTurn?: number;
 
   /** Authoritative layout template (matches DialogTreeBeat). */
   layoutTemplate?: DialogTreeLayoutTemplate;
@@ -90,6 +95,7 @@ export class AIDialogTreeBeat extends Beat {
   public includeVisitedBeats: boolean;
   public includeChoiceHistory: boolean;
   public maxTurns: number;
+  public maxChoicesPerTurn?: number;
   /** Authoritative layout field, matching DialogTreeBeat (v0.9.62). The legacy
    *  presentationMode is migrated forward in the constructor / updateParameters
    *  and surfaced in getParameters for one release for round-trip compat. */
@@ -127,6 +133,7 @@ export class AIDialogTreeBeat extends Beat {
     this.includeVisitedBeats = params.includeVisitedBeats ?? config.includeVisitedBeats ?? true;
     this.includeChoiceHistory = params.includeChoiceHistory ?? config.includeChoiceHistory ?? true;
     this.maxTurns = params.maxTurns || config.maxTurns || 3;
+    this.maxChoicesPerTurn = params.maxChoicesPerTurn ?? (config as any).maxChoicesPerTurn;
     // v0.9.62-style layout unification (was missing on aiDialogTree — the VE
     // dropdown read a non-existent layoutTemplate and always showed 'stacked'
     // while the beat rendered from the legacy presentationMode, so a chat-mode
@@ -160,6 +167,7 @@ export class AIDialogTreeBeat extends Beat {
       includeVisitedBeats: this.includeVisitedBeats,
       includeChoiceHistory: this.includeChoiceHistory,
       maxTurns: this.maxTurns,
+      maxChoicesPerTurn: this.maxChoicesPerTurn,
       layoutTemplate: this.layoutTemplate,
       presentationMode: this.presentationMode,
       showAvatars: this.showAvatars,
@@ -178,6 +186,7 @@ export class AIDialogTreeBeat extends Beat {
     if (params.includeVisitedBeats !== undefined) this.includeVisitedBeats = params.includeVisitedBeats;
     if (params.includeChoiceHistory !== undefined) this.includeChoiceHistory = params.includeChoiceHistory;
     if (params.maxTurns !== undefined) this.maxTurns = params.maxTurns;
+    if (params.maxChoicesPerTurn !== undefined) this.maxChoicesPerTurn = params.maxChoicesPerTurn;
     // layoutTemplate is authoritative; a stale presentationMode-only write
     // (legacy readers) still migrates forward. layoutTemplate wins if both set.
     if (params.layoutTemplate !== undefined) {
@@ -487,7 +496,7 @@ ${this.systemInstructions ? `ADDITIONAL INSTRUCTIONS: ${this.systemInstructions}
 REQUIREMENTS:
 1. Build a genuinely MULTI-LEVEL branching tree that runs the FULL ${this.maxTurns} conversation turns deep. Turn 1 is the root node; EACH of its choices must lead into a nested "dialogNode" (the NPC's turn-2 reply); EACH turn-2 choice must lead into a further nested "dialogNode" (turn 3); continue nesting until turn ${this.maxTurns}. A flat, single-level tree is WRONG.
 2. The NPC should respond based on the player's known state (name, choices, inventory)
-3. EVERY dialog node MUST offer 2-3 player choices that are genuinely different in attitude or content. A node with a single choice is WRONG — one option is not a choice. Do NOT sacrifice branching to reach the required depth: use 2 choices per node (3 at the root if it helps) and keep each NPC text to 2-4 sentences, so the full-depth tree with branching fits the response. A 2-per-node tree ${this.maxTurns} turns deep is the expected size
+3. EVERY dialog node MUST offer 2-3 player choices that are genuinely different in attitude or content. A node with a single choice is WRONG — one option is not a choice. Do NOT sacrifice branching to reach the required depth: use 2 choices per node (3 at the root if it helps) and keep each NPC text to 2-4 sentences, so the full-depth tree with branching fits the response. A 2-per-node tree ${this.maxTurns} turns deep is the expected size${this.maxChoicesPerTurn ? `\n3b. BRANCHING CAP: after the opening turn, offer AT MOST ${this.maxChoicesPerTurn} choice${this.maxChoicesPerTurn === 1 ? '' : 's'} per node. The root may offer up to ${Math.max(this.maxChoicesPerTurn, 2)}. This cap is deliberate — the author traded breadth for pace — so meeting it is part of a correct answer.` : ''}
 4. A choice either CONTINUES the conversation with a nested "dialogNode", or EXITS with a "target". Use "target" ONLY when a specific exit condition is genuinely satisfied by that choice. For a turn-limit exit (e.g. "after ${this.maxTurns} turns"), ONLY the choices at the DEEPEST turn (turn ${this.maxTurns}) may use "target" — every earlier-turn choice MUST use "dialogNode". NEVER put a "target" on a turn-1 or turn-2 choice for a turn-limit exit; that collapses the whole tree to a single level.
 5. PERSONALIZATION IS CRITICAL: Use the player's actual name, location, profession, and other details from the PLAYER CONTEXT above. Write them directly into the NPC's dialog text (e.g., "Welcome to Stockholm, Mirjam!" not "Welcome to your city!"). Never use placeholder syntax like {playerName}. If you don't know a value, omit it gracefully
 6. Make the conversation feel natural and engaging

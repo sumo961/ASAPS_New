@@ -84,6 +84,31 @@ function createMockStory() {
 }
 
 describe('AIDialogTreeBeat', () => {
+  describe('maxChoicesPerTurn (branching cap)', () => {
+    it('weaves the cap into the generation prompt; absent by default', async () => {
+      const prompts: string[] = [];
+      const generateDialog = vi.fn().mockImplementation(async (request: any) => {
+        if (request.format === 'text') return '';
+        prompts.push(request.prompt);
+        return JSON.stringify({ routingPlan: 'p', speaker: 'N', text: 'hi', choices: [{ id: 'c1', text: 'bye', target: 'exit_beat' }] });
+      });
+      const context = new StoryContext();
+      context.setStory(createMockStory() as any);
+      const mock = createMockRenderer();
+      mock.setAIService({ generateDialog });
+      mock.queueChoices(['c1', 'c1']);
+
+      const capped = new AIDialogTreeBeat({ id: 'a', type: 'aiDialogTree', parameters: { maxChoicesPerTurn: 2 } as any });
+      await (capped as any).performAction(context, mock.renderer);
+      expect(prompts[0]).toContain('AT MOST 2 choices per node');
+      expect(capped.getParameters().maxChoicesPerTurn).toBe(2);
+
+      const uncapped = new AIDialogTreeBeat({ id: 'b', type: 'aiDialogTree' });
+      await (uncapped as any).performAction(context, mock.renderer);
+      expect(prompts[1]).not.toContain('BRANCHING CAP');
+    });
+  });
+
   describe('prefetch/execute in-flight join (the double-generation race)', () => {
     it('a prefetch still in flight is JOINED by execute — one generation, not two', async () => {
       // Slow generation: resolves only when we release it.

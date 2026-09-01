@@ -4477,6 +4477,17 @@
           "default": 3,
           "description": "Maximum conversation turns"
         },
+        "maxChoicesPerTurn": {
+          "type": "number",
+          "required": false,
+          "min": 1,
+          "max": 4,
+          "description": "Cap on player choices per dialog node AFTER the opening turn (the opening turn may offer one more). Tree size — and generation TIME the player waits — grow exponentially with branching: at 5 turns, 3 choices per turn is a 40+ node tree (about 2 minutes to generate on any model), while 2 halves it and 5-turn depth with cap 2 is the sweet spot for a personal conversation. Unset = the model chooses (2-3). Generating stories SHOULD set this (2 is a good default) on any aiDialogTree with maxTurns 4+.",
+          "ui": {
+            "label": "Max choices per turn",
+            "help": "Fewer choices per turn = a much faster conversation start. Applies after the opening turn."
+          }
+        },
         "layoutTemplate": {
           "type": "string",
           "required": false,
