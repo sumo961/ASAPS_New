@@ -383,6 +383,16 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         messages: args.messages,
       };
       if (args.systemPrompt) body.system = args.systemPrompt;
+      // Claude 5-family models run ADAPTIVE THINKING when the request omits
+      // `thinking` — measured on the Environmental Choices dialog tree:
+      // 10,425 thinking tokens, max_tokens exhausted, tree truncated, 149s.
+      // Runtime beats are latency-sensitive JSON producers; pin thinking
+      // off where the model supports it (Fable always thinks and rejects
+      // 'disabled', so it is deliberately NOT matched; pre-5 models treat
+      // an omitted param as off already and need nothing).
+      if (/claude-(sonnet-5|opus-5)/.test(String(model))) {
+        body.thinking = { type: 'disabled' };
+      }
       const response = await transport(body);
       logElapsed();
       return stripThinkingBlocks(anthropicText(response));

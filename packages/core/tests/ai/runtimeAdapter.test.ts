@@ -39,6 +39,22 @@ const anthropicReply = (text: string, withThinking = false) => ({
 });
 
 describe('generateContent', () => {
+  it('pins thinking OFF for Claude 5 models (adaptive-by-default trap) and leaves others alone', async () => {
+    const bodies: any[] = [];
+    const transport = async (body: any) => {
+      bodies.push(body);
+      return { content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' };
+    };
+    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5']) {
+      const svc = createRuntimeAIService({ family: 'anthropic', model, transport });
+      await svc.generateContent('hi');
+    }
+    expect(bodies[0].thinking).toEqual({ type: 'disabled' }); // opus-5
+    expect(bodies[1].thinking).toEqual({ type: 'disabled' }); // sonnet-5
+    expect(bodies[2].thinking).toBeUndefined(); // opus-4-8: omitted = off already
+    expect(bodies[3].thinking).toBeUndefined(); // haiku-4-5
+  });
+
   it('openai family: reasoning default model uses max_completion_tokens, no system message', async () => {
     const { transport, calls } = stub(openaiReply('hello'));
     const svc = createRuntimeAIService({ family: 'openai', transport });
