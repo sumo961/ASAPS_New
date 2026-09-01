@@ -115,7 +115,16 @@ export function calculateSmartTextBoxDimensions(
   stageWidth: number,
   stageHeight: number,
   /** Extra horizontal space consumed by inline content (e.g., speaker portrait) */
-  inlineContentWidth: number = 0
+  inlineContentWidth: number = 0,
+  /**
+   * Lowest bottom edge (stage px) of any text box ABOVE this one. Upward
+   * growth stops here instead of at the stage top — without it, long
+   * runtime content (onlineContent ai-query) grew UP through the title,
+   * and the scroll verdict never fired because the inflated height budget
+   * still "fit". The collision pass computes this per element
+   * (location.smartUpperBoundY); absent ⇒ the stage-top margin as before.
+   */
+  upperBoundY?: number
 ): { width: number; height: number; needsScroll: boolean; xOffset: number; yOffset: number } {
   // Estimate text dimensions.
   // 0.58 is the average char-width ratio that fits both proportional fonts
@@ -190,7 +199,8 @@ export function calculateSmartTextBoxDimensions(
   const bottomMargin = stageHeight * 0.02;
   const maxDownwardHeight = stageHeight - location.y - buttonSpace - bottomMargin;
   const topMargin = stageHeight * 0.02;
-  const maxTopGrowth = Math.max(0, location.y - topMargin);
+  const upwardFloor = Math.max(topMargin, upperBoundY ?? topMargin);
+  const maxTopGrowth = Math.max(0, location.y - upwardFloor);
   const maxHeight = Math.max(0, maxDownwardHeight) + maxTopGrowth;
 
   console.log(`[SmartTextBox] Max growth: rightGrowth=${maxRightGrowth.toFixed(1)}, leftGrowth=${maxLeftGrowth.toFixed(1)}, maxWidth=${maxWidth.toFixed(1)}, maxDownwardHeight=${maxDownwardHeight.toFixed(1)}, maxTopGrowth=${maxTopGrowth.toFixed(1)}, maxHeight=${maxHeight.toFixed(1)}`);
@@ -771,9 +781,15 @@ export function adjustElementsForCollisions(
   const TEXT_STACK_GAP = 12;
   const textBoxBounds: { bottom: number; left: number; right: number; name: string }[] = [];
   const shiftedYByElement = new Map<PositionedElementData, number>();
+  // Per-element upward-growth floor for the render-time smart sizer: the
+  // bottom of the nearest text box above (+gap). Attached to the adjusted
+  // location as smartUpperBoundY so TextElement/DialogElement clamp their
+  // upward growth the same way this estimate pass does.
+  const upperBoundByElement = new Map<PositionedElementData, number | undefined>();
   let prevTextBottom = -Infinity;
 
   for (const el of [...textElements].sort((a, b) => a.location.y - b.location.y)) {
+    upperBoundByElement.set(el, prevTextBottom > -Infinity ? prevTextBottom + TEXT_STACK_GAP : undefined);
     const width = el.location.width;
     const originalHeight = el.location.height || 50;
 
@@ -803,7 +819,9 @@ export function adjustElementsForCollisions(
         padding,
         effectiveButtonHeight,
         stageWidth,
-        stageHeight
+        stageHeight,
+        0,
+        prevTextBottom > -Infinity ? prevTextBottom + TEXT_STACK_GAP : undefined
       );
 
       // Use the smart-sized dimensions and apply offsets for collision detection
@@ -858,11 +876,14 @@ export function adjustElementsForCollisions(
   }
 
   // Preserve the original element order (z-order falls back to array index)
-  const adjustedTextElements = textElements.map(el =>
-    shiftedYByElement.has(el)
-      ? { ...el, location: { ...el.location, y: shiftedYByElement.get(el)! } }
-      : el
-  );
+  const adjustedTextElements = textElements.map(el => ({
+    ...el,
+    location: {
+      ...el.location,
+      ...(shiftedYByElement.has(el) ? { y: shiftedYByElement.get(el)! } : {}),
+      smartUpperBoundY: upperBoundByElement.get(el),
+    } as Location,
+  }));
 
   if (buttonElements.length === 0) {
     return [...otherElements, ...adjustedTextElements];
@@ -2061,7 +2082,9 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           padding,
           effectiveButtonHeight,
           stageWidth,
-          stageHeight
+          stageHeight,
+          0,
+          (el.location as any).smartUpperBoundY
         );
         return {
           name: el.location.name,
@@ -3362,7 +3385,8 @@ const TextElement: React.FC<{
       effectiveButtonHeight,
       stageWidth,
       stageHeight,
-      portraitInlineWidth
+      portraitInlineWidth,
+      (location as any).smartUpperBoundY
     );
 
     console.log(`[TextElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
@@ -4285,7 +4309,8 @@ const DialogElement: React.FC<{
       effectiveButtonHeight,
       stageWidth,
       stageHeight,
-      dialogPortraitInlineWidth
+      dialogPortraitInlineWidth,
+      (location as any).smartUpperBoundY
     );
 
     console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);

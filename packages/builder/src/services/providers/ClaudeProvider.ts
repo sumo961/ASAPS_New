@@ -283,6 +283,33 @@ export class ClaudeProvider extends BaseAIProvider {
   /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
+  /**
+   * One call path for the single-shot Anthropic requests. Proxy requests
+   * thread the abort signal; DIRECT requests STREAM (messages.stream) — a
+   * buffered messages.create() holds the connection until the whole
+   * response exists and the SDK's fixed timeout aborts long thinking runs
+   * (the generateStory lesson, now applied to dialog / suggestions /
+   * NL-beat / conversation too). Returns the { content, stop_reason }
+   * shape extractTextBlock consumers expect. The generateChatWithTools
+   * loop stays on its own buffered path: tool_use deltas are not handled
+   * by the SSE reassembly.
+   */
+  private async callAnthropic(
+    requestBody: any,
+    signal?: AbortSignal,
+    onProgress?: (chars: number) => void,
+  ): Promise<any> {
+    if (this.useProxy) {
+      return this.makeProxyRequest(requestBody, signal);
+    }
+    const stream = this.client!.messages.stream(requestBody as any, { signal });
+    if (onProgress) {
+      stream.on('text', (_delta: string, snapshot: string) => onProgress(snapshot.length));
+    }
+    const apiResponse = await stream.finalMessage();
+    return { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
+  }
+
   private async makeProxyRequest(requestBody: any, signal?: AbortSignal): Promise<any> {
     const response = await fetch(this.proxyEndpoint, {
       method: 'POST',
@@ -494,12 +521,7 @@ export class ClaudeProvider extends BaseAIProvider {
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
-      }
+      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const contentText = this.extractTextBlock(response, maxTokens);
 
@@ -545,12 +567,7 @@ export class ClaudeProvider extends BaseAIProvider {
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
-      }
+      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
@@ -613,12 +630,7 @@ Respond with JSON in this format:
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        const apiResponse = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
-      }
+      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
@@ -658,12 +670,7 @@ Respond with JSON in this format:
     };
 
     let response;
-    if (this.useProxy) {
-      response = await this.makeProxyRequest(requestBody);
-    } else {
-      const apiResponse = await this.client!.messages.create(requestBody as any);
-      response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
-    }
+    response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
     return { text: this.extractTextBlock(response, requestBody.max_tokens).trim() };
   }

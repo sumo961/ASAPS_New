@@ -104,6 +104,27 @@ export class OpenAIProvider extends BaseAIProvider {
   /**
    * Make request via proxy for custom baseUrls (to avoid CORS)
    */
+  /**
+   * One call path for the single-shot OpenAI-shaped requests. Proxy
+   * requests STREAM (stream:true + SSE reassembly in makeProxyRequest) —
+   * the buffered form idles the connection through long reasoning pauses
+   * and gets killed by intermediaries (the generateStory lesson, now
+   * applied to dialog / suggestions / NL-beat / conversation too).
+   * Direct calls (local servers — Ollama etc.) stay non-streaming: no
+   * intermediary, no timeout problem. The generateChatWithTools loop
+   * stays on its own buffered path (tool-call deltas not reassembled).
+   */
+  private async callOpenAI(
+    requestBody: any,
+    signal?: AbortSignal,
+    onProgress?: (chars: number) => void,
+  ): Promise<any> {
+    if (this.useProxy) {
+      return this.makeProxyRequest({ ...requestBody, stream: true }, signal, onProgress);
+    }
+    return this.client!.chat.completions.create(requestBody, { signal });
+  }
+
   private async makeProxyRequest(
     requestBody: any,
     signal?: AbortSignal,
@@ -760,11 +781,7 @@ export class OpenAIProvider extends BaseAIProvider {
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        response = await this.client!.chat.completions.create(requestBody);
-      }
+      response = await this.callOpenAI(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -813,11 +830,7 @@ export class OpenAIProvider extends BaseAIProvider {
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        response = await this.client!.chat.completions.create(requestBody);
-      }
+      response = await this.callOpenAI(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -885,11 +898,7 @@ Respond with JSON in this format:
 
       let response;
 
-      if (this.useProxy) {
-        response = await this.makeProxyRequest(requestBody);
-      } else {
-        response = await this.client!.chat.completions.create(requestBody);
-      }
+      response = await this.callOpenAI(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
@@ -927,11 +936,7 @@ Respond with JSON in this format:
     const requestBody = this.buildChatRequest(messages as any, request.maxTokens ?? 1000, 0.8, false);
 
     let response;
-    if (this.useProxy) {
-      response = await this.makeProxyRequest(requestBody);
-    } else {
-      response = await this.client!.chat.completions.create(requestBody);
-    }
+    response = await this.callOpenAI(requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
     const choice = response.choices?.[0];
     const message = choice?.message;

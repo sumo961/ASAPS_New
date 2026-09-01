@@ -189,6 +189,10 @@ export interface GeneratedBeat {
  * Dialog generation request
  */
 export interface DialogGenerationRequest {
+  /** Abort the generation (wired to a cancel control where one exists). */
+  signal?: AbortSignal;
+  /** Progress callback: cumulative characters received (streaming). */
+  onProgress?: (chars: number) => void;
   /** Character speaking */
   character?: string;
 
@@ -254,6 +258,10 @@ export interface DialogNode {
  * Beat suggestion request
  */
 export interface BeatSuggestionRequest {
+  /** Abort the generation (wired to a cancel control where one exists). */
+  signal?: AbortSignal;
+  /** Progress callback: cumulative characters received (streaming). */
+  onProgress?: (chars: number) => void;
   /** Current beat context */
   currentBeat: BeatConfig;
 
@@ -308,6 +316,10 @@ export interface BeatSuggestion {
  * Natural language beat creation request
  */
 export interface NaturalLanguageBeatRequest {
+  /** Abort the generation (wired to a cancel control where one exists). */
+  signal?: AbortSignal;
+  /** Progress callback: cumulative characters received (streaming). */
+  onProgress?: (chars: number) => void;
   /** Natural language description */
   description: string;
 
