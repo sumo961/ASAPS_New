@@ -369,6 +369,13 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
     messages: Array<{ role: string; content: unknown }>;
     maxTokens: number;
   }): Promise<string> {
+    // Elapsed-time visibility for every runtime AI round-trip — field
+    // debugging of "it took forever" needs numbers, not vibes.
+    const startedAt = Date.now();
+    const logElapsed = () => {
+      const secs = (Date.now() - startedAt) / 1000;
+      console.log(`${logPrefix} AI round-trip: ${secs >= 90 ? (secs / 60).toFixed(1) + 'min' : secs.toFixed(1) + 's'} (${family}/${model})`);
+    };
     if (family === 'anthropic') {
       const body: Record<string, unknown> = {
         model,
@@ -377,6 +384,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       };
       if (args.systemPrompt) body.system = args.systemPrompt;
       const response = await transport(body);
+      logElapsed();
       return stripThinkingBlocks(anthropicText(response));
     }
 
@@ -391,6 +399,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       effectiveMaxTokens(model, args.maxTokens)
     );
     const response = await transport(body);
+    logElapsed();
     return stripThinkingBlocks(openaiText(response));
   }
 

@@ -84,6 +84,50 @@ function createMockStory() {
 }
 
 describe('AIDialogTreeBeat', () => {
+  describe('prefetch/execute in-flight join (the double-generation race)', () => {
+    it('a prefetch still in flight is JOINED by execute — one generation, not two', async () => {
+      // Slow generation: resolves only when we release it.
+      let release!: (v: string) => void;
+      const gate = new Promise<string>(r => { release = r; });
+      const tree = {
+        speaker: 'NPC', text: 'Hello', choices: [
+          { id: 'c1', text: 'Bye', target: 'exit_beat' },
+        ],
+      };
+      const generateDialog = vi.fn().mockImplementation(async (request: any) => {
+        if (request.format === 'text') return '';
+        await gate;
+        return JSON.stringify({ routingPlan: 'plan', ...tree });
+      });
+
+      const context = new StoryContext();
+      context.setStory(createMockStory() as any);
+      const mock = createMockRenderer();
+      mock.setAIService({ generateDialog });
+      mock.queueChoice('c1');
+
+      const beat = new AIDialogTreeBeat({ id: 'race', type: 'aiDialogTree' });
+
+      // Start prefetch; give it a tick to reach the transport await.
+      const prefetchP = beat.prefetch(context, mock.renderer);
+      await new Promise(r => setTimeout(r, 10));
+
+      // Player arrives while prefetch is in flight.
+      const execP = (beat as any).performAction(context, mock.renderer);
+      await new Promise(r => setTimeout(r, 10));
+
+      // Still exactly ONE tree generation started (exit-message 'text'
+      // requests are a different format and don't count).
+      const treeCalls = () => generateDialog.mock.calls.filter(c => c[0]?.format !== 'text').length;
+      expect(treeCalls()).toBe(1);
+
+      release('unused');
+      await prefetchP;
+      await execP;
+      expect(treeCalls()).toBe(1);
+    });
+  });
+
   let context: StoryContext;
   let mockRenderer: ReturnType<typeof createMockRenderer>;
 

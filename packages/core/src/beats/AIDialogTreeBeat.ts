@@ -104,6 +104,13 @@ export class AIDialogTreeBeat extends Beat {
   private generatedTree: DialogNode | null = null;
   private currentNode: DialogNode | null = null;
   private lastContextHash: string | null = null; // Track context to detect changes
+  // In-flight generation, keyed by context hash. Prefetch and execute JOIN
+  // this instead of racing: without it, arriving at the beat mid-prefetch
+  // started a SECOND full generation in parallel (two routing plans in the
+  // field log, 25- and 45-node trees) — double cost, and the player waited
+  // for the slower one.
+  private inflightTree: Promise<DialogNode> | null = null;
+  private inflightHash: string | null = null;
   private lastRoutingPlan: string | null = null; // AI's exit routing reasoning
 
   constructor(config: BeatConfig & {
@@ -228,23 +235,56 @@ export class AIDialogTreeBeat extends Beat {
     try {
       const aiService = renderer.getState('aiService');
       if (!aiService || typeof aiService.generateDialog !== 'function') return;
-
-      const contextHash = this.createContextHash(context);
-      if (this.generatedTree && this.lastContextHash === contextHash) return; // already cached
-
       console.log(`[AIDialogTreeBeat ${this.id}] Prefetching dialog tree...`);
-      try {
-        this.generatedTree = await this.generateDialogTree(context, aiService);
-      } catch (firstErr) {
-        // JSON parse errors are common with complex dialog trees — retry once
-        console.log(`[AIDialogTreeBeat ${this.id}] Prefetch attempt 1 failed (${(firstErr as Error).message}), retrying...`);
-        this.generatedTree = await this.generateDialogTree(context, aiService);
-      }
-      this.lastContextHash = contextHash;
+      await this.ensureTree(context, aiService);
       console.log(`[AIDialogTreeBeat ${this.id}] Prefetch complete`);
     } catch (err) {
       // Prefetch failure is non-fatal - will retry on execute
       console.log(`[AIDialogTreeBeat ${this.id}] Prefetch failed (will retry on execute):`, err);
+    }
+  }
+
+  /**
+   * The ONE path to a generated tree. Returns the cached tree when the
+   * context hash matches; JOINS an in-flight generation for the same hash
+   * (the prefetch/execute race); otherwise starts a generation with one
+   * parse-failure retry and timing logs.
+   */
+  private async ensureTree(context: StoryContext, aiService: any): Promise<DialogNode> {
+    const contextHash = this.createContextHash(context);
+    if (this.generatedTree && this.lastContextHash === contextHash) return this.generatedTree;
+
+    if (this.inflightTree && this.inflightHash === contextHash) {
+      console.log(`[AIDialogTreeBeat ${this.id}] Joining in-flight generation...`);
+      return this.inflightTree;
+    }
+
+    const startedAt = Date.now();
+    const run = (async () => {
+      let tree: DialogNode;
+      try {
+        tree = await this.generateDialogTree(context, aiService);
+      } catch (firstErr) {
+        // JSON parse errors are common with complex dialog trees — retry once
+        console.log(`[AIDialogTreeBeat ${this.id}] Generation attempt 1 failed after ${((Date.now() - startedAt) / 1000).toFixed(1)}s (${(firstErr as Error).message}), retrying...`);
+        tree = await this.generateDialogTree(context, aiService);
+      }
+      this.generatedTree = tree;
+      this.lastContextHash = contextHash;
+      const secs = (Date.now() - startedAt) / 1000;
+      console.log(`[AIDialogTreeBeat ${this.id}] Dialog tree generated in ${secs >= 90 ? (secs / 60).toFixed(1) + 'min' : secs.toFixed(1) + 's'}`);
+      return tree;
+    })();
+
+    this.inflightTree = run;
+    this.inflightHash = contextHash;
+    try {
+      return await run;
+    } finally {
+      if (this.inflightTree === run) {
+        this.inflightTree = null;
+        this.inflightHash = null;
+      }
     }
   }
 
@@ -304,8 +344,9 @@ export class AIDialogTreeBeat extends Beat {
 
       // Generate dialog tree if not already generated OR if context has changed
       if (needsRegeneration) {
-        // Clear any existing tree from previous playthrough
-        this.generatedTree = null;
+        // Reset traversal; ensureTree replaces the tree itself (nulling it
+        // here would be fine, but the in-flight join relies on cache state
+        // only via the context hash).
         this.currentNode = null;
 
         // Show loading indicator while generating dialog tree
@@ -324,14 +365,9 @@ export class AIDialogTreeBeat extends Beat {
           });
         }
 
-        try {
-          this.generatedTree = await this.generateDialogTree(context, aiService);
-        } catch (firstErr) {
-          // JSON parse errors are common — retry once
-          console.log(`[AIDialogTreeBeat ${this.id}] Generation attempt 1 failed (${(firstErr as Error).message}), retrying...`);
-          this.generatedTree = await this.generateDialogTree(context, aiService);
-        }
-        this.lastContextHash = contextHash;
+        // ensureTree joins an in-flight prefetch for the same context
+        // instead of starting a duplicate generation.
+        this.generatedTree = await this.ensureTree(context, aiService);
       }
 
       // Always log routing plan and tree (even when prefetched)
