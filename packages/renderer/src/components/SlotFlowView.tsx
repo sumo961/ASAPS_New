@@ -731,14 +731,20 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const root = rootRef.current;
     if (!root) return;
 
-    // Single inner scroller owns scroll in BOTH phases — phase 1
-    // (no action row) has the card at full stage height; phase 2 (action
-    // row visible) has the card at constrained height, but it's still
-    // the same scroll surface, so scrollTop carries naturally across.
-    const scrollEl: HTMLElement = (root.querySelector('.slotflow-scroll') as HTMLElement) || root;
+    // Single inner scroller owns scroll in BOTH phases. Resolved on
+    // EVERY check — binding it once let a React re-render that replaced
+    // the scroller (or its children) strand the observers on detached
+    // nodes: the box the ResizeObserver watched no longer existed, the
+    // scroller's own box never changed size, and the gate became
+    // permanently unearnable — a responsive multiChoice/dialogTree stood
+    // at its body text with the choices row null forever (the bake-off
+    // field case: choices existed, gate never fired).
+    const getScrollEl = (): HTMLElement =>
+      (root.querySelector('.slotflow-scroll') as HTMLElement) || root;
 
     const check = () => {
       if (gateEarned) return;
+      const scrollEl = getScrollEl();
       const sh = scrollEl.scrollHeight;
       const ch = scrollEl.clientHeight;
       const st = scrollEl.scrollTop;
@@ -763,22 +769,41 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       }
     };
 
-    const raf = requestAnimationFrame(check);
     const ro = new ResizeObserver(check);
-    ro.observe(scrollEl);
-    // Observe each non-style/script child so the check re-runs when the
-    // body grows (typewriter reveal, font load, theme swap). Observing
-    // only firstElementChild misses content when a <style> tag sits at
-    // index 0 (a common scope-class setup in this view).
-    for (const c of Array.from(scrollEl.children) as HTMLElement[]) {
-      if (c.tagName !== 'STYLE' && c.tagName !== 'SCRIPT') ro.observe(c);
-    }
+    const observed = new Set<Element>();
+    const observeCurrent = () => {
+      const scrollEl = getScrollEl();
+      for (const el of [scrollEl, ...Array.from(scrollEl.children)]) {
+        if (el.tagName === 'STYLE' || el.tagName === 'SCRIPT') continue;
+        if (!observed.has(el)) {
+          observed.add(el);
+          ro.observe(el);
+        }
+      }
+    };
+
+    const raf = requestAnimationFrame(() => {
+      observeCurrent();
+      check();
+    });
+    // Node replacement (content swap, translation arriving, theme
+    // remount) detaches previously-observed elements — re-observe the
+    // live tree and re-check on every structural change.
+    const mo = new MutationObserver(() => {
+      observeCurrent();
+      check();
+    });
+    mo.observe(root, { childList: true, subtree: true });
+    // Capture-phase listener on the stage root hears scrolls from
+    // whichever descendant currently owns them, including a scroller
+    // mounted after this effect ran.
     const onScroll = () => check();
-    scrollEl.addEventListener('scroll', onScroll, { passive: true });
+    root.addEventListener('scroll', onScroll, { passive: true, capture: true });
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      scrollEl.removeEventListener('scroll', onScroll);
+      mo.disconnect();
+      root.removeEventListener('scroll', onScroll, { capture: true } as any);
     };
   }, [gateEarned, isMultiAction]);
 

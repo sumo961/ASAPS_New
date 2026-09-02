@@ -6,6 +6,7 @@ import type { DialogTreeParameters, DialogNode, DialogChoice } from '../generate
 import { computeDialogTreeLayout, type DialogTreeLayoutTheme } from '../layout';
 import { migrateDialogTreeEffects } from '../migration/effectsMigration';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
+import { uiString } from '../i18n/uiStrings';
 
 /**
  * Phase layout override - stores position adjustments for elements that
@@ -610,9 +611,25 @@ export class DialogTreeBeat extends Beat {
 
       // Check for NPC exit node: has target set (choices are unreachable when target is set)
       if (this.currentNode.target) {
-        // NPC exit — auto-advance after TTS/reading delay
-        await waitForTTS(renderer);
-        await waitForReadingTime(renderer, processedText);
+        // NPC exit — the farewell line auto-advances after TTS + reading
+        // time, but never as a frozen screen: a Continue button renders
+        // immediately and whichever fires first wins. The old invisible
+        // wait read as a hang (~13s for a 45-word farewell at 200 WPM,
+        // compounding across consecutive NPC-exit hops in generated
+        // trees). The un-clicked renderChoices promise is abandoned on
+        // timer win; the next render replaces the button and the
+        // renderer's resolveAction slot.
+        const advanceTimer = (async () => {
+          await waitForTTS(renderer);
+          await waitForReadingTime(renderer, processedText);
+          return '__timer__';
+        })();
+        // A renderer that rejects or throws on this auxiliary button must
+          // not break the exit — degrade to the pure timer.
+          const continueClick: Promise<string> = Promise.resolve()
+            .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit`, text: uiString('continue'), isExit: true }], locations))
+            .catch(() => new Promise<string>(() => { /* never */ }));
+        await Promise.race([advanceTimer, continueClick]);
 
         if (this.currentNode.target === '__self__') {
           this.currentNode = this.dialogTree;
@@ -636,8 +653,18 @@ export class DialogTreeBeat extends Beat {
         if (visibleChoices.length === 0) {
           // No visible choices — fall back to node-level target if available
           if (this.currentNode.target) {
-            await waitForTTS(renderer);
-            await waitForReadingTime(renderer, processedText);
+            // Same skippable-wait contract as the NPC-exit branch above.
+            const advanceTimer2 = (async () => {
+              await waitForTTS(renderer);
+              await waitForReadingTime(renderer, processedText);
+              return '__timer__';
+            })();
+            // A renderer that rejects or throws on this auxiliary button must
+              // not break the exit — degrade to the pure timer.
+              const continueClick2: Promise<string> = Promise.resolve()
+                .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit_f`, text: uiString('continue'), isExit: true }], locations))
+                .catch(() => new Promise<string>(() => { /* never */ }));
+            await Promise.race([advanceTimer2, continueClick2]);
             if (this.currentNode.target === '__self__') {
               this.currentNode = this.dialogTree;
               nodePath = 'root';

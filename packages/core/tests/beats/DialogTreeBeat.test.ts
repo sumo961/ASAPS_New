@@ -415,7 +415,11 @@ describe('DialogTreeBeat', () => {
       // Should render dialog once, no choices
       expect(mockRenderer.getDialogCalls().length).toBe(1);
       expect(mockRenderer.getDialogCalls()[0].text).toBe('Go away! I do not want to talk to you.');
-      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      // NPC exit now renders a single skippable Continue racing the
+      // auto-advance timer (frozen farewell screens read as hangs).
+      expect(mockRenderer.getChoicesCalls().length).toBe(1);
+      expect(mockRenderer.getChoicesCalls()[0].choices).toHaveLength(1);
+      expect(mockRenderer.getChoicesCalls()[0].choices[0].text).toBe('Continue');
       expect(result).toBe('beat_kicked_out');
     });
 
@@ -457,7 +461,7 @@ describe('DialogTreeBeat', () => {
       // Should render root dialog + choices, then NPC exit dialog (no choices for exit node)
       expect(mockRenderer.getDialogCalls().length).toBe(2);
       expect(mockRenderer.getDialogCalls()[1].text).toBe('How dare you! Leave my tower at once!');
-      expect(mockRenderer.getChoicesCalls().length).toBe(1); // Only root choices
+      expect(mockRenderer.getChoicesCalls().length).toBe(2); // Root choices + skippable exit Continue
       expect(result).toBe('beat_expelled');
     });
 
@@ -484,9 +488,9 @@ describe('DialogTreeBeat', () => {
 
       const result = await beat.execute(context, mockRenderer.renderer);
 
-      // All choices filtered → should use node-level target
+      // All choices filtered → node-level target, with a skippable Continue
       expect(mockRenderer.getDialogCalls().length).toBe(1);
-      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      expect(mockRenderer.getChoicesCalls().length).toBe(1);
       expect(result).toBe('beat_fallback');
     });
 
@@ -510,8 +514,9 @@ describe('DialogTreeBeat', () => {
 
       const result = await beat.execute(context, mockRenderer.renderer);
 
-      // NPC exit target takes priority — no choices shown
-      expect(mockRenderer.getChoicesCalls().length).toBe(0);
+      // NPC exit target takes priority — only the skippable Continue shows
+      expect(mockRenderer.getChoicesCalls().length).toBe(1);
+      expect(mockRenderer.getChoicesCalls()[0].choices).toHaveLength(1);
       expect(result).toBe('beat_fallback');
     });
 
@@ -545,8 +550,9 @@ describe('DialogTreeBeat', () => {
         }
       });
 
-      // First loop: ask something → NPC loops back → then leave
-      mockRenderer.queueChoices(['c1', 'c2']);
+      // First loop: ask something → NPC loop-back shows a skippable
+      // Continue (click it) → back at root, leave.
+      mockRenderer.queueChoices(['c1', '__skip_farewell', 'c2']);
 
       const result = await beat.execute(context, mockRenderer.renderer);
 

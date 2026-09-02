@@ -4,6 +4,7 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
+import { uiString } from '../i18n/uiStrings';
 import { buildDossierForRef, resolveCharacterDisplayName } from '../utils/dossier';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
 import {
@@ -884,8 +885,20 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
             if (exitText.trim()) {
               await renderer.renderDialog(this._npcDisplay, exitText.trim(), undefined, locations);
               console.log(`[AIDialogTreeBeat ${this.id}] NPC exit message: "${exitText.trim().substring(0, 80)}..."`);
-              await waitForTTS(renderer);
-              await waitForReadingTime(renderer, exitText.trim());
+              // Skippable, like DialogTreeBeat's NPC-exit: Continue button
+              // races the TTS/reading auto-advance; frozen screens read as
+              // hangs.
+              const advanceTimer = (async () => {
+                await waitForTTS(renderer);
+                await waitForReadingTime(renderer, exitText.trim());
+                return '__timer__';
+              })();
+              // A renderer that rejects or throws on this auxiliary button must
+                // not break the exit — degrade to the pure timer.
+                const continueClick: Promise<string> = Promise.resolve()
+                  .then(() => renderer.renderChoices([{ id: '__ai_npc_exit', text: uiString('continue'), isExit: true }], locations))
+                  .catch(() => new Promise<string>(() => { /* never */ }));
+              await Promise.race([advanceTimer, continueClick]);
             }
           } catch (err) {
             console.warn(`[AIDialogTreeBeat ${this.id}] NPC exit message generation failed:`, err);
