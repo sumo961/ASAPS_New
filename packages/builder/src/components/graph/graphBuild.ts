@@ -812,7 +812,13 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
           const edge = createEdge(childId(ee.sourcePath), ee.exitTarget!, {
             id: `dlgexit-${beat.id}-${ee.sourcePath}`,
             type: 'custom',
-            zIndex: 20,
+            // 21, not 20: the expanded container is OPAQUE at z 20, so an
+            // exit edge on the same tier paints UNDERNEATH it — the segment
+            // from the child card to the container border was invisible and
+            // the exits read as missing connections (only the far tails
+            // peeked out beyond the frame). Same tier as internal edges:
+            // above the container, below the child cards (22).
+            zIndex: 21,
             markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
             // Same weight as regular beat connections — an expanded dialog's
             // exits ARE the beat's outgoing edges, they must not thin out.
