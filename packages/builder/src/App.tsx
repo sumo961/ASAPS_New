@@ -1537,6 +1537,17 @@ function App() {
             { id: beatData.id, name: beatData.name || beatData.label }
           );
 
+          // Cluster membership. The generation handler has carried this
+          // since the normalize pipeline shipped; THIS handler never did —
+          // injected stories registered the cluster shells (story.clusters)
+          // while every beat stayed unclustered, and the save then wrote
+          // all beats into clusters/_unclustered/. Same class of drift as
+          // the api-server variables drop: the injection path trailing the
+          // generation path.
+          if (typeof beatData.cluster === 'string' && beatData.cluster.trim()) {
+            (beat as any).cluster = beatData.cluster.trim();
+          }
+
           // Apply parameters directly to the beat instance
           if (beatData.parameters) {
             const params = { ...beatData.parameters };

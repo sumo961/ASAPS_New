@@ -403,7 +403,7 @@ export class EmbeddedAPIServer {
   private async handleStoryInject(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       const body = await this.readBody(req);
-      const { metadata, beats, connections, characters, environment, suggestedTheme } = JSON.parse(body);
+      const { metadata, beats, connections, characters, environment, suggestedTheme, variables } = JSON.parse(body);
 
       // Validate required fields
       if (!beats || !Array.isArray(beats)) {
@@ -425,6 +425,11 @@ export class EmbeddedAPIServer {
           characters: characters || [],
           environment: environment || { props: [], nodes: [] },
           suggestedTheme: suggestedTheme || undefined,
+          // The renderer's injection handler merges generated variables[]
+          // into globalSettings (mergeGeneratedVariables). This hop used to
+          // DROP the field — every MCP injection lost its counters/vars
+          // while the in-app generator path kept them.
+          variables: variables || undefined,
           injectedAt: new Date().toISOString(),
         });
 
