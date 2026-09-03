@@ -28,6 +28,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor, uiString } from '@asaps/core';
+import { pillSafeRadius } from '../utils/pillRadius';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
 import type { SlotSpec } from '../utils/slotLayout';
@@ -2304,7 +2305,7 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string): 
     color: theme.button?.textColor || '#fff',
     background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
     border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
-    borderRadius: `${theme.button?.borderRadius ?? 8}px`,
+    borderRadius: pillSafeRadius(theme.button?.borderRadius),
     padding: `0 ${hPad ?? 'clamp(20px, 3vw, 36px)'}`,
     minHeight: 44, // Apple HIG minimum tap target
     minWidth: 120,

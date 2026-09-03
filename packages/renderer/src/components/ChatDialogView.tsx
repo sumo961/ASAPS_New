@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { pillSafeRadius } from '../utils/pillRadius';
 import type { RenderThemeSettings } from './PositionedBeatView';
 import { renderMarkdownLite } from '../utils/markdownLite';
 
@@ -281,7 +282,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               backgroundColor: button.backgroundColor,
               color: button.textColor,
               border: `${button.borderWidth}px solid ${button.borderColor}`,
-              borderRadius: button.borderRadius || 20,
+              borderRadius: pillSafeRadius(button.borderRadius, 20),
               padding: '8px 16px',
               fontFamily: fonts.buttonFont,
               fontSize: Math.round(14 * fontScale),

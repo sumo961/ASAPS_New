@@ -1,4 +1,5 @@
 import React from 'react';
+import { pillSafeRadius } from '../utils/pillRadius';
 import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
 import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand } from '@asaps/core';
@@ -3691,7 +3692,7 @@ const ButtonElement: React.FC<{
     color: hideButtonBox ? theme.colors.textColor : (isVisited ? `color-mix(in srgb, ${theme.colors.textColor} 60%, transparent)` : theme.button.textColor),
     border: buttonImageUrl ? 'none' : borderStyle,
     opacity: isVisited ? 0.7 : 1,
-    borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
+    borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : pillSafeRadius(theme.button.borderRadius)),
     padding: hideButtonBox ? '8px 12px' : `${paddingVertical}px ${paddingHorizontal}px`,
     fontSize: `${computedFontSize}px`,
     fontFamily: computedFont,
@@ -3797,7 +3798,7 @@ const ButtonElement: React.FC<{
     backgroundColor: theme.button.backgroundColor,
     color: theme.button.textColor,
     padding: '6px 12px',
-    borderRadius: `${theme.button.borderRadius}px`,
+    borderRadius: pillSafeRadius(theme.button.borderRadius),
     fontSize: '14px',
     fontFamily: theme.fonts.buttonFont,
     fontWeight: tooltipHasDescription ? 'normal' : '600',
@@ -4811,7 +4812,7 @@ const AssetElement: React.FC<{
       backgroundColor: theme?.button?.backgroundColor || '#333',
       color: theme?.button?.textColor || '#fff',
       padding: '6px 12px',
-      borderRadius: `${theme?.button?.borderRadius || 4}px`,
+      borderRadius: pillSafeRadius(theme?.button?.borderRadius, 4),
       fontSize: '14px',
       fontFamily: theme?.fonts?.buttonFont || 'inherit',
       fontWeight: 'normal',
@@ -6298,7 +6299,7 @@ const FlexButtonElement: React.FC<{
         }),
         color: hideButtonBox ? theme.colors.textColor : (isVisited ? `color-mix(in srgb, ${theme.colors.textColor} 60%, transparent)` : theme.button.textColor),
         border: buttonImageUrl ? 'none' : (hideButtonBox ? 'none' : `${theme.button.borderWidth}px solid ${borderColor}`),
-        borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : `${theme.button.borderRadius}px`),
+        borderRadius: hideButtonBox ? '4px' : (buttonImageUrl ? '0' : pillSafeRadius(theme.button.borderRadius)),
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
         fontWeight: '600',

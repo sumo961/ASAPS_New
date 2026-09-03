@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { pillSafeRadius } from '../utils/pillRadius';
 import type {
   SlotIntent,
   SlotIntentResolution,
@@ -911,7 +912,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                       color: theme?.button?.textColor || '#fff',
                       background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
                       border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
-                      borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
+                      borderRadius: pillSafeRadius(theme?.button?.borderRadius),
                       padding: `10px clamp(14px, ${vwU(2.5)}, 24px)`,
                       minHeight: 44,
                       cursor: gateEarned ? 'pointer' : 'default',

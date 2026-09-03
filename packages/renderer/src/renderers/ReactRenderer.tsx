@@ -1,4 +1,5 @@
 import { uiString, isPresetSound, getPresetSound } from '@asaps/core';
+import { pillSafeRadius } from '../utils/pillRadius';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
@@ -361,7 +362,7 @@ const DialogWithChoicesDisplay: React.FC<{
                 backgroundColor: button.backgroundColor,
                 color: button.textColor,
                 border: `${button.borderWidth}px solid ${button.borderColor}`,
-                borderRadius: `${button.borderRadius}px`,
+                borderRadius: pillSafeRadius(button.borderRadius),
                 fontFamily: fonts.buttonFont,
               }}
               onMouseEnter={(e) => {
