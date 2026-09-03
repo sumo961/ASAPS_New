@@ -2129,11 +2129,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // In conversation mode the action panel claims a fixed
                 // width fraction of the stage; body scroller flexes to
                 // fill the rest. Without flex-basis the empty-buttons
-                // row collapses to zero width. Widened from 28%/280
-                // because the previous max squeezed longer button text
-                // ("Your name is Kim, right?") onto 2-3 lines even when
-                // there was plenty of horizontal room on stage.
-                flexBasis: isConversation ? 'clamp(200px, 34%, 380px)' : undefined,
+                // row collapses to zero width. Widened twice (28%/280,
+                // then 34%/380): paragraph-length choices still wrapped
+                // to ~4 words per line and pushed the third button below
+                // the fold while a third of the stage sat empty between
+                // the body card and the panel. Buttons right-align, so
+                // extra basis grows leftward into that gap.
+                flexBasis: isConversation ? 'clamp(200px, 45%, 580px)' : undefined,
                 // Conversation: top-align with the body card so the
                 // buttons sit at the same Y as the NPC text, not floated
                 // mid-stage. paddingTop matches the body card's top
