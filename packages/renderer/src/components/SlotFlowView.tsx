@@ -326,7 +326,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   visitedChoiceIds = [],
   layoutTemplate = 'stacked',
 }) => {
-  const isConversation = layoutTemplate === 'conversation';
+  // Author intent only — whether the stage can actually afford the
+  // side-by-side row is decided later (isConversation), once the stage
+  // and HUD reserve are measured.
+  const wantsConversation = layoutTemplate === 'conversation';
   const isCustom = layoutTemplate === 'custom';
   const theme = themeProp ?? DEFAULT_THEME;
   // Stable unique class so the scoped <style> (media-query font floor,
@@ -712,7 +715,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // own or by the player scrolling to the end-sentinel. Conversation
   // layout bypasses the gate entirely: it's a short snappy back-and-
   // forth, the action row sits beside the body from the start.
-  const [gateEarned, setGateEarned] = useState(isConversation || !requireFullRead);
+  const [gateEarned, setGateEarned] = useState(wantsConversation || !requireFullRead);
 
   // Stage-root + end-of-body sentinel for the gate.
   // Detection uses the ACTUAL scrolling element's scrollTop /
@@ -879,16 +882,25 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
        * content, not above it.
        */
       /*
-       * A narrow corner HUD on a short, wide stage is stepped AROUND rather
-       * than under. Reserving a full-width band costs the whole frame height
-       * on a stage that has none to give — at 740×360 it pushed a four-choice
-       * beat's question off the top. Reserving the HUD's width instead lets
-       * the column start at the top and simply begin past it.
+       * A narrow corner HUD is stepped AROUND rather than under — on ANY
+       * stage that can spare the indent, not just short-wide ones. The
+       * full-width band pushed content below the HUD's whole height while
+       * most of the width sat empty beside it: at 740×360 it shoved a
+       * four-choice beat's question off the top, and on a 1024-wide desktop
+       * stage a 3-meter corner stack pushed the body card ~190px down for
+       * no reason (bake-off Story M, 2026-09-03).
        *
-       * Only when the HUD is genuinely narrow: indenting by a wide one would
-       * leave a column too thin to read. Those keep the horizontal band.
+       * Three guards keep the band where it is genuinely needed: the HUD
+       * must be narrow relative to the stage, actually cornered (a
+       * top-CENTER timer cannot be dodged sideways), and the remaining
+       * column must stay readable — phone portrait fails that last test
+       * and correctly keeps content below the HUD.
        */
-      if (shortAndWide && viewportW > 0 && r.width / viewportW < 0.4) {
+      const cornered = viewportW > 0
+        && (r.x + r.width <= viewportW * 0.48 || r.x >= viewportW * 0.52);
+      if (cornered
+        && r.width / viewportW < 0.4
+        && viewportW - (r.width + 16) >= 520) {
         if (r.x + r.width / 2 < viewportW / 2) left = Math.max(left, r.x + r.width + 8);
         else right = Math.max(right, (viewportW - r.x) + 8);
         continue;
@@ -916,7 +928,19 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       left: Math.round(Math.min(left, sideCeiling)),
       right: Math.round(Math.min(right, sideCeiling)),
     };
-  }, [reservedHudRects, previewHeight, previewWidth, measuredH, measuredW, shortAndWide]);
+  }, [reservedHudRects, previewHeight, previewWidth, measuredH, measuredW]);
+
+  /**
+   * Conversation needs genuine side-by-side room. Below ~640px of usable
+   * width the action panel's 200px minimum plus both paddings starve the
+   * body — at 390px phone-portrait the NPC text measured ZERO visible
+   * pixels (bake-off Story M, 2026-09-03) — and on short-wide stages the
+   * stacked path's two-column choice grid spends the height budget
+   * better. Collapse to the stacked flow; dialog semantics (choices,
+   * read-gate exemption) follow author intent, not the collapsed layout.
+   */
+  const usableW = (measuredW || previewWidth || 0) - hudReserve.left - hudReserve.right;
+  const isConversation = wantsConversation && !shortAndWide && (usableW <= 0 || usableW >= 640);
 
   // When the beat's body/title text changes, reset scroll back to the top
   // and re-arm the gate. Otherwise the previous beat's scrollTop persists
@@ -973,12 +997,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     backgroundRepeat: 'no-repeat',
     backgroundPosition: 'center',
     paddingTop: `max(env(safe-area-inset-top, 0px), ${hudReserve.top}px)`,
+    // Conversation keeps its own generous stage margins but must ALSO
+    // clear a side-stepped HUD reserve — it used to ignore
+    // hudReserve.left/right entirely, so once a corner HUD became a side
+    // indent the NPC card slid underneath the meters.
     paddingRight: isConversation
-      ? `max(env(safe-area-inset-right, 0px), clamp(20px, ${vwU(4)}, 48px))`
+      ? `max(env(safe-area-inset-right, 0px), ${hudReserve.right}px, clamp(20px, ${vwU(4)}, 48px))`
       : `max(env(safe-area-inset-right, 0px), ${hudReserve.right}px)`,
     paddingBottom: `max(env(safe-area-inset-bottom, 0px), ${hudReserve.bottom}px)`,
     paddingLeft: isConversation
-      ? `max(env(safe-area-inset-left, 0px), clamp(20px, ${vwU(4)}, 48px))`
+      ? `max(env(safe-area-inset-left, 0px), ${hudReserve.left}px, clamp(20px, ${vwU(4)}, 48px))`
       : `max(env(safe-area-inset-left, 0px), ${hudReserve.left}px)`,
     // Bug 16 — apply theme.colors.textAlpha (0-100) to the inherited
     // text color using the same #RRGGBB+AA hex pattern used elsewhere.
@@ -2086,7 +2114,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // the Continue button.
                 position: 'relative',
                 zIndex: 5,
-                flexShrink: 0,
+                // Stacked dynamic choices may SHRINK and scroll: with the
+                // default flexShrink:0 + min-content floor, a tall choice
+                // list squeezed the sibling body scroller to 0px on a
+                // 740×360 stage — the NPC speech vanished entirely, a
+                // dialog with no dialog. Because the body's flex basis is
+                // its (smaller) content height, proportional shrinking
+                // leaves it the larger relative share, so the speech stays
+                // readable while long choice lists scroll. Conversation and
+                // system rows (Continue etc.) keep their rigid height.
+                ...(hasDynamicChoices && !isConversation && !customActionStyle
+                  ? { flexShrink: 1, minHeight: 0, overflowY: 'auto' as const }
+                  : { flexShrink: 0 }),
                 display: 'flex',
                 // Stack buttons VERTICALLY whenever dynamicChoices are
                 // present (MultiChoice + DialogTree-conversation). Reads as
@@ -2104,6 +2143,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ? {
                       display: 'grid',
                       gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                      // Rows must size to their content: with the row now
+                      // shrinkable+scrollable, auto tracks compressed to the
+                      // squeezed container height and clipped multi-line
+                      // choices at ~70px while their text needed ~140.
+                      gridAutoRows: 'max-content',
                       alignContent: 'start',
                     }
                   : {}),
@@ -2308,9 +2352,13 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string): 
     background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
     border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
     borderRadius: pillSafeRadius(theme.button?.borderRadius),
-    padding: `0 ${hPad ?? 'clamp(20px, 3vw, 36px)'}`,
+    padding: `6px ${hPad ?? 'clamp(20px, 3vw, 36px)'}`,
     minHeight: 44, // Apple HIG minimum tap target
     minWidth: 120,
+    // Never shrink below natural height: inside the (now scrollable)
+    // stacked action row, default flex shrinking clipped the third line
+    // of long choices instead of letting the row scroll.
+    flexShrink: 0,
     cursor: 'pointer',
     fontWeight: 600,
   };
