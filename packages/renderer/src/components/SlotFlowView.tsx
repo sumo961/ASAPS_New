@@ -2186,7 +2186,16 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // padding so the first button visually aligns with the
                 // first line of the prompt. (Stacked alignSelf is set
                 // above to 'stretch' when dynamicChoices are present.)
-                justifyContent: isConversation ? 'flex-start' : actionJustify,
+                // Shrinkable dynamic-choice rows MUST start-justify: a
+                // centered flex container that overflows clips BOTH ends,
+                // and the overflow above the start edge is unreachable by
+                // scrolling (phone portrait: the first choice sat half
+                // hidden with no way to scroll it into view). When the
+                // row isn't squeezed it hugs its content, so start vs
+                // center is invisible there — safe to force.
+                justifyContent: isConversation
+                  ? 'flex-start'
+                  : ((hasDynamicChoices && !customActionStyle) ? 'flex-start' : actionJustify),
                 gap: `clamp(12px, ${vwU(2)}, 24px)`,
                 paddingTop: isConversation
                   ? `clamp(24px, ${vhU(5)}, 64px)`
