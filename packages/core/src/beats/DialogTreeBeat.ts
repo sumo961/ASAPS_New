@@ -62,6 +62,13 @@ export class DialogTreeBeat extends Beat {
   public choiceDelay?: number; // Delay in seconds before showing choices
   public responseDelay?: number; // Delay in seconds before NPC responds (for natural chat pacing)
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
+  // Opt-in: effects (counters/variables/inventory) fire only the FIRST
+  // time a given choice is selected; the choice itself stays selectable.
+  // The re-viewable-but-once-scored middle ground between markVisited
+  // (dim + block) and default repeat-fire (bake-off finding 2026-09-04:
+  // re-examining evidence kept re-scoring suspicion counters).
+  public effectsOncePerChoice?: boolean;
+
   public backgroundUrl?: string; // Direct URL for background from ASML import
   public backgroundAssetId?: string; // Asset ID for background
   public phaseOverrides?: Record<string, Record<string, PhaseOverride>>; // Per-phase visual element overrides
@@ -89,6 +96,7 @@ export class DialogTreeBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.responseDelay = config.parameters?.responseDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
     // v0.9.62 — unified layoutTemplate. Migrate legacy presentationMode:
     //   'positioned' → 'stacked' (preserves the visual-novel rendering
@@ -337,6 +345,7 @@ export class DialogTreeBeat extends Beat {
       choiceDelay: this.choiceDelay,
       responseDelay: this.responseDelay,
       markVisited: this.markVisited,
+      effectsOncePerChoice: this.effectsOncePerChoice,
       backgroundUrl: this.backgroundUrl,
       backgroundAssetId: this.backgroundAssetId,
       phaseOverrides: this.phaseOverrides,
@@ -377,6 +386,7 @@ export class DialogTreeBeat extends Beat {
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.responseDelay !== undefined) this.responseDelay = params.responseDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
     if (params.backgroundAssetId !== undefined) this.backgroundAssetId = params.backgroundAssetId;
     if (params.phaseOverrides !== undefined) this.phaseOverrides = params.phaseOverrides;
@@ -754,8 +764,13 @@ export class DialogTreeBeat extends Beat {
               : this.name || 'Dialog choice',
           });
 
-          // Apply effects from the selected choice (canonical effects array, migrated from flat counter fields)
-          if (selectedChoice.effects) {
+          // Apply effects from the selected choice (canonical effects array,
+          // migrated from flat counter fields). effectsOncePerChoice: a
+          // re-asked question replays the dialog but doesn't re-score.
+          // Visited keys are path-prefixed, matching markChoiceVisited below.
+          const alreadyChosen = this.effectsOncePerChoice
+            && context.getVisitedChoicesForBeat(this.id).includes(`${nodePath}_${selectedChoice.id}`);
+          if (selectedChoice.effects && !alreadyChosen) {
             selectedChoice.effects.forEach(effect => context.applyEffect(effect));
           }
 

@@ -10,6 +10,13 @@ export class PickPropBeat extends Beat {
   public props: PropOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
+  // Opt-in: effects (counters/variables/inventory) fire only the FIRST
+  // time a given choice is selected; the choice itself stays selectable.
+  // The re-viewable-but-once-scored middle ground between markVisited
+  // (dim + block) and default repeat-fire (bake-off finding 2026-09-04:
+  // re-examining evidence kept re-scoring suspicion counters).
+  public effectsOncePerChoice?: boolean;
+
   public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
 
   constructor(config: BeatConfig & {
@@ -20,6 +27,7 @@ export class PickPropBeat extends Beat {
     this.props = config.props || config.parameters?.props || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
     this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
 
@@ -34,6 +42,7 @@ export class PickPropBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
+      effectsOncePerChoice: this.effectsOncePerChoice,
       spatialFit: this.spatialFit,
       slotIntent: this.slotIntent,
       slotAnimations: this.slotAnimations,
@@ -59,6 +68,7 @@ export class PickPropBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.spatialFit !== undefined) {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
         ? params.spatialFit : undefined;
@@ -167,12 +177,16 @@ export class PickPropBeat extends Beat {
     }
 
     if (selectedProp) {
+      const choiceKey = selectedProp.id || selectedProp.name;
+      // effectsOncePerChoice: re-examining stays allowed, re-SCORING doesn't.
+      const alreadyChosen = this.effectsOncePerChoice
+        && context.getVisitedChoicesForBeat(this.id).includes(choiceKey);
       // Persist per-choice visited state. DialogTree and MultiChoice have
       // always done this; PickProp only ever READ the set (above), so
       // markVisited on a pickProp was inert — evidence props never dimmed
       // and their counter/inventory effects re-fired on every revisit
       // (bake-off finding, 2026-09-04: re-examining evidence re-scored it).
-      context.markChoiceVisited(this.id, selectedProp.id || selectedProp.name);
+      context.markChoiceVisited(this.id, choiceKey);
 
       // Record this choice for AI context
       context.recordChoice({
@@ -184,13 +198,15 @@ export class PickPropBeat extends Beat {
       });
 
       // Apply prop effects (canonical effects array, migrated from flat counter fields)
-      if (selectedProp.effects) {
+      if (selectedProp.effects && !alreadyChosen) {
         selectedProp.effects.forEach(effect => context.applyEffect(effect));
       }
 
-      // Add prop to inventory with fallback chain: inventoryName → locationName → name
-      const inventoryItemName = selectedProp.inventoryName || selectedProp.locationName || selectedProp.name;
-      context.addToInventory(inventoryItemName);
+      if (!alreadyChosen) {
+        // Add prop to inventory with fallback chain: inventoryName → locationName → name
+        const inventoryItemName = selectedProp.inventoryName || selectedProp.locationName || selectedProp.name;
+        context.addToInventory(inventoryItemName);
+      }
 
       // Play sound effect
       if (selectedProp.soundEffect && renderer.playSound) {

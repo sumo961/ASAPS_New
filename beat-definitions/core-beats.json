@@ -24,7 +24,7 @@
         "effects": "effect[]?",
         "target": "string?"
       },
-      "notes": "dialogNode displays text. If 'target' is set and no visible choices exist, auto-advances to the target beat after a delay (NPC exit). Otherwise waits for player to click a choice."
+      "notes": "dialogNode displays text. If 'target' is set and no visible choices exist, auto-advances to the target beat after a delay (NPC exit). Otherwise waits for player to click a choice. conditions[] on a NODE skips the node when unmet; conditions[] on its choices hide individual replies until the story state matches."
     },
     "dialogChoice": {
       "description": "A player choice in dialog. Can exit to a beat or continue with nested dialog.",
@@ -42,7 +42,7 @@
         "soundEffect": "string?",
         "hotspot": "spatialHotspot?"
       },
-      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. P3-3c-9 — optional `hotspot` (normalized 0–1 against the spatial image) flips the CURRENT dialog node into spatial mode: the renderer composes speaker/text into flow slots over the beat background and turns the choices into clickable regions on the image. Per-node, so a dialogTree can mix spatial nodes (a scene) with positioned nodes (a close-up monologue)."
+      "notes": "Either 'target' (beat ID to exit) OR 'dialogNode' (continue conversation), not both. Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. P3-3c-9 — optional `hotspot` (normalized 0–1 against the spatial image) flips the CURRENT dialog node into spatial mode: the renderer composes speaker/text into flow slots over the beat background and turns the choices into clickable regions on the image. Per-node, so a dialogTree can mix spatial nodes (a scene) with positioned nodes (a close-up monologue). conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
     "multiChoiceOption": {
       "description": "A button-style choice in a MultiChoice beat (NPC text + several response buttons, single level, no spatial layer). Same per-choice effect surface as a movementOption / dialogChoice, but no location / hotspot fields — the choice is always a button.",
@@ -55,7 +55,7 @@
         "effects": "effect[]?",
         "soundEffect": "string?"
       },
-      "notes": "displayText is the translated/display label; text is the internal identifier. soundEffect plays when this choice is selected. Effects apply per-choice (variable/counter/inventory/affect/etc.) — same surface as DialogTree's dialogChoice and MovementChoice's movementOption."
+      "notes": "displayText is the translated/display label; text is the internal identifier. soundEffect plays when this choice is selected. Effects apply per-choice (variable/counter/inventory/affect/etc.) — same surface as DialogTree's dialogChoice and MovementChoice's movementOption. conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
     "movementOption": {
       "description": "A movement choice",
@@ -74,7 +74,7 @@
         "soundEffect": "string?",
         "hotspot": "spatialHotspot?"
       },
-      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching. P3-3c — optional `hotspot` carries a normalized 0–1 rectangle on the spatial layer; when ALL choices have hotspots AND the beat has no baked locations, the renderer composes movementChoice through SpatialFlowView with the image as background and the hotspots as clickable regions."
+      "notes": "Counter fields allow direct counter modification (any counter name) in addition to effects[]. soundEffect plays when this choice is selected. locationName optionally references a hotspot or prop from beat.locations by name. displayText is the translated/display label; text is the internal identifier used for hotspot matching. P3-3c — optional `hotspot` carries a normalized 0–1 rectangle on the spatial layer; when ALL choices have hotspots AND the beat has no baked locations, the renderer composes movementChoice through SpatialFlowView with the image as background and the hotspots as clickable regions. conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
     "propOption": {
       "description": "A prop interaction choice",
@@ -95,7 +95,7 @@
         "soundEffect": "string?",
         "hotspot": "spatialHotspot?"
       },
-      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key."
+      "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key. conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
     "condition": {
       "description": "Condition for beat logic",
@@ -799,6 +799,12 @@
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
         },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+        },
         "layoutTemplate": {
           "type": "string",
           "required": false,
@@ -962,6 +968,12 @@
           "default": false,
           "description": "Block and dim choices that lead to previously visited beats"
         },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+        },
         "layoutTemplate": {
           "type": "string",
           "required": false,
@@ -1094,6 +1106,12 @@
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
         },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+        },
         "showTextOnHover": {
           "type": "boolean",
           "required": false,
@@ -1213,6 +1231,12 @@
           "required": false,
           "default": false,
           "description": "Block and dim choices leading to previously visited beats"
+        },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
         },
         "spatialFit": {
           "type": "string",

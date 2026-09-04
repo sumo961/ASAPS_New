@@ -36,6 +36,13 @@ export class MultiChoiceBeat extends Beat {
   public choices: MultiChoiceOption[];
   public choiceDelay?: number;
   public markVisited?: boolean;
+  // Opt-in: effects (counters/variables/inventory) fire only the FIRST
+  // time a given choice is selected; the choice itself stays selectable.
+  // The re-viewable-but-once-scored middle ground between markVisited
+  // (dim + block) and default repeat-fire (bake-off finding 2026-09-04:
+  // re-examining evidence kept re-scoring suspicion counters).
+  public effectsOncePerChoice?: boolean;
+
   public layoutTemplate: MultiChoiceLayoutTemplate;
 
   constructor(config: BeatConfig & {
@@ -46,6 +53,7 @@ export class MultiChoiceBeat extends Beat {
     this.choices = (config.choices || config.parameters?.choices || []) as MultiChoiceOption[];
     this.choiceDelay = config.choiceDelay ?? config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     this.layoutTemplate = normalizeLayoutTemplate(
       (config as any).layoutTemplate ?? config.parameters?.layoutTemplate,
     );
@@ -62,6 +70,7 @@ export class MultiChoiceBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
+      effectsOncePerChoice: this.effectsOncePerChoice,
       layoutTemplate: this.layoutTemplate,
       slotIntent: this.slotIntent,
       slotAnimations: this.slotAnimations,
@@ -89,6 +98,7 @@ export class MultiChoiceBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.layoutTemplate !== undefined) this.layoutTemplate = normalizeLayoutTemplate(params.layoutTemplate);
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
@@ -208,6 +218,10 @@ export class MultiChoiceBeat extends Beat {
         break;
       }
 
+      // effectsOncePerChoice: the choice stays selectable, its effects don't
+      // re-fire. Read BEFORE marking.
+      const alreadyChosen = this.effectsOncePerChoice
+        && context.getVisitedChoicesForBeat(this.id).includes(selected.id);
       // Visited tracking + AI context, same as MovementChoice / DialogTree.
       context.markChoiceVisited(this.id, selected.id);
       if (renderer.setVisitedChoiceIds) {
@@ -223,7 +237,7 @@ export class MultiChoiceBeat extends Beat {
 
       // Apply effects from the selected choice (canonical effects array;
       // migrated from any flat counter fields in the constructor).
-      if (selected.effects && selected.effects.length > 0) {
+      if (selected.effects && selected.effects.length > 0 && !alreadyChosen) {
         selected.effects.forEach(effect => context.applyEffect(effect));
       }
 

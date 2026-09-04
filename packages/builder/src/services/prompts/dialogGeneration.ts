@@ -129,6 +129,9 @@ When "markVisited" is true on the dialogTree beat:
 - Useful for interrogation or shopping dialogs where player explores multiple questions
 - Combine with "__self__" targets for multi-question conversations
 
+## Effects Fire Once
+"effectsOncePerChoice": true on the dialogTree beat keeps every choice selectable on revisits, but its effects[] fire only the FIRST time that choice is picked. Use it whenever choices carry suspicion/trust counters in a dialog the player can re-enter — otherwise re-asking a question re-scores the counter.
+
 ## Writing Guidelines
 1. Keep dialog natural and conversational
 2. Player choices should be distinct and meaningful

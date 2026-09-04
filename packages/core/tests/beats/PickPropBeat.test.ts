@@ -599,3 +599,45 @@ describe('PickPropBeat', () => {
     });
   });
 });
+
+describe('effectsOncePerChoice', () => {
+  function makeBeat(effectsOncePerChoice: boolean) {
+    return new PickPropBeat({
+      id: 'evidence1',
+      name: 'Search the Desk',
+      type: 'pickProp',
+      effectsOncePerChoice,
+      props: [
+        {
+          id: 'letter', name: 'Old Letter', target: 'beat_read',
+          effects: [{ type: 'incrementCounter', target: 'suspicion', value: 2 }],
+        } as any,
+      ],
+    });
+  }
+
+  it('fires effects and inventory only on the first pick when enabled', async () => {
+    const context = new StoryContext();
+    const renderer = createMockRenderer();
+    (renderer.renderPropSelection as any).mockResolvedValue('letter');
+    const beat = makeBeat(true);
+
+    await beat.execute(context, renderer);
+    await beat.execute(context, renderer); // player re-reads the evidence
+
+    expect(context.getCounter('suspicion')).toBe(2);
+    expect(context.getInventory().filter(i => /Old Letter/i.test(typeof i === 'string' ? i : (i as any).name)).length).toBe(1);
+  });
+
+  it('keeps repeat-firing when disabled (authored default unchanged)', async () => {
+    const context = new StoryContext();
+    const renderer = createMockRenderer();
+    (renderer.renderPropSelection as any).mockResolvedValue('letter');
+    const beat = makeBeat(false);
+
+    await beat.execute(context, renderer);
+    await beat.execute(context, renderer);
+
+    expect(context.getCounter('suspicion')).toBe(4);
+  });
+});

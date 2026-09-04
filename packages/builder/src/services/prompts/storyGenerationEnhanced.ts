@@ -141,7 +141,7 @@ const BEAT_TYPE_GUIDE = `
 - 🚨 PREFERRED CHOICE BEAT for non-nested branching: Use multiChoice for the common "ask a question, player picks one answer" pattern — scene-level decisions, simple NPC responses, action picks, story branches with no follow-up turn.
 - Why: this is what most authors actually want when they reach for a multi-button beat. Simpler than dialogTree (no nested follow-ups), more discoverable than movementChoice (no spatial layer).
 - Use: Standalone questions, single-screen decisions, "what do you do?" prompts, simple NPC one-liners that don't lead into a back-and-forth
-- Parameters: question (the prompt text), choices (array), optional speaker, choiceDelay, markVisited
+- Parameters: question (the prompt text), choices (array), optional speaker, choiceDelay, markVisited, effectsOncePerChoice (effects fire only on first pick; choice stays selectable)
   {
     "question": "You stand at a crossroads. Three paths lie before you.",
     "choices": [
@@ -184,6 +184,7 @@ const BEAT_TYPE_GUIDE = `
     ⚠️ Prefer layoutTemplate. The legacy "presentationMode" still parses but layoutTemplate wins; do not emit both.
   - markVisited: true to block and dim choices leading to previously visited beats
 - 🚨 DO NOT enable markVisited on hub beats the player must return to (investigation hubs, shops, menus, decision loops). It makes each option one-shot and can leave the story unsolvable. Only enable markVisited on beats representing a truly one-way decision.
+- effectsOncePerChoice: true → the choice stays selectable on revisits but its effects[] fire only the FIRST time. Use on evidence/clue choices so re-reading never re-scores a suspicion counter. (markVisited instead dims AND blocks; pick one per beat: block re-reads, or allow them un-scored.)
 - ⚠️ WRONG: { "dialogTree": { "root": { ... } } } - NO extra "root" wrapper!
 - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
 - target (string): Beat ID to exit dialog
@@ -225,6 +226,7 @@ const BEAT_TYPE_GUIDE = `
   - choiceDelay: seconds before choices fade in (creates suspense)
   - markVisited: true to block and dim choices leading to previously visited beats
   - 🚨 DO NOT enable markVisited on a movementChoice hub the player must return to (rooms in an investigation, floors in a building). It silently makes the story unsolvable. Only enable on truly one-way spatial moves.
+  - effectsOncePerChoice: true → the choice stays selectable on revisits but its effects[] fire only the FIRST time. Use on evidence/clue choices so re-reading never re-scores a suspicion counter. (markVisited instead dims AND blocks; pick one per beat: block re-reads, or allow them un-scored.)
   - showTextOnHover: true to only show choice text when hovering over the hotspot
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
@@ -260,6 +262,7 @@ const BEAT_TYPE_GUIDE = `
 - Optional parameters:
   - choiceDelay: seconds before props fade in (creates suspense)
   - markVisited: true to show visual indication for props leading to already-visited beats
+  - effectsOncePerChoice: true → the choice stays selectable on revisits but its effects[] fire only the FIRST time. Use on evidence/clue choices so re-reading never re-scores a suspicion counter. (markVisited instead dims AND blocks; pick one per beat: block re-reads, or allow them un-scored.)
 - COUNTER EFFECTS: Props can modify counters when selected
   { "id": "sword", "name": "Rusty Sword", "description": "A weathered blade with strange markings", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
 - SOUND EFFECTS: Props can play a sound when selected
@@ -323,7 +326,9 @@ beat_letter_desc (infoText):
   → target: beat_examine_study   ← LOOP BACK to the same pickProp
 \`\`\`
 
-The player keeps picking until they've seen everything, then chooses the explicit "Leave" option. Combine this with markVisited: true ONLY on the pickProp itself so already-examined items are dimmed but not blocked — OR leave markVisited off and let the player re-read.
+The player keeps picking until they've seen everything, then chooses the explicit "Leave" option. Two ways to handle re-examination — pick ONE per pickProp:
+- markVisited: true — already-examined items are dimmed AND blocked (one look each).
+- effectsOncePerChoice: true — items stay re-readable, but their counter/inventory effects fire only on the FIRST pick. 🚨 For evidence that raises suspicion counters this is almost always what you want: without it, a player who re-reads a clue farms the counter and breaks your accusation thresholds.
 
 ### 🚨 Recoverable Gates (MANDATORY)
 
@@ -333,6 +338,13 @@ Concrete rules:
 - If a choice is "enter the crypt (needs the key)," also offer "go back and find the key" from the same beat.
 - If an ending requires a counter value the player may have under-accumulated, include a late-game beat that can raise the counter, or make the fallback ending still meaningful.
 - Never build dead-end branches where the player must restart the whole story to try again.
+
+### Earned Options — conditional choices (USE these)
+
+Every choice, movement option, prop, and dialog choice accepts "conditions": [ ... ] (same shapes as conditionBeat: variable / counter / inventory / visitedBeat / sentiment). An option with unmet conditions is HIDDEN. Use this instead of clumsier workarounds:
+- ✓ An accusation option that only appears after the decisive clue: { "id": "c_twist", "text": "No one. The 'original' was never real.", "target": "beat_end_twist", "conditions": [{ "type": "visitedBeat", "beatId": "beat_clue_1894" }] }
+- ✗ Do NOT duplicate an entire menu beat just to add one unlocked option — add a conditional choice to the one menu.
+- ✗ Do NOT let discovered knowledge OVERRIDE an explicit player decision. If the player names a suspect, never reroute them to a different ending because they happen to hold a twist clue — reveal knowledge as a new OPTION the player may choose, never as a substitute for the choice they made.
 
 **hyperText** - Clickable word/phrase branching
 - Use: Subtle choices, memory/knowledge checks, exploring details in text
@@ -593,6 +605,7 @@ If the author's brief clearly calls for a location-based or AR experience, say s
   - RANGE CARRIES MEANING. The bar grows from ZERO, wherever zero falls in min..max. Set min: -100 when the feeling has a real opposite (trust/distrust) so the bar grows outward from the centre. Set min: 0 when it does not (fear's absence is calm, not anti-fear) — negatives then read as an empty bar.
   - Optional "bands" replace the number with a word. Give a bipolar ladder a band covering ZERO, because sentiments start at zero and a ladder without one opens the story calling someone "wary" before they have met anyone: "bands": [ { "from": -100, "label": "strong distrust" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] with "numericFormat": "band".
   - A visible meter needs a frame to render in — give the character a "meterFrame": { "dockMode": "screen", "screenPosition": "screen-top-left" }.
+  - 🚨 SURFACE WHAT YOU TRACK, SYMMETRICALLY. If a counter or sentiment gates an outcome (an ending threshold, a character opening up), the player deserves a visible meter for it — invisible bookkeeping makes success feel arbitrary. And meters must be symmetric across parallel characters: three suspects tracked by suspicion means three meters (or none), never a meter for one suspect only — unless the story explicitly justifies the asymmetry (e.g. an established relationship with that one character, stated in the text).
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
   - Operations: "set" (initialize), "advance" (move forward), "subtract" (time travel/flashback)
   - For "set": specify timeYear, timeMonth (1-12), timeDay (1-31), timeHour (0-23), timeMinute (0-59)

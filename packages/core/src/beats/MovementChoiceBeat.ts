@@ -10,6 +10,13 @@ export class MovementChoiceBeat extends Beat {
   public choices: MovementOption[];
   public choiceDelay?: number; // Delay in seconds before showing choices
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
+  // Opt-in: effects (counters/variables/inventory) fire only the FIRST
+  // time a given choice is selected; the choice itself stays selectable.
+  // The re-viewable-but-once-scored middle ground between markVisited
+  // (dim + block) and default repeat-fire (bake-off finding 2026-09-04:
+  // re-examining evidence kept re-scoring suspicion counters).
+  public effectsOncePerChoice?: boolean;
+
   public showTextOnHover?: boolean; // Only show choice text when hovering over the hotspot
   public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
 
@@ -21,6 +28,7 @@ export class MovementChoiceBeat extends Beat {
     this.choices = config.choices || config.parameters?.choices || [];
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
+    this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     this.showTextOnHover = config.showTextOnHover ?? config.parameters?.showTextOnHover ?? false;
     const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
     this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
@@ -40,6 +48,7 @@ export class MovementChoiceBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
+      effectsOncePerChoice: this.effectsOncePerChoice,
       showTextOnHover: this.showTextOnHover,
       spatialFit: this.spatialFit,
       slotIntent: this.slotIntent,
@@ -81,6 +90,7 @@ export class MovementChoiceBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
+    if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.showTextOnHover !== undefined) this.showTextOnHover = params.showTextOnHover;
     if (params.spatialFit !== undefined) {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
@@ -95,6 +105,7 @@ export class MovementChoiceBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       markVisited: this.markVisited,
+      effectsOncePerChoice: this.effectsOncePerChoice,
       showTextOnHover: this.showTextOnHover
     });
   }
@@ -204,6 +215,9 @@ export class MovementChoiceBeat extends Beat {
       }
 
       if (selectedChoice) {
+        // effectsOncePerChoice: read BEFORE marking below.
+        const alreadyChosen = this.effectsOncePerChoice
+          && context.getVisitedChoicesForBeat(this.id).includes(selectedChoice.id);
         // Mark this choice as visited for per-choice tracking
         context.markChoiceVisited(this.id, selectedChoice.id);
 
@@ -227,7 +241,7 @@ export class MovementChoiceBeat extends Beat {
         }
 
         // Apply effects from choice (canonical effects array, migrated from flat counter fields)
-        if (selectedChoice.effects) {
+        if (selectedChoice.effects && !alreadyChosen) {
           selectedChoice.effects.forEach(effect => context.applyEffect(effect));
         }
 

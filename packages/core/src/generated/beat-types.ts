@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-08-31T09:27:04.526Z
+ * Generated: 2026-09-04T15:56:09.493Z
  */
 
 // ============================================
@@ -228,6 +228,8 @@ export interface DialogTreeParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
+  /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
+  effectsOncePerChoice?: boolean | undefined;
   /** How the dialog renders in responsive mode. 'conversation' (default) lays text on one side and choices on the other — the natural back-and-forth feel. 'stacked' keeps text on top, choices below. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors for fine-grained author control. Lives in the LEFT-side VE settings panel (it's a layout property, not a content property). */
   layoutTemplate?: string | undefined;
   /** DEPRECATED in v0.9.62 — use layoutTemplate instead. Existing projects auto-migrate at load: 'positioned' → 'conversation', 'chat-scroll' → 'chat-scroll', 'chat-bubble' → 'chat-bubble'. The field is kept in the schema only so legacy ZIPs deserialize without warnings; new projects should never write to it. */
@@ -260,6 +262,8 @@ export interface MultiChoiceParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices that lead to previously visited beats */
   markVisited?: boolean | undefined;
+  /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
+  effectsOncePerChoice?: boolean | undefined;
   /** How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel. */
   layoutTemplate?: string | undefined;
   /** Who speaks the prompt (for TTS voice routing and optional display) */
@@ -286,6 +290,8 @@ export interface MovementChoiceParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
+  /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
+  effectsOncePerChoice?: boolean | undefined;
   /** Only show choice text when hovering over the hotspot */
   showTextOnHover?: boolean | undefined;
   /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
@@ -314,6 +320,8 @@ export interface PickPropParameters {
   choiceDelay?: number | undefined;
   /** Block and dim choices leading to previously visited beats */
   markVisited?: boolean | undefined;
+  /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
+  effectsOncePerChoice?: boolean | undefined;
   /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */
   spatialFit?: string | undefined;
   /** Who speaks this beat's text (for TTS voice and optional display) */
@@ -1018,6 +1026,8 @@ export interface AiDialogTreeParameters {
   includeChoiceHistory?: boolean | undefined;
   /** Maximum conversation turns */
   maxTurns?: number | undefined;
+  /** Cap on player choices per dialog node AFTER the opening turn (the opening turn may offer one more). Tree size — and generation TIME the player waits — grow exponentially with branching: at 5 turns, 3 choices per turn is a 40+ node tree (about 2 minutes to generate on any model), while 2 halves it and 5-turn depth with cap 2 is the sweet spot for a personal conversation. Unset = the model chooses (2-3). Generating stories SHOULD set this (2 is a good default) on any aiDialogTree with maxTurns 4+. */
+  maxChoicesPerTurn?: number | undefined;
   /** How the dialog renders. 'stacked' keeps the NPC text on top with choices below (visual-novel). 'conversation' lays text on one side and choices on the other. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors. Lives in the LEFT-side VE settings panel. */
   layoutTemplate?: string | undefined;
   /** Exit targets for conversation outcomes */
