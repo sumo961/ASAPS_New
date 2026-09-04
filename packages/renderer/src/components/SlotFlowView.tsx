@@ -1454,7 +1454,13 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           // width, dragging the card mid-stage and leaving an oversized
           // left margin next to a too-tight right margin.
           maxWidth: isConversation ? 'clamp(280px, 50%, 560px)' : undefined,
-          maxHeight: (belowBody || (hasDynamicChoices && !isConversation) || !!webViewSlot || !!inputSlot) ? '100%' : undefined,
+          // '100%' resolves against the root (inset:0, definite height) in
+          // both flow directions. Conversation was excluded here, so a long
+          // NPC speech grew past the stage bottom with no scrollbar (the
+          // root's alignItems:flex-start lets row children exceed the row) —
+          // Story K's ~1500-char Lena node ran clean off the stage. Capped,
+          // the card scrolls internally via the overflowY:auto below.
+          maxHeight: (belowBody || hasDynamicChoices || !!webViewSlot || !!inputSlot) ? '100%' : undefined,
           minHeight: 0,
           overflowY: 'auto',
           display: 'flex',
