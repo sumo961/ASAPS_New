@@ -167,6 +167,13 @@ export class PickPropBeat extends Beat {
     }
 
     if (selectedProp) {
+      // Persist per-choice visited state. DialogTree and MultiChoice have
+      // always done this; PickProp only ever READ the set (above), so
+      // markVisited on a pickProp was inert — evidence props never dimmed
+      // and their counter/inventory effects re-fired on every revisit
+      // (bake-off finding, 2026-09-04: re-examining evidence re-scored it).
+      context.markChoiceVisited(this.id, selectedProp.id || selectedProp.name);
+
       // Record this choice for AI context
       context.recordChoice({
         beatId: this.id,

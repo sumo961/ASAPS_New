@@ -283,6 +283,30 @@ describe('PickPropBeat', () => {
       expect(result).toBe('beat_key');
     });
 
+    it('marks the picked prop visited so markVisited can dim/block it on revisit', async () => {
+      (renderer.renderPropSelection as any).mockResolvedValue('key');
+
+      const beat = new PickPropBeat({
+        id: 'pick1',
+        name: 'Pick Item',
+        type: 'pickProp',
+        markVisited: true,
+        props: [
+          { id: 'key', name: 'Silver Key', target: 'beat_key' },
+          { id: 'book', name: 'Old Book', target: 'beat_book' },
+        ],
+      });
+
+      await beat.execute(context, renderer);
+      // DialogTree and MultiChoice always persisted this; PickProp only read
+      // it, so evidence props re-fired their effects on every revisit.
+      expect(context.getVisitedChoicesForBeat('pick1')).toContain('key');
+
+      // Re-entering the beat hands the persisted set to the renderer.
+      await beat.execute(context, renderer);
+      expect((renderer.setVisitedChoiceIds as any).mock.calls.at(-1)[0]).toContain('key');
+    });
+
     it('should filter props based on conditions', async () => {
       (renderer.renderPropSelection as any).mockResolvedValue('public');
 
