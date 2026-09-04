@@ -3789,6 +3789,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </span>
                           </label>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="effectsOnce-dialog"
+                            checked={localBeat.parameters?.effectsOncePerChoice || false}
+                            onChange={(e) => handleParameterChange('effectsOncePerChoice', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="effectsOnce-dialog" className="text-sm text-gray-700">
+                            Effects fire only on first pick
+                            <span className="text-xs text-gray-500 block">
+                              Choices stay selectable on revisits, but their effects (counters, inventory) apply only the first time
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     )}
 
@@ -4072,6 +4087,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Block and dim visited choices
                             <span className="text-xs text-gray-500 block">
                               Block and dim choices leading to previously visited beats
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="effectsOnce-movement"
+                            checked={localBeat.parameters?.effectsOncePerChoice || false}
+                            onChange={(e) => handleParameterChange('effectsOncePerChoice', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="effectsOnce-movement" className="text-sm text-gray-700">
+                            Effects fire only on first pick
+                            <span className="text-xs text-gray-500 block">
+                              Choices stay selectable on revisits, but their effects (counters, inventory) apply only the first time
                             </span>
                           </label>
                         </div>
@@ -4619,6 +4649,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                             Block and dim visited choices
                             <span className="text-xs text-gray-500 block">
                               Block and dim choices leading to previously visited beats
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="effectsOnce-pickprop"
+                            checked={localBeat.parameters?.effectsOncePerChoice || false}
+                            onChange={(e) => handleParameterChange('effectsOncePerChoice', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <label htmlFor="effectsOnce-pickprop" className="text-sm text-gray-700">
+                            Effects fire only on first pick
+                            <span className="text-xs text-gray-500 block">
+                              Choices stay selectable on revisits, but their effects (counters, inventory) apply only the first time
                             </span>
                           </label>
                         </div>
