@@ -1277,6 +1277,8 @@ a phone screen before the story gets a pixel. So on phone-sized stages (under
 size) ASAPS collapses every screen-docked HUD in a corner into **one slim
 strip**:
 
+![Phone-portrait preview: the three suspicion meters folded into one strip, pulsing "Suspicion: Brandt +1" after a choice](images/65-compact-hud-strip.png)
+
 - meters become the character's initials plus a micro-bar (a `+2` marks
   further counters), inventories become an item count, mood tokens shrink to
   a small token;
@@ -2002,6 +2004,8 @@ Elements stack on top of each other. A character should appear in front of the b
 When you select two or more elements at once, alignment and distribution buttons appear (align left/right/top/bottom/center, distribute horizontally/vertically); selecting two or more elements also reveals group/ungroup controls.
 
 <a id="phone-crop-preview"></a>
+![The responsive Visual Editor at the Phone · 390 preset — the beat as a portrait phone will lay it out, with the meter frames docked top-left](images/68-visual-editor-phone.png)
+
 ### Phone Crop Preview
 
 A landscape stage shown on a phone held upright gets cropped: the renderer keeps the full height and shows the middle of the picture. The **phone crop preview** button draws two dashed frames over the stage — a **9:16** and a taller **9:19.5** phone — so you can see which part of your background, and which characters and hotspots, a phone player will actually get. Anything outside the frames is what a phone loses. Keep the things that matter inside the inner frame, or anchor them to the image (see [Anchored to](#animation-anchor) for animations, and image [asset variants](#image-asset-variants--orientation-and-device-class-v0959) for a different picture altogether on phones).
@@ -2580,6 +2584,8 @@ The **Debug Info** panel (toggle with the **Debug** button on the toolbar) shows
 ### Editing State While You Play
 
 The values in the Debug Info panel aren't just a read-out — **variables and counters are editable in place**. Click a value, type a new one, and press **Enter** (or click away) to commit; **Escape** reverts. Every HUD, meter, and condition reacts immediately, exactly as if a beat had set the value.
+
+![The Debug Info rail mid-play — Variables and Counters are plain fields: the suspBrandt value has just been edited in place (Enter commits, Escape reverts)](images/67-debug-rail-editing.png)
 
 - Counters take a number.
 - Variables accept `true`, `false`, numbers, and quoted strings as you'd write them; a bare word is stored as plain text.
@@ -3492,6 +3498,8 @@ Supported operations: edit beat properties, add beats, delete beats, move beats.
 ## Find & Change
 
 One panel for every bulk edit. Click **Find & Change** in the header (or press **Ctrl/Cmd+F**) and a panel docks on the right with two tabs:
+
+![Find & Change docked on the right — 24 matches for "Brandt" across beat text, button labels, names, and dialog speakers, each match highlighted](images/66-find-change.png)
 
 - **Find** — search and replace, no AI involved. Opens with **Ctrl/Cmd+F**.
 - **Change with AI** — describe the change in plain language and let the AI apply it across the project. Opens directly with **Ctrl/Cmd+Shift+F** (also **Tools → Change with AI**).
