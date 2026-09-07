@@ -349,6 +349,13 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
   const [expandedCorner, setExpandedCorner] = React.useState<HudCorner | null>(null);
   const [pulses, setPulses] = React.useState<Record<string, { text: string; at: number }>>({});
   const prevSnapshot = React.useRef<Map<string, { label: string; value: number }> | null>(null);
+  // Per-corner clear timers. They must NOT be the change-effect's cleanup:
+  // that effect re-runs on every layout tick, and a cleanup there cancelled
+  // the clear, so the first pulse's element lived forever (faded to opacity 0
+  // by its own animation) and every later pulse only retexted an invisible
+  // node — "pulses once per playthrough". Timers only die on unmount.
+  const pulseTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  React.useEffect(() => () => { Object.values(pulseTimers.current).forEach(clearTimeout); }, []);
 
   // Beat change (or leaving compact mode) folds an open panel.
   React.useEffect(() => { setExpandedCorner(null); }, [collapseKey, compact]);
@@ -398,14 +405,15 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
       for (const c of corners) n[c] = { text: perCorner[c].join(' · '), at };
       return n;
     });
-    const t = setTimeout(() => {
-      setPulses((p) => {
-        const n: typeof p = {};
-        for (const [c, v] of Object.entries(p)) if (v.at !== at) n[c] = v;
-        return n;
-      });
-    }, PULSE_MS);
-    return () => clearTimeout(t);
+    for (const c of corners) {
+      clearTimeout(pulseTimers.current[c]);
+      pulseTimers.current[c] = setTimeout(() => {
+        setPulses((p) => {
+          if (p[c]?.at !== at) return p; // a newer pulse owns this corner now
+          const n = { ...p }; delete n[c]; return n;
+        });
+      }, PULSE_MS);
+    }
     // Layout identity changes on every value tick; that is exactly the signal.
   }, [layout, compact, strips]);
 
@@ -435,7 +443,7 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
             left={p?.left ?? 12}
             top={p?.top ?? 12}
             fontScale={fontScale}
-            pulse={pulses[strip.corner] ? { text: pulses[strip.corner].text } : null}
+            pulse={pulses[strip.corner] ? { text: pulses[strip.corner].text, at: pulses[strip.corner].at } : null}
             atBottom={strip.corner.startsWith('bottom')}
             expanded={expandedCorner === strip.corner}
             onToggle={() => setExpandedCorner((c) => (c === strip.corner ? null : strip.corner))}

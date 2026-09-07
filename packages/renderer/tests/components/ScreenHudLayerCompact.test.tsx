@@ -45,6 +45,28 @@ describe('ScreenHudLayer — compact interaction', () => {
     }
   });
 
+  it('pulses again on every later change, even when layouts re-render in between', () => {
+    vi.useFakeTimers();
+    try {
+      const at = (v: number) => buildScreenHudLayout({ characters: chars(v), stage });
+      const { rerender } = render(<ScreenHudLayer layout={at(1)} stage={stage} collapseKey="b" />);
+      rerender(<ScreenHudLayer layout={at(2)} stage={stage} collapseKey="b" />);
+      expect(screen.getByTestId('compact-hud-pulse').textContent).toBe('Suspicion: Brandt +1');
+      // A value-less re-render (new layout object, same values) — the runtime
+      // does this on every tick. It must not cancel the pulse's clear timer.
+      rerender(<ScreenHudLayer layout={at(2)} stage={stage} collapseKey="b" />);
+      act(() => { vi.advanceTimersByTime(2500); });
+      expect(screen.queryByTestId('compact-hud-pulse')).toBeNull();
+      // Second change later in the playthrough pulses again, with fresh text.
+      rerender(<ScreenHudLayer layout={at(4)} stage={stage} collapseKey="b" />);
+      expect(screen.getByTestId('compact-hud-pulse').textContent).toBe('Suspicion: Brandt +2');
+      act(() => { vi.advanceTimersByTime(2500); });
+      expect(screen.queryByTestId('compact-hud-pulse')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('draws the full card on desktop stages with no strip', () => {
     const desk = { width: 1024, height: 768 };
     render(<ScreenHudLayer layout={buildScreenHudLayout({ characters: chars(1), stage: desk })} stage={desk} />);

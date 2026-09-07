@@ -72,8 +72,9 @@ export interface CompactHudStripProps {
   left: number;
   top: number;
   fontScale?: number;
-  /** Transient change notice ("Brandt +1") rendered beside the strip. */
-  pulse?: { text: string } | null;
+  /** Transient change notice ("Brandt +1") rendered beside the strip. `at`
+   *  keys the element so each pulse remounts and its animation restarts. */
+  pulse?: { text: string; at?: number } | null;
   /** Bottom corners hang the pulse above the strip instead of below. */
   atBottom?: boolean;
   expanded?: boolean;
@@ -151,6 +152,7 @@ export function CompactHudStrip({
       })}
       {pulse && (
         <span
+          key={pulse.at ?? 0}
           data-testid="compact-hud-pulse"
           style={{
             position: 'absolute',
