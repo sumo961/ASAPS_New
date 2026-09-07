@@ -2523,6 +2523,8 @@ export class ReactRenderer extends BaseRenderer {
           ?? (content.spatialAnimations as Record<string, any> | undefined);
         this.renderComponent(
           <SpatialFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
             key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-default'}
@@ -3119,6 +3121,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-dialogTree'}
@@ -3456,6 +3460,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-movementChoice'}
@@ -3601,6 +3607,8 @@ export class ReactRenderer extends BaseRenderer {
           };
           this.renderComponent(
             <SpatialFlowView
+            reservedHudRects={this.hudSuppressed ? undefined : this.reservedHudRects}
+            onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
             previewWidth={this.viewportOverride?.width}
             previewHeight={this.viewportOverride?.height}
               key={(this.getState('currentBeatInfo') as { id?: string } | undefined)?.id ?? 'spatial-pickProp'}

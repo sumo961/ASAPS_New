@@ -10,15 +10,23 @@
  * its packed position. Global HUDs are drawn dashed/muted ("from General
  * Settings"); this character's frames are solid and accented.
  */
-import React from 'react';
-import { layoutScreenHuds, placementMap, type HudBox, type HudCorner } from '@asaps/renderer';
+import React, { useState } from 'react';
+import {
+  layoutScreenHuds, placementMap, resolveHudCompact, compactStripWidthEstimate, COMPACT_STRIP_HEIGHT,
+  type HudBox, type HudCorner, type CompactHudItem,
+} from '@asaps/renderer';
 import type { Character } from '../../types/character';
 
 /** Minimal shape of the global-settings HUD overlay config we read. */
 export interface HudOverlaySettings {
   timerHud?: { enabled?: boolean; position?: string; label?: string };
   countdownMeter?: { enabled?: boolean; position?: string; meterWidth?: number };
+  /** Phone HUD collapse policy (General Settings → HUDs). */
+  compactMode?: 'auto' | 'always' | 'never';
 }
+
+/** The phone stage the schematic packs against when the 📱 toggle is on. */
+const PHONE_STAGE = { width: 390, height: 740 };
 
 interface HudLayoutPreviewProps {
   character: Character;
@@ -48,10 +56,18 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
-  character, hudOverlays, stage = { width: 960, height: 600 },
+  character, hudOverlays, stage: desktopStage = { width: 960, height: 600 },
 }) => {
+  // 📱 toggle: pack against a phone-portrait stage instead. There this
+  // character's cards fold into the compact strip (unless the story's
+  // Compact-HUD setting says never) — the schematic shows the strip so the
+  // author sees what a phone player actually gets.
+  const [phone, setPhone] = useState(false);
+  const stage = phone ? PHONE_STAGE : desktopStage;
+  const compact = resolveHudCompact(hudOverlays?.compactMode, stage);
   const boxes: HudBox[] = [];
   const globalIds = new Set<string>();
+  const stripIds = new Set<string>();
 
   // Global obstacles from General Settings.
   if (hudOverlays?.timerHud?.enabled) {
@@ -89,7 +105,30 @@ export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
     }
   }
 
-  const scale = Math.min(CANVAS_W / stage.width, CANVAS_H / stage.height);
+  // Compact: fold this character's cards into one strip per corner, exactly
+  // as buildScreenHudLayout does at runtime (global timer/countdown keep
+  // their own boxes and the strip packs beneath them).
+  if (compact) {
+    const byCorner = new Map<HudCorner, CompactHudItem[]>();
+    for (const b of boxes) {
+      if (globalIds.has(b.id)) continue;
+      const item: CompactHudItem = b.kind === 'inventory'
+        ? { kind: 'inventory', characterId: character.id, name: character.name, count: ((character as any).inventory || []).length }
+        : b.kind === 'mood'
+          ? { kind: 'mood', characterId: character.id, name: character.name, valence: 0, arousal: 0 }
+          : { kind: 'meter', characterId: character.id, name: character.name, counters: ((character as any).counters || []).filter((k: any) => k.visible) };
+      (byCorner.get(b.corner) ?? byCorner.set(b.corner, []).get(b.corner)!).push(item);
+    }
+    for (let i = boxes.length - 1; i >= 0; i--) if (!globalIds.has(boxes[i].id)) boxes.splice(i, 1);
+    for (const [corner, items] of byCorner) {
+      const id = `compact-${corner}`;
+      stripIds.add(id);
+      boxes.push({ id, corner, width: compactStripWidthEstimate(items), height: COMPACT_STRIP_HEIGHT, kind: 'meter' });
+    }
+  }
+
+  const canvasH = phone ? 220 : CANVAS_H;
+  const scale = Math.min(CANVAS_W / stage.width, canvasH / stage.height);
   const stageW = stage.width * scale;
   const stageH = stage.height * scale;
   const place = placementMap(layoutScreenHuds(boxes, stage));
@@ -97,6 +136,24 @@ export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
 
   return (
     <div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 4, marginBottom: 6 }}>
+        {([['desktop', 'Desktop'], ['phone', '📱 Phone']] as const).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setPhone(k === 'phone')}
+            aria-pressed={phone === (k === 'phone')}
+            style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+              border: '1px solid #3d4356',
+              background: phone === (k === 'phone') ? '#3d4356' : 'transparent',
+              color: phone === (k === 'phone') ? '#f8fafc' : '#94a3b8',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
       <div
         style={{
           position: 'relative',
@@ -124,9 +181,9 @@ export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
                 top: p.top * scale,
                 width: Math.max(18, b.width * scale),
                 height: Math.max(10, b.height * scale),
-                background: isGlobal ? 'transparent' : c.fill,
-                border: isGlobal ? `1px dashed ${c.fill}` : `1px solid ${c.fill}`,
-                borderRadius: 3,
+                background: isGlobal ? 'transparent' : (stripIds.has(b.id) ? '#111827' : c.fill),
+                border: isGlobal ? `1px dashed ${c.fill}` : (stripIds.has(b.id) ? '1px solid #f5c451' : `1px solid ${c.fill}`),
+                borderRadius: stripIds.has(b.id) ? 999 : 3,
                 color: isGlobal ? c.fill : c.text,
                 fontSize: 8,
                 lineHeight: 1,
@@ -138,7 +195,7 @@ export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
                 whiteSpace: 'nowrap',
               }}
             >
-              {KIND_LABEL[b.kind]}
+              {stripIds.has(b.id) ? 'Strip' : KIND_LABEL[b.kind]}
             </div>
           );
         })}
@@ -146,6 +203,10 @@ export const HudLayoutPreview: React.FC<HudLayoutPreviewProps> = ({
       <div style={{ marginTop: 6, fontSize: 10, color: '#94a3b8', textAlign: 'center' }}>
         {characterBoxes.length === 0 ? (
           <span>No screen-docked HUDs for this character yet.</span>
+        ) : compact ? (
+          <span>On phones this character's HUDs fold into a tap-to-expand strip{hudOverlays?.compactMode === 'always' ? ' (Compact HUD: always)' : ''}</span>
+        ) : phone ? (
+          <span>Compact HUD is set to never — full cards even on phones</span>
         ) : globalIds.size > 0 ? (
           <span>Solid = this character · dashed = General Settings HUDs (reserved)</span>
         ) : (

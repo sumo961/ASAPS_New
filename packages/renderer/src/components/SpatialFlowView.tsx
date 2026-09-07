@@ -21,6 +21,15 @@ import type { SpriteSheetData } from './PositionedBeatView';
 
 interface SpatialFlowViewProps {
   beatType: string;
+  /**
+   * Screen-HUD rects the flow layer must keep clear of. Spatial beats used to
+   * reserve nothing — the question/choice panel of a hotspot or map beat sat
+   * under a corner HUD while every other beat type stepped around it.
+   */
+  reservedHudRects?: Array<{ x: number; y: number; width: number; height: number }>;
+  onSubscribeReservedHudRects?: (
+    listener: (rects: Array<{ x: number; y: number; width: number; height: number }> | undefined) => void,
+  ) => () => void;
   /** Image layer + flow slots (schema-driven, from getSpatialSpec). */
   spatial: SpatialSpec;
   content: Record<string, any>;
@@ -265,6 +274,8 @@ function spatialPhaseStyles(
  */
 export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
   beatType,
+  reservedHudRects,
+  onSubscribeReservedHudRects,
   spatial,
   content,
   theme,
@@ -878,6 +889,8 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
           previewHeight={previewHeight}
           previewCoarse={previewCoarse}
           extraExitMs={spatialExitMs}
+          reservedHudRects={reservedHudRects}
+          onSubscribeReservedHudRects={onSubscribeReservedHudRects}
           onExitStart={handleExitStart}
           forceMultiActionGate={hasDynamicActions}
           onGateChange={handleGateChange}

@@ -112,4 +112,4 @@ export { renderMarkdownLite } from './utils/markdownLite';
 // story played the full screen.
 export { generateDefaultLocations } from './utils/DefaultLocationGenerator';
 export { backfillUnplacedDefaults } from './renderers/ReactRenderer';
-export { CompactHudStrip, COMPACT_STRIP_HEIGHT, type CompactHudItem } from './components/CompactHudStrip';
+export { CompactHudStrip, COMPACT_STRIP_HEIGHT, compactStripWidthEstimate, type CompactHudItem } from './components/CompactHudStrip';
