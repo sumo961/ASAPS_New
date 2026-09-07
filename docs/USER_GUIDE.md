@@ -266,10 +266,11 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
 | **Export** | Dropdown: export as Project ZIP (ASML 2.0 — JSON, complete and native), template (.asapst), standalone HTML — or legacy ASML 1.0 XML (frozen serialization; a confirm explains what it can't carry) |
-| **Tools** | Dropdown: Transformations, Merge DialogTrees |
+| **Tools** | Dropdown: Change with AI, Merge DialogTrees |
 
 | Right Side | What it Does |
 |------------|--------------|
+| **Find & Change** | Find & replace, and AI bulk changes (slate button, Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
 | **Characters** | Create and manage your cast (blue button) |
 | **Assets** | Manage images, sounds, videos, fonts (orange button) |
 | **Settings** | Global configuration (purple button) |
@@ -454,18 +455,26 @@ This is where interactivity shines. Present text and multiple choices, each pote
 - **Main Text** - The prompt or situation
 - **Dialog Elements** - The choices (add as many as needed)
 - **Presentation Mode** - How the dialog appears:
-  - *Positioned* - Traditional visual novel style
-  - *Chat Scroll* - Messaging app style
-  - *Chat Bubble* - Speech bubbles
+  - *Positioned (traditional elements / spatial)* - Traditional visual novel style
+  - *Chat — scrolling history* - Messaging app style
+  - *Chat — single bubble* - One speech bubble at a time
 
 **Each Choice Can Have:**
 - **Text** - What the option says
 - **Target** - Which beat to go to
-- **Condition** - Only show this choice if a condition is met
+- **Conditions** - Only show this choice when the story state matches (see *Earned options* below)
 
 **When to Use:** Conversations, decision points, anywhere the interactor needs options.
 
-**Pro Tip:** Use conditions to hide choices the player hasn't unlocked. Found a secret note? Show the "Ask about the mysterious symbol" option.
+<a id="conditional-choices"></a>
+**Earned options — choices that appear only when they've been earned.** Directly under a choice's **Target** in the Inspector sits a small **Show only if…** editor (the same one Movement Choice destinations, Pick Prop props, and hotspots carry). Add a condition there and the choice is *hidden* until every condition holds — an inventory **item** the player has (or lacks), a **variable** value, a **counter** comparison, or a **visited beat** (visited or not yet visited). This is the tool for the "Ask about the mysterious symbol" option that should only exist once the player has actually found the note. Two habits make it pay off:
+
+- **Prefer a conditional choice over a duplicated menu.** One dialog with an accusation choice gated on *visited beat: the decisive clue* beats two near-identical dialogs (one with the accusation, one without) that drift apart the moment you edit one of them.
+- **Let discoveries unlock options, not decide them.** Finding the clue should make the accusation *possible*; the player still chooses whether to make it. Gating hides options — it never forces an outcome.
+
+The flowchart draws a choice's conditions on its edge, so you can see at a glance which paths are gated.
+
+**Layout on responsive stages.** In a responsive project the *Visual Editor's* left panel adds a **Layout Template** for dialog beats — *Stacked (Visual Novel)*, *Conversation (side-by-side)*, *Chat - Scrollable History*, *Chat - Single Bubble*, or *Custom (drag-place)*. Conversation puts the NPC text on one side and the choices on the other; it needs genuine side-by-side room, so below roughly 640 px of usable width (a phone held upright) the same beat quietly falls back to the stacked flow — nothing to configure, and your choices and effects are untouched. Long NPC speeches scroll inside their card instead of running off the bottom of the stage, and a narrow corner HUD indents the text beside it rather than pushing everything down.
 
 **Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand.
 
@@ -474,11 +483,40 @@ This is where interactivity shines. Present text and multiple choices, each pote
 - Set auto-exit to a beat to advance there after the NPC speaks
 - Set auto-exit to **Return to initial choices** (`__self__`) to loop back to the root of the dialog tree
 
-**Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking** (`markVisited`), choices the interactor has already picked can be visually dimmed or hidden.
+The farewell line is never a frozen screen: a **Continue** button appears right away, and whichever comes first — the player's tap or the reading time (plus any speech) — moves the story on. Fast readers skip ahead; slow readers are never cut off.
+
+**Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking**, choices the interactor has already picked can be visually dimmed or blocked.
+
+<a id="revisit-policy"></a>
+**What happens on a second visit?** Under **Show Advanced Options** at the bottom of the Inspector, every choice beat (Dialog Tree, Multi Choice, Movement Choice, Pick Prop) carries two checkboxes that decide how choices behave when the player comes back:
+
+- **Block and dim visited choices** (`markVisited`) — choices leading to beats the player has already seen are dimmed and can't be picked again. Good for hubs where each question should be asked once.
+- **Effects fire only on first pick** (`effectsOncePerChoice`) — choices stay selectable on revisits, but their effects (counters, inventory, affect) apply only the first time. This is the setting for evidence and clue beats: re-reading the letter is fine, re-scoring *suspicion +1* every time is not.
+
+Leave both off and a choice is simply repeatable, effects and all — sometimes exactly what you want (a shop, a save point).
 
 **Seeing the depth from the flowchart:** A dialog with nested exchanges — choices that open deeper dialog nodes inside the same beat — used to look identical to a one-liner on the graph. Now a multi-phase Dialog Tree node draws with a **stacked-card edge** and a row of **green dots** (one per exchange, capped at six); hover the dots for the count. The same count appears as a green **N phases** chip on the Dialog Tree Editor's header in the Inspector, where the actual structure lives. The node itself stays the same size no matter how deep the dialog goes.
 
 **Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, or **append a reflection** to a Mode B character's memory. Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
+
+---
+
+### Multi Choice
+
+**Purpose:** One question, several buttons — the simplest decision point.
+
+Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's question on top, a row of response buttons below, each leading to its own beat. When a decision doesn't need a back-and-forth, this is the lighter beat to reach for. You'll find it in the palette's **Multi Choice → Buttons** group next to Dialog Tree.
+
+**Key Settings:**
+- **Question** - The prompt above the buttons (supports the same light formatting as Info Text)
+- **Speaker** - Who's asking, via the [Character combobox](#character-combobox)
+- **Choices** - Each with its text, target beat, optional *Show only if…* conditions ([Earned options](#conditional-choices)), and effects (effects appear under **Show Advanced Options**)
+- **Choice Delay (seconds)** - Hold the buttons back for a moment so the question gets read first
+- **Revisit behaviour** - the same *Block and dim visited choices* / *Effects fire only on first pick* pair as Dialog Tree — see [What happens on a second visit?](#revisit-policy)
+
+In a responsive project the Visual Editor's left panel offers a **Layout Template** — *Stacked (prompt + buttons)*, *Conversation (side-by-side)*, *Chat - Single Bubble*, or *Custom (drag-place)*. Like Dialog Tree, a Conversation layout falls back to stacked on phone-width stages.
+
+**When to Use:** Quick decisions, quiz questions, "which way?" moments that don't need a conversation.
 
 ---
 
@@ -490,7 +528,8 @@ Perfect for exploration! Display a scene and let interactors choose where to go.
 
 **Key Settings:**
 - **Main Text** - Description of current location
-- **Destinations** - Places the interactor can go, each with a target beat
+- **Destinations** - Places the interactor can go, each with a target beat, optional conditions (a locked door that only opens once you hold the key — see [Earned options](#conditional-choices)), and optional effects
+- **Revisit behaviour** - the same *Block and dim visited choices* / *Effects fire only on first pick* pair as Dialog Tree, under Show Advanced Options — see [What happens on a second visit?](#revisit-policy)
 
 **When to Use:** Exploration games, room-by-room adventures, maps.
 
@@ -514,8 +553,10 @@ Present objects the interactor can interact with. Great for investigation scenes
 
 **Key Settings:**
 - **Main Text** - Description of what they're looking at
-- **Props** - Items to choose from
+- **Props** - Items to choose from, each with a target beat and optional conditions and effects
 - **Display Mode** - Text list or graphical icons
+
+**Examining the same clue twice.** Investigation scenes are where the [revisit checkboxes](#revisit-policy) earn their keep. With **Effects fire only on first pick** on, the player can re-read the ledger as often as they like, but the *suspicion +1* it carries is scored once. With **Block and dim visited choices** on, a prop already picked is dimmed and can't be taken again — the natural choice for items that go into the inventory. Both live under Show Advanced Options in the Inspector.
 
 **When to Use:** Investigation scenes, inventory puzzles, examining objects.
 
@@ -1050,8 +1091,11 @@ Instead of scripting every possible response, let AI generate a contextually app
 - **NPC Personality** - How the AI should "act"
 - **Exit Targets** - Named exits with descriptions telling the AI when to use each one
 - **Max Turns** - Limit conversation length
+- **Max choices per turn** - Cap on how many replies the player is offered per exchange (1–4), applied after the opening turn. Leave it empty and the model chooses (usually 2–3). This one number decides how long the player waits: a tree grows *exponentially* with branching, so five turns at three choices is a 40-plus-node tree (about two minutes to generate on any model), while two choices halves it. Five turns with a cap of two is the sweet spot for a personal conversation — set **2** on any AI Dialog Tree with four or more turns.
 - **Presentation Mode** - Positioned, chat scroll, or chat bubble
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
+
+**Which model answers?** In-story AI beats use the **Model for in-story AI** from AI settings when you've set one, and your main model otherwise — see [Which Model for Which Job?](#which-model-for-which-job). The generated tree streams in as it is written, and every call logs its round-trip time to the browser console (`[PreviewWindow]` while previewing) so you can see what a change to the cap or the model actually buys.
 
 **Exit Target Features:**
 - **NPC Exit Message** - Each exit target can have an optional `npcExitMessage` prompt. When set, the AI generates a farewell line that directly acknowledges the player's last choice before transitioning. This makes exits feel natural rather than abrupt.
@@ -1216,7 +1260,7 @@ Counters are **scoped to the character**, so two characters can each have a `tru
 
 A counter that's only in the data does nothing for your interactor. The **Meter Frame** is the little panel that puts them on screen. Scroll to the bottom of the **Counters** tab, tick **Enable**, and choose:
 
-- **Dock To** — *Character* (the frame floats beside the character's sprite, positioned by **Anchor Position**) or *Screen* (pinned to one of the four corners, with a small **HUD layout preview** showing how it will stack alongside any other overlays in that corner).
+- **Dock To** — *Character* (the frame floats beside the character's sprite, positioned by **Anchor Position**) or *Screen* (pinned to one of the four corners, with a small **HUD layout preview** showing how it will stack alongside any other overlays in that corner). The preview has a **Desktop / 📱 Phone** toggle: flip it to Phone to see the same corners packed against a phone-portrait stage, where this character's cards fold into the compact strip described below.
 - **Offset X / Y**, and a **Style** block: background, border colour and width, corner radius, padding, opacity.
 - **Show Labels**, plus **Meter Width**, **Meter Height** and **Spacing** for the bars themselves.
 
@@ -1240,15 +1284,21 @@ strip**:
   the delta for a moment (*Brandt +1*, *+1 item*) — the "your accusation
   landed" moment is kept, just smaller;
 - **tap the strip** to open that corner's full cards over the story; tap
-  anywhere (or move to the next beat) to fold them again. The open panel
-  reserves no space, so story text never reflows around it.
+  anywhere, move to the next beat, or just wait a few seconds and they fold
+  again. The open panel reserves no space, so story text never reflows
+  around it.
 
 The strip only reserves its own height, so on a phone the text starts a few
 lines lower instead of a few paragraphs lower. It is on by default for phones
-only; **General Settings → HUDs → Compact HUD on phones** offers *Always* (useful
-to check the strip on a desktop preview) and *Never*. A fixed-layout story
-authored at 1024 px and shrunk onto a phone keeps its full cards — the whole
-stage scales together there, and the strip would scale down with it.
+only: **General Settings → HUDs → Compact HUD on phones** is set to *Auto —
+collapse on phone-sized stages*, and also offers *Always — collapse on every
+stage* (useful to check the strip on a desktop preview) and *Never — always
+show full cards*. A fixed-layout story authored at 1024 px and shrunk onto a
+phone keeps its full cards — the whole stage scales together there, and the
+strip would scale down with it.
+
+Beats with a spatial background (Movement Choice and Pick Prop hotspots over
+an image) reserve space against screen HUDs too, the same way text beats do.
 
 #### Counters that read affect — "a display, not a mechanic"
 
@@ -1943,10 +1993,18 @@ Elements stack on top of each other. A character should appear in front of the b
 | Add Prop | Place item/object |
 | Add Hotspot | Create click zone |
 | Toggle Grid | Show alignment grid |
+| Phone crop preview (phone icon) | Outline what a portrait phone keeps of this stage — see below |
+| Snapping (magnet icon) | Snap guides: while you drag, elements align to the edges and centres of the other elements on stage (on by default) |
+| HUD Overlays (eye icon) | Show the story's HUDs (timers, meters, inventory, mood) on the editor stage, so you can lay out around them; an amber badge warns when HUDs stack awkwardly |
 | Zoom | Adjust view scale (in / out / reset) |
 | Reset Layout | Re-run the default layout for this beat, discarding any manual position edits |
 
 When you select two or more elements at once, alignment and distribution buttons appear (align left/right/top/bottom/center, distribute horizontally/vertically); selecting two or more elements also reveals group/ungroup controls.
+
+<a id="phone-crop-preview"></a>
+### Phone Crop Preview
+
+A landscape stage shown on a phone held upright gets cropped: the renderer keeps the full height and shows the middle of the picture. The **phone crop preview** button draws two dashed frames over the stage — a **9:16** and a taller **9:19.5** phone — so you can see which part of your background, and which characters and hotspots, a phone player will actually get. Anything outside the frames is what a phone loses. Keep the things that matter inside the inner frame, or anchor them to the image (see [Anchored to](#animation-anchor) for animations, and image [asset variants](#image-asset-variants--orientation-and-device-class-v0959) for a different picture altogether on phones).
 
 ### Reset Layout
 
@@ -1976,6 +2034,11 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 4. Enter your API key (for cloud providers)
 5. Adjust settings (model, temperature, etc.)
 
+Two fields in that dialog deserve a second look once you start playing your stories, not just generating them:
+
+- **Model for in-story AI** *(optional)* — a second model, used only while a story *plays*: AI Dialog Tree, AI Conversation, and AI Condition in the Preview Window and in exported players. Authoring tools (story generation, Ideator, translation, the character helper) keep using the main model. Leave it empty and in-story AI uses the main model too. The reason it exists is in [Which Model for Which Job?](#which-model-for-which-job) — the best authoring model is not the best model to make a player wait on.
+- **Max Tokens** *(optional)* — leave it blank. The budget is chosen for you and scales with the reasoning effort you pick (the placeholder shows the current automatic value). If you do type a number below the automatic budget, the dialog warns you: reasoning tokens count against it, so a too-small budget can produce nothing at all, or a story cut off mid-JSON.
+
 ### OpenAI Model Tiers (GPT-5.6 Family)
 
 The OpenAI provider defaults to **gpt-5.6-sol**, the current flagship. The GPT-5.6 family has three tiers — type the one you want into the **Model** field:
@@ -1990,15 +2053,19 @@ Leave the field empty to use the default. Older models (gpt-5.5, GPT-4o) keep wo
 
 ### Which Model for Which Job?
 
-One model setting serves every AI feature in ASAPS, but the features have
-different demands — some run once while you wait, others run on every player
-turn. Pick for the job you're doing most right now, and switch when the job
-changes (the setting takes effect immediately; nothing needs restarting):
+The main **Model** setting serves every AI feature in ASAPS, but the features
+have different demands — some run once while you wait, others run on every
+player turn. Pick for the job you're doing most right now, and switch when the
+job changes (the setting takes effect immediately; nothing needs restarting).
+The one split you don't have to keep switching by hand is authoring versus
+play: the optional **Model for in-story AI** field lets the runtime beats use a
+different model from everything else. The dialog's own **Which model for which
+job?** fold-out carries the short version of this table:
 
 | What you're doing | What matters | Good fit |
 |---|---|---|
 | **Story generation, Ideator, Co-Designer** | One-shot draft quality — you wait once, then work with the result | Flagship: `claude-opus-5` / `gpt-5.6-sol`. Reasoning **Auto** or higher; **Pro** mode for hard material. See *What we measured* below before reaching for Fable |
-| **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto** |
+| **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto**. Put it in **Model for in-story AI** so your authoring model stays the flagship |
 | **Translation** | Instruction-following (markers, variables, JSON) plus literary register, across big batches | Flagship for the pass you ship; the balanced tier is fine for drafts |
 | **Character helper, beat suggestions, transformations** | A structured proposal you review before accepting | The default tier is fine |
 
@@ -2240,6 +2307,8 @@ The AI Dialog Tree beat generates conversations on the fly during play:
 - NPC "remembers" previous exchanges and references the player's name, location, and other context
 - Conversations adapt to story state (variables, inventory, history)
 - Exit routing is intelligent -- the AI explains its reasoning via a routing plan
+- The tree streams in as the model writes it, and the beat's **Max choices per turn** setting is your main lever on how long that takes (see [AI Dialog Tree](#ai-dialog-tree))
+- If you've set a **Model for in-story AI** in AI settings, that model answers here — in the Preview Window and in exported players alike — while your authoring model stays untouched
 
 Configure with personality prompts:
 ```
@@ -2379,11 +2448,11 @@ The Preview Window is your primary tool for testing your interactive narrative. 
 
 ### Starting a Preview
 
-1. Click **Preview** in the header (or use the shortcut)
-2. The preview window opens in a new panel
-3. Click anywhere on the stage to begin, or use the controls
+1. Click **Preview** in the header (or press **Ctrl/Cmd+Shift+P**)
+2. The Preview Window opens as a separate window
+3. Choose where to start — **From the beginning**, or **From "‹beat›"** (the beat currently selected in the editor; the arrow next to it lets you pick any beat) — then click the stage to begin
 
-**Pro Tip:** You can preview from any beat in your story—just select a beat in the flowchart and open the Preview window. The preview automatically navigates to the selected beat.
+**Pro Tip:** Starting mid-story is a first-class mode, not a guess: while **From "‹beat›"** is active, selecting a different beat in the flowchart re-arms the preview live, and a **Start as if…** picker appears so you can begin with the state a player would really have at that point (see [Path-Based State Presets](#path-based-state-presets)).
 
 ![Preview Running](images/09-preview-running.png)
 *Preview mode showing the experience in action*
@@ -2394,17 +2463,19 @@ The top toolbar provides essential controls:
 
 | Control | Function |
 |---------|----------|
-| **Play/Pause** | Start, pause, or resume preview |
-| **Stop** | End preview and return to editing |
-| **Restart** | Start over from the beginning |
-| **Step** | Advance one beat at a time |
-| **Zoom** | Adjust display size |
+| **From the beginning / From "‹beat›"** | Choose the start point before you play |
+| **Pause / Resume** | Pause or resume the running story (**Space**) |
+| **Stop** | End the run and go back to the start controls |
+| **Restart** | Start over from the chosen start point |
+| **Save play session log** | Download a log of the run — beat path, choices, branches, AI output — handy for bug reports |
+| **Zoom** | Adjust display size (in / out) |
 | **Fit** | Auto-fit to window |
 | **Viewport** | Switch the preview container to a device preset (Fit window, Desktop 1280×800, Tablet landscape/portrait, Phone landscape/portrait) — see below |
 | **Text Animation** | Toggle typewriter effect on/off |
 | **Mute** | Silence all audio |
+| **Text-to-Speech / Speech-to-Text** | Toggle voice output and voice input for this run (see [TTS](#text-to-speech-tts) and [STT](#speech-to-text-stt)) |
 | **Inventory** | Show/hide inventory panel (Ctrl/Cmd+I) |
-| **Debug Panel** | Toggle debug information sidebar |
+| **Debug** | Toggle the debug panel (state, variables, visited beats) |
 
 ### Viewport Switcher (v0.9.59)
 
@@ -2475,54 +2546,45 @@ The timeline is accessible through the debug panel and is recorded automatically
 
 ### Debug Panel
 
-The debug panel (toggle with the bug icon) shows real-time state information:
+The **Debug Info** panel (toggle with the **Debug** button on the toolbar) shows real-time state information:
 
 **Current Beat:**
 - Beat name and ID
 - Beat type
+
+**Character affect** *(only when your story uses the affect system)*:
+- Each defined character's current mood and strongest sentiments, updating live
+
+**Visited Beats:**
+- List of visited beats, in order
+- Useful for debugging conditions based on beat history
+- When you start preview from a mid-story beat, path-injected beats carry an amber **seeded** badge — they satisfy visited-beat conditions but weren't actually played this run
 
 **Variables:**
 - All story variables and their current values
 - Updated in real-time as the story progresses
 
 **Counters:**
-- Numeric counters with current values
-- Shows both character-specific and global counters
+- Numeric counters with current values, labelled the way you reference them (`ada.trust` for a character-scoped counter)
+- Counters with a level meter show their bar here too
 
 **Inventory:**
 - Items held by each character
 - Quantity of stackable items
 
-**Visited Beats (History):**
-- List of visited beats, in order
-- Useful for debugging conditions based on beat history
-- When you start preview from a mid-story beat, path-injected beats carry an amber **seeded** badge — they satisfy visited-beat conditions but weren't actually played this run
-
 **Active Timers:**
 - Running timers with remaining time
 - Timer names and target beats
 
-### Manual State Editing
+<a id="manual-state-editing"></a>
+### Editing State While You Play
 
-For advanced testing, you can manually edit the current state:
+The values in the Debug Info panel aren't just a read-out — **variables and counters are editable in place**. Click a value, type a new one, and press **Enter** (or click away) to commit; **Escape** reverts. Every HUD, meter, and condition reacts immediately, exactly as if a beat had set the value.
 
-1. Open the Debug Panel
-2. Click **Edit State**
-3. Modify variables, counters, or inventory
-4. Changes take effect immediately
+- Counters take a number.
+- Variables accept `true`, `false`, numbers, and quoted strings as you'd write them; a bare word is stored as plain text.
 
-This is useful for testing edge cases like "What if the player has negative gold?" or "What happens with 100 items in inventory?"
-
-### State Presets (Saved)
-
-Save commonly-used test states for quick access:
-
-1. Set up your desired state (through play or manual editing)
-2. Click **Save Preset** in the debug panel
-3. Name your preset (e.g., "Has all keys", "Low health scenario")
-4. Access saved presets from the preset menu
-
-Perfect for regression testing—create presets for critical game states and verify they still work after changes.
+This is the quickest way to test the edge cases — "what if trust is already at 90 when they meet?", "what if gold goes negative?" — without building a path that gets you there. For "what would the state be if the player had arrived *this* way?", use the **Start as if…** picker and its [path presets](#path-based-state-presets) instead.
 
 ## Debug Tools
 
@@ -2989,21 +3051,27 @@ Bring scenes to life with movement.
 
 ### Waypoint Animations
 
-1. Select an element (character, prop)
-2. Open **Animations** tab
-3. Click **Add Waypoint**
-4. Click on stage to add path points
-5. Drag bezier handles for curves
-6. Set duration and easing
+1. In the Visual Editor, open the **Animations** tab
+2. Pick the element to animate (character, prop, text) and click **Add Animation**
+3. The path editor opens over the beat's background: click the stage to add waypoints, drag them to adjust, and (for a Bezier path) drag the handles for curves
+4. Give each leg of the path its duration and easing in the waypoint list
+5. **Edit** or delete an existing animation from the same tab
 
 ### Animation Properties
 
+The settings row at the top of the path editor:
+
 | Property | Effect |
 |----------|--------|
-| Duration | How long the animation takes |
-| Easing | Acceleration curve (linear, ease-in, bounce, etc.) |
-| Loop | Whether to repeat |
-| Auto-start | Begin on beat load vs. triggered |
+| **Type** | *Linear* (straight legs) or *Bezier* (curved, with handles) |
+| **Trigger** | *On Load* (starts with the beat), *On Click* (starts when the player clicks an element — pick which one in **Click Element**), or *On Variable* |
+| **Anchored to** | What the path follows when the screen shape changes — see below |
+| **Loop** | Whether to repeat |
+
+Per waypoint (in the list beside the canvas): the duration of the leg *to* that waypoint and its easing curve. The first waypoint is the start position, so its duration isn't used.
+
+<a id="animation-anchor"></a>
+**Anchored to: Background image vs Screen.** Phones crop a landscape background; a path authored as "walk to the door" on a desktop stage can end up walking to a bit of wall once the door has moved. **Screen** (the default) keeps waypoints at fixed fractions of the visible stage — the right choice for things that belong to the frame rather than the scene (a bird flying across the top of the screen, a UI flourish). **Background image** pins every waypoint to the image itself, so the path ends at the door on every device, even when the phone only shows the middle of the picture — pick it for anything that walks *through the scene*. To check what a portrait phone will keep of your stage, use the Visual Editor's [phone-crop preview](#phone-crop-preview).
 
 ### Sprite Animations
 
@@ -3064,6 +3132,8 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
   Individual beats can override these global settings. This lets you hide the speaker name for narration beats while showing it for dialog, for example.
 
 **Settings → HUD:**
+- **Compact HUD on phones** — *Auto* (default: fold screen HUDs into a slim tap-to-expand strip on phone-sized stages), *Always*, or *Never*. See [On phones — the compact HUD strip](#counter-binding).
+- **Show HUDs on the title screen** — off by default for a distraction-free start; turn on if a HUD (say, a countdown that is already running) should be visible from the first frame.
 - Timer / Time Display overlay (timer name, default text, position)
 - Fictional Time overlay
 - Countdown Meter overlay
@@ -3418,25 +3488,34 @@ ASAPS Modern maintains a full undo/redo history for beat operations:
 
 Supported operations: edit beat properties, add beats, delete beats, move beats. The undo stack persists for the current session.
 
-## Search & Replace
+<a id="find-and-change"></a>
+## Find & Change
 
-Find and modify content across your entire project:
+One panel for every bulk edit. Click **Find & Change** in the header (or press **Ctrl/Cmd+F**) and a panel docks on the right with two tabs:
 
-1. Press **Ctrl/Cmd+F** or click **Tools → Search**
-2. The Search panel appears at the bottom
+- **Find** — search and replace, no AI involved. Opens with **Ctrl/Cmd+F**.
+- **Change with AI** — describe the change in plain language and let the AI apply it across the project. Opens directly with **Ctrl/Cmd+Shift+F** (also **Tools → Change with AI**).
+
+Both tabs keep their state when you close and reopen the panel — a search you were in the middle of, or an AI conversation in progress, is still there.
+
+### Find
 
 **Features:**
-- Search across beat names, text content, dialog choices, and properties
-- **Replace** individual matches or replace all
-- **Case-sensitive** toggle
-- **Regex** support for pattern matching
-- Results grouped by beat with context preview
-- Click a result to select that beat in the canvas
+- Search across beat names, text content, dialog choices, and properties; narrow it with the **Beats / Characters / Assets / Metadata** checkboxes
+- **Case sensitive**, **Whole word**, and **Regular expression** options
+- Results grouped by beat with context preview; click a result to select that beat in the canvas
+- Expand **Replace**, type the replacement, tick the matches you want, and press **Replace Selected (N)**. Replace writes into beats only — results from characters, assets, or metadata are shown for finding, not replacing
 
 **Use Cases:**
 - Rename a character across all dialog
 - Find all beats mentioning a specific location
 - Replace placeholder text throughout the story
+
+### Change with AI
+
+Type an instruction such as *"Change 'Prince' to 'Princess' with correct pronouns"* or *"Change blacksmith to jeweler and adapt context"* and the AI rewrites the affected text everywhere, adapting related terms (forge → workshop) rather than doing a blind replace. Simple structural commands — *"Set all transitions to fade 500ms"*, *"Set all backgrounds to forest.jpg"*, *"Set all button sounds to 'Soft Click'"*, *"Remove all meters from dialog beats"* — run without AI at all; the **Examples** fold-out marks these with ⚡. A **History** fold-out keeps your recent commands.
+
+Every change goes through the normal undo history, so **Ctrl/Cmd+Z** takes a bulk edit back in one step.
 
 ## Multi-Language Translation
 
@@ -3456,11 +3535,11 @@ Create localized versions of your story with AI-assisted translation:
 
 **VCS-Aware:** Translations persist through git operations (push, pull, merge) and are saved in the directory project format.
 
-## Transformation Commands
+## The Tools Menu
 
 Bulk operations accessible from the **Tools** dropdown in the header:
 
-- **Transformations** - Bulk transformation commands (also accessible via Ctrl/Cmd+Shift+K)
+- **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F)
 - **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
 
 The **Auto-Arrange** button is available directly on the flowchart canvas (bottom-left controls). The **Debug** button in the header provides reachability analysis, path analysis, and logic validation.
@@ -3487,9 +3566,10 @@ Quick reference for all beat types.
 | Title Screen | Story opening | title, subtitle, author, button text |
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
-| Dialog Tree | Choices | prompt, choices (each with text, target, condition), NPC auto-exit target, presentation mode, markVisited, choice effects |
-| Movement Choice | Navigation | description, destinations |
-| Pick Prop | Item selection | prompt, props, display mode |
+| Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
+| Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
+| Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
+| Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip, captions (cue rows: start/end/text, auto-translated into per-language subtitles), captionsEnabled, videoTranslations (per-language video override) |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
@@ -3524,7 +3604,7 @@ Quick reference for all beat types.
 | AI Info Text | Dynamic narrative text | prompt, fallbackText, buttonText, includeVariables, includeInventory, includeHistory, maxSentences |
 | AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
-| AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, presentationMode, prefetch support |
+| AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, maxChoicesPerTurn (1–4), presentationMode, prefetch support |
 | AI Conversation | Real-time AI conversation | presentation (chat / dialog — set in the Visual Editor's Conversation Settings), scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
 | AI Summary | Journey recap | style, length, include options |
 
@@ -3537,9 +3617,10 @@ Quick reference for all beat types.
 | Ctrl/Cmd + S | Save project |
 | Ctrl/Cmd + Z | Undo |
 | Ctrl/Cmd + Shift + Z | Redo |
-| Ctrl/Cmd + F | Search & Replace |
+| Ctrl/Cmd + F | Find & Change (Find tab) |
+| Ctrl/Cmd + Shift + F | Find & Change (Change with AI tab) |
 | Ctrl/Cmd + Shift + P | Open Preview window |
-| Ctrl/Cmd + Shift + K | Open Transformations panel |
+| Space | Pause / resume (in preview) |
 | Ctrl/Cmd + I | Toggle inventory (in preview) |
 | Delete | Delete selected beat |
 | Escape | Deselect / Close panel |
@@ -3612,6 +3693,14 @@ Quick reference for all beat types.
 **Bookmark / Affect bookmark** - An author-named snapshot of mood / emotion / sentiment state taken at a specific point in the story via the *Bookmark Affect State* effect. Conditions reference it by name through the *delta from a named bookmark* baseline mode — `delta vs. "reunion-scene"`. Bookmarks can scope to all characters or to a single target. See [Bookmark Affect State (effect)](#bookmark-affect-state-effect).
 
 **Affect Summary** - The small italic blue-tinted block (prefixed with `→`) shown below the effect rows in the Choice Effects editor. Synthesises the cumulative effect of the choice in plain language ("Alex: feels happier; joy spikes; trust toward the player grows (+0.50) · +2 supportScore"), updating live as the author tweaks values. Hidden when no effects or every delta is below noise.
+
+**Earned option** - A choice, destination, or prop with a *Show only if…* condition, so it appears only once the story state allows it (a visited beat, an item held, a variable or counter value). The alternative to duplicating a whole menu with and without the option. See [Earned options](#conditional-choices).
+
+**Effects fire only on first pick** - Per-beat checkbox (`effectsOncePerChoice`) on Dialog Tree, Multi Choice, Movement Choice, and Pick Prop: choices stay selectable on revisits, but their effects apply only the first time. The re-readable-but-once-scored middle ground between a plain repeatable choice and *Block and dim visited choices*. See [What happens on a second visit?](#revisit-policy).
+
+**Compact HUD strip** - On phone-sized stages, the slim tap-to-expand bar each corner's screen-docked HUDs fold into (initials + micro-bar per metered character, item counts, mood tokens). Controlled by **General Settings → HUDs → Compact HUD on phones** (Auto / Always / Never). See [On phones — the compact HUD strip](#counter-binding).
+
+**Model for in-story AI** - Optional second model in AI settings, used only while a story plays (AI Dialog Tree, AI Conversation, AI Condition) in the Preview Window and exported players; authoring tools keep the main model. See [Which Model for Which Job?](#which-model-for-which-job).
 
 **Personality Archetype** - One of ten research-grounded Big Five presets (Balanced, Narcissist, Anxious introvert, Conscientious leader, Free spirit, Recluse, Hothead, Peacekeeper, Stoic, Trickster) that can be loaded onto a character to seed traits and, in some cases, self-directed sentiments.
 
