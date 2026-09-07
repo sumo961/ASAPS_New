@@ -4000,6 +4000,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               availableCounters={availableCounters}
                               availableVariables={availableVariables}
                               availableInventoryItems={availableInventoryItems}
+                              characters={characters}
                             />
                           </div>
                           {/* Effects are basic-tier (B2): the write side of a
@@ -4319,6 +4320,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               availableCounters={availableCounters}
                               availableVariables={availableVariables}
                               availableInventoryItems={availableInventoryItems}
+                              characters={characters}
                             />
                           </div>
                           {/* Effects are basic-tier (B2) — see the hotspot note. */}
@@ -4964,6 +4966,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               availableCounters={availableCounters}
                               availableVariables={availableVariables}
                               availableInventoryItems={availableInventoryItems}
+                              characters={characters}
                             />
                           </div>
                           {/* Effects (counter/variable only — inventory handled inherently by pickProp) */}

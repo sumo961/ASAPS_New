@@ -6,8 +6,9 @@
  * the AUTHORING surface; the same guard renders on the choice's edge in
  * the flowchart (dashed + ◇ + summary) so the logic stays visible where
  * it acts. Covers the gating set — inventory / variable / counter /
- * visited-beat; affect and sensor gating stay the ConditionCheck beat's
- * territory for now.
+ * visited-beat / feeling (a character's sentiment toward someone, the
+ * gate the bake-off stories reached for and the editor could not offer);
+ * mood / emotion / sensor gating stay the ConditionCheck beat's territory.
  */
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
@@ -37,16 +38,22 @@ interface ChoiceConditionsEditorProps {
   availableCounters: AvailableOption[];
   availableVariables: AvailableOption[];
   availableInventoryItems: AvailableOption[];
+  /** Story characters, for the feeling gate's holder / target pickers. Optional — without it those fields are free text. */
+  characters?: Array<{ id: string; name?: string; displayName?: string; role?: string }>;
 }
 
-type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat';
+type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat' | 'sentiment';
 
 const GATE_TYPES: Array<{ value: GateType; label: string }> = [
   { value: 'inventory', label: 'item' },
   { value: 'variable', label: 'variable' },
   { value: 'counter', label: 'counter' },
   { value: 'visitedBeat', label: 'visited beat' },
+  { value: 'sentiment', label: 'feeling' },
 ];
+
+/** Common sentiment labels, offered as suggestions — any emotion name in the story's palette works. */
+const SENTIMENT_SUGGESTIONS = ['trust', 'affection', 'respect', 'fear', 'anger', 'suspicion', 'interest', 'gratitude'];
 
 function defaultConditionFor(type: GateType): Condition {
   switch (type) {
@@ -58,6 +65,11 @@ function defaultConditionFor(type: GateType): Condition {
       return { type: 'counter', operator: '>=', variableName: '', value: 1 } as Condition;
     case 'visitedBeat':
       return { type: 'visitedBeat', operator: '==', beatId: '' } as Condition;
+    case 'sentiment':
+      // Sentiments run -1..1; 0.3 is "mild". `character` holds the feeling,
+      // `sentimentTarget` receives it. baseline 'literal' = current value;
+      // 'initial' = change since the story started.
+      return { type: 'sentiment', character: '', sentimentTarget: 'player', sentimentEmotion: 'trust', operator: '>=', value: 0.3, baseline: 'literal' } as Condition;
   }
 }
 
@@ -68,8 +80,10 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
   availableCounters,
   availableVariables,
   availableInventoryItems,
+  characters,
 }) => {
   const conditions = value ?? [];
+  const charLabel = (c: { id: string; name?: string; displayName?: string }) => c.displayName || c.name || c.id;
 
   const update = (index: number, patch: Partial<Condition>) => {
     const next = conditions.map((c, i) => (i === index ? { ...c, ...patch } : c));
@@ -108,10 +122,10 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
       </div>
 
       {conditions.map((cond, i) => {
-        const gate: GateType = (['inventory', 'variable', 'counter', 'visitedBeat'] as const)
+        const gate: GateType = (['inventory', 'variable', 'counter', 'visitedBeat', 'sentiment'] as const)
           .includes(cond.type as GateType) ? (cond.type as GateType) : 'variable';
         return (
-          <div key={i} className="flex items-start gap-1 p-1.5 bg-violet-50 border border-violet-200 rounded">
+          <div key={i} className="flex items-start gap-1 flex-wrap p-1.5 bg-violet-50 border border-violet-200 rounded">
             <select
               value={gate}
               onChange={e => replace(i, defaultConditionFor(e.target.value as GateType))}
@@ -173,6 +187,92 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
                   placeholder="value"
                   className="w-16 px-1.5 py-1 border border-gray-300 rounded text-xs"
                 />
+              </>
+            )}
+
+            {gate === 'sentiment' && (
+              <>
+                {characters && characters.length > 0 ? (
+                  <select
+                    aria-label="Who feels it"
+                    value={(cond as any).character ?? ''}
+                    onChange={e => update(i, { character: e.target.value } as Partial<Condition>)}
+                    className="px-1.5 py-1 border border-gray-300 rounded text-xs bg-white"
+                  >
+                    <option value="">who feels…</option>
+                    {characters.map(c => <option key={c.id} value={c.id}>{charLabel(c)}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    aria-label="Who feels it"
+                    type="text"
+                    value={(cond as any).character ?? ''}
+                    onChange={e => update(i, { character: e.target.value } as Partial<Condition>)}
+                    placeholder="character id"
+                    className="w-24 px-1.5 py-1 border border-gray-300 rounded text-xs font-mono"
+                  />
+                )}
+                <input
+                  aria-label="Feeling"
+                  type="text"
+                  list="choice-sentiment-suggestions"
+                  value={(cond as any).sentimentEmotion ?? ''}
+                  onChange={e => update(i, { sentimentEmotion: e.target.value } as Partial<Condition>)}
+                  placeholder="trust…"
+                  title="Emotion label from the story's palette. Empty = all feelings toward the target summed."
+                  className="w-20 px-1.5 py-1 border border-gray-300 rounded text-xs"
+                />
+                <datalist id="choice-sentiment-suggestions">
+                  {SENTIMENT_SUGGESTIONS.map(e => <option key={e} value={e} />)}
+                </datalist>
+                <span className="text-[11px] text-gray-500 self-center">toward</span>
+                {characters && characters.length > 0 ? (
+                  <select
+                    aria-label="Toward whom"
+                    value={(cond as any).sentimentTarget ?? 'player'}
+                    onChange={e => update(i, { sentimentTarget: e.target.value } as Partial<Condition>)}
+                    className="px-1.5 py-1 border border-gray-300 rounded text-xs bg-white"
+                  >
+                    <option value="player">Player</option>
+                    {characters.filter(c => c.role !== 'player').map(c => <option key={c.id} value={c.id}>{charLabel(c)}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    aria-label="Toward whom"
+                    type="text"
+                    value={(cond as any).sentimentTarget ?? 'player'}
+                    onChange={e => update(i, { sentimentTarget: e.target.value } as Partial<Condition>)}
+                    placeholder="player"
+                    className="w-20 px-1.5 py-1 border border-gray-300 rounded text-xs font-mono"
+                  />
+                )}
+                <select
+                  aria-label="Operator"
+                  value={cond.operator}
+                  onChange={e => update(i, { operator: e.target.value as Condition['operator'] })}
+                  className="px-1 py-1 border border-gray-300 rounded text-xs bg-white"
+                >
+                  {['>=', '>', '<=', '<'].map(op => <option key={op} value={op}>{op}</option>)}
+                </select>
+                <input
+                  aria-label="Strength"
+                  type="number"
+                  step={0.1}
+                  min={-1}
+                  max={1}
+                  value={String(cond.value ?? 0.3)}
+                  onChange={e => update(i, { value: Number(e.target.value) })}
+                  title="Sentiments run from -1 to 1; 0.3 is mild, 0.6 strong"
+                  className="w-14 px-1.5 py-1 border border-gray-300 rounded text-xs"
+                />
+                <label className="text-[11px] text-gray-600 self-center flex items-center gap-1" title="Compare the CHANGE since the story started instead of the current value">
+                  <input
+                    type="checkbox"
+                    checked={(cond as any).baseline === 'initial'}
+                    onChange={e => update(i, { baseline: e.target.checked ? 'initial' : 'literal' } as Partial<Condition>)}
+                  />
+                  since start
+                </label>
               </>
             )}
 

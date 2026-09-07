@@ -35,6 +35,13 @@ export function summarizeCondition(
       const negated = c.operator === 'not' || c.operator === '!=';
       return negated ? `not visited "${name}"` : `visited "${name}"`;
     }
+    case 'sentiment': {
+      const holder = (c as any).character || '?';
+      const target = (c as any).sentimentTarget || 'player';
+      const feeling = (c as any).sentimentEmotion || 'feeling';
+      const delta = (c as any).baseline === 'initial' ? 'Δ' : '';
+      return `${holder} ${feeling}→${target} ${delta}${OP_TEXT[c.operator] ?? c.operator} ${c.value}`;
+    }
     default:
       // Affect / XR / timer types — name the type rather than invent syntax
       return `${c.type}${c.variableName ? ` ${c.variableName}` : ''}`;

@@ -800,6 +800,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                           condition holds — same editor as multiChoice. */}
                       <div className="mt-2">
                         <ChoiceConditionsEditor
+                          characters={characterObjects}
                           value={choice.conditions}
                           onChange={(conds) => updateChoiceAtPath(path, index, { conditions: conds })}
                           allBeats={allBeats}
