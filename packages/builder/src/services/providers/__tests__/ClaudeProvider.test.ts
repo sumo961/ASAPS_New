@@ -16,7 +16,7 @@
  * API-correct one. See the date-suffixed-model test for a flagged edge.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClaudeProvider } from '../ClaudeProvider';
+import { ClaudeProvider, defaultStoryMaxTokensFor } from '../ClaudeProvider';
 import type { AIProviderConfig } from '../../../types/ai';
 
 // generateStory loads the beat schema via the AIValidator singleton — stub it
@@ -356,5 +356,24 @@ describe('no-text-block responses', () => {
     expect(() =>
       (p as any).extractTextBlock({ content: [{ type: 'tool_use' }], stop_reason: 'end_turn' }),
     ).toThrow(/stop_reason=end_turn.*tool_use/);
+  });
+});
+
+describe('defaultStoryMaxTokensFor — Fable floor', () => {
+  // Measured 2026-09-07: claude-fable-5-1 spends 45-68K tokens thinking on an
+  // Ideator-length brief and truncated mid-JSON at 64K. Fable cannot turn
+  // thinking off, so its default cap must never fall to the 32K 'Auto' value.
+  it('floors Fable models at the xhigh budget regardless of effort', () => {
+    expect(defaultStoryMaxTokensFor(undefined, 'claude-fable-5-1')).toBe(96000);
+    expect(defaultStoryMaxTokensFor('low', 'claude-fable-5-1')).toBe(96000);
+    expect(defaultStoryMaxTokensFor('xhigh', 'claude-fable-5')).toBe(96000);
+  });
+  it('lets max exceed the floor on Fable', () => {
+    expect(defaultStoryMaxTokensFor('max', 'claude-fable-5-1')).toBe(128000);
+  });
+  it('leaves non-Fable models on the effort scale', () => {
+    expect(defaultStoryMaxTokensFor(undefined, 'claude-opus-5')).toBe(32000);
+    expect(defaultStoryMaxTokensFor('xhigh', 'claude-opus-5')).toBe(96000);
+    expect(defaultStoryMaxTokensFor('high')).toBe(64000);
   });
 });

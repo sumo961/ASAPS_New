@@ -49,17 +49,26 @@ import {
  * a wrong "Default: …" hint is what invites someone to type a smaller value
  * and silently defeat this scaling.
  */
-export function defaultStoryMaxTokensFor(effort: string | undefined): number {
-  switch (effort) {
-    case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
-    case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
-    case 'high':  return 64000;
-    case 'medium': return 48000;
-    case 'low':
-    case 'minimal':
-    case 'none':
-    default: return 32000;
-  }
+export function defaultStoryMaxTokensFor(effort: string | undefined, model?: string): number {
+  // Fable models think ALWAYS (no off switch) and think hard: measured
+  // 2026-09-07 on an Ideator-length brief, claude-fable-5-1 spent 45-68K
+  // tokens on thinking alone and truncated mid-JSON at a 64K cap. Their
+  // floor is therefore the xhigh budget regardless of the effort setting —
+  // 'Auto' on Fable must not mean 32K.
+  const fable = /^claude-fable-/.test(model ?? '');
+  const byEffort = (() => {
+    switch (effort) {
+      case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
+      case 'xhigh': return 96000;  // xhigh thinking can eat 30-40K alone
+      case 'high':  return 64000;
+      case 'medium': return 48000;
+      case 'low':
+      case 'minimal':
+      case 'none':
+      default: return 32000;
+    }
+  })();
+  return fable ? Math.max(byEffort, 96000) : byEffort;
 }
 
 export class ClaudeProvider extends BaseAIProvider {
@@ -377,7 +386,7 @@ export class ClaudeProvider extends BaseAIProvider {
       //
       // Scale headroom by effort so a default install just works without
       // requiring users to manually bump Max Tokens.
-      const defaultMaxTokens = defaultStoryMaxTokensFor(this.config?.reasoningEffort);
+      const defaultMaxTokens = defaultStoryMaxTokensFor(this.config?.reasoningEffort, this.model);
       const maxTokens = this.config?.maxTokens || defaultMaxTokens;
       console.log(
         `[ClaudeProvider] generateStory max_tokens=${maxTokens} ` +

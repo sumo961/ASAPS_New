@@ -103,7 +103,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
     '' | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
   >('');
   // Same scaling the provider uses, so this can't drift from what actually runs.
-  const computedMaxTokens = defaultStoryMaxTokensFor(reasoningEffort || undefined);
+  const computedMaxTokens = defaultStoryMaxTokensFor(reasoningEffort || undefined, model || undefined);
   // OpenAI pro reasoning (GPT-5.6 via the Responses API). '' = standard.
   const [reasoningMode, setReasoningMode] = useState<'' | 'pro'>('');
   const [error, setError] = useState('');
@@ -385,6 +385,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
                 <p>
                   <span className="font-medium">Story generation, Ideator, Co-Designer:</span>{' '}
                   the flagship pays off — {provider === 'openai' ? 'gpt-5.6-sol' : provider === 'claude' ? 'claude-opus-5' : 'your largest local model'}. You wait once, then work with the result.
+                  {provider === 'claude' ? ' Measured (blind bake-off, Sept 2026): claude-opus-5 won both rounds; claude-opus-4-8 is the fast rough-draft tier; claude-fable-5-1 at X-High gives the cleanest structure at ~3× the cost — Fable always thinks, so ASAPS floors its Max Tokens at 96K.' : ''}
                 </p>
                 <p>
                   <span className="font-medium">Runtime AI beats</span> (AI Conversation, AI Dialog Tree, AI Condition):{' '}
