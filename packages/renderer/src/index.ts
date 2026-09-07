@@ -35,6 +35,9 @@ export { HudExplanationLayer, DEFAULT_HUD_CAPTIONS, type HudExplanationLayerProp
 // and what it draws, shared by both players and the Visual Editor.
 export {
   ScreenHudLayer,
+  resolveHudCompact,
+  type HudCompactMode,
+  type CompactStrip,
   buildScreenHudLayout,
   type ScreenHudLayerProps,
   type ScreenHudLayout,
@@ -109,3 +112,4 @@ export { renderMarkdownLite } from './utils/markdownLite';
 // story played the full screen.
 export { generateDefaultLocations } from './utils/DefaultLocationGenerator';
 export { backfillUnplacedDefaults } from './renderers/ReactRenderer';
+export { CompactHudStrip, COMPACT_STRIP_HEIGHT, type CompactHudItem } from './components/CompactHudStrip';

@@ -1225,6 +1225,31 @@ The frame draws every counter whose eye toggle is on, in the order they're liste
 > **Will your interactor know what it is?** A bar labelled *Trust* in the corner is still a bar they've never seen before. The [Explanation beat](#explanation) labels the HUDs that are actually on screen, and every beat carries an *Explain HUDs on entry* checkbox that does the same thing in place — worth one beat early on.
 
 <a id="counter-binding"></a>
+#### On phones — the compact HUD strip
+
+A stack of meter cards that looks fine on a desktop stage can cover a third of
+a phone screen before the story gets a pixel. So on phone-sized stages (under
+640 px wide — responsive stories on a phone, or a fixed story authored at phone
+size) ASAPS collapses every screen-docked HUD in a corner into **one slim
+strip**:
+
+- meters become the character's initials plus a micro-bar (a `+2` marks
+  further counters), inventories become an item count, mood tokens shrink to
+  a small token;
+- when a value changes while the strip is collapsed, the strip glows and shows
+  the delta for a moment (*Brandt +1*, *+1 item*) — the "your accusation
+  landed" moment is kept, just smaller;
+- **tap the strip** to open that corner's full cards over the story; tap
+  anywhere (or move to the next beat) to fold them again. The open panel
+  reserves no space, so story text never reflows around it.
+
+The strip only reserves its own height, so on a phone the text starts a few
+lines lower instead of a few paragraphs lower. It is on by default for phones
+only; **General Settings → HUDs → Compact HUD on phones** offers *Always* (useful
+to check the strip on a desktop preview) and *Never*. A fixed-layout story
+authored at 1024 px and shrunk onto a phone keeps its full cards — the whole
+stage scales together there, and the strip would scale down with it.
+
 #### Counters that read affect — "a display, not a mechanic"
 
 Here's the idea, and it's a genuinely useful one: **a counter doesn't have to be something you move. It can be a window onto something the character actually feels.**

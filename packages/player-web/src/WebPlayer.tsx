@@ -987,6 +987,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           stage={stageDims}
           palette={palette}
           zIndex={0}
+          collapseKey={(beatNow as any)?.id}
           explanation={showCallouts ? {
             captions: (beatNow as any)?.resolvedCaptions ?? (beatNow as any)?.captions,
             skipKinds: (beatNow as any)?.skipKinds,

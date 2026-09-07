@@ -111,6 +111,9 @@ interface GlobalSettings {
     sourceLanguage: string;  // BCP 47 code, default 'en'
   };
   hudOverlays?: {
+    /** Phone HUD collapse — screen HUDs fold into a slim tap-to-expand strip on
+     *  phone-class stages. 'auto' (default) = phones only; 'always'; 'never'. */
+    compactMode?: 'auto' | 'always' | 'never';
     /** Show HUD chrome on the title screen too. Off by default — the start
      *  screen is distraction-free (see renderer utils/hudVisibility). */
     showOnTitleScreen?: boolean;
@@ -2252,7 +2255,27 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
               {/* Title-screen chrome. HUDs are hidden on the title screen by
                   default — the timer hasn't started and no counter or mood has
                   moved yet, so the chrome only competes with the title. */}
-              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                            <label className="block text-sm">
+                <span className="block font-medium text-gray-700">Compact HUD on phones</span>
+                <select
+                  className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+                  value={settings.hudOverlays?.compactMode || 'auto'}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    hudOverlays: { ...settings.hudOverlays, compactMode: e.target.value as 'auto' | 'always' | 'never' },
+                  })}
+                >
+                  <option value="auto">Auto — collapse on phone-sized stages (default)</option>
+                  <option value="always">Always — collapse on every stage</option>
+                  <option value="never">Never — always show full cards</option>
+                </select>
+                <span className="block text-xs text-gray-500 mt-1">
+                  On phones a stack of meter cards can cover a third of the screen. Collapsed, each
+                  corner becomes a slim strip (initials + micro-bar, item count, mood token) that
+                  flashes when a value changes; tapping it opens the full cards over the story.
+                </span>
+              </label>
+<label className="flex items-start gap-2 cursor-pointer text-sm">
                 <input
                   type="checkbox"
                   className="mt-0.5"

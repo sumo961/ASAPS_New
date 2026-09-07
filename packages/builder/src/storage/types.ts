@@ -149,6 +149,9 @@ export interface GlobalSettings {
     sourceLanguage: string;  // BCP 47 code, default 'en'
   };
   hudOverlays?: {
+    /** Phone HUD collapse — screen HUDs fold into a slim tap-to-expand strip on
+     *  phone-class stages. 'auto' (default) = phones only; 'always'; 'never'. */
+    compactMode?: 'auto' | 'always' | 'never';
     timerHud?: {
       enabled: boolean;
       mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects

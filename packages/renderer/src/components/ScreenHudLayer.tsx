@@ -29,7 +29,14 @@
  * the editor having to pretend a story is running.
  */
 import React from 'react';
+import { detectDeviceClass } from '@asaps/core';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
+import {
+  CompactHudStrip,
+  compactStripWidthEstimate,
+  COMPACT_STRIP_HEIGHT,
+  type CompactHudItem,
+} from './CompactHudStrip';
 import { CharacterInventoryFrame, type InventoryItemData } from './CharacterInventoryFrame';
 import { CharacterMoodFrame } from './CharacterMoodFrame';
 import { MoodRail, type MoodRailEntry } from './CharacterMoodToken';
@@ -69,6 +76,30 @@ export interface ScreenHudLayoutInput {
    */
   extraBoxes?: HudBox[];
   stage: { width: number; height: number };
+  /**
+   * Phone HUD collapse. 'auto' (default) folds each corner's screen HUDs into
+   * a slim tap-to-expand strip when the STAGE is phone-class (< 640px wide —
+   * responsive stories on phones, or fixed stories authored at phone size);
+   * 'always' forces the strip on every stage; 'never' keeps full cards.
+   * Falls back to `hudOverlays.compactMode` when omitted.
+   */
+  compactMode?: HudCompactMode;
+}
+
+export type HudCompactMode = 'auto' | 'always' | 'never';
+
+/** Decide whether this stage gets the collapsed strip. Pure; exported for tests and hosts. */
+export function resolveHudCompact(mode: HudCompactMode | undefined, stage: { width: number }): boolean {
+  if (mode === 'always') return true;
+  if (mode === 'never') return false;
+  return detectDeviceClass(stage.width) === 'phone';
+}
+
+/** One corner's collapsed HUDs. */
+export interface CompactStrip {
+  id: string;
+  corner: HudCorner;
+  items: CompactHudItem[];
 }
 
 /** A packed HUD's absolute box on the stage, for reserving space against it. */
@@ -92,12 +123,18 @@ export interface ScreenHudLayout {
   discs: ScreenHudCharacter[];
   meters: Array<{ c: ScreenHudCharacter; frame: any; counters: MeterCounterData[] }>;
   inventories: Array<{ c: ScreenHudCharacter; frame: any; items: InventoryItemData[] }>;
+  /** Phone collapse active: `boxes`/`rects` describe the strips, not the cards. */
+  compact: boolean;
+  strips: CompactStrip[];
+  /** In compact mode, where the full cards go when a strip is expanded. */
+  expanded?: { boxes: HudBox[]; placements: Map<string, HudPlacement> };
 }
 
 const toCorner = (s?: string): HudCorner => ((s || 'top-left').replace('screen-', '') as HudCorner);
 
 const EMPTY: ScreenHudLayout = {
   boxes: [], placements: new Map(), rects: [], rails: {}, discs: [], meters: [], inventories: [],
+  compact: false, strips: [],
 };
 
 /**
@@ -172,6 +209,8 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
     }
   }
 
+  const compact = resolveHudCompact(input.compactMode ?? hudOverlays?.compactMode, stage);
+
   const boxes: HudBox[] = [...(extraBoxes || [])];
   if (hudOverlays?.timerHud?.enabled) {
     boxes.push({
@@ -187,30 +226,75 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
       height: (hudOverlays.countdownMeter.meterHeight ?? 12) + 26, kind: 'countdown',
     });
   }
+  // The full cards, packed as they would be drawn. In compact mode this is the
+  // EXPANDED layout (drawn as an overlay, reserving nothing); otherwise it is
+  // the layout, full stop.
+  const cardBoxes: HudBox[] = [...boxes];
   for (const m of meters) {
-    boxes.push({
+    cardBoxes.push({
       id: `meter-${m.c.id}`, corner: toCorner(m.frame.screenPosition ?? 'screen-top-left'),
       width: m.frame.width ?? 160, height: meterHeightEstimate(m.frame, m.counters.length), kind: 'meter',
     });
   }
   for (const v of inventories) {
-    boxes.push({
+    cardBoxes.push({
       id: `inv-${v.c.id}`, corner: toCorner(v.frame.screenPosition ?? 'screen-bottom-right'),
       width: (v.frame.itemSize ?? 36) * Math.max(1, v.frame.columns ?? 4) + 24,
       height: inventoryHeightEstimate(v.frame, v.items.length), kind: 'inventory',
     });
   }
   for (const corner of Object.keys(rails)) {
-    boxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner), width: 200, height: 54, kind: 'mood' });
+    cardBoxes.push({ id: `mood-rail-${corner}`, corner: toCorner(corner), width: 200, height: 54, kind: 'mood' });
   }
 
-  const placements = placementMap(layoutScreenHuds(boxes, stage));
-  const rects: HudRect[] = boxes.map((b) => {
-    const p = placements.get(b.id);
+  const toRects = (bs: HudBox[], pl: Map<string, HudPlacement>): HudRect[] => bs.map((b) => {
+    const p = pl.get(b.id);
     return { id: b.id, kind: b.kind, corner: b.corner, x: p?.left ?? 0, y: p?.top ?? 0, width: b.width, height: b.height };
   });
 
-  return { boxes, placements, rects, rails, discs, meters, inventories };
+  if (!compact) {
+    const placements = placementMap(layoutScreenHuds(cardBoxes, stage));
+    return { boxes: cardBoxes, placements, rects: toRects(cardBoxes, placements), rails, discs, meters, inventories, compact: false, strips: [] };
+  }
+
+  // Compact: fold every card in a corner into one strip. Timer / countdown /
+  // host chrome keep their own boxes — they are small, drawn elsewhere, and
+  // the strip packs below them like a card would.
+  const byCorner = new Map<HudCorner, CompactHudItem[]>();
+  const push = (corner: HudCorner, item: CompactHudItem) => {
+    (byCorner.get(corner) ?? byCorner.set(corner, []).get(corner)!).push(item);
+  };
+  for (const m of meters) {
+    push(toCorner(m.frame.screenPosition ?? 'screen-top-left'),
+      { kind: 'meter', characterId: m.c.id, name: m.c.name, color: m.c.color, counters: m.counters });
+  }
+  for (const v of inventories) {
+    push(toCorner(v.frame.screenPosition ?? 'screen-bottom-right'),
+      { kind: 'inventory', characterId: v.c.id, name: v.c.name, count: v.items.reduce((n, it) => n + (it.quantity ?? 1), 0) });
+  }
+  for (const [corner, entries] of Object.entries(rails)) {
+    for (const e of entries) {
+      push(toCorner(corner), { kind: 'mood', characterId: e.key, name: e.characterName ?? '', valence: e.valence, arousal: e.arousal });
+    }
+  }
+  const strips: CompactStrip[] = [];
+  const stripBoxes: HudBox[] = [...boxes];
+  for (const [corner, items] of byCorner) {
+    const id = `compact-${corner}`;
+    strips.push({ id, corner, items });
+    stripBoxes.push({ id, corner, width: compactStripWidthEstimate(items), height: COMPACT_STRIP_HEIGHT, kind: 'meter' });
+  }
+  const placements = placementMap(layoutScreenHuds(stripBoxes, stage));
+  // Expanded cards stack BELOW their strip (same kind, earlier index), so the
+  // tapped strip stays visible as the handle that folds them again.
+  const stripOnly = stripBoxes.slice(boxes.length);
+  const expandedBoxes: HudBox[] = [...boxes, ...stripOnly, ...cardBoxes.slice(boxes.length)];
+  const expandedPlacements = placementMap(layoutScreenHuds(expandedBoxes, stage));
+  return {
+    boxes: stripBoxes, placements, rects: toRects(stripBoxes, placements),
+    rails, discs, meters, inventories,
+    compact: true, strips, expanded: { boxes: expandedBoxes, placements: expandedPlacements },
+  };
 }
 
 export interface ScreenHudLayerProps {
@@ -229,16 +313,136 @@ export interface ScreenHudLayerProps {
     fontFamily?: string;
   };
   zIndex?: number;
+  /**
+   * Compact mode: an expanded strip collapses again when this changes —
+   * hosts pass the current beat id so a panel opened on one beat does not
+   * sit over the next.
+   */
+  collapseKey?: string;
+  fontScale?: number;
+}
+
+const PULSE_MS = 2200;
+const EXPAND_AUTO_COLLAPSE_MS = 8000;
+
+/** Values worth pulsing about while the strip is collapsed. */
+function valueSnapshot(layout: ScreenHudLayout): Map<string, { label: string; value: number }> {
+  const m = new Map<string, { label: string; value: number }>();
+  for (const { c, counters } of layout.meters) {
+    for (const k of counters) {
+      m.set(`m:${c.id}:${k.name}`, { label: k.displayName || k.name || c.name, value: k.value });
+    }
+  }
+  for (const { c, items } of layout.inventories) {
+    m.set(`i:${c.id}`, { label: c.name, value: items.reduce((n, it) => n + (it.quantity ?? 1), 0) });
+  }
+  return m;
 }
 
 /** Draw a built layout. Pointer-events stay off so the stage below is usable. */
-export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 40 }: ScreenHudLayerProps) {
-  const { rails, discs, meters, inventories, boxes, placements } = layout;
-  const offsetFor = (id: string) => placements.get(id)?.offsetY ?? 0;
+export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 40, collapseKey, fontScale = 1 }: ScreenHudLayerProps) {
+  const { rails, discs, meters, inventories, boxes, placements, compact, strips } = layout;
+  const cardPlacements = compact && layout.expanded ? layout.expanded.placements : placements;
+  const offsetFor = (id: string) => cardPlacements.get(id)?.offsetY ?? 0;
+
+  // ---- compact-mode interaction state ----
+  const [expandedCorner, setExpandedCorner] = React.useState<HudCorner | null>(null);
+  const [pulses, setPulses] = React.useState<Record<string, { text: string; at: number }>>({});
+  const prevSnapshot = React.useRef<Map<string, { label: string; value: number }> | null>(null);
+
+  // Beat change (or leaving compact mode) folds an open panel.
+  React.useEffect(() => { setExpandedCorner(null); }, [collapseKey, compact]);
+
+  // An open panel folds itself after a while — it reserves nothing and would
+  // otherwise sit over the next thing the player needs to read.
+  React.useEffect(() => {
+    if (!expandedCorner) return;
+    const t = setTimeout(() => setExpandedCorner(null), EXPAND_AUTO_COLLAPSE_MS);
+    return () => clearTimeout(t);
+  }, [expandedCorner]);
+
+  // Change pulses: a value that moves while the strip is collapsed flashes the
+  // strip and shows the delta for a moment — the "+1 suspicion" beat that an
+  // always-on card used to carry for free.
+  React.useEffect(() => {
+    const next = valueSnapshot(layout);
+    const prev = prevSnapshot.current;
+    prevSnapshot.current = next;
+    if (!compact || !prev) return;
+    const perCorner: Record<string, string[]> = {};
+    for (const strip of strips) {
+      for (const it of strip.items) {
+        if (it.kind === 'meter') {
+          for (const k of it.counters) {
+            const key = `m:${it.characterId}:${k.name}`;
+            const was = prev.get(key);
+            if (was && was.value !== k.value) {
+              const d = k.value - was.value;
+              (perCorner[strip.corner] ||= []).push(`${(k.displayName || k.name || it.name)} ${d > 0 ? '+' : ''}${Math.round(d * 100) / 100}`);
+            }
+          }
+        } else if (it.kind === 'inventory') {
+          const was = prev.get(`i:${it.characterId}`);
+          if (was && was.value !== it.count) {
+            const d = it.count - was.value;
+            (perCorner[strip.corner] ||= []).push(d > 0 ? `+${d} item${d === 1 ? '' : 's'}` : `${d} item${d === -1 ? '' : 's'}`);
+          }
+        }
+      }
+    }
+    const corners = Object.keys(perCorner);
+    if (corners.length === 0) return;
+    const at = Date.now();
+    setPulses((p) => {
+      const n = { ...p };
+      for (const c of corners) n[c] = { text: perCorner[c].join(' · '), at };
+      return n;
+    });
+    const t = setTimeout(() => {
+      setPulses((p) => {
+        const n: typeof p = {};
+        for (const [c, v] of Object.entries(p)) if (v.at !== at) n[c] = v;
+        return n;
+      });
+    }, PULSE_MS);
+    return () => clearTimeout(t);
+    // Layout identity changes on every value tick; that is exactly the signal.
+  }, [layout, compact, strips]);
+
+  const cornerOf = (screenPosition: string | undefined, fallback: string) =>
+    toCorner(screenPosition ?? fallback);
+  const showCard = (corner: HudCorner) => !compact || expandedCorner === corner;
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex }}>
-      {Object.entries(rails).map(([corner, entries]) => (
+      {compact && (
+        <style>{`@keyframes asapsHudPulse { 0% { opacity: 0; transform: translateY(-4px); } 12% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }`}</style>
+      )}
+      {compact && expandedCorner && (
+        // Scrim: tap anywhere to fold the panel back. Reserves nothing.
+        <div
+          data-testid="compact-hud-scrim"
+          onClick={() => setExpandedCorner(null)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', pointerEvents: 'auto' }}
+        />
+      )}
+      {compact && strips.map((strip) => {
+        const p = placements.get(strip.id);
+        return (
+          <CompactHudStrip
+            key={strip.id}
+            items={strip.items}
+            left={p?.left ?? 12}
+            top={p?.top ?? 12}
+            fontScale={fontScale}
+            pulse={pulses[strip.corner] ? { text: pulses[strip.corner].text } : null}
+            atBottom={strip.corner.startsWith('bottom')}
+            expanded={expandedCorner === strip.corner}
+            onToggle={() => setExpandedCorner((c) => (c === strip.corner ? null : strip.corner))}
+          />
+        );
+      })}
+      {Object.entries(rails).filter(([corner]) => showCard(toCorner(corner))).map(([corner, entries]) => (
         <MoodRail
           key={`mood-rail-${corner}`}
           entries={entries}
@@ -262,7 +466,7 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           containerDimensions={stage}
         />
       ))}
-      {meters.map(({ c, frame, counters }) => (
+      {meters.filter(({ frame }) => showCard(cornerOf(frame.screenPosition, 'screen-top-left'))).map(({ c, frame, counters }) => (
         <CharacterMeterFrame
           key={`meter-hud-${c.id}`}
           counters={counters}
@@ -277,7 +481,7 @@ export function ScreenHudLayer({ layout, stage, palette, explanation, zIndex = 4
           characterColor={c.color}
         />
       ))}
-      {inventories.map(({ c, frame, items }) => (
+      {inventories.filter(({ frame }) => showCard(cornerOf(frame.screenPosition, 'screen-bottom-right'))).map(({ c, frame, items }) => (
         <CharacterInventoryFrame
           key={`inventory-hud-${c.id}`}
           items={items}

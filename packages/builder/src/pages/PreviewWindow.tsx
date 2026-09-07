@@ -3006,6 +3006,7 @@ export const PreviewWindow: React.FC = () => {
                   stage={activeStage}
                   palette={previewDataRef.current?.emotionPalette}
                   explanation={hudExplanation}
+                  collapseKey={currentBeat?.id}
                 />
               )}
               {startBlockedReason && (
