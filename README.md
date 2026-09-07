@@ -22,8 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.95** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.95 is the verification release**:
+Current release: **v0.9.96** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.96 is the phone release**: in-story
+AI answers in seconds instead of minutes (no more double generation, no
+silent thinking-budget burn, streaming everywhere, a per-turn branching cap,
+and a separate model setting for in-story AI); a blind seven-story bake-off
+settled the authoring-model question (Opus 5 won both rounds — the verdict
+is in the User Guide and inline in AI settings) and its AI-length stories
+flushed out a family of layout bugs, all fixed; dialog trees work on phones;
+and screen HUDs fold into a tap-to-expand strip on phone-sized stages
+instead of covering a third of the screen. Also: `effectsOncePerChoice`
+(re-readable but once-scored evidence), conditional choices finally
+documented, Field App P0 chassis, image-anchored background animation,
+Find & Change, and zero open advisories.
+
+**v0.9.95 was the verification release**:
 dialog trees open up on the flowchart with their choice logic visible on the
 edges, clustered beats behave exactly like free beats (one rendering path),
 multi-language exports shrank from 170 MB to ~40 MB with translated

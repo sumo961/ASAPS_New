@@ -1,5 +1,124 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-07: The phone release — AI that answers, stories that fit, HUDs that fold (v0.9.96)
+
+### Overview
+
+Thirty-two commits in three arcs. First, in-story AI stopped keeping players
+waiting: dialog trees were generating twice, Claude 5 models were silently
+spending the whole token budget on adaptive thinking, and nothing streamed —
+all fixed, with a per-turn branching cap and a separate model setting for
+in-story AI so the best authoring model no longer has to be the model a
+player waits on. Second, a blind seven-story bake-off (plus three Fable 5.1
+follow-ups) settled the authoring-model question — Opus 5 won both rounds
+unanimously — and, more usefully, its ten generated stories fuzzed the
+renderer with paragraph-length AI text and exposed a family of layout bugs
+hand-authored stories never triggered: every one fixed. Third, the phone:
+dialog trees now work at all on phone-sized stages, and screen HUDs fold
+into a tap-to-expand strip instead of covering a third of the screen. Also
+in this release: Field App P0 chassis, image-anchored background animation,
+Find & Change, an editable debug rail, Capacitor 8, and zero open advisories.
+
+### Runtime AI latency — players stop waiting
+
+`aiDialogTree` generated every tree twice (prefetch and execute raced) and
+Claude 5 models, given no `thinking` parameter, defaulted to adaptive
+thinking and burned the budget before writing a choice; both fixed, every
+runtime AI call now streams (direct Anthropic and OpenAI transports
+reassemble SSE; the relay already did) and logs its round-trip time. A new
+`maxChoicesPerTurn` parameter caps branching on AI dialog trees, and AI
+settings gained "Model for in-story AI" — measured on dialog trees,
+`claude-opus-4-8` was both fastest and best there while Opus 5 remains the
+authoring default. The exported player uses the same adapter and the same
+override.
+
+**Files modified:** `packages/core/src/ai/runtimeAdapter.ts`, `packages/core/src/beats/AIDialogTreeBeat.ts`,
+`packages/builder/src/services/providers/{ClaudeProvider,OpenAIProvider}.ts`, `packages/builder/src/hooks/useAI.ts`,
+`packages/builder/src/components/ai/AIConfigDialog.tsx`, `packages/builder/src/pages/PreviewWindow.tsx`,
+`packages/builder/src/components/export/HtmlExportDialog.tsx`, `beat-definitions/core-beats.json`
+
+### The bake-off — which model writes the best story, and what it taught the engine
+
+Two briefs (short and Ideator-length), identical captured requests replayed
+per model, stories injected as playable projects and ranked blind by two
+judges who agreed 7/7: Opus 5 (adaptive) won both rounds; Opus 4.8 is the
+fast rough-draft tier; Fable 5.1 at X-High gives the cleanest structure at
+~3× the cost and needs 128K output tokens on long briefs. The verdict is in
+the User Guide and inline in AI settings, and Fable models now get a 96K
+token floor so "Auto" effort can't truncate their JSON. The corpus also
+exposed engine gaps: `PickPropBeat` never recorded picked props as visited
+(so `markVisited` was inert on every evidence beat and re-examining a clue
+re-scored it — fixed); a new opt-in `effectsOncePerChoice` makes choices
+re-readable but once-scored; conditional choice visibility (`conditions[]`),
+supported but undocumented, is finally taught in the schema; and the prompt
+guidance gained "Earned Options" (conditional accusations instead of
+duplicated menus; discovered knowledge must never override a player's
+explicit decision) and "surface what you track, symmetrically" for meters.
+MCP story injection stopped dropping `variables[]` and cluster membership.
+
+**Files modified:** `packages/core/src/beats/{PickPropBeat,MultiChoiceBeat,MovementChoiceBeat,DialogTreeBeat}.ts`,
+`beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`,
+`packages/builder/src/services/prompts/{storyGenerationEnhanced,dialogGeneration}.ts`,
+`packages/builder/src/components/Inspector.tsx`, `packages/builder/src/App.tsx`,
+`apps/builder-desktop/src/main/api-server.ts`, `docs/USER_GUIDE.md`
+
+### Renderer — the bugs only AI-length text could find
+
+Paragraph-length choices turned the pill button radius into ellipses (CSS
+scales overlapping radii on both axes; a pill-safe radius now caps at half a
+line); the conversation layout's choice panel was too narrow for them
+(widened to 45% of the stage, growing leftward); long NPC speeches ran off
+the stage bottom (the body card is capped and scrolls); squeezed choice
+lists start-justify so the first choice can always be scrolled to; the
+read-gate's observers died when React replaced the scroller node (choices
+could stay hidden forever); NPC farewells were frozen for their reading
+time with no affordance (a Continue button now races the timer); expanded
+dialog exit edges painted under the opaque container; and a smart-sizing
+text box could grow over the title.
+
+**Files modified:** `packages/renderer/src/utils/pillRadius.ts` (new), `packages/renderer/src/components/{SlotFlowView,SpatialFlowView,ChatDialogView,PositionedBeatView}.tsx`,
+`packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/core/src/beats/{DialogTreeBeat,AIDialogTreeBeat}.ts`,
+`packages/builder/src/components/graph/graphBuild.ts`
+
+### Phones — dialog trees that work, HUDs that fold
+
+On phone-portrait stages the side-by-side conversation layout had squeezed
+the NPC text to zero pixels; it now collapses to the stacked flow below
+~640px of usable width, and narrow corner HUDs become side indents on any
+stage that can afford them instead of a full-width band (desktop content no
+longer starts 190px down for a 3-meter stack). Screen HUDs on phone-class
+stages fold into one 36px strip per corner — initials + micro-bar per
+metered character, item counts, mood tokens — that reserves only itself
+(182px → 56px on a 390×740 stage); tapping it overlays the full cards
+behind a scrim, folding on tap-away, beat change, or 8s; values that move
+while collapsed pulse the strip with the delta ("Suspicion: Brandt +1").
+Setting: General Settings → HUDs → Compact HUD on phones (auto/always/never).
+Spatial beats now reserve space against HUDs too, and the CharacterEditor's
+HUD schematic has a Desktop/📱 Phone toggle.
+
+**Files modified:** `packages/renderer/src/components/{ScreenHudLayer,CompactHudStrip,SlotFlowView,SpatialFlowView}.tsx`,
+`packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/renderer/src/index.ts`,
+`packages/builder/src/components/characters/HudLayoutPreview.tsx`, `packages/builder/src/components/settings/GlobalSettingsInspector.tsx`,
+`packages/builder/src/storage/types.ts`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/player-web/src/WebPlayer.tsx`,
+`packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
+
+### Field App, animation, triage, dependencies
+
+Field App P0 chassis: GPS + camera permission plumbing, `.asaps`/`.asapst`
+intake on Android and iOS, all four plan decisions recorded (AR-first,
+generic player, model-agnostic LLM, HTML-AR deferred with a degradation
+ladder). Image-anchored background animation (decision C, phases A+B):
+element paths anchored to a rectangle of the background image with an
+editor, island, and phone-crop preview. Find & Change bulk editing (B10);
+editable debug-rail state values (B8). Capacitor 6→8 and the August
+advisory wave cleared — `npm audit` reports zero vulnerabilities.
+
+**Files modified:** `apps/player-mobile/**`, `docs/Mobile-Field-App-Plan.md`, `docs/Responsive-Background-Animation-Design.md`,
+`packages/core/src/**` (animation paths), `packages/renderer/src/components/{SpatialFlowView,ResponsiveCharacterLayer}.tsx`,
+`packages/builder/src/components/{findChange/**,preview/**,visual/**}`, `package-lock.json`
+
+---
+
 ## 2026-08-31: The verification release — everything checked, everything fixed (v0.9.95)
 
 ### Overview
