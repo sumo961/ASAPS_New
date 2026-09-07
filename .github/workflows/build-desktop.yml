@@ -107,14 +107,45 @@ jobs:
             echo "No ASC key secret — packaging will be unsigned/unnotarized"
           fi
 
+      # electron-builder used to import the p12 itself (CSC_LINK) into a
+      # throwaway keychain. The macos-26 runner image build of 2026-08-31
+      # broke that path: its `security set-key-partition-list` step fails
+      # with "SecKeychainUnlock: passphrase not correct" (v0.9.96, twice).
+      # So the cert goes into OUR keychain with the documented Apple/GitHub
+      # recipe — long auto-lock timeout, partition list set with the same
+      # password, keychain added to the search list — and electron-builder
+      # is pointed at it via CSC_KEYCHAIN. No secret → step is a no-op and
+      # the build stays unsigned, exactly as before.
+      - name: Import signing certificate into a build keychain
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          if [ -z "$MAC_CERT_P12" ]; then
+            echo "No signing certificate secret — packaging unsigned"
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/asaps-build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          printf '%s' "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/mac-cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/mac-cert.p12" -k "$KEYCHAIN" -P "$MAC_CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/mac-cert.p12"
+          echo "CSC_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "Identities available for signing:"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
       - name: Package macOS Universal
         working-directory: apps/builder-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # electron-builder imports the Developer ID cert from the base64
-          # p12 into a temporary keychain for the build, then removes it.
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          # Signing identity comes from CSC_KEYCHAIN (set by the import
+          # step above). CSC_LINK is deliberately NOT set — see that step.
         run: npx electron-builder@26.8.1 --mac --publish never
 
       - name: Verify signature & notarization
