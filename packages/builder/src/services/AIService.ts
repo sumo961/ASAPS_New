@@ -33,6 +33,7 @@ import { buildBeatTypeDigest } from './beatSchemaVocabulary';
 import { normalizeBeat } from '@asaps/core';
 import { getAIValidator } from './AIValidator';
 import { normalizeStory } from '@asaps/core';
+import { mergeRepairedStory } from './storyRepairMerge';
 import {
   buildCharacterQuestionsPrompt,
   buildCharacterProfilePrompt,
@@ -1669,6 +1670,28 @@ Return ONLY the corrected JSON, no explanation needed.
 
       console.log('[AIService] Sending story repair request to AI...');
       let repairedResponse = await this.currentProvider!.generateStory(repairRequest);
+
+      // The repair re-emits the whole story and routinely drops what it did
+      // not touch (characters / variables / clusters / theme — seen on an
+      // 85-beat story whose repaired copy came back beats-only). Original
+      // fields fill every gap, then the SAME normalize pipeline the first
+      // pass ran rebuilds clusters from per-beat strings, flattens
+      // conditions and backfills characters. Skipping it here is how a
+      // story reached the graph with 84 clustered beats and 0 clusters.
+      repairedResponse = mergeRepairedStory(story, repairedResponse);
+      try {
+        const schema = (this.validator as any).getSchema?.();
+        if (schema?.beatTypes) {
+          const pipeline = normalizeStory(repairedResponse as any, schema);
+          if (pipeline.story) repairedResponse = { ...repairedResponse, ...(pipeline.story as any) };
+          console.log(
+            `[AIService.repair] Re-normalized repaired story: ${pipeline.report.changes.length} changes, ` +
+              `${pipeline.report.clustersCreated.length} clusters auto-created`,
+          );
+        }
+      } catch (err) {
+        console.warn('[AIService.repair] Re-normalize failed; continuing with merged repair:', err);
+      }
 
       // Transform the repaired response
       repairedResponse = this.transformStoryResponse(repairedResponse);

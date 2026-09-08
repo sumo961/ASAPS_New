@@ -16,7 +16,7 @@
  * API-correct one. See the date-suffixed-model test for a flagged edge.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClaudeProvider, defaultStoryMaxTokensFor } from '../ClaudeProvider';
+import { ClaudeProvider, defaultStoryMaxTokensFor, maxOutputTokensFor } from '../ClaudeProvider';
 import type { AIProviderConfig } from '../../../types/ai';
 
 // generateStory loads the beat schema via the AIValidator singleton — stub it
@@ -372,8 +372,57 @@ describe('defaultStoryMaxTokensFor — Fable floor', () => {
     expect(defaultStoryMaxTokensFor('max', 'claude-fable-5-1')).toBe(128000);
   });
   it('leaves non-Fable models on the effort scale', () => {
-    expect(defaultStoryMaxTokensFor(undefined, 'claude-opus-5')).toBe(32000);
+    // Opus 5 thinks by default (omitting `thinking` runs adaptive) → 64K floor
+    expect(defaultStoryMaxTokensFor(undefined, 'claude-opus-5')).toBe(64000);
+    expect(defaultStoryMaxTokensFor(undefined, 'claude-sonnet-5')).toBe(64000);
+    expect(defaultStoryMaxTokensFor(undefined, 'claude-opus-4-8')).toBe(32000);
     expect(defaultStoryMaxTokensFor('xhigh', 'claude-opus-5')).toBe(96000);
     expect(defaultStoryMaxTokensFor('high')).toBe(64000);
+  });
+});
+
+describe('generateStory escalates once when the output hits max_tokens', () => {
+  // 2026-09-08, Ideator-length preschool brief on opus-5 with the 32K
+  // default: BOTH the first pass and the repair pass stopped at max_tokens
+  // mid-JSON (11 minutes, two truncated repairs). The API docs say a capped
+  // run is a failed attempt, not something to retry at the same cap.
+  function clientWith(responses: any[]) {
+    const bodies: any[] = [];
+    const stream = vi.fn((body: any) => {
+      bodies.push({ ...body });
+      const next = responses.shift();
+      return { on: vi.fn(), finalMessage: vi.fn().mockResolvedValue(next) };
+    });
+    p.configure({ ...cfg(), model: 'claude-opus-5', maxTokens: 32000 });
+    (p as any).client = { messages: { stream, create: vi.fn() } };
+    return { stream, bodies };
+  }
+  const ok = { content: [{ type: 'text', text: JSON.stringify({ metadata: { title: 'T' }, beats: [] }) }], stop_reason: 'end_turn', usage: { output_tokens: 10 } };
+  const capped = { content: [{ type: 'text', text: '{"metadata":{"title":"T"},"beats":[' }], stop_reason: 'max_tokens', usage: { output_tokens: 32000 } };
+
+  it('retries at double the budget and remembers it for the next call (the repair pass)', async () => {
+    const { stream, bodies } = clientWith([capped, ok, ok]);
+    await p.generateStory({ prompt: 'x' } as any);
+    expect(stream).toHaveBeenCalledTimes(2);
+    expect(bodies[0].max_tokens).toBe(32000);
+    expect(bodies[1].max_tokens).toBe(64000);
+    await p.generateStory({ prompt: 'repair' } as any);
+    expect(bodies[2].max_tokens).toBe(64000);
+  });
+
+  it('escalates only once per call and never past the model cap', async () => {
+    const { stream, bodies } = clientWith([capped, capped]);
+    (p as any).escalatedMaxTokens = 128000;
+    await p.generateStory({ prompt: 'x' } as any).catch(() => {}); // truncated JSON may still repair or throw — not the point
+    expect(stream).toHaveBeenCalledTimes(1);
+    expect(bodies[0].max_tokens).toBe(128000);
+  });
+
+  it('maxOutputTokensFor knows the per-model ceilings', () => {
+    expect(maxOutputTokensFor('claude-opus-5')).toBe(128000);
+    expect(maxOutputTokensFor('claude-fable-5-1')).toBe(128000);
+    expect(maxOutputTokensFor('claude-sonnet-4-6')).toBe(128000);
+    expect(maxOutputTokensFor('claude-haiku-4-5')).toBe(64000);
+    expect(maxOutputTokensFor('claude-opus-4-5')).toBe(64000);
   });
 });

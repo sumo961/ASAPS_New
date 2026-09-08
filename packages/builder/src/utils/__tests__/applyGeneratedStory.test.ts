@@ -152,13 +152,14 @@ describe('applyGeneratedStory', () => {
     expect(deps.commitGlobalSettings).toHaveBeenCalledTimes(3);
   });
 
-  it('runs the normalize pipeline only when asked (MCP raw input)', async () => {
+  it('looks the schema up for beat types on every run, and survives it being unavailable', async () => {
     const loadSchema = vi.fn(async () => undefined);
     const deps = makeDeps({ loadSchema });
-    await applyGeneratedStory(story(), deps, { fallbackTitle: 'x' });
-    expect(loadSchema).not.toHaveBeenCalled();
-    await applyGeneratedStory(story(), deps, { fallbackTitle: 'x', normalize: true });
-    expect(loadSchema).toHaveBeenCalledTimes(1);
+    const a = await applyGeneratedStory(story(), deps, { fallbackTitle: 'x' });
+    const b = await applyGeneratedStory(story(), deps, { fallbackTitle: 'x', normalize: true });
+    expect(loadSchema).toHaveBeenCalledTimes(2);
+    expect(a.beatCount).toBe(3);
+    expect(b.beatCount).toBe(3);
   });
 
   it('falls back to the given title and current author, and positions beats without coordinates', async () => {
@@ -194,5 +195,25 @@ describe('helpers', () => {
     const next: any = withFictionalTimeHud(off, { beats: [{ type: 'conditionBeat', parameters: { conditionType: 'fictionalTime' } }] });
     expect(next.hudOverlays.fictionalTime.enabled).toBe(true);
     expect(next.hudOverlays.timerHud.position).toBe('top-left'); // existing timer HUD kept
+  });
+});
+
+describe('applyGeneratedStory — 2026-09-08 dragon-story regressions', () => {
+  it('trusts the loaded schema for beat types instead of the hardcoded list', async () => {
+    const deps = makeDeps({ loadSchema: vi.fn(async () => ({ beatTypes: { aiConversation: {}, aiSummary: {} } })) });
+    const r = await applyGeneratedStory({ beats: [{ id: 'a', type: 'aiConversation' }, { id: 's', type: 'aiSummary' }, { id: 'z', type: 'hologram' }] }, deps, { fallbackTitle: 'x' });
+    expect(r.unknownBeatTypes).toEqual(['hologram']);
+  });
+
+  it('builds cluster shells for beats whose cluster object is missing (repair dropped the array)', async () => {
+    const deps = makeDeps();
+    const s: any = story();
+    s.beats.push({ id: 'b9', type: 'infoText', cluster: 'Finale' }); // no cluster object for Finale
+    await applyGeneratedStory(s, deps, { fallbackTitle: 'x' });
+    const loaded = deps.loaded[0];
+    expect(loaded.clusters.map((c: any) => c.id).sort()).toEqual(['Act 1', 'Finale']);
+    const finale = loaded.clusters.find((c: any) => c.id === 'Finale');
+    expect(finale.containerBounds.width).toBeGreaterThan(0);
+    expect(deps.requestClusterArrange).toHaveBeenCalled();
   });
 });

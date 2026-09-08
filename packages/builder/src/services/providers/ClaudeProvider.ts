@@ -55,7 +55,12 @@ export function defaultStoryMaxTokensFor(effort: string | undefined, model?: str
   // tokens on thinking alone and truncated mid-JSON at a 64K cap. Their
   // floor is therefore the xhigh budget regardless of the effort setting —
   // 'Auto' on Fable must not mean 32K.
-  const fable = /^claude-fable-/.test(model ?? '');
+  const fable = /^claude-(fable|mythos)-/.test(model ?? '');
+  // Opus 5 / Sonnet 5 think BY DEFAULT — omitting `thinking` runs adaptive
+  // — so an "effort unset" install still spends output budget on thinking.
+  // Measured 2026-09-08: opus-5 on an Ideator-length brief hit a 32K cap
+  // twice (first pass AND the repair pass), each time mid-JSON.
+  const thinksByDefault = /^claude-(opus|sonnet)-5/.test(model ?? '');
   const byEffort = (() => {
     switch (effort) {
       case 'max':   return 128000; // max can match xhigh's reasoning span or exceed
@@ -68,7 +73,27 @@ export function defaultStoryMaxTokensFor(effort: string | undefined, model?: str
       default: return 32000;
     }
   })();
-  return fable ? Math.max(byEffort, 96000) : byEffort;
+  if (fable) return Math.max(byEffort, 96000);
+  if (thinksByDefault) return Math.max(byEffort, 64000);
+  return byEffort;
+}
+
+/**
+ * Hard ceiling for max_tokens per model (platform.claude.com model table):
+ * every Opus/Sonnet 4.6+ and 5.x, and Fable/Mythos, allow 128K output;
+ * Haiku 4.5 allows 64K. Unknown models get the conservative 64K.
+ */
+export function maxOutputTokensFor(model?: string): number {
+  const m = (model ?? '').toLowerCase();
+  if (/^claude-haiku-/.test(m)) return 64000;
+  if (/^claude-(fable|mythos)-/.test(m)) return 128000;
+  const match = m.match(/^claude-(opus|sonnet)-(\d+)(?:-(\d+))?/);
+  if (match) {
+    const major = parseInt(match[2], 10);
+    const minor = match[3] && match[3].length <= 2 ? parseInt(match[3], 10) : undefined;
+    if (major >= 5 || (major === 4 && minor !== undefined && minor >= 6)) return 128000;
+  }
+  return 64000;
 }
 
 export class ClaudeProvider extends BaseAIProvider {
@@ -76,6 +101,12 @@ export class ClaudeProvider extends BaseAIProvider {
   private client: Anthropic | null = null;
   private model: string = 'claude-sonnet-5';
   private useProxy: boolean = false;
+  /**
+   * Budget a previous generateStory call had to escalate to after hitting
+   * max_tokens. Later calls in the same session (the repair pass, a retry)
+   * start there instead of rediscovering the same wall.
+   */
+  private escalatedMaxTokens: number | null = null;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
   private proxyEndpoint: string = typeof window !== 'undefined' && window.location?.port === '5173'
     ? '/api/ai/claude'
@@ -87,6 +118,7 @@ export class ClaudeProvider extends BaseAIProvider {
   configure(config: AIProviderConfig): void {
     super.configure(config);
 
+    this.escalatedMaxTokens = null;
     if (this._isReady) {
       // If custom baseUrl is provided, use proxy to avoid CORS
       this.useProxy = !!config.baseUrl;
@@ -387,11 +419,13 @@ export class ClaudeProvider extends BaseAIProvider {
       // Scale headroom by effort so a default install just works without
       // requiring users to manually bump Max Tokens.
       const defaultMaxTokens = defaultStoryMaxTokensFor(this.config?.reasoningEffort, this.model);
-      const maxTokens = this.config?.maxTokens || defaultMaxTokens;
+      const modelCap = maxOutputTokensFor(this.model);
+      let maxTokens = Math.min(modelCap, Math.max(this.config?.maxTokens || defaultMaxTokens, this.escalatedMaxTokens ?? 0));
       console.log(
         `[ClaudeProvider] generateStory max_tokens=${maxTokens} ` +
           `(default=${defaultMaxTokens}, configured=${this.config?.maxTokens ?? 'unset'}, ` +
-          `effort=${this.config?.reasoningEffort ?? 'unset'})`,
+          `effort=${this.config?.reasoningEffort ?? 'unset'}, model cap=${modelCap}` +
+          `${this.escalatedMaxTokens ? `, escalated=${this.escalatedMaxTokens}` : ''})`,
       );
 
       // `temperature` is omitted: newer Anthropic models reject it as
@@ -428,20 +462,45 @@ export class ClaudeProvider extends BaseAIProvider {
         // chunks as they arrive, so the initial-fetch timeout clears early
         // and the body streams for as long as generation takes.
         // .finalMessage() reassembles the complete Message.
-        const stream = this.client!.messages.stream(requestBody as any, {
-          signal: request.signal,
-        });
-        // Drive the UI progress indicator with the real cumulative char count.
-        if (request.onProgress) {
-          stream.on('text', (_delta: string, snapshot: string) => {
-            request.onProgress!(snapshot.length);
+        //
+        // stop_reason=max_tokens is a FAILED attempt, not a result (per the
+        // API docs: "treat max_tokens as a failed attempt rather than
+        // retrying at the same cap"). Escalate ONCE to double the budget
+        // (bounded by the model's output ceiling) before falling back to
+        // the truncated-JSON repair below; remember the escalated budget so
+        // the repair pass does not hit the same wall.
+        let escalated = false;
+        let apiResponse;
+        for (;;) {
+          requestBody.max_tokens = maxTokens;
+          const stream = this.client!.messages.stream(requestBody as any, {
+            signal: request.signal,
           });
+          // Drive the UI progress indicator with the real cumulative char count.
+          if (request.onProgress) {
+            stream.on('text', (_delta: string, snapshot: string) => {
+              request.onProgress!(snapshot.length);
+            });
+          }
+          apiResponse = await stream.finalMessage();
+          console.log(
+            `[ClaudeProvider] generateStory response: stop=${apiResponse.stop_reason}, ` +
+              `output_tokens=${apiResponse.usage?.output_tokens ?? '?'}`,
+          );
+          if (apiResponse.stop_reason === 'max_tokens' && !escalated && maxTokens < modelCap) {
+            const next = Math.min(modelCap, maxTokens * 2);
+            console.warn(
+              `[ClaudeProvider] Output hit max_tokens=${maxTokens} — retrying once at ${next} ` +
+                `(model cap ${modelCap}). Thinking counts against this budget; raise Max Tokens ` +
+                `in AI settings to skip this extra call.`,
+            );
+            this.escalatedMaxTokens = next;
+            maxTokens = next;
+            escalated = true;
+            continue;
+          }
+          break;
         }
-        const apiResponse = await stream.finalMessage();
-        console.log(
-          `[ClaudeProvider] generateStory response: stop=${apiResponse.stop_reason}, ` +
-            `output_tokens=${apiResponse.usage?.output_tokens ?? '?'}`,
-        );
         response = { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
       }
 

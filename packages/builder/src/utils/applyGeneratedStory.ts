@@ -18,7 +18,7 @@
  * WebSocket de-dup (injection), and the deferred create-project + save.
  */
 import type { Beat } from '@asaps/core';
-import { normalizeStory } from '@asaps/core';
+import { normalizeStory, buildClustersFromBeats } from '@asaps/core';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
 import { applyTreeLayoutToBeats } from './TreeLayoutAlgorithm';
@@ -213,10 +213,18 @@ export async function applyGeneratedStory(
     console.warn('[applyGeneratedStory] Logic validation failed; continuing:', err);
   }
 
+  // Beat schema: the authority on beat types (the hardcoded list below is
+  // only the fallback when no schema is loadable — it went stale and
+  // flagged aiConversation / aiSummary as unknown).
+  let schema: any;
+  if (deps.loadSchema) {
+    try { schema = await deps.loadSchema(); } catch (err) { console.warn('[applyGeneratedStory] Schema unavailable:', err); }
+  }
+  const knownBeatTypes = new Set<string>([...KNOWN_BEAT_TYPES, ...Object.keys(schema?.beatTypes ?? {})]);
+
   // 3. Schema-driven normalize pipeline (raw MCP input only — see option doc).
-  if (options.normalize && deps.loadSchema) {
+  if (options.normalize) {
     try {
-      const schema = await deps.loadSchema();
       if (schema?.beatTypes) {
         const result = normalizeStory(story, schema);
         if (result.story) Object.assign(story, result.story); // in place: the rest reads `story`
@@ -299,7 +307,7 @@ export async function applyGeneratedStory(
       beatData.position ||
       { x: beatData.x || 200, y: beatData.y || 200 };
     const beatType: string = beatData.type || 'infoText';
-    if (!KNOWN_BEAT_TYPES.has(beatType)) unknownBeatTypes.push(beatType);
+    if (!knownBeatTypes.has(beatType)) unknownBeatTypes.push(beatType);
 
     const beat = deps.actions.createBeat(beatType, position, {
       id: beatData.id,
@@ -352,7 +360,24 @@ export async function applyGeneratedStory(
 
   // 10. The single batch load. Clusters ride along (loadStoryData takes
   //     them) instead of an addCluster per cluster after the fact.
-  const clusters: any[] = Array.isArray(story.clusters) ? story.clusters : [];
+  //     Beats that name a cluster no object exists for get a shell built
+  //     the same way the pipeline builds them — otherwise the graph shows
+  //     "orphaned" beats (84 of 84 on the 2026-09-08 dragon story, whose
+  //     repair pass had dropped the clusters array).
+  const clusters: any[] = Array.isArray(story.clusters) ? [...story.clusters] : [];
+  const referencedClusters = new Set<string>(
+    beatsIn.map((b: any) => (typeof b.cluster === 'string' ? b.cluster.trim() : '')).filter(Boolean),
+  );
+  const missingClusters = [...referencedClusters].filter(
+    (name) => !clusters.some((c: any) => c.id === name || c.name === name),
+  );
+  if (missingClusters.length > 0) {
+    const positioned = beatsIn
+      .filter((b: any) => missingClusters.includes(String(b.cluster ?? '').trim()))
+      .map((b: any) => ({ ...b, position: adjustedPositions.get(b.id) || b.position || { x: b.x || 200, y: b.y || 200 } }));
+    clusters.push(...buildClustersFromBeats(positioned));
+    console.warn('[applyGeneratedStory] Built cluster shell(s) for beats whose cluster object was missing:', missingClusters);
+  }
   deps.beforeStateLoad?.();
   deps.actions.loadStoryData({
     title,
