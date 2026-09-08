@@ -298,6 +298,14 @@ Then **before the ending**, branch on whether trust actually grew:
 }
 \`\`\`
 
+Note \`baseline: "initial"\` — value 0.3 reads as "trust has grown by
+≥ 0.3 from where Mara started", not "trust is now ≥ 0.3 absolute". For
+a character seeded with \`initialSentiments: [{toEntityRef: 'player',
+emotion: 'trust', strength: -0.2}]\`, the literal threshold would
+require the player to win Mara back from negative AND get her to
+positive 0.3 — almost unattainable. The delta version means "you moved
+her by 0.3 in either direction" — the actual story question.
+
 The same \`sentiment\` condition also works as a **per-choice gate** — put it
 in a choice's \`conditions\` array and the reply is hidden until the feeling
 exists, no extra beat needed. Use it for lines the player should only be
@@ -314,14 +322,6 @@ Prefer this over a separate conditionBeat when the gate belongs to ONE reply;
 keep the conditionBeat for branching the whole story. Any story with a
 feeling-gated choice should give that character a visible meter (a counter
 bound to the sentiment) so the player can see the door opening.
-
-Note \`baseline: "initial"\` — value 0.3 reads as "trust has grown by
-≥ 0.3 from where Mara started", not "trust is now ≥ 0.3 absolute". For
-a character seeded with \`initialSentiments: [{toEntityRef: 'player',
-emotion: 'trust', strength: -0.2}]\`, the literal threshold would
-require the player to win Mara back from negative AND get her to
-positive 0.3 — almost unattainable. The delta version means "you moved
-her by 0.3 in either direction" — the actual story question.
 
 ### Worked example: bookmarks are TWO-STEP
 
