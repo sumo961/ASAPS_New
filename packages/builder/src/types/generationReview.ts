@@ -62,7 +62,7 @@ export interface UnsatisfiableThresholdFinding extends FindingBase {
 
 export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding;
 
-export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous';
+export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'ai-edit';
 
 /**
  * A local, undoable edit: set one parameter path on one beat to one value.
@@ -81,6 +81,23 @@ export interface FixProposal {
   /** Author-facing sentence describing the edit. */
   description: string;
   confidence: 'safe' | 'review';
+  /** Who authored the edit. Absent = deterministic code. */
+  source?: 'deterministic' | 'ai';
+  /** The model's stated reason (AI edits only). */
+  rationale?: string;
+}
+
+/**
+ * One AI-authored fix for one finding: a handful of parameter edits that
+ * passed the deterministic envelope (allowed beats only, valid paths, the
+ * finding gone and no new finding on a simulated copy). Shown as a diff;
+ * applied only on accept.
+ */
+export interface AIFixSuggestion {
+  findingId: string;
+  rationale: string;
+  edits: FixProposal[];
+  preview: Array<{ beatId: string; beatName?: string; path: string; before: unknown; after: unknown }>;
 }
 
 export type ReviewStatus = 'open' | 'applied' | 'skipped';

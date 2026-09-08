@@ -11,6 +11,7 @@ import type {
   GenerationFinding, MissingTargetFinding, UnreachableBeatFinding, UnsatisfiableThresholdFinding,
   FixProposal, GenerationReview,
 } from '../types/generationReview';
+import { PARAMETER_DERIVED_TYPES } from './beatConnectionModel';
 
 /**
  * Beat types whose only exit is the single `connection` parameter — the
@@ -233,6 +234,72 @@ export function buildParameterPatch(
   const last = segs[segs.length - 1];
   cursor['key' in last ? last.key : last.index] = value;
   return { key, next: { [key]: top }, prev: { [key]: clone(currentParameters?.[key]) } };
+}
+
+/** Read a dotted/indexed parameter path. */
+export function readParameterPath(params: Record<string, any>, path: string): unknown {
+  let cur: any = params;
+  for (const part of path.split('.')) {
+    const m = part.match(/^([^[]+)((?:\[\d+\])*)$/);
+    if (!m) return undefined;
+    cur = cur?.[m[1]];
+    for (const idx of m[2].matchAll(/\[(\d+)\]/g)) cur = cur?.[Number(idx[1])];
+    if (cur === undefined) return undefined;
+  }
+  return cur;
+}
+
+export interface BeatEditPlan {
+  /** Which store the edit writes: the beat-level connections array, or a parameter. */
+  kind: 'connections' | 'parameters';
+  /** `updates` objects for useStoryBuilder.updateBeat — the undo pair. */
+  prev: Record<string, any>;
+  next: Record<string, any>;
+  before: unknown;
+  after: unknown;
+}
+
+/**
+ * Turn (path, value) into the edit the LIVE beat needs. A single-exit beat
+ * (infoText, titleScreen, …) keeps its link in the beat-level `connections`
+ * array — `parameters.connection` is only the generators' wire shape, and
+ * a live beat ignores it. So `connection` / `connection.target` on such a
+ * beat becomes a connections edit; everything else is a parameter patch.
+ * The AI-fix simulation, the preview and the apply all go through here, so
+ * they cannot disagree about what an edit does.
+ */
+export function planBeatEdit(
+  beat: { type?: string; name?: string; parameters?: Record<string, any>; connections?: Array<{ targetId?: string; target?: string; label?: string }> },
+  path: string,
+  value: unknown,
+): BeatEditPlan {
+  const params = beat.parameters ?? {};
+  const isConnectionPath = path === 'connection.target' || path === 'connection';
+  if (isConnectionPath && !PARAMETER_DERIVED_TYPES.has(beat.type ?? '')) {
+    const targetId = path === 'connection' ? (value as any)?.target : value;
+    const existing = Array.isArray(beat.connections) ? beat.connections : [];
+    const label = (path === 'connection' ? (value as any)?.label : undefined) ?? existing[0]?.label;
+    const before = existing[0]?.targetId ?? existing[0]?.target ?? params.connection?.target;
+    return {
+      kind: 'connections',
+      prev: { connections: JSON.parse(JSON.stringify(existing)) },
+      next: { connections: typeof targetId === 'string' && targetId ? [{ targetId, ...(label ? { label } : {}) }] : [] },
+      before,
+      after: targetId,
+    };
+  }
+  const patch = buildParameterPatch(params, path, value);
+  return { kind: 'parameters', prev: { parameters: patch.prev }, next: { parameters: patch.next }, before: readParameterPath(params, path), after: value };
+}
+
+/** Apply a plan to a SERIALIZED beat (toJSON shape) in place — the simulation's write. */
+export function applyPlanToSerializedBeat(beat: any, plan: BeatEditPlan): void {
+  if (plan.kind === 'connections') {
+    beat.connections = JSON.parse(JSON.stringify(plan.next.connections));
+    if (beat.parameters?.connection) delete beat.parameters.connection;
+  } else {
+    beat.parameters = { ...(beat.parameters ?? {}), ...plan.next.parameters };
+  }
 }
 
 export function createGenerationReview(args: {

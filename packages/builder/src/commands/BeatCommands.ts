@@ -429,8 +429,9 @@ export class ApplyFixProposalCommand extends Command {
   public description: string;
 
   private beatId: string;
-  private prevParameters: Record<string, any>;
-  private nextParameters: Record<string, any>;
+  /** `updates` objects for BeatStateMutations.updateBeat — `{ parameters }` or `{ connections }`. */
+  private prevUpdates: Record<string, any>;
+  private nextUpdates: Record<string, any>;
   private proposalId: string;
   private mutations: BeatStateMutations;
   /** Review bookkeeping: an undone proposal reopens in the banner, a redone one settles again. Not serialized. */
@@ -439,8 +440,8 @@ export class ApplyFixProposalCommand extends Command {
   constructor(
     proposalId: string,
     beatId: string,
-    prevParameters: Record<string, any>,
-    nextParameters: Record<string, any>,
+    prevUpdates: Record<string, any>,
+    nextUpdates: Record<string, any>,
     description: string,
     mutations: BeatStateMutations,
     id?: string,
@@ -449,19 +450,19 @@ export class ApplyFixProposalCommand extends Command {
     super(id);
     this.proposalId = proposalId;
     this.beatId = beatId;
-    this.prevParameters = prevParameters;
-    this.nextParameters = nextParameters;
+    this.prevUpdates = prevUpdates;
+    this.nextUpdates = nextUpdates;
     this.description = description;
     this.mutations = mutations;
     this.hooks = hooks;
   }
 
   execute(): void {
-    this.mutations.updateBeat(this.beatId, { parameters: structuredClone(this.nextParameters) } as any);
+    this.mutations.updateBeat(this.beatId, structuredClone(this.nextUpdates) as any);
   }
 
   undo(): void {
-    this.mutations.updateBeat(this.beatId, { parameters: structuredClone(this.prevParameters) } as any);
+    this.mutations.updateBeat(this.beatId, structuredClone(this.prevUpdates) as any);
     this.hooks?.onUndo?.();
   }
 
@@ -473,11 +474,11 @@ export class ApplyFixProposalCommand extends Command {
   canMergeWith(): boolean { return false; }
 
   protected serializeData(): any {
-    return { proposalId: this.proposalId, beatId: this.beatId, prevParameters: this.prevParameters, nextParameters: this.nextParameters, description: this.description };
+    return { proposalId: this.proposalId, beatId: this.beatId, prevUpdates: this.prevUpdates, nextUpdates: this.nextUpdates, description: this.description };
   }
 
   static deserialize(data: SerializedCommand, mutations: BeatStateMutations): ApplyFixProposalCommand {
-    return new ApplyFixProposalCommand(data.data.proposalId, data.data.beatId, data.data.prevParameters, data.data.nextParameters, data.data.description, mutations, data.id);
+    return new ApplyFixProposalCommand(data.data.proposalId, data.data.beatId, data.data.prevUpdates, data.data.nextUpdates, data.data.description, mutations, data.id);
   }
 }
 

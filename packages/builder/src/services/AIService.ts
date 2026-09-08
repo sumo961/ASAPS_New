@@ -2046,6 +2046,27 @@ Always be helpful and try to interpret the user's intent, even if the command is
    * reasoning-token headroom — and neither branch worked behind the proxy
    * (provider.client is null there).
    */
+  /**
+   * One system + user turn against the configured provider, text back.
+   * The public face of makeDirectAICall for small authoring helpers
+   * (the generation review's "Ask AI for a fix"). `signal` cancels: both
+   * providers honour it on conversation turns.
+   */
+  async completeTurn(systemPrompt: string, userPrompt: string, opts: { maxTokens?: number; signal?: AbortSignal } = {}): Promise<string> {
+    if (!this.currentProvider) throw new Error('No AI provider configured');
+    const provider = this.currentProvider as any;
+    if (typeof provider.generateConversationTurn !== 'function') {
+      throw new Error(`Provider ${provider.name} not supported for direct calls`);
+    }
+    const { text } = await provider.generateConversationTurn({
+      systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: opts.maxTokens ?? 4000,
+      signal: opts.signal,
+    } as any);
+    return text;
+  }
+
   private async makeDirectAICall(systemPrompt: string, userPrompt: string): Promise<string> {
     if (!this.currentProvider) {
       throw new Error('No AI provider configured');

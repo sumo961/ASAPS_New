@@ -97,3 +97,31 @@ describe('fix proposals (generation review, 2026-09-08)', () => {
     expect(screen.getByText(/1 proposed fix/i)).toBeTruthy();
   });
 });
+
+describe('Ask AI for a fix (generation review phase 2)', () => {
+  const finding = { id: 'unreachable-beat:beat_lost', kind: 'unreachable-beat', beatId: 'beat_lost', beatName: 'Lost', beatType: 'infoText', index: 4, message: '"Lost" (infoText) can never be reached — no choice or link leads to it.' } as const;
+  const missing = { id: 'missing-target:beat_2:beat_ending:choices[1].target', kind: 'missing-target', beatId: 'beat_2', beatName: 'Fork', targetId: 'beat_ending', via: 'choice', path: 'choices[1].target', message: 'x' } as const;
+  it('offers Ask AI on finding rows and on the matching broken-link row', () => {
+    const onAsk = vi.fn();
+    render(<ImportIssuesBanner brokenTargets={[{ sourceBeatId: 'beat_2', sourceBeatName: 'Fork', target: 'beat_ending' }]} findings={[finding, missing] as any} onAskAI={onAsk} onDismiss={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/^Ask AI: "Lost"/));
+    expect(onAsk).toHaveBeenCalledWith(expect.objectContaining({ id: finding.id }));
+    fireEvent.click(screen.getByLabelText(/^Ask AI: x/));
+    expect(onAsk).toHaveBeenCalledWith(expect.objectContaining({ id: missing.id }));
+  });
+  it('shows the checked AI edits as before → after with Accept / Reject, and a cancellable loading state', () => {
+    const onAccept = vi.fn(); const onReject = vi.fn(); const onCancel = vi.fn();
+    const ready = { findingId: finding.id, status: 'ready', suggestion: { findingId: finding.id, rationale: 'Link from the scene that mentions it.', edits: [], preview: [{ beatId: 'beat_3', beatName: 'Camp', path: 'connection.target', before: undefined, after: 'beat_lost' }] } } as any;
+    const { rerender } = render(<ImportIssuesBanner brokenTargets={[]} findings={[finding] as any} onAskAI={() => {}} aiFix={ready} onAcceptAIFix={onAccept} onRejectAIFix={onReject} onDismiss={() => {}} />);
+    expect(screen.getByText(/Link from the scene/)).toBeTruthy();
+    expect(screen.getByText('(empty)')).toBeTruthy();
+    expect(screen.getByText('beat_lost')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Accept AI fix'));
+    expect(onAccept).toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('Reject AI fix'));
+    expect(onReject).toHaveBeenCalled();
+    rerender(<ImportIssuesBanner brokenTargets={[]} findings={[finding] as any} onAskAI={() => {}} aiFix={{ findingId: finding.id, status: 'loading' }} onCancelAIFix={onCancel} onDismiss={() => {}} />);
+    fireEvent.click(screen.getByText('Cancel'));
+    expect(onCancel).toHaveBeenCalled();
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeStoryFindings, proposeFixes, idSimilarity, closestBeatId, buildParameterPatch, openFindings, createGenerationReview } from '../generationReview';
+import { analyzeStoryFindings, proposeFixes, idSimilarity, closestBeatId, buildParameterPatch, openFindings, createGenerationReview, planBeatEdit, applyPlanToSerializedBeat } from '../generationReview';
 
 const story = () => ({
   metadata: { title: 'T' },
@@ -99,5 +99,28 @@ describe('after the normalize pipeline (trueTarget → trueConnection string ali
   it('flattenConditionParams accepts the string form', async () => {
     const { flattenConditionParams } = await import('../applyGeneratedStory');
     expect(flattenConditionParams({ trueConnection: 'a', falseConnection: { target: 'b' } })).toEqual({ trueTarget: 'a', falseTarget: 'b' });
+  });
+});
+
+describe('planBeatEdit — connections vs parameters', () => {
+  it('routes a connection edit on a single-exit beat to the beat-level connections array', () => {
+    const plan = planBeatEdit({ type: 'infoText', name: 'Intro', parameters: { text: 'x' }, connections: [{ targetId: 'beat_2', label: 'To Fork' }] }, 'connection.target', 'beat_camp');
+    expect(plan.kind).toBe('connections');
+    expect(plan.next).toEqual({ connections: [{ targetId: 'beat_camp', label: 'To Fork' }] });
+    expect(plan.prev).toEqual({ connections: [{ targetId: 'beat_2', label: 'To Fork' }] });
+    expect(plan.before).toBe('beat_2');
+    expect(plan.after).toBe('beat_camp');
+  });
+  it('accepts the object form too, and writes an empty array when the beat had no link', () => {
+    const plan = planBeatEdit({ type: 'infoText', parameters: {} }, 'connection', { target: 'beat_2' });
+    expect(plan.next).toEqual({ connections: [{ targetId: 'beat_2' }] });
+    expect(plan.prev).toEqual({ connections: [] });
+    expect(plan.before).toBeUndefined();
+  });
+  it('keeps parameter-derived types and every other path as a parameter patch', () => {
+    const plan = planBeatEdit({ type: 'multiChoice', parameters: { choices: [{ target: 'a' }] } }, 'choices[0].target', 'b');
+    expect(plan.kind).toBe('parameters');
+    expect(plan.next.parameters.choices[0].target).toBe('b');
+    expect(applyPlanToSerializedBeat).toBeTypeOf('function');
   });
 });

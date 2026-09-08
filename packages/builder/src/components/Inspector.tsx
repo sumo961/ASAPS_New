@@ -171,10 +171,7 @@ interface InspectorProps {
 // stale connections (e.g. a replaced multiChoice target kept rendering as a
 // third edge because multiChoice was missing from this list while its sibling
 // movementChoice was in it). Single source for both save paths.
-const PARAMETER_DERIVED_TYPES = new Set([
-  'dialogTree', 'pickProp', 'movementChoice', 'multiChoice',
-  'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
-]);
+import { PARAMETER_DERIVED_TYPES } from '../utils/beatConnectionModel';
 
 const MIN_INSPECTOR_WIDTH = 280;
 const DEFAULT_INSPECTOR_WIDTH = 320;

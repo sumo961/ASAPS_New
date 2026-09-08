@@ -189,7 +189,7 @@ describe('ReparentBeatCommand', () => {
 describe('ApplyFixProposalCommand', () => {
   it('applies the patch, undoes to the previous parameters, and hands out fresh clones each time', () => {
     const m = mutations();
-    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { value: 3 }, { value: 1 }, 'Change the check', m);
+    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { parameters: { value: 3 } }, { parameters: { value: 1 } }, 'Change the check', m);
     cmd.execute();
     const first = m.updateBeat.mock.calls[0][1];
     expect(first).toEqual({ parameters: { value: 1 } });
@@ -207,7 +207,7 @@ describe('ApplyFixProposalCommand review hooks', () => {
   it('reports undo and redo back so the banner can reopen / settle the proposal', () => {
     const m = mutations();
     const onUndo = vi.fn(); const onRedo = vi.fn();
-    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { value: 3 }, { value: 1 }, 'x', m, undefined, { onUndo, onRedo });
+    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { parameters: { value: 3 } }, { parameters: { value: 1 } }, 'x', m, undefined, { onUndo, onRedo });
     cmd.execute();
     cmd.undo();
     expect(onUndo).toHaveBeenCalledTimes(1);
