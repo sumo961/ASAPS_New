@@ -1914,6 +1914,10 @@ The Visual Editor adapts to the active mode:
 - **Path-keyframe animations** (the absolute-mode animation editor) keep working on beats with baked pixel positions even in responsive projects, but the Animations panel shows a small amber **"Legacy path animation"** banner reminding you that slot-anchored elements use a different animation editor.
 - **Speaker label preview** — when a slot-mode dialog beat has a speaker assigned, the VE preview now shows the speaker label exactly where the runtime would render it, matching `resolveSpeakerForSlot`.
 
+In Responsive mode the bar above the stage previews the beat at each device width — **Phone · 390**, **Tablet · 768**, **Authored** (your project's own size), **Desktop · 1440** — and **Fit / 1:1** control the zoom. Switching presets re-lays the slots the way a real device would, HUD frames included, so a portrait-phone problem shows up here before it shows up on a phone.
+
+![The responsive Visual Editor at the Phone · 390 preset — the beat as a portrait phone will lay it out, with the meter frames docked top-left](images/68-visual-editor-phone.png)
+
 ### Per-button pins (action slot)
 
 In responsive mode, the slot-intent toolbar (top of the Visual Editor preview area) has a **Pin** row that lets you lift individual stage buttons out of the shared action row and pin them to any stage corner. One control per visible button — *Continue*, *Restart*, *Credits*. The six preset glyphs are:
@@ -2004,8 +2008,6 @@ Elements stack on top of each other. A character should appear in front of the b
 When you select two or more elements at once, alignment and distribution buttons appear (align left/right/top/bottom/center, distribute horizontally/vertically); selecting two or more elements also reveals group/ungroup controls.
 
 <a id="phone-crop-preview"></a>
-![The responsive Visual Editor at the Phone · 390 preset — the beat as a portrait phone will lay it out, with the meter frames docked top-left](images/68-visual-editor-phone.png)
-
 ### Phone Crop Preview
 
 A landscape stage shown on a phone held upright gets cropped: the renderer keeps the full height and shows the middle of the picture. The **phone crop preview** button draws two dashed frames over the stage — a **9:16** and a taller **9:19.5** phone — so you can see which part of your background, and which characters and hotspots, a phone player will actually get. Anything outside the frames is what a phone loses. Keep the things that matter inside the inner frame, or anchor them to the image (see [Anchored to](#animation-anchor) for animations, and image [asset variants](#image-asset-variants--orientation-and-device-class-v0959) for a different picture altogether on phones).
