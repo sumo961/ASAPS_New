@@ -2121,6 +2121,24 @@ export const PreviewWindow: React.FC = () => {
         }
       }
 
+      // The runtime AI adapter is normally wired by the previewData effect,
+      // but a fresh window that starts straight on an AI beat could reach
+      // the beat before that wiring landed ("AI features require
+      // configuration" on a configured install). The start path now
+      // guarantees it: if the renderer has no service and a config exists,
+      // wire the same adapter here, language directives included.
+      if (rendererRef.current && !rendererRef.current.getState('aiService')) {
+        let lateAdapter = createAIServiceAdapter();
+        if (lateAdapter) {
+          const pd = previewDataRef.current;
+          if (pd?.activeLanguage) {
+            lateAdapter = createLanguageAwareAdapter(lateAdapter, pd.activeLanguage, pd.settings?.translation?.sourceLanguage || 'en');
+          }
+          rendererRef.current.setState('aiService', lateAdapter);
+          console.log('[PreviewWindow] AI service adapter wired at start (effect had not run yet)');
+        }
+      }
+
       // Start from the specified beat or the beginning
       const actualStartBeat = overrideBeatId || startBeatId || undefined;
       await engineRef.current.start(actualStartBeat);
