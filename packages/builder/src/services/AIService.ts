@@ -33,7 +33,6 @@ import { buildBeatTypeDigest } from './beatSchemaVocabulary';
 import { normalizeBeat } from '@asaps/core';
 import { getAIValidator } from './AIValidator';
 import { normalizeStory } from '@asaps/core';
-import { mergeRepairedStory } from './storyRepairMerge';
 import {
   buildCharacterQuestionsPrompt,
   buildCharacterProfilePrompt,
@@ -1405,7 +1404,6 @@ export class AIService {
     }
     const requestWithSignal: StoryGenerationRequest = { ...request, signal: controller.signal };
 
-    const MAX_REPAIR_ATTEMPTS = 2;
 
     try {
       // Generate with current provider
@@ -1494,118 +1492,33 @@ export class AIService {
           !harmlessWarningPatterns.some(pattern => pattern.test(warning))
         );
 
-        if (!validation.valid) {
-          // Check if errors are repairable (counter threshold issues or unreachable beats)
-          const repairableErrors = validationErrors.filter((e: any) => {
-            const msg = e.message || e;
-            return msg.includes('cannot satisfy') ||
-              msg.includes('Possible range') ||
-              msg.includes('unreachable');  // Include all unreachable errors (beats may be orphaned due to threshold issues)
-          });
-
-          if (repairableErrors.length > 0) {
-            // Attempt repair with AI feedback for repairable errors
-            console.log(`[AIService] Found ${repairableErrors.length} repairable errors (of ${validationErrors.length} total), attempting AI repair...`);
-
-            for (let attempt = 1; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
-              console.log(`[AIService] Story repair attempt ${attempt}/${MAX_REPAIR_ATTEMPTS}`);
-
-              const repairedResponse = await this.attemptStoryRepair(
-                response,
-                repairableErrors,
-                request
-              );
-
-              if (repairedResponse) {
-                // Re-validate the repaired response
-                const revalidation = await this.validator.validateStoryGeneration(repairedResponse);
-                const newRepairableErrors = (revalidation.errors || []).filter((e: any) => {
-                  const msg = e.message || e;
-                  return msg.includes('cannot satisfy') ||
-                    msg.includes('Possible range') ||
-                    msg.includes('unreachable');
-                });
-
-                if (revalidation.valid || newRepairableErrors.length < repairableErrors.length) {
-                  console.log(`[AIService] Repair reduced errors from ${repairableErrors.length} to ${newRepairableErrors.length}`);
-                  response = repairedResponse;
-                  validationErrors = revalidation.errors || [];
-                  validationWarnings = revalidation.warnings || [];
-
-                  if (revalidation.valid) {
-                    console.log('[AIService] All repairable errors resolved!');
-                    break;
-                  }
-                } else {
-                  console.log('[AIService] Repair did not improve errors, trying again...');
-                }
-              } else {
-                console.log('[AIService] Repair attempt failed');
-              }
-            }
-
-            // Check if we still have errors after repair attempts
-            const finalValidation = await this.validator.validateStoryGeneration(response);
-            if (!finalValidation.valid) {
-              console.error('[AIService] Story validation still failed after repair attempts:', finalValidation.errors);
-              this.exportStoryDebug(response, finalValidation.errors || [], finalValidation.warnings || [], 'failed');
-              throw new Error(`Story validation failed: ${(finalValidation.errors || []).map((e: any) => e.message || e).join(', ')}`);
-            }
-          } else {
-            // Non-repairable errors - fail immediately
-            console.error('[AIService] Story validation failed:', validationErrors);
-            this.exportStoryDebug(response, validationErrors, validationWarnings, 'failed');
-            throw new Error(`Story validation failed: ${validationErrors.map((e: any) => e.message || e).join(', ')}`);
-          }
+        // Validation no longer gates generation and no longer triggers an AI
+        // repair pass (removed 2026-09-08). Two instrumented runs showed the
+        // repair regenerating the WHOLE story at the same token cap — once
+        // introducing a new broken link while fixing another, once spending
+        // nine minutes on a validator false positive. Only an unusable result
+        // (no beats) throws; every other finding rides on the response as
+        // generationIssues and the App's import banner puts it in front of
+        // the author, who fixes a dangling link in seconds. Model-authored
+        // fixes belong behind an explicit "propose a fix" with a diff
+        // preview, never inside this pipeline.
+        const beatCount = Array.isArray(response.beats) ? response.beats.length : 0;
+        if (beatCount === 0) {
+          console.error('[AIService] Story validation failed — no beats:', validationErrors);
+          this.exportStoryDebug(response, validationErrors, validationWarnings, 'failed');
+          throw new Error(`Story validation failed: ${validationErrors.map((e: any) => e.message || e).join(', ') || 'no beats'}`);
         }
-
-        // Attempt to repair fixable warnings (like unreachable beats)
+        if (!validation.valid) {
+          console.warn('[AIService] Story validation found issues (shown in the import banner):', validationErrors);
+        }
         if (validationWarnings.length > 0) {
           console.warn('[AIService] Story validation warnings:', validationWarnings);
-
-          // Check for fixable warnings (unreachable beats, missing connections, etc.)
-          const fixableWarnings = validationWarnings.filter(w =>
-            w.includes('unreachable') ||
-            w.includes('no other beat connects') ||
-            w.includes('missing connection')
-          );
-
-          if (fixableWarnings.length > 0) {
-            console.log(`[AIService] Found ${fixableWarnings.length} fixable warnings, attempting repair...`);
-
-            for (let attempt = 1; attempt <= MAX_REPAIR_ATTEMPTS; attempt++) {
-              console.log(`[AIService] Repair attempt ${attempt}/${MAX_REPAIR_ATTEMPTS}`);
-
-              const repairedResponse = await this.attemptStoryRepair(response, fixableWarnings, request);
-
-              if (repairedResponse) {
-                // Re-validate the repaired response
-                const revalidation = await this.validator.validateStoryGeneration(repairedResponse);
-                const newWarnings = (revalidation.warnings || []).filter(w =>
-                  w.includes('unreachable') ||
-                  w.includes('no other beat connects') ||
-                  w.includes('missing connection')
-                );
-
-                if (newWarnings.length < fixableWarnings.length) {
-                  console.log(`[AIService] Repair reduced warnings from ${fixableWarnings.length} to ${newWarnings.length}`);
-                  response = repairedResponse;
-                  validationWarnings = revalidation.warnings || [];
-
-                  if (newWarnings.length === 0) {
-                    console.log('[AIService] All fixable warnings resolved!');
-                    break;
-                  }
-                } else {
-                  console.log('[AIService] Repair did not improve warnings, keeping original');
-                  break;
-                }
-              } else {
-                console.log('[AIService] Repair attempt failed, keeping original');
-                break;
-              }
-            }
-          }
+        }
+        if (validationErrors.length > 0 || validationWarnings.length > 0) {
+          response.generationIssues = {
+            errors: validationErrors.map((e: any) => (typeof e === 'string' ? e : e.message)),
+            warnings: [...validationWarnings],
+          };
         }
       }
 
@@ -1628,118 +1541,6 @@ export class AIService {
       if (this.currentAbortController === controller) {
         this.currentAbortController = null;
       }
-    }
-  }
-
-  /**
-   * Attempt to repair story issues (counter thresholds, unreachable beats) by asking the AI
-   */
-  private async attemptStoryRepair(
-    story: StoryGenerationResponse,
-    issues: any[],
-    originalRequest: StoryGenerationRequest
-  ): Promise<StoryGenerationResponse | null> {
-    try {
-      const issueList = issues.map((issue, i) => {
-        const msg = issue.message || issue;
-        return `${i + 1}. ${msg}`;
-      }).join('\n');
-
-      const repairPrompt = `
-STORY REPAIR REQUEST: The generated story has validation issues that need fixing.
-
-## Issues Found:
-${issueList}
-
-## Common Fixes:
-
-### Counter Threshold Issues (cannot satisfy condition):
-The condition checks require counter values that cannot be reached.
-- Add more setVariable beats with operation="add" for the counter
-- Or increase the counterValue on existing choice effects
-- Place counter increments BEFORE condition checks
-- A condition "counter >= 3" needs at least 3 increments reachable before it
-
-### Unreachable Beat Issues:
-Some beats cannot be reached from the title screen.
-- Add missing connections to orphaned beats
-- Or connect them to an existing beat in the story flow
-- Ensure every beat has at least one incoming connection (except title screen)
-
-## Current Story JSON:
-${JSON.stringify(story, null, 2)}
-
-## Instructions:
-1. Analyze each issue and determine the appropriate fix
-2. For counter issues: Add setVariable beats or choice counter effects
-3. For unreachable beats: Add connections from existing beats to orphaned ones
-4. Preserve ALL existing content - only ADD beats/connections or MODIFY values
-5. Do NOT remove any beats or break existing connections
-
-## Important:
-- Use setVariable beats with type="counter", operation="add" for counter increments
-- Or add counter/counterOperation/counterValue to existing choices
-- For unreachable beats, find logical places to add connections to them
-- Every beat must be reachable from the title screen through some path
-
-Return ONLY the corrected JSON, no explanation needed.
-`;
-
-      // Create a repair request
-      const repairRequest: StoryGenerationRequest = {
-        ...originalRequest,
-        prompt: repairPrompt,
-      };
-
-      console.log('[AIService] Sending story repair request to AI...');
-      let repairedResponse = await this.currentProvider!.generateStory(repairRequest);
-
-      // The repair re-emits the whole story and routinely drops what it did
-      // not touch (characters / variables / clusters / theme — seen on an
-      // 85-beat story whose repaired copy came back beats-only). Original
-      // fields fill every gap, then the SAME normalize pipeline the first
-      // pass ran rebuilds clusters from per-beat strings, flattens
-      // conditions and backfills characters. Skipping it here is how a
-      // story reached the graph with 84 clustered beats and 0 clusters.
-      repairedResponse = mergeRepairedStory(story, repairedResponse);
-      try {
-        const schema = (this.validator as any).getSchema?.();
-        if (schema?.beatTypes) {
-          const pipeline = normalizeStory(repairedResponse as any, schema);
-          if (pipeline.story) repairedResponse = { ...repairedResponse, ...(pipeline.story as any) };
-          console.log(
-            `[AIService.repair] Re-normalized repaired story: ${pipeline.report.changes.length} changes, ` +
-              `${pipeline.report.clustersCreated.length} clusters auto-created`,
-          );
-        }
-      } catch (err) {
-        console.warn('[AIService.repair] Re-normalize failed; continuing with merged repair:', err);
-      }
-
-      // Transform the repaired response
-      repairedResponse = this.transformStoryResponse(repairedResponse);
-
-      // Clean up redundant parameters
-      this.cleanupRedundantParameters(repairedResponse);
-
-      // Verify the repair didn't break the story
-      if (!repairedResponse.beats || repairedResponse.beats.length === 0) {
-        console.warn('[AIService] Story repair produced invalid response (no beats)');
-        return null;
-      }
-
-      // Check that we didn't lose beats
-      if (repairedResponse.beats.length < story.beats.length) {
-        console.warn('[AIService] Story repair removed beats, rejecting');
-        return null;
-      }
-
-      console.log('[AIService] Story repair completed, verifying...');
-      return repairedResponse;
-
-    } catch (error) {
-      console.error('[AIService] Story repair failed:', error);
-      return null;
     }
   }
 

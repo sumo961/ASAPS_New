@@ -243,7 +243,7 @@ describe('AIService', () => {
       expect(result).toEqual(mockStoryResponse);
     });
 
-    it('should throw on validation failure', async () => {
+    it('attaches validation findings to the story instead of throwing (2026-09-08: no self-repair, no gate)', async () => {
       const invalidResponse = {
         ...mockStoryResponse,
         beats: [
@@ -262,9 +262,9 @@ describe('AIService', () => {
       validatingService.registerProvider(mockProvider);
       mockProvider.generateStory = vi.fn(async () => invalidResponse);
 
-      await expect(validatingService.generateStory(mockStoryRequest)).rejects.toThrow(
-        'Story validation failed'
-      );
+      const result = await validatingService.generateStory(mockStoryRequest);
+      expect(result.beats).toHaveLength(1);
+      expect(result.generationIssues?.errors.some(m => /unknownType|beat type/i.test(m))).toBe(true);
     });
 
     it('should propagate provider errors', async () => {
@@ -562,7 +562,7 @@ describe('AIService', () => {
       ).rejects.toThrow('Network error');
     });
 
-    it('should handle validation errors gracefully', async () => {
+    it('still fails on an unusable result (no beats at all)', async () => {
       const invalidResponse: StoryGenerationResponse = {
         metadata: { title: '', author: '' }, // Invalid empty title
         beats: [],

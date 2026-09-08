@@ -364,10 +364,16 @@ function App() {
   const reportImportValidation = useCallback((story: any) => {
     const validation = validateAIStory(story);
     console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
-    if (validation.valid) {
+    // Findings the generator's own validator attached (schema level: unknown
+    // beat types / params, counter ranges …). Its missing-target errors are
+    // the same links this validator renders as rows below, so those drop.
+    const generationErrors: string[] = (story?.generationIssues?.errors ?? [])
+      .filter((m: unknown): m is string => typeof m === 'string' && !/non-existent beat/i.test(m));
+    if (validation.valid && generationErrors.length === 0) {
       setImportIssues(null);
       return;
     }
+    generationErrors.forEach(m => console.warn('[App] generator validation:', m));
     validation.errors.forEach(e => console.warn('[App] validation:', e.message));
     validation.warnings.forEach(w => console.warn('[App] validation warning:', w.message));
     const nameOf = (id: string) =>
@@ -375,9 +381,10 @@ function App() {
     const brokenTargets = validation.errors
       .filter(e => e.category === 'missing_beat' && e.beatId && e.targetId)
       .map(e => ({ sourceBeatId: e.beatId!, sourceBeatName: nameOf(e.beatId!), target: e.targetId! }));
-    const otherErrors = validation.errors
-      .filter(e => e.category !== 'missing_beat')
-      .map(e => e.message);
+    const otherErrors = [
+      ...validation.errors.filter(e => e.category !== 'missing_beat').map(e => e.message),
+      ...generationErrors,
+    ];
     const beatIds = (story.beats || []).map((b: any) => b.id).filter(Boolean);
     setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors, beatIds } : null);
   }, []);

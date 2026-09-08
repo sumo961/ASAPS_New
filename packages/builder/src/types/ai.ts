@@ -138,6 +138,14 @@ export interface StoryGenerationResponse {
   /** Suggested theme based on genre and story style */
   suggestedTheme?: SuggestedTheme;
 
+  /**
+   * Findings from the generator's own schema validation. Generation no
+   * longer fails or self-repairs on these — the import banner shows them
+   * and the author decides. Missing-target errors are also derived by the
+   * importer's link walk, so consumers de-duplicate on that wording.
+   */
+  generationIssues?: { errors: string[]; warnings: string[] };
+
   /** Generated beats */
   beats: GeneratedBeat[];
 
