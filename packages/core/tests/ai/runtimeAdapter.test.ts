@@ -297,7 +297,8 @@ describe('transports (fetch wire contracts)', () => {
     await t({ model: 'm', messages: [] });
     const [url, init] = spy.mock.calls[0];
     expect(url).toBe('/api/ai/openai');
-    expect(JSON.parse(init.body)).toEqual({ baseUrl: 'https://x.example/v1', apiKey: 'k', model: 'm', messages: [] });
+    // stream:true is added by default (see runtimeAdapterProxy.test.ts); the { baseUrl, apiKey, ...body } shape is the contract.
+    expect(JSON.parse(init.body)).toEqual({ baseUrl: 'https://x.example/v1', apiKey: 'k', model: 'm', messages: [], stream: true });
   });
 
   it('direct anthropic transport targets /v1/messages with CORS opt-in headers', async () => {

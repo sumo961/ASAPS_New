@@ -197,6 +197,16 @@ export class EmbeddedAPIServer {
       const headers = buildClaudeHeaders(apiKey);
       const requestBodyStr = JSON.stringify(requestBody);
 
+      // stream:true → chunked text/plain of the assistant's content, the same
+      // contract the Vite dev proxy has served the builder for months. The
+      // runtime adapter's proxy transport now sends stream:true too; before
+      // this path existed the packaged app forwarded the flag upstream and
+      // then failed to JSON-parse the SSE it got back.
+      if (requestBody?.stream === true) {
+        await this.streamingNativeRequest(endpoint, headers, requestBodyStr, 'claude', res);
+        return;
+      }
+
       // Use Node.js native https to bypass Electron's Chromium networking
       const { status, text } = await this.nativeRequest(endpoint, headers, requestBodyStr, DEFAULT_AI_TIMEOUT_MS);
 
@@ -256,6 +266,11 @@ export class EmbeddedAPIServer {
       // Use shared header construction
       const headers = buildOpenAIHeaders(apiKey);
       const requestBodyStr = JSON.stringify(requestBody);
+
+      if (requestBody?.stream === true) {
+        await this.streamingNativeRequest(endpoint, headers, requestBodyStr, 'openai', res);
+        return;
+      }
 
       // Use Node.js native https to bypass Electron's Chromium networking
       // Electron's fetch() goes through Chromium's network stack which can
@@ -586,6 +601,98 @@ export class EmbeddedAPIServer {
    * which can abort long-running AI requests. Using Node.js native https/http
    * modules bypasses Chromium entirely and handles large, slow responses reliably.
    */
+  /**
+   * Streaming proxy: forward the request upstream with stream:true, parse
+   * the provider's SSE, and write only the assistant's content deltas to the
+   * client as chunked text/plain (Vite dev-proxy contract — see
+   * packages/builder/src/api/vite-ai-proxy.ts). The connection stays warm
+   * across long reasoning pauses, so the fixed request timeout no longer
+   * kills slow generations; the guard here is an IDLE timeout between chunks.
+   */
+  private streamingNativeRequest(
+    endpoint: string,
+    headers: Record<string, string>,
+    body: string,
+    provider: 'claude' | 'openai',
+    res: ServerResponse,
+  ): Promise<void> {
+    const IDLE_TIMEOUT_MS = 120_000;
+    return new Promise((resolve) => {
+      const url = new URL(endpoint);
+      const isHttps = url.protocol === 'https:';
+      const requestFn = isHttps ? httpsRequest : httpRequest;
+      let idle: NodeJS.Timeout | undefined;
+      const armIdle = (onIdle: () => void) => { if (idle) clearTimeout(idle); idle = setTimeout(onIdle, IDLE_TIMEOUT_MS); };
+
+      const req = requestFn(
+        {
+          hostname: url.hostname,
+          port: url.port || (isHttps ? 443 : 80),
+          path: url.pathname + url.search,
+          method: 'POST',
+          headers: { ...headers, Accept: 'text/event-stream', 'Content-Length': Buffer.byteLength(body) },
+        },
+        (upstream) => {
+          const status = upstream.statusCode || 500;
+          if (status >= 400) {
+            const chunks: Buffer[] = [];
+            upstream.on('data', (c: Buffer) => chunks.push(c));
+            upstream.on('end', () => {
+              const text = Buffer.concat(chunks).toString('utf-8');
+              try { this.sendJson(res, status, JSON.parse(text)); } catch { this.sendJson(res, status, { error: text }); }
+              resolve();
+            });
+            return;
+          }
+          res.writeHead(200, {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',
+          });
+          let lineBuffer = '';
+          let totalChars = 0;
+          const t0 = Date.now();
+          armIdle(() => { console.warn('[API Server] streaming proxy idle timeout'); upstream.destroy(); });
+          upstream.on('data', (chunk: Buffer) => {
+            armIdle(() => { console.warn('[API Server] streaming proxy idle timeout'); upstream.destroy(); });
+            lineBuffer += chunk.toString('utf-8');
+            const lines = lineBuffer.split('\n');
+            lineBuffer = lines.pop() || '';
+            for (const raw of lines) {
+              const line = raw.trim();
+              if (!line.startsWith('data:')) continue;
+              const payload = line.slice(5).trim();
+              if (!payload || payload === '[DONE]') continue;
+              try {
+                const json = JSON.parse(payload);
+                const content = provider === 'openai'
+                  ? json?.choices?.[0]?.delta?.content
+                  : (json?.type === 'content_block_delta' ? (json?.delta?.text ?? json?.delta?.partial_json) : undefined);
+                if (content) { res.write(content); totalChars += String(content).length; }
+              } catch { /* malformed SSE line — skip */ }
+            }
+          });
+          upstream.on('end', () => {
+            if (idle) clearTimeout(idle);
+            res.end();
+            console.log(`[API Server] streaming proxy done: ${totalChars} chars in ${Math.round((Date.now() - t0) / 1000)}s`);
+            resolve();
+          });
+          upstream.on('error', () => { if (idle) clearTimeout(idle); res.end(); resolve(); });
+        },
+      );
+      req.on('error', (err) => {
+        if (idle) clearTimeout(idle);
+        if (!res.headersSent) this.sendJson(res, 502, { error: 'Proxy request failed', message: err.message });
+        else res.end();
+        resolve();
+      });
+      req.write(body);
+      req.end();
+    });
+  }
+
   private nativeRequest(
     endpoint: string,
     headers: Record<string, string>,

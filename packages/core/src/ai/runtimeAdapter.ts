@@ -313,12 +313,25 @@ export function createProxyTransport(options: {
   endpoint: string;
   baseUrl: string;
   apiKey: string;
+  /** Which provider shape to rebuild from a plain-text stream. Derived from the endpoint when omitted. */
+  family?: 'anthropic' | 'openai';
 }): RuntimeTransport {
+  const family: 'anthropic' | 'openai' =
+    options.family ?? (/claude|anthropic/i.test(options.endpoint) ? 'anthropic' : 'openai');
   return async (body) => {
+    // Stream by default, like the direct and relay transports: the proxied
+    // path was the last one that held a silent connection open for the
+    // whole generation and died on the proxy's own timeout. The builder's
+    // proxies answer a stream:true request with a chunked text/plain body
+    // of the assistant's content (their long-standing contract for the
+    // authoring path); some deployments pass SSE straight through; a proxy
+    // that ignores the flag still returns JSON. All three are accepted.
+    const wantStream = (body as any).stream !== false;
+    const sendBody = wantStream ? { ...body, stream: true } : body;
     const response = await fetch(options.endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baseUrl: options.baseUrl, apiKey: options.apiKey, ...body }),
+      headers: { 'Content-Type': 'application/json', ...(wantStream ? { Accept: 'text/event-stream, text/plain, application/json' } : {}) },
+      body: JSON.stringify({ baseUrl: options.baseUrl, apiKey: options.apiKey, ...sendBody }),
     });
 
     if (!response.ok) {
@@ -326,8 +339,27 @@ export function createProxyTransport(options: {
       throw new Error(error.message || error.error?.message || 'Proxy request failed');
     }
 
+    const contentType = response.headers?.get?.('content-type') ?? '';
+    if (wantStream && contentType.includes('text/event-stream')) {
+      return family === 'anthropic' ? reassembleAnthropicStream(response) : reassembleOpenAIStream(response);
+    }
+    if (wantStream && contentType.includes('text/plain')) {
+      const text = await response.text();
+      return wrapPlainTextAsProviderResponse(text, family);
+    }
     return response.json();
   };
+}
+
+/**
+ * The builder's proxies stream a bare text/plain body of assistant content.
+ * Rebuild the provider-shaped non-streaming response so every caller keeps
+ * reading `content[0].text` / `choices[0].message.content` as before.
+ */
+export function wrapPlainTextAsProviderResponse(text: string, family: 'anthropic' | 'openai'): any {
+  return family === 'anthropic'
+    ? { role: 'assistant', content: [{ type: 'text', text }], stop_reason: 'end_turn' }
+    : { choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }] };
 }
 
 export interface RuntimeAIServiceOptions {

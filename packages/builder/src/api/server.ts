@@ -795,7 +795,9 @@ export class APIServer {
     // Proxy for Claude/Anthropic-compatible APIs
     router.post('/claude', async (req: Request, res: Response) => {
       try {
-        const { baseUrl: providedBaseUrl, apiKey, ...requestBody } = req.body;
+        // Buffered-JSON server: a forwarded stream flag would come back as SSE and
+        // fail the JSON parse below, so it is stripped here.
+        const { baseUrl: providedBaseUrl, apiKey, stream: _stream, ...requestBody } = req.body;
 
         if (!apiKey) {
           return res.status(400).json({
@@ -877,7 +879,9 @@ export class APIServer {
       try {
         // _endpoint: 'responses' routes to OpenAI's Responses API
         // (pro-mode reasoning, GPT-5.6). Proxy metadata — stripped here.
-        const { baseUrl: providedBaseUrl, apiKey, _endpoint, ...requestBody } = req.body;
+        // Buffered-JSON server: a forwarded stream flag would come back as SSE and
+        // fail the JSON parse below, so it is stripped here.
+        const { baseUrl: providedBaseUrl, apiKey, _endpoint, stream: _stream, ...requestBody } = req.body;
 
         if (!apiKey) {
           return res.status(400).json({
