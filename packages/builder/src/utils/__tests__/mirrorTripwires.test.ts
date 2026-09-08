@@ -25,19 +25,46 @@ import { extractTranslatableStrings } from '../../export/StoryTranslator';
 
 const REPO = join(__dirname, '..', '..', '..', '..', '..');
 
-describe('AFFECT_CATALOG mirror', () => {
-  it('is byte-identical between core and the MCP desktop server', () => {
-    const grab = (src: string) => {
-      const m = src.match(/const AFFECT_CATALOG = `([\s\S]*?)`;/);
-      if (!m) throw new Error('AFFECT_CATALOG block not found');
-      return m[1];
+describe('affect prompt mirror (core → MCP desktop server)', () => {
+  const core = readFileSync(join(REPO, 'packages/core/src/prompts/affectPrompt.ts'), 'utf8');
+  const mcpFile = readFileSync(join(REPO, 'mcp-server-desktop/src/index.ts'), 'utf8');
+  // Only the hand-mirrored SYNC region of the server counts.
+  const mcp = (() => {
+    const start = mcpFile.indexOf('// SYNC SOURCE: packages/core/src/prompts/affectPrompt.ts');
+    const end = mcpFile.indexOf('// END SYNC SOURCE block');
+    if (start < 0 || end < 0) throw new Error('SYNC SOURCE region markers not found in mcp-server-desktop/src/index.ts');
+    return mcpFile.slice(start, end);
+  })();
+  const literal = (src: string, name: string) => {
+    const m = src.match(new RegExp(`const ${name} = \`([\\s\\S]*?)\`;`));
+    if (!m) throw new Error(`${name} block not found`);
+    return m[1];
+  };
+
+  // Every template literal in the mirrored region, not just the catalog.
+  // 2026-09-08: a per-choice sentiment-gate paragraph was added to the
+  // worked example inside EFFECTS_CONDITIONS_REFERENCE and the catalog-only
+  // check stayed green while the server copy silently lagged.
+  for (const name of ['LAYER2_FOUNDATIONS', 'AFFECT_CATALOG', 'EFFECTS_CONDITIONS_REFERENCE', 'DOSSIER_POLICY_HEURISTIC']) {
+    it(`${name} is byte-identical between core and the MCP desktop server`, () => {
+      // If this fails: packages/core/src/prompts/affectPrompt.ts changed.
+      // Copy the block verbatim into mcp-server-desktop/src/index.ts — the
+      // sync arrow points from core to the server, never the other way.
+      expect(literal(mcp, name)).toBe(literal(core, name));
+    });
+  }
+
+  it('buildDepthDialGuidance body is identical (signature may differ in type spelling)', () => {
+    const body = (src: string) => {
+      const m = src.match(/function buildDepthDialGuidance\([^)]*\)[^{]*\{([\s\S]*)$/);
+      if (!m) throw new Error('buildDepthDialGuidance not found');
+      // Core ends at EOF; the server region ends before the END marker. Both
+      // close with the function's own `}` — compare up to and including it.
+      const text = m[1];
+      const close = text.lastIndexOf('\n}');
+      return text.slice(0, close + 2).trimEnd();
     };
-    const core = grab(readFileSync(join(REPO, 'packages/core/src/prompts/affectPrompt.ts'), 'utf8'));
-    const mcp = grab(readFileSync(join(REPO, 'mcp-server-desktop/src/index.ts'), 'utf8'));
-    // If this fails: packages/core/src/prompts/affectPrompt.ts changed. Copy
-    // the block verbatim into mcp-server-desktop/src/index.ts — the sync
-    // arrow points from core to the server, never the other way.
-    expect(mcp).toBe(core);
+    expect(body(mcp)).toBe(body(core));
   });
 });
 

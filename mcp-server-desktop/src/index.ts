@@ -283,14 +283,6 @@ require the player to win Mara back from negative AND get her to
 positive 0.3 — almost unattainable. The delta version means "you moved
 her by 0.3 in either direction" — the actual story question.
 
-Note \`baseline: "initial"\` — value 0.3 reads as "trust has grown by
-≥ 0.3 from where Mara started", not "trust is now ≥ 0.3 absolute". For
-a character seeded with \`initialSentiments: [{toEntityRef: 'player',
-emotion: 'trust', strength: -0.2}]\`, the literal threshold would
-require the player to win Mara back from negative AND get her to
-positive 0.3 — almost unattainable. The delta version means "you moved
-her by 0.3 in either direction" — the actual story question.
-
 ### Worked example: bookmarks are TWO-STEP
 
 \`baseline: 'initial'\` is automatic — the runtime captures it for you.
