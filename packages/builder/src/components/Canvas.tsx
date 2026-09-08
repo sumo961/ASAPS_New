@@ -31,6 +31,8 @@ interface CanvasProps {
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
   onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  onClusterResizeCommit?: (clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => void;
+  onBeatReparent?: (beatId: string, to: { clusterId: string | null; x: number; y: number }) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
   pwVisitedBeatIds?: string[];
@@ -79,6 +81,8 @@ export const Canvas: React.FC<CanvasProps> = ({
   onDropBeatToCluster,
   onRemoveBeatFromCluster,
   onClusterResize,
+  onClusterResizeCommit,
+  onBeatReparent,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
@@ -157,6 +161,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           onDropBeatToCluster={onDropBeatToCluster}
           onRemoveBeatFromCluster={onRemoveBeatFromCluster}
           onClusterResize={onClusterResize}
+          onClusterResizeCommit={onClusterResizeCommit}
+          onBeatReparent={onBeatReparent}
           onAutoLayoutCluster={onAutoLayoutCluster}
           highlightedBeatIds={highlightedBeatIds}
           pwVisitedBeatIds={pwVisitedBeatIds}

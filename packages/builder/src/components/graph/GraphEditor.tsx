@@ -23,6 +23,7 @@ import { DialogInternalNode } from './DialogInternalNode';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
 import { CLUSTER_HEADER_H } from './graphStyle';
+import { resolveBeatDrop, toContentRelative, clusterAt } from './clusterDrop';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -49,6 +50,13 @@ interface GraphEditorProps {
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
   onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  onClusterResizeCommit?: (clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => void;
+  /**
+   * Cluster membership change with a landing position (undoable in App):
+   * clusterId set → content-relative x/y inside it; null → absolute x/y on
+   * the canvas. When absent the graph falls back to the raw drop/remove pair.
+   */
+  onBeatReparent?: (beatId: string, to: { clusterId: string | null; x: number; y: number }) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   highlightedBeatIds?: string[];
   /** Beats visited during the active Preview Window session — rendered as a red trace. */
@@ -112,6 +120,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onDropBeatToCluster,
   onRemoveBeatFromCluster,
   onClusterResize,
+  onClusterResizeCommit,
+  onBeatReparent,
   onAutoLayoutCluster,
   highlightedBeatIds = [],
   pwVisitedBeatIds = [],
@@ -247,6 +257,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       onDropBeatToCluster,
       onRemoveBeatFromCluster,
       onClusterResize,
+      onClusterResizeCommit,
       onAutoLayoutCluster,
       onRemoveCluster,
       onSetClusterMap,
@@ -258,7 +269,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // We use refs to access current values without triggering full node recalculation
   // This is critical for performance - changing highlighted beats shouldn't rebuild all nodes
   // eslint-disable-next-line react-hooks/exhaustive-deps -- clusterMapUrlKey stands in for `assets`
-  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, clusterMapUrlKey, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
+  }), [beats, clusters, containerBeatPositions, selectedBeat, selectedCluster, clusterMapUrlKey, onRemoveCluster, onClusterExpandCollapse, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onClusterResize, onClusterResizeCommit, onAutoLayoutCluster, onBeatSelect, onSetClusterMap, onSetClusterSound, expandedDialogs, toggleDialogExpand]);
 
   // Convert beat connections to ReactFlow edges
   const edges = useMemo(
@@ -599,57 +610,51 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           continue;
         }
 
-        // Clustered child — its position is PARENT-relative, so it must
-        // never reach onBeatMove (top-level coords) or the drop hit test.
-        // Persist content-relative (−header), 20px-snapped, clamped ≥ 0.
-        // Not routed through the undoable MoveBeatCommand: in-container
-        // moves were never undoable before either (follow-up).
+        // A clustered child's position is PARENT-relative; resolve the drop
+        // in absolute canvas coordinates so one hit test covers all four
+        // outcomes: moved within its cluster, dragged into another cluster,
+        // dragged OUT (children are not clamped by extent any more), or an
+        // ordinary top-level move / drop-in.
         const parentId = (n as any).parentNode as string | undefined;
-        if (parentId && clusters.some(c => c.id === parentId)) {
-          onBeatInContainerMove(
-            n.id,
-            parentId,
-            Math.max(0, snap20(n.position.x)),
-            Math.max(0, snap20(n.position.y - CLUSTER_HEADER_H)),
-          );
-          continue;
-        }
+        const parent = parentId ? clusters.find(c => c.id === parentId) : undefined;
+        const absolute = (n as any).positionAbsolute ?? (parent
+          ? { x: (parent.containerPosition?.x ?? 0) + n.position.x, y: (parent.containerPosition?.y ?? 0) + n.position.y }
+          : n.position);
+        const outcome = resolveBeatDrop({ currentClusterId: parent?.id, absolute, clusters });
 
-        // Beat node — first record the move, then check whether the beat was
-        // dropped INSIDE any cluster's bounds. If yes, reassign the beat to
-        // that cluster (mirrors the sidebar→cluster drag flow).
-        onBeatMove(n.id, n.position.x, n.position.y);
-
-        if (!onDropBeatToCluster) continue;
-        const dropX = n.position.x;
-        const dropY = n.position.y;
-        for (const cluster of clusters) {
-          if (!cluster.isExpanded) continue; // collapsed clusters: no drop zone
-          const cx = cluster.containerPosition?.x ?? 0;
-          const cy = cluster.containerPosition?.y ?? 0;
-          const cw = cluster.containerBounds?.width ?? 0;
-          const ch = cluster.containerBounds?.height ?? 0;
-          if (cw <= 0 || ch <= 0) continue;
-          if (dropX >= cx && dropX <= cx + cw && dropY >= cy && dropY <= cy + ch) {
-            // Don't redundantly fire when the beat is already in this cluster
-            const beatObj = beats.find(b => b.id === n.id);
-            if (beatObj?.cluster !== cluster.id) {
-              onDropBeatToCluster(n.id, cluster.id);
-              // Land the beat where it was dropped, not on the default grid
-              // slot: store the content-relative position (−header).
-              onBeatInContainerMove(
-                n.id,
-                cluster.id,
-                Math.max(0, snap20(dropX - cx)),
-                Math.max(0, snap20(dropY - cy - CLUSTER_HEADER_H)),
-              );
+        switch (outcome.kind) {
+          case 'move-in-cluster':
+            onBeatInContainerMove(n.id, outcome.clusterId, outcome.x, outcome.y);
+            break;
+          case 'move-top-level':
+            onBeatMove(n.id, absolute.x, absolute.y);
+            break;
+          case 'enter-cluster':
+            if (onBeatReparent) {
+              onBeatReparent(n.id, { clusterId: outcome.clusterId, x: outcome.x, y: outcome.y });
+            } else if (onDropBeatToCluster) {
+              if (!parent) onBeatMove(n.id, absolute.x, absolute.y);
+              onDropBeatToCluster(n.id, outcome.clusterId);
+              onBeatInContainerMove(n.id, outcome.clusterId, outcome.x, outcome.y);
+            } else if (!parent) {
+              onBeatMove(n.id, absolute.x, absolute.y);
             }
             break;
-          }
+          case 'eject':
+            if (onBeatReparent) {
+              onBeatReparent(n.id, { clusterId: null, x: outcome.x, y: outcome.y });
+            } else if (onRemoveBeatFromCluster) {
+              onRemoveBeatFromCluster(n.id);
+              onBeatMove(n.id, outcome.x, outcome.y);
+            } else {
+              // No way to leave: keep it where it is inside the frame.
+              onBeatInContainerMove(n.id, parent!.id, Math.max(0, snap20(n.position.x)), Math.max(0, snap20(n.position.y - CLUSTER_HEADER_H)));
+            }
+            break;
         }
       }
     },
-    [onBeatMove, onClusterMove, onBeatInContainerMove, onDropBeatToCluster, clusters, beats]
+    [onBeatMove, onClusterMove, onBeatInContainerMove, onDropBeatToCluster, onRemoveBeatFromCluster, onBeatReparent, clusters]
   );
 
 // Handle drop: existing beats (from the sidebar) into clusters, and new
@@ -672,32 +677,21 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
       const beatId = event.dataTransfer.getData('text/beatId') || event.dataTransfer.getData('beatId');
       if (beatId) {
-        const snap20 = (v: number) => Math.round(v / 20) * 20;
-        for (const cluster of clusters) {
-          if (!cluster.isExpanded) continue;
-          const cx = cluster.containerPosition?.x ?? 0;
-          const cy = cluster.containerPosition?.y ?? 0;
-          const cw = cluster.containerBounds?.width ?? 0;
-          const ch = cluster.containerBounds?.height ?? 0;
-          if (cw <= 0 || ch <= 0) continue;
-          if (position.x >= cx && position.x <= cx + cw && position.y >= cy && position.y <= cy + ch) {
-            const beatObj = beats.find(b => b.id === beatId);
-            if (beatObj?.cluster !== cluster.id) {
-              onDropBeatToCluster?.(beatId, cluster.id);
-            }
-            // Land where dropped (content-relative, −header), also when the
-            // beat was already a member — a sidebar drag is a positioning
-            // gesture either way.
-            onBeatInContainerMove(
-              beatId,
-              cluster.id,
-              Math.max(0, snap20(position.x - cx)),
-              Math.max(0, snap20(position.y - cy - CLUSTER_HEADER_H)),
-            );
+        const cluster = clusterAt(clusters, position);
+        if (!cluster) return; // beat drag that missed every cluster: no-op
+        const rel = toContentRelative(position, cluster);
+        const beatObj = beats.find(b => b.id === beatId);
+        if (beatObj?.cluster !== cluster.id) {
+          if (onBeatReparent) {
+            onBeatReparent(beatId, { clusterId: cluster.id, x: rel.x, y: rel.y });
             return;
           }
+          onDropBeatToCluster?.(beatId, cluster.id);
         }
-        return; // beat drag that missed every cluster: no-op
+        // Land where dropped, also when the beat was already a member — a
+        // sidebar drag is a positioning gesture either way.
+        onBeatInContainerMove(beatId, cluster.id, rel.x, rel.y);
+        return;
       }
 
       const beatType = event.dataTransfer.getData('beatType');
@@ -727,7 +721,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
 
       onBeatAdd(beatType, position);
     },
-    [reactFlowInstance, onBeatAdd, clusters, beats, onDropBeatToCluster, onBeatInContainerMove]
+    [reactFlowInstance, onBeatAdd, clusters, beats, onDropBeatToCluster, onBeatInContainerMove, onBeatReparent]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {

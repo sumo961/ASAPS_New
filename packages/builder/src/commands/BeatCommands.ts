@@ -27,6 +27,19 @@ export interface BeatStateMutations {
   moveBeatInContainer?: (beatId: string, clusterId: string, x: number, y: number) => void;
   /** Cluster frame bounds. Optional: only App wires it. */
   resizeCluster?: (clusterId: string, width: number, height: number) => void;
+  /** Cluster membership (drag-in / drag-out / ⏏). Optional: only App wires them. */
+  moveBeatToCluster?: (beatId: string, clusterId: string) => void;
+  removeBeatFromCluster?: (beatId: string) => void;
+}
+
+/**
+ * Where a beat lives: inside a cluster at a content-relative position, or
+ * top-level at an absolute canvas position.
+ */
+export interface BeatPlacement {
+  clusterId: string | null;
+  x: number;
+  y: number;
 }
 
 // ============================================================================
@@ -356,6 +369,54 @@ export class MoveBeatInContainerCommand extends Command {
 }
 
 // ============================================================================
+// Reparent Beat Command — drag into / out of / between clusters, and the ⏏
+// eject button. One entry per gesture; undo puts the beat back where it was
+// (membership AND position), which the raw store calls never did.
+// ============================================================================
+
+export class ReparentBeatCommand extends Command {
+  public readonly type = 'REPARENT_BEAT';
+  public description: string;
+
+  private beatId: string;
+  private from: BeatPlacement;
+  private to: BeatPlacement;
+  private mutations: BeatStateMutations;
+
+  constructor(beatId: string, from: BeatPlacement, to: BeatPlacement, mutations: BeatStateMutations, id?: string) {
+    super(id);
+    this.beatId = beatId;
+    this.from = from;
+    this.to = to;
+    this.mutations = mutations;
+    this.description = to.clusterId
+      ? (from.clusterId ? 'Move beat to another cluster' : 'Move beat into cluster')
+      : 'Take beat out of cluster';
+  }
+
+  private apply(p: BeatPlacement): void {
+    if (p.clusterId) {
+      this.mutations.moveBeatToCluster?.(this.beatId, p.clusterId);
+      this.mutations.moveBeatInContainer?.(this.beatId, p.clusterId, p.x, p.y);
+    } else {
+      this.mutations.removeBeatFromCluster?.(this.beatId);
+      this.mutations.moveBeat(this.beatId, { x: p.x, y: p.y });
+    }
+  }
+
+  execute(): void { this.apply(this.to); }
+  undo(): void { this.apply(this.from); }
+
+  protected serializeData(): any {
+    return { beatId: this.beatId, from: this.from, to: this.to };
+  }
+
+  static deserialize(data: SerializedCommand, mutations: BeatStateMutations): ReparentBeatCommand {
+    return new ReparentBeatCommand(data.data.beatId, data.data.from, data.data.to, mutations, data.id);
+  }
+}
+
+// ============================================================================
 // Resize Cluster Command (pairs with the auto-arrange batch: arranging grows
 // the frame, so undo must restore the old bounds too)
 // ============================================================================
@@ -441,5 +502,9 @@ export function registerBeatCommands(mutations: BeatStateMutations): void {
 
   CommandRegistry.register('RESIZE_CLUSTER', (data) =>
     ResizeClusterCommand.deserialize(data, mutations)
+  );
+
+  CommandRegistry.register('REPARENT_BEAT', (data) =>
+    ReparentBeatCommand.deserialize(data, mutations)
   );
 }

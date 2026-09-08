@@ -1,6 +1,6 @@
-import React, { memo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { memo, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position, NodeResizeControl } from 'reactflow';
 import { Cluster, SharedVisualContent } from '@asaps/core';
 import { CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
 
@@ -8,11 +8,12 @@ import { CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
  * ClusterContainerNode — the cluster FRAME.
  *
  * Since the cluster unification (Phase 2), beats inside a cluster are real
- * ReactFlow child nodes (BeatNode with parentNode/extent, built in
+ * ReactFlow child nodes (BeatNode with parentNode — deliberately without
+ * extent, so dragging past the frame is how a beat leaves; built in
  * graphBuild.ts) and every connection is a real ReactFlow edge. This
  * component renders only what the frame owns: the header bar with its
- * popovers, the map background, the resize handle, the drop target and the
- * collapsed pill. It must NOT render beats or edges — that dual rendering
+ * popovers, the map background, ReactFlow's resize control (zoom-correct,
+ * one undo entry per gesture), the drop target and the collapsed pill. It must NOT render beats or edges — that dual rendering
  * path is exactly what the unification removed (clustered beats missed the
  * B1b ▸, PW trace, broken marks, context menu, multi-select, and dragged
  * wrong at zoom ≠ 1).
@@ -32,6 +33,8 @@ interface ClusterContainerNodeData {
   onExpandCollapse: (clusterId: string) => void;
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  /** End of an interactive resize — App records one undo entry. */
+  onClusterResizeCommit?: (clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   mapAssetUrl?: string;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
@@ -56,6 +59,7 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     onExpandCollapse,
     onDropBeatToCluster,
     onClusterResize,
+    onClusterResizeCommit,
     onAutoLayoutCluster,
     mapAssetUrl,
     onSetClusterMap,
@@ -68,8 +72,8 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
   const assets = getAssets ? getAssets() : [];
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  // Size at the start of an interactive resize (for the single undo entry).
+  const resizeStartRef = useRef<{ width: number; height: number } | null>(null);
   const [showMapSettings, setShowMapSettings] = useState(false);
   const [showSoundSettings, setShowSoundSettings] = useState(false);
   const [showSharedVisualsSettings, setShowSharedVisualsSettings] = useState(false);
@@ -98,31 +102,6 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     }
   }, [cluster.id, onAutoLayoutCluster]);
 
-  // Global mouse handlers for the manual resize drag
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (onClusterResize) {
-        const deltaX = e.clientX - resizeStart.x;
-        const deltaY = e.clientY - resizeStart.y;
-        const newWidth = Math.max(MIN_CONTAINER_WIDTH, resizeStart.width + deltaX);
-        const newHeight = Math.max(MIN_CONTAINER_HEIGHT, resizeStart.height + deltaY);
-        onClusterResize(cluster.id, newWidth, newHeight);
-      }
-    };
-
-    const handleGlobalMouseUp = () => setIsResizing(false);
-
-    document.addEventListener('mousemove', handleGlobalMouseMove);
-    document.addEventListener('mouseup', handleGlobalMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [isResizing, resizeStart, cluster.id, onClusterResize]);
-
   const handleExpandCollapse = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onExpandCollapse(cluster.id);
@@ -132,19 +111,6 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
     e.stopPropagation();
     onRemoveContainer(cluster.id);
   }, [cluster.id, onRemoveContainer]);
-
-  // Resize handling
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsResizing(true);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: containerWidth,
-      height: containerHeight,
-    });
-  }, [containerWidth, containerHeight]);
 
   // Drag-drop visuals. The EXPANDED frame does not handle drop payloads
   // itself anymore — whether a drop lands on the frame body or on one of the
@@ -700,17 +666,44 @@ export const ClusterContainerNode = memo<NodeProps<ClusterContainerNodeData>>(({
             </div>
           )}
 
-          {/* Resize Handle — opts back into pointer events (see header note) */}
-          <div
-            className="nodrag absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+          {/* Resize handle — ReactFlow's own control, so deltas are in FLOW
+              units (the hand-rolled handle measured screen pixels and drifted
+              at zoom ≠ 1). Opts back into pointer events (see header note).
+              Live size goes through onClusterResize; the single undo entry
+              is committed on mouse-up via onClusterResizeCommit. */}
+          <NodeResizeControl
+            position="bottom-right"
+            minWidth={MIN_CONTAINER_WIDTH}
+            minHeight={MIN_CONTAINER_HEIGHT}
+            className="nodrag"
             style={{
+              width: 16,
+              height: 16,
+              border: 'none',
               background: 'linear-gradient(135deg, transparent 50%, #6366f1 50%)',
               borderBottomRightRadius: '0.5rem',
+              // RF anchors the corner handle at left/top 100% and centres it
+              // with translate(-50%,-50%); the frame body is overflow-hidden,
+              // so tuck the whole handle inside the corner instead.
+              transform: 'translate(-100%, -100%)',
+              cursor: 'se-resize',
               zIndex: 2,
               pointerEvents: 'all',
             }}
-            onMouseDown={handleResizeMouseDown}
-            title="Drag to resize"
+            onResizeStart={() => {
+              resizeStartRef.current = { width: containerWidth, height: containerHeight };
+            }}
+            onResize={(_e, params) => {
+              onClusterResize?.(cluster.id, Math.round(params.width), Math.round(params.height));
+            }}
+            onResizeEnd={(_e, params) => {
+              const from = resizeStartRef.current;
+              resizeStartRef.current = null;
+              const to = { width: Math.round(params.width), height: Math.round(params.height) };
+              if (from && (from.width !== to.width || from.height !== to.height)) {
+                onClusterResizeCommit?.(cluster.id, from, to);
+              }
+            }}
           />
         </div>
       </div>

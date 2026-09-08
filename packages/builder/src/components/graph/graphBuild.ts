@@ -31,6 +31,8 @@ export interface GraphNodeCallbacks {
   onDropBeatToCluster?: (beatId: string, clusterId: string) => void;
   onRemoveBeatFromCluster?: (beatId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  /** End of an interactive resize: one undo entry from `from` to `to`. */
+  onClusterResizeCommit?: (clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => void;
   onAutoLayoutCluster?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
@@ -80,6 +82,7 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
     onDropBeatToCluster,
     onRemoveBeatFromCluster,
     onClusterResize,
+    onClusterResizeCommit,
     onAutoLayoutCluster,
     onRemoveCluster,
     onSetClusterMap,
@@ -161,7 +164,9 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
         };
         position = { x: content.x, y: content.y + CLUSTER_HEADER_H };
         parentProps.parentNode = parentCluster.id;
-        parentProps.extent = 'parent';
+        // No extent:'parent' — a child dragged past the frame is a drag-OUT
+        // (GraphEditor resolves the drop: eject, or enter another cluster).
+        // Clamping it made the ⏏ button the only way back to the top level.
         parentProps.zIndex = 10;
         // Collapsed cluster: children stay in the node array (stable
         // fingerprint/selection) but hidden; their edges re-target to the
@@ -300,6 +305,7 @@ export function buildGraphNodes(input: GraphNodesInput): Node[] {
           onExpandCollapse: onClusterExpandCollapse || (() => {}),
           onDropBeatToCluster: onDropBeatToCluster,
           onClusterResize: onClusterResize,
+          onClusterResizeCommit,
           onAutoLayoutCluster: onAutoLayoutCluster,
           // Map background - use ref to get current assets without triggering re-render
           mapAssetUrl: cluster.mapAssetId ? assetsRef.current.find(a => a.id === cluster.mapAssetId)?.url : undefined,

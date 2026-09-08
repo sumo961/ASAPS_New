@@ -57,6 +57,8 @@ interface WorkspaceViewProps {
   onAddToContainer?: (clusterId: string) => void;
   onRemoveCluster?: (clusterId: string) => void;
   onClusterResize?: (clusterId: string, width: number, height: number) => void;
+  onClusterResizeCommit?: (clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => void;
+  onBeatReparent?: (beatId: string, to: { clusterId: string | null; x: number; y: number }) => void;
   onSetClusterMap?: (clusterId: string, assetId: string | null, scale?: number, opacity?: number, fit?: 'natural' | 'cover' | 'contain') => void;
   onSetClusterSound?: (clusterId: string, soundAssetId: string | null, volume?: number) => void;
   onSetClusterSharedVisuals?: (clusterId: string, sharedVisuals: any) => void;
@@ -117,6 +119,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onAddToContainer,
   onRemoveCluster,
   onClusterResize,
+  onClusterResizeCommit,
+  onBeatReparent,
   onSetClusterMap,
   onSetClusterSound,
   onSetClusterSharedVisuals,
@@ -318,6 +322,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onAddToContainer={onAddToContainer}
               onRemoveCluster={onRemoveCluster}
               onClusterResize={onClusterResize}
+              onClusterResizeCommit={onClusterResizeCommit}
+              onBeatReparent={onBeatReparent}
               assets={assets}
               onSetClusterMap={onSetClusterMap}
               onSetClusterSound={onSetClusterSound}

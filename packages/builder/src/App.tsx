@@ -74,7 +74,8 @@ import { useAIDebug } from './hooks/useAIDebug';
 import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
-import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
 import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
@@ -313,6 +314,8 @@ function App() {
     moveBeat: (id, pos) => actions.moveBeat(id, pos),
     moveBeatInContainer: (id, clusterId, x, y) => actions.moveBeatInContainer?.(id, clusterId, x, y),
     resizeCluster: (id, w, h) => actions.resizeCluster?.(id, w, h),
+    moveBeatToCluster: (id, clusterId) => actions.moveBeatToCluster(id, clusterId),
+    removeBeatFromCluster: (id) => actions.removeBeatFromCluster(id),
   };
 
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
@@ -2915,6 +2918,32 @@ function App() {
     setSelectedBeat(newBeat);
     markChanged();
   }, [actions, markChanged]);
+
+  /**
+   * Cluster membership change with a landing spot — drag into / out of /
+   * between clusters and the ⏏ eject button all go through here, so each is
+   * ONE undo entry that restores membership and position together.
+   */
+  const handleBeatReparent = useCallback((beatId: string, to: { clusterId: string | null; x: number; y: number }) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (!beat) return;
+    const from = beat.cluster
+      ? { clusterId: beat.cluster, ...containerSlotFor(beatId, beat.cluster, state.beats, state.containerBeatPositions ?? []) }
+      : { clusterId: null, x: beat.x || 0, y: beat.y || 0 };
+    if (from.clusterId === to.clusterId && from.x === to.x && from.y === to.y) return;
+    getCommandManager().execute(new ReparentBeatCommand(beatId, from, to, stableMutations.current));
+    markChanged();
+  }, [state.beats, state.containerBeatPositions, markChanged]);
+
+  /** ⏏ / sidebar "take out of cluster": lands the beat just right of its frame. */
+  const ejectBeat = useCallback((beatId: string) => {
+    const beat = state.beats.find(b => b.id === beatId);
+    if (!beat?.cluster) return;
+    const cluster = state.clusters.find(c => c.id === beat.cluster);
+    const content = containerSlotFor(beatId, beat.cluster, state.beats, state.containerBeatPositions ?? []);
+    const landing = cluster ? ejectPosition(cluster, content) : { x: beat.x || 0, y: beat.y || 0 };
+    handleBeatReparent(beatId, { clusterId: null, ...landing });
+  }, [state.beats, state.clusters, state.containerBeatPositions, handleBeatReparent]);
 
   const handleBeatMove = useCallback((beatId: string, position: { x: number; y: number }) => {
     const currentBeat = state.beats.find(b => b.id === beatId);
@@ -6047,10 +6076,7 @@ function App() {
             actions.moveBeatToCluster(beatId, clusterId);
             markChanged();
           }}
-          onRemoveBeatFromCluster={(beatId) => {
-            actions.removeBeatFromCluster(beatId);
-            markChanged();
-          }}
+          onRemoveBeatFromCluster={ejectBeat}
           onToggleCluster={actions.expandCollapseCluster}
           onRenameCluster={(clusterId, name) => {
             actions.renameCluster(clusterId, name);
@@ -6084,15 +6110,7 @@ function App() {
               if (!actions.moveBeatInContainer) return;
               // Undoable (cluster-unification follow-up). Old position =
               // stored, else the default grid slot the beat rendered on.
-              const stored = state.containerBeatPositions?.find(
-                p => p.beatId === beatId && p.clusterId === clusterId
-              );
-              let oldPos = stored ? { x: stored.position.x, y: stored.position.y } : null;
-              if (!oldPos) {
-                const idx = state.beats.filter(b => b.cluster === clusterId).findIndex(b => b.id === beatId);
-                const i = Math.max(0, idx);
-                oldPos = { x: 20 + (i % 2) * 200, y: 20 + Math.floor(i / 2) * 110 };
-              }
+              const oldPos = containerSlotFor(beatId, clusterId, state.beats, state.containerBeatPositions ?? []);
               if (oldPos.x === x && oldPos.y === y) return; // no-op move
               const cmd = new MoveBeatInContainerCommand(beatId, clusterId, oldPos, { x, y }, stableMutations.current);
               getCommandManager().execute(cmd);
@@ -6104,10 +6122,8 @@ function App() {
                 markChanged();
               }
             }}
-            onRemoveBeatFromCluster={(beatId: string) => {
-              actions.removeBeatFromCluster(beatId);
-              markChanged();
-            }}
+            onRemoveBeatFromCluster={ejectBeat}
+            onBeatReparent={handleBeatReparent}
             paletteCollapsed={paletteCollapsed}
             onTogglePalette={() => setPaletteCollapsed(!paletteCollapsed)}
             assets={assets}
@@ -6198,6 +6214,12 @@ function App() {
                 actions.removeCluster(clusterId);
                 markChanged();
               }
+            }}
+            onClusterResizeCommit={(clusterId: string, from: { width: number; height: number }, to: { width: number; height: number }) => {
+              // Live sizes went through onClusterResize; this is the ONE undo
+              // entry for the whole gesture.
+              getCommandManager().execute(new ResizeClusterCommand(clusterId, from, to, stableMutations.current));
+              markChanged();
             }}
             onClusterResize={(clusterId: string, width: number, height: number) => {
               if (actions.resizeCluster) {

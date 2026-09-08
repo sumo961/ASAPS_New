@@ -2,7 +2,7 @@
  * graphBuild — the single source of graph nodes and edges.
  *
  * These tests pin the conversion rules of the cluster unification: clustered
- * beats are real ReactFlow child nodes (parentNode/extent, +header position
+ * beats are real ReactFlow child nodes (parentNode, no extent, +header position
  * conversion, hidden-on-collapse), and every edge is a real edge with
  * collapse-aware endpoint resolution. If a second rendering path ever grows
  * back, these are the tripwire.
@@ -116,7 +116,8 @@ describe('buildGraphNodes', () => {
     const child = nodes.find(n => n.id === 'b1')!;
     expect(child.type).toBe('beat');
     expect((child as any).parentNode).toBe('c1');
-    expect((child as any).extent).toBe('parent');
+    // Not clamped: dragging past the frame is how a beat leaves a cluster.
+    expect((child as any).extent).toBeUndefined();
     expect(child.hidden).toBeUndefined();
     expect(typeof child.data.onEjectFromCluster).toBe('function');
     // top-level beats carry no eject affordance
