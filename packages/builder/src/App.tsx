@@ -40,7 +40,7 @@ import { deserializeBeats } from './utils/projectDeserializer';
 import { cloneBeatsForDuplicate } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
 import { v4 as uuidv4 } from 'uuid';
-import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, normalizeStory, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
+import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
@@ -66,7 +66,6 @@ import { validateAIStory, formatValidationResult } from './utils/aiStoryValidato
 import { storyLinks as storyLinksOf, dedupeLinks } from './utils/storyLinks';
 import { importIssuesVisible } from './utils/importIssuesVisible';
 import { ImportIssuesBanner, type BrokenTarget } from './components/ImportIssuesBanner';
-import { validateStoryLogic, formatLogicValidationResult } from './utils/storyLogicValidator';
 import { validateProjectAssets } from './utils/assetValidator';
 import { MissingAssetsDialog } from './components/settings/MissingAssetsDialog';
 import { preloadFonts } from './utils/fontRegistry';
@@ -82,8 +81,7 @@ import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
-import { themeToGlobalSettings } from './themes/migration/GlobalSettingsAdapter';
-import { mergeGeneratedVariables } from './utils/generatedVariables';
+import { applyGeneratedStory, type ApplyGeneratedStoryDeps } from './utils/applyGeneratedStory';
 import { BUILT_IN_THEMES } from '@asaps/core';
 import { useVCSStatus } from './vcs/VCSStatusProvider';
 import { VCSPanel } from './components/vcs/VCSPanel';
@@ -1415,6 +1413,37 @@ function App() {
   const injectionSaveInProgressRef = useRef<boolean>(false);
   const currentInjectionIdRef = useRef<string | null>(null);
   // Track processed injections by server timestamp to prevent duplicates
+  // Dependency bundle for applyGeneratedStory — the ONE path that turns an
+  // AI-produced story (in-app generator, Ideator, MCP injection) into
+  // builder state. Reads refs at call time, so it is never a render behind.
+  const makeApplyStoryDeps = useCallback((): ApplyGeneratedStoryDeps => ({
+    actions: { createBeat: actions.createBeat, loadStoryData: actions.loadStoryData },
+    currentAuthor: state.author,
+    getGlobalSettings: () => globalSettingsRef.current ?? globalSettings,
+    // Ref AND state: the deferred project save reads the ref before the
+    // state→ref effect has run.
+    commitGlobalSettings: (next) => { globalSettingsRef.current = next; setGlobalSettings(next); },
+    setCharacters,
+    reportImportValidation,
+    clearTranslations: () => translationActionsRef.current?.clearTranslations(),
+    requestClusterArrange: () => { pendingClusterArrangeRef.current = true; },
+    // Block the load effect from reloading the previous project when the
+    // new beats land in state; the deferred save replaces 'pending' with
+    // the new project id (or clears it on failure).
+    beforeStateLoad: () => { pendingNewProjectIdRef.current = 'pending'; },
+    loadSchema: async () => {
+      const validator = getAIValidator();
+      await validator.ensureSchemaLoaded();
+      return validator.getSchema();
+    },
+    resolveTheme: async (themeId: string) => {
+      const themeService = getThemeService();
+      await themeService.initialize();
+      await themeService.registerBuiltInThemes(BUILT_IN_THEMES);
+      return themeService.getResolvedTheme(themeId);
+    },
+  }), [actions, state.author, globalSettings, setGlobalSettings, setCharacters, reportImportValidation]);
+
   const processedInjectionsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -1448,268 +1477,16 @@ function App() {
       const storyTitle = story.metadata?.title || 'Injected Story';
       console.log('[App] Received story via WebSocket:', storyTitle, 'injectionId:', injectionId);
 
-      // An injected story gets the same check as a generated one. This path
-      // used to skip validation entirely.
-      reportImportValidation(story);
-
-      // Pause auto-save to prevent AI-generated content from being written
-      // to the current directory project before the new project is created
+      // Pause auto-save so the injected beats are never written into the
+      // current project; resumed after the new project exists (below).
       pauseAutoSave();
 
-      // Schema-driven normalize pipeline (v0.9.51+). Same pass that
-      // AIService.generateStory uses — gives us flat conditionType,
-      // top-level affect-stack fields, primitive coercion, character
-      // backfill, and auto-created clusters from per-beat strings. The
-      // existing manual condition flattener and character normalize
-      // below now operate on already-normalized data and are no-ops;
-      // they're kept for one release as a safety net and can be
-      // removed in a follow-up.
-      try {
-        const validator = getAIValidator();
-        await validator.ensureSchemaLoaded();
-        const schema = validator.getSchema();
-        if (schema?.beatTypes) {
-          const result = normalizeStory(story, schema);
-          if (result.story) {
-            // Mutate in place so the rest of this function sees normalized data
-            Object.assign(story, result.story);
-          }
-          if (result.report.changes.length > 0) {
-            console.log(
-              `[App.loadStoryData] Pipeline applied ${result.report.changes.length} changes ` +
-                `(${result.report.beatsNormalized} beats, ` +
-                `${result.report.charactersNormalized} characters, ` +
-                `${result.report.clustersCreated.length} clusters auto-created)`
-            );
-          }
-        }
-      } catch (err) {
-        console.warn('[App.loadStoryData] Pipeline failed; continuing with raw story:', err);
-      }
+      // Shared applier for both AI import paths (see applyGeneratedStory).
+      // MCP input is raw JSON, so the normalize pipeline runs in here.
+      await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle, normalize: true });
 
-      // NOTE: We use loadStoryData for a single batch update instead of:
-      // - actions.clearStory() - would trigger a state update
-      // - actions.setTitle() - would trigger another state update
-      // - actions.addBeat() x 42 - would trigger 42 state updates!
-      // This reduces re-renders from 44+ to just 1
-
-      // BATCH UPDATE: Create all beats first, then load them in a single state update
-      // This prevents the GraphEditor from re-rendering 42+ times
-      // Use tree layout algorithm to position beats based on their connections
-      // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
-      const externalConnections = story.connections && Array.isArray(story.connections)
-        ? story.connections.map((conn: any) => ({
-            source: conn.sourceId || conn.source,
-            target: conn.targetId || conn.target,
-          }))
-        : [];
-      const firstBeatId = story.metadata?.firstBeatId || story.firstBeatId || (story.beats?.[0]?.id);
-      const adjustedPositions = story.beats && Array.isArray(story.beats)
-        ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatId)
-        : new Map();
-
-      // Create all beats without adding to state (batch preparation)
-      const createdBeats: Beat[] = [];
-      // Known beat types for validation (including AI variations that map to canonical types)
-      const knownBeatTypes = new Set([
-        'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'multiChoice', 'movementChoice',
-        'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'inputText', 'hyperText',
-        'setVariable', 'setGlobal', 'setCounter', 'counter', 'variable', 'conditionBeat', 'conditionCheck', 'condition',
-        'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory'
-      ]);
-
-      if (story.beats && Array.isArray(story.beats)) {
-        story.beats.forEach((beatData: any) => {
-          const position = adjustedPositions.get(beatData.id) ||
-            beatData.position ||
-            { x: beatData.x || 200, y: beatData.y || 200 };
-
-          // Log warning if AI generated an unknown beat type
-          const beatType = beatData.type || 'infoText';
-          if (!knownBeatTypes.has(beatType)) {
-            console.warn(`[App] AI generated unknown beat type: "${beatType}" for beat ${beatData.id}. Check AI prompt constraints.`);
-          }
-
-          // Use createBeat (not addBeat) to avoid state updates
-          const beat = actions.createBeat(
-            beatType,
-            position,
-            { id: beatData.id, name: beatData.name || beatData.label }
-          );
-
-          // Cluster membership. The generation handler has carried this
-          // since the normalize pipeline shipped; THIS handler never did —
-          // injected stories registered the cluster shells (story.clusters)
-          // while every beat stayed unclustered, and the save then wrote
-          // all beats into clusters/_unclustered/. Same class of drift as
-          // the api-server variables drop: the injection path trailing the
-          // generation path.
-          if (typeof beatData.cluster === 'string' && beatData.cluster.trim()) {
-            (beat as any).cluster = beatData.cluster.trim();
-          }
-
-          // Apply parameters directly to the beat instance
-          if (beatData.parameters) {
-            const params = { ...beatData.parameters };
-
-            // Transform conditionBeat nested format to flat format
-            if (beatData.type === 'conditionBeat') {
-              if (params.condition) {
-                const cond = params.condition;
-                params.conditionType = cond.type || params.conditionType;
-                // AI may generate 'variable', 'variableName', or 'left' - support all
-                params.variableName = cond.variableName || cond.variable || cond.left || params.variableName;
-                params.operator = cond.operator || params.operator;
-                params.value = cond.value ?? cond.right ?? params.value;
-                delete params.condition;
-              }
-              if (params.trueConnection?.target) {
-                params.trueTarget = params.trueConnection.target;
-                delete params.trueConnection;
-              }
-              if (params.falseConnection?.target) {
-                params.falseTarget = params.falseConnection.target;
-                delete params.falseConnection;
-              }
-            }
-
-            // Update parameters on the beat instance directly
-            beat.updateParameters(params);
-          }
-
-          createdBeats.push(beat);
-        });
-      }
-
-      // Build the connection list from the one shared walk. This handler and
-      // the generation handler below each carried a private copy, and they
-      // disagreed with each other AND with the validators — see storyLinks.
-      const connectionsToCreate: Array<{ source: string; target: string; label?: string }> =
-        dedupeLinks(storyLinksOf(story)).map((l) => ({
-          source: l.source, target: l.target, ...(l.label ? { label: l.label } : {}),
-        }));
-
-      // Handle characters if provided
-      const storyCharacters = story.characters && Array.isArray(story.characters)
-        ? story.characters
-        : characters; // Keep existing characters if none provided
-
-      // Migrate legacy "Interactor" speaker values to actual player character name
-      const pc = storyCharacters.find((c: any) => c.role === 'player');
-      if (pc) {
-        const pcName = pc.displayName || pc.name;
-        for (const beat of createdBeats) {
-          if (beat.speaker === 'Interactor') {
-            beat.speaker = pcName;
-          }
-        }
-      }
-
-      // CRITICAL: Add connections to beat instances BEFORE loading story data
-      // The GraphEditor reads connections from beat.getConnections(), not state.connections
-      // Build a map of beats by ID for fast lookup
-      const beatMap = new Map<string, Beat>();
-      createdBeats.forEach(beat => beatMap.set(beat.id, beat));
-
-      // Add connections to source beats
-      connectionsToCreate.forEach(conn => {
-        const sourceBeat = beatMap.get(conn.source);
-        const targetBeat = beatMap.get(conn.target);
-        if (sourceBeat && targetBeat) {
-          sourceBeat.addConnection({
-            targetId: conn.target,
-            label: conn.label || `To ${targetBeat.name}`,
-          });
-        }
-      });
-
-      // CRITICAL: Set pendingNewProjectIdRef BEFORE loadStoryData
-      // The loadStoryData call will trigger the load effect via state.beats dependency.
-      // We need to mark that we're in a save transition BEFORE that happens.
-      pendingNewProjectIdRef.current = 'pending';
-      console.log('[App] Set pendingNewProjectIdRef to "pending" before loadStoryData');
-
-      // SINGLE BATCH UPDATE: Load all story data at once
-      // This triggers only ONE re-render instead of 42+
-      console.log('[App] Batch loading story data:', {
-        beats: createdBeats.length,
-        connections: connectionsToCreate.length,
-        characters: storyCharacters.length,
-      });
-
-      actions.loadStoryData({
-        title: storyTitle,
-        author: story.metadata?.author || state.author,
-        beats: createdBeats,
-        connections: connectionsToCreate,
-        characters: storyCharacters,
-      });
-
-      // Register pipeline-produced clusters (auto-created from per-beat
-      // cluster strings by the normalize pass at the top of this function).
-      if (Array.isArray(story.clusters) && story.clusters.length > 0) {
-        for (const c of story.clusters) actions.addCluster(c);
-        console.log(`[App.loadStoryData] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
-        // Queue the cluster-aware auto-arrange (sizes containers to their
-        // members and pushes overlapping outside beats clear).
-        pendingClusterArrangeRef.current = true;
-      }
-
-      // App-level character state. Pipeline already normalized editor-only
-      // fields (visual / states / defaultState / counters / inventory /
-      // tags / traits / goals / timestamps) above, so we can pass straight
-      // through. Without this setter call, charactersRef.current still
-      // holds the previous project's characters and syncProjectData would
-      // write those stale chars into the new project (the v0.9.50 bug).
-      if (story.characters && Array.isArray(story.characters)) {
-        setCharacters(story.characters);
-      }
-
-      // Wire the generated story's top-level variables[] into
-      // globalSettings.variables so the Variables panel / Inspector /
-      // state-preset editor can see them. Previously these were silently
-      // dropped on import — the story still played (StoryContext creates a
-      // var on first write) but the authoring surfaces were blind to them.
-      // Character counters need no equivalent step: story.characters carry
-      // counters[], which flow through loadStoryData / setCharacters and are
-      // seeded at runtime. The ref is updated alongside state because the
-      // imminent injection save reads globalSettingsRef.current before the
-      // state→ref effect runs.
-      {
-        const mergedVars = mergeGeneratedVariables(
-          globalSettingsRef.current ?? globalSettings,
-          story.variables
-        );
-        if (mergedVars) {
-          globalSettingsRef.current = mergedVars;
-          setGlobalSettings(mergedVars);
-          console.log(
-            `[App] Wired ${mergedVars.variables?.length ?? 0} variable(s) into globalSettings.variables`
-          );
-        }
-      }
-
-      // NOTE: Don't call markChanged() here - we'll save the project immediately
-      // and it should not appear as "unsaved" after the save completes
-      console.log('[App] Story injection complete:', {
-        beats: story.beats?.length || 0,
-        connections: connectionsToCreate.length,
-        characters: story.characters?.length || 0,
-        injectionId,
-      });
-
-      // DIAGNOSTIC: dump character names at every step of the AI-injection
-      // pipeline so we can spot where the AI characters get replaced by
-      // prior-project characters. The "all generated stories have wrong
-      // characters" pattern points at a deterministic clobber somewhere
-      // in this flow; the analytic trace through createProject →
-      // syncProjectData → updateProjectStory says the AI characters
-      // should win, yet authored projects show otherwise. Reproduce
-      // once with this in place and the divergence will jump out.
-      console.log('[AI-CHAR-DIAG] AFTER setCharacters:', {
-        storyCharIds: storyCharacters.map((c: any) => c.id),
-        appCharIds: charactersRef.current.map((c: any) => c.id),
-      });
+      // NOTE: no markChanged() here — the save below persists immediately and
+      // the project must not read as "unsaved" afterwards.
 
       // Auto-save: Create a new project and save the injected story
       // Use an async IIFE that runs immediately - don't use setTimeout that can be cancelled by HMR
@@ -1742,10 +1519,6 @@ function App() {
           // THEN sync beats. This prevents writing AI beats to the current directory project.
           const newProjectId = await createProject(storyTitle, description);
           console.log('[App] Injected story saved successfully, new project ID:', newProjectId);
-          console.log('[AI-CHAR-DIAG] AFTER createProject (before syncProjectData):', {
-            newProjectId,
-            appCharIds: charactersRef.current.map((c: any) => c.id),
-          });
 
           // Phase 3 — AI-generated projects default to responsive layout.
           // The inference in resolveLayoutMode would already classify a
@@ -1772,9 +1545,6 @@ function App() {
 
           // NOW sync beats to the new project (createProject updated currentProjectRef)
           syncProjectData();
-          console.log('[AI-CHAR-DIAG] AFTER syncProjectData:', {
-            appCharIds: charactersRef.current.map((c: any) => c.id),
-          });
 
           // CRITICAL: Update both refs atomically
           // pendingNewProjectIdRef stores the new ID so the load effect knows to skip
@@ -1801,7 +1571,7 @@ function App() {
     };
 
     // No cleanup needed - the async IIFE will check injectionId to prevent duplicate saves
-  }, [actions, markChanged, createProject, syncProjectData, saveNow, pauseAutoSave, resumeAutoSave]);
+  }, [actions, markChanged, createProject, syncProjectData, saveNow, pauseAutoSave, resumeAutoSave, makeApplyStoryDeps]);
 
   useEffect(() => {
     // MCP WebSocket integration is disabled by default to reduce noise
@@ -5512,279 +5282,13 @@ function App() {
       }
     }
 
-    // CRITICAL: Pause auto-save immediately to prevent the AI-generated beats
-    // from being written to the current directory project. Auto-save will be
-    // resumed after the new project is created (see createProject below).
+    // Pause auto-save so the generated beats are never written into the
+    // current project; resumed after the new project exists (below).
     pauseAutoSave();
 
-    // Validate AI-generated story structure before import. The import still
-    // proceeds — a story with a few bad links is mostly good work — but the
-    // author is told which links are broken and which beats carry them.
-    reportImportValidation(story);
-
-    // Validate narrative logic (hub beats, state assumptions, undescribed items)
-    const logicValidation = validateStoryLogic(story);
-    console.log('[App] Story Logic Validation:\n' + formatLogicValidationResult(logicValidation));
-
-    if (logicValidation.issues.length > 0) {
-      console.warn('[App] Story logic issues detected:');
-      logicValidation.issues.forEach(issue => {
-        const icon = issue.type === 'warning' ? '⚠️' : 'ℹ️';
-        console.warn(`  ${icon} [${issue.beatId}] ${issue.message}`);
-        if (issue.suggestedFix) {
-          console.warn(`     Fix: ${issue.suggestedFix}`);
-        }
-      });
-    }
-
-    // Clear existing beats, connections, and translations from previous project
-    actions.clearStory();
-    translationActionsRef.current?.clearTranslations();
-
-    // Inject AI-generated characters into App-level character state.
-    // The schema-driven pipeline (AIService.generateStory) has already
-    // normalized editor-only fields (visual / states / defaultState /
-    // counters / inventory / tags / traits / goals / timestamps), so we
-    // can pass story.characters straight to setCharacters. Without this
-    // setter call, charactersRef.current still holds the *previous*
-    // project's characters and syncProjectData would write those stale
-    // characters into the new project (the v0.9.50 bug).
-    if (story.characters && Array.isArray(story.characters)) {
-      console.log('[App] Injecting', story.characters.length, 'AI-generated characters:', story.characters.map((c: any) => c.id || c.name));
-      setCharacters(story.characters);
-    } else {
-      console.log('[App] No characters in AI response; clearing character state');
-      setCharacters([]);
-    }
-
-    // Wire the generated story's top-level variables[] into
-    // globalSettings.variables so the authoring surfaces (Variables panel,
-    // Inspector, state-preset editor) see them. Without this they were
-    // silently dropped on import — the story still played (vars are created
-    // on first write) but were invisible to the editor. Character counters
-    // need no equivalent step (they ride on story.characters and are seeded
-    // at runtime). Mirrors the WebSocket/injected handler.
-    {
-      const mergedVars = mergeGeneratedVariables(
-        globalSettingsRef.current ?? globalSettings,
-        story.variables
-      );
-      if (mergedVars) {
-        globalSettingsRef.current = mergedVars;
-        setGlobalSettings(mergedVars);
-        console.log(
-          `[App] Wired ${mergedVars.variables?.length ?? 0} variable(s) into globalSettings.variables`
-        );
-      }
-    }
-
-    // Add metadata
-    if (story.metadata) {
-      actions.setTitle(storyTitle);
-    }
-
-    // Apply suggested theme if provided
-    if (story.suggestedTheme?.themeId) {
-      const themeId = story.suggestedTheme.themeId;
-      console.log('[App] AI suggested theme:', themeId, '-', story.suggestedTheme.reason);
-
-      try {
-        // Initialize theme service and get the theme
-        const themeService = getThemeService();
-        await themeService.initialize();
-        await themeService.registerBuiltInThemes(BUILT_IN_THEMES);
-
-        const theme = await themeService.getResolvedTheme(themeId);
-        if (theme) {
-          // Apply theme to global settings
-          const newSettings = themeToGlobalSettings(theme, globalSettingsRef.current || globalSettings);
-          setGlobalSettings(newSettings);
-          console.log('[App] Applied theme:', theme.meta.name);
-        } else {
-          console.warn('[App] Suggested theme not found:', themeId);
-        }
-      } catch (error) {
-        console.warn('[App] Failed to apply suggested theme:', error);
-      }
-    }
-
-    // Auto-enable fictional-time HUD overlay if (and only if) the story actually
-    // uses fictional time. AI reliably sets up the data-side (setVariable type
-    // fictionalTime, conditionBeat type fictionalTime) but forgets the display
-    // toggle in global settings, leaving the in-story clock invisible.
-    if (Array.isArray(story.beats)) {
-      let usesFictionalTime = false;
-      let earliestSetTime: { year: number; month: number; day: number; hour: number; minute: number } | null = null;
-
-      for (const b of story.beats) {
-        const t = b?.type;
-        const p = b?.parameters || {};
-        if (t === 'setVariable' && p.type === 'fictionalTime') {
-          usesFictionalTime = true;
-          if (p.operation === 'set' && earliestSetTime == null) {
-            earliestSetTime = {
-              year: Number(p.timeYear ?? 2024),
-              month: Number(p.timeMonth ?? 1),
-              day: Number(p.timeDay ?? 1),
-              hour: Number(p.timeHour ?? 9),
-              minute: Number(p.timeMinute ?? 0),
-            };
-          }
-        }
-        if (t === 'conditionBeat') {
-          const cond = p.condition || p;
-          if (cond?.type === 'fictionalTime') usesFictionalTime = true;
-        }
-      }
-
-      if (usesFictionalTime) {
-        setGlobalSettings(prev => {
-          // Only inject defaults if the user hasn't already configured fictional-time HUD
-          if (prev.hudOverlays?.fictionalTime?.enabled) return prev;
-          const initialTime = earliestSetTime || { year: 2024, month: 1, day: 1, hour: 9, minute: 0 };
-          console.log('[App] Auto-enabling fictional-time HUD for generated story (initialTime=', initialTime, ')');
-          return {
-            ...prev,
-            hudOverlays: {
-              ...(prev.hudOverlays || {}),
-              fictionalTime: {
-                enabled: true,
-                initialTime,
-                displayFormat: 'datetime-12h',
-                showInTimerHud: true,
-              },
-              // Ensure Timer HUD container is on too (required to render anything)
-              timerHud: prev.hudOverlays?.timerHud?.enabled
-                ? prev.hudOverlays.timerHud
-                : {
-                    enabled: true,
-                    timerName: '',
-                    staticText: '',
-                    position: 'top-right',
-                    style: 'digital',
-                    fontSize: 18,
-                    textColor: '#FFFFFF',
-                    backgroundColor: '#000000',
-                    backgroundOpacity: 70,
-                    borderRadius: 6,
-                    padding: 8,
-                    showLabel: false,
-                    label: '',
-                    showWhenInactive: false,
-                  },
-            },
-          };
-        });
-      }
-    }
-
-    // Apply tree layout to position beats based on their connections
-    // Pass both beats (for parameter-embedded connections) and the connections array (for external connections)
-    const externalConnections = story.connections && Array.isArray(story.connections)
-      ? story.connections.map((conn: any) => ({
-          source: conn.sourceId || conn.source,
-          target: conn.targetId || conn.target,
-        }))
-      : [];
-    const firstBeatIdForLayout = story.metadata?.firstBeatId || story.firstBeatId || (story.beats?.[0]?.id);
-    const adjustedPositions = story.beats && Array.isArray(story.beats)
-      ? applyTreeLayoutToBeats(story.beats, undefined, externalConnections, firstBeatIdForLayout)
-      : new Map();
-
-    // Register the Cluster container objects produced by the schema-driven
-    // pipeline (AIService.generateStory → normalizeStory.buildClustersFromBeats).
-    // Pipeline already grouped beats by cluster name and computed bboxes —
-    // we just walk story.clusters and feed them into the builder's state.
-    if (Array.isArray(story.clusters) && story.clusters.length > 0) {
-      for (const c of story.clusters) {
-        actions.addCluster(c);
-      }
-      // Queue the cluster-aware auto-arrange once the batch lands in state.
-      pendingClusterArrangeRef.current = true;
-      console.log(`[App] Registered ${story.clusters.length} cluster(s) from pipeline:`, story.clusters.map((c: any) => c.name));
-    }
-
-    // Add all generated beats, preserving AI-generated IDs with adjusted positions
-    if (story.beats && Array.isArray(story.beats)) {
-      story.beats.forEach((beatData: any) => {
-        // Use adjusted position if available, otherwise fall back to original
-        const position = adjustedPositions.get(beatData.id) || beatData.position;
-
-        // Pass the AI-generated ID and name directly to addBeat
-        const beat = actions.addBeat(
-          beatData.type || 'infoText',
-          position,
-          { id: beatData.id, name: beatData.label || beatData.name }
-        );
-
-        // Associate beat with its cluster (AI emits cluster: "<name>";
-        // we registered Clusters above keyed by name).
-        if (typeof beatData.cluster === 'string' && beatData.cluster.trim()) {
-          actions.updateBeat(beatData.id, { cluster: beatData.cluster.trim() } as any);
-        }
-        // Carry over notes if the AI emitted them
-        if (typeof beatData.notes === 'string' && beatData.notes.trim()) {
-          actions.updateBeat(beatData.id, { notes: beatData.notes } as any);
-        }
-
-        // Update beat with generated parameters
-        if (beatData.parameters) {
-          const params = { ...beatData.parameters };
-
-          // ConditionBeat shape: the schema-driven pipeline already
-          // flattened condition.* into top-level params (conditionType,
-          // character, sentimentTarget, baseline, etc.) and applied any
-          // per-condition-type aliases (variable→variableName). We just
-          // need to extract trueConnection/falseConnection target ids,
-          // which the runtime expects as `trueTarget`/`falseTarget`.
-          if (beatData.type === 'conditionBeat') {
-            if (params.trueConnection?.target) {
-              params.trueTarget = params.trueConnection.target;
-              delete params.trueConnection;
-            }
-            if (params.falseConnection?.target) {
-              params.falseTarget = params.falseConnection.target;
-              delete params.falseConnection;
-            }
-          }
-
-          // CRITICAL: Call updateParameters() directly on the beat instance
-          // Using actions.updateBeat() would use Object.assign which bypasses
-          // the beat's proper parameter handling (e.g., DialogTree migration)
-          beat.updateParameters(params);
-        }
-      });
-    }
-
-    // Build the connection list from the one shared walk — same authority as
-    // the inject handler above, the validators and layout. This copy's private
-    // walk read story-level connections as from/to only, silently dropping the
-    // source/target spelling the inject path accepted.
-    const connectionsToCreate: Array<{ source: string; target: string; label?: string }> =
-      dedupeLinks(storyLinksOf(story)).map((l) => ({
-        source: l.source, target: l.target, ...(l.label ? { label: l.label } : {}),
-      }));
-
-    // Create all connections with a delay to ensure state has updated
-    if (connectionsToCreate.length > 0) {
-      console.log('[App] Creating', connectionsToCreate.length, 'connections');
-      setTimeout(() => {
-        let successCount = 0;
-        let failCount = 0;
-        connectionsToCreate.forEach((conn) => {
-          try {
-            if (conn.source && conn.target) {
-              actions.connectBeats(conn.source, conn.target, conn.label);
-              successCount++;
-            }
-          } catch (error) {
-            failCount++;
-            console.warn('[App] Failed to create connection:', conn, error);
-          }
-        });
-        console.log(`[App] Connections created: ${successCount} success, ${failCount} failed`);
-      }, 100);
-    }
+    // Shared applier for both AI import paths (see applyGeneratedStory).
+    // AIService.generateStory already ran the normalize pipeline.
+    await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle });
 
     markChanged();
 
@@ -5797,7 +5301,7 @@ function App() {
         const description = story.metadata?.description || 'AI-generated interactive story';
 
         console.log('[App] Creating new project for generated story:', storyTitle);
-        pendingNewProjectIdRef.current = 'pending';
+        // pendingNewProjectIdRef is already 'pending' (set by the applier before the state load)
         const newProjectId = await createProject(storyTitle, description);
         pendingNewProjectIdRef.current = newProjectId;
         loadedProjectIdRef.current = newProjectId;
@@ -5821,7 +5325,7 @@ function App() {
         resumeAutoSave();
       }
     }, 300);
-  }, [actions, markChanged, createProject, syncProjectData, saveNow, runAIDebug, globalSettings, setGlobalSettings, pauseAutoSave, resumeAutoSave]);
+  }, [markChanged, createProject, syncProjectData, saveNow, runAIDebug, pauseAutoSave, resumeAutoSave, makeApplyStoryDeps]);
 
   /**
    * Handle handoff from the Ideator pop-out. The user has confirmed the

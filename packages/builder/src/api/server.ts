@@ -588,7 +588,7 @@ export class APIServer {
      */
     router.post('/inject', async (req: Request, res: Response) => {
       try {
-        const { metadata, beats, connections, characters, environment } = req.body;
+        const { metadata, beats, connections, characters, environment, suggestedTheme, variables, clusters } = req.body;
 
         // Validate required fields
         if (!beats || !Array.isArray(beats)) {
@@ -609,6 +609,11 @@ export class APIServer {
           connections: connections || [],
           characters: characters || [],
           environment: environment || { props: [], nodes: [] },
+          // Same fields the desktop api-server forwards — this hop used to
+          // drop variables and the suggested theme.
+          suggestedTheme: suggestedTheme || undefined,
+          variables: variables || undefined,
+          clusters: clusters || undefined,
           injectedAt: new Date().toISOString(),
         });
 
