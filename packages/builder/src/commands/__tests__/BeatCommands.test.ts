@@ -105,7 +105,7 @@ describe('MoveBeatCommand', () => {
 // ---------------------------------------------------------------------------
 // Cluster commands (unification follow-ups)
 // ---------------------------------------------------------------------------
-import { MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand } from '../BeatCommands';
+import { MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, ApplyFixProposalCommand } from '../BeatCommands';
 
 const clusterMutations = () => ({
   ...mutations(),
@@ -183,5 +183,22 @@ describe('ReparentBeatCommand', () => {
     expect(m.moveBeatToCluster).toHaveBeenLastCalledWith('b1', 'c1');
     expect(cmd.description).toBe('Move beat to another cluster');
     expect(cmd.toJSON()).toMatchObject({ type: 'REPARENT_BEAT', data: { beatId: 'b1', to: { clusterId: 'c2' } } });
+  });
+});
+
+describe('ApplyFixProposalCommand', () => {
+  it('applies the patch, undoes to the previous parameters, and hands out fresh clones each time', () => {
+    const m = mutations();
+    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { value: 3 }, { value: 1 }, 'Change the check', m);
+    cmd.execute();
+    const first = m.updateBeat.mock.calls[0][1];
+    expect(first).toEqual({ parameters: { value: 1 } });
+    delete (first as any).parameters; // what useStoryBuilder.updateBeat does to the object it is handed
+    cmd.redo();
+    expect(m.updateBeat.mock.calls[1][1]).toEqual({ parameters: { value: 1 } }); // not a no-op
+    cmd.undo();
+    expect(m.updateBeat).toHaveBeenLastCalledWith('b1', { parameters: { value: 3 } });
+    expect(cmd.canMergeWith()).toBe(false);
+    expect(cmd.toJSON()).toMatchObject({ type: 'APPLY_FIX_PROPOSAL', data: { proposalId: 'fix:1', beatId: 'b1' } });
   });
 });

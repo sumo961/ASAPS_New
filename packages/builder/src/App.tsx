@@ -77,6 +77,9 @@ import { getCommandManager } from './commands/CommandManager';
 import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
 import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
 import { reconcileLegacyMaxTokens } from './utils/aiConfigBudget';
+import { analyzeStoryFindings, proposeFixes, buildParameterPatch, createGenerationReview, openFindings } from './utils/generationReview';
+import type { GenerationFinding, FixProposal, GenerationReview } from './types/generationReview';
+import { ApplyFixProposalCommand } from './commands/BeatCommands';
 import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
@@ -353,7 +356,21 @@ function App() {
     /** Beat ids of the imported story — the banner is scoped to them, not
      *  cleared by lifecycle events. See importIssuesVisible. */
     beatIds: string[];
+    /** Deterministic fix proposals (generation review), still open. */
+    proposals?: FixProposal[];
   } | null>(null);
+  /**
+   * Generation review record: the story as the AI handed it over, the typed
+   * findings, the proposals and their status. Ref + state: the ref is what
+   * syncProjectData persists (generation/review.json on disk), the state is
+   * what re-renders. Loaded back from the project; dismissed reviews stay quiet.
+   */
+  const generationReviewRef = useRef<GenerationReview | null>(null);
+  const [, setGenerationReviewTick] = useState(0);
+  const setGenerationReview = useCallback((review: GenerationReview | null) => {
+    generationReviewRef.current = review;
+    setGenerationReviewTick(t => t + 1);
+  }, []);
   /**
    * Run the story validator and put anything it found where the author can
    * see it. Shared because there are two import paths — the in-app generator
@@ -361,15 +378,24 @@ function App() {
    * story injected from Claude Desktop went in completely unchecked, which is
    * how a probe with a link to a non-existent beat imported in silence.
    */
-  const reportImportValidation = useCallback((story: any) => {
+  const reportImportValidation = useCallback((story: any, findings?: GenerationFinding[]) => {
     const validation = validateAIStory(story);
     console.log('[App] AI Story Validation:\n' + formatValidationResult(validation));
-    // Findings the generator's own validator attached (schema level: unknown
-    // beat types / params, counter ranges …). Its missing-target errors are
-    // the same links this validator renders as rows below, so those drop.
+    // Typed findings + deterministic proposals (generation review). The
+    // generator's validator attaches them; an MCP-injected or reloaded story
+    // gets them analysed here. Flow-level findings (links, reachability,
+    // counter gates) render as proposals or typed rows, so the generator's
+    // prose versions of the same things are dropped; what remains of its
+    // string errors is schema-level (unknown beat types / params).
+    const typed: GenerationFinding[] = findings ?? story?.generationIssues?.findings ?? analyzeStoryFindings(story);
+    const proposals = proposeFixes(typed, story);
+    const proposedFindingIds = new Set(proposals.map(p => p.findingId));
     const generationErrors: string[] = (story?.generationIssues?.errors ?? [])
-      .filter((m: unknown): m is string => typeof m === 'string' && !/non-existent beat/i.test(m));
-    if (validation.valid && generationErrors.length === 0) {
+      .filter((m: unknown): m is string => typeof m === 'string' && !/non-existent beat|unreachable beat|never runs|cannot satisfy/i.test(m));
+    const unproposed = typed
+      .filter(f => f.kind !== 'missing-target' && !proposedFindingIds.has(f.id))
+      .map(f => f.message);
+    if (validation.valid && generationErrors.length === 0 && proposals.length === 0 && unproposed.length === 0) {
       setImportIssues(null);
       return;
     }
@@ -384,9 +410,14 @@ function App() {
     const otherErrors = [
       ...validation.errors.filter(e => e.category !== 'missing_beat').map(e => e.message),
       ...generationErrors,
+      ...unproposed,
     ];
     const beatIds = (story.beats || []).map((b: any) => b.id).filter(Boolean);
-    setImportIssues(brokenTargets.length || otherErrors.length ? { brokenTargets, otherErrors, beatIds } : null);
+    setImportIssues(
+      brokenTargets.length || otherErrors.length || proposals.length
+        ? { brokenTargets, otherErrors, beatIds, proposals }
+        : null,
+    );
   }, []);
 
   /**
@@ -1357,6 +1388,9 @@ function App() {
         delete projForTranslations.translations;
         delete projForTranslations.translationManifest;
       }
+      // Generation review rides with the project (generation/review.json).
+      if (generationReviewRef.current) projForTranslations.generationReview = generationReviewRef.current;
+      else delete projForTranslations.generationReview;
     }
 
     updateStory(storyData);
@@ -1498,7 +1532,11 @@ function App() {
 
       // Shared applier for both AI import paths (see applyGeneratedStory).
       // MCP input is raw JSON, so the normalize pipeline runs in here.
-      await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle, normalize: true });
+      const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle, normalize: true });
+      setGenerationReview(createGenerationReview({
+        source: 'mcp', title: applied.title, original: applied.original,
+        findings: applied.findings, proposals: proposeFixes(applied.findings, story),
+      }));
 
       // NOTE: no markChanged() here — the save below persists immediately and
       // the project must not read as "unsaved" afterwards.
@@ -2323,6 +2361,23 @@ function App() {
         console.log('[App] >>> Setting themeId from project:', currentProject.themeId || '(none)');
         setCurrentThemeId(currentProject.themeId);
 
+        // Generation review: load it back; if the author has not dismissed it
+        // and findings are still open, re-analyse the story as it stands now
+        // (fixes made since count) and show what remains.
+        generationReviewRef.current = (currentProject as any).generationReview ?? null;
+        setGenerationReviewTick(t => t + 1);
+        {
+          const review = generationReviewRef.current;
+          const storyData: any = currentProject.story;
+          const rawBeats: any[] | undefined = Array.isArray(storyData?.beats)
+            ? storyData.beats
+            : (typeof storyData?.getBeats === 'function' ? storyData.getBeats() : undefined);
+          if (review && !review.dismissedAt && openFindings(review).length > 0 && rawBeats?.length) {
+            const beats = rawBeats.map((b: any) => (typeof b?.toJSON === 'function' ? b.toJSON() : b));
+            reportImportValidation({ beats, variables: (currentProject.globalSettings as any)?.variables });
+          }
+        }
+
         // Load translations from project (sync against current source to detect new fields)
         // IMPORTANT: Build projectData from currentProject directly instead of reading
         // from IndexedDB (which may be stale after git reset — race with async updateProject).
@@ -2930,6 +2985,71 @@ function App() {
     setSelectedBeat(newBeat);
     markChanged();
   }, [actions, markChanged]);
+
+  // ---- Generation review: apply / skip / apply-all-safe / dismiss ----------
+
+  /** Mark a finding in the persisted review and drop its proposal from the banner. */
+  const settleProposal = useCallback((proposal: FixProposal, status: 'applied' | 'skipped') => {
+    const review = generationReviewRef.current;
+    if (review) setGenerationReview({ ...review, status: { ...review.status, [proposal.findingId]: status } });
+    // A retarget that was applied also settles the broken-link row it came
+    // from (the row is keyed by the OLD target, which still does not exist).
+    const finding = review?.findings.find(f => f.id === proposal.findingId);
+    const settledRow = status === 'applied' && finding?.kind === 'missing-target'
+      ? { sourceBeatId: finding.beatId, target: finding.targetId } : null;
+    setImportIssues(prev => {
+      if (!prev) return prev;
+      const proposals = (prev.proposals ?? []).filter(p => p.id !== proposal.id);
+      const brokenTargets = settledRow
+        ? prev.brokenTargets.filter(b => !(b.sourceBeatId === settledRow.sourceBeatId && b.target === settledRow.target))
+        : prev.brokenTargets;
+      const remaining = brokenTargets.length + prev.otherErrors.length + proposals.length;
+      return remaining ? { ...prev, proposals, brokenTargets } : null;
+    });
+  }, [setGenerationReview]);
+
+  /** The command for one proposal against the LIVE beat, or null when the beat is gone. */
+  const proposalCommand = useCallback((proposal: FixProposal): ApplyFixProposalCommand | null => {
+    const beat = state.beats.find(b => b.id === proposal.beatId);
+    if (!beat) return null;
+    const params = typeof (beat as any).getParameters === 'function' ? (beat as any).getParameters() : {};
+    const patch = buildParameterPatch(params ?? {}, proposal.path, proposal.value);
+    return new ApplyFixProposalCommand(proposal.id, proposal.beatId, patch.prev, patch.next, proposal.description, stableMutations.current);
+  }, [state.beats]);
+
+  const handleApplyProposal = useCallback(async (proposal: FixProposal) => {
+    const cmd = proposalCommand(proposal);
+    if (!cmd) { settleProposal(proposal, 'skipped'); return; }
+    await getCommandManager().execute(cmd);
+    settleProposal(proposal, 'applied');
+    markChanged();
+  }, [proposalCommand, settleProposal, markChanged]);
+
+  const handleSkipProposal = useCallback((proposal: FixProposal) => {
+    settleProposal(proposal, 'skipped');
+    markChanged();
+  }, [settleProposal, markChanged]);
+
+  /** Every 'safe' proposal as ONE undo entry. */
+  const handleApplyAllSafe = useCallback(async () => {
+    const safe = (importIssues?.proposals ?? []).filter(p => p.confidence === 'safe');
+    const pairs = safe.map(p => ({ p, cmd: proposalCommand(p) }));
+    const cmds = pairs.map(x => x.cmd).filter((c): c is ApplyFixProposalCommand => !!c);
+    if (cmds.length > 0) {
+      await getCommandManager().execute(new BatchCommand(cmds, `Apply ${cmds.length} safe fix${cmds.length === 1 ? '' : 'es'}`));
+    }
+    for (const { p, cmd } of pairs) settleProposal(p, cmd ? 'applied' : 'skipped');
+    markChanged();
+  }, [importIssues, proposalCommand, settleProposal, markChanged]);
+
+  const handleDismissImportIssues = useCallback(() => {
+    setImportIssues(null);
+    const review = generationReviewRef.current;
+    if (review && !review.dismissedAt) {
+      setGenerationReview({ ...review, dismissedAt: new Date().toISOString() });
+      markChanged();
+    }
+  }, [setGenerationReview, markChanged]);
 
   /**
    * Cluster membership change with a landing spot — drag into / out of /
@@ -5329,7 +5449,12 @@ function App() {
 
     // Shared applier for both AI import paths (see applyGeneratedStory).
     // AIService.generateStory already ran the normalize pipeline.
-    await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle });
+    const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle });
+    setGenerationReview(createGenerationReview({
+      source: 'generator', title: applied.title, original: applied.original,
+      findings: applied.findings, proposals: proposeFixes(applied.findings, story),
+      model: getSavedAIConfig()?.model,
+    }));
 
     markChanged();
 
@@ -6055,13 +6180,17 @@ function App() {
         // self-healing rule as the graph's ⚠ marks.
         const existing = new Set(state.beats.map(b => b.id));
         const liveBroken = importIssues.brokenTargets.filter(b => !existing.has(b.target));
-        if (!liveBroken.length && !importIssues.otherErrors.length) return null;
+        if (!liveBroken.length && !importIssues.otherErrors.length && !(importIssues.proposals?.length)) return null;
         return (
         <ImportIssuesBanner
           brokenTargets={liveBroken}
           otherErrors={importIssues.otherErrors}
           context={(importIssues as any).context ?? 'import'}
-          onDismiss={() => setImportIssues(null)}
+          proposals={importIssues.proposals ?? []}
+          onApplyProposal={handleApplyProposal}
+          onSkipProposal={handleSkipProposal}
+          onApplyAllSafe={handleApplyAllSafe}
+          onDismiss={handleDismissImportIssues}
           onSelectBeat={(beatId) => {
             const beat = state.beats.find(b => b.id === beatId);
             if (beat) handleBeatSelect(beat);

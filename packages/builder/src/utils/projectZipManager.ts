@@ -165,6 +165,11 @@ export async function exportProjectAsZip(
     zip.file(metadataFileName, JSON.stringify(assetMetadata, null, 2));
   }
 
+  // Generation review (same folder as the directory format)
+  if (project.generationReview) {
+    zip.file('generation/review.json', JSON.stringify(project.generationReview, null, 2));
+  }
+
   // Add translation files if present
   if (project.translations && Array.isArray(project.translations)) {
     const translationsFolder = zip.folder('translations');
@@ -556,6 +561,11 @@ export async function importProjectFromZip(
     });
 
     // Import translation files if present
+    let generationReview: any = undefined;
+    const reviewFile = zip.file('generation/review.json');
+    if (reviewFile) {
+      try { generationReview = JSON.parse(await reviewFile.async('string')); } catch { /* unreadable review: ignore */ }
+    }
     let translations: any[] | undefined;
     let translationManifest: any | undefined;
     const translationsFolder = zip.folder('translations');
@@ -597,6 +607,7 @@ export async function importProjectFromZip(
       version: projectData.project.version || '1.0.0',
       ...(translations ? { translations } : {}),
       ...(translationManifest ? { translationManifest } : {}),
+      ...(generationReview ? { generationReview } : {}),
     } as any;
 
     // Save or update project

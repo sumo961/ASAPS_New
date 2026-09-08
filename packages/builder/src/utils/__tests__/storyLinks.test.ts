@@ -48,8 +48,8 @@ describe('beatLinks — one beat, every shape', () => {
         props: [{ target: 'y', name: 'Brass key' }],
       },
     });
-    expect(links).toContainEqual({ source: 'b', target: 'x', via: 'choice', label: 'Go left' });
-    expect(links).toContainEqual({ source: 'b', target: 'y', via: 'prop', label: 'Brass key' });
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'x', via: 'choice', label: 'Go left' }));
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'y', via: 'prop', label: 'Brass key' }));
   });
 
   it('accepts randomTarget in both of its shapes', () => {
@@ -95,12 +95,12 @@ describe('beatLinks — one beat, every shape', () => {
         qrJumpTargets: ['secret'],
       },
     });
-    expect(links).toContainEqual({ source: 'b', target: 'jail', via: 'fail', label: 'Fail' });
-    expect(links).toContainEqual({ source: 'b', target: 'note', via: 'hyperlink', label: 'letter' });
-    expect(links).toContainEqual({ source: 'b', target: 'door', via: 'hotspot', label: 'North door' });
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'jail', via: 'fail', label: 'Fail' }));
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'note', via: 'hyperlink', label: 'letter' }));
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'door', via: 'hotspot', label: 'North door' }));
     // QR jumps are real links — the beat is not orphaned — but only reachable
     // by scanning, and marked so.
-    expect(links).toContainEqual({ source: 'b', target: 'secret', via: 'qr-jump', outOfBand: true });
+    expect(links).toContainEqual(expect.objectContaining({ source: 'b', target: 'secret', via: 'qr-jump', outOfBand: true }));
   });
 
   it('reads timer, restart, single connection, and bare param target', () => {
@@ -226,5 +226,12 @@ describe('aiConversation exits (2026-09-08)', () => {
     const targets = beatLinks(beat).map(l => l.target).sort();
     expect(targets).toEqual(['after', 'bye', 'idea']);
     expect(beatLinks(beat).find(l => l.target === 'idea')?.label).toBe('Idea found');
+  });
+});
+
+describe('conditionBeat exits in the normalize pipeline\'s string-alias form (2026-09-08)', () => {
+  it('reads trueConnection / falseConnection when they are bare ids', () => {
+    const links = beatLinks({ id: 'g', type: 'conditionBeat', parameters: { conditionType: 'counter', trueConnection: 'yes', falseConnection: 'no' } });
+    expect(links.map(l => [l.target, l.via, l.path])).toEqual([['yes', 'condition-true', 'trueConnection'], ['no', 'condition-false', 'falseConnection']]);
   });
 });

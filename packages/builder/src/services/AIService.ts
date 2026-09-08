@@ -1518,6 +1518,7 @@ export class AIService {
           response.generationIssues = {
             errors: validationErrors.map((e: any) => (typeof e === 'string' ? e : e.message)),
             warnings: [...validationWarnings],
+            findings: validation.findings ?? [],
           };
         }
       }

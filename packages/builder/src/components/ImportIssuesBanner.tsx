@@ -14,7 +14,8 @@
  * on the beats concerned so the banner's list has somewhere to point.
  */
 import React, { useState } from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, Check, Wrench } from 'lucide-react';
+import type { FixProposal } from '../types/generationReview';
 
 export interface BrokenTarget {
   /** Beat the broken link starts from. */
@@ -36,16 +37,27 @@ export interface ImportIssuesBannerProps {
   onDismiss: () => void;
   /** Focus a beat in the graph when its row is clicked. */
   onSelectBeat?: (beatId: string) => void;
+  /**
+   * Deterministic fix proposals for what the validator found (generation
+   * review). Each is one local, undoable edit; nothing applies until the
+   * author says so. 'safe' ones may be applied together.
+   */
+  proposals?: FixProposal[];
+  onApplyProposal?: (proposal: FixProposal) => void;
+  onSkipProposal?: (proposal: FixProposal) => void;
+  onApplyAllSafe?: () => void;
 }
 
 export function ImportIssuesBanner({
   brokenTargets, otherErrors = [], context = 'import', onDismiss, onSelectBeat,
+  proposals = [], onApplyProposal, onSkipProposal, onApplyAllSafe,
 }: ImportIssuesBannerProps) {
   const [expanded, setExpanded] = useState(true);
-  if (brokenTargets.length === 0 && otherErrors.length === 0) return null;
+  if (brokenTargets.length === 0 && otherErrors.length === 0 && proposals.length === 0) return null;
 
   const n = brokenTargets.length;
   const beatsAffected = new Set(brokenTargets.map((b) => b.sourceBeatId)).size;
+  const safeCount = proposals.filter((p) => p.confidence === 'safe').length;
 
   return (
     <div className="mx-3 mt-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 shadow-sm">
@@ -90,7 +102,66 @@ export function ImportIssuesBanner({
               ))}
             </ul>
           )}
-          {(brokenTargets.length + otherErrors.length) > 0 && (
+          {expanded && proposals.length > 0 && (
+            <div className="mt-2" data-testid="fix-proposals">
+              <div className="flex items-center gap-2 text-xs font-medium">
+                <Wrench className="w-3.5 h-3.5" />
+                {proposals.length === 1 ? '1 proposed fix' : `${proposals.length} proposed fixes`}
+                <span className="font-normal opacity-80">— each is one edit you can undo</span>
+                {safeCount > 0 && onApplyAllSafe && (
+                  <button
+                    type="button"
+                    onClick={onApplyAllSafe}
+                    className="ml-auto px-2 py-0.5 rounded bg-amber-700 text-white hover:bg-amber-800"
+                    title="Apply every proposal marked safe, as one undo step"
+                  >
+                    Apply {safeCount} safe fix{safeCount === 1 ? '' : 'es'}
+                  </button>
+                )}
+              </div>
+              <ul className="mt-1 space-y-1">
+                {proposals.map((p) => (
+                  <li key={p.id} className="text-xs flex items-start gap-2" data-testid="fix-proposal">
+                    <span
+                      className={`mt-0.5 px-1 rounded text-[10px] uppercase tracking-wide ${p.confidence === 'safe' ? 'bg-emerald-200 text-emerald-900' : 'bg-amber-200 text-amber-900'}`}
+                      title={p.confidence === 'safe' ? 'Unambiguous — safe to apply' : 'Have a look before applying'}
+                    >
+                      {p.confidence === 'safe' ? 'safe' : 'review'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectBeat?.(p.beatId)}
+                      className="flex-1 text-left hover:underline"
+                      title={onSelectBeat ? 'Show this beat in the graph' : undefined}
+                    >
+                      {p.description}
+                    </button>
+                    {onApplyProposal && (
+                      <button
+                        type="button"
+                        onClick={() => onApplyProposal(p)}
+                        className="px-2 py-0.5 rounded bg-white border border-amber-300 hover:bg-amber-100 flex items-center gap-1"
+                        aria-label={`Apply: ${p.description}`}
+                      >
+                        <Check className="w-3 h-3" /> Apply
+                      </button>
+                    )}
+                    {onSkipProposal && (
+                      <button
+                        type="button"
+                        onClick={() => onSkipProposal(p)}
+                        className="px-2 py-0.5 rounded hover:bg-amber-100 opacity-80"
+                        aria-label={`Skip: ${p.description}`}
+                      >
+                        Skip
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(brokenTargets.length + otherErrors.length + proposals.length) > 0 && (
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}

@@ -26,6 +26,8 @@ import { storyLinks as storyLinksOf, dedupeLinks } from './storyLinks';
 import { mergeGeneratedVariables } from './generatedVariables';
 import { validateStoryLogic, formatLogicValidationResult } from './storyLogicValidator';
 import { themeToGlobalSettings } from '../themes/migration/GlobalSettingsAdapter';
+import { analyzeStoryFindings } from './generationReview';
+import type { GenerationFinding } from '../types/generationReview';
 
 export interface ApplyGeneratedStoryDeps {
   /** Store actions — only the batch-safe pair is needed. */
@@ -44,8 +46,10 @@ export interface ApplyGeneratedStoryDeps {
    */
   commitGlobalSettings: (next: GlobalSettings) => void;
   setCharacters: (characters: Character[]) => void;
-  /** Runs the import validators and raises the import-issues banner. */
-  reportImportValidation: (story: any) => void;
+  /** Runs the import validators and raises the import-issues banner, with the
+   *  typed findings the review proposes fixes for. Called AFTER normalize so
+   *  the findings' parameter paths match the beats as they will be loaded. */
+  reportImportValidation: (story: any, findings?: GenerationFinding[]) => void;
   /** Previous project's translations must not bleed into the new one. */
   clearTranslations?: () => void;
   /** Queue the cluster-aware auto-arrange for the next render. */
@@ -84,6 +88,10 @@ export interface ApplyGeneratedStoryResult {
   fictionalTimeHudEnabled: boolean;
   unknownBeatTypes: string[];
   logicIssueCount: number;
+  /** The story exactly as it arrived here — before normalize, layout or any fix. */
+  original: unknown;
+  /** Typed findings (from the generator's validator when present, else analysed here). */
+  findings: GenerationFinding[];
 }
 
 /** Beat types the generators may emit, including the aliases the registry maps. */
@@ -111,12 +119,15 @@ export function flattenConditionParams(params: Record<string, any>): Record<stri
     out.value = cond.value ?? cond.right ?? out.value;
     delete out.condition;
   }
-  if (out.trueConnection?.target) {
-    out.trueTarget = out.trueConnection.target;
+  // Object form from the generators, bare-string form from the normalize
+  // pipeline's schema alias (trueTarget → trueConnection).
+  const target = (v: any) => (typeof v === 'string' ? v : v?.target);
+  if (target(out.trueConnection)) {
+    out.trueTarget = target(out.trueConnection);
     delete out.trueConnection;
   }
-  if (out.falseConnection?.target) {
-    out.falseTarget = out.falseConnection.target;
+  if (target(out.falseConnection)) {
+    out.falseTarget = target(out.falseConnection);
     delete out.falseConnection;
   }
   return out;
@@ -198,12 +209,9 @@ export async function applyGeneratedStory(
   options: ApplyGeneratedStoryOptions,
 ): Promise<ApplyGeneratedStoryResult> {
   const title: string = story?.metadata?.title || options.fallbackTitle;
+  const original = JSON.parse(JSON.stringify(story ?? {}));
 
-  // 1. Structural validation → import-issues banner. The import proceeds
-  //    (a story with a few bad links is mostly good work).
-  deps.reportImportValidation(story);
-
-  // 2. Narrative-logic validation (console only).
+  // 1. Narrative-logic validation (console only).
   let logicIssueCount = 0;
   try {
     const logic = validateStoryLogic(story);
@@ -240,6 +248,13 @@ export async function applyGeneratedStory(
       console.warn('[applyGeneratedStory] Pipeline failed; continuing with raw story:', err);
     }
   }
+
+  // 3b. Structural validation → import-issues banner, with typed findings.
+  //     After normalize on purpose: the proposals' parameter paths must match
+  //     the shape the beats are loaded in. The import proceeds regardless — a
+  //     story with a few bad links is mostly good work.
+  const findings: GenerationFinding[] = story?.generationIssues?.findings ?? analyzeStoryFindings(story);
+  deps.reportImportValidation(story, findings);
 
   // 4. A generated story is a new project: nothing of the previous one bleeds through.
   deps.clearTranslations?.();
@@ -393,6 +408,8 @@ export async function applyGeneratedStory(
   }
 
   const result: ApplyGeneratedStoryResult = {
+    original,
+    findings,
     title,
     beatCount: createdBeats.length,
     connectionCount: connections.length,
@@ -403,6 +420,7 @@ export async function applyGeneratedStory(
     unknownBeatTypes,
     logicIssueCount,
   };
-  console.log('[applyGeneratedStory] Applied:', result);
+  const { original: _o, findings: _f, ...summary } = result;
+  console.log('[applyGeneratedStory] Applied:', { ...summary, findings: findings.length });
   return result;
 }

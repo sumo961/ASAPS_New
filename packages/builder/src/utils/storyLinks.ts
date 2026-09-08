@@ -55,6 +55,13 @@ export interface StoryLink {
   /** Author-facing text for the link, when the shape carries one. */
   label?: string;
   /**
+   * Parameter path of the target field relative to `parameters` (e.g.
+   * `trueTarget`, `choices[2].target`, `connection.target`), for links a
+   * retarget can write back to. Absent for dialog-internal and story-level
+   * links, whose write location is not a single parameter field.
+   */
+  path?: string;
+  /**
    * Reachable only through an out-of-band jump — a scanned QR code. Layout
    * and reachability count these as real links (the beat is not orphaned);
    * a play-flow analysis may want to treat them differently.
@@ -69,11 +76,13 @@ const push = (
   via: StoryLink['via'],
   label?: unknown,
   outOfBand?: boolean,
+  path?: string,
 ): void => {
   if (typeof target !== 'string' || !target) return;
   const link: StoryLink = { source, target, via };
   if (typeof label === 'string' && label) link.label = label;
   if (outOfBand) link.outOfBand = true;
+  if (path) link.path = path;
   out.push(link);
 };
 
@@ -144,75 +153,82 @@ export function beatLinks(beat: any): StoryLink[] {
   push(out, id, beat.defaultTarget, 'default-target');
 
   const p = beat.parameters || {};
-  push(out, id, p.defaultTarget, 'default-target');
+  push(out, id, p.defaultTarget, 'default-target', undefined, false, 'defaultTarget');
 
   // Single connection (infoText, titleScreen, …).
-  push(out, id, p.connection?.target, 'connection', p.connection?.label);
+  push(out, id, p.connection?.target, 'connection', p.connection?.label, false, 'connection.target');
 
   // aiConversation: the exit is the max-turns fallback plus any direction
   // whose action (or one of a multi-action's parts) exits the conversation
   // — mirrors AIConversationBeat.getConnections. Without these the walk
   // saw no exit at all and the beat after every AI conversation was
   // "unreachable" (2026-09-08 dragon story: 5 repair rounds for nothing).
-  push(out, id, p.fallbackExitTarget, 'param-target', 'Max turns');
+  push(out, id, p.fallbackExitTarget, 'param-target', 'Max turns', false, 'fallbackExitTarget');
   if (Array.isArray(p.directions)) {
-    for (const d of p.directions) {
+    p.directions.forEach((d: any, di: number) => {
       const action = d?.action;
-      if (!action) continue;
-      push(out, id, action.exitTarget, 'param-target', d.name || d.id);
+      if (!action) return;
+      push(out, id, action.exitTarget, 'param-target', d.name || d.id, false, `directions[${di}].action.exitTarget`);
       if (Array.isArray(action.actions)) {
-        for (const a of action.actions) push(out, id, a?.exitTarget, 'param-target', d.name || d.id);
+        action.actions.forEach((a: any, ai: number) =>
+          push(out, id, a?.exitTarget, 'param-target', d.name || d.id, false, `directions[${di}].action.actions[${ai}].exitTarget`));
       }
-    }
+    });
   }
 
   // conditionBeat — the builder writes trueTarget/falseTarget directly; AI
-  // output and legacy data use connection objects. Both are real.
-  push(out, id, p.trueTarget, 'condition-true', 'true');
-  push(out, id, p.falseTarget, 'condition-false', 'false');
-  push(out, id, p.trueConnection?.target, 'condition-true', 'true');
-  push(out, id, p.falseConnection?.target, 'condition-false', 'false');
+  // output and legacy data use connection objects; and the normalize
+  // pipeline's schema alias (trueTarget → trueConnection) leaves the id as a
+  // BARE STRING under trueConnection. All three are real — the string form
+  // was invisible here, so every gate's exits read as unreachable after
+  // normalize (2026-09-08 review fixture).
+  push(out, id, p.trueTarget, 'condition-true', 'true', false, 'trueTarget');
+  push(out, id, p.falseTarget, 'condition-false', 'false', false, 'falseTarget');
+  if (typeof p.trueConnection === 'string') push(out, id, p.trueConnection, 'condition-true', 'true', false, 'trueConnection');
+  else push(out, id, p.trueConnection?.target, 'condition-true', 'true', false, 'trueConnection.target');
+  if (typeof p.falseConnection === 'string') push(out, id, p.falseConnection, 'condition-false', 'false', false, 'falseConnection');
+  else push(out, id, p.falseConnection?.target, 'condition-false', 'false', false, 'falseConnection.target');
 
   // Choice-based beats. randomTarget's choices may be bare strings.
   if (Array.isArray(p.choices)) {
     p.choices.forEach((choice: any, i: number) => {
       if (typeof choice === 'string') {
-        push(out, id, choice, 'random', `Random ${i + 1}`);
+        push(out, id, choice, 'random', `Random ${i + 1}`, false, `choices[${i}]`);
       } else if (choice) {
         push(out, id, choice.target, 'choice',
-          choice.text || choice.location || choice.name || `Choice ${i + 1}`);
-        push(out, id, choice.targetId, 'choice', choice.text);
+          choice.text || choice.location || choice.name || `Choice ${i + 1}`, false, `choices[${i}].target`);
+        push(out, id, choice.targetId, 'choice', choice.text, false, `choices[${i}].targetId`);
       }
     });
   }
   if (Array.isArray(p.props)) {
-    for (const prop of p.props) {
-      if (prop) push(out, id, prop.target, 'prop', prop.name || 'Prop');
-    }
+    p.props.forEach((prop: any, i: number) => {
+      if (prop) push(out, id, prop.target, 'prop', prop.name || 'Prop', false, `props[${i}].target`);
+    });
   }
 
   // randomTarget's other shape: targets[] with targetId.
   if (Array.isArray(p.targets)) {
-    for (const t of p.targets) {
-      if (t) push(out, id, t.targetId ?? t.target, 'random');
-    }
+    p.targets.forEach((t: any, i: number) => {
+      if (t) push(out, id, t.targetId ?? t.target, 'random', undefined, false, `targets[${i}].${t.targetId !== undefined ? 'targetId' : 'target'}`);
+    });
   }
 
   if (p.dialogTree) walkDialog(p.dialogTree, id, out);
 
-  push(out, id, p.timerTarget, 'timer');
-  push(out, id, p.restartConnection?.target, 'restart', 'Restart');
-  push(out, id, p.failTarget, 'fail', 'Fail');
+  push(out, id, p.timerTarget, 'timer', undefined, false, 'timerTarget');
+  push(out, id, p.restartConnection?.target, 'restart', 'Restart', false, 'restartConnection.target');
+  push(out, id, p.failTarget, 'fail', 'Fail', false, 'failTarget');
 
   if (Array.isArray(p.hyperlinks)) {
-    for (const link of p.hyperlinks) {
-      if (link) push(out, id, link.targetBeatId, 'hyperlink', link.word || 'Link');
-    }
+    p.hyperlinks.forEach((link: any, i: number) => {
+      if (link) push(out, id, link.targetBeatId, 'hyperlink', link.word || 'Link', false, `hyperlinks[${i}].targetBeatId`);
+    });
   }
   if (Array.isArray(p.hotspots)) {
-    for (const hs of p.hotspots) {
-      if (hs) push(out, id, hs.target, 'hotspot', hs.name || hs.label);
-    }
+    p.hotspots.forEach((hs: any, i: number) => {
+      if (hs) push(out, id, hs.target, 'hotspot', hs.name || hs.label, false, `hotspots[${i}].target`);
+    });
   }
 
   // qrScan QR-jump targets — printed asaps://beat/<id> codes. Real links for
@@ -225,7 +241,7 @@ export function beatLinks(beat: any): StoryLink[] {
   }
 
   // A bare params.target (some generated shapes).
-  push(out, id, p.target, 'param-target');
+  push(out, id, p.target, 'param-target', undefined, false, 'target');
 
   return out;
 }

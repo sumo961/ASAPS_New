@@ -73,3 +73,27 @@ describe('ImportIssuesBanner', () => {
     expect(screen.getByText(/no content/i)).toBeTruthy();
   });
 });
+
+describe('fix proposals (generation review, 2026-09-08)', () => {
+  const proposals = [
+    { id: 'fix:1', findingId: 'f1', kind: 'retarget', beatId: 'beat_2', path: 'choices[1].target', value: 'beat_end', description: 'Point "Fork" at "End" instead of the missing "beat_ned".', confidence: 'safe' },
+    { id: 'fix:2', findingId: 'f2', kind: 'clamp-threshold', beatId: 'beat_gate', path: 'value', value: 1, description: 'Change the check on "Gate" to trust >= 1.', confidence: 'review' },
+  ] as const;
+  it('renders each proposal with Apply / Skip and a jump to the beat, and offers the safe ones in one go', () => {
+    const onApply = vi.fn(); const onSkip = vi.fn(); const onAll = vi.fn(); const onSelect = vi.fn();
+    render(<ImportIssuesBanner brokenTargets={[]} proposals={proposals as any} onDismiss={() => {}} onApplyProposal={onApply} onSkipProposal={onSkip} onApplyAllSafe={onAll} onSelectBeat={onSelect} />);
+    expect(screen.getByText(/2 proposed fixes/i)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/^Apply: Point/));
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ id: 'fix:1' }));
+    fireEvent.click(screen.getByLabelText(/^Skip: Change/));
+    expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ id: 'fix:2' }));
+    fireEvent.click(screen.getByText(/Apply 1 safe fix$/));
+    expect(onAll).toHaveBeenCalled();
+    fireEvent.click(screen.getByText(/Change the check on/));
+    expect(onSelect).toHaveBeenCalledWith('beat_gate');
+  });
+  it('shows with proposals alone', () => {
+    render(<ImportIssuesBanner brokenTargets={[]} proposals={[proposals[1]] as any} onDismiss={() => {}} />);
+    expect(screen.getByText(/1 proposed fix/i)).toBeTruthy();
+  });
+});

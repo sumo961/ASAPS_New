@@ -116,6 +116,12 @@ export interface SerializeInput {
   translations?: TranslationResource[];
   /** Translation manifest */
   translationManifest?: TranslationManifest;
+  /**
+   * Generation review record (the story as the AI generator handed it over,
+   * plus typed findings and fix proposals). Opaque to core; the builder owns
+   * the shape. Written to generation/review.json.
+   */
+  generationReview?: any;
 }
 
 /** Serialized story data (when story is already a plain object) */
@@ -147,6 +153,8 @@ export interface DeserializeResult {
   translations: TranslationResource[];
   /** Translation manifest (if present) */
   translationManifest?: TranslationManifest;
+  /** Generation review record from generation/review.json (if present) */
+  generationReview?: any;
 }
 
 // ============================================================================
@@ -373,6 +381,15 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
         content: deterministicStringify(input.translationManifest),
       });
     }
+  }
+
+  // 9b. Generation review — its own top-level folder (NOT under clusters/,
+  // whose orphan cleanup deletes any json it did not write).
+  if (input.generationReview) {
+    files.push({
+      path: 'generation/review.json',
+      content: deterministicStringify(input.generationReview),
+    });
   }
 
   // 10. VCS helper files
@@ -632,6 +649,17 @@ export async function deserializeFromDirectory(
   }
 
   // Build story metadata
+  // 9b. Read generation review
+  let generationReview: any = undefined;
+  const generationReviewPath = join(rootPath, 'generation', 'review.json');
+  if (await reader.exists(generationReviewPath)) {
+    try {
+      generationReview = JSON.parse(await reader.readText(generationReviewPath));
+    } catch (err) {
+      console.warn('[DirectoryFormat] generation/review.json unreadable; ignoring:', err);
+    }
+  }
+
   const storyMetadata: any = {
     firstBeatId: project.firstBeatId,
     title: project.name,
@@ -654,6 +682,7 @@ export async function deserializeFromDirectory(
     storyMetadata,
     translations,
     translationManifest,
+    generationReview,
   };
 }
 

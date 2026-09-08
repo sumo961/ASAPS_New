@@ -132,8 +132,8 @@ function chainReturnsToHub(
         ? evaluateConditionAgainstSummary(condition, state)
         : undefined;
       const target = result === true
-        ? (params.trueConnection?.target || params.trueTarget)
-        : (params.falseConnection?.target || params.falseTarget);
+        ? ((typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget)
+        : ((typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget);
       if (!target) return false;
       nextBeatId = target;
       break;
@@ -166,8 +166,8 @@ function chainReturnsToHub(
         ? evaluateConditionAgainstSummary(condition, state)
         : undefined;
       cursor = result === true
-        ? (params.trueConnection?.target || params.trueTarget)
-        : (params.falseConnection?.target || params.falseTarget);
+        ? ((typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget)
+        : ((typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget);
       continue;
     }
     // Any other branching beat (keypad, choice) — assume exit, not return-to-hub
@@ -1437,8 +1437,8 @@ const VisitBeatChain: React.FC<{
         : undefined;
       const condText = condition ? formatCondition(condition) : b.beatName;
 
-      const trueTarget = params.trueConnection?.target || params.trueTarget;
-      const falseTarget = params.falseConnection?.target || params.falseTarget;
+      const trueTarget = (typeof params.trueConnection === 'string' ? params.trueConnection : params.trueConnection?.target) || params.trueTarget;
+      const falseTarget = (typeof params.falseConnection === 'string' ? params.falseConnection : params.falseConnection?.target) || params.falseTarget;
       const trueChain = trueTarget && story ? walkChain(trueTarget, story, new Set([b.beatId])) : null;
       const falseChain = falseTarget && story ? walkChain(falseTarget, story, new Set([b.beatId])) : null;
 

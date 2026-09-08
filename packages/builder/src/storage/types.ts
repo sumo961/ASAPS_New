@@ -360,6 +360,9 @@ export interface Project {
 
   /** Translation manifest with completeness info */
   translationManifest?: TranslationManifest;
+  /** Generation review: the story as the AI handed it over + typed findings
+   *  + fix proposals + their status. See types/generationReview.ts. */
+  generationReview?: import('../types/generationReview').GenerationReview;
 
   /** Metadata */
   createdAt: Date;

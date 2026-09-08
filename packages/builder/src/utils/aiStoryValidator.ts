@@ -9,6 +9,7 @@
  */
 
 import { storyLinks } from './storyLinks';
+import { analyzeCounterRanges, readCounterCondition, conditionCanBeTrue, conditionCanBeFalse } from './counterRangeAnalysis';
 
 export interface ValidationIssue {
   type: 'error' | 'warning';
@@ -32,177 +33,36 @@ export interface ValidationResult {
 }
 
 /**
- * Analyze counter modifications in the story to determine max reachable values
+ * Counter gates that can never take a branch — the shared analysis
+ * (utils/counterRangeAnalysis), reported in this validator's own issue shape.
+ * The private copy this replaced only read the nested `condition` object,
+ * so every post-pipeline (flattened) story went unchecked, and it never saw
+ * the canonical `effects[]` on choices.
  */
-function analyzeCounterModifications(beats: any[]): Map<string, { min: number; max: number }> {
-  const counterRanges = new Map<string, { min: number; max: number }>();
-
-  for (const beat of beats) {
-    const params = beat.parameters || {};
-
-    // SetVariable beats
-    if (beat.type === 'setVariable' || beat.type === 'variable') {
-      const varType = params.type;
-      const varName = params.name;
-      const value = Number(params.value) || 0;
-      const operation = params.operation || 'set';
-
-      if (varType === 'counter' && varName) {
-        if (!counterRanges.has(varName)) {
-          counterRanges.set(varName, { min: 0, max: 0 });
-        }
-
-        const range = counterRanges.get(varName)!;
-        if (operation === 'set') {
-          range.max = Math.max(range.max, value);
-          range.min = Math.min(range.min, value);
-        } else if (operation === 'add' || operation === 'change') {
-          if (value > 0) {
-            range.max += value;
-          } else {
-            range.min += value;
-          }
-        } else if (operation === 'subtract') {
-          range.min -= value;
-        }
-      }
-    }
-
-    // Choice-based beats with counter effects
-    const choices = params.choices || params.props || [];
-    for (const choice of choices) {
-      // Check both counterEffect object format and flat counter/counterValue format
-      const counterName = choice.counterEffect?.counter || choice.counter;
-      const counterValue = choice.counterEffect?.value || choice.counterValue;
-
-      if (counterName && counterValue !== undefined) {
-        const value = Number(counterValue) || 0;
-
-        if (!counterRanges.has(counterName)) {
-          counterRanges.set(counterName, { min: 0, max: 0 });
-        }
-
-        const range = counterRanges.get(counterName)!;
-        if (value > 0) {
-          range.max += value;
-        } else {
-          range.min += value;
-        }
-      }
-    }
-
-    // DialogTree choices
-    if (beat.type === 'dialogTree' && params.dialogTree) {
-      analyzeDialogTreeCounters(params.dialogTree, counterRanges);
-    }
-  }
-
-  return counterRanges;
-}
-
-/**
- * Recursively analyze dialog tree for counter modifications
- */
-function analyzeDialogTreeCounters(node: any, counterRanges: Map<string, { min: number; max: number }>): void {
-  if (!node || !node.choices) return;
-
-  for (const choice of node.choices) {
-    const counterName = choice.counterEffect?.counter || choice.counter;
-    const counterValue = choice.counterEffect?.value || choice.counterValue;
-
-    if (counterName && counterValue !== undefined) {
-      const value = Number(counterValue) || 0;
-
-      if (!counterRanges.has(counterName)) {
-        counterRanges.set(counterName, { min: 0, max: 0 });
-      }
-
-      const range = counterRanges.get(counterName)!;
-      if (value > 0) {
-        range.max += value;
-      } else {
-        range.min += value;
-      }
-    }
-
-    if (choice.dialogNode) {
-      analyzeDialogTreeCounters(choice.dialogNode, counterRanges);
-    }
-  }
-}
-
-/**
- * Check if a counter condition threshold is reachable
- */
-function checkCounterThresholdReachable(
-  range: { min: number; max: number },
-  operator: string,
-  threshold: number
-): boolean {
-  switch (operator) {
-    case '==': return range.min <= threshold && threshold <= range.max;
-    case '!=': return true;
-    case '>': return range.max > threshold;
-    case '>=': return range.max >= threshold;
-    case '<': return range.min < threshold;
-    case '<=': return range.min <= threshold;
-    default: return true;
-  }
-}
-
-/**
- * Validate conditionBeat thresholds against counter modifications
- */
-function validateConditionThresholds(
-  beats: any[],
-  counterRanges: Map<string, { min: number; max: number }>
-): ValidationIssue[] {
+function validateConditionThresholds(beats: any[], variables?: any[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
-
+  const ranges = analyzeCounterRanges(beats, variables);
   for (const beat of beats) {
-    if (beat.type !== 'conditionBeat') continue;
-
-    const params = beat.parameters || {};
-    const condition = params.condition || {};
-
-    // Only check counter-type conditions
-    if (condition.type !== 'counter') continue;
-
-    const counterName = condition.variable || condition.variableName;
-    const operator = condition.operator || '==';
-    const threshold = Number(condition.value) || 0;
-
-    if (!counterName) continue;
-
-    const range = counterRanges.get(counterName);
-
-    if (!range) {
-      // Counter is never modified - defaults to 0
-      const defaultRange = { min: 0, max: 0 };
-      if (!checkCounterThresholdReachable(defaultRange, operator, threshold)) {
-        issues.push({
-          type: 'warning',
-          category: 'unreachable_threshold',
-          message: `ConditionBeat '${beat.id}' checks counter "${counterName}" ${operator} ${threshold}, but counter is never modified (stays at 0). True branch may be unreachable.`,
-          beatId: beat.id,
-          counterName,
-          threshold,
-          maxReachable: 0
-        });
-      }
-    } else if (!checkCounterThresholdReachable(range, operator, threshold)) {
+    const cond = readCounterCondition(beat);
+    if (!cond) continue;
+    const r = ranges.get(cond.counterName) || { min: 0, max: 0, modified: false };
+    if (cond.trueTarget && !conditionCanBeTrue(r, cond.operator, cond.value)) {
       issues.push({
-        type: 'warning',
-        category: 'unreachable_threshold',
-        message: `ConditionBeat '${beat.id}' checks counter "${counterName}" ${operator} ${threshold}, but counter can only reach ${range.min} to ${range.max}. True branch is UNREACHABLE.`,
-        beatId: beat.id,
-        counterName,
-        threshold,
-        maxReachable: range.max
+        type: 'warning', category: 'unreachable_threshold', beatId: beat.id,
+        counterName: cond.counterName, threshold: cond.value, maxReachable: r.max,
+        message: r.modified
+          ? `Beat "${beat.name || beat.id}" checks ${cond.counterName} ${cond.operator} ${cond.value}, but ${cond.counterName} can only reach ${r.min}…${r.max}`
+          : `Beat "${beat.name || beat.id}" checks ${cond.counterName} ${cond.operator} ${cond.value}, but nothing in the story changes ${cond.counterName}`,
+      });
+    }
+    if (cond.falseTarget && !conditionCanBeFalse(r, cond.operator, cond.value)) {
+      issues.push({
+        type: 'warning', category: 'unreachable_threshold', beatId: beat.id,
+        counterName: cond.counterName, threshold: cond.value, maxReachable: r.max,
+        message: `Beat "${beat.name || beat.id}" checks ${cond.counterName} ${cond.operator} ${cond.value}, which is always true (${cond.counterName} reaches ${r.min}…${r.max})`,
       });
     }
   }
-
   return issues;
 }
 
@@ -343,8 +203,7 @@ export function validateAIStory(story: any): ValidationResult {
   }
 
   // Check for unreachable counter thresholds in conditionBeats
-  const counterRanges = analyzeCounterModifications(story.beats);
-  const thresholdIssues = validateConditionThresholds(story.beats, counterRanges);
+  const thresholdIssues = validateConditionThresholds(story.beats, story.variables);
   warnings.push(...thresholdIssues);
 
   return {

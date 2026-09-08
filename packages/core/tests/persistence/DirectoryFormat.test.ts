@@ -354,3 +354,28 @@ describe('DirectoryFormat', () => {
     });
   });
 });
+
+describe('generation review record (2026-09-08)', () => {
+  it('round-trips generation/review.json outside clusters/', async () => {
+    const review = { version: 1, source: 'generator', title: 'Ember', findings: [{ id: 'f1' }], proposals: [], status: {}, original: { beats: [] } };
+    const input = { ...createMinimalInput(), generationReview: review } as any;
+    const { files } = serializeToDirectory(input);
+    const file = files.find(f => f.path === 'generation/review.json');
+    expect(file).toBeTruthy();
+    expect(JSON.parse(file!.content).title).toBe('Ember');
+    expect(files.some(f => f.path.startsWith('clusters/') && f.path.includes('review'))).toBe(false);
+
+    const byPath = new Map(files.map(f => [f.path, f.content]));
+    const reader = {
+      readText: async (path: string) => { const rel = path.replace(/^\/root\//, ''); if (!byPath.has(rel)) throw new Error('nope ' + rel); return byPath.get(rel)!; },
+      exists: async (path: string) => { const rel = path.replace(/^\/root\//, ''); return byPath.has(rel) || [...byPath.keys()].some(k => k.startsWith(rel + '/')); },
+      listDir: async (path: string) => { const rel = path.replace(/^\/root\//, ''); const names = new Set<string>(); for (const k of byPath.keys()) { if (k.startsWith(rel + '/')) names.add(k.slice(rel.length + 1).split('/')[0]); } return [...names].map(name => ({ name, isDirectory: !name.includes('.') })); },
+    };
+    const result = await deserializeFromDirectory('/root', reader);
+    expect(result.generationReview?.title).toBe('Ember');
+  });
+  it('omits the file when there is no review', () => {
+    const { files } = serializeToDirectory(createMinimalInput());
+    expect(files.some(f => f.path === 'generation/review.json')).toBe(false);
+  });
+});

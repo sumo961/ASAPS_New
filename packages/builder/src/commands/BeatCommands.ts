@@ -417,6 +417,61 @@ export class ReparentBeatCommand extends Command {
 }
 
 // ============================================================================
+// Apply Fix Proposal Command — one review proposal = one parameter patch on
+// one beat, one undo entry. Holds its own clones: useStoryBuilder.updateBeat
+// strips `parameters` off the object it is handed, which would otherwise
+// make redo a no-op; and it never merges with a neighbour, so two proposals
+// applied in quick succession stay individually undoable.
+// ============================================================================
+
+export class ApplyFixProposalCommand extends Command {
+  public readonly type = 'APPLY_FIX_PROPOSAL';
+  public description: string;
+
+  private beatId: string;
+  private prevParameters: Record<string, any>;
+  private nextParameters: Record<string, any>;
+  private proposalId: string;
+  private mutations: BeatStateMutations;
+
+  constructor(
+    proposalId: string,
+    beatId: string,
+    prevParameters: Record<string, any>,
+    nextParameters: Record<string, any>,
+    description: string,
+    mutations: BeatStateMutations,
+    id?: string
+  ) {
+    super(id);
+    this.proposalId = proposalId;
+    this.beatId = beatId;
+    this.prevParameters = prevParameters;
+    this.nextParameters = nextParameters;
+    this.description = description;
+    this.mutations = mutations;
+  }
+
+  execute(): void {
+    this.mutations.updateBeat(this.beatId, { parameters: structuredClone(this.nextParameters) } as any);
+  }
+
+  undo(): void {
+    this.mutations.updateBeat(this.beatId, { parameters: structuredClone(this.prevParameters) } as any);
+  }
+
+  canMergeWith(): boolean { return false; }
+
+  protected serializeData(): any {
+    return { proposalId: this.proposalId, beatId: this.beatId, prevParameters: this.prevParameters, nextParameters: this.nextParameters, description: this.description };
+  }
+
+  static deserialize(data: SerializedCommand, mutations: BeatStateMutations): ApplyFixProposalCommand {
+    return new ApplyFixProposalCommand(data.data.proposalId, data.data.beatId, data.data.prevParameters, data.data.nextParameters, data.data.description, mutations, data.id);
+  }
+}
+
+// ============================================================================
 // Resize Cluster Command (pairs with the auto-arrange batch: arranging grows
 // the frame, so undo must restore the old bounds too)
 // ============================================================================
@@ -506,5 +561,9 @@ export function registerBeatCommands(mutations: BeatStateMutations): void {
 
   CommandRegistry.register('REPARENT_BEAT', (data) =>
     ReparentBeatCommand.deserialize(data, mutations)
+  );
+
+  CommandRegistry.register('APPLY_FIX_PROPOSAL', (data) =>
+    ApplyFixProposalCommand.deserialize(data, mutations)
   );
 }

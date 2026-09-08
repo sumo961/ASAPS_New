@@ -144,7 +144,7 @@ export interface StoryGenerationResponse {
    * and the author decides. Missing-target errors are also derived by the
    * importer's link walk, so consumers de-duplicate on that wording.
    */
-  generationIssues?: { errors: string[]; warnings: string[] };
+  generationIssues?: { errors: string[]; warnings: string[]; findings?: import('./generationReview').GenerationFinding[] };
 
   /** Generated beats */
   beats: GeneratedBeat[];
@@ -366,6 +366,9 @@ export interface AIValidationResult {
 
   /** Warnings (non-fatal issues) */
   warnings?: string[];
+  /** Typed findings behind the flow-level errors (missing targets, unreachable
+   *  beats, unsatisfiable counter gates) — what the review banner proposes fixes for. */
+  findings?: import('./generationReview').GenerationFinding[];
 }
 
 /**
