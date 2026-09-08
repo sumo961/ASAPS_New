@@ -298,6 +298,23 @@ Then **before the ending**, branch on whether trust actually grew:
 }
 \`\`\`
 
+The same \`sentiment\` condition also works as a **per-choice gate** — put it
+in a choice's \`conditions\` array and the reply is hidden until the feeling
+exists, no extra beat needed. Use it for lines the player should only be
+able to say once a character trusts (or fears) them:
+
+\`\`\`json
+{ "id": "c_confide", "text": "Tell me what really happened that night.",
+  "dialogNode": { "id": "n_confide", "speaker": "Mara", "text": "…" },
+  "conditions": [{ "type": "sentiment", "character": "mara", "sentimentTarget": "player",
+                   "sentimentEmotion": "trust", "operator": ">=", "value": 0.3 }] }
+\`\`\`
+
+Prefer this over a separate conditionBeat when the gate belongs to ONE reply;
+keep the conditionBeat for branching the whole story. Any story with a
+feeling-gated choice should give that character a visible meter (a counter
+bound to the sentiment) so the player can see the door opening.
+
 Note \`baseline: "initial"\` — value 0.3 reads as "trust has grown by
 ≥ 0.3 from where Mara started", not "trust is now ≥ 0.3 absolute". For
 a character seeded with \`initialSentiments: [{toEntityRef: 'player',

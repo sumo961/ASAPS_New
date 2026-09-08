@@ -121,6 +121,7 @@ Example: { "text": "I accept your offer.", "target": "deal_done", "soundEffect":
 
 ## Gating choices
 - "conditions": [ ... ] on a choice hides or blocks it until the story state matches — use it so earlier decisions visibly change what the player can say.
+- Condition shapes: { "type": "inventory", "operator": "contains", "item": "key" }, { "type": "counter", "variableName": "clues", "operator": ">=", "value": 2 }, { "type": "visitedBeat", "beatId": "beat_7", "operator": "==" }, and the FEELING gate { "type": "sentiment", "character": "<who feels it>", "sentimentTarget": "player", "sentimentEmotion": "trust", "operator": ">=", "value": 0.3 } — a reply that exists only once the NPC trusts (or fears) the player. Add "baseline": "initial" to gate on the change since the story began.
 - "visible": false hides a choice outright.
 
 ## Visited Choice Tracking

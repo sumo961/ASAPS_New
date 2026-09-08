@@ -343,6 +343,7 @@ Concrete rules:
 
 Every choice, movement option, prop, and dialog choice accepts "conditions": [ ... ] (same shapes as conditionBeat: variable / counter / inventory / visitedBeat / sentiment). An option with unmet conditions is HIDDEN. Use this instead of clumsier workarounds:
 - ✓ An accusation option that only appears after the decisive clue: { "id": "c_twist", "text": "No one. The 'original' was never real.", "target": "beat_end_twist", "conditions": [{ "type": "visitedBeat", "beatId": "beat_clue_1894" }] }
+- ✓ A reply the player can only say once a character trusts them — a FEELING gate, no conditionBeat needed: { "id": "c_confide", "text": "Tell me what really happened.", "dialogNode": { ... }, "conditions": [{ "type": "sentiment", "character": "char_mara", "sentimentTarget": "player", "sentimentEmotion": "trust", "operator": ">=", "value": 0.3 }] }. Add "baseline": "initial" to test how much the feeling has CHANGED since the story began. Give that character a visible meter bound to the same sentiment so the player sees the door opening.
 - ✗ Do NOT duplicate an entire menu beat just to add one unlocked option — add a conditional choice to the one menu.
 - ✗ Do NOT let discovered knowledge OVERRIDE an explicit player decision. If the player names a suspect, never reroute them to a different ending because they happen to hold a twist clue — reveal knowledge as a new OPTION the player may choose, never as a substitute for the choice they made.
 
