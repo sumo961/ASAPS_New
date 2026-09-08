@@ -2988,6 +2988,25 @@ function App() {
 
   // ---- Generation review: apply / skip / apply-all-safe / dismiss ----------
 
+  /** An undone proposal comes back: status open again, row and proposal restored. */
+  const reopenProposal = useCallback((proposal: FixProposal) => {
+    const review = generationReviewRef.current;
+    if (review) {
+      const status = { ...review.status }; delete status[proposal.findingId];
+      setGenerationReview({ ...review, status });
+    }
+    const finding = review?.findings.find(f => f.id === proposal.findingId);
+    const row = finding?.kind === 'missing-target'
+      ? { sourceBeatId: finding.beatId, sourceBeatName: finding.beatName, target: finding.targetId } : null;
+    setImportIssues(prev => {
+      const base = prev ?? { brokenTargets: [], otherErrors: [], beatIds: state.beats.map(b => b.id), proposals: [] };
+      const proposals = (base.proposals ?? []).some(p => p.id === proposal.id) ? base.proposals! : [...(base.proposals ?? []), proposal];
+      const brokenTargets = row && !base.brokenTargets.some(b => b.sourceBeatId === row.sourceBeatId && b.target === row.target)
+        ? [...base.brokenTargets, row] : base.brokenTargets;
+      return { ...base, proposals, brokenTargets };
+    });
+  }, [setGenerationReview, state.beats]);
+
   /** Mark a finding in the persisted review and drop its proposal from the banner. */
   const settleProposal = useCallback((proposal: FixProposal, status: 'applied' | 'skipped') => {
     const review = generationReviewRef.current;
@@ -3014,8 +3033,11 @@ function App() {
     if (!beat) return null;
     const params = typeof (beat as any).getParameters === 'function' ? (beat as any).getParameters() : {};
     const patch = buildParameterPatch(params ?? {}, proposal.path, proposal.value);
-    return new ApplyFixProposalCommand(proposal.id, proposal.beatId, patch.prev, patch.next, proposal.description, stableMutations.current);
-  }, [state.beats]);
+    return new ApplyFixProposalCommand(
+      proposal.id, proposal.beatId, patch.prev, patch.next, proposal.description, stableMutations.current, undefined,
+      { onUndo: () => reopenProposal(proposal), onRedo: () => settleProposal(proposal, 'applied') },
+    );
+  }, [state.beats, reopenProposal, settleProposal]);
 
   const handleApplyProposal = useCallback(async (proposal: FixProposal) => {
     const cmd = proposalCommand(proposal);

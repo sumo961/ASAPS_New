@@ -2260,6 +2260,20 @@ Start with a concept, get a complete story structure:
 
 AI creates a complete story structure with beats, characters, and connections. You can then edit everything to your liking.
 
+### After generation: the review banner
+
+Generated stories arrive with the occasional loose end — a choice that points at a beat id the AI never wrote, a scene nothing leads to, or a counter check that no path in the story can ever satisfy. ASAPS does **not** send the story back to the AI to "repair" itself (that used to regenerate the whole story and could introduce new mistakes). Instead it keeps what the AI produced, analyses it deterministically, and shows you what it found in an amber **review banner** under the header, together with concrete fix proposals you can apply one at a time:
+
+![The review banner after a generation, with three proposed fixes](images/70-generation-review.png)
+*The review banner. Broken links are listed first (click one to jump to the beat). Below, each **proposed fix** is a single edit: a typo'd link re-pointed at the beat clearly meant, a counter threshold clamped into the range the counter can actually reach, or an unreachable scene linked from the beat written just before it. **Apply** makes the edit (one undo step each); **Skip** leaves it for you; the green **safe** ones are unambiguous and can be applied together with **Apply N safe fixes**.*
+
+A few things worth knowing:
+
+- **Nothing is applied for you.** Every proposal waits for your click. If a finding has no clear fix — say the missing beat id resembles two existing beats equally — ASAPS shows the problem but proposes nothing rather than guess.
+- **The original generation is kept** with the project (`generation/review.json` in a folder project). Reopen the project later and, until you dismiss the banner, ASAPS re-checks the story as it stands and shows what is still open.
+- **Undo works as usual.** An undone proposal returns to the banner.
+- The same banner appears for stories injected from Claude Desktop via MCP.
+
 ## AI Beat Suggestions
 
 Stuck on what should happen next?

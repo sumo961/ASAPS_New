@@ -14,6 +14,13 @@ import type { CommandManagerOptions } from '../commands/CommandManager';
 export interface UndoRedoToolbarProps {
   /** Command manager options */
   options?: CommandManagerOptions;
+  /**
+   * Called after a toolbar undo / redo (also the history jumps). The
+   * keyboard shortcuts run through App's hook, which marks the project
+   * changed; toolbar clicks used their own hook and did not — an undone
+   * edit then sat unsaved until the next unrelated change.
+   */
+  onAfterUndoRedo?: () => void;
 
   /** Show command descriptions in tooltips */
   showDescriptions?: boolean;
@@ -46,6 +53,7 @@ function formatRelativeTime(date: Date): string {
  */
 export const UndoRedoToolbar: React.FC<UndoRedoToolbarProps> = ({
   options,
+  onAfterUndoRedo,
   showDescriptions = true,
   showShortcuts = true,
   orientation = 'horizontal',
@@ -113,11 +121,13 @@ export const UndoRedoToolbar: React.FC<UndoRedoToolbarProps> = ({
       // Need to undo (currentIndex - targetIndex) times
       for (let i = 0; i < currentIndex - targetIndex; i++) {
         await manager.undo();
+        onAfterUndoRedo?.();
       }
     } else {
       // Need to redo (targetIndex - currentIndex) times
       for (let i = 0; i < targetIndex - currentIndex; i++) {
         await manager.redo();
+        onAfterUndoRedo?.();
       }
     }
     setShowHistory(false);
@@ -132,7 +142,7 @@ export const UndoRedoToolbar: React.FC<UndoRedoToolbarProps> = ({
     <div className={`${containerClass} ${className}`} ref={dropdownRef}>
       {/* Undo button */}
       <button
-        onClick={undo}
+        onClick={async () => { await undo(); onAfterUndoRedo?.(); }}
         disabled={!canUndo}
         title={getUndoTooltip()}
         className={`
@@ -150,7 +160,7 @@ export const UndoRedoToolbar: React.FC<UndoRedoToolbarProps> = ({
 
       {/* Redo button */}
       <button
-        onClick={redo}
+        onClick={async () => { await redo(); onAfterUndoRedo?.(); }}
         disabled={!canRedo}
         title={getRedoTooltip()}
         className={`

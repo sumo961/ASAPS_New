@@ -433,6 +433,8 @@ export class ApplyFixProposalCommand extends Command {
   private nextParameters: Record<string, any>;
   private proposalId: string;
   private mutations: BeatStateMutations;
+  /** Review bookkeeping: an undone proposal reopens in the banner, a redone one settles again. Not serialized. */
+  private hooks?: { onUndo?: () => void; onRedo?: () => void };
 
   constructor(
     proposalId: string,
@@ -441,7 +443,8 @@ export class ApplyFixProposalCommand extends Command {
     nextParameters: Record<string, any>,
     description: string,
     mutations: BeatStateMutations,
-    id?: string
+    id?: string,
+    hooks?: { onUndo?: () => void; onRedo?: () => void },
   ) {
     super(id);
     this.proposalId = proposalId;
@@ -450,6 +453,7 @@ export class ApplyFixProposalCommand extends Command {
     this.nextParameters = nextParameters;
     this.description = description;
     this.mutations = mutations;
+    this.hooks = hooks;
   }
 
   execute(): void {
@@ -458,6 +462,12 @@ export class ApplyFixProposalCommand extends Command {
 
   undo(): void {
     this.mutations.updateBeat(this.beatId, { parameters: structuredClone(this.prevParameters) } as any);
+    this.hooks?.onUndo?.();
+  }
+
+  redo(): void {
+    this.execute();
+    this.hooks?.onRedo?.();
   }
 
   canMergeWith(): boolean { return false; }

@@ -202,3 +202,17 @@ describe('ApplyFixProposalCommand', () => {
     expect(cmd.toJSON()).toMatchObject({ type: 'APPLY_FIX_PROPOSAL', data: { proposalId: 'fix:1', beatId: 'b1' } });
   });
 });
+
+describe('ApplyFixProposalCommand review hooks', () => {
+  it('reports undo and redo back so the banner can reopen / settle the proposal', () => {
+    const m = mutations();
+    const onUndo = vi.fn(); const onRedo = vi.fn();
+    const cmd = new ApplyFixProposalCommand('fix:1', 'b1', { value: 3 }, { value: 1 }, 'x', m, undefined, { onUndo, onRedo });
+    cmd.execute();
+    cmd.undo();
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    cmd.redo();
+    expect(onRedo).toHaveBeenCalledTimes(1);
+    expect(m.updateBeat).toHaveBeenLastCalledWith('b1', { parameters: { value: 1 } });
+  });
+});
