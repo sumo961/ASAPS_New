@@ -2012,6 +2012,8 @@ When you select two or more elements at once, alignment and distribution buttons
 
 A landscape stage shown on a phone held upright gets cropped: the renderer keeps the full height and shows the middle of the picture. The **phone crop preview** button draws two dashed frames over the stage — a **9:16** and a taller **9:19.5** phone — so you can see which part of your background, and which characters and hotspots, a phone player will actually get. Anything outside the frames is what a phone loses. Keep the things that matter inside the inner frame, or anchor them to the image (see [Anchored to](#animation-anchor) for animations, and image [asset variants](#image-asset-variants--orientation-and-device-class-v0959) for a different picture altogether on phones).
 
+![Phone crop preview on a fixed-canvas beat — the dashed 9:16 and 9:19.5 frames show what a portrait phone keeps of the 1024×768 stage in cover mode](images/69-phone-crop-preview.png)
+
 ### Reset Layout
 
 The **Reset Layout** button (grid icon, next to Reset Zoom) is the escape hatch when you've nudged elements around on a beat and want to return to the default schema-driven layout — or when a new ASAPS release ships improved default layouts and you want to opt this beat in without deleting and re-creating it.
