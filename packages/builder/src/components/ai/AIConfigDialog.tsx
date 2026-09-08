@@ -196,7 +196,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
 
       // configure()'s positional signature predates the runtime override —
       // merge it into the saved config afterwards (undefined clears it).
-      updateSavedAIConfig({ runtimeModel: runtimeModel.trim() || undefined });
+      // A typed Max Tokens is deliberate: stamp it so the legacy-value
+      // migration (utils/aiConfigBudget.ts) never drops it.
+      updateSavedAIConfig({ runtimeModel: runtimeModel.trim() || undefined, maxTokensUserSet: maxTokensNum ? true : undefined });
 
       setSuccess(true);
 
@@ -208,7 +210,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           ...(model ? { model } : {}),
           ...(runtimeModel.trim() ? { runtimeModel: runtimeModel.trim() } : {}),
           ...(baseUrl ? { baseUrl } : {}),
-          ...(maxTokensNum ? { maxTokens: maxTokensNum } : {}),
+          ...(maxTokensNum ? { maxTokens: maxTokensNum, maxTokensUserSet: true } : {}),
           ...(reasoningEffort ? { reasoningEffort } : {}),
           ...(reasoningMode === 'pro' ? { reasoningMode: 'pro' as const } : {}),
         });

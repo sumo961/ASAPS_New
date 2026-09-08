@@ -76,6 +76,8 @@ interface HeaderProps {
     model?: string;
     baseUrl?: string;
     maxTokens?: number;
+    /** Max Tokens was typed deliberately (see utils/aiConfigBudget.ts). */
+    maxTokensUserSet?: boolean;
     reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   }) => void;
   onCurrentProjectDeleted?: () => void;

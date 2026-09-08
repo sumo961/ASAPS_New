@@ -149,6 +149,23 @@ export function beatLinks(beat: any): StoryLink[] {
   // Single connection (infoText, titleScreen, …).
   push(out, id, p.connection?.target, 'connection', p.connection?.label);
 
+  // aiConversation: the exit is the max-turns fallback plus any direction
+  // whose action (or one of a multi-action's parts) exits the conversation
+  // — mirrors AIConversationBeat.getConnections. Without these the walk
+  // saw no exit at all and the beat after every AI conversation was
+  // "unreachable" (2026-09-08 dragon story: 5 repair rounds for nothing).
+  push(out, id, p.fallbackExitTarget, 'param-target', 'Max turns');
+  if (Array.isArray(p.directions)) {
+    for (const d of p.directions) {
+      const action = d?.action;
+      if (!action) continue;
+      push(out, id, action.exitTarget, 'param-target', d.name || d.id);
+      if (Array.isArray(action.actions)) {
+        for (const a of action.actions) push(out, id, a?.exitTarget, 'param-target', d.name || d.id);
+      }
+    }
+  }
+
   // conditionBeat — the builder writes trueTarget/falseTarget directly; AI
   // output and legacy data use connection objects. Both are real.
   push(out, id, p.trueTarget, 'condition-true', 'true');

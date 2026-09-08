@@ -76,6 +76,7 @@ import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
 import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
 import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
+import { reconcileLegacyMaxTokens } from './utils/aiConfigBudget';
 import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
 import { AIDebugModal } from './components/ai/AIDebugModal';
@@ -192,15 +193,19 @@ function applyProjectAIDefaults(globalSettings: any): void {
   if (getSavedAIConfig()?.apiKey) return; // User already has their own config with a key
   const ai = globalSettings.ai;
   try {
-    const config = {
+    const { config, dropped, automatic } = reconcileLegacyMaxTokens({
       provider: ai.provider || 'openai',
       apiKey: '',
       model: ai.model,
       baseUrl: ai.baseUrl,
       maxTokens: ai.maxTokens,
+      maxTokensUserSet: ai.maxTokensUserSet,
       reasoningEffort: ai.reasoningEffort,
       providerType: ai.providerType,
-    };
+    });
+    if (dropped !== undefined) {
+      console.warn(`[App] Project AI defaults carried a legacy Max Tokens ${dropped} (automatic is ${automatic}); ignored.`);
+    }
     localStorage.setItem('asaps_ai_config', JSON.stringify(config));
     console.log('[App] Applied project-level AI defaults:', ai.providerType || ai.provider);
   } catch { /* ignore localStorage errors */ }

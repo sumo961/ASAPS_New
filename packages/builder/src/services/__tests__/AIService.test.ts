@@ -596,3 +596,32 @@ describe('AIService', () => {
     });
   });
 });
+
+describe('transformBeatFormat routes the single link by schema (2026-09-08)', () => {
+  const schema = {
+    beatTypes: {
+      aiConversation: { parameters: { fallbackExitTarget: { type: 'connection' }, maxTurns: { type: 'number' } } },
+      infoText: { parameters: { connection: { type: 'connection' }, text: { type: 'string' } } },
+      durScreen: { parameters: { connection: { type: 'connection' }, timerTarget: { type: 'connection' } } },
+    },
+  };
+  function svc() {
+    const s = new AIService();
+    (s as any).validator = { getSchema: () => schema };
+    return s as any;
+  }
+  it('aiConversation: top-level connections land in fallbackExitTarget, no off-schema connection param', () => {
+    const out = svc().transformBeatFormat({ id: 'talk', type: 'aiConversation', parameters: { maxTurns: 5 }, connections: [{ targetId: 'after', label: 'Idea found' }] });
+    expect(out.parameters.fallbackExitTarget).toBe('after');
+    expect(out.parameters.connection).toBeUndefined();
+  });
+  it('aiConversation: an explicit fallbackExitTarget wins, the stray connection is still removed', () => {
+    const out = svc().transformBeatFormat({ id: 'talk', type: 'aiConversation', parameters: { fallbackExitTarget: 'keep', connection: { target: 'other' } } });
+    expect(out.parameters.fallbackExitTarget).toBe('keep');
+    expect(out.parameters.connection).toBeUndefined();
+  });
+  it('beat types that HAVE a connection param keep it (infoText, durScreen)', () => {
+    expect(svc().transformBeatFormat({ id: 'i', type: 'infoText', parameters: {}, connections: [{ targetId: 'n' }] }).parameters.connection.target).toBe('n');
+    expect(svc().transformBeatFormat({ id: 'd', type: 'durScreen', parameters: { name: 't', value: 3 }, connections: [{ targetId: 'n' }] }).parameters.connection.target).toBe('n');
+  });
+});

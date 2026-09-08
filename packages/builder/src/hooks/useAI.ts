@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAIService, ClaudeProvider, OpenAIProvider } from '../services';
+import { reconcileLegacyMaxTokens } from '../utils/aiConfigBudget';
 import type {
   StoryGenerationRequest,
   StoryGenerationResponse,
@@ -39,6 +40,10 @@ export interface SavedAIConfig {
   runtimeModel?: string;
   baseUrl?: string;
   maxTokens?: number;
+  /** True when the settings dialog saved a Max Tokens the user typed. Unset
+   *  values below the automatic budget are legacy and get dropped on load —
+   *  see utils/aiConfigBudget.ts. */
+  maxTokensUserSet?: boolean;
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
   /** OpenAI pro reasoning (GPT-5.6, Responses API). Ignored elsewhere. */
   reasoningMode?: 'standard' | 'pro';
@@ -53,7 +58,20 @@ function loadSavedConfig(): SavedAIConfig | null {
   try {
     const saved = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved) as SavedAIConfig;
+      // One-time migration of a legacy Max Tokens that silently capped the
+      // automatic budget (32000 stored on an opus-5 install → both passes
+      // of a generation truncated). Persisted so it runs once per install.
+      const { config, dropped, automatic } = reconcileLegacyMaxTokens(parsed);
+      if (dropped !== undefined) {
+        console.warn(
+          `[useAI] Dropped legacy Max Tokens ${dropped} (below the automatic ${automatic} for ` +
+            `${config.model ?? 'the configured model'}); the budget is automatic again. ` +
+            'Set it deliberately in AI settings if you really want a cap.',
+        );
+        localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(config));
+      }
+      return config;
     }
   } catch (error) {
     console.warn('[useAI] Failed to load saved config:', error);

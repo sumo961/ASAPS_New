@@ -210,3 +210,21 @@ describe('stale serialized connections on dialogTree beats', () => {
     expect(beatLinks(beat).map((l) => l.target)).toContain('x1');
   });
 });
+
+describe('aiConversation exits (2026-09-08)', () => {
+  it('walks fallbackExitTarget and direction exit targets, including multi-action parts', () => {
+    const beat = {
+      id: 'talk', type: 'aiConversation',
+      parameters: {
+        fallbackExitTarget: 'after',
+        directions: [
+          { id: 'd1', name: 'Idea found', action: { type: 'exit', exitTarget: 'idea' } },
+          { id: 'd2', action: { type: 'multi', actions: [{ type: 'say' }, { type: 'exit', exitTarget: 'bye' }] } },
+        ],
+      },
+    };
+    const targets = beatLinks(beat).map(l => l.target).sort();
+    expect(targets).toEqual(['after', 'bye', 'idea']);
+    expect(beatLinks(beat).find(l => l.target === 'idea')?.label).toBe('Idea found');
+  });
+});

@@ -300,6 +300,29 @@ export class AIService {
       };
     }
 
+    // Schema-driven: a beat type with NO `connection` parameter but exactly
+    // one connection-typed parameter takes the single link THERE
+    // (aiConversation → fallbackExitTarget). Otherwise every generated
+    // aiConversation carried an off-schema `connection` (validation
+    // warning on each) while its real exit field stayed empty.
+    {
+      const def = this.validator.getSchema?.()?.beatTypes?.[transformed.type];
+      const link = transformed.parameters.connection;
+      if (def?.parameters && !def.parameters.connection && link?.target) {
+        const connectionParams = Object.entries(def.parameters)
+          .filter(([, v]: [string, any]) => v?.type === 'connection')
+          .map(([k]) => k);
+        if (connectionParams.length === 1) {
+          const [name] = connectionParams;
+          if (!transformed.parameters[name]) {
+            transformed.parameters[name] = link.target;
+            console.log(`[AIService] Routed connection → ${name} "${link.target}" for ${transformed.type} beat ${beat.id}`);
+          }
+          delete transformed.parameters.connection;
+        }
+      }
+    }
+
     // Normalize inputText parameters
     if (beat.type === 'inputText') {
       const params = transformed.parameters;
