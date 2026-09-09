@@ -22,8 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.97** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.97 is the review release**: a
+Current release: **v0.9.98** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.98 is the provenance release**: a
+project now carries its own record of AI involvement — an AI edits ledger
+with every proposal from the generator review, Ask AI and the Co-Designer
+and what the author decided, accepted and declined alike (**AI ▸ AI
+changes**) — and the conversations that belong to it, the Ideator session
+that produced it and every Co-Designer session about it, travel with it
+through folders, zips and version control. Also: all Dependabot alerts
+cleared, multi-line question fields, and a generation rule that sibling
+variants of one story moment each introduce their characters.
+
+**v0.9.97 was the review release**: a
 generated story keeps its original with the project and arrives with typed
 findings and one-click, undoable fix proposals in the import banner — a
 typo'd link re-pointed, a counter threshold clamped into reach, an orphaned

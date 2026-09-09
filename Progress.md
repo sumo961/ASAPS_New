@@ -1,5 +1,77 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-10: The provenance release — who wrote what, and the conversations that got there (v0.9.98)
+
+### Overview
+
+Five commits closing the loop the review release opened. A project now
+carries its own record of AI involvement: an **AI edits ledger** with every
+proposal an AI surface made — the generator review, its Ask AI, the
+Co-Designer — and what the author decided, accepted and declined alike,
+readable under **AI ▸ AI changes**; and the conversations that belong to
+the project — the Ideator session that produced it and every Co-Designer
+session held about it — travel with it through folders, zips and version
+control and land in the Sessions panels of whichever machine opens it.
+Around that: the 26 Dependabot alerts cleared to zero, multi-line question
+fields in the Inspector, a generation rule that sibling variants of one
+story moment must each introduce their characters (the Pip finding), and
+console lines that make a Co-Designer session watchable.
+
+### AI edits ledger — every proposal, every decision, kept with the project
+
+`generation/ai-edits.json` (folder projects; also the IndexedDB project and
+zip exports) records each AI proposal with its source, batch, one-line
+summary, beats touched, outcome or rejection reason, and the raw proposal.
+Writers: the review banner's apply / skip / apply-all-safe, Ask AI accept
+and reject (one entry per edit), and the Co-Designer's apply with
+per-proposal outcomes — the pop-out now also sends the unticked rest of a
+batch as declined, and a batch dismissed without applying, so what the
+author turned down is on record too. **AI ▸ AI changes (N)** in the header
+opens the log, newest first, with source and decision badges and a jump to
+each beat.
+
+**Files modified:** `packages/builder/src/types/aiEdits.ts`, `packages/builder/src/utils/aiEditsLedger.ts`, `packages/builder/src/components/ai/AIEditsLogDialog.tsx`,
+`packages/builder/src/components/Header.tsx`, `packages/builder/src/App.tsx`, `packages/builder/src/components/ai/codesigner/{types.ts,useCoDesigner.ts}`,
+`packages/builder/src/services/CoDesignerWindowManager.ts`, `packages/core/src/persistence/DirectoryFormat.ts`, `packages/builder/src/storage/{types.ts,adapters/DirectoryAdapter.ts}`, `packages/builder/src/utils/projectZipManager.ts`
+
+### Conversations travel with the project
+
+The pop-outs keep their conversations in per-machine browser stores, so a
+folder project opened elsewhere had no history. The Ideator session that
+produced a project rides along on the handoff (the handoff creates the
+project, so the session predates it) and later turns of the same
+conversation update the copy; every Co-Designer session about a project is
+mirrored on each save. Persisted as `generation/ideator-sessions.json` and
+`generation/codesigner-sessions.json`; on open, the project copies are
+merged into the local stores (newer copy of each session wins) so the
+Sessions panels list them there too. Ideator conversations that never
+handed off stay local by design.
+
+**Files modified:** `packages/builder/src/utils/projectSessions.ts`, `packages/builder/src/components/ai/ideator/{types.ts,useIdeator.ts}`, `packages/builder/src/services/IdeatorWindowManager.ts`,
+`packages/builder/src/components/ai/codesigner/{types.ts,useCoDesigner.ts}`, `packages/builder/src/services/CoDesignerWindowManager.ts`, `packages/core/src/persistence/DirectoryFormat.ts`,
+`packages/builder/src/storage/{types.ts,adapters/DirectoryAdapter.ts}`, `packages/builder/src/utils/projectZipManager.ts`, `packages/builder/src/App.tsx`, `docs/USER_GUIDE.md`
+
+### Editor, guidance, observability, dependencies
+
+The Question field of multiChoice / movementChoice / pickProp is multi-line
+(generated stories put a paragraph of scene text there). Generation
+guidance gained the rule that variants of one story moment selected by a
+router — participation level, difficulty, language — are alternatives, not
+a sequence: each must introduce its characters, place and goal itself, with
+aiConversation introductions in the opening line because scenario and
+personality are never shown to the interactor; taught in the prompt, the
+schema description and the schema's validation rules (Claude Desktop learns
+it live). The Co-Designer logs proposals extracted, the author's selection,
+and per-proposal outcomes. All 26 Dependabot alerts cleared: vitest 4.1.11,
+xmldom, fast-uri, js-yaml, multer, browserslist, postcss-selector-parser,
+hono, qs (root override + pin, since express 4 pins the vulnerable minor);
+audit at zero in both lockfiles.
+
+**Files modified:** `packages/builder/src/components/Inspector.tsx`, `beat-definitions/core-beats.json`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`,
+`packages/builder/src/components/ai/codesigner/useCoDesigner.ts`, `packages/builder/src/App.tsx`, `package.json`, `package-lock.json`, `mcp-server-desktop/package-lock.json`, workspace `package.json` files
+
+---
+
 ## 2026-09-09: The review release — generated stories you can trust, fixes you can see (v0.9.97)
 
 ### Overview
