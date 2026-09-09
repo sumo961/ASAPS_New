@@ -22,8 +22,22 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.96** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.96 is the phone release**: in-story
+Current release: **v0.9.97** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.97 is the review release**: a
+generated story keeps its original with the project and arrives with typed
+findings and one-click, undoable fix proposals in the import banner — a
+typo'd link re-pointed, a counter threshold clamped into reach, an orphaned
+scene linked — and "Ask AI" for the rest, whose answers are checked by code
+on a simulated copy and shown as before → after before anything applies.
+Automatic AI self-repair is gone. Generation escalates once on a capped
+output instead of truncating twice, Opus 5 gets a 64K floor, and a saved
+Max Tokens that silently capped every budget fix is migrated away. One
+import path serves the generator, the Ideator and MCP injection; beats drag
+out of and between clusters with undo; cluster resize is zoom-correct; the
+proxy runtime transport streams; feeling gates on choices; voice input off
+by default on generated conversations.
+
+**v0.9.96 was the phone release**: in-story
 AI answers in seconds instead of minutes (no more double generation, no
 silent thinking-budget burn, streaming everywhere, a per-turn branching cap,
 and a separate model setting for in-story AI); a blind seven-story bake-off

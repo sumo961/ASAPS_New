@@ -1,5 +1,126 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-09: The review release — generated stories you can trust, fixes you can see (v0.9.97)
+
+### Overview
+
+Twenty-one commits, one theme: what happens to an AI-generated story after
+the model stops talking. Replaying a summer-school Ideator brief (a preschool
+dragon story, five interaction points × four participation levels) on Opus 5
+reproduced the failure class that had killed the July session — both the
+first pass and the "repair" pass hit the 32K output cap mid-JSON, the repair
+regenerated the whole story and dropped its clusters and characters, and the
+validators had been skipping every post-pipeline condition. The response is a
+decision and a mechanism. Decision: automatic AI repair is gone — a step that
+asks the model what the fix is cannot be made trustworthy, only the envelope
+around it can. Mechanism: a *generation review*. The story exactly as the AI
+handed it over is kept with the project; typed findings (missing link
+targets, unreachable beats, counter gates that can never be taken) get
+deterministic fix proposals the author applies one click at a time, each an
+undo step; and for the rest, "Ask AI" sends one problem and the few beats
+involved to the model, checks its answer by code on a simulated copy, and
+shows the exact edits as before → after before anything applies. Around it:
+truncation escalation and a 64K floor for Opus 5, a migration for installs
+whose saved Max Tokens silently capped every budget fix, one story-import
+path for the generator, Ideator and MCP alike, the last cluster follow-ups
+(drag out of / between clusters, ReactFlow resize, all undoable), streaming
+on the proxy transport, feeling gates on choices, and voice input off by
+default on generated conversations.
+
+### Generation review — findings, proposals, and "Ask AI" behind a code envelope
+
+After a generation or an MCP injection the import banner lists what the
+deterministic analysis found and, where the fix is local and unambiguous,
+proposes it: a typo'd link re-pointed at the one clearly closest beat id, a
+counter threshold clamped into the range the counter can actually reach
+(only when something in the story changes it), an unreachable scene linked
+from the beat written just before it when that beat's single exit is free.
+**Apply** is one undoable command per proposal; **Apply N safe fixes** is one
+undo step; **Skip** leaves it; undo reopens it. Findings without a proposal
+carry **Ask AI**: the model gets one finding, the involved beats with their
+current links, a per-type schema excerpt and every beat id — never the whole
+story — and its reply is accepted only if it touches allowed beats, uses
+valid parameter paths, points at beats that exist, and on a simulated copy
+removes the finding without introducing another; otherwise the author reads
+why. Accepted edits apply as one undo step and are recorded in the review
+with their source. The record (`generation/review.json` in folder projects,
+in the IndexedDB project, in zip exports) survives reload: an undismissed
+review re-analyses the story as it stands and shows what is still open. One
+counter-range analysis replaces the two private copies in the validators
+(they skipped flattened conditions and never saw `effects[]`); the link walk
+carries the parameter path of every writable link and reads the pipeline's
+string-alias form of condition exits, which had made every gate's exits
+invisible after normalize. A shared edit planner writes a text beat's link to
+its beat-level connections (not `parameters.connection`, which live beats
+drop) so simulation, preview and apply cannot disagree. Toolbar undo/redo now
+marks the project changed like the keyboard shortcuts always did.
+
+**Files modified:** `packages/builder/src/types/generationReview.ts`, `packages/builder/src/utils/{generationReview,counterRangeAnalysis,beatConnectionModel,storyLinks,aiStoryValidator}.ts`,
+`packages/builder/src/services/{findingFixService,AIValidator,AIService}.ts`, `packages/builder/src/components/ImportIssuesBanner.tsx`,
+`packages/builder/src/commands/BeatCommands.ts` (ApplyFixProposalCommand), `packages/builder/src/components/{UndoRedoToolbar,Header,Inspector}.tsx`,
+`packages/core/src/persistence/DirectoryFormat.ts`, `packages/builder/src/storage/{types.ts,adapters/DirectoryAdapter.ts}`, `packages/builder/src/utils/projectZipManager.ts`,
+`packages/builder/src/App.tsx`, `docs/USER_GUIDE.md` (+ images 70, 71)
+
+### The generation pipeline — no self-repair, budgets that fit, one import path
+
+`generateStory` is one model call plus at most one escalation: a run that
+stops at `max_tokens` retries once at double the budget (bounded by the
+model's 128K ceiling) and the escalated budget carries into later calls.
+Opus 5 and Sonnet 5 think by default, so their "effort unset" budget floor
+is 64K. Validation findings no longer fail a generation or trigger a repair —
+only a result with zero beats throws; everything else rides on the response
+and the banner shows it. A saved Max Tokens below the automatic budget, when
+the settings dialog did not stamp it as deliberate, is dropped once on load
+(and when project-level AI defaults are applied); a typed value is stamped
+from now on. The generator's `connection` on aiConversation beats is routed,
+schema-driven, into `fallbackExitTarget`, and the link walk knows that field
+and every direction's exit target — the "unreachable" beats after every AI
+conversation were this. Both AI import paths (the in-app generator with the
+Ideator, and MCP injection) now run one `applyGeneratedStory`: theme,
+fictional-time HUD, characters, notes, speaker migration, batched load —
+each had been missing from one of the two. Both inject routes forward
+suggested theme, variables and clusters alike.
+
+**Files modified:** `packages/builder/src/services/AIService.ts`, `packages/builder/src/services/providers/ClaudeProvider.ts`,
+`packages/builder/src/utils/{applyGeneratedStory,aiConfigBudget,storyLinks}.ts`, `packages/builder/src/hooks/useAI.ts`,
+`packages/builder/src/components/ai/AIConfigDialog.tsx`, `packages/builder/src/api/server.ts`, `apps/builder-desktop/src/main/api-server.ts`,
+`packages/builder/src/App.tsx`
+
+### Clusters — drag out, drag between, resize, all undoable
+
+Clustered beats are no longer clamped inside their frame: one flow-coordinate
+hit test resolves every drop into move-within, enter-cluster, eject or plain
+move, for graph drags and sidebar drops alike. Drag-in, drag-out,
+drag-between and the ⏏ button are each one undo entry restoring membership
+and position together, and ⏏ lands the beat beside its frame instead of on
+stale coordinates. Cluster resize uses ReactFlow's resize control — correct
+at any zoom, where the hand-rolled handle measured screen pixels — and
+commits one undo entry on mouse-up.
+
+**Files modified:** `packages/builder/src/components/graph/{clusterDrop.ts,GraphEditor.tsx,ClusterContainerNode.tsx,graphBuild.ts}`,
+`packages/builder/src/components/{Canvas,WorkspaceView}.tsx`, `packages/builder/src/commands/BeatCommands.ts` (ReparentBeatCommand), `packages/builder/src/App.tsx`
+
+### Runtime AI, guidance, and defaults
+
+The proxied runtime transport (Preview Window and packaged app against a
+remote gateway) was the last one holding a silent connection open for the
+whole generation; it now streams, and the desktop API server streams content
+deltas with an idle timeout instead of a total one. The Preview Window
+guarantees the AI adapter on the start path. Feeling gates — sentiment
+conditions on choices — are editable in the Show-only-if editor and taught
+on every generation surface, with the mirror tripwire extended to every
+mirrored literal. Voice input on AI conversation beats is off by default:
+the schema and the beat class had defaulted it on, so every generated
+conversation shipped a microphone that could not work without a
+speech-to-text server. The User Guide got a v0.9.96 audit pass with new
+screenshots, the bake-off verdict, and sections for the review banner.
+
+**Files modified:** `packages/core/src/ai/runtimeAdapter.ts`, `apps/builder-desktop/src/main/api-server.ts`, `packages/builder/src/pages/PreviewWindow.tsx`,
+`packages/builder/src/editors/ChoiceConditionsEditor.tsx`, `packages/builder/src/utils/conditionSummary.ts`, `packages/core/src/prompts/affectPrompt.ts`, `mcp-server-desktop/src/index.ts`,
+`packages/builder/src/services/prompts/{storyGenerationEnhanced,dialogGeneration}.ts`, `packages/core/src/beats/AIConversationBeat.ts`, `beat-definitions/core-beats.json`, `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-09-07: The phone release — AI that answers, stories that fit, HUDs that fold (v0.9.96)
 
 ### Overview
