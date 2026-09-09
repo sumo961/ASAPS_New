@@ -4047,10 +4047,14 @@ export const Inspector: React.FC<InspectorProps> = ({
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                      {/* Multi-line: generated stories put a paragraph of scene
+                          text here, which a one-line field made uneditable. */}
                       <TextFieldWithVariables
                         value={localBeat.parameters?.question || (beat.type === 'multiChoice' ? 'What do you say?' : 'Where do you want to go?')}
                         onChange={(val) => handleParameterChange('question', val)}
                         availableVariables={availableVariables}
+                        multiline
+                        rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>
@@ -4614,6 +4618,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                         value={localBeat.parameters?.question || 'What do you want to pick up?'}
                         onChange={(val) => handleParameterChange('question', val)}
                         availableVariables={availableVariables}
+                        multiline
+                        rows={3}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>

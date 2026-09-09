@@ -941,6 +941,7 @@
         "question": {
           "type": "string",
           "required": true,
+          "ui": {"control": "textarea", "rows": 3},
           "default": "What do you say?",
           "description": "Prompt text shown above the choice buttons. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
@@ -1079,6 +1080,7 @@
         "question": {
           "type": "string",
           "required": true,
+          "ui": {"control": "textarea", "rows": 3},
           "default": "Where do you want to go?",
           "description": "Question prompt"
         },
@@ -1205,6 +1207,7 @@
         "question": {
           "type": "string",
           "required": true,
+          "ui": {"control": "textarea", "rows": 3},
           "default": "What do you want to interact with?",
           "description": "Interaction prompt"
         },
@@ -5381,7 +5384,7 @@
         "openingLine": {
           "type": "string",
           "required": false,
-          "description": "NPC's opening line (if empty, AI generates one)",
+          "description": "NPC's opening line (if empty, AI generates one) If this beat is the interactor's first meeting with the NPC, introduce them HERE (name, what they are, one vivid detail) — scenario and npcPersonality are never shown to the interactor.",
           "ui": {
             "control": "textarea",
             "rows": 2,
@@ -5814,6 +5817,9 @@
       "multipleConnections": "Beats with connectionType='multiple' must embed targets in choices/props",
       "conditionalConnections": "Beats with connectionType='conditional' must have trueConnection",
       "noOrphans": "All beats except endScreen should have at least one outgoing connection"
+    },
+    "variants": {
+      "standAlone": "When a conditionBeat/router selects ONE of several versions of the same story moment (participation level, difficulty, language, mood, study condition), the interactor sees exactly one — every version must introduce the characters, place and goal itself, at the same quality; never rely on another version having run first. aiConversation: put the introduction in openingLine (scenario/npcPersonality are invisible to the interactor)."
     }
   },
   "exportFormat": {

@@ -797,7 +797,7 @@ Fictional time condition example (CORRECT format):
     - action: What happens (steer the conversation, exit to a beat, set a variable, or combinations)
     - npcExitMessage: Optional prompt for farewell when exiting via this direction
   - fallbackExitTarget: Beat to go to when maxTurns reached
-  - openingLine: Fixed opening NPC line (if empty, AI generates one)
+  - openingLine: Fixed opening NPC line (if empty, AI generates one). If this is the interactor's first meeting with the NPC, introduce them here — scenario and npcPersonality are invisible to the interactor
   - Do NOT set enableVoiceInput (leave it out — voice input stays off; it only works once the author has configured a speech-to-text server)
   - systemInstructions: Additional instructions for the AI
 - Connections: Multiple → one per exit direction + fallback
@@ -1294,6 +1294,12 @@ Hub beats (reachable from multiple paths) should NOT have text that assumes play
 ✓ CORRECT: Use generic text at hub beats: "What would you like to do next?"
 ✓ CORRECT: Add conditionBeat BEFORE the hub to show different text based on state
 ✓ CORRECT: If text must reference state, gate it with a conditionBeat first
+
+❌ **Variants of ONE moment that lean on each other (they are ALTERNATIVES, not a sequence)**
+When a conditionBeat / router picks ONE of several versions of the same story moment — participation level (passive / active / constructive / interactive), difficulty, language, mood, study condition — the interactor sees exactly one of them. Every version must therefore stand alone: introduce the character (name, what they are, one vivid detail), the place and the goal INSIDE each version, at the same quality. The introduction must not live only in the first or simplest variant while the others open mid-conversation.
+✗ WRONG: passive variant: "The little light is **Lumi**, a lantern sprite no bigger than a teacup…" — interactive variant: the sprite is already talking and nobody says who she is
+✓ CORRECT: each variant carries its own introduction — in a multiChoice / movementChoice in the "question" text before the prompt; in a dialogTree in the first node's text; in an aiConversation in "openingLine" (scenario and npcPersonality are NEVER shown to the interactor, so an introduction there is invisible)
+✓ CORRECT: a shared infoText BEFORE the router that introduces the character once, then the variants pick up from there
 
 ### Pattern: State-Aware Hub Beats
 \`\`\`

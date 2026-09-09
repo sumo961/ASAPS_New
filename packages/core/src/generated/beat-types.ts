@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-09-09T02:34:38.666Z
+ * Generated: 2026-09-09T11:42:17.252Z
  */
 
 // ============================================
@@ -1198,7 +1198,7 @@ export interface AiConversationParameters {
   npcName: string;
   /** NPC personality traits and behavior guidelines */
   npcPersonality?: string | undefined;
-  /** NPC's opening line (if empty, AI generates one) */
+  /** NPC's opening line (if empty, AI generates one) If this beat is the interactor's first meeting with the NPC, introduce them HERE (name, what they are, one vivid detail) — scenario and npcPersonality are never shown to the interactor. */
   openingLine?: string | undefined;
   /** Conversation directions: trigger + action pairs that steer the conversation dynamically */
   directions?: Object[] | undefined;
