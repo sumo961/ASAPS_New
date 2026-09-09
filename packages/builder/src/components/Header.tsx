@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus } from 'lucide-react';
+import { Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
+import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
+import type { AIEditLedger } from '../types/aiEdits';
 import { ProjectSelector } from './ProjectSelector';
 import { NewProjectDialog } from './NewProjectDialog';
 import { NewProjectPicker } from './NewProjectPicker';
@@ -58,6 +60,10 @@ interface HeaderProps {
   onBeatCreated?: (beat: any) => void;
   onIdeator?: () => void;
   onCoDesigner?: () => void;
+  /** The project's AI edits ledger (proposals + decisions) for the "AI changes" log. */
+  aiEdits?: AIEditLedger | null;
+  /** Focus a beat by id (from the AI changes log). */
+  onSelectBeatById?: (beatId: string) => void;
   onSaveProject?: () => void;
   onRenameProject?: (projectId: string, newName: string) => Promise<void>;
   isUntitledProject?: boolean;
@@ -120,6 +126,8 @@ export const Header: React.FC<HeaderProps> = ({
   onBeatCreated,
   onIdeator,
   onCoDesigner,
+  aiEdits,
+  onSelectBeatById,
   onSaveProject,
   onRenameProject,
   isUntitledProject,
@@ -153,6 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [showAIConfig, setShowAIConfig] = useState(false);
   const [showStoryGenerator, setShowStoryGenerator] = useState(false);
+  const [showAIEditsLog, setShowAIEditsLog] = useState(false);
   const [showBeatCreator, setShowBeatCreator] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
   const [showImportMenu, setShowImportMenu] = useState(false);
@@ -801,6 +810,17 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                   <button
                     onClick={() => {
+                      setShowAIEditsLog(true);
+                      setShowAIMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3"
+                    title="Every edit an AI proposed for this project and what you decided — kept with the project"
+                  >
+                    <History className="w-4 h-4" />
+                    AI changes{aiEdits?.entries?.length ? ` (${aiEdits.entries.length})` : ''}
+                  </button>
+                  <button
+                    onClick={() => {
                       setShowBeatCreator(true);
                       setShowAIMenu(false);
                     }}
@@ -1236,6 +1256,11 @@ export const Header: React.FC<HeaderProps> = ({
           localStorage.setItem('asaps_stt_enabled', String(enabled));
         }}
       />
+
+      {/* AI changes — the project's AI edits ledger */}
+      {showAIEditsLog && (
+        <AIEditsLogDialog ledger={aiEdits ?? null} onClose={() => setShowAIEditsLog(false)} onSelectBeat={onSelectBeatById} />
+      )}
 
       {/* Story Generator Dialog */}
       {onStoryGenerated && (

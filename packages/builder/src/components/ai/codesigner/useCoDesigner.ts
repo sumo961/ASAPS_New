@@ -352,12 +352,14 @@ export function useCoDesigner() {
       `[CoDesigner] Applying ${selected.length} of ${offered} proposal(s) — "${storeState.pendingProposals?.title ?? ''}"\n` +
         selected.map((p, i) => `  ${i + 1}. ${describeProposal(p)}`).join('\n'),
     );
+    const declined = (storeState.pendingProposals?.proposals ?? []).filter(p => !selected.includes(p));
     const message: CoDesignerWireMessage = {
       type: 'APPLY_PROPOSALS',
       payload: {
         proposals: selected,
         title: storeState.pendingProposals?.title,
         projectId: storeState.context?.projectId,
+        ...(declined.length ? { declined } : {}),
       },
     };
 
@@ -369,9 +371,12 @@ export function useCoDesigner() {
   }, [setApplying, setError]);
 
   const dismissProposals = useCallback(() => {
-    const set_ = useCoDesignerStore.getState().pendingProposals;
+    const store = useCoDesignerStore.getState();
+    const set_ = store.pendingProposals;
     setPendingProposals(null);
     if (set_) {
+      // The ledger records what was declined, not only what was applied.
+      postToMain({ type: 'DISMISS_PROPOSALS', payload: { proposals: set_.proposals, title: set_.title, projectId: store.context?.projectId } });
       addMessage({
         role: 'assistant',
         content: `(Proposal batch "${set_.title}" dismissed — nothing was changed: ${set_.proposals.map(describeProposal).join('; ')}.)`,

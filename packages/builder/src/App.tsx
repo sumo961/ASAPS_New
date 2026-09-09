@@ -81,6 +81,8 @@ import { analyzeStoryFindings, proposeFixes, planBeatEdit, createGenerationRevie
 import type { GenerationFinding, FixProposal, GenerationReview } from './types/generationReview';
 import { requestAIFix } from './services/findingFixService';
 import type { AIFixState } from './components/ImportIssuesBanner';
+import { appendAIEdits, coDesignerAppliedEntries, coDesignerDeclinedEntries, reviewProposalEntry, aiFixRejectedEntries, type NewAIEditEntry } from './utils/aiEditsLedger';
+import type { AIEditLedger } from './types/aiEdits';
 import { ApplyFixProposalCommand } from './commands/BeatCommands';
 import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
@@ -376,6 +378,9 @@ function App() {
    */
   const generationReviewRef = useRef<GenerationReview | null>(null);
   const [, setGenerationReviewTick] = useState(0);
+  /** AI edits ledger (see types/aiEdits.ts): ref persists, tick re-renders the header count. */
+  const aiEditsRef = useRef<AIEditLedger | null>(null);
+  const [, setAiEditsTick] = useState(0);
   const setGenerationReview = useCallback((review: GenerationReview | null) => {
     generationReviewRef.current = review;
     setGenerationReviewTick(t => t + 1);
@@ -437,6 +442,8 @@ function App() {
     const review: GenerationReview | null = project?.generationReview ?? null;
     generationReviewRef.current = review;
     setGenerationReviewTick(t => t + 1);
+    aiEditsRef.current = project?.aiEdits ?? null;
+    setAiEditsTick(t => t + 1);
     console.log('[App] Generation review on load:', review ? `${openFindings(review).length} open finding(s), dismissed=${!!review.dismissedAt}` : 'none');
     // Re-analyse whenever the author has not dismissed the review: status is
     // bookkeeping, the story as it stands is the truth (an 'applied' fix that
@@ -1422,6 +1429,8 @@ function App() {
       // Generation review rides with the project (generation/review.json).
       if (generationReviewRef.current) projForTranslations.generationReview = generationReviewRef.current;
       else delete projForTranslations.generationReview;
+      if (aiEditsRef.current) projForTranslations.aiEdits = aiEditsRef.current;
+      else delete projForTranslations.aiEdits;
     }
 
     updateStory(storyData);
@@ -3004,6 +3013,14 @@ function App() {
 
   // ---- Generation review: apply / skip / apply-all-safe / dismiss ----------
 
+  /** Append to the project's AI edits ledger (persisted with the project). */
+  const recordAIEdits = useCallback((entries: NewAIEditEntry[]) => {
+    if (entries.length === 0) return;
+    aiEditsRef.current = appendAIEdits(aiEditsRef.current, entries);
+    setAiEditsTick(t => t + 1);
+    markChanged();
+  }, [markChanged]);
+
   /** An undone proposal comes back: status open again, row and proposal restored. */
   const reopenProposal = useCallback((proposal: FixProposal) => {
     const review = generationReviewRef.current;
@@ -3080,14 +3097,16 @@ function App() {
     if (!cmd) { settleProposal(proposal, 'skipped'); return; }
     await getCommandManager().execute(cmd);
     settleProposal(proposal, 'applied');
+    recordAIEdits([reviewProposalEntry(proposal, 'accepted')]);
     pruneResolvedFindings();
     markChanged();
-  }, [proposalCommand, settleProposal, markChanged, pruneResolvedFindings]);
+  }, [proposalCommand, settleProposal, markChanged, pruneResolvedFindings, recordAIEdits]);
 
   const handleSkipProposal = useCallback((proposal: FixProposal) => {
     settleProposal(proposal, 'skipped');
+    recordAIEdits([reviewProposalEntry(proposal, 'skipped')]);
     markChanged();
-  }, [settleProposal, markChanged]);
+  }, [settleProposal, markChanged, recordAIEdits]);
 
   /** Every 'safe' proposal as ONE undo entry. */
   const handleApplyAllSafe = useCallback(async () => {
@@ -3098,9 +3117,10 @@ function App() {
       await getCommandManager().execute(new BatchCommand(cmds, `Apply ${cmds.length} safe fix${cmds.length === 1 ? '' : 'es'}`));
     }
     for (const { p, cmd } of pairs) settleProposal(p, cmd ? 'applied' : 'skipped');
+    recordAIEdits(pairs.map(({ p, cmd }) => reviewProposalEntry(p, cmd ? 'accepted' : 'skipped')));
     pruneResolvedFindings();
     markChanged();
-  }, [importIssues, proposalCommand, settleProposal, markChanged, pruneResolvedFindings]);
+  }, [importIssues, proposalCommand, settleProposal, markChanged, pruneResolvedFindings, recordAIEdits]);
 
   // ---- "Ask AI for a fix": one finding → small model call → checked by code → diff → accept ----
 
@@ -3136,7 +3156,10 @@ function App() {
     }
   }, [state.beats, globalSettings]);
 
-  const handleRejectAIFix = useCallback(() => setAiFix(null), []);
+  const handleRejectAIFix = useCallback(() => {
+    if (aiFix?.status === 'ready' && aiFix.suggestion) recordAIEdits(aiFixRejectedEntries(aiFix.suggestion));
+    setAiFix(null);
+  }, [aiFix, recordAIEdits]);
 
   /** Accept: every AI edit as ONE undo entry; the finding is settled and the edits recorded in the review. */
   const handleAcceptAIFix = useCallback(async () => {
@@ -3163,10 +3186,11 @@ function App() {
       const remaining = brokenTargets.length + prev.otherErrors.length + (prev.proposals?.length ?? 0) + findings.length;
       return remaining ? { ...prev, findings, brokenTargets } : null;
     });
+    recordAIEdits(suggestion.edits.map(e => reviewProposalEntry(e, 'accepted')));
     setAiFix(null);
     pruneResolvedFindings();
     markChanged();
-  }, [aiFix, proposalCommand, setGenerationReview, markChanged, pruneResolvedFindings]);
+  }, [aiFix, proposalCommand, setGenerationReview, markChanged, pruneResolvedFindings, recordAIEdits]);
 
   const handleDismissImportIssues = useCallback(() => {
     setAiFix(null);
@@ -5867,7 +5891,8 @@ function App() {
   const handleCoDesignerApply = useCallback(async (
     proposals: import('./components/ai/codesigner/types').ChangeProposal[],
     _title?: string,
-    snapshotProjectId?: string
+    snapshotProjectId?: string,
+    declined?: import('./components/ai/codesigner/types').ChangeProposal[],
   ) => {
     // Stale-snapshot guard: the conversation may be grounded in a DIFFERENT
     // project than the one now open (beat ids collide across projects, so
@@ -5926,10 +5951,19 @@ function App() {
           applied.map(r => `  ${r.ok ? '✓' : '✗'} #${r.index + 1} ${r.detail}`).join('\n'),
       );
     }
+    recordAIEdits([
+      ...coDesignerAppliedEntries(proposals, results.filter(r => r.index >= 0), _title),
+      ...coDesignerDeclinedEntries(declined ?? [], _title),
+    ]);
     coDesignerWindowManager.notifyApplyResult(results);
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
-  }, [state.beats, characters, actions, handleBeatUpdate, handleCharactersChange, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply]);
+  }, [state.beats, characters, actions, handleBeatUpdate, handleCharactersChange, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply, recordAIEdits]);
+
+  // A batch dismissed in the pop-out is a decision too — it goes in the ledger.
+  useEffect(() => coDesignerWindowManager.onDismiss(
+    (proposals, title) => recordAIEdits(coDesignerDeclinedEntries(proposals, title, 'Batch dismissed by the author')),
+  ), [recordAIEdits]);
 
   useEffect(() => {
     const unsubscribe = coDesignerWindowManager.onApply(handleCoDesignerApply);
@@ -6272,6 +6306,8 @@ function App() {
         onBeatCreated={handleBeatCreated}
         onIdeator={handleOpenIdeator}
         onCoDesigner={handleOpenCoDesigner}
+        aiEdits={aiEditsRef.current}
+        onSelectBeatById={(beatId) => { const b = state.beats.find(x => x.id === beatId); if (b) handleBeatSelect(b); }}
         onSaveProject={handleSaveProject}
         onRenameProject={handleRenameProject}
         isUntitledProject={isUntitledProject}

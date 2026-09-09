@@ -106,8 +106,13 @@ export type CoDesignerWireMessage =
          *  REFUSES the batch when this doesn't match the open project
          *  (stale-snapshot safety guard). */
         projectId?: string;
+        /** The rest of the batch the author left unticked — recorded as
+         *  declined in the project's AI edits ledger. */
+        declined?: ChangeProposal[];
       };
     }
+  /** Pop-out → main: the author dismissed a whole batch without applying (ledger: rejected). */
+  | { type: 'DISMISS_PROPOSALS'; payload: { proposals: ChangeProposal[]; title?: string; projectId?: string } }
   | { type: 'APPLY_RESULT'; payload: { results: ProposalApplyResult[] } }
   /** Pop-out → main: rebuild the digest and rewrite the localStorage snapshot. */
   | { type: 'REQUEST_CONTEXT' }

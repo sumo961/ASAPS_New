@@ -374,6 +374,13 @@ describe('generation review record (2026-09-08)', () => {
     const result = await deserializeFromDirectory('/root', reader);
     expect(result.generationReview?.title).toBe('Ember');
   });
+  it('round-trips generation/ai-edits.json the same way', async () => {
+    const aiEdits = { version: 1, entries: [{ id: 'e1', at: 'now', source: 'co-designer', decision: 'accepted', summary: 's', beatIds: ['b'] }] };
+    const { files } = serializeToDirectory({ ...createMinimalInput(), aiEdits } as any);
+    const file = files.find(f => f.path === 'generation/ai-edits.json');
+    expect(JSON.parse(file!.content).entries).toHaveLength(1);
+    expect(serializeToDirectory(createMinimalInput()).files.some(f => f.path === 'generation/ai-edits.json')).toBe(false);
+  });
   it('omits the file when there is no review', () => {
     const { files } = serializeToDirectory(createMinimalInput());
     expect(files.some(f => f.path === 'generation/review.json')).toBe(false);

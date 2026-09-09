@@ -21,7 +21,8 @@ export interface CoDesignerWindowState {
 }
 
 type StateChangeCallback = (state: CoDesignerWindowState) => void;
-type ApplyCallback = (proposals: ChangeProposal[], title?: string, projectId?: string) => void;
+type ApplyCallback = (proposals: ChangeProposal[], title?: string, projectId?: string, declined?: ChangeProposal[]) => void;
+type DismissCallback = (proposals: ChangeProposal[], title?: string, projectId?: string) => void;
 type ContextRequestCallback = () => void;
 type BeatContentRequestCallback = (requestId: string, beatId: string) => void;
 type PreviewRequestCallback = (requestId: string, proposals: ChangeProposal[], projectId?: string) => void;
@@ -71,6 +72,13 @@ class CoDesignerWindowManager {
   onApply(callback: ApplyCallback): () => void {
     this.applyListeners.add(callback);
     return () => this.applyListeners.delete(callback);
+  }
+
+  private dismissListeners = new Set<DismissCallback>();
+  /** App subscribes: a batch the author dismissed without applying (for the AI edits ledger). */
+  onDismiss(callback: DismissCallback): () => void {
+    this.dismissListeners.add(callback);
+    return () => this.dismissListeners.delete(callback);
   }
 
   /** Report per-proposal outcomes back to the pop-out's chat log. */
@@ -138,7 +146,7 @@ class CoDesignerWindowManager {
     // Other pop-outs (Preview, Ideator) post to the same main window;
     // capturing on any message poisoned this ref with foreign windows.
     if (
-      (message.type === 'APPLY_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT' || message.type === 'PREVIEW_PROPOSALS') &&
+      (message.type === 'APPLY_PROPOSALS' || message.type === 'DISMISS_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT' || message.type === 'PREVIEW_PROPOSALS') &&
       event.source &&
       event.source !== window &&
       this.popoutWindow !== event.source
@@ -150,8 +158,13 @@ class CoDesignerWindowManager {
       const proposals = message.payload?.proposals;
       if (Array.isArray(proposals) && proposals.length > 0) {
         this.applyListeners.forEach(cb =>
-          cb(proposals, message.payload?.title, message.payload?.projectId)
+          cb(proposals, message.payload?.title, message.payload?.projectId, message.payload?.declined)
         );
+      }
+    } else if (message.type === 'DISMISS_PROPOSALS') {
+      const proposals = message.payload?.proposals;
+      if (Array.isArray(proposals) && proposals.length > 0) {
+        this.dismissListeners.forEach(cb => cb(proposals, message.payload?.title, message.payload?.projectId));
       }
     } else if (message.type === 'REQUEST_CONTEXT') {
       this.contextRequestListeners.forEach(cb => cb());

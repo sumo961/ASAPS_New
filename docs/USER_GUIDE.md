@@ -2275,6 +2275,7 @@ A few things worth knowing:
 - **Ask AI** appears next to any finding ASAPS could not fix deterministically. It sends *only that problem and the handful of beats involved* to your configured model and asks for the smallest edit. Whatever comes back is checked by code before you see it — edits may only touch the beats the AI was shown, links must point at beats that exist, and on a simulated copy of the story the problem has to disappear without a new one appearing. If the answer fails any of that, you see why instead of a fix. What passes is shown as a before → after card; **Accept** applies it as one undo step, **Reject** discards it. The AI never edits the story on its own.
 
   ![An AI fix card: the model's reasoning, the exact edit as before → after, Accept and Reject](images/71-ask-ai-fix.png)
+- **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source, your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
 - The same banner appears for stories injected from Claude Desktop via MCP.
 
 ## AI Beat Suggestions

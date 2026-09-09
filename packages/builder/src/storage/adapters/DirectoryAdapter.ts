@@ -133,6 +133,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       translations: result.translations.length > 0 ? result.translations : undefined,
       translationManifest: result.translationManifest,
       ...(result.generationReview ? { generationReview: result.generationReview } : {}),
+      ...(result.aiEdits ? { aiEdits: result.aiEdits } : {}),
     };
 
     return project;
@@ -636,6 +637,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       ...(project.translations && project.translations.length > 0 ? { translations: project.translations } : {}),
       ...(project.translationManifest ? { translationManifest: project.translationManifest } : {}),
       ...(project.generationReview ? { generationReview: project.generationReview } : {}),
+      ...(project.aiEdits ? { aiEdits: project.aiEdits } : {}),
     };
   }
 

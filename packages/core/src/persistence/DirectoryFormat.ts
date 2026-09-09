@@ -122,6 +122,8 @@ export interface SerializeInput {
    * the shape. Written to generation/review.json.
    */
   generationReview?: any;
+  /** AI edits ledger (proposals + decisions across AI surfaces). Opaque to core. Written to generation/ai-edits.json. */
+  aiEdits?: any;
 }
 
 /** Serialized story data (when story is already a plain object) */
@@ -155,6 +157,8 @@ export interface DeserializeResult {
   translationManifest?: TranslationManifest;
   /** Generation review record from generation/review.json (if present) */
   generationReview?: any;
+  /** AI edits ledger from generation/ai-edits.json (if present) */
+  aiEdits?: any;
 }
 
 // ============================================================================
@@ -389,6 +393,13 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
     files.push({
       path: 'generation/review.json',
       content: deterministicStringify(input.generationReview),
+    });
+  }
+
+  if (input.aiEdits) {
+    files.push({
+      path: 'generation/ai-edits.json',
+      content: deterministicStringify(input.aiEdits),
     });
   }
 
@@ -660,6 +671,16 @@ export async function deserializeFromDirectory(
     }
   }
 
+  let aiEdits: any = undefined;
+  const aiEditsPath = join(rootPath, 'generation', 'ai-edits.json');
+  if (await reader.exists(aiEditsPath)) {
+    try {
+      aiEdits = JSON.parse(await reader.readText(aiEditsPath));
+    } catch (err) {
+      console.warn('[DirectoryFormat] generation/ai-edits.json unreadable; ignoring:', err);
+    }
+  }
+
   const storyMetadata: any = {
     firstBeatId: project.firstBeatId,
     title: project.name,
@@ -683,6 +704,7 @@ export async function deserializeFromDirectory(
     translations,
     translationManifest,
     generationReview,
+    aiEdits,
   };
 }
 

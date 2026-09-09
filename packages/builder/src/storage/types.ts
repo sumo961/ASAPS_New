@@ -363,6 +363,8 @@ export interface Project {
   /** Generation review: the story as the AI handed it over + typed findings
    *  + fix proposals + their status. See types/generationReview.ts. */
   generationReview?: import('../types/generationReview').GenerationReview;
+  /** AI edits ledger — every AI proposal and the author's decision. See types/aiEdits.ts. */
+  aiEdits?: import('../types/aiEdits').AIEditLedger;
 
   /** Metadata */
   createdAt: Date;

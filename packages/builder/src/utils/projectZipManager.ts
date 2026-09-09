@@ -169,6 +169,9 @@ export async function exportProjectAsZip(
   if (project.generationReview) {
     zip.file('generation/review.json', JSON.stringify(project.generationReview, null, 2));
   }
+  if (project.aiEdits) {
+    zip.file('generation/ai-edits.json', JSON.stringify(project.aiEdits, null, 2));
+  }
 
   // Add translation files if present
   if (project.translations && Array.isArray(project.translations)) {
@@ -561,6 +564,11 @@ export async function importProjectFromZip(
     });
 
     // Import translation files if present
+    let aiEdits: any = undefined;
+    const aiEditsFile = zip.file('generation/ai-edits.json');
+    if (aiEditsFile) {
+      try { aiEdits = JSON.parse(await aiEditsFile.async('string')); } catch { /* unreadable ledger: ignore */ }
+    }
     let generationReview: any = undefined;
     const reviewFile = zip.file('generation/review.json');
     if (reviewFile) {
@@ -608,6 +616,7 @@ export async function importProjectFromZip(
       ...(translations ? { translations } : {}),
       ...(translationManifest ? { translationManifest } : {}),
       ...(generationReview ? { generationReview } : {}),
+      ...(aiEdits ? { aiEdits } : {}),
     } as any;
 
     // Save or update project
