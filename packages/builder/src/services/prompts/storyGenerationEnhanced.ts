@@ -798,6 +798,7 @@ Fictional time condition example (CORRECT format):
     - npcExitMessage: Optional prompt for farewell when exiting via this direction
   - fallbackExitTarget: Beat to go to when maxTurns reached
   - openingLine: Fixed opening NPC line (if empty, AI generates one)
+  - Do NOT set enableVoiceInput (leave it out — voice input stays off; it only works once the author has configured a speech-to-text server)
   - systemInstructions: Additional instructions for the AI
 - Connections: Multiple → one per exit direction + fallback
 - Requires text input from the player (free-form typing, not pre-authored choices)

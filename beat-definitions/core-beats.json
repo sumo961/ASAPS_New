@@ -5708,8 +5708,8 @@
         "enableVoiceInput": {
           "type": "boolean",
           "required": false,
-          "default": true,
-          "description": "Show microphone button for voice input"
+          "default": false,
+          "description": "Show a microphone button for voice input. OFF by default and NOT something to turn on when generating a story: it only works after the author has set up a speech-to-text server (header STT menu). Leave it unset."
         },
         "language": {
           "type": "string",

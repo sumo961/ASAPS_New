@@ -1121,7 +1121,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
 - **Fallback Exit Target** - Where to go when max turns are reached
-- **Enable Voice Input** - Show a microphone button for speech-to-text input
+- **Enable Voice Input** - Show a microphone button for speech-to-text input. Off by default — switch it on only after you have configured STT (header **STT** menu); AI-generated stories leave it off
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
 - **System Instructions** - Additional rules for the AI
 

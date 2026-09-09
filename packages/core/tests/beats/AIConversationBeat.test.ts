@@ -95,7 +95,7 @@ describe('AIConversationBeat', () => {
       expect(params.includeInventory).toBe(true);
       expect(params.includeVisitedBeats).toBe(true);
       expect(params.includeChoiceHistory).toBe(true);
-      expect(params.enableVoiceInput).toBe(true);
+      expect(params.enableVoiceInput).toBe(false); // off unless the author enables it (needs an STT server)
       expect(params.directions).toEqual([]);
     });
 

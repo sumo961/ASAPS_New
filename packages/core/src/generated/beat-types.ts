@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-09-07T16:01:19.965Z
+ * Generated: 2026-09-09T02:34:38.666Z
  */
 
 // ============================================
@@ -1214,7 +1214,7 @@ export interface AiConversationParameters {
   includeVisitedBeats?: boolean | undefined;
   /** Include rich choice history in AI context */
   includeChoiceHistory?: boolean | undefined;
-  /** Show microphone button for voice input */
+  /** Show a microphone button for voice input. OFF by default and NOT something to turn on when generating a story: it only works after the author has set up a speech-to-text server (header STT menu). Leave it unset. */
   enableVoiceInput?: boolean | undefined;
   /** Language for speech recognition (BCP 47, e.g., 'en-US') */
   language?: string | undefined;

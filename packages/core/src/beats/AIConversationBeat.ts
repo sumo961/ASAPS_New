@@ -123,7 +123,10 @@ export class AIConversationBeat extends Beat {
     this.fallbackExitTarget = params.fallbackExitTarget || config.fallbackExitTarget;
     this.systemInstructions = params.systemInstructions || config.systemInstructions;
     this.openingLine = params.openingLine || config.openingLine;
-    this.enableVoiceInput = params.enableVoiceInput ?? config.enableVoiceInput ?? true;
+    // Off unless the author switched it on: the mic only works with a
+    // speech-to-text server configured, and generated stories should never
+    // ship one they cannot use (Pip Walks to the Party, 2026-09-09).
+    this.enableVoiceInput = params.enableVoiceInput ?? config.enableVoiceInput ?? false;
     this.language = params.language || config.language;
     this.presentation = params.presentation ?? config.presentation ?? 'chat';
   }
