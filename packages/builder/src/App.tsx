@@ -5917,6 +5917,15 @@ function App() {
       // displayed, so -1 renders as an ordinary line).
       results.unshift({ index: -1, ok: true, detail: `Backup copy saved to your library: "${backupName}"` });
     }
+    {
+      const applied = results.filter(r => r.index >= 0);
+      const failed = applied.filter(r => !r.ok);
+      console.log(
+        `[App] Co-Designer applied: ${applied.length - failed.length} ok, ${failed.length} failed` +
+          `${backupName ? ` — backup "${backupName}"` : ''}\n` +
+          applied.map(r => `  ${r.ok ? '✓' : '✗'} #${r.index + 1} ${r.detail}`).join('\n'),
+      );
+    }
     coDesignerWindowManager.notifyApplyResult(results);
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();

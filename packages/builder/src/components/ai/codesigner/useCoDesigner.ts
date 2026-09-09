@@ -301,6 +301,14 @@ export function useCoDesigner() {
       const { cleanText, proposalSet, droppedCount } = extractProposalsFromReply(result.text);
       addMessage({ role: 'assistant', content: cleanText || '(proposed changes below)' });
       if (proposalSet) {
+        // One line per turn for anyone watching the console: what the model
+        // proposed, before the author touches it (the apply is logged in the
+        // main window as "[App] Co-Designer applied").
+        console.log(
+          `[CoDesigner] Proposals extracted: ${proposalSet.proposals.length}` +
+            `${droppedCount > 0 ? ` (${droppedCount} malformed dropped)` : ''} — "${proposalSet.title}"\n` +
+            proposalSet.proposals.map((p, i) => `  ${i + 1}. ${describeProposal(p)}`).join('\n'),
+        );
         setPendingProposals(proposalSet);
         setLastApplyResults(null);
         // Dry-run round-trip: ask the main window for the CURRENT values of
@@ -339,6 +347,11 @@ export function useCoDesigner() {
   const applyProposals = useCallback((selected: ChangeProposal[]) => {
     if (selected.length === 0) return;
     const storeState = useCoDesignerStore.getState();
+    const offered = storeState.pendingProposals?.proposals.length ?? selected.length;
+    console.log(
+      `[CoDesigner] Applying ${selected.length} of ${offered} proposal(s) — "${storeState.pendingProposals?.title ?? ''}"\n` +
+        selected.map((p, i) => `  ${i + 1}. ${describeProposal(p)}`).join('\n'),
+    );
     const message: CoDesignerWireMessage = {
       type: 'APPLY_PROPOSALS',
       payload: {
