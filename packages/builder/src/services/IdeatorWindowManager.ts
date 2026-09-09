@@ -7,9 +7,7 @@
  * for the handoff event.
  */
 
-import type {
-  IdeatorWireMessage,
-} from '../components/ai/ideator/types';
+import type { IdeatorWireMessage, IdeatorSessionRecord } from '../components/ai/ideator/types';
 import type { StoryGenerationRequest } from '../types/ai';
 
 export interface IdeatorWindowState {
@@ -17,13 +15,14 @@ export interface IdeatorWindowState {
 }
 
 type StateChangeCallback = (state: IdeatorWindowState) => void;
-type SubmitCallback = (request: StoryGenerationRequest) => void;
+type SubmitCallback = (request: StoryGenerationRequest, session?: IdeatorSessionRecord) => void;
 
 class IdeatorWindowManager {
   private ideatorWindow: Window | null = null;
   private checkInterval: ReturnType<typeof setInterval> | null = null;
   private listeners = new Set<StateChangeCallback>();
   private submitListeners = new Set<SubmitCallback>();
+  private sessionListeners = new Set<(session: IdeatorSessionRecord) => void>();
   /** Electron build flag: detected once at construction. When true, the
    *  manager routes open / close / sendMessage / etc. through the
    *  electronAPI.ideator IPC bridge instead of window.open + postMessage,
@@ -75,6 +74,12 @@ class IdeatorWindowManager {
   onSubmit(callback: SubmitCallback): () => void {
     this.submitListeners.add(callback);
     return () => this.submitListeners.delete(callback);
+  }
+
+  /** The pop-out persisted its conversation; App mirrors it onto the project it produced. */
+  onSessionSaved(callback: (session: IdeatorSessionRecord) => void): () => void {
+    this.sessionListeners.add(callback);
+    return () => this.sessionListeners.delete(callback);
   }
 
   getState(): IdeatorWindowState {
@@ -219,8 +224,15 @@ class IdeatorWindowManager {
       case 'SUBMIT_REQUEST': {
         const req = message.payload?.request;
         if (req && typeof req.prompt === 'string') {
-          this.submitListeners.forEach(cb => cb(req));
+          const session = message.payload?.session;
+          // Arity stays as it was for callers that never asked for the session.
+          this.submitListeners.forEach(cb => (session ? cb(req, session) : cb(req)));
         }
+        break;
+      }
+      case 'SESSION_SAVED': {
+        const session = message.payload?.session;
+        if (session && typeof session.id === 'string') this.sessionListeners.forEach(cb => cb(session));
         break;
       }
       case 'PING':

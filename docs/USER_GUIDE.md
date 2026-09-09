@@ -2239,7 +2239,7 @@ Every conversation you have with Ideator is **auto-saved to this machine** as yo
 - **New** — saves the current conversation in the session list and starts a fresh one with the opening question.
 - **Reset** — discards the current transcript and starts over. The previous conversation **stays in Sessions** until you delete it from there.
 
-Sessions live in your browser's IndexedDB for the app's origin — they are **not synced** across machines, and they are not bound to any project (Ideator's output creates a new project on handoff, so per-project scoping wouldn't match how the feature is used). If you want a conversation accessible elsewhere, export it as Markdown.
+Sessions live in your browser's IndexedDB for the app's origin, so the list itself is per machine. **The conversation that produced a project travels with that project**: on handoff, the session is saved into the new project (`generation/ideator-sessions.json` in a folder project, also inside zip exports), later turns in the same conversation keep it current, and opening the project on another machine puts that session back into the Sessions panel there. Conversations that never handed off stay on the machine they were held on — export those as Markdown if you want them elsewhere. Co-Designer conversations work the same way: they belong to the project they were held about and travel with it (`generation/codesigner-sessions.json`).
 
 ## AI Story Generation
 

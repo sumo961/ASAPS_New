@@ -26,7 +26,7 @@ import {
   newSessionId,
   saveSession,
 } from './ideatorSessionStore';
-import type { IdeatorStatus, IdeatorWireMessage } from './types';
+import type { IdeatorStatus, IdeatorWireMessage, IdeatorSessionRecord } from './types';
 import type { StoryGenerationRequest } from '../../../types/ai';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -41,6 +41,31 @@ const OPENING_TURN =
   "generator. Don't worry about plot, beats, or technicalities yet.\n\n" +
   "To start: what's the issue, theme, or question you've been turning over in " +
   "your head — the one you'd like the audience to sit with?";
+
+/** Pop-out → main window: Electron IPC when available, else postMessage to the opener. */
+function postSessionToMain(message: IdeatorWireMessage): void {
+  const electronApi = (window as any).electronAPI?.ideator;
+  try {
+    if (electronApi?.sendToMain) { electronApi.sendToMain(message); return; }
+    if (window.opener && !window.opener.closed) window.opener.postMessage(message, window.location.origin);
+  } catch (err) {
+    console.warn('[Ideator] Could not notify the main window:', err);
+  }
+}
+
+/** The current conversation as a session record (what SUBMIT_REQUEST and SESSION_SAVED carry). */
+function currentSessionRecord(): IdeatorSessionRecord | null {
+  const state = useIdeatorStore.getState();
+  if (!state.sessionId) return null;
+  return {
+    id: state.sessionId,
+    createdAt: state.sessionCreatedAt ?? Date.now(),
+    lastUpdatedAt: Date.now(),
+    messages: state.messages,
+    draftRequest: state.draftRequest ?? undefined,
+    handedOff: state.status === 'handed_off',
+  };
+}
 
 export function useIdeator(_opts: UseIdeatorOptions = {}) {
   const {
@@ -109,6 +134,10 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
         draftRequest: state.draftRequest ?? undefined,
         handedOff: state.status === 'handed_off',
       });
+      // Mirror onto the project this conversation produced (the main window
+      // only keeps sessions it already knows about).
+      const record = currentSessionRecord();
+      if (record) postSessionToMain({ type: 'SESSION_SAVED', payload: { session: record } });
     } catch (err) {
       console.warn('[Ideator] Failed to save session:', err);
     }
@@ -308,7 +337,8 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
     setStatus('submitting');
     const message: IdeatorWireMessage = {
       type: 'SUBMIT_REQUEST',
-      payload: { request: req },
+      // The conversation travels with the project it is about to create.
+      payload: { request: req, session: currentSessionRecord() ?? undefined },
     };
     // Two transports — choose by environment:
     //   1. Electron desktop: window.opener is null because the pop-out

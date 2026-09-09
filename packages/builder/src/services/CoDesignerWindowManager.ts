@@ -75,6 +75,12 @@ class CoDesignerWindowManager {
   }
 
   private dismissListeners = new Set<DismissCallback>();
+  private sessionListeners = new Set<(session: import('../components/ai/codesigner/coDesignerSessionStore').CoDesignerSession) => void>();
+  /** The pop-out persisted its conversation; App mirrors it onto the project. */
+  onSessionSaved(callback: (session: import('../components/ai/codesigner/coDesignerSessionStore').CoDesignerSession) => void): () => void {
+    this.sessionListeners.add(callback);
+    return () => this.sessionListeners.delete(callback);
+  }
   /** App subscribes: a batch the author dismissed without applying (for the AI edits ledger). */
   onDismiss(callback: DismissCallback): () => void {
     this.dismissListeners.add(callback);
@@ -146,7 +152,7 @@ class CoDesignerWindowManager {
     // Other pop-outs (Preview, Ideator) post to the same main window;
     // capturing on any message poisoned this ref with foreign windows.
     if (
-      (message.type === 'APPLY_PROPOSALS' || message.type === 'DISMISS_PROPOSALS' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT' || message.type === 'PREVIEW_PROPOSALS') &&
+      (message.type === 'APPLY_PROPOSALS' || message.type === 'DISMISS_PROPOSALS' || message.type === 'SESSION_SAVED' || message.type === 'REQUEST_CONTEXT' || message.type === 'GET_BEAT_CONTENT' || message.type === 'PREVIEW_PROPOSALS') &&
       event.source &&
       event.source !== window &&
       this.popoutWindow !== event.source
@@ -161,6 +167,9 @@ class CoDesignerWindowManager {
           cb(proposals, message.payload?.title, message.payload?.projectId, message.payload?.declined)
         );
       }
+    } else if (message.type === 'SESSION_SAVED') {
+      const session = message.payload?.session;
+      if (session && typeof session.id === 'string') this.sessionListeners.forEach(cb => cb(session));
     } else if (message.type === 'DISMISS_PROPOSALS') {
       const proposals = message.payload?.proposals;
       if (Array.isArray(proposals) && proposals.length > 0) {

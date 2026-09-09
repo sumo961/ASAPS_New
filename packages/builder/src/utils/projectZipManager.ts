@@ -172,6 +172,8 @@ export async function exportProjectAsZip(
   if (project.aiEdits) {
     zip.file('generation/ai-edits.json', JSON.stringify(project.aiEdits, null, 2));
   }
+  if (project.ideatorSessions?.length) zip.file('generation/ideator-sessions.json', JSON.stringify(project.ideatorSessions, null, 2));
+  if (project.coDesignerSessions?.length) zip.file('generation/codesigner-sessions.json', JSON.stringify(project.coDesignerSessions, null, 2));
 
   // Add translation files if present
   if (project.translations && Array.isArray(project.translations)) {
@@ -564,6 +566,12 @@ export async function importProjectFromZip(
     });
 
     // Import translation files if present
+    const readSessions = async (name: string): Promise<any[] | undefined> => {
+      const f = zip.file(`generation/${name}`); if (!f) return undefined;
+      try { const v = JSON.parse(await f.async('string')); return Array.isArray(v) ? v : undefined; } catch { return undefined; }
+    };
+    const ideatorSessions = await readSessions('ideator-sessions.json');
+    const coDesignerSessions = await readSessions('codesigner-sessions.json');
     let aiEdits: any = undefined;
     const aiEditsFile = zip.file('generation/ai-edits.json');
     if (aiEditsFile) {
@@ -617,6 +625,8 @@ export async function importProjectFromZip(
       ...(translationManifest ? { translationManifest } : {}),
       ...(generationReview ? { generationReview } : {}),
       ...(aiEdits ? { aiEdits } : {}),
+      ...(ideatorSessions?.length ? { ideatorSessions } : {}),
+      ...(coDesignerSessions?.length ? { coDesignerSessions } : {}),
     } as any;
 
     // Save or update project

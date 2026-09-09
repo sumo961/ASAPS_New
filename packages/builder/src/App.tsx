@@ -83,6 +83,11 @@ import { requestAIFix } from './services/findingFixService';
 import type { AIFixState } from './components/ImportIssuesBanner';
 import { appendAIEdits, coDesignerAppliedEntries, coDesignerDeclinedEntries, reviewProposalEntry, aiFixRejectedEntries, type NewAIEditEntry } from './utils/aiEditsLedger';
 import type { AIEditLedger } from './types/aiEdits';
+import { upsertSession, mergeSessions, sessionsNewerThan } from './utils/projectSessions';
+import type { IdeatorSessionRecord } from './components/ai/ideator/types';
+import type { CoDesignerSession } from './components/ai/codesigner/coDesignerSessionStore';
+import { listSessions as listIdeatorSessions, saveSession as saveIdeatorSession } from './components/ai/ideator/ideatorSessionStore';
+import { listSessions as listCoDesignerSessions, saveSession as saveCoDesignerSession } from './components/ai/codesigner/coDesignerSessionStore';
 import { ApplyFixProposalCommand } from './commands/BeatCommands';
 import { BatchCommand } from './commands/BatchCommand';
 import { UpdateCharactersCommand, UpdateGlobalSettingsCommand } from './commands/ProjectStateCommands';
@@ -381,6 +386,14 @@ function App() {
   /** AI edits ledger (see types/aiEdits.ts): ref persists, tick re-renders the header count. */
   const aiEditsRef = useRef<AIEditLedger | null>(null);
   const [, setAiEditsTick] = useState(0);
+  /**
+   * AI conversations that belong to this project (see utils/projectSessions):
+   * the Ideator session that produced it, and every Co-Designer session about
+   * it. Mirrored from the pop-outs' per-machine stores, persisted with the
+   * project, merged back into the local stores on open.
+   */
+  const ideatorSessionsRef = useRef<IdeatorSessionRecord[]>([]);
+  const coDesignerSessionsRef = useRef<CoDesignerSession[]>([]);
   const setGenerationReview = useCallback((review: GenerationReview | null) => {
     generationReviewRef.current = review;
     setGenerationReviewTick(t => t + 1);
@@ -444,6 +457,25 @@ function App() {
     setGenerationReviewTick(t => t + 1);
     aiEditsRef.current = project?.aiEdits ?? null;
     setAiEditsTick(t => t + 1);
+    ideatorSessionsRef.current = Array.isArray(project?.ideatorSessions) ? project.ideatorSessions : [];
+    coDesignerSessionsRef.current = Array.isArray(project?.coDesignerSessions) ? project.coDesignerSessions : [];
+    // Merge with this machine's stores: newer project copies land locally (so
+    // the pop-outs' Sessions panels show them here too); Co-Designer sessions
+    // this machine already holds about the project join the project copy.
+    void (async () => {
+      try {
+        for (const s of sessionsNewerThan(await listIdeatorSessions(), ideatorSessionsRef.current)) {
+          await saveIdeatorSession({ ...s, projectId: s.projectId ?? project?.id } as any);
+        }
+        if (project?.id) {
+          const local = await listCoDesignerSessions(project.id);
+          for (const s of sessionsNewerThan(local, coDesignerSessionsRef.current)) await saveCoDesignerSession(s);
+          coDesignerSessionsRef.current = mergeSessions(coDesignerSessionsRef.current, local);
+        }
+      } catch (err) {
+        console.warn('[App] Session merge with local stores failed:', err);
+      }
+    })();
     console.log('[App] Generation review on load:', review ? `${openFindings(review).length} open finding(s), dismissed=${!!review.dismissedAt}` : 'none');
     // Re-analyse whenever the author has not dismissed the review: status is
     // bookkeeping, the story as it stands is the truth (an 'applied' fix that
@@ -1431,6 +1463,10 @@ function App() {
       else delete projForTranslations.generationReview;
       if (aiEditsRef.current) projForTranslations.aiEdits = aiEditsRef.current;
       else delete projForTranslations.aiEdits;
+      if (ideatorSessionsRef.current.length) projForTranslations.ideatorSessions = ideatorSessionsRef.current;
+      else delete projForTranslations.ideatorSessions;
+      if (coDesignerSessionsRef.current.length) projForTranslations.coDesignerSessions = coDesignerSessionsRef.current;
+      else delete projForTranslations.coDesignerSessions;
     }
 
     updateStory(storyData);
@@ -1572,6 +1608,8 @@ function App() {
 
       // Shared applier for both AI import paths (see applyGeneratedStory).
       // MCP input is raw JSON, so the normalize pipeline runs in here.
+      ideatorSessionsRef.current = [];
+      coDesignerSessionsRef.current = [];
       const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle, normalize: true });
       setGenerationReview(createGenerationReview({
         source: 'mcp', title: applied.title, original: applied.original,
@@ -5600,6 +5638,8 @@ function App() {
 
     // Shared applier for both AI import paths (see applyGeneratedStory).
     // AIService.generateStory already ran the normalize pipeline.
+    ideatorSessionsRef.current = [];
+    coDesignerSessionsRef.current = [];
     const applied = await applyGeneratedStory(story, makeApplyStoryDeps(), { fallbackTitle: storyTitle });
     setGenerationReview(createGenerationReview({
       source: 'generator', title: applied.title, original: applied.original,
@@ -5655,7 +5695,7 @@ function App() {
    * a "Sent" confirmation and the user can iterate from there if needed.
    */
   const handleIdeatorSubmit = useCallback(
-    async (request: StoryGenerationRequest) => {
+    async (request: StoryGenerationRequest, session?: IdeatorSessionRecord) => {
       console.log('[App] Ideator submitted request:', request);
       const aiService = getAIService();
       if (!aiService.isReady()) {
@@ -5668,6 +5708,11 @@ function App() {
       try {
         const story = await aiService.generateStory(request);
         await handleStoryGenerated(story);
+        // The conversation that produced the project travels with it.
+        if (session) {
+          ideatorSessionsRef.current = [{ ...session, handedOff: true }];
+          markChanged();
+        }
         ideatorWindowManager.notifyGenerationComplete();
       } catch (error) {
         console.error('[App] Ideator handoff failed:', error);
@@ -5676,7 +5721,7 @@ function App() {
         alert(`Failed to generate story from Ideator prompt:\n${message}`);
       }
     },
-    [handleStoryGenerated]
+    [handleStoryGenerated, markChanged]
   );
 
   // Open the Ideator pop-out, passing the current project title and id so
@@ -5959,6 +6004,22 @@ function App() {
     // Keep the conversation's snapshot current with what was just applied.
     if (writeCoDesignerContext()) coDesignerWindowManager.notifyContextUpdated();
   }, [state.beats, characters, actions, handleBeatUpdate, handleCharactersChange, markChanged, currentProject?.id, writeCoDesignerContext, backupBeforeCoDesignerApply, recordAIEdits]);
+
+  // Conversations the pop-outs persist: the Ideator session already attached
+  // to this project is updated in place (later turns after the handoff);
+  // Co-Designer sessions about the open project are mirrored.
+  useEffect(() => ideatorWindowManager.onSessionSaved((session) => {
+    if (!ideatorSessionsRef.current.some(s => s.id === session.id)) return;
+    ideatorSessionsRef.current = upsertSession(ideatorSessionsRef.current, session);
+    console.log('[App] Ideator session mirrored onto the project:', session.id, `${session.messages?.length ?? 0} turns`);
+    markChanged();
+  }), [markChanged]);
+  useEffect(() => coDesignerWindowManager.onSessionSaved((session) => {
+    if (session.projectId && currentProject?.id && session.projectId !== currentProject.id) return;
+    coDesignerSessionsRef.current = upsertSession(coDesignerSessionsRef.current, session);
+    console.log('[App] Co-Designer session mirrored onto the project:', session.id, `${session.messages?.length ?? 0} turns`);
+    markChanged();
+  }), [markChanged, currentProject?.id]);
 
   // A batch dismissed in the pop-out is a decision too — it goes in the ledger.
   useEffect(() => coDesignerWindowManager.onDismiss(

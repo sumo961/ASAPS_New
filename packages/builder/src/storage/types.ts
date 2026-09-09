@@ -365,6 +365,10 @@ export interface Project {
   generationReview?: import('../types/generationReview').GenerationReview;
   /** AI edits ledger — every AI proposal and the author's decision. See types/aiEdits.ts. */
   aiEdits?: import('../types/aiEdits').AIEditLedger;
+  /** The Ideator conversation that produced this project (and later turns of it). */
+  ideatorSessions?: import('../components/ai/ideator/types').IdeatorSessionRecord[];
+  /** Co-Designer conversations about this project. */
+  coDesignerSessions?: import('../components/ai/codesigner/coDesignerSessionStore').CoDesignerSession[];
 
   /** Metadata */
   createdAt: Date;

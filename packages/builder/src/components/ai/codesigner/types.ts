@@ -111,6 +111,8 @@ export type CoDesignerWireMessage =
         declined?: ChangeProposal[];
       };
     }
+  /** Pop-out → main: the conversation was persisted; main mirrors it onto the project. */
+  | { type: 'SESSION_SAVED'; payload: { session: import('./coDesignerSessionStore').CoDesignerSession } }
   /** Pop-out → main: the author dismissed a whole batch without applying (ledger: rejected). */
   | { type: 'DISMISS_PROPOSALS'; payload: { proposals: ChangeProposal[]; title?: string; projectId?: string } }
   | { type: 'APPLY_RESULT'; payload: { results: ProposalApplyResult[] } }

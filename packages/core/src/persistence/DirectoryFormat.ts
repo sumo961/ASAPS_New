@@ -124,6 +124,9 @@ export interface SerializeInput {
   generationReview?: any;
   /** AI edits ledger (proposals + decisions across AI surfaces). Opaque to core. Written to generation/ai-edits.json. */
   aiEdits?: any;
+  /** AI conversation sessions that belong to the project (Ideator session that produced it, Co-Designer sessions about it). Opaque to core. */
+  ideatorSessions?: any[];
+  coDesignerSessions?: any[];
 }
 
 /** Serialized story data (when story is already a plain object) */
@@ -159,6 +162,8 @@ export interface DeserializeResult {
   generationReview?: any;
   /** AI edits ledger from generation/ai-edits.json (if present) */
   aiEdits?: any;
+  ideatorSessions?: any[];
+  coDesignerSessions?: any[];
 }
 
 // ============================================================================
@@ -401,6 +406,12 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
       path: 'generation/ai-edits.json',
       content: deterministicStringify(input.aiEdits),
     });
+  }
+  if (input.ideatorSessions && input.ideatorSessions.length > 0) {
+    files.push({ path: 'generation/ideator-sessions.json', content: deterministicStringify(input.ideatorSessions) });
+  }
+  if (input.coDesignerSessions && input.coDesignerSessions.length > 0) {
+    files.push({ path: 'generation/codesigner-sessions.json', content: deterministicStringify(input.coDesignerSessions) });
   }
 
   // 10. VCS helper files
@@ -681,6 +692,15 @@ export async function deserializeFromDirectory(
     }
   }
 
+  const readSessions = async (name: string): Promise<any[] | undefined> => {
+    const p = join(rootPath, 'generation', name);
+    if (!(await reader.exists(p))) return undefined;
+    try { const v = JSON.parse(await reader.readText(p)); return Array.isArray(v) ? v : undefined; }
+    catch (err) { console.warn(`[DirectoryFormat] generation/${name} unreadable; ignoring:`, err); return undefined; }
+  };
+  const ideatorSessions = await readSessions('ideator-sessions.json');
+  const coDesignerSessions = await readSessions('codesigner-sessions.json');
+
   const storyMetadata: any = {
     firstBeatId: project.firstBeatId,
     title: project.name,
@@ -705,6 +725,8 @@ export async function deserializeFromDirectory(
     translationManifest,
     generationReview,
     aiEdits,
+    ideatorSessions,
+    coDesignerSessions,
   };
 }
 

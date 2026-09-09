@@ -193,14 +193,17 @@ export function useCoDesigner() {
       state.setSessionId(sessionId, createdAt);
     }
     try {
-      await saveSession({
+      const session = {
         id: sessionId,
         projectId: state.context?.projectId,
         projectTitle: state.context?.projectTitle,
         createdAt: createdAt ?? Date.now(),
         lastUpdatedAt: Date.now(),
         messages: state.messages,
-      });
+      };
+      await saveSession(session);
+      // Mirror onto the project (generation/codesigner-sessions.json).
+      postToMain({ type: 'SESSION_SAVED', payload: { session } });
     } catch (err) {
       console.warn('[CoDesigner] Failed to save session:', err);
     }

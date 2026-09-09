@@ -63,6 +63,7 @@ export type IdeatorMessageType =
   | 'SUBMIT_REQUEST'       // pop-out → main: user confirmed the synthesized request
   | 'GENERATION_COMPLETE'  // main → pop-out: generateStory() resolved; story is on the canvas
   | 'GENERATION_FAILED'    // main → pop-out: generateStory() threw; payload.error has the message
+  | 'SESSION_SAVED'        // pop-out → main: the conversation was persisted; main mirrors it onto the project it produced
   | 'REQUEST_CLOSE';       // main → pop-out: ask the window to close (rarely used)
 
 export interface IdeatorWireMessage {
@@ -71,5 +72,20 @@ export interface IdeatorWireMessage {
     request?: StoryGenerationRequest;
     projectTitle?: string;
     error?: string;
+    /** SUBMIT_REQUEST: the conversation that produced the request (travels
+     *  with the generated project). SESSION_SAVED: the updated session. */
+    session?: IdeatorSessionRecord;
   };
+}
+
+/** A persisted Ideator conversation (same shape as the local store's IdeatorSession). */
+export interface IdeatorSessionRecord {
+  id: string;
+  projectId?: string;
+  projectTitle?: string;
+  createdAt: number;
+  lastUpdatedAt: number;
+  messages: IdeatorMessage[];
+  draftRequest?: StoryGenerationRequest;
+  handedOff?: boolean;
 }
