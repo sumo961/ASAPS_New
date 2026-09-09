@@ -14,7 +14,13 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": ["mcp", "asaps", "claude-desktop", "story", "interactive-fiction"],
+  "keywords": [
+    "mcp",
+    "asaps",
+    "claude-desktop",
+    "story",
+    "interactive-fiction"
+  ],
   "author": "ASAPS Team",
   "license": "MIT",
   "dependencies": {
@@ -23,6 +29,6 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.1.11"
   }
 }
