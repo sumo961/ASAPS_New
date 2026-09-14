@@ -109,7 +109,7 @@ export function resolveMeterFrame(
   character: { meterFrame?: MeterFrameConfig | null; counters?: MeterCounterDef[] } | null | undefined,
 ): MeterFrameConfig | null {
   if (!character) return null;
-  if (character.meterFrame) return character.meterFrame;
+  if (character.meterFrame) return completeMeterFrame(character.meterFrame);
 
   const wantsAMeter = (character.counters || []).some(
     (c) => c && c.visible !== false && c.showLevelMeter,
@@ -124,6 +124,24 @@ export function resolveMeterFrame(
  * needs the character to be placed on stage, which is not true in slot-based
  * responsive beats — the fallback has to render wherever it is used.
  */
+/**
+ * An authored frame may be PARTIAL — the generation guidance itself says
+ * `{ "dockMode": "screen", "screenPosition": "screen-top-left" }` is enough,
+ * and hand-written JSON arrives the same way. Every authored field wins;
+ * every missing one comes from the fallback, so no renderer reads
+ * `style.padding` off undefined (Puff's Hilltop Journey, 2026-09-14: the
+ * Preview Window crashed on its first beat for exactly that).
+ */
+export function completeMeterFrame(partial: Partial<MeterFrameConfig> | null | undefined): MeterFrameConfig {
+  const p: any = partial ?? {};
+  return {
+    ...FALLBACK_METER_FRAME,
+    ...p,
+    offset: { ...FALLBACK_METER_FRAME.offset, ...(p.offset ?? {}) },
+    style: { ...FALLBACK_METER_FRAME.style, ...(p.style ?? {}) },
+  };
+}
+
 export const FALLBACK_METER_FRAME: MeterFrameConfig = {
   dockMode: 'screen',
   anchor: 'top',

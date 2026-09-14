@@ -92,8 +92,26 @@ export function normalizeCharacter(c: any): { character: any; changed: boolean }
   if (!Array.isArray(out.goals)) { out.goals = []; changed = true; }
   if (!out.createdAt) { out.createdAt = now; changed = true; }
   if (!out.updatedAt) { out.updatedAt = now; changed = true; }
+  // A generator-emitted meterFrame is usually partial (dock + position). The
+  // editor and the renderer read style/offset sub-fields directly, so the
+  // saved shape must be complete. Authored fields win; gaps get defaults.
+  if (out.meterFrame && typeof out.meterFrame === 'object') {
+    const completed = completeMeterFrameDefaults(out.meterFrame);
+    if (JSON.stringify(completed) !== JSON.stringify(out.meterFrame)) { out.meterFrame = completed; changed = true; }
+  }
   void before;
   return { character: out, changed };
+}
+
+/** Same defaults as the renderer's FALLBACK_METER_FRAME / the builder's DEFAULT_METER_FRAME_CONFIG (screen-docked variant). */
+export function completeMeterFrameDefaults(partial: any): any {
+  const base = {
+    dockMode: 'screen', anchor: 'top', screenPosition: 'screen-top-left', offset: { x: 0, y: 0 },
+    style: { backgroundColor: '#1b1f2b', borderColor: '#3d4356', borderWidth: 1, borderRadius: 6, padding: 8, opacity: 90 },
+    meterHeight: 12, meterSpacing: 6, showLabels: true, meterWidth: 130,
+  };
+  const p = partial && typeof partial === 'object' ? partial : {};
+  return { ...base, ...p, offset: { ...base.offset, ...(p.offset ?? {}) }, style: { ...base.style, ...(p.style ?? {}) } };
 }
 
 /**

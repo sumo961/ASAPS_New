@@ -221,3 +221,18 @@ describe('normalizeStory — end-to-end on a v0.9.50-patch-shaped story', () => 
     expect(result.report.beatsNormalized).toBe(0);
   });
 });
+
+describe('normalizeCharacter completes a partial meterFrame (2026-09-14)', () => {
+  it('keeps authored fields and fills style/offset/sizes so editor and renderer never read off undefined', async () => {
+    const { normalizeCharacter } = await import('../../src/normalize/normalizeStory');
+    const { character, changed } = normalizeCharacter({ id: 'puff', name: 'Puff', meterFrame: { dockMode: 'screen', screenPosition: 'screen-top-left' } });
+    expect(changed).toBe(true);
+    expect(character.meterFrame).toMatchObject({ dockMode: 'screen', screenPosition: 'screen-top-left', style: { padding: 8 }, offset: { x: 0, y: 0 }, meterWidth: 130 });
+    const again = normalizeCharacter(character);
+    expect(again.character.meterFrame).toEqual(character.meterFrame);
+  });
+  it('leaves characters without a frame alone', async () => {
+    const { normalizeCharacter } = await import('../../src/normalize/normalizeStory');
+    expect(normalizeCharacter({ id: 'x', name: 'X' }).character.meterFrame).toBeUndefined();
+  });
+});

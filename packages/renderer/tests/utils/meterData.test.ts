@@ -65,9 +65,18 @@ describe('toMeterCounterData', () => {
 describe('resolveMeterFrame', () => {
   const meter = (over = {}) => ({ name: 'trust', visible: true, showLevelMeter: true, ...over });
 
-  it('returns the authored frame untouched — an author always wins', () => {
-    const authored = { dockMode: 'character', anchor: 'bottom' } as any;
-    expect(resolveMeterFrame({ meterFrame: authored, counters: [meter()] })).toBe(authored);
+  it('keeps every authored field and fills the missing ones — a PARTIAL frame must not crash the renderer', () => {
+    // The shape the generation guidance teaches (Puff's Hilltop Journey,
+    // 2026-09-14): dock + position only. The old contract returned it
+    // untouched and CharacterMeterFrame read style.padding off undefined.
+    const authored = { dockMode: 'character', anchor: 'bottom', style: { padding: 20 } } as any;
+    const frame = resolveMeterFrame({ meterFrame: authored, counters: [meter()] })!;
+    expect(frame.dockMode).toBe('character');
+    expect(frame.anchor).toBe('bottom');
+    expect(frame.style.padding).toBe(20);          // authored wins
+    expect(frame.style.backgroundColor).toBeTruthy(); // filled
+    expect(frame.offset).toEqual({ x: 0, y: 0 });
+    expect(frame.meterWidth).toBeGreaterThan(0);
   });
 
   it('supplies a screen-docked frame when meters are visible but no frame exists', () => {

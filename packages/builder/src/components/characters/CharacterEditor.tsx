@@ -103,7 +103,18 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
   // Who a suggested opening stance points at. Empty = first available.
   const [openingStanceTarget, setOpeningStanceTarget] = useState('');
-  const [editedCharacter, setEditedCharacter] = useState<Character>(character);
+  /**
+   * Frames saved partial (an AI-generated character carries just dock +
+   * position) are completed on the way in — the fields below read
+   * meterFrame.style.* and .offset.* directly.
+   */
+  const withCompleteFrames = (c: Character): Character => ({
+    ...c,
+    ...(c.meterFrame ? { meterFrame: { ...DEFAULT_METER_FRAME_CONFIG, ...c.meterFrame, offset: { ...DEFAULT_METER_FRAME_CONFIG.offset, ...(c.meterFrame.offset ?? {}) }, style: { ...DEFAULT_METER_FRAME_CONFIG.style, ...(c.meterFrame.style ?? {}) } } } : {}),
+    ...(c.inventoryFrame ? { inventoryFrame: { ...DEFAULT_INVENTORY_FRAME_CONFIG, ...c.inventoryFrame, offset: { ...DEFAULT_INVENTORY_FRAME_CONFIG.offset, ...((c.inventoryFrame as any).offset ?? {}) }, style: { ...DEFAULT_INVENTORY_FRAME_CONFIG.style, ...((c.inventoryFrame as any).style ?? {}) } } as any } : {}),
+    ...(c.moodFrame ? { moodFrame: { ...DEFAULT_MOOD_FRAME_CONFIG, ...c.moodFrame, offset: { ...DEFAULT_MOOD_FRAME_CONFIG.offset, ...((c.moodFrame as any).offset ?? {}) } } as any } : {}),
+  });
+  const [editedCharacter, setEditedCharacter] = useState<Character>(() => withCompleteFrames(character));
 
   // When opened with focusVariantId set (variant card click), scroll the
   // matching variant card into view so the author lands on what they clicked.
@@ -134,13 +145,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   useEffect(() => {
     // Always update when switching to a different character
     if (character.id !== editedCharacter.id) {
-      setEditedCharacter(character);
+      setEditedCharacter(withCompleteFrames(character));
       setHasChanges(false);
       setJustSaved(false);
     }
     // Also update after a successful save (when we're expecting the update)
     else if (justSaved) {
-      setEditedCharacter(character);
+      setEditedCharacter(withCompleteFrames(character));
       setHasChanges(false);
       setJustSaved(false);
     }
