@@ -1,5 +1,40 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-14: Partial meter frames no longer crash the Preview Window (v0.9.99)
+
+### Overview
+
+One fix, three layers deep. A freshly generated story ("Puff's Hilltop
+Journey") looked fine on the flowchart and died on the first beat of the
+Preview Window with `Cannot read properties of undefined (reading
+'padding')` inside the character meter frame. The story's protagonist
+carries a mood-driven meter — a good authoring choice, and exactly what the
+generation guidance asks for — with a `meterFrame` of just a dock mode and
+a screen position, because the guidance itself says that is enough. The
+runtime resolver returned any authored frame untouched, so the renderer
+read the frame's style off nothing; the unit test even pinned that
+contract. Now every reader of a frame gets a complete one: the renderer's
+resolver fills missing fields from the fallback (authored fields win), the
+normalize pipeline completes a partial frame on import so saved projects
+are whole, and the Character Editor completes meter, inventory and mood
+frames on the way in, since it reads their style and offset fields
+directly and would have crashed on the same character. The guidance now
+says the minimal shape is the whole shape needed. Verified live: the story
+plays; the title screen shows no HUDs (by design); beat 2 shows the frame
+reading "Puff's Brave Glow — gathering courage" on desktop, and the
+compact HUD strip on the phone preset.
+
+Also in this release: 246 directories and 573 files that iCloud Drive had
+silently duplicated inside `node_modules` with a " 2" suffix were removed —
+they broke the core type-check with "Cannot find type definition file for
+'node 2'" while no code had changed.
+
+**Files modified:** `packages/renderer/src/utils/meterData.ts` (completeMeterFrame), `packages/renderer/src/index.ts`,
+`packages/core/src/normalize/normalizeStory.ts` (completeMeterFrameDefaults), `packages/builder/src/components/characters/CharacterEditor.tsx`,
+`packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/public/player-web.js`
+
+---
+
 ## 2026-09-10: The provenance release — who wrote what, and the conversations that got there (v0.9.98)
 
 ### Overview

@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.98** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.98 is the provenance release**: a
+Current release: **v0.9.99** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.99 fixes a Preview Window crash**
+on generated stories whose characters carry a meter with a minimal frame
+definition — the shape the generation guidance asks for. Frames are now
+completed wherever they are read (renderer, import pipeline, Character
+Editor), so a mood-driven meter renders on desktop and folds into the
+compact strip on phones instead of taking the preview down.
+
+**v0.9.98 was the provenance release**: a
 project now carries its own record of AI involvement — an AI edits ledger
 with every proposal from the generator review, Ask AI and the Co-Designer
 and what the author decided, accepted and declined alike (**AI ▸ AI
