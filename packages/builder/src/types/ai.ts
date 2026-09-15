@@ -26,17 +26,19 @@ export interface AIProviderConfig {
   maxTokens?: number;
 
   /**
-   * Reasoning effort for reasoning-capable models (GPT-5 series, Claude
-   * 4.5+ adaptive thinking, Kimi K2.x). Supported values and meaning vary
-   * by model: 'max' is currently honoured by Claude adaptive thinking; on
-   * other providers it caps at the next-highest available tier.
-   * gpt-5.5 defaults to 'none'.
+   * Reasoning effort for reasoning-capable models (GPT-6 Astra, GPT-5
+   * series, Claude 4.5+ adaptive thinking, Kimi K2.x). Supported values
+   * and meaning vary by model: 'max' is honoured by Claude adaptive
+   * thinking and GPT-6 Astra; other OpenAI models cap it at 'xhigh'.
+   * Astra rejects 'none'/'minimal' (sent as 'low' — see
+   * openaiReasoningEffort in @asaps/core). gpt-5.5 defaults to 'none'.
    */
   reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
   /**
-   * OpenAI reasoning mode (GPT-5.6 family). 'pro' routes requests through
-   * the Responses API (POST /v1/responses) for OpenAI's deepest reasoning —
+   * OpenAI reasoning mode (GPT-5.6 family only — GPT-6 Astra has no pro
+   * mode). 'pro' routes requests through the Responses API
+   * (POST /v1/responses) for OpenAI's deepest reasoning —
    * only honored for gpt-5.6* models on the official endpoint; ignored for
    * every other model / custom / local endpoint so OpenAI-compatible
    * servers (Ollama, Kimi, proxies) keep the plain chat-completions shape.

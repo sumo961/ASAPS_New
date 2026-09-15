@@ -28,6 +28,7 @@
 export function requiresMaxCompletionTokens(model: string): boolean {
   const m = model.toLowerCase();
   if (m.startsWith('gpt-5')) return true;
+  if (m.startsWith('gpt-6')) return true;
   if (m.includes('gpt-4o')) return true;
   if (m.startsWith('o1')) return true;
   if (m.startsWith('o3')) return true;
@@ -51,8 +52,57 @@ export function isReasoningModel(model: string, reasoningEffort?: string): boole
   return m.startsWith('o1') ||
          m.startsWith('o3') ||
          m.startsWith('gpt-5') ||
+         m.startsWith('gpt-6') ||
          m.includes('kimi-k2') ||
          !!reasoningEffort;
+}
+
+/**
+ * Whether a model is GPT-6 Astra (`gpt-6-astra`, OpenAI's flagship since
+ * September 2026, 1.05M context / 128K output). Astra differs from the
+ * GPT-5.x families in three ways that matter to request shape:
+ *   - reasoning effort accepts low|medium|high|xhigh|max — `none` and
+ *     `minimal` return HTTP 400 (developers.openai.com/api/docs/guides/latest-model)
+ *   - function tools are Responses-API only ("Chat Completions does not
+ *     support function calling with GPT-6 Astra")
+ *   - no `reasoning.mode: pro` (that stays a GPT-5.6 feature)
+ */
+export function isGpt6Model(model: string | undefined): boolean {
+  return !!model && model.toLowerCase().startsWith('gpt-6');
+}
+
+/**
+ * Translate ASAPS's provider-neutral reasoning effort into the value OpenAI
+ * accepts for the given model. Returns undefined when nothing should be
+ * sent (model default).
+ *
+ *   - 'max' is honoured by GPT-6 Astra; every other OpenAI model caps it at
+ *     'xhigh' (the tier below), so a global 'max' never 400s on a provider
+ *     switch.
+ *   - 'none' / 'minimal' are rejected by GPT-6 Astra; OpenAI's migration
+ *     note says "start with low and compare results", so that is what Astra
+ *     receives. Other models pass them through untouched.
+ */
+export function openaiReasoningEffort(
+  model: string | undefined,
+  effort: string | undefined,
+): string | undefined {
+  if (effort === undefined || effort === '') return undefined;
+  const gpt6 = isGpt6Model(model);
+  if (effort === 'max') return gpt6 ? 'max' : 'xhigh';
+  if (gpt6 && (effort === 'none' || effort === 'minimal')) return 'low';
+  return effort;
+}
+
+/**
+ * Whether a base URL points at the official OpenAI API (or is unset, which
+ * defaults there). Only the official endpoint serves POST /v1/responses —
+ * OpenAI-compatible servers (Ollama, Kimi/Moonshot, DeepSeek, custom
+ * proxies) implement /chat/completions only, so anything that changes the
+ * request shape to the Responses API must be gated on this.
+ */
+export function isOfficialOpenAIEndpoint(baseUrl: string | undefined): boolean {
+  return !baseUrl || baseUrl.includes('api.openai.com');
 }
 
 /**
@@ -130,8 +180,9 @@ export function buildChatRequestBody(
     body.response_format = options.responseFormat;
   }
 
-  if (options?.reasoningEffort !== undefined) {
-    body.reasoning_effort = options.reasoningEffort;
+  const effort = openaiReasoningEffort(model, options?.reasoningEffort);
+  if (effort !== undefined) {
+    body.reasoning_effort = effort;
   }
 
   if (!isReasoningModel(model, options?.reasoningEffort) && options?.temperature !== undefined) {
@@ -187,6 +238,106 @@ export function buildResponsesRequestBody(
     max_output_tokens: maxTokens,
     reasoning,
   };
+}
+
+/**
+ * A function tool in the provider-neutral (Anthropic-style) shape ASAPS
+ * uses across ClaudeProvider / OpenAIProvider / AIService.
+ */
+export interface NeutralToolSpec {
+  name: string;
+  description: string;
+  input_schema: unknown;
+}
+
+/**
+ * A function call the model requested, lifted out of a Responses-API
+ * result (`output[]` items of type `function_call`).
+ */
+export interface ResponsesFunctionCall {
+  /** Item id (`fc_…`) — informational; the round-trip key is call_id. */
+  id?: string;
+  /** Pairs the tool result (`function_call_output.call_id`) to this call. */
+  call_id: string;
+  name: string;
+  /** JSON-encoded arguments string, exactly as the API returned it. */
+  arguments: string;
+}
+
+/**
+ * Build a Responses-API request body for a function-calling turn
+ * (POST /v1/responses with `tools`). Used by the OpenAI tool loop on the
+ * official endpoint for EVERY model — Chat Completions rejects function
+ * tools + reasoning_effort on the GPT-5.6 family ("use /v1/responses or set
+ * reasoning_effort to 'none'") and does not support function tools at all
+ * on GPT-6 Astra.
+ *
+ * Shape per developers.openai.com/api/docs/guides/function-calling:
+ *   - `instructions` carries the system prompt; `input` is the running item
+ *     list (role messages, echoed prior `output` items, and
+ *     `function_call_output` results)
+ *   - tools are flat `{ type:'function', name, description, parameters }`
+ *     (no `function:{}` wrapper as in Chat Completions); `strict:false`
+ *     keeps our loosely-typed tool schemas accepted verbatim
+ *   - `reasoning.effort` via openaiReasoningEffort; `reasoning.mode:'pro'`
+ *     only when the caller asks for it (GPT-5.6 pro mode, medium+ efforts)
+ *   - never `temperature` (rejected by reasoning models, unsupported on Astra)
+ */
+export function buildResponsesToolRequestBody(
+  model: string,
+  instructions: string,
+  input: unknown[],
+  tools: NeutralToolSpec[],
+  maxTokens: number,
+  options?: {
+    reasoningEffort?: string;
+    proMode?: boolean;
+  }
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    model,
+    instructions,
+    input,
+    tools: tools.map(t => ({
+      type: 'function',
+      name: t.name,
+      description: t.description,
+      parameters: t.input_schema,
+      strict: false,
+    })),
+    max_output_tokens: maxTokens,
+  };
+  const reasoning: Record<string, unknown> = {};
+  if (options?.proMode) {
+    reasoning.mode = 'pro';
+    const effort = options.reasoningEffort === 'max' ? 'xhigh' : options.reasoningEffort;
+    if (effort === 'medium' || effort === 'high' || effort === 'xhigh') reasoning.effort = effort;
+  } else {
+    const effort = openaiReasoningEffort(model, options?.reasoningEffort);
+    if (effort !== undefined) reasoning.effort = effort;
+  }
+  if (Object.keys(reasoning).length > 0) body.reasoning = reasoning;
+  return body;
+}
+
+/**
+ * Lift the function calls the model requested out of a Responses-API
+ * result. Empty when the turn ended in plain text.
+ */
+export function extractResponsesFunctionCalls(json: any): ResponsesFunctionCall[] {
+  const calls: ResponsesFunctionCall[] = [];
+  if (!Array.isArray(json?.output)) return calls;
+  for (const item of json.output) {
+    if (item?.type !== 'function_call') continue;
+    if (typeof item.call_id !== 'string' || typeof item.name !== 'string') continue;
+    calls.push({
+      id: typeof item.id === 'string' ? item.id : undefined,
+      call_id: item.call_id,
+      name: item.name,
+      arguments: typeof item.arguments === 'string' ? item.arguments : '{}',
+    });
+  }
+  return calls;
 }
 
 /**

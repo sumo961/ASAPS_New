@@ -77,8 +77,19 @@ export function resolveClaudeEndpoint(baseUrl?: string): string {
  * @param baseUrl - Optional base URL (defaults to OpenAI)
  * @returns Resolved endpoint URL for chat completions
  */
-export function resolveOpenAIEndpoint(baseUrl?: string): string {
+export function resolveOpenAIEndpoint(
+  baseUrl?: string,
+  api: 'chat' | 'responses' = 'chat',
+): string {
   const effectiveBaseUrl = baseUrl || 'https://api.openai.com/v1';
+
+  // Responses API (POST /v1/responses): pro reasoning and function-tool
+  // turns. A base URL that was given as the full chat-completions path is
+  // rebased onto its /v1 root first.
+  if (api === 'responses') {
+    const root = effectiveBaseUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/$/, '');
+    return `${root}/responses`;
+  }
 
   // If the URL already includes /completions, use it as-is
   if (effectiveBaseUrl.includes('/completions')) {

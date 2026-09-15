@@ -42,18 +42,18 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
   },
   openai: {
     name: 'OpenAI',
-    description: 'GPT-5.6 (Sol / Terra / Luna)',
+    description: 'GPT-6 Astra / GPT-5.6',
     defaultBaseUrl: '',
-    // GPT-5.6 family (GA 2026-07-09): gpt-5.6-sol (flagship), gpt-5.6-terra
-    // (≈5.5 performance at half price), gpt-5.6-luna (fastest/cheapest).
-    // The bare 'gpt-5.6' alias routes to Sol; we pin the explicit id for
-    // deterministic routing per OpenAI's guidance. Sol costs the same as
-    // gpt-5.5 ($5/$30 per MTok) since OpenAI's May 2026 reprice.
-    defaultModel: 'gpt-5.6-sol',
+    // GPT-6 Astra (gpt-6-astra, Sept 2026): OpenAI's flagship — 1.05M
+    // context, 128K output, $10/$50 per MTok. Reasoning low…max (no
+    // none/minimal), function tools via the Responses API only.
+    // The GPT-5.6 family (GA 2026-07-09) stays the value tier: gpt-5.6-sol
+    // ($5/$30, pro mode), gpt-5.6-terra (balanced), gpt-5.6-luna (fastest).
+    defaultModel: 'gpt-6-astra',
     apiKeyRequired: true,
     apiKeyPlaceholder: 'Enter your OpenAI API key',
     apiKeyHelp: 'Get your API key from platform.openai.com',
-    modelHelp: 'e.g. gpt-5.6-sol (flagship), gpt-5.6-terra (balanced), gpt-5.6-luna (fastest). Leave empty for default.',
+    modelHelp: 'e.g. gpt-6-astra (flagship), gpt-5.6-sol (value flagship, pro mode), gpt-5.6-terra (balanced), gpt-5.6-luna (fastest). Leave empty for default.',
   },
   local: {
     name: 'Local LLM',
@@ -386,7 +386,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               <div className="mt-1.5 space-y-1 pl-1">
                 <p>
                   <span className="font-medium">Story generation, Ideator, Co-Designer:</span>{' '}
-                  the flagship pays off — {provider === 'openai' ? 'gpt-5.6-sol' : provider === 'claude' ? 'claude-opus-5' : 'your largest local model'}. You wait once, then work with the result.
+                  the flagship pays off — {provider === 'openai' ? 'gpt-6-astra (or gpt-5.6-sol at half the price)' : provider === 'claude' ? 'claude-opus-5' : 'your largest local model'}. You wait once, then work with the result.
                   {provider === 'claude' ? ' Measured (blind bake-off, Sept 2026): claude-opus-5 won both rounds; claude-opus-4-8 is the fast rough-draft tier; claude-fable-5-1 at X-High gives the cleanest structure at ~3× the cost — Fable always thinks, so ASAPS floors its Max Tokens at 96K.' : ''}
                 </p>
                 <p>
@@ -429,7 +429,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           {/* Reasoning effort / extended thinking */}
           <div>
             <label htmlFor="reasoningEffort" className="block text-sm font-medium text-gray-700 mb-2">
-              {provider === 'claude' ? 'Extended thinking (Claude)' : 'Reasoning effort (GPT-5)'}
+              {provider === 'claude' ? 'Extended thinking (Claude)' : 'Reasoning effort (OpenAI)'}
             </label>
             <select
               id="reasoningEffort"
@@ -444,12 +444,12 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               <option value="medium">Medium</option>
               <option value="high">High</option>
               <option value="xhigh">X-High</option>
-              <option value="max">Max (Claude 4.5+ only)</option>
+              <option value="max">Max (Claude 4.5+, GPT-6 Astra)</option>
             </select>
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'claude'
                 ? 'Claude 4+ extended thinking allocates a thinking budget before responding. Temperature is forced to 1.0 when enabled. Only applies to the direct Anthropic endpoint; most Claude-compatible proxies do not support this.'
-                : 'GPT-5.x reasoning uses max_completion_tokens and ignores temperature. Values none–xhigh apply to gpt-5.5 and the gpt-5.6 family (Sol/Terra/Luna). Leave blank to use the model default.'}
+                : 'OpenAI reasoning uses max_completion_tokens and ignores temperature. GPT-6 Astra accepts Low–Max (None and Minimal are sent as Low — Astra rejects them); gpt-5.5 and the gpt-5.6 family accept None–X-High. Leave blank to use the model default.'}
             </p>
           </div>
 
@@ -471,9 +471,9 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               <p className="mt-1 text-xs text-gray-500">
                 Pro mode uses OpenAI's Responses API for the hardest problems.
                 Only takes effect with a GPT-5.6 model (Sol recommended) on the
-                official OpenAI endpoint — for any other model, or a custom /
-                local endpoint, it is safely ignored and the standard path is
-                used. Expect much longer generation times.
+                official OpenAI endpoint — for any other model (GPT-6 Astra has
+                no pro mode), or a custom / local endpoint, it is safely ignored
+                and the standard path is used. Expect much longer generation times.
               </p>
             </div>
           )}

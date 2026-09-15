@@ -2037,7 +2037,7 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 2. Select **Configure AI** from the dropdown
 3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended; default model: **claude-sonnet-5**). The whole Claude 5 family works — type `claude-opus-5` or `claude-fable-5` into the Model field if you prefer; older Claude 4.x models keep working when named explicitly.
-   - **OpenAI** - GPT models (default model: **gpt-5.6-sol**)
+   - **OpenAI** - GPT models (default model: **gpt-6-astra**)
    - **Ollama** - Local models (free, no API key needed)
 4. Enter your API key (for cloud providers)
 5. Adjust settings (model, temperature, etc.)
@@ -2047,17 +2047,20 @@ Two fields in that dialog deserve a second look once you start playing your stor
 - **Model for in-story AI** *(optional)* — a second model, used only while a story *plays*: AI Dialog Tree, AI Conversation, and AI Condition in the Preview Window and in exported players. Authoring tools (story generation, Ideator, translation, the character helper) keep using the main model. Leave it empty and in-story AI uses the main model too. The reason it exists is in [Which Model for Which Job?](#which-model-for-which-job) — the best authoring model is not the best model to make a player wait on.
 - **Max Tokens** *(optional)* — leave it blank. The budget is chosen for you and scales with the reasoning effort you pick (the placeholder shows the current automatic value). If you do type a number below the automatic budget, the dialog warns you: reasoning tokens count against it, so a too-small budget can produce nothing at all, or a story cut off mid-JSON.
 
-### OpenAI Model Tiers (GPT-5.6 Family)
+### OpenAI Models (GPT-6 Astra and the GPT-5.6 Family)
 
-The OpenAI provider defaults to **gpt-5.6-sol**, the current flagship. The GPT-5.6 family has three tiers — type the one you want into the **Model** field:
+The OpenAI provider defaults to **gpt-6-astra**, OpenAI's flagship since September 2026 (1.05M-token context, 128K output). The GPT-5.6 family stays available as the value tier — type the one you want into the **Model** field:
 
 | Model | Character |
 |-------|-----------|
-| **gpt-5.6-sol** | Flagship — strongest results, the default |
-| **gpt-5.6-terra** | Balanced — roughly gpt-5.5-level performance at about half the price |
+| **gpt-6-astra** | Flagship — strongest results, the default. About twice the price of Sol ($10 / $50 per million tokens) |
+| **gpt-5.6-sol** | Value flagship — the previous default, and the only tier with **Pro** reasoning mode |
+| **gpt-5.6-terra** | Balanced — roughly gpt-5.5-level performance at about half Sol's price |
 | **gpt-5.6-luna** | Fastest and cheapest |
 
 Leave the field empty to use the default. Older models (gpt-5.5, GPT-4o) keep working if you name them explicitly.
+
+Two Astra-specific behaviours ASAPS handles for you: Astra has no **None** or **Minimal** reasoning tier (those settings are sent as **Low**, and **Max** is honoured), and Astra only supports tools through OpenAI's Responses API — so the Ideator's web search now runs through that API on every OpenAI model when you use the official endpoint. Custom or local endpoints (Ollama, Kimi, proxies) keep the plain chat-completions path.
 
 ### Which Model for Which Job?
 
@@ -2072,7 +2075,7 @@ job?** fold-out carries the short version of this table:
 
 | What you're doing | What matters | Good fit |
 |---|---|---|
-| **Story generation, Ideator, Co-Designer** | One-shot draft quality — you wait once, then work with the result | Flagship: `claude-opus-5` / `gpt-5.6-sol`. Reasoning **Auto** or higher; **Pro** mode for hard material. See *What we measured* below before reaching for Fable |
+| **Story generation, Ideator, Co-Designer** | One-shot draft quality — you wait once, then work with the result | Flagship: `claude-opus-5` / `gpt-6-astra` (or `gpt-5.6-sol` at half the price). Reasoning **Auto** or higher; **Pro** mode (GPT-5.6 only) for hard material. See *What we measured* below before reaching for Fable |
 | **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto**. Put it in **Model for in-story AI** so your authoring model stays the flagship |
 | **Translation** | Instruction-following (markers, variables, JSON) plus literary register, across big batches | Flagship for the pass you ship; the balanced tier is fine for drafts |
 | **Character helper, beat suggestions, transformations** | A structured proposal you review before accepting | The default tier is fine |
@@ -2121,17 +2124,17 @@ What to take from it:
 
 ### Reasoning Effort / Extended Thinking
 
-The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anthropic and *Reasoning effort (GPT-5)* on OpenAI) controls how much "thinking budget" the model is given before responding:
+The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anthropic and *Reasoning effort (OpenAI)* on OpenAI) controls how much "thinking budget" the model is given before responding:
 
 | Tier | Behaviour |
 |------|-----------|
 | **Auto (model default)** | Lets the model pick — usually the safe choice |
 | **None** | No reasoning, fastest, cheapest |
 | **Minimal** / **Low** / **Medium** / **High** | Progressively more thinking budget |
-| **X-High** | Most thinking the OpenAI tiers expose; OpenAI providers cap here internally |
-| **Max (Claude 4.5+ only)** | Anthropic-only top tier on Claude 4.5+ models. Selecting it on other providers silently falls back to X-High. On Fable models **None** is not available — Fable always thinks, and Auto is the safe choice |
+| **X-High** | Most thinking the GPT-5.x tiers expose; they cap here internally |
+| **Max (Claude 4.5+, GPT-6 Astra)** | Top tier on Claude 4.5+ models and on GPT-6 Astra. Selecting it on other OpenAI models silently falls back to X-High. On Fable models **None** is not available — Fable always thinks, and Auto is the safe choice; GPT-6 Astra likewise rejects **None** and **Minimal**, which ASAPS sends as **Low** |
 
-Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. GPT-5.x reasoning uses `max_completion_tokens` and ignores temperature; the none–xhigh tiers apply to gpt-5.5 and the whole gpt-5.6 family (Sol/Terra/Luna), and `gpt-5.5` defaults to `none` when no tier is selected.
+Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. OpenAI reasoning uses `max_completion_tokens` and ignores temperature; the none–xhigh tiers apply to gpt-5.5 and the whole gpt-5.6 family (Sol/Terra/Luna), `gpt-6-astra` takes low–max, and `gpt-5.5` defaults to `none` when no tier is selected.
 
 ### Reasoning Mode: Standard vs Pro (OpenAI, GPT-5.6)
 
@@ -2140,7 +2143,7 @@ When the **OpenAI** provider is selected, the config dialog shows a **Reasoning 
 - **Standard (default)** — the normal request path. What you've always had.
 - **Pro — deepest reasoning (slow, expensive)** — routes requests through OpenAI's Responses API to unlock the deepest reasoning available for GPT-5.6 models.
 
-Pro mode is deliberately conservative about when it activates: it **only takes effect with a gpt-5.6 model on the official OpenAI endpoint**. If you're using any other model, or a custom/local Base URL (Ollama, Kimi, a proxy), the setting is safely ignored and the standard path is used — nothing breaks, you just don't get Pro reasoning.
+Pro mode is deliberately conservative about when it activates: it **only takes effect with a gpt-5.6 model on the official OpenAI endpoint**. If you're using any other model (GPT-6 Astra has no pro mode), or a custom/local Base URL (Ollama, Kimi, a proxy), the setting is safely ignored and the standard path is used — nothing breaks, you just don't get Pro reasoning.
 
 Expect much longer generation times and noticeably higher costs. Pro shines on **story generation with hard material** — dense systemic subjects, long complex branching — where you want the model to really chew on the structure. It's not recommended for runtime AI beats (AI Conversation, AI Condition, and friends), where the player is sitting there waiting.
 

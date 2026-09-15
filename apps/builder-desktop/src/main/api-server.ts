@@ -14,6 +14,7 @@ import { request as httpRequest } from 'http';
 import { parse as parseUrl } from 'url';
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
+import { gunzipSync } from 'zlib';
 import {
   resolveClaudeEndpoint,
   resolveOpenAIEndpoint,
@@ -162,6 +163,8 @@ export class EmbeddedAPIServer {
         await this.handleClaudeProxy(req, res);
       } else if (path === '/api/ai/openai' && req.method === 'POST') {
         await this.handleOpenAIProxy(req, res);
+      } else if (path === '/api/search/brave' && req.method === 'POST') {
+        await this.handleBraveSearch(req, res);
       } else {
         this.sendJson(res, 404, { error: 'Not found', path });
       }
@@ -249,7 +252,12 @@ export class EmbeddedAPIServer {
    */
   private async handleOpenAIProxy(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await this.readBody(req);
-    const { baseUrl, apiKey, ...requestBody } = JSON.parse(body);
+    // _endpoint: 'responses' routes to OpenAI's Responses API (pro-mode
+    // reasoning, function-tool turns). It is proxy metadata — stripped
+    // here, never forwarded upstream. Mirrors the Vite dev proxy
+    // (packages/builder/src/api/vite-ai-proxy.ts); the packaged app used
+    // to forward it as an unknown body field and 400.
+    const { baseUrl, apiKey, _endpoint, ...requestBody } = JSON.parse(body);
 
     if (!apiKey) {
       this.sendJson(res, 400, { error: 'Missing required parameter: apiKey' });
@@ -257,7 +265,8 @@ export class EmbeddedAPIServer {
     }
 
     // Use shared endpoint resolution
-    const endpoint = resolveOpenAIEndpoint(baseUrl);
+    const useResponses = _endpoint === 'responses';
+    const endpoint = resolveOpenAIEndpoint(baseUrl, useResponses ? 'responses' : 'chat');
 
     console.log(`[API Server] OpenAI proxy to: ${endpoint}`);
     console.log(`[API Server] Making request (${DEFAULT_AI_TIMEOUT_MS / 1000}s timeout)...`);
@@ -268,7 +277,7 @@ export class EmbeddedAPIServer {
       const requestBodyStr = JSON.stringify(requestBody);
 
       if (requestBody?.stream === true) {
-        await this.streamingNativeRequest(endpoint, headers, requestBodyStr, 'openai', res);
+        await this.streamingNativeRequest(endpoint, headers, requestBodyStr, useResponses ? 'openai-responses' : 'openai', res);
         return;
       }
 
@@ -590,6 +599,98 @@ export class EmbeddedAPIServer {
   /**
    * Send JSON response
    */
+  /**
+   * Brave Search proxy (the Ideator web_search tool). Brave does not enable
+   * CORS, so the renderer cannot call the API directly — the apiKey travels
+   * in the JSON body and is sent upstream as X-Subscription-Token. Same
+   * contract as the Vite dev proxy route (braveSearch.ts falls back to this
+   * port when the app is served from file://, i.e. the packaged build).
+   */
+  private async handleBraveSearch(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const BRAVE_TIMEOUT_MS = 30_000;
+    let parsed: { apiKey?: string; query?: string; count?: number };
+    try {
+      parsed = JSON.parse(await this.readBody(req));
+    } catch {
+      this.sendJson(res, 400, { error: 'Invalid JSON body' });
+      return;
+    }
+    const apiKey = parsed.apiKey;
+    const query = parsed.query;
+    const count = parsed.count ?? 5;
+    if (!apiKey) {
+      this.sendJson(res, 400, { error: 'Missing required parameter: apiKey' });
+      return;
+    }
+    if (!query) {
+      this.sendJson(res, 400, { error: 'Missing required parameter: query' });
+      return;
+    }
+
+    const params = new URLSearchParams({
+      q: query,
+      count: String(Math.max(1, Math.min(20, Number(count) || 5))),
+    });
+    const url = new URL(`https://api.search.brave.com/res/v1/web/search?${params}`);
+    console.log(`[API Server] Brave search "${query}" (count=${count})`);
+
+    try {
+      // Brave's docs ask for Accept-Encoding: gzip and may return a gzipped
+      // body. Gunzip server-side before forwarding — the renderer sees
+      // Content-Type: application/json with no Content-Encoding.
+      const result = await new Promise<{ status: number; buffer: Buffer; encoding: string }>((resolve, reject) => {
+        const upstream = httpsRequest(
+          {
+            hostname: url.hostname,
+            port: 443,
+            path: url.pathname + url.search,
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              'Accept-Encoding': 'gzip',
+              'X-Subscription-Token': apiKey,
+            },
+          },
+          (upstreamRes: IncomingMessage) => {
+            const chunks: Buffer[] = [];
+            upstreamRes.on('data', (chunk: Buffer) => chunks.push(chunk));
+            upstreamRes.on('end', () =>
+              resolve({
+                status: upstreamRes.statusCode || 500,
+                buffer: Buffer.concat(chunks),
+                encoding: String(upstreamRes.headers['content-encoding'] || ''),
+              })
+            );
+            upstreamRes.on('error', reject);
+          }
+        );
+        upstream.on('error', reject);
+        upstream.setTimeout(BRAVE_TIMEOUT_MS, () => {
+          upstream.destroy(new Error('Request timeout'));
+        });
+        upstream.end();
+      });
+
+      let bodyBuf = result.buffer;
+      if (result.encoding.toLowerCase().includes('gzip')) {
+        try {
+          bodyBuf = gunzipSync(bodyBuf);
+        } catch (err) {
+          console.error('[API Server] Brave gunzip failed:', err);
+        }
+      }
+      res.writeHead(result.status, { 'Content-Type': 'application/json' });
+      res.end(bodyBuf);
+    } catch (error) {
+      console.error('[API Server] Brave proxy error:', error);
+      const isTimeout = error instanceof Error && error.message === 'Request timeout';
+      this.sendJson(res, isTimeout ? 504 : 500, {
+        error: isTimeout ? 'Request timeout' : 'Brave proxy request failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
   private sendJson(res: ServerResponse, status: number, data: unknown): void {
     res.writeHead(status, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
@@ -614,7 +715,7 @@ export class EmbeddedAPIServer {
     endpoint: string,
     headers: Record<string, string>,
     body: string,
-    provider: 'claude' | 'openai',
+    provider: 'claude' | 'openai' | 'openai-responses',
     res: ServerResponse,
   ): Promise<void> {
     const IDLE_TIMEOUT_MS = 120_000;
@@ -667,9 +768,14 @@ export class EmbeddedAPIServer {
               if (!payload || payload === '[DONE]') continue;
               try {
                 const json = JSON.parse(payload);
+                // OpenAI chat: { choices: [{ delta: { content } }] }
+                // OpenAI Responses API: { type: 'response.output_text.delta', delta }
+                // Anthropic: { type: 'content_block_delta', delta: { text | partial_json } }
                 const content = provider === 'openai'
                   ? json?.choices?.[0]?.delta?.content
-                  : (json?.type === 'content_block_delta' ? (json?.delta?.text ?? json?.delta?.partial_json) : undefined);
+                  : provider === 'openai-responses'
+                    ? (json?.type === 'response.output_text.delta' ? json?.delta : undefined)
+                    : (json?.type === 'content_block_delta' ? (json?.delta?.text ?? json?.delta?.partial_json) : undefined);
                 if (content) { res.write(content); totalChars += String(content).length; }
               } catch { /* malformed SSE line — skip */ }
             }

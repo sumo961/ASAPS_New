@@ -36,6 +36,12 @@ import {
   extractJSON,
   parseJSONWithRepair,
 } from './openai-utils';
+import {
+  openaiReasoningEffort,
+  isOfficialOpenAIEndpoint,
+  buildResponsesToolRequestBody,
+  extractResponsesFunctionCalls,
+} from '@asaps/core';
 
 /**
  * OpenAI Provider Implementation
@@ -43,7 +49,7 @@ import {
 export class OpenAIProvider extends BaseAIProvider {
   readonly name = 'openai';
   private client: OpenAI | null = null;
-  private model: string = 'gpt-5.6-sol';
+  private model: string = 'gpt-6-astra';
   private useJsonFormat: boolean = true;
   private useProxy: boolean = false;
   // Prefer same-origin proxy (Vite dev server plugin) over cross-origin port 3001
@@ -89,7 +95,7 @@ export class OpenAIProvider extends BaseAIProvider {
         });
       }
 
-      this.model = config.model || 'gpt-5.6-sol';
+      this.model = config.model || 'gpt-6-astra';
 
       // Disable response_format for third-party providers that may not support it
       // (e.g., Moonshot, DeepSeek, local Ollama, etc.)
@@ -129,6 +135,10 @@ export class OpenAIProvider extends BaseAIProvider {
     requestBody: any,
     signal?: AbortSignal,
     onProgress?: (charsReceived: number) => void,
+    // Responses-API callers that need the raw `{ output: [...] }` (the
+    // function-tool loop reads function_call items) opt out of the
+    // choices[] normalisation below.
+    rawResponse: boolean = false,
   ): Promise<any> {
     console.log('[OpenAIProvider] makeProxyRequest called, endpoint:', this.proxyEndpoint);
     console.log('[OpenAIProvider] baseUrl:', this.config?.baseUrl || '(none - using default)');
@@ -223,7 +233,7 @@ export class OpenAIProvider extends BaseAIProvider {
     // Pro reasoning (Responses API) returns { output: [...] } instead of
     // { choices: [...] } — normalize so every caller keeps reading
     // choices[0].message.content.
-    if (requestBody?._endpoint === 'responses' && !json?.choices) {
+    if (requestBody?._endpoint === 'responses' && !json?.choices && !rawResponse) {
       return {
         choices: [{ message: { content: extractResponsesOutputText(json) } }],
         _responsesApi: true,
@@ -316,14 +326,12 @@ export class OpenAIProvider extends BaseAIProvider {
       requestBody.response_format = { type: 'json_object' };
     }
 
-    if (reasoningEffort !== undefined) {
-      // OpenAI's reasoning_effort accepts none|minimal|low|medium|high|xhigh
-      // per developers.openai.com/api/docs/guides/reasoning. 'max' is an
-      // Anthropic-only tier we expose in the UI; cap it at 'xhigh' on the
-      // OpenAI side so a global 'max' setting doesn't error out for users
-      // who switch providers without changing reasoning effort. SDK types
-      // may also lag the newest GPT-5 levels, so cast to allow them.
-      const effortForOpenAI = reasoningEffort === 'max' ? 'xhigh' : reasoningEffort;
+    // Model-aware effort mapping (shared with the runtime paths): 'max' is
+    // honoured by GPT-6 Astra and capped at 'xhigh' elsewhere; Astra
+    // rejects none/minimal, which become 'low'. SDK types may lag the
+    // newest levels, so cast to allow them.
+    const effortForOpenAI = openaiReasoningEffort(this.model, reasoningEffort);
+    if (effortForOpenAI !== undefined) {
       requestBody.reasoning_effort = effortForOpenAI as any;
     }
 
@@ -1041,6 +1049,16 @@ Respond with JSON in this format:
     const toolLoopMaxTokens = this.config?.maxTokens ?? 8192;
     const reasoningEffort = this.config?.reasoningEffort;
 
+    // Official OpenAI endpoint → Responses API. Chat Completions rejects
+    // function tools together with reasoning_effort on the GPT-5.6 family
+    // ("use /v1/responses or set reasoning_effort to 'none'") and has no
+    // function calling at all on GPT-6 Astra, so on api.openai.com every
+    // tool turn goes through POST /v1/responses. OpenAI-compatible servers
+    // (Ollama, Kimi, custom proxies) keep the chat-completions loop below.
+    if (this.useProxy && isOfficialOpenAIEndpoint(this.config?.baseUrl)) {
+      return this.runResponsesToolLoop(request, request.tools, toolCalls, maxIter, toolLoopMaxTokens);
+    }
+
     for (let iter = 0; iter < maxIter; iter++) {
       // Mirror buildChatRequest's model handling: GPT-5 / o-series / gpt-4o /
       // Kimi-K2 reject the legacy `max_tokens` field and require
@@ -1058,8 +1076,9 @@ Respond with JSON in this format:
       } else {
         requestBody.max_tokens = toolLoopMaxTokens;
       }
-      if (reasoningEffort !== undefined) {
-        requestBody.reasoning_effort = reasoningEffort === 'max' ? 'xhigh' : reasoningEffort;
+      const effortForOpenAI = openaiReasoningEffort(this.model, reasoningEffort);
+      if (effortForOpenAI !== undefined) {
+        requestBody.reasoning_effort = effortForOpenAI;
       }
       console.log(
         `[OpenAIProvider] tool-loop iter ${iter}/${maxIter}, ` +
@@ -1158,6 +1177,99 @@ Respond with JSON in this format:
           tool_call_id: tc.id,
           content: result,
         });
+      }
+    }
+
+    return {
+      text:
+        '(Reached the maximum number of tool steps for this turn — let me know what you would like to focus on.)',
+      toolCalls,
+    };
+  }
+
+  /**
+   * Function-calling loop over the Responses API (POST /v1/responses).
+   *
+   * Item flow per developers.openai.com/api/docs/guides/function-calling:
+   * the system prompt rides as `instructions`; `input` starts as the role
+   * messages and grows by (a) every `output` item the model returned —
+   * reasoning items included, which reasoning models require echoed back
+   * with the tool results — and (b) one `function_call_output` per call.
+   * Non-streaming on purpose: the proxies' streaming path forwards only
+   * output_text deltas and would drop the function_call items.
+   */
+  private async runResponsesToolLoop(
+    request: {
+      systemPrompt: string;
+      messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+      executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
+      onToolUse?: (name: string, input: Record<string, unknown>) => void;
+    },
+    tools: Array<{ name: string; description: string; input_schema: unknown }>,
+    toolCalls: Array<{ name: string; input: Record<string, unknown>; result: string }>,
+    maxIter: number,
+    maxTokens: number,
+  ): Promise<{
+    text: string;
+    toolCalls: Array<{ name: string; input: Record<string, unknown>; result: string }>;
+  }> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const input: any[] = request.messages.map((m) => ({ role: m.role, content: m.content }));
+    const proMode = this.proReasoningActive();
+
+    for (let iter = 0; iter < maxIter; iter++) {
+      const body = buildResponsesToolRequestBody(
+        this.model,
+        request.systemPrompt,
+        input,
+        tools,
+        maxTokens,
+        { reasoningEffort: this.config?.reasoningEffort, proMode },
+      ) as Record<string, any>;
+      body._endpoint = 'responses';
+      console.log(
+        `[OpenAIProvider] responses tool-loop iter ${iter}/${maxIter}, ` +
+          `${input.length} input items, up to ${maxTokens} output tokens` +
+          (proMode ? ' (pro)' : ''),
+      );
+
+      const json = await this.makeProxyRequest(body, undefined, undefined, true);
+      const calls = extractResponsesFunctionCalls(json);
+      const text = extractResponsesOutputText(json).trim();
+      console.log(
+        `[OpenAIProvider] responses iter ${iter}: status=${json?.status ?? 'unknown'}, ` +
+          `text_len=${text.length}, function_calls=${calls.length}` +
+          (json?.incomplete_details?.reason ? `, incomplete=${json.incomplete_details.reason}` : ''),
+      );
+
+      if (calls.length === 0) {
+        return { text, toolCalls };
+      }
+
+      // Echo the model's output items (reasoning, function_call, message)
+      // so the next turn has the same context the API stored for them.
+      if (Array.isArray(json?.output)) input.push(...json.output);
+
+      for (const call of calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = call.arguments ? (JSON.parse(call.arguments) as Record<string, unknown>) : {};
+        } catch {
+          args = {};
+        }
+        try {
+          request.onToolUse?.(call.name, args);
+        } catch {
+          /* host UI errors must never break the loop */
+        }
+        let result: string;
+        try {
+          result = await request.executeTool(call.name, args);
+        } catch (err) {
+          result = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        toolCalls.push({ name: call.name, input: args, result });
+        input.push({ type: 'function_call_output', call_id: call.call_id, output: result });
       }
     }
 

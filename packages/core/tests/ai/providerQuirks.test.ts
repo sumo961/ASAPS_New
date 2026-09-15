@@ -31,6 +31,11 @@ import {
   supportsProReasoning,
   buildResponsesRequestBody,
   extractResponsesOutputText,
+  isGpt6Model,
+  openaiReasoningEffort,
+  isOfficialOpenAIEndpoint,
+  buildResponsesToolRequestBody,
+  extractResponsesFunctionCalls,
 } from '../../src/ai/providerQuirks';
 
 describe('requiresMaxCompletionTokens', () => {
@@ -38,6 +43,11 @@ describe('requiresMaxCompletionTokens', () => {
     it('gpt-5 family', () => {
       expect(requiresMaxCompletionTokens('gpt-5')).toBe(true);
       expect(requiresMaxCompletionTokens('gpt-5-turbo')).toBe(true);
+    });
+
+    it('gpt-6 astra (Sept 2026 flagship)', () => {
+      expect(requiresMaxCompletionTokens('gpt-6-astra')).toBe(true);
+      expect(requiresMaxCompletionTokens('GPT-6-Astra')).toBe(true);
     });
 
     it('gpt-5.6 tier family (Sol / Terra / Luna, GA 2026-07-09)', () => {
@@ -140,6 +150,10 @@ describe('isReasoningModel', () => {
     expect(isReasoningModel('O1')).toBe(true);
     expect(isReasoningModel('GPT-5-TURBO')).toBe(true);
   });
+  it('detects gpt-6 astra as a reasoning model (temperature must not be sent)', () => {
+    expect(isReasoningModel('gpt-6-astra')).toBe(true);
+  });
+
   it('detects the gpt-5.6 tier family as reasoning models', () => {
     expect(isReasoningModel('gpt-5.6-sol')).toBe(true);
     expect(isReasoningModel('gpt-5.6-terra')).toBe(true);
@@ -339,7 +353,8 @@ describe('supportsProReasoning', () => {
     expect(supportsProReasoning('GPT-5.6-Sol')).toBe(true); // case-insensitive
   });
 
-  it('rejects everything that is not gpt-5.6', () => {
+  it('rejects everything that is not gpt-5.6 (Astra has no pro mode)', () => {
+    expect(supportsProReasoning('gpt-6-astra')).toBe(false);
     expect(supportsProReasoning('gpt-5.5')).toBe(false);
     expect(supportsProReasoning('gpt-4.1')).toBe(false);
     expect(supportsProReasoning('o1')).toBe(false);
@@ -422,5 +437,141 @@ describe('extractResponsesOutputText', () => {
     expect(extractResponsesOutputText(null)).toBe('');
     expect(extractResponsesOutputText({ output: [] })).toBe('');
     expect(extractResponsesOutputText({ output: [{ type: 'message', content: [] }] })).toBe('');
+  });
+});
+
+describe('isGpt6Model', () => {
+  it('matches the gpt-6 family case-insensitively and nothing else', () => {
+    expect(isGpt6Model('gpt-6-astra')).toBe(true);
+    expect(isGpt6Model('GPT-6-ASTRA')).toBe(true);
+    expect(isGpt6Model('gpt-5.6-sol')).toBe(false);
+    expect(isGpt6Model('o4-mini')).toBe(false);
+    expect(isGpt6Model(undefined)).toBe(false);
+    expect(isGpt6Model('')).toBe(false);
+  });
+});
+
+describe('openaiReasoningEffort', () => {
+  it('sends nothing when no effort is set', () => {
+    expect(openaiReasoningEffort('gpt-6-astra', undefined)).toBeUndefined();
+    expect(openaiReasoningEffort('gpt-5.6-sol', '')).toBeUndefined();
+  });
+
+  it("honours 'max' on GPT-6 Astra and caps it at 'xhigh' everywhere else", () => {
+    expect(openaiReasoningEffort('gpt-6-astra', 'max')).toBe('max');
+    expect(openaiReasoningEffort('gpt-5.6-sol', 'max')).toBe('xhigh');
+    expect(openaiReasoningEffort('gpt-5.5', 'max')).toBe('xhigh');
+    expect(openaiReasoningEffort(undefined, 'max')).toBe('xhigh');
+  });
+
+  it("maps none/minimal to 'low' on GPT-6 Astra (Astra 400s on them) and passes them through elsewhere", () => {
+    expect(openaiReasoningEffort('gpt-6-astra', 'none')).toBe('low');
+    expect(openaiReasoningEffort('gpt-6-astra', 'minimal')).toBe('low');
+    expect(openaiReasoningEffort('gpt-5.6-sol', 'none')).toBe('none');
+    expect(openaiReasoningEffort('gpt-5.5', 'minimal')).toBe('minimal');
+  });
+
+  it('passes the supported tiers through untouched', () => {
+    for (const effort of ['low', 'medium', 'high', 'xhigh']) {
+      expect(openaiReasoningEffort('gpt-6-astra', effort)).toBe(effort);
+      expect(openaiReasoningEffort('gpt-5.6-terra', effort)).toBe(effort);
+    }
+  });
+
+  it('is what buildChatRequestBody applies to reasoning_effort', () => {
+    const msgs = [{ role: 'user' as const, content: 'hi' }];
+    expect(buildChatRequestBody('gpt-6-astra', msgs, 100, { reasoningEffort: 'none' }).reasoning_effort).toBe('low');
+    expect(buildChatRequestBody('gpt-6-astra', msgs, 100, { reasoningEffort: 'max' }).reasoning_effort).toBe('max');
+    expect(buildChatRequestBody('gpt-5.6-sol', msgs, 100, { reasoningEffort: 'max' }).reasoning_effort).toBe('xhigh');
+    expect(buildChatRequestBody('gpt-6-astra', msgs, 100, {}).reasoning_effort).toBeUndefined();
+  });
+});
+
+describe('isOfficialOpenAIEndpoint', () => {
+  it('is true for unset and api.openai.com base URLs', () => {
+    expect(isOfficialOpenAIEndpoint(undefined)).toBe(true);
+    expect(isOfficialOpenAIEndpoint('')).toBe(true);
+    expect(isOfficialOpenAIEndpoint('https://api.openai.com/v1')).toBe(true);
+    expect(isOfficialOpenAIEndpoint('https://api.openai.com/v1/')).toBe(true);
+  });
+
+  it('is false for OpenAI-compatible third parties and local servers', () => {
+    expect(isOfficialOpenAIEndpoint('http://localhost:11434/v1')).toBe(false);
+    expect(isOfficialOpenAIEndpoint('https://api.moonshot.ai/v1')).toBe(false);
+    expect(isOfficialOpenAIEndpoint('https://api.deepseek.com')).toBe(false);
+  });
+});
+
+describe('buildResponsesToolRequestBody', () => {
+  const tools = [
+    { name: 'web_search', description: 'Search the web', input_schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+  ];
+  const input = [{ role: 'user', content: 'find something' }];
+
+  it('builds the Responses function-calling shape (flat tools, instructions, input, max_output_tokens)', () => {
+    const body = buildResponsesToolRequestBody('gpt-6-astra', 'be helpful', input, tools, 8192);
+    expect(body.model).toBe('gpt-6-astra');
+    expect(body.instructions).toBe('be helpful');
+    expect(body.input).toBe(input);
+    expect(body.max_output_tokens).toBe(8192);
+    expect(body.tools).toEqual([
+      {
+        type: 'function',
+        name: 'web_search',
+        description: 'Search the web',
+        parameters: tools[0].input_schema,
+        strict: false,
+      },
+    ]);
+    // chat-completions keys and temperature must not leak in
+    expect((body as any).messages).toBeUndefined();
+    expect((body as any).max_completion_tokens).toBeUndefined();
+    expect((body as any).temperature).toBeUndefined();
+    expect((body as any).reasoning_effort).toBeUndefined();
+    expect(body.reasoning).toBeUndefined();
+  });
+
+  it('threads the model-aware effort into reasoning.effort', () => {
+    expect(buildResponsesToolRequestBody('gpt-6-astra', 's', input, tools, 100, { reasoningEffort: 'none' }).reasoning)
+      .toEqual({ effort: 'low' });
+    expect(buildResponsesToolRequestBody('gpt-6-astra', 's', input, tools, 100, { reasoningEffort: 'max' }).reasoning)
+      .toEqual({ effort: 'max' });
+    expect(buildResponsesToolRequestBody('gpt-5.6-sol', 's', input, tools, 100, { reasoningEffort: 'max' }).reasoning)
+      .toEqual({ effort: 'xhigh' });
+    expect(buildResponsesToolRequestBody('gpt-5.6-sol', 's', input, tools, 100, { reasoningEffort: 'none' }).reasoning)
+      .toEqual({ effort: 'none' });
+  });
+
+  it('adds reasoning.mode pro (medium+ efforts only) when asked', () => {
+    expect(buildResponsesToolRequestBody('gpt-5.6-sol', 's', input, tools, 100, { proMode: true }).reasoning)
+      .toEqual({ mode: 'pro' });
+    expect(buildResponsesToolRequestBody('gpt-5.6-sol', 's', input, tools, 100, { proMode: true, reasoningEffort: 'high' }).reasoning)
+      .toEqual({ mode: 'pro', effort: 'high' });
+    expect(buildResponsesToolRequestBody('gpt-5.6-sol', 's', input, tools, 100, { proMode: true, reasoningEffort: 'low' }).reasoning)
+      .toEqual({ mode: 'pro' });
+  });
+});
+
+describe('extractResponsesFunctionCalls', () => {
+  it('lifts function_call items out of output[] and ignores the rest', () => {
+    const calls = extractResponsesFunctionCalls({
+      output: [
+        { type: 'reasoning', id: 'rs_1', summary: [] },
+        { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'web_search', arguments: '{"query":"x"}' },
+        { type: 'message', id: 'msg_1', role: 'assistant', content: [{ type: 'output_text', text: 'hi' }] },
+        { type: 'function_call', id: 'fc_2', call_id: 'call_2', name: 'web_search' }, // no arguments
+        { type: 'function_call', name: 'broken' }, // no call_id → skipped
+      ],
+    });
+    expect(calls).toEqual([
+      { id: 'fc_1', call_id: 'call_1', name: 'web_search', arguments: '{"query":"x"}' },
+      { id: 'fc_2', call_id: 'call_2', name: 'web_search', arguments: '{}' },
+    ]);
+  });
+
+  it('is empty for text-only results and malformed input', () => {
+    expect(extractResponsesFunctionCalls({ output: [{ type: 'message', content: [] }] })).toEqual([]);
+    expect(extractResponsesFunctionCalls({})).toEqual([]);
+    expect(extractResponsesFunctionCalls(null)).toEqual([]);
   });
 });

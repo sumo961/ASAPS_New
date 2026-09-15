@@ -64,6 +64,23 @@ describe('resolveClaudeEndpoint', () => {
   });
 });
 
+describe('resolveOpenAIEndpoint (responses api)', () => {
+  it('targets /responses on the official endpoint by default', () => {
+    expect(resolveOpenAIEndpoint(undefined, 'responses')).toBe('https://api.openai.com/v1/responses');
+  });
+
+  it('rebases a chat-completions base URL onto its /v1 root', () => {
+    expect(resolveOpenAIEndpoint('https://api.openai.com/v1/chat/completions', 'responses'))
+      .toBe('https://api.openai.com/v1/responses');
+    expect(resolveOpenAIEndpoint('https://api.openai.com/v1/', 'responses'))
+      .toBe('https://api.openai.com/v1/responses');
+  });
+
+  it("'chat' (and the omitted default) keep the legacy behaviour", () => {
+    expect(resolveOpenAIEndpoint(undefined, 'chat')).toBe('https://api.openai.com/v1/chat/completions');
+  });
+});
+
 describe('resolveOpenAIEndpoint', () => {
   it('returns the OpenAI chat-completions URL by default', () => {
     expect(resolveOpenAIEndpoint()).toBe('https://api.openai.com/v1/chat/completions');

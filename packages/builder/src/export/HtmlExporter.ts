@@ -660,9 +660,11 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
               rMsgs[0].content += '\n\nRespond with a single valid JSON object.';
             }
             relayBody = { model: config.model || 'gpt-4o-mini', messages: rMsgs, temperature: 0.3, response_format: { type: 'json_object' } };
-            if (/^(gpt-5|o1|o3|o4)/i.test(relayBody.model) || /gpt-4o/i.test(relayBody.model)) {
+            if (/^(gpt-5|gpt-6|o1|o3|o4)/i.test(relayBody.model) || /gpt-4o/i.test(relayBody.model)) {
               relayBody.max_completion_tokens = 8192;
             }
+            // Reasoning models (GPT-5.x, GPT-6 Astra, o-series) reject temperature.
+            if (/^(gpt-5|gpt-6|o1|o3|o4)/i.test(relayBody.model)) delete relayBody.temperature;
           }
           var relayResp = await fetch(config.proxyUrl, {
             method: 'POST',
@@ -720,11 +722,13 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           // GPT-5 / o-series / gpt-4o reject the legacy max_tokens field; only
           // the newer models need an explicit budget here, and they take
           // max_completion_tokens.
-          if (/^(gpt-5|o1|o3|o4)/i.test(oaiBody.model) || /gpt-4o/i.test(oaiBody.model)) {
+          if (/^(gpt-5|gpt-6|o1|o3|o4)/i.test(oaiBody.model) || /gpt-4o/i.test(oaiBody.model)) {
             oaiBody.max_completion_tokens = 8192;
           } else {
             oaiBody.max_tokens = 8192;
           }
+          // Reasoning models (GPT-5.x, GPT-6 Astra, o-series) reject temperature.
+          if (/^(gpt-5|gpt-6|o1|o3|o4)/i.test(oaiBody.model)) delete oaiBody.temperature;
           var resp = await fetch(url, {
             method: 'POST',
             headers: headers,
@@ -977,7 +981,7 @@ export interface HtmlExportOptions {
   aiProxyUrl?: string;
   /** Custom base URL for API (OpenAI-compatible endpoints) */
   aiBaseUrl?: string;
-  /** Model override (e.g., 'gpt-5.6-sol', 'claude-sonnet-5') */
+  /** Model override (e.g., 'gpt-6-astra', 'claude-sonnet-5') */
   aiModel?: string;
   /** TTS provider type */
   ttsProvider?: string;

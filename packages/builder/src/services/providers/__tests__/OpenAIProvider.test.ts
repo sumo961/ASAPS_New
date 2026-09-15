@@ -13,7 +13,7 @@
  *   - gpt-4.1  → not reasoning, uses max_tokens + temperature
  *   - gpt-5.5  → reasoning, uses max_completion_tokens, no temperature
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAIProvider } from '../OpenAIProvider';
 import type { AIProviderConfig } from '../../../types/ai';
 
@@ -48,10 +48,10 @@ describe('configure', () => {
     expect(p.isReady()).toBe(false);
   });
 
-  it('defaults the model to gpt-5.6-sol and proxies the default OpenAI endpoint', () => {
+  it('defaults the model to gpt-6-astra and proxies the default OpenAI endpoint', () => {
     p.configure(cfg());
     expect(p.isReady()).toBe(true);
-    expect((p as any).model).toBe('gpt-5.6-sol');
+    expect((p as any).model).toBe('gpt-6-astra');
     expect((p as any).useProxy).toBe(true); // no baseUrl → proxy
     expect((p as any).useJsonFormat).toBe(true); // json_object on for default
   });
@@ -209,9 +209,21 @@ describe('buildChatRequest', () => {
     expect(body.temperature).toBeUndefined(); // effort makes it a reasoning request
   });
 
-  it("caps the Anthropic-only 'max' tier to 'xhigh' on the OpenAI side", () => {
+  it("caps the 'max' tier to 'xhigh' on OpenAI models that lack it", () => {
     const body = build({ model: 'gpt-5.5', reasoningEffort: 'max' });
     expect(body.reasoning_effort).toBe('xhigh');
+  });
+
+  it("honours 'max' on GPT-6 Astra and rewrites none/minimal to 'low' (Astra 400s on them)", () => {
+    expect(build({ model: 'gpt-6-astra', reasoningEffort: 'max' }).reasoning_effort).toBe('max');
+    expect(build({ model: 'gpt-6-astra', reasoningEffort: 'none' }).reasoning_effort).toBe('low');
+    expect(build({ model: 'gpt-6-astra', reasoningEffort: 'minimal' }).reasoning_effort).toBe('low');
+    expect(build({ model: 'gpt-6-astra', reasoningEffort: 'high' }).reasoning_effort).toBe('high');
+    // reasoning model: max_completion_tokens, no temperature
+    const body = build({ model: 'gpt-6-astra' });
+    expect(body.max_completion_tokens).toBeDefined();
+    expect(body.max_tokens).toBeUndefined();
+    expect(body.temperature).toBeUndefined();
   });
 
   it('injects Ollama options for an Ollama connection', () => {
@@ -325,5 +337,122 @@ describe('cleanupBeatParameters', () => {
     };
     (p as any).cleanupBeatParameters(data);
     expect(Object.keys(data.beats[0].parameters).sort()).toEqual(['author', 'title']);
+  });
+});
+
+describe('generateChatWithTools — Responses API on the official endpoint', () => {
+  const tools = [
+    { name: 'web_search', description: 'Search', input_schema: { type: 'object', properties: { query: { type: 'string' } } } },
+  ];
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const originalFetch = globalThis.fetch;
+
+  const jsonResponse = (payload: unknown) =>
+    ({ ok: true, status: 200, json: async () => payload, text: async () => JSON.stringify(payload) }) as unknown as Response;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const sentBody = (call: number) => JSON.parse(fetchMock.mock.calls[call][1].body as string);
+
+  it('posts a Responses-API body (flat tools, instructions, _endpoint marker) instead of chat completions', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      status: 'completed',
+      output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'no search needed' }] }],
+    }));
+    p.configure(cfg({ model: 'gpt-6-astra', reasoningEffort: 'none' }));
+
+    const result = await p.generateChatWithTools({
+      systemPrompt: 'You are the Ideator',
+      messages: [{ role: 'user', content: 'hello' }],
+      tools,
+      executeTool: async () => 'unused',
+    });
+
+    expect(result).toEqual({ text: 'no search needed', toolCalls: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('http://localhost:3001/api/ai/openai');
+    const body = sentBody(0);
+    expect(body._endpoint).toBe('responses');
+    expect(body.model).toBe('gpt-6-astra');
+    expect(body.instructions).toBe('You are the Ideator');
+    expect(body.input).toEqual([{ role: 'user', content: 'hello' }]);
+    expect(body.tools).toEqual([
+      { type: 'function', name: 'web_search', description: 'Search', parameters: tools[0].input_schema, strict: false },
+    ]);
+    expect(body.max_output_tokens).toBe(8192);
+    // Astra: none → low; chat-completions keys must not leak in
+    expect(body.reasoning).toEqual({ effort: 'low' });
+    expect(body.messages).toBeUndefined();
+    expect(body.reasoning_effort).toBeUndefined();
+    expect(body.stream).toBeUndefined();
+  });
+
+  it('runs the requested tool, echoes output items + function_call_output, and returns the final text', async () => {
+    const firstOutput = [
+      { type: 'reasoning', id: 'rs_1', summary: [] },
+      { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'web_search', arguments: '{"query":"neolithic"}' },
+    ];
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ status: 'completed', output: firstOutput }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: 'completed',
+        output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Here is what I found.' }] }],
+      }));
+    p.configure(cfg({ model: 'gpt-5.6-sol', reasoningEffort: 'medium' }));
+
+    const executeTool = vi.fn(async (name: string, input: Record<string, unknown>) => `results for ${input.query} via ${name}`);
+    const onToolUse = vi.fn();
+    const result = await p.generateChatWithTools({
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'research neolithic life' }],
+      tools,
+      executeTool,
+      onToolUse,
+    });
+
+    expect(executeTool).toHaveBeenCalledWith('web_search', { query: 'neolithic' });
+    expect(onToolUse).toHaveBeenCalledWith('web_search', { query: 'neolithic' });
+    expect(result.text).toBe('Here is what I found.');
+    expect(result.toolCalls).toEqual([
+      { name: 'web_search', input: { query: 'neolithic' }, result: 'results for neolithic via web_search' },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const second = sentBody(1);
+    expect(second.input).toEqual([
+      { role: 'user', content: 'research neolithic life' },
+      ...firstOutput,
+      { type: 'function_call_output', call_id: 'call_1', output: 'results for neolithic via web_search' },
+    ]);
+    // GPT-5.6 keeps its chat-style effort values on the Responses API
+    expect(second.reasoning).toEqual({ effort: 'medium' });
+    expect(second.reasoning.mode).toBeUndefined();
+  });
+
+  it('keeps the chat-completions tool loop for OpenAI-compatible third parties', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      choices: [{ finish_reason: 'stop', message: { content: 'plain reply' } }],
+    }));
+    p.configure(cfg({ model: 'kimi-k2-thinking', baseUrl: 'https://api.moonshot.ai/v1' }));
+
+    const result = await p.generateChatWithTools({
+      systemPrompt: 'sys',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools,
+      executeTool: async () => 'unused',
+    });
+
+    expect(result.text).toBe('plain reply');
+    const body = sentBody(0);
+    expect(body._endpoint).toBeUndefined();
+    expect(body.messages?.[0]).toEqual({ role: 'system', content: 'sys' });
+    expect(body.tools?.[0]?.type).toBe('function');
+    expect(body.tools?.[0]?.function?.name).toBe('web_search');
   });
 });
