@@ -386,7 +386,15 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         zIndex: 1,
       }}
     >
-      {locations.map((loc, idx) => {
+      {[...locations]
+        // Paint order = location.zIndex (stable for ties): the editor's
+        // ▲ / ▼ reorder buttons swap zIndex between elements, and this is
+        // what makes that visible in responsive mode. Each sprite also
+        // carries its zIndex as CSS so the order holds regardless of DOM
+        // position (animated transforms don't change stacking).
+        .map((loc, idx) => ({ loc, idx, z: typeof loc.zIndex === 'number' ? loc.zIndex : 0 }))
+        .sort((a, b) => a.z - b.z || a.idx - b.idx)
+        .map(({ loc, idx, z }) => {
         const { url, sprite } = resolveImg(loc);
         if (!url) return null;
         const stage = stageSizeRef.current;
@@ -488,6 +496,7 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         const isSelected = !!editorMode && selectedElementName === loc.name;
         const commonStyle: React.CSSProperties = {
           position: 'absolute',
+          zIndex: z,
           left: x,
           top: y,
           width: visualW,

@@ -285,37 +285,75 @@ async function preTranslateUIStrings(
  * variableChanged/counterChanged events the rail and every HUD already
  * subscribe to do the propagation.
  */
+/** Values longer than this get their own full-width, multi-line row in the
+ *  debug panel instead of the 6rem inline field (a long string variable was
+ *  unreadable — the field clipped it to its first ~10 characters). */
+const DEBUG_VALUE_LONG = 14;
+
 const DebugValueInput: React.FC<{
   display: string;
   numeric?: boolean;
   onCommit: (raw: string) => void;
   className?: string;
-}> = ({ display, numeric, onCommit, className }) => (
-  <input
-    // Re-key on external value change so engine-driven updates refresh the
-    // field, while keystrokes never fight a controlled re-render.
-    key={display}
-    type={numeric ? 'number' : 'text'}
-    defaultValue={display}
-    onKeyDown={(e) => {
-      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-      if (e.key === 'Escape') {
-        (e.target as HTMLInputElement).value = display;
-        (e.target as HTMLInputElement).blur();
-      }
-      e.stopPropagation();
-    }}
-    onBlur={(e) => {
-      const raw = e.target.value.trim();
-      if (raw !== display && raw !== '') onCommit(raw);
-    }}
-    className={
-      'font-mono text-xs bg-transparent border border-transparent rounded px-1 text-right ' +
-      'hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none ' +
-      (className || '')
-    }
-  />
-);
+}> = ({ display, numeric, onCommit, className }) => {
+  const baseClass =
+    'font-mono text-xs bg-transparent border border-transparent rounded px-1 ' +
+    'hover:border-gray-300 focus:border-blue-400 focus:bg-white focus:outline-none ';
+  if (!numeric && display.length > DEBUG_VALUE_LONG) {
+    // Long value: a textarea sized to its content (grows with the text, capped
+    // so a huge JSON blob doesn't swallow the panel — it scrolls past 8 rows).
+    // Enter commits, Shift+Enter inserts a newline inside a string.
+    const rows = Math.min(8, Math.max(1, Math.ceil(display.length / 30)));
+    return (
+      <textarea
+        key={display}
+        rows={rows}
+        defaultValue={display}
+        title={display}
+        spellCheck={false}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            (e.target as HTMLTextAreaElement).blur();
+          }
+          if (e.key === 'Escape') {
+            (e.target as HTMLTextAreaElement).value = display;
+            (e.target as HTMLTextAreaElement).blur();
+          }
+          e.stopPropagation();
+        }}
+        onBlur={(e) => {
+          const raw = e.target.value.trim();
+          if (raw !== display && raw !== '') onCommit(raw);
+        }}
+        className={baseClass + 'w-full text-left break-all resize-y leading-snug ' + (className || '')}
+      />
+    );
+  }
+  return (
+    <input
+      // Re-key on external value change so engine-driven updates refresh the
+      // field, while keystrokes never fight a controlled re-render.
+      key={display}
+      type={numeric ? 'number' : 'text'}
+      defaultValue={display}
+      title={display}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') {
+          (e.target as HTMLInputElement).value = display;
+          (e.target as HTMLInputElement).blur();
+        }
+        e.stopPropagation();
+      }}
+      onBlur={(e) => {
+        const raw = e.target.value.trim();
+        if (raw !== display && raw !== '') onCommit(raw);
+      }}
+      className={baseClass + 'text-right ' + (className || '')}
+    />
+  );
+};
 
 export const PreviewWindow: React.FC = () => {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -3179,24 +3217,33 @@ export const PreviewWindow: React.FC = () => {
                   <div className="bg-white p-3 rounded-lg">
                     <div className="text-sm font-medium text-gray-600 mb-2">Variables</div>
                     <div className="space-y-1">
-                      {Object.entries(debugInfo.variables).map(([key, value]) => (
-                        <div key={key} className="text-xs flex items-center justify-between gap-2">
-                          <span className="font-mono text-gray-600">{key}:</span>
-                          <DebugValueInput
-                            display={JSON.stringify(value)}
-                            onCommit={(raw) => {
-                              const ctx = engineRef.current?.getContext();
-                              if (!ctx) return;
-                              // JSON first (numbers, booleans, quoted strings,
-                              // null); bare words fall back to plain strings.
-                              let parsed: any = raw;
-                              try { parsed = JSON.parse(raw); } catch { /* string */ }
-                              ctx.setVariable(key, parsed);
-                            }}
-                            className="w-24"
-                          />
-                        </div>
-                      ))}
+                      {Object.entries(debugInfo.variables).map(([key, value]) => {
+                        const display = JSON.stringify(value);
+                        // Long values drop to their own line under the name so
+                        // the full content is readable (and editable) in place.
+                        const long = display.length > DEBUG_VALUE_LONG;
+                        return (
+                          <div
+                            key={key}
+                            className={`text-xs flex gap-2 ${long ? 'flex-col items-stretch' : 'items-center justify-between'}`}
+                          >
+                            <span className="font-mono text-gray-600 break-all">{key}:</span>
+                            <DebugValueInput
+                              display={display}
+                              onCommit={(raw) => {
+                                const ctx = engineRef.current?.getContext();
+                                if (!ctx) return;
+                                // JSON first (numbers, booleans, quoted strings,
+                                // null); bare words fall back to plain strings.
+                                let parsed: any = raw;
+                                try { parsed = JSON.parse(raw); } catch { /* string */ }
+                                ctx.setVariable(key, parsed);
+                              }}
+                              className={long ? '' : 'w-24'}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

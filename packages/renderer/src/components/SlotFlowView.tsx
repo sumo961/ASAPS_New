@@ -41,6 +41,22 @@ import { WebViewElement } from './WebViewElement';
 import { ARSceneElement } from './ARSceneElement';
 import { runSlotPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer } from './ResponsiveCharacterLayer';
+
+/**
+ * Stacking contract of the slot stage (positioned-tier z, root context):
+ *   0  background / video
+ *   1  ResponsiveCharacterLayer — free-positioned characters and props
+ *   2  content rows — speaker, title, body, input, keypad, camera,
+ *      image input, web view (this constant)
+ *   4  anchored per-button placements
+ *   5  the action row
+ * The rows are in-flow flex children; without their own positioned
+ * z-index they paint UNDER the absolutely positioned sprite layer, so a
+ * prop dropped on an inputText covered the prompt and the input field.
+ * Text, buttons and inputs are always in front of sprites by default;
+ * sprites order among themselves by location.zIndex inside the layer.
+ */
+const CONTENT_ABOVE_SPRITES: React.CSSProperties = { position: 'relative', zIndex: 2 };
 import { TimerProgressBar } from './TimerProgressBar';
 
 interface SlotFlowViewProps {
@@ -207,6 +223,13 @@ interface SlotFlowViewProps {
   assetResolver?: (assetId: string) => string | undefined;
   spriteDataResolver?: (characterId: string) => SpriteSheetData | null;
   /**
+   * Editor selection for the sprite layer (mirror of SpatialFlowView):
+   * the Visual Editor highlights the selected character / prop and a
+   * click on a sprite selects its row in the elements panel.
+   */
+  selectedElementName?: string;
+  onElementSelect?: (locationName: string) => void;
+  /**
    * Default-target countdown — when present and visible, a green
    * progress bar pinned to the top of the stage shows the remaining
    * time before auto-advance. The wrapping renderer publishes this
@@ -316,6 +339,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   characterResolver,
   assetResolver,
   spriteDataResolver,
+  selectedElementName,
+  onElementSelect,
   editorMode,
   selectedSlotKey,
   onSlotSelect,
@@ -1520,6 +1545,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 className={a.className}
                 data-slotflow-slot={speakerSlot.name}
                 style={{
+                  ...CONTENT_ABOVE_SPRITES,
                   fontFamily: theme.fonts.textFont || 'sans-serif',
                   fontWeight: 600,
                   letterSpacing: '0.04em',
@@ -1565,6 +1591,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 data-slotflow-slot={titleSlotName}
                 onClick={editorClick}
                 style={{
+                  ...CONTENT_ABOVE_SPRITES,
                   fontFamily: ovFont || theme.fonts.titleFont || theme.fonts.textFont || 'serif',
                   fontWeight: 700,
                   ...(editorMode ? { cursor: 'pointer' } : null),
@@ -1625,6 +1652,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 data-slotflow-slot={bodySlot?.name}
                 onClick={editorClick}
                 style={{
+                  ...CONTENT_ABOVE_SPRITES,
                   whiteSpace: 'pre-wrap',
                   ...(editorMode ? { cursor: 'pointer' } : null),
                   ...(isSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
@@ -1705,6 +1733,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             data-slotflow-slot={inputSlot.name}
             onClick={editorClick}
             style={{
+              ...CONTENT_ABOVE_SPRITES,
               display: 'flex',
               justifyContent: 'center',
               padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
@@ -1754,6 +1783,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             data-slotflow-slot={keypadSlot.name}
             onClick={editorClick}
             style={{
+              ...CONTENT_ABOVE_SPRITES,
               display: 'flex',
               justifyContent: 'center',
               padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
@@ -1804,6 +1834,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             data-slotflow-slot={cameraSlot.name}
             onClick={editorClick}
             style={{
+              ...CONTENT_ABOVE_SPRITES,
               display: 'flex',
               justifyContent: 'center',
               padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
@@ -1862,6 +1893,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             data-slotflow-slot={imageInputSlot.name}
             onClick={editorClick}
             style={{
+              ...CONTENT_ABOVE_SPRITES,
               display: 'flex',
               justifyContent: 'center',
               padding: `clamp(8px, ${vhU(2)}, 16px) 16px`,
@@ -1924,6 +1956,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             data-slotflow-slot={webViewSlot.name}
             onClick={editorClick}
             style={{
+              ...CONTENT_ABOVE_SPRITES,
               display: 'flex',
               justifyContent: 'center',
               // Grow to the REMAINING stage height (after speaker/prompt).
@@ -2311,6 +2344,9 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           characterResolver={characterResolver}
           assetResolver={assetResolver}
           spriteDataResolver={spriteDataResolver}
+          editorMode={editorMode}
+          selectedElementName={selectedElementName}
+          onElementSelect={onElementSelect}
         />
       )}
     </div>

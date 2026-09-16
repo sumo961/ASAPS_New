@@ -70,6 +70,22 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 
+
+/**
+ * Free-positioned character / prop locations of a beat, for the responsive
+ * preview sprite layer. beat.locations is a Map<string, Location>, not an
+ * array — iterate values. Returns undefined when there are none so the
+ * views skip mounting the layer.
+ */
+function freePositionedLocations(beat: unknown): any[] | undefined {
+  const locsMap = (beat as any)?.locations as Map<string, any> | any[] | undefined;
+  if (!locsMap) return undefined;
+  const list: any[] = Array.isArray(locsMap)
+    ? locsMap
+    : (typeof locsMap.values === 'function' ? Array.from(locsMap.values()) : []);
+  const out = list.filter(l => l?.kind === 'character' || l?.kind === 'prop');
+  return out.length > 0 ? out : undefined;
+}
 /**
  * Helper to resolve fresh image URL from assets using assetId.
  * Character state images stored with blob URLs become stale after page reload.
@@ -1287,6 +1303,41 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'elements' | 'animations'>('elements');
   const [animations, setAnimations] = useState<AnimationPath[]>([]);
+
+  // ---- Responsive preview sprite layer (slot + spatial) ------------------
+  // The three resolvers mirror ReactRenderer's (characterResolver /
+  // assetResolver / spriteDataResolver) so the Visual Editor stage shows
+  // the same characters and props the Preview Window draws.
+  // Resolve a character's current image URL by id/state. Falls through
+  // state.visual.image → defaultImage → spritesheet, same chain the panel uses.
+  const previewCharacterResolver = useCallback((characterId: string, stateId?: string) => {
+    const ch = characters.find(c => c.id === characterId);
+    if (!ch) return undefined;
+    const st = ch.states?.find(s => s.id === (stateId || ch.defaultState)) ?? null;
+    return resolveCharacterImageUrl(
+      st,
+      ch.visual?.defaultImage,
+      assets,
+      ch.visual?.spriteSheet,
+    );
+  }, [characters, assets]);
+  // assetId → fresh URL (props; character fallback).
+  const previewAssetResolver = useCallback((assetId: string) => {
+    return assets?.find(a => a.id === assetId)?.url;
+  }, [assets]);
+  // Sprite metadata so the renderer crops the spritesheet to one frame
+  // (otherwise it draws the whole tiled sheet).
+  const previewSpriteDataResolver = useCallback((characterId: string) => {
+    const ch = characters.find(c => c.id === characterId);
+    const ss = ch?.visual?.spriteSheet;
+    if (!ss || !ss.frameWidth || !ss.frameHeight) return null;
+    return {
+      frameWidth: ss.frameWidth,
+      frameHeight: ss.frameHeight,
+      imageWidth: ss.imageWidth,
+      animations: ss.animations,
+    };
+  }, [characters]);
   const [leftPanelWidth, setLeftPanelWidth] = useState(320); // Default w-80 = 320px
   const [isResizingPanel, setIsResizingPanel] = useState(false);
 
@@ -6145,43 +6196,14 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       // runtime wiring in ReactRenderer (pickFreePositioned).
                       // beat.locations is a Map<string, Location>, not an
                       // array — iterate values.
-                      characterLocations={(() => {
-                        const locsMap = (beat as any)?.locations as Map<string, any> | any[] | undefined;
-                        if (!locsMap) return undefined;
-                        const list: any[] = Array.isArray(locsMap)
-                          ? locsMap
-                          : (typeof locsMap.values === 'function' ? Array.from(locsMap.values()) : []);
-                        const out = list.filter(l => l?.kind === 'character' || l?.kind === 'prop');
-                        return out.length > 0 ? out : undefined;
-                      })()}
-                      // Resolve a character's current image URL by id/state.
-                      // Falls through state.visual.image → defaultImage →
-                      // spritesheet, same chain the panel uses.
-                      characterResolver={(characterId: string, stateId?: string) => {
-                        const ch = characters.find(c => c.id === characterId);
-                        if (!ch) return undefined;
-                        const st = ch.states?.find(s => s.id === (stateId || ch.defaultState)) ?? null;
-                        return resolveCharacterImageUrl(
-                          st,
-                          ch.visual?.defaultImage,
-                          assets,
-                          ch.visual?.spriteSheet,
-                        );
-                      }}
-                      // Provide sprite metadata so the renderer can crop the
-                      // spritesheet to a single frame (otherwise it draws the
-                      // whole tiled sheet). Mirrors ReactRenderer.spriteDataResolver.
-                      spriteDataResolver={(characterId: string) => {
-                        const ch = characters.find(c => c.id === characterId);
-                        const ss = ch?.visual?.spriteSheet;
-                        if (!ss || !ss.frameWidth || !ss.frameHeight) return null;
-                        return {
-                          frameWidth: ss.frameWidth,
-                          frameHeight: ss.frameHeight,
-                          imageWidth: ss.imageWidth,
-                          animations: ss.animations,
-                        };
-                      }}
+                      characterLocations={freePositionedLocations(beat)}
+                      characterResolver={previewCharacterResolver}
+                      // Props (and characters without a resolvable state
+                      // image) resolve their asset id to a fresh URL — the
+                      // stored location.imageUrl is a stale blob: URL after
+                      // a reload. Mirrors ReactRenderer.assetResolver.
+                      assetResolver={previewAssetResolver}
+                      spriteDataResolver={previewSpriteDataResolver}
                       // Editor selection: clicking a sprite OR slot
                       // content on the stage selects the matching row
                       // in the left panel + highlights the clicked
@@ -6423,6 +6445,28 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     previewWidth={isFixed ? devW : undefined}
                     previewHeight={isFixed ? devH : undefined}
                     previewCoarse={selVp.coarse}
+                    // Free-positioned character / prop locations — the same
+                    // sprite layer the runtime mounts over slot content
+                    // (ReactRenderer passes charPropLocations to SlotFlowView).
+                    // Without this the editor showed the prop's properties in
+                    // the panel and the Preview Window drew it, but the stage
+                    // here stayed empty.
+                    characterLocations={freePositionedLocations(beat)}
+                    characterResolver={previewCharacterResolver}
+                    assetResolver={previewAssetResolver}
+                    spriteDataResolver={previewSpriteDataResolver}
+                    selectedElementName={(() => {
+                      if (selectedElementIds.length !== 1) return undefined;
+                      const el = visualElements.find(e => e.id === selectedElementIds[0]);
+                      return el?.name;
+                    })()}
+                    onElementSelect={(locationName) => {
+                      const el = visualElements.find(e => e.name === locationName);
+                      if (el) setSelectedElementIds([el.id]);
+                      // Exclusive selection: a sprite click clears the slot
+                      // expansion so only the sprite is highlighted.
+                      setExpandedSlotKey(null);
+                    }}
                     onResolve={(res) =>
                       setSlotResolutions(prev =>
                         prev.length === res.length &&
