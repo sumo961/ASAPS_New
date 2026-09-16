@@ -146,7 +146,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Signing identity comes from CSC_KEYCHAIN (set by the import
           # step above). CSC_LINK is deliberately NOT set — see that step.
-        run: npx electron-builder@26.8.1 --mac --publish never
+        # --no-install: use the electron-builder the lockfile installed at
+        # the repo root (npm install above) instead of a hand-pinned npx
+        # version that drifts from it. The Electron that gets packaged is
+        # build.electronVersion in apps/builder-desktop/package.json — keep
+        # it equal to the electron devDependency there; v0.9.9x shipped an
+        # EOL Electron 40 for a month because only the dependency moved.
+        run: npx --no-install electron-builder --mac --publish never
 
       - name: Verify signature & notarization
         if: env.APPLE_API_KEY != ''
@@ -213,7 +219,7 @@ jobs:
         working-directory: apps/builder-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder@26.8.1 --win --publish never
+        run: npx --no-install electron-builder --win --publish never
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v7
@@ -223,6 +229,67 @@ jobs:
             apps/builder-desktop/release/*.exe
             apps/builder-desktop/release/latest.yml
           if-no-files-found: error
+
+  # macOS 27 readiness check — packages an unsigned arm64 app on GitHub's
+  # xcode-27 image (macOS 27 since 2026-09-10, arm64 only, "preview") and
+  # launches it for 20 s to catch a crash-on-start. Non-blocking: the
+  # release job does not wait for it and continue-on-error keeps a flaky
+  # preview runner from failing the run. Promote to a hard gate once the
+  # image leaves preview.
+  validate-macos-27:
+    needs: increment-build-number
+    runs-on: xcode-27
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Build Electron app
+        working-directory: apps/builder-desktop
+        run: |
+          npm run build:electron
+          npm run copy-builder
+
+      - name: Package unsigned arm64 app
+        working-directory: apps/builder-desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --mac --arm64 --dir -c.mac.identity=null
+
+      - name: Launch smoke test on macOS 27
+        run: |
+          sw_vers
+          APP=$(ls -d apps/builder-desktop/release/mac-arm64/*.app | head -1)
+          echo "App: $APP"
+          BIN="$APP/Contents/MacOS/$(defaults read "$PWD/$APP/Contents/Info" CFBundleExecutable)"
+          "$BIN" --no-sandbox > "$RUNNER_TEMP/smoke.log" 2>&1 &
+          PID=$!
+          sleep 20
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "Still running after 20 s — no crash on start"
+            kill "$PID" || true
+            STATUS=0
+          else
+            wait "$PID"; RC=$?
+            echo "Process exited early with code $RC"
+            STATUS=1
+          fi
+          echo "--- smoke log (tail)"; tail -50 "$RUNNER_TEMP/smoke.log" || true
+          exit $STATUS
 
   release:
     needs: [increment-build-number, build-macos, build-windows]
