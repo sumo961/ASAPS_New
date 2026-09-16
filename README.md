@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.100** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.100 moves OpenAI to GPT-6 Astra**
+Current release: **v0.9.101** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.101 ships Electron 43** in the
+packaged app: a macOS 27 readiness review found that releases since August
+had packaged an end-of-life Electron 40 because the packaging pin had not
+moved with the dependency. macOS 27 Golden Gate itself needs nothing else
+from the app (universal binary, signed and notarized); a non-blocking CI
+job now smoke-tests each release on GitHub's macOS 27 runner image.
+
+**v0.9.100 moved OpenAI to GPT-6 Astra**
 as the default model and runs OpenAI tool turns (the Ideator's web search)
 through the Responses API — Chat Completions refuses function tools with a
 reasoning effort on GPT-5.6 and has none on Astra — with per-model effort

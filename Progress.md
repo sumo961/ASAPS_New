@@ -1,5 +1,51 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-16: Electron 43 in the shipped app — the pin that drifted (v0.9.101)
+
+### Overview
+
+A macOS 27 readiness review found no Golden Gate change that breaks ASAPS
+Builder — the app is a universal binary, signed and notarized, uses no
+panel windows or notifications, and Apple documented no Gatekeeper or
+permission changes for shipped apps — but it did find that every release
+since August has run an **end-of-life Electron**. The August security
+upgrade moved the `electron` dependency to 43.3.0; electron-builder,
+however, packages `build.electronVersion`, which still said 40.6.1
+(end-of-life 2026-06-30). The v0.9.100 build log confirms it downloaded and
+packaged 40.6.1. This release ships Electron 43.3.0 (Chromium 150,
+supported until 2027-01-05); because the hop into it runs the old app, the
+new runtime is what users are on from this release onward.
+
+### Packaging pin and CI
+
+`build.electronVersion` is 43.3.0, with a comment in the workflow that it
+must move together with the devDependency. The workflow runs
+`npx --no-install electron-builder` — the lockfile's version — on both
+platforms instead of a hand-pinned `electron-builder@26.8.1` that had
+drifted from the installed 26.15.2. Verified locally before tagging: an
+unsigned arm64 `--dir` package reports Electron Framework 43.3.0 and runs
+for 20 s with a clean log.
+
+**Files modified:** `apps/builder-desktop/package.json`, `.github/workflows/build-desktop.yml`
+
+### macOS 27 validation job
+
+A new non-blocking `validate-macos-27` job runs on GitHub's `xcode-27`
+runner image (macOS 27 since 2026-09-10, arm64 only, still marked
+preview): it packages an unsigned arm64 app and launches it for 20 s to
+catch a crash on start. The release job does not wait for it and
+`continue-on-error` keeps a flaky preview runner from failing the run; it
+becomes a hard gate once the image leaves preview. Findings of the review
+for the record: macOS 27 is Apple-silicon only and the last version with
+full Rosetta 2 (reinstalled on demand for x86-only binaries; macOS 28 drops
+Intel apps); Electron 44 (current stable) requires macOS 13 and its
+breaking changes — clipboard module no longer exposed to renderers,
+pre-macOS 13 login-item fields removed — do not touch this app.
+
+**Files modified:** `.github/workflows/build-desktop.yml`
+
+---
+
 ## 2026-09-16: GPT-6 Astra, OpenAI tools on the Responses API, and props back on the responsive stage (v0.9.100)
 
 ### Overview
