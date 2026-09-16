@@ -1,5 +1,109 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-16: GPT-6 Astra, OpenAI tools on the Responses API, and props back on the responsive stage (v0.9.100)
+
+### Overview
+
+Two commits. On the AI side, OpenAI's new flagship **GPT-6 Astra** becomes
+the default model, and the reason the Ideator failed with a Brave key on
+OpenAI is gone: Chat Completions refuses function tools together with a
+reasoning effort on the GPT-5.6 family, and has no function calling at all
+on Astra, so tool turns on the official OpenAI endpoint now run through the
+Responses API. The packaged app's built-in proxy gains the Brave search
+route the dev proxy already had, and honours the Responses-API marker it
+used to forward upstream as an unknown field. On the authoring side, a
+prop on a responsive inputText — editable in the panel, visible in the
+Preview Window, absent from the Visual Editor stage — renders again; text,
+inputs and buttons stack in front of props and characters by default; the
+elements panel's reorder arrows work in responsive mode; and long variable
+values in the Preview Window debug panel are readable in full.
+
+### GPT-6 Astra as the OpenAI default; effort mapping per model
+
+`gpt-6-astra` (1.05M context, 128K output, $10 / $50 per MTok) is the
+default across the provider, the runtime adapter, the config dialog, the
+export dialog, exported players and the User Guide; the GPT-5.6 family
+stays the value tier. One shared helper, `openaiReasoningEffort`, now maps
+ASAPS's provider-neutral effort to what each OpenAI model accepts: 'max' is
+honoured on Astra and capped at 'xhigh' elsewhere; Astra rejects 'none' and
+'minimal' (HTTP 400), which it receives as 'low' per OpenAI's migration
+note. Astra is a reasoning model for `max_completion_tokens` / no
+`temperature` purposes, in the builder path and in the embedded runtime of
+exported players. Pro reasoning mode stays GPT-5.6 only (Astra has none);
+the dialog and guide say so.
+
+**Files modified:** `packages/core/src/ai/providerQuirks.ts` (isGpt6Model, openaiReasoningEffort, isOfficialOpenAIEndpoint), `packages/core/src/ai/runtimeAdapter.ts`,
+`packages/builder/src/services/providers/OpenAIProvider.ts`, `packages/builder/src/components/ai/AIConfigDialog.tsx`, `packages/builder/src/components/export/HtmlExportDialog.tsx`,
+`packages/builder/src/export/HtmlExporter.ts`, `packages/builder/src/types/ai.ts`, `docs/USER_GUIDE.md`, `packages/core/tests/ai/providerQuirks.test.ts`, `packages/builder/src/services/providers/__tests__/OpenAIProvider.test.ts`
+
+### OpenAI tool turns via the Responses API
+
+`generateChatWithTools` on the official OpenAI endpoint runs a
+Responses-API function-calling loop: the system prompt rides as
+`instructions`, tools are the flat `{ type, name, description, parameters }`
+items, and every `output` item the model returns (reasoning items included,
+which reasoning models require echoed back) goes into the next `input`
+together with one `function_call_output` per call. Non-streaming on
+purpose — the proxies' streaming path forwards only text deltas. Custom and
+local endpoints (Ollama, Kimi, proxies) keep the chat-completions loop,
+since they only implement that. Shared builders and parsers live in core
+(`buildResponsesToolRequestBody`, `extractResponsesFunctionCalls`) with
+tests; the provider test drives the loop through a mocked proxy.
+
+**Files modified:** `packages/core/src/ai/providerQuirks.ts`, `packages/builder/src/services/providers/OpenAIProvider.ts` (runResponsesToolLoop), tests as above
+
+### Desktop proxy: Brave search route and /responses routing
+
+The Electron api-server on port 3001 — what the packaged app's renderer
+talks to from `file://` — now serves `POST /api/search/brave` (gunzipped
+pass-through, the key travels as the upstream subscription header, same
+contract as the Vite route), so the Ideator's web search works outside the
+dev server. It also strips the `_endpoint: 'responses'` marker and targets
+`/v1/responses` (buffered and streaming, parsing
+`response.output_text.delta`), where it used to forward the marker upstream
+as an unknown body field. `resolveOpenAIEndpoint(base, 'responses')` in
+core carries the URL logic. Verified by booting the server standalone and
+exercising both routes; this machine has no OpenAI or Brave key, so a live
+Ideator turn on OpenAI with Brave is the remaining check.
+
+**Files modified:** `apps/builder-desktop/src/main/api-server.ts`, `packages/core/src/utils/AIProxyHandlers.ts`, `packages/core/tests/utils/AIProxyHandlers.test.ts`
+
+### Responsive Visual Editor: props and characters on the slot stage, content in front
+
+The editor's slot-mode preview never passed the beat's character and prop
+locations — or an asset resolver — to the slot view; the runtime did. Both
+editor previews (slot and spatial) now share the runtime's three resolvers
+(character image, asset URL, sprite data) through one helper, and the slot
+preview gets editor selection: clicking a sprite selects its row, the
+selected row outlines the sprite. Stacking contract of the slot stage,
+documented at the top of `SlotFlowView`: background 0, sprite layer 1,
+content rows 2 (speaker, title, body, input, keypad, camera, image input,
+web view — they were plain flow children painting under the layer),
+anchored buttons 4, action row 5. `ResponsiveCharacterLayer` paints
+sprites in `location.zIndex` order and stamps it as CSS, so the elements
+panel's ▲/▼ reorder is visible in responsive mode. A sprite cannot yet be
+placed in front of the content rows; that is a possible per-element switch.
+
+**Files modified:** `packages/builder/src/components/visual/VisualWorkspace.tsx` (freePositionedLocations, preview resolvers), `packages/renderer/src/components/SlotFlowView.tsx`,
+`packages/renderer/src/components/ResponsiveCharacterLayer.tsx`, `packages/renderer/tests/components/SlotFlowView.test.tsx`, `packages/builder/public/player-web.js`
+
+### Preview Window debug panel: long values readable
+
+Variable values longer than 14 characters drop to their own line under the
+name in an auto-sized multi-line field (capped at eight rows, scrolling
+past that; Enter commits, Shift+Enter inserts a newline) instead of a 6rem
+input that clipped them to their first few characters. Every debug field
+carries the full value as a tooltip.
+
+**Files modified:** `packages/builder/src/pages/PreviewWindow.tsx`
+
+### Housekeeping
+
+Seven throwaway verification projects from the review and ledger work were
+removed from the projects folder.
+
+---
+
 ## 2026-09-14: Partial meter frames no longer crash the Preview Window (v0.9.99)
 
 ### Overview

@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.99** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.99 fixes a Preview Window crash**
+Current release: **v0.9.100** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.100 moves OpenAI to GPT-6 Astra**
+as the default model and runs OpenAI tool turns (the Ideator's web search)
+through the Responses API — Chat Completions refuses function tools with a
+reasoning effort on GPT-5.6 and has none on Astra — with per-model effort
+mapping so a global setting never 400s. The packaged app's built-in proxy
+gains the Brave search route and Responses-API routing. In the responsive
+Visual Editor, props and characters render on the slot stage again, text,
+inputs and buttons stack in front of them by default, and the elements
+panel's reorder arrows work; long variable values in the Preview Window
+debug panel are readable in full.
+
+**v0.9.99 fixed a Preview Window crash**
 on generated stories whose characters carry a meter with a minimal frame
 definition — the shape the generation guidance asks for. Frames are now
 completed wherever they are read (renderer, import pipeline, Character
