@@ -57,13 +57,13 @@ const PROVIDER_PRESETS: Record<ProviderType, ProviderPreset> = {
   },
   local: {
     name: 'Local LLM',
-    description: 'Ollama / Local',
+    description: 'Ollama / Apple Intelligence / Local',
     defaultBaseUrl: 'http://localhost:11434/v1',
     defaultModel: 'llama3.2',
     apiKeyRequired: false,
     apiKeyPlaceholder: 'ollama (or leave empty)',
     apiKeyHelp: 'Most local servers ignore this - use any value or leave empty',
-    modelHelp: 'e.g., llama3.2, deepseek-coder:6.7b, mistral:7b',
+    modelHelp: 'e.g., llama3.2, deepseek-coder:6.7b, mistral:7b — or the model name your server lists (Apple Intelligence: system)',
   },
 };
 
@@ -319,7 +319,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
               >
                 <div className="text-center">
                   <p className="font-medium text-gray-900">OpenAI</p>
-                  <p className="text-xs text-gray-500 mt-1">GPT-5.2</p>
+                  <p className="text-xs text-gray-500 mt-1">GPT-6 Astra</p>
                 </div>
               </button>
 
@@ -335,7 +335,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
                 <div className="text-center">
                   <Server className="w-5 h-5 mx-auto mb-1 text-gray-600" />
                   <p className="font-medium text-gray-900">Local</p>
-                  <p className="text-xs text-gray-500 mt-1">Ollama</p>
+                  <p className="text-xs text-gray-500 mt-1">Ollama · Apple Intelligence</p>
                 </div>
               </button>
             </div>
@@ -505,7 +505,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             </div>
             <p className="mt-1 text-xs text-gray-500">
               {provider === 'local'
-                ? 'Ollama default: localhost:11434. For remote: http://your-server:11434/v1'
+                ? 'Ollama default: localhost:11434/v1. Apple Intelligence (macOS 27, fm serve): the URL fm prints, e.g. http://localhost:8000/v1. For remote: http://your-server:11434/v1'
                 : 'For alternative API-compatible providers (leave empty for default)'}
             </p>
           </div>
@@ -623,6 +623,24 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
             </ol>
             <p className="text-xs text-green-700 mt-2">
               For Jetson/ARM: Use quantized models (e.g., deepseek-coder:6.7b-q4) to fit in memory.
+            </p>
+            {/* Apple Foundation Models via the macOS 27 `fm` CLI. Its local
+                Chat Completions server is the zero-install way to run the
+                built-in model; the on-device context is 8K tokens shared
+                between prompt and reply, which fits the runtime beats
+                (AI Conversation / AI Dialog Tree / AI Condition / AI Info
+                Text) but not story generation, the Ideator or the
+                Co-Designer — say so here rather than let a generation fail. */}
+            <p className="text-sm text-green-900 font-medium mt-4 mb-2">Or Apple Intelligence on macOS 27 (built-in, no download):</p>
+            <ol className="text-sm text-green-800 list-decimal list-inside space-y-1">
+              <li>Turn on Apple Intelligence in System Settings (Apple silicon Mac, signed in)</li>
+              <li>In Terminal: <code className="bg-green-100 px-1 rounded">fm serve</code> — it prints the local URL</li>
+              <li>Base URL: that URL plus <code className="bg-green-100 px-1 rounded">/v1</code>; Model: <code className="bg-green-100 px-1 rounded">system</code></li>
+            </ol>
+            <p className="text-xs text-green-700 mt-2">
+              The on-device model has an 8K-token window shared by prompt and reply — good for the
+              in-story AI beats (AI Conversation, AI Dialog Tree, AI Condition), too small for story
+              generation, the Ideator or the Co-Designer. Switch back to a cloud provider for those.
             </p>
           </div>
         ) : (

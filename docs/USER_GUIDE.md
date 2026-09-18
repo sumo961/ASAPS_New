@@ -2038,7 +2038,7 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
 3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended; default model: **claude-sonnet-5**). The whole Claude 5 family works — type `claude-opus-5` or `claude-fable-5` into the Model field if you prefer; older Claude 4.x models keep working when named explicitly.
    - **OpenAI** - GPT models (default model: **gpt-6-astra**)
-   - **Ollama** - Local models (free, no API key needed)
+   - **Ollama / Apple Intelligence** - Local models (free, no API key needed). On macOS 27 the built-in Apple model works here too: run `fm serve` in Terminal, enter the URL it prints plus `/v1` as the Base URL and `system` as the Model. Its 8K-token window suits the in-story AI beats (AI Conversation, AI Dialog Tree, AI Condition); story generation, the Ideator and the Co-Designer need a cloud model.
 4. Enter your API key (for cloud providers)
 5. Adjust settings (model, temperature, etc.)
 

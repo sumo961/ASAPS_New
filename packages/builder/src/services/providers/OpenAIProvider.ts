@@ -128,7 +128,10 @@ export class OpenAIProvider extends BaseAIProvider {
     if (this.useProxy) {
       return this.makeProxyRequest({ ...requestBody, stream: true }, signal, onProgress);
     }
-    return this.client!.chat.completions.create(requestBody, { signal });
+    // Explicit stream:false — Apple's `fm serve` (macOS 27) answers an
+    // OMITTED stream flag with an event stream, and the SDK's non-streaming
+    // call omits it. Ollama and friends treat false as the default anyway.
+    return this.client!.chat.completions.create({ ...requestBody, stream: false }, { signal });
   }
 
   private async makeProxyRequest(
@@ -595,7 +598,7 @@ export class OpenAIProvider extends BaseAIProvider {
         // Direct API call only for local servers (Ollama, etc.) — keep
         // non-streaming for now since local servers don't have the
         // intermediary-timeout problem the proxy was solving.
-        response = await this.client!.chat.completions.create(requestBody, {
+        response = await this.client!.chat.completions.create({ ...requestBody, stream: false }, {
           signal: request.signal,
         });
       }
@@ -1093,7 +1096,7 @@ Respond with JSON in this format:
         // OpenAI SDK types `function.parameters` strictly; we accept
         // unknown here to keep the Anthropic-style ChatToolSpec shape
         // portable across providers. Runtime is fine.
-        response = await this.client!.chat.completions.create(requestBody as any);
+        response = await this.client!.chat.completions.create({ ...requestBody, stream: false } as any);
       }
 
       const choice = response.choices?.[0];

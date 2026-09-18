@@ -456,3 +456,25 @@ describe('generateChatWithTools — Responses API on the official endpoint', () 
     expect(body.tools?.[0]?.function?.name).toBe('web_search');
   });
 });
+
+describe('direct (local) calls send an explicit stream:false', () => {
+  // Apple's `fm serve` (macOS 27) answers an OMITTED stream flag with an
+  // event stream; the SDK's non-streaming call omits it. Ollama etc. are
+  // indifferent. Pin the flag on every direct call site.
+  it('callOpenAI and the tool loop both pass stream:false to the SDK client', async () => {
+    p.configure(cfg({ baseUrl: 'http://localhost:8000/v1', model: 'system', apiKey: 'ollama' }));
+    const create = vi.fn(async () => ({ choices: [{ finish_reason: 'stop', message: { content: 'hi' } }] }));
+    (p as any).client = { chat: { completions: { create } } };
+    expect((p as any).useProxy).toBe(false);
+
+    await (p as any).callOpenAI({ model: 'system', messages: [] });
+    expect(create.mock.calls[0][0].stream).toBe(false);
+
+    await p.generateChatWithTools({
+      systemPrompt: 's', messages: [{ role: 'user', content: 'u' }],
+      tools: [{ name: 't', description: 'd', input_schema: { type: 'object' } }],
+      executeTool: async () => '',
+    });
+    expect(create.mock.calls[1][0].stream).toBe(false);
+  });
+});

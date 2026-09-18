@@ -768,6 +768,8 @@ async function callOpenAI(
     temperature: 0.3,
     responseFormat: jsonMode ? { type: 'json_object' } : undefined,
   });
+  // Explicit: Apple's `fm serve` streams when the flag is omitted.
+  body.stream = false;
 
   const response = await fetch(url, {
     method: 'POST',
