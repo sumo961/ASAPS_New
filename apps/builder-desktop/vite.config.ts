@@ -1,6 +1,17 @@
 import { defineConfig } from 'vite';
 import electron from 'vite-plugin-electron';
 import path from 'path';
+import { readFileSync } from 'fs';
+
+// CI build number (build-number.json, incremented by the "Build Desktop Apps"
+// workflow) — the main process needs it for Help ▸ Report a Bug…, which
+// reports the same "0.9.x.N" the app header shows.
+let buildNumber = 0;
+try {
+  buildNumber = JSON.parse(readFileSync(path.resolve(__dirname, '../../build-number.json'), 'utf-8')).build ?? 0;
+} catch {
+  /* local checkout without the file — report the bare version */
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,6 +24,9 @@ export default defineConfig({
           options.startup();
         },
         vite: {
+          define: {
+            __BUILD_NUMBER__: JSON.stringify(buildNumber),
+          },
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {

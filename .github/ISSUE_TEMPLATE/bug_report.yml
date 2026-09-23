@@ -1,0 +1,85 @@
+name: Bug report
+description: Something in ASAPS Builder doesn't work as it should.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. From the desktop app, **Help ▸ Report a Bug…** fills in the version and environment for you.
+        Please don't paste API keys, and only attach story content you're happy to make public — issues on this repository are visible to everyone.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see? Include the exact text of any error message.
+      placeholder: The Preview Window stays blank after I click Start Preview…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest path from opening the app to the problem.
+      placeholder: |
+        1. Open a responsive project
+        2. Select an inputText beat and switch to the Visual Editor
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where in the app?
+      options:
+        - Flowchart / beat graph
+        - Visual Editor
+        - Inspector / beat properties
+        - Preview Window
+        - AI (story generation, Ideator, Co-Designer, runtime AI beats)
+        - Characters / HUDs
+        - Assets / themes
+        - Import / export / saving
+        - Translation
+        - Other
+    validations:
+      required: false
+  - type: dropdown
+    id: layout-mode
+    attributes:
+      label: Project layout mode
+      options:
+        - Responsive
+        - Fixed
+        - Not sure / not project-specific
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: ASAPS Builder version
+      description: Shown next to the logo in the app header, e.g. 0.9.101.162. Filled in automatically from Help ▸ Report a Bug….
+      placeholder: 0.9.101.162
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and runtime. Filled in automatically from Help ▸ Report a Bug….
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots, logs or a sample project
+      description: Drag files in here. The Preview Window's **Save Log** button produces a log that helps a lot with playback problems.
+    validations:
+      required: false

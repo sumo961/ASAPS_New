@@ -3585,6 +3585,7 @@ The ASAPS Desktop app (built with Electron) provides additional capabilities:
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
+- **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 
 ---
 
@@ -3872,7 +3873,7 @@ It doesn't — it sits at *zero*, and zero is where you put it. On a `Min: 0` ra
 ## Still Have Questions?
 
 - Check the [README](../README.md) for technical details
-- Report issues at [GitHub Issues](https://github.com/sumo961/ASAPS_New)
+- Report bugs from the desktop app with **Help → Report a Bug…** (it fills in your version and system details), or directly at [GitHub Issues](https://github.com/sumo961/ASAPS_New/issues/new?template=bug_report.yml)
 - Sample projects ship as ZIP files in the project library — open one and use **Open → Open Project File…** to learn techniques. The canonical demonstration of the affect stack (variants, choice effects, mood-gated endings) is **Standing Beside Alex**.
 
 ---

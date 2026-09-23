@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w @asaps/builder\" \"sleep 3 && NODE_ENV=development electron .\"",
     "build:electron": "vite build",
+    "test": "vitest run",
     "build:all": "npm run build -w @asaps/builder && npm run build:electron && npm run copy-builder",
     "copy-builder": "rm -rf ./builder && cp -r ../../packages/builder/dist ./builder",
     "build:mac": "npm run build:all && electron-builder --mac",

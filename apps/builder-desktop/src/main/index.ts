@@ -6,6 +6,11 @@ import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
 import { startWatching, stopWatching } from './fileWatcher';
 import { execFile, spawn } from 'child_process';
+import { release as osRelease } from 'os';
+import { buildBugReportUrl, ISSUES_REPO_URL } from './bugReport';
+
+/** Injected by vite.config.ts from build-number.json (0 when absent). */
+declare const __BUILD_NUMBER__: number;
 
 /**
  * True only for URLs it is safe to hand to the operating system.
@@ -25,6 +30,29 @@ export function isSafeExternalUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Help ▸ Report a Bug…: the GitHub bug-report form with version, build, OS
+ * and runtime prefilled (see bugReport.ts). Environment facts only — no
+ * project content, paths or keys leave the app, and nothing is submitted
+ * until the user does so in the browser.
+ */
+function openBugReport(): void {
+  const url = buildBugReportUrl({
+    appVersion: app.getVersion(),
+    buildNumber: typeof __BUILD_NUMBER__ !== 'undefined' ? __BUILD_NUMBER__ : undefined,
+    packaged: app.isPackaged,
+    platform: process.platform,
+    osVersion: typeof process.getSystemVersion === 'function' ? process.getSystemVersion() : osRelease(),
+    arch: process.arch,
+    translated: app.runningUnderARM64Translation,
+    electron: process.versions.electron ?? '',
+    chrome: process.versions.chrome ?? '',
+    node: process.versions.node ?? '',
+    locale: app.getLocale(),
+  });
+  openExternalIfSafe(url);
 }
 
 /**
@@ -755,11 +783,18 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: 'Documentation',
-          click: () => shell.openExternal('https://github.com/sumo961/ASAPS_New/blob/main/docs/USER_GUIDE.md'),
+          click: () => shell.openExternal(`${ISSUES_REPO_URL}/blob/main/docs/USER_GUIDE.md`),
+        },
+        { type: 'separator' },
+        {
+          // Opens the bug-report issue form in the browser with the version
+          // and environment prefilled; the user reviews and submits there.
+          label: 'Report a Bug…',
+          click: () => openBugReport(),
         },
         {
-          label: 'Report Issue',
-          click: () => shell.openExternal('https://github.com/sumo961/ASAPS_New/issues'),
+          label: 'Known Issues',
+          click: () => shell.openExternal(`${ISSUES_REPO_URL}/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug`),
         },
       ],
     },
