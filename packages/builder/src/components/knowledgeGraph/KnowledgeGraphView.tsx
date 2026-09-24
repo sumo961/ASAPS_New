@@ -17,7 +17,7 @@ import {
   SYSTEMIC_NODE_TYPES as N,
 } from '@asaps/core';
 import type { Character } from '../../types/character';
-import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../../storage/types';
 import { useAI } from '../../hooks/useAI';
 import { buildWorkspaceKG, layoutKG, legendColor } from './kgAdapter';
 import {

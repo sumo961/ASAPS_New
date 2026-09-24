@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mergeGeneratedVariables } from '../generatedVariables';
-import type { GlobalSettings } from '../../components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../../storage/types';
 
 const base = (vars?: unknown[]): GlobalSettings =>
   ({ project: {}, ...(vars ? { variables: vars } : {}) } as unknown as GlobalSettings);

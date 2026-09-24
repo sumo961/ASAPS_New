@@ -6,7 +6,7 @@
  */
 
 import type { RenderThemeSettings } from '@asaps/renderer';
-import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../storage/types';
 
 /**
  * Font name to CSS font-family mapping

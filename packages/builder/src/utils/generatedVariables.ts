@@ -1,4 +1,4 @@
-import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../storage/types';
 
 /**
  * Merge a generated story's top-level `variables[]` ({ name, initialValue,

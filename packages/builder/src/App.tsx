@@ -47,7 +47,7 @@ import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
-import type { GlobalSettings } from './components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from './storage/types';
 import { loadProjectData } from './utils/projectDeserializer';
 import { normalizeGlobalSettings } from './utils/themeConverter';
 import { notifyIfCorrupted } from './utils/projectRepair';

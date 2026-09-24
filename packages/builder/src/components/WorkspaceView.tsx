@@ -5,7 +5,7 @@ import { VisualWorkspace } from './visual/VisualWorkspace';
 import { KnowledgeGraphView } from './knowledgeGraph/KnowledgeGraphView';
 import { Map, Palette, Share2 } from 'lucide-react';
 import type { Character } from '../types/character';
-import type { GlobalSettings } from './settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../storage/types';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
 import { usePersistedState } from '../utils/persistedState';
 

@@ -8,7 +8,7 @@
 
 import { Command } from './Command';
 import type { Character } from '../types/character';
-import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../storage/types';
 import type { SerializedCommand } from '../storage/types';
 
 function clone<T>(value: T): T {

@@ -29,7 +29,7 @@ import {
 import type { Asset } from '../assets/AssetManager';
 import type { Location } from '@asaps/core';
 import type { Character } from '../../types/character';
-import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../../storage/types';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import {
   PositionedBeatView,

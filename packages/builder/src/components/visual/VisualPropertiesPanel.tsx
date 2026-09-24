@@ -29,7 +29,7 @@ import { getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 import type { Asset } from '../assets/AssetManager';
 import type { VisualElement } from './VisualBeatEditor';
 import type { Character, CharacterState } from '../../types/character';
-import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../../storage/types';
 import { useFonts } from '../../hooks/useFonts';
 
 // Transition types supported by the renderer

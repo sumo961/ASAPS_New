@@ -107,6 +107,8 @@ export interface GlobalSettings {
   };
   sound: {
     backgroundMusic: string;    // Background music file
+    backgroundMusicName?: string;  // Original filename for display
+    backgroundMusicAssetId?: string; // Asset ID for reference
     backgroundVolume: number;   // Volume 0-100
     mute: boolean;             // Global mute
   };
@@ -154,6 +156,9 @@ export interface GlobalSettings {
     /** Phone HUD collapse — screen HUDs fold into a slim tap-to-expand strip on
      *  phone-class stages. 'auto' (default) = phones only; 'always'; 'never'. */
     compactMode?: 'auto' | 'always' | 'never';
+    /** Show screen HUDs on title screens too (default off — the title
+     *  screen is distraction-free; see renderer utils/hudVisibility). */
+    showOnTitleScreen?: boolean;
     timerHud?: {
       enabled: boolean;
       mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects
@@ -301,6 +306,25 @@ export interface GlobalSettings {
       targetCulture?: string;
     };
   };
+
+  /**
+   * Story variables declared in Settings → Variables (and merged in from
+   * AI-generated stories). Was declared only in GlobalSettingsInspector's
+   * private copy of this type.
+   */
+  variables?: {
+    name: string;
+    type: 'string' | 'number' | 'boolean';
+    defaultValue?: string | number | boolean;
+    description?: string;
+  }[];
+
+  /**
+   * Player-facing UI labels ("Continue", "Inventory", …) overriding the
+   * built-in defaults; translated via project.globalSettings.uiStrings.*.
+   * Used by the translator and Preview, previously undeclared.
+   */
+  uiStrings?: Record<string, string>;
 }
 
 // ============================================================================

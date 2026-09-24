@@ -20,7 +20,7 @@
 import type { Beat } from '@asaps/core';
 import { normalizeStory, buildClustersFromBeats } from '@asaps/core';
 import type { Character } from '../types/character';
-import type { GlobalSettings } from '../components/settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../storage/types';
 import { applyTreeLayoutToBeats } from './TreeLayoutAlgorithm';
 import { storyLinks as storyLinksOf, dedupeLinks } from './storyLinks';
 import { mergeGeneratedVariables } from './generatedVariables';

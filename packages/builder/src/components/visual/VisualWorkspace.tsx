@@ -64,7 +64,7 @@ const SLOT_PREVIEW_SAMPLE_BODY = [
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { getTranslationsForBeat } from '../../export/StoryTranslator';
 
-import type { GlobalSettings } from '../settings/GlobalSettingsInspector';
+import type { GlobalSettings } from '../../storage/types';
 import type { Character } from '../../types/character';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { getCommandManager } from '../../commands/CommandManager';
