@@ -22,12 +22,7 @@ export function buildBeatSuggestionsSystemPrompt(schema: any): string {
 ${buildBeatTypeDigest()}
 
 ## Your Task
-Analyze the current beat and story context, then suggest 3-5 logical next beats that would:
-1. Advance the story naturally
-2. Provide player agency and choices
-3. Match the genre and tone
-4. Create engaging narrative flow
-5. Use appropriate beat types
+Suggest 3-5 beats that could plausibly follow the current beat.
 
 ## Output Format
 Respond with JSON in this structure:
@@ -39,8 +34,7 @@ Respond with JSON in this structure:
       "reasoning": "Why this makes sense as the next beat",
       "parameters": { /* pre-filled parameters */ },
       "connections": [{ "targetId": "..." }],
-      "confidence": 0.85,
-      "position": { "x": 100, "y": 200 }
+      "confidence": 0.85
     }
   ]
 }
@@ -52,7 +46,6 @@ Respond with JSON in this structure:
 4. Pre-fill parameters with sensible defaults
 5. Order suggestions by confidence (most likely first)
 6. Confidence scores: 0.8-1.0 = highly likely, 0.6-0.8 = good option, 0.4-0.6 = possible
-7. Position beats to the right of current beat with vertical spacing
 
 ## Common Patterns
 - After titleScreen → infoText or multiChoice (setup story)
@@ -96,7 +89,7 @@ a character feels: addSentiment, nudgeMood, fireEmotion. When a scene is about
 a relationship, moving the feeling is usually the truer consequence than
 incrementing a number.
 
-🚨 Some counters are BOUND to affect state (they carry a "source" and act as a
+Some counters are BOUND to affect state (they carry a "source" and act as a
 read-only display of a feeling). Never suggest a counter effect targeting one —
 the write is discarded by the next appraisal. Suggest an affect effect instead
 and the meter follows.

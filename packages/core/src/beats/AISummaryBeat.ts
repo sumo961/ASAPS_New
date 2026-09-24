@@ -452,9 +452,9 @@ export class AISummaryBeat extends Beat {
       reflection: 'Write as if the player is reflecting on their journey, using "you" form.',
     }[this.summaryStyle];
 
-    // Build the generation prompt with strict constraints
-    // IMPORTANT: Be very explicit about output format to avoid AI reasoning/thinking in output
-    const prompt = `You are generating a summary for an interactive story. Output ONLY the summary text itself - no thinking, no explanations, no metadata, no word counts.
+    // Thinking/reasoning leakage is handled by config (thinking off on the
+    // runtime route) and stripThinkingBlocks + the post-filters below.
+    const prompt = `Write the end-of-story summary for this player, shown on the final screen.
 
 PLAYER JOURNEY DATA:
 ${journeySummary}
@@ -463,20 +463,8 @@ ${this.prompt ? `ADDITIONAL CONTEXT: ${this.prompt}` : ''}
 
 STYLE: ${styleGuide}
 
-CRITICAL RULES:
-- Output ONLY the final summary text (${maxWords} words maximum)
-- Do NOT include any reasoning, planning, or meta-commentary
-- Do NOT start with phrases like "I need to...", "Let me...", "Here's...", or "Based on..."
-- Do NOT include word counts or analysis
-- Just write the summary directly, starting with the content itself
-- Use the player's name if available in the data
-- ONLY reference things that are EXPLICITLY stated in the journey data above
-- Do NOT invent or hallucinate events, conversations, or choices that are not in the data
-- If a beat name suggests a topic (like "Car Ownership"), you can mention the player explored that topic, but do NOT invent specific conversations or discussions that aren't documented
-- Focus on the player's journey path, variables, and counters that ARE provided
-- End positively
-
-OUTPUT THE SUMMARY NOW (just the text, nothing else):`;
+Length: about ${maxWords} words at most (the author's length setting, sized for the end screen).
+Use the player's name if the data has one. Describe only what the journey data records — choices, variables, counters, scenes; if a scene title suggests a topic, you can say the player explored it, but do not invent conversations that aren't documented. End on a positive note. Output only the summary text.`;
 
     console.log(`[AISummaryBeat ${this.id}] Generating summary (max ${maxWords} words)...`);
 

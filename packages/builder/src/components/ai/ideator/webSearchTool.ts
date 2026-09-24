@@ -31,9 +31,10 @@ export const webSearchToolSpec = {
     "Search the web with Brave Search to bring in real-world context " +
     "about the issue or theme the author is discussing. Use when you " +
     "want recent facts, examples, statistics, news, or stakeholder " +
-    "perspectives that would deepen the conversation. Do NOT use for " +
-    "trivia or to fetch story plots — only when external context would " +
-    "genuinely help the author articulate a complex issue.",
+    "perspectives that would deepen the conversation. Not for trivia or " +
+    "story plots. Returns up to `count` numbered results (title, URL, " +
+    "snippet) or \"No results found.\"; on failure it returns text " +
+    "starting \"Tool error:\".",
   input_schema: {
     type: 'object' as const,
     properties: {

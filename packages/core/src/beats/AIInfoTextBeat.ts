@@ -368,17 +368,14 @@ ${filteredContext}
 
 ${dataAvailability}
 
-CRITICAL REQUIREMENTS:
-1. Write exactly ${this.maxSentences} sentence${this.maxSentences > 1 ? 's' : ''} or fewer
-2. ONLY reference data that exists in PLAYER STATE above
-3. Do NOT use placeholders like [Player Name], [Location], etc.
-4. Do NOT reference variables, names, or data that are not explicitly listed above
-5. Do NOT reference internal beat names, story structure, or technical terms (e.g., "Title Screen", "beat_3", "DialogTree")
-6. Use player-friendly language: say "beginning" not "title screen", "conversation" not "dialog tree", "choice" not "movement beat"
-7. Write as if speaking directly to the player immersed in the story, not describing the game system
-8. If no personalization data is available, write engaging generic text
-9. Keep the tone appropriate to the context
-10. Be concise and engaging
+REQUIREMENTS:
+1. ONLY reference data that exists in PLAYER STATE above
+2. Do NOT use placeholders like [Player Name], [Location], etc.
+3. Do NOT reference variables, names, or data that are not explicitly listed above
+4. Do NOT reference internal beat names, story structure, or technical terms (e.g., "Title Screen", "beat_3", "DialogTree")
+5. Use player-friendly language: say "beginning" not "title screen", "conversation" not "dialog tree", "choice" not "movement beat"
+6. Write as if speaking directly to the player immersed in the story, not describing the game system
+7. If no personalization data is available, write engaging generic text
 
 Return a JSON object with this exact format:
 {

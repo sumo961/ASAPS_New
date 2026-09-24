@@ -13,7 +13,7 @@
 
 export const IDN_COMPLEXITY_PRINCIPLES = `
 Interactive Digital Narrative (IDN) represents complex issues differently from
-traditional linear storytelling. When interviewing the author, keep these
+traditional linear storytelling. When working with the author, keep these
 dimensions in view and draw them out over the course of the conversation:
 
 1. PLURALITY OF PERSPECTIVES

@@ -1954,14 +1954,7 @@ Beat-type reference (id, category, description, per-type parameters — any
 listed parameter can be targeted with setProperty on beats of that type):
 ${buildBeatTypeDigest()}
 
-Your task:
-1. Parse the user's natural language command
-2. Identify the action type (setProperty, addElement, removeElement, moveElement, transformText)
-3. Identify what elements to target (beats, locations, clusters)
-4. Identify any filters (beat types, cluster names, patterns)
-5. Identify any exclusions ("except...")
-6. Determine the modification to apply
-7. Rate your confidence (0-1)
+Your task: turn the command into one structured action — action type (setProperty, addElement, removeElement, moveElement, transformText), target (beats, locations, clusters) with filters and any "except…" exclusion, and the modification — with a confidence from 0 to 1.
 
 Common patterns:
 - "Apply/Add/Set X to all Y" → setProperty/addElement on Y
@@ -1980,9 +1973,8 @@ SOUND EFFECTS ON BUTTONS/LOCATIONS:
 
 TRANSITIONS:
 - For transitions, set the "transition" property on beats
-- The value MUST be an object with BOTH "type" AND "duration" fields:
+- The value is an object with "type" and "duration" (use duration 500 when the user gives none):
   { "type": "fade", "duration": 1000 }
-- BOTH fields are REQUIRED - never omit duration!
 - Valid transition types: "none", "fade", "slide", "zoom", "dissolve"
 - Duration is a NUMBER in milliseconds (not a string):
   - "500ms" → duration: 500
@@ -2008,7 +2000,6 @@ BACKGROUNDS:
   2. Use its ID (e.g., "asset_1769032511458_1") as the value, NOT the filename
 - Example: If assets list shows: - "asset_123": smithy.jpg (background)
   → User says "set background to smithy.jpg" → use value: "asset_123"
-- CRITICAL: Never use the filename (smithy.jpg) as the value - always use the asset ID
 
 IMPORTANT for text transformations (transformText action type):
 - When the user asks to "replace X with Y" or "change X to Y" in text content, use targetType: "text"

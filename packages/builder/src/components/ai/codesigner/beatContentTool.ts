@@ -22,12 +22,14 @@ export const GET_BEAT_TYPE_SCHEMA_TOOL_NAME = 'get_beat_type_schema';
 export const getBeatTypeSchemaToolSpec = {
   name: GET_BEAT_TYPE_SCHEMA_TOOL_NAME,
   description:
-    'Get the exact parameter names and shapes for one beat type (e.g. ' +
-    '"aiConversation", "dialogTree", "infoText"). Call it BEFORE proposing ' +
-    'addBeat, replaceBeat or updateParams for a beat type whose parameters ' +
-    'you have not already seen in this conversation — the app refuses ' +
-    'parameter names the beat type does not have. Never ask the author for ' +
-    'field names; look them up here.',
+    "Return one beat type's parameter reference from the app's schema: each " +
+    'parameter\'s name, type, whether it is required, default, allowed values, ' +
+    'and nested item shapes (e.g. aiConversation directions). Answered ' +
+    'locally, so it does not fail for network reasons. Common aliases resolve ' +
+    '("conversation" → aiConversation); an unknown type returns "No beat type …" ' +
+    'followed by the valid type ids. Use it before proposing addBeat, ' +
+    'replaceBeat or updateParams for a type whose parameters you have not seen ' +
+    'in this conversation; the app rejects parameter names a type does not have.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -46,11 +48,14 @@ export const GET_BEAT_CONTENT_TOOL_NAME = 'get_beat_content';
 export const getBeatContentToolSpec = {
   name: GET_BEAT_CONTENT_TOOL_NAME,
   description:
-    'Fetch the FULL current content of one beat from the open story ' +
-    '(all parameters, notes, and connections). Use whenever the story ' +
-    "digest shows truncated text ('…') for a beat you want to discuss in " +
-    'detail or propose edits to — never propose editText over text you ' +
-    'have only partially seen.',
+    'Fetch the full current content of one beat in the open story: all ' +
+    'parameters (untruncated text, choices, dialog trees), author notes, ' +
+    'entry requirements and outgoing connections, as a text block. Use it ' +
+    "when the digest truncates a beat ('…') or shortens its choice labels. " +
+    'It reads live builder state, so it reflects edits made after the digest ' +
+    'was captured. Fetch at most a handful of beats per turn. Returns a ' +
+    '"Could not fetch <id>: …" message if the id is unknown or the main ' +
+    'builder window does not answer within a few seconds.',
   input_schema: {
     type: 'object' as const,
     properties: {

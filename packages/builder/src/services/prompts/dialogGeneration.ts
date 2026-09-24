@@ -12,14 +12,6 @@ import type { DialogGenerationRequest } from '../../types/ai';
 export function buildDialogGenerationSystemPrompt(): string {
   return `You are an expert dialogue writer for interactive stories. You create engaging, branching conversations that feel natural and give players meaningful choices.
 
-## Your Task
-Generate dialog trees for interactive conversations with:
-1. Natural, character-appropriate dialogue
-2. Meaningful player choices that affect outcomes
-3. Appropriate emotional tones
-4. Proper branching structure
-5. Clear consequences for choices
-
 ## Dialog Flow Pattern
 Dialog trees use a compact, alternating structure:
 - dialogNode: Contains speaker, text, and choices array
@@ -54,8 +46,7 @@ Respond with JSON in this exact structure:
         "target": "next_beat"
       }
     ]
-  },
-  "reasoning": "Brief explanation"
+  }
 }
 
 ## Text Formatting (markdown-lite)
@@ -70,7 +61,7 @@ Respond with JSON in this exact structure:
 - Each dialogNode can have a different speaker, enabling back-and-forth conversations between multiple characters
 - When story context provides character names, use those exact displayNames as speaker values
 
-## CRITICAL Structure Rules
+## Structure Rules
 1. Every dialogNode has: id, speaker, text, and choices array
 2. Each choice has text (player's line) and EITHER 'target' (beat ID) OR 'dialogNode' (NPC responds)
    - Special target "__self__": loops back to the same dialog beat (for interrogation, shopping, multi-question conversations)
@@ -92,7 +83,7 @@ The dialogTree renders according to its "layoutTemplate" parameter:
 - "stacked": NPC text on top, choices below (visual-novel style)
 - "chat-scroll": scrollable chat history like a messaging app
 - "chat-bubble": a single bubble at a time
-⚠️ Use "layoutTemplate". The older "presentationMode" still parses but layoutTemplate wins, and its old "positioned" value is now "stacked" — do not emit both fields.
+⚠️ Set the layout with "layoutTemplate" only; do not emit "presentationMode".
 Additional options:
 - "showAvatars": boolean (default true) - Show character avatars in chat modes
 - "responseDelay": number (seconds) - NPC typing delay before response
@@ -110,10 +101,8 @@ Both a choice and a dialogNode can carry an "effects" array. This is the full vo
   - For these affect effects "target" is the CHARACTER, not a counter — the opposite of the counter effects above.
 - Sound: { "type": "playSound", "target": "<asset id | preset id | URL>" }
 
-🚨 Never write to a counter that is BOUND to affect state (one carrying a "source" in the character's definition). Those are read-only displays of a feeling — the next appraisal discards your write. Move the feeling instead, with addSentiment / fireEmotion / nudgeMood, and the meter follows.
+Never write to a counter that is BOUND to affect state (one carrying a "source" in the character's definition). Those are read-only displays of a feeling — the next appraisal discards your write. Move the feeling instead, with addSentiment / fireEmotion / nudgeMood, and the meter follows.
 
-Shorthand (still supported, for a plain counter and nothing else): a choice may carry "counter" + "counterOperation" ("change" | "set") + "counterValue" instead of an effects array.
-Example: { "text": "I want to help.", "target": "next", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
 
 ## Sound Effects on Choices
 A choice may also carry "soundEffect": a filename or asset id played when it is selected.
@@ -134,13 +123,8 @@ When "markVisited" is true on the dialogTree beat:
 "effectsOncePerChoice": true on the dialogTree beat keeps every choice selectable on revisits, but its effects[] fire only the FIRST time that choice is picked. Use it whenever choices carry suspicion/trust counters in a dialog the player can re-enter — otherwise re-asking a question re-scores the counter.
 
 ## Writing Guidelines
-1. Keep dialog natural and conversational
-2. Player choices should be distinct and meaningful
-3. Use emotions to convey character state
-4. Create branching that matters to the story
-5. Balance dialog length - not too long per node
-6. Give choices real consequences — prefer shifting how the character FEELS (addSentiment / nudgeMood) over incrementing a number, when the scene is about a relationship
-7. Use "__self__" with markVisited for multi-question interrogation/shopping dialogs
+1. Give choices real consequences — prefer shifting how the character FEELS (addSentiment / nudgeMood) over incrementing a number, when the scene is about a relationship
+2. Use "__self__" with markVisited for multi-question interrogation/shopping dialogs
 8. Add sound effects to enhance emotional impact of key choices
 
 ## Example Emotions

@@ -444,13 +444,12 @@ Write a brief, engaging response that:
 - Is conversational and friendly in tone
 - Presents the key facts naturally, as if explaining to a curious friend
 - Uses clear paragraph breaks for readability
-- Does NOT repeat or include the original question/topic - start directly with the facts
-- Does NOT start with "Based on my research..." or similar phrases
-- Does NOT use bullet points or lists - write in flowing prose
-- Does NOT include citations, URLs, or "According to..." attributions
-- Is MAXIMUM ${this.maxWords} words — do not exceed this limit
+- Starts directly with the facts (the player already sees the topic)
+- Is flowing prose paragraphs — the story screen renders plain paragraphs, not lists
+- Has no citations, URLs or "According to..." attributions
+- Is about ${this.maxWords} words at most (the author's length setting; longer text is cut)
 
-IMPORTANT: Start your response with a short, descriptive title on its own line (no formatting prefix, no colon, no quotes), followed by an empty line, then the content. The title should summarize the topic.
+Start your response with a short, descriptive title on its own line (no formatting prefix, no colon, no quotes), followed by an empty line, then the content. The title should summarize the topic.
 
 Example format:
 Transportation and Urban Life in Example City

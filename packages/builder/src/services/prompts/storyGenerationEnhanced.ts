@@ -5,7 +5,10 @@
  */
 
 import type { StoryGenerationRequest } from '../../types/ai';
-import { buildAffectPromptSection, type AffectDepth } from '@asaps/core';
+import { buildAffectPromptSection, BUILT_IN_THEMES, type AffectDepth } from '@asaps/core';
+
+/** Presets described in detail below; every other built-in preset is listed from the theme registry. */
+const DETAILED_THEME_IDS = new Set(['builtin-visual-novel', 'builtin-twine', 'builtin-point-and-click']);
 
 /**
  * Theme presets guide for AI - describes available visual themes
@@ -14,8 +17,6 @@ const THEME_GUIDE = `
 ## Theme Presets
 
 ASAPS includes built-in theme presets that control the visual presentation of stories. When generating a story, you should recommend the most appropriate theme based on the genre and style.
-
-**NOTE:** All themes have text effects DISABLED by default (no typewriter, no fade). This speeds up debugging. Authors can enable effects later if desired.
 
 ### Available Themes
 
@@ -51,6 +52,8 @@ Characteristics:
 - Inventory/exploration focus
 - Inspired by LucasArts (Monkey Island) and Sierra classics
 Use when: Story involves exploration, picking up items, location-based puzzles
+
+${BUILT_IN_THEMES.filter((t) => !DETAILED_THEME_IDS.has(t.meta.id)).map((t) => `**${t.meta.id}** - ${t.meta.name}: ${t.meta.description}`).join('\n')}
 
 ### ⚠️ Color Contrast Guidelines (IMPORTANT!)
 
@@ -194,7 +197,7 @@ const BEAT_TYPE_GUIDE = `
 - dialogNode (nested): NPC responds, conversation continues
 - Connections: Multiple → based on dialog choices leading to beat targets
 - COUNTER EFFECTS: Choices can modify counters
-  { "id": "c1", "text": "I'll help you!", "target": "beat_5", "counter": "trust", "counterOperation": "change", "counterValue": 5 }
+  { "id": "c1", "text": "I'll help you!", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "trust", "value": 5 }] }
 - SOUND EFFECTS: Choices can play a sound when selected
   { "id": "c1", "text": "I accept your offer.", "target": "beat_5", "soundEffect": "handshake.mp3" }
 - IMPORTANT: Choice text IS what the player says. Never use "[Continue]" - use actual dialogue.
@@ -207,7 +210,7 @@ const BEAT_TYPE_GUIDE = `
 - RECURSIVE DIALOGS: A choice can use target: "__self__" to loop back to the SAME dialogTree beat:
   - Useful for: interrogation, browsing a shop, asking multiple questions before leaving
   - The dialog re-displays with the same speaker/text and choices
-  - Combine with per-choice visited tracking (markVisited: true) to gray out already-asked questions
+  - In an interrogation loop, markVisited: true grays out questions already asked; leave it off for shops and menus the player must be able to revisit
   - Example: { "id": "c_ask_name", "text": "What's your name?", "target": "__self__" }
   - At least one choice should have a real target to exit the loop
 - Example: NPC asks question → [Player response A | Player response B] → NPC responds
@@ -233,7 +236,7 @@ const BEAT_TYPE_GUIDE = `
   - showTextOnHover: true to only show choice text when hovering over the hotspot
 - Connections: Multiple → one per choice
 - COUNTER EFFECTS: Choices can modify counters (same as dialogTree)
-  { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "counter": "courage", "counterOperation": "change", "counterValue": 5 }
+  { "id": "c1", "text": "Take the dangerous path", "target": "beat_danger", "effects": [{ "type": "incrementCounter", "target": "courage", "value": 5 }] }
 - SOUND EFFECTS: Choices can play a sound when selected
   { "id": "c1", "text": "Enter the cave", "target": "beat_cave", "soundEffect": "cave_echo.mp3" }
 - Example: "Where to go?" → [Library | Kitchen | Garden] → 3 different beats
@@ -267,11 +270,11 @@ const BEAT_TYPE_GUIDE = `
   - markVisited: true to show visual indication for props leading to already-visited beats
   - effectsOncePerChoice: true → the choice stays selectable on revisits but its effects[] fire only the FIRST time. Use on evidence/clue choices so re-reading never re-scores a suspicion counter. (markVisited instead dims AND blocks; pick one per beat: block re-reads, or allow them un-scored.)
 - COUNTER EFFECTS: Props can modify counters when selected
-  { "id": "sword", "name": "Rusty Sword", "description": "A weathered blade with strange markings", "target": "beat_armed", "counter": "confidence", "counterOperation": "change", "counterValue": 3 }
+  { "id": "sword", "name": "Rusty Sword", "description": "A weathered blade with strange markings", "target": "beat_armed", "effects": [{ "type": "incrementCounter", "target": "confidence", "value": 3 }] }
 - SOUND EFFECTS: Props can play a sound when selected
   { "id": "coins", "name": "Gold Coins", "description": "A heavy pouch of gold coins", "target": "beat_rich", "soundEffect": "coin_pickup.mp3" }
-- ⚠️ For action choices (verbs), use movementChoice instead!
-- ⚠️ For leaving/continuing without picking anything, use a separate connection or movementChoice
+- ⚠️ For action choices (verbs), use multiChoice instead.
+- ⚠️ To let the player leave without picking anything, give the item-description beats a way onward (e.g. a two-choice multiChoice: "Keep looking" / "Leave").
 - Example: "What do you pick up?" → [Silver Key | Old Book | Lantern] → each leads to different beat
 
 🚨🚨🚨 **MANDATORY: DESCRIBE ITEMS AFTER PICKUP!** 🚨🚨🚨
@@ -322,14 +325,14 @@ pickProp beat_examine_study:
     - "Bloodstained Letter" → beat_letter_desc
     - "Desk Drawer" → beat_drawer_desc
     - "Portrait on the Wall" → beat_portrait_desc
-    - "Leave the study" → beat_hallway   ← one explicit exit
+    (no exit prop — every picked prop goes into the inventory)
 
 beat_letter_desc (infoText):
   text: "The letter is addressed to..."
   → target: beat_examine_study   ← LOOP BACK to the same pickProp
 \`\`\`
 
-The player keeps picking until they've seen everything, then chooses the explicit "Leave" option. Two ways to handle re-examination — pick ONE per pickProp:
+The player keeps picking until they've seen everything; each description beat offers "Keep looking" (back to the pickProp) and "Leave the study" (onward), e.g. as a two-choice multiChoice instead of an infoText. Two ways to handle re-examination — pick ONE per pickProp:
 - markVisited: true — already-examined items are dimmed AND blocked (one look each).
 - effectsOncePerChoice: true — items stay re-readable, but their counter/inventory effects fire only on the FIRST pick. 🚨 For evidence that raises suspicion counters this is almost always what you want: without it, a player who re-reads a clue farms the counter and breaks your accusation thresholds.
 
@@ -420,7 +423,7 @@ unreachable gates. Use this whenever a beat should only be meaningfully entered 
 narrative setup. Typical pairing:
   - code-revealing pickProp/infoText: effects = [{ type:"setVariable", target:"knowsCode", value:true }]
   - keypad that consumes that code: requires = [{ condition: { type:"variable", variableName:"knowsCode", operator:"==", value:true }, explanation:"..." }]
-Combine with a conditionBeat that actually routes the player if the requirement is unmet.
+Give a requirement "fallbackTarget": "beat_id" to enforce it at runtime: a player who arrives without it is redirected there. Without fallbackTarget it is an analyzer annotation only.
 
 Example requires entry:
   "requires": [
@@ -466,7 +469,7 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
      }]
    AND set that flag in the code-revealing beat's effects:
      { "type": "setVariable", "target": "knowsCode", "value": true }
-   AND put a conditionBeat in front of the keypad checking the flag.
+   AND either give that requirement a fallbackTarget or put a conditionBeat in front of the keypad checking the flag.
    If the flag is false, the conditionBeat should send the player somewhere helpful (not into the keypad).
 
 3) maxAttempts: 0 (unlimited tries) is only valid if the failure chain mutates state
@@ -511,9 +514,9 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
 - ❌ WRONG: Creating a separate "endings" array (this is NOT recognized!)
 - ❌ WRONG: Referencing "beat_end_good" without creating it in the "beats" array
 - ✓ CORRECT: Put ALL endScreen beats in the main "beats" array:
-  { "id": "beat_end_good", "type": "endScreen", "parameters": { "message": "...", "showRestart": true } }
+  { "id": "beat_end_good", "type": "endScreen", "parameters": { "message": "...", "showRestart": true, "reset": true }, "connections": [{ "targetId": "beat_0" }] }
 - 🚨 NEVER create an "endings" array - it will be IGNORED! All endings go in "beats"!
-- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
+- Example: { "id": "beat_ending_good", "type": "endScreen", "parameters": { "message": "Victory!", "showRestart": true, "reset": true, "showCredits": true, "creditsPageTitle": "Credits", "creditsPageBody": "Written by...\\nDesigned by..." }, "connections": [{ "targetId": "beat_0" }] }
 
 #### Beats that reach outside the story — use ONLY when the author asked for them
 
@@ -539,7 +542,7 @@ These work and are fully supported, but each depends on something outside the te
 
 **arBeat** (marker-tracked AR), **gpsLocation** (map-anchored geofences), **indoorLocation** (Bluetooth beacon zones) and **setGpsLocation** (writes named GPS point sets) all need assets or coordinates that only the author can supply: a compiled .mind tracker, real latitudes and longitudes, beacon identifiers. Inventing them produces a story that cannot run.
 
-If the author's brief clearly calls for a location-based or AR experience, say so in your reasoning and structure the story so those beats can be dropped in later — but generate ordinary beats in their place. Do not emit these beat types with placeholder coordinates or asset ids.
+If the author's brief clearly calls for a location-based or AR experience, say so in the "notes" of the beats where those beats would go, and structure the story so those beats can be dropped in later — but generate ordinary beats in their place. Do not emit these beat types with placeholder coordinates or asset ids.
 
 ### INVISIBLE BEATS (Logic/Background Operations)
 
@@ -883,11 +886,11 @@ Player-facing prose supports a small markdown subset, rendered in every view
   the same places as the formatting above. A counter shows once something has
   set it — give it a starting value on an early beat.
 
-## Beat Notes (Author Annotations) - USE LIBERALLY!
+## Beat Notes (Author Annotations)
 
 All beats can include a "notes" field for author documentation:
 - Notes are NOT shown to players - purely for author reference
-- **AI should actively use notes to help the human author**, including:
+- Use notes where the human author has something to act on or decide, including:
   - Suggested visual assets: "ASSET: Dark forest background, ominous lighting"
   - Character art suggestions: "CHARACTER: Show detective looking suspicious"
   - Sound/music suggestions: "AUDIO: Tense investigation music"
@@ -914,7 +917,7 @@ When using defaultTarget with defaultTargetDelay, you can add visual feedback:
   {
     "id": "beat_bomb",
     "name": "Defuse the Bomb",
-    "type": "movementChoice",
+    "type": "multiChoice",
     "parameters": {
       "question": "The bomb is ticking! What do you do?",
       "choices": [...]
@@ -1030,7 +1033,7 @@ variants instead keep fixed selection: \`defaultVariantId\` on the character plu
 \`setCharacterVariant\` Effects at the transition points.
 
 ### Speaker System on Beats
-Visible beats (titleScreen, infoText, durScreen, dialogTree, movementChoice, pickProp, endScreen, videoBeat, inputText, hyperText) have a **speaker** property that controls who is "speaking" the beat's text.
+Visible beats (titleScreen, infoText, durScreen, multiChoice, dialogTree, movementChoice, pickProp, endScreen, videoBeat, inputText, hyperText) have a **speaker** property that controls who is "speaking" the beat's text.
 
 - The **speaker** value is a character's **displayName** (e.g., "Red", "Mom", "Woodsman")
 - **"Narrator"** is the built-in default speaker (used when speaker is empty or "Narrator")
@@ -1092,10 +1095,7 @@ Characters support translated display names per language:
 Counters should be defined on characters, then referenced consistently in choices:
 - Define counters in the characters array with meaningful names and limits
 - These counters become available in ALL choice-type beats (dialogTree, movementChoice, pickProp)
-- Counter properties on choices:
-  - "counter": name of the counter to modify
-  - "counterOperation": "change" (add/subtract) or "set" (replace)
-  - "counterValue": numeric value
+- Counter changes on choices go in the choice's "effects": incrementCounter (a negative value decreases) or setCounter (replaces); add "character" for a per-character counter
 - Sound effect property on choices:
   - "soundEffect": filename of sound to play when choice is selected (e.g., "click.mp3", "success.wav")
 - Example character with counters:
@@ -1108,7 +1108,7 @@ Counters should be defined on characters, then referenced consistently in choice
     ]
   }
 - Example choice with counter effect:
-  { "id": "c1", "text": "Stand your ground", "target": "beat_fight", "counter": "courage", "counterOperation": "change", "counterValue": 10 }
+  { "id": "c1", "text": "Stand your ground", "target": "beat_fight", "effects": [{ "type": "incrementCounter", "target": "courage", "value": 10 }] }
 - Best practice: Define all counters you plan to use on relevant characters first, then reference them in choices
 
 ## Advanced Branching Patterns
@@ -1156,12 +1156,11 @@ After merge: conditionBeat checks which path taken → tailored consequences
 
 ### Pattern 5: Conditional Unlocks (Metroidvania-style)
 \`\`\`
-Early game: movementChoice shows locked options
-  - [Go North] ✓
-  - [Go East - Locked] ✗ (requires key)
+Hub (multiChoice or movementChoice) lists every exit
+  - [Go North] always shown
+  - [Go East] "conditions": [{ "type": "variable", "variable": "hasKey", "operator": "==", "value": true }]
 Player explores, finds key → setVariable(hasKey=true)
-Return to same movementChoice
-Now: conditionBeat before choice → If hasKey, show East option
+Back at the same hub, East is now shown — one hub beat, no duplicate
 New path unlocked with new content
 \`\`\`
 
@@ -1179,7 +1178,7 @@ Used for: Escape sequences, defusing bombs, urgent decisions
 \`\`\`
 Encounter obstacle → conditionBeat(check inventory for 'tool')
   - Has tool → Use it → Success beat → continue
-  - No tool → Blocked → movementChoice(go back | try different approach)
+  - No tool → Blocked → multiChoice(go back | try a different approach)
 Player must explore to find tool first
 Creates backtracking and exploration incentive
 \`\`\`
@@ -1206,7 +1205,7 @@ Step 3: Verification beat checks the input:
     falseConnection: { target: "beat_wrong_code" }
   }
 Step 4a: Success path (correct code)
-Step 4b: Failure path (wrong code) → can loop back to inputText for retry
+Step 4b: Failure path (wrong code) → a beat that offers a way forward (a hint, a route back to find the code, or a consequence), never a bare retry loop
 
 🚨 Common mistake: Creating conditionBeat but forgetting to connect inputText TO it!
 The inputText's connection.target MUST point to the conditionBeat's ID!
@@ -1230,11 +1229,8 @@ Final confrontation outcome depends on accumulated relationship
 - Scores: \`trustScore\`, \`moralityScore\`, \`suspicionLevel\`
 - Inventory: Use specific IDs like \`key_mansion\`, \`sword_vorpal\`
 
-### Beat Positioning Strategy
-- Linear sequences: Horizontal (x += 300)
-- Branching points: Fan out vertically (y += 150 per branch)
-- Reconvergence: Return to center alignment
-- Clusters: Group related beats by location or theme (see Clusters section below)
+### Clusters
+- Group related beats by location or theme (see Clusters section below)
 
 ## Clusters (Organizational Containers)
 
@@ -1273,7 +1269,7 @@ Clusters are containers that help organize larger projects into logical sections
 - Label important choices clearly
 - Use conditions on connections when state matters
 - Add effects to connections (setVariable, addInventory) for immediate consequences
-- Multiple connections from choice beats (movementChoice, pickProp, dialogTree)
+- Multiple connections from choice beats (multiChoice, movementChoice, pickProp, dialogTree)
 - Single connection from logic beats (setVariable, addRemoveInventory)
 - Two connections from conditionBeat (true/false paths)
 
@@ -1346,7 +1342,7 @@ CRAFT RULE: choose values that are GRAMMATICALLY DROP-IN — every possible valu
 ✓ If you plan beat_X as a reconvergence, add it as target in the branching beats
 
 ❌ **DUPLICATE CONNECTIONS - targets defined twice**
-For choice-based beats (dialogTree, movementChoice, pickProp), targets are in the choices.
+For choice-based beats (multiChoice, dialogTree, movementChoice, pickProp), targets are in the choices.
 DO NOT also add a "connections" array - this creates duplicates!
 ✓ CORRECT: choices have "target" fields, NO "connections" array on the beat
 ✗ WRONG: choices have "target" AND beat has "connections" array with same targets
@@ -1464,13 +1460,13 @@ When using conditionBeat to check if a counter reaches a threshold (e.g., cluesF
 🚨 **If you create a conditionBeat checking a counter, you MUST modify that counter somewhere earlier!**
 
 1. **dialogTree choices** - Add counter effect to choice:
-   { "id": "c1", "text": "Be brave", "target": "beat_5", "counter": "courage", "counterOperation": "add", "counterValue": 10 }
+   { "id": "c1", "text": "Be brave", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "courage", "value": 10 }] }
 
 2. **movementChoice choices** - Same format:
-   { "id": "c1", "text": "Investigate", "location": "Lab", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+   { "id": "c1", "text": "Investigate", "location": "Lab", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "cluesFound", "value": 1 }] }
 
 3. **pickProp props** - Same format:
-   { "id": "clue", "name": "Secret Letter", "target": "beat_5", "counter": "cluesFound", "counterOperation": "add", "counterValue": 1 }
+   { "id": "clue", "name": "Secret Letter", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "cluesFound", "value": 1 }] }
 
 4. **setVariable beat** - Dedicated beat for counter modification:
    { "type": "setVariable", "parameters": { "type": "counter", "name": "cluesFound", "value": 1, "operation": "add" }, "connections": [...] }
@@ -1490,10 +1486,10 @@ When designing stories with state accumulation:
   - Create 4 point-gaining choices (giving player room for 1 miss)
 
   Implementation (using choice effects):
-  - dialogTree choice "Be thorough": counter=cluesFound, counterOperation=add, counterValue=1
-  - pickProp "Find letter": counter=cluesFound, counterOperation=add, counterValue=1
-  - movementChoice "Search carefully": counter=cluesFound, counterOperation=add, counterValue=1
-  - dialogTree choice "Press for details": counter=cluesFound, counterOperation=add, counterValue=1
+  - dialogTree choice "Be thorough": effects incrementCounter cluesFound +1
+  - pickProp "Find letter": effects incrementCounter cluesFound +1
+  - movementChoice "Search carefully": effects incrementCounter cluesFound +1
+  - dialogTree choice "Press for details": effects incrementCounter cluesFound +1
   Total possible: 4 points → threshold of 3 is REACHABLE ✓
 
 ❌ **NEVER create a conditionBeat checking a counter without ALSO adding counter modifications to choices!**
@@ -1541,24 +1537,21 @@ export function buildEnhancedStoryGenerationSystemPrompt(
 
 ${affectSection}
 
-🚨🚨🚨 CRITICAL RULE: If you use counters, you MUST include a conditionBeat! 🚨🚨🚨
-- Every counter that gets incremented MUST be checked by a conditionBeat before endings
-- The conditionBeat determines which ending the player gets based on accumulated counter value
-- WITHOUT a conditionBeat, counters are POINTLESS - do NOT use counters if you won't check them!
+Counter rule: if you use counters, you must include a conditionBeat that reads them wherever they decide the outcome. Every counter you change must be read somewhere that matters — a conditionBeat, a choice's conditions[], a requires[] gate, a visible meter, or \${name} in text. A counter that decides the ending is checked by a conditionBeat every path passes through before the endings (see "Counter + ConditionBeat Pattern").
 
 ${THEME_GUIDE}
 
-## 🎮 PROCEDURAL GAME ELEMENTS (REQUIRED for engaging stories!)
+## 🎮 Procedural game elements
 
-Stories MUST include procedural/game-like mechanics, not just simple branching:
+Unless the request asks for a linear story, give the player state that matters. Use two or three of these mechanics:
 
-### REQUIRED Elements (include at least 2-3):
+### Elements:
 1. **Counters** - Track numeric values like clues, trust, suspicion, courage
-   - 🚨 **ADD COUNTER EFFECTS DIRECTLY TO CHOICES** - this is the preferred method!
+   - Put counter effects on the choices themselves (effects[] with incrementCounter / setCounter)
    - Use conditionBeat to check accumulated values and branch accordingly
 
 2. **Variables** - Track boolean/string state
-   - Use setVariable beats: { "type": "setVariable", "name": "hasKey", "value": true }
+   - Use setVariable beats with parameters { "type": "variable", "name": "hasKey", "value": true }
    - Use conditionBeat to check: { "condition": { "type": "variable", "variable": "hasKey", "operator": "==" , "value": true } }
 
 3. **Inventory** - Track collected items
@@ -1596,9 +1589,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
         "id": "c1",
         "text": "Search thoroughly",
         "target": "beat_5",
-        "counter": "cluesFound",
-        "counterOperation": "add",
-        "counterValue": 1
+        "effects": [{ "type": "incrementCounter", "target": "cluesFound", "value": 1 }]
       }
     ]
   }
@@ -1615,9 +1606,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
       "text": "Search the library",
       "location": "Search the library",
       "target": "beat_5",
-      "counter": "cluesFound",
-      "counterOperation": "add",
-      "counterValue": 1
+      "effects": [{ "type": "incrementCounter", "target": "cluesFound", "value": 1 }]
     }
   ]
 }
@@ -1633,9 +1622,7 @@ Stories MUST include procedural/game-like mechanics, not just simple branching:
       "name": "Suspicious Letter",
       "description": "A crumpled letter with hasty handwriting",
       "target": "beat_5",
-      "counter": "cluesFound",
-      "counterOperation": "add",
-      "counterValue": 1
+      "effects": [{ "type": "incrementCounter", "target": "cluesFound", "value": 1 }]
     }
   ]
 }
@@ -1649,13 +1636,11 @@ Note: pickProp automatically adds "Suspicious Letter" to inventory - do NOT foll
 - **Horror**: Track sanity/fear (counter), items (inventory), knowledge gained (variables)
 
 ### Example Pattern for Mystery Story:
-1. Player investigates → **choices have counter/counterOperation/counterValue** to add to "cluesFound"
+1. Player investigates → **choices have incrementCounter effects** on "cluesFound"
 2. Player finds items → addRemoveInventory beats add to inventory
 3. Before ending → conditionBeat checks "cluesFound >= 3"
 4. Good ending if enough clues, bad ending otherwise
 
-🚨 **IF YOU ADD counter/counterOperation/counterValue TO CHOICES, YOU MUST CREATE A conditionBeat TO CHECK IT!**
-🚨 **DO NOT increment counters without a conditionBeat that uses them to determine story outcome!**
 
 ### MANDATORY: Counter + ConditionBeat Pattern
 
@@ -1688,9 +1673,8 @@ choices add cluesFound → ... → conditionBeat (cluesFound >= 3?) → good/bad
 - Connect choices to the conditionBeat instead
 - Let the conditionBeat decide which ending based on accumulated counter value
 
-CRITICAL JSON FORMAT:
-- Your response MUST be valid JSON
-- Every property name MUST have a colon after the closing quote: "property": "value" (NOT "property: "value")
+JSON FORMAT:
+- Output one JSON object and nothing else
 - Beat type names are case-sensitive - use EXACTLY the names listed below
 
 ## Available Beat Types (USE EXACTLY THESE NAMES - case-sensitive)
@@ -1739,11 +1723,7 @@ Generate complete, sophisticated interactive story structures that:
    - Climax: Major decisions, state checks
    - Resolution: Multiple endings based on accumulated state
 
-6. **Position Beats Logically**
-   - Linear progression: horizontal spacing (x += 300)
-   - Branches: vertical spacing (y += 150 per option)
-   - Clusters: Group related content
-   - Reconvergence: Align back to center
+6. **Group related beats** into clusters by location or act
 
 ## Output Format
 
@@ -1766,7 +1746,6 @@ Generate complete, sophisticated interactive story structures that:
       "id": "beat_0",
       "name": "Descriptive name",
       "type": "beatType",
-      "position": { "x": 100, "y": 200 },
       "notes": "Optional author notes (not shown to player)",
       "parameters": { /* type-specific, see schema */ },
       "connections": [
@@ -1814,24 +1793,13 @@ Generate complete, sophisticated interactive story structures that:
         { "name": "trust", "displayName": "Trust", "value": 0, "min": -100, "max": 100 }
       ]
     }
-  ],
-  "translations": [
-    {
-      "languageCode": "de",
-      "languageName": "German",
-      "strings": { "project.story.metadata.title": "Translated title", "beat:beat_0.parameters.title": "..." }
-    }
-  ],
-  "reasoning": "Explain story structure, branching strategy, and how beat types work together"
+  ]
 }
 \`\`\`
 
-Note: The "translations" array is OPTIONAL - only include it when the user requests multiple languages.
-
 ## Critical Requirements
 🚨 **MANDATORY: beat_0 MUST be type "titleScreen"** - NEVER start with infoText!
-🚨 **MANDATORY: If you use counters, you MUST have a conditionBeat to check them!**
-✓ End with one or more endScreen beats (always with showRestart: true)
+✓ End with one or more endScreen beats (showRestart: true, reset: true, connection to beat_0)
 
 ## Story Length & Complexity Guidelines
 - **Short** (8-15 beats): Fragment or proof-of-concept
@@ -1845,58 +1813,16 @@ Note: The "translations" array is OPTIONAL - only include it when the user reque
 ✓ Use invisible beats (setVariable, conditionBeat) for logic
 ✓ Create variables for any state you want to track
 ✓ Label connections clearly for choice beats
-✓ Add reasoning explaining your structural decisions
-✓ Position beats with logical spacing
 ✓ Create reconvergent paths, not just endless branching
 ✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
 ✓ **Include suggestedTheme** with a theme ID and reason based on genre/style
 ✓ **ALL endings go in the "beats" array** - NEVER create a separate "endings" array!
 
-## Multi-Language / Translation Support
+## Translatable Labels
 
-ASAPS supports **multi-language Interactive Digital Narratives (IDNs)**. When the user requests a story in multiple languages:
-
-1. **Write the story in the primary language** (first language in the list, or the user's language)
-2. **Include a "translations" array** in the output with translations for each additional language
-3. **Use displayName/displayText fields** for translatable labels on choice-based beats:
-   - **pickProp**: Use "displayName" on props (the "name" field is an internal ID used for inventory matching)
-   - **movementChoice**: Use "displayText" on choices (the "text" field is used as a location key)
-   - These display fields are what gets translated; the internal keys stay in the source language
-
-### Translation Output Format
-
-When languages are requested, add a "translations" array to the output:
-\`\`\`json
-{
-  "translations": [
-    {
-      "languageCode": "de",
-      "languageName": "German",
-      "strings": {
-        "project.story.metadata.title": "Mord im Blackwood Manor",
-        "beat:beat_0.parameters.title": "Mord im Blackwood Manor",
-        "beat:beat_1.parameters.text": "Sie kommen als Detektiv...",
-        "beat:beat_2.parameters.props.0.displayName": "Goldener Schlüssel",
-        "beat:beat_2.parameters.props.0.description": "Ein glänzender goldener Schlüssel"
-      }
-    }
-  ]
-}
-\`\`\`
-
-### Translation Key Format
-- Story metadata: \`project.story.metadata.title\`
-- Beat text fields: \`beat:{beatId}.parameters.{field}\`
-- Character names: \`project.story.characters.{index}.name\`
-- Choices: \`beat:{beatId}.parameters.choices.{index}.displayText\` or \`beat:{beatId}.parameters.props.{index}.displayName\`
-- DialogTree: \`beat:{beatId}.parameters.dialogTree.text\`, \`...choices.{index}.text\`
-- Counters: Counter display names on characters
-
-### Important Translation Rules
-- Translate ALL player-visible text: beat text, button labels, choice text, item names/descriptions, character names
-- Do NOT translate: beat IDs, variable names, counter internal names, connection targets, conditions
-- Keep translations natural - adapt idioms, don't translate literally
-- Maintain the same emotional tone and narrative voice in each language
+Authors translate stories in the app after generation. Give choice-based beats labels that translate cleanly:
+- **pickProp**: put the player-visible label in "displayName" (the "name" field is an internal ID used for inventory matching)
+- **movementChoice**: put the player-visible label in "displayText" (the "text" field is used as a location key)
 
 ## ⚠️ CRITICAL: Data Format Rules (MUST FOLLOW)
 
@@ -1953,6 +1879,8 @@ When languages are requested, add a "translations" array to the output:
 ⚠️ VALIDATION ERROR: Adding "connection" to multi-connection beats triggers warnings!
 
 These beat types define targets in their choices/props/hyperlinks - NEVER add a separate "connection" parameter:
+- multiChoice → targets in choices[].target
+- randomTarget → branches in choices[] (beat ids or { "target", "weight", "effects" })
 - dialogTree → targets in dialogTree.choices[].target
 - movementChoice → targets in choices[].target
 - pickProp → targets in props[].target
@@ -2025,8 +1953,7 @@ These are internal editor fields - NEVER include them:
 
 ### 5b. Layout — responsive is the default
 
-ASAPS Modern v0.9.59 ships responsive layout as the **default for new
-projects**. Visible text-driven beats (titleScreen, infoText, durScreen,
+Generated stories use responsive layout. Visible text-driven beats (titleScreen, infoText, durScreen,
 endScreen, aiInfoText, aiSummary, onlineContent) render via slot mode —
 the engine resolves position from the beat's schema slots at runtime
 instead of pixel coordinates. Spatial-mode beats (titleScreen with a
@@ -2059,7 +1986,7 @@ themed button below the scene.
 
 **Slot intent — soft layout hints (optional)**. For slot-mode beats,
 \`parameters.slotIntent\` is a per-slot map of soft preferences the
-renderer honours when it can. Today: \`preferredLines\` (target line
+renderer honours when it can. Supported keys: \`preferredLines\` (target line
 count for the title slot) and \`anchor\` (alignment / edge-relative
 position for the action slot). NEVER serialize this as
 \`locations[]\` — the no-bake guard is what keeps the beat responsive.
@@ -2116,19 +2043,18 @@ beat_4 now checks variable and shows new option to progress
 - Double-check all targets in: choices[].target, connection.target, trueConnection.target, falseConnection.target
 - Common error: Referencing "beat_22" but stopping generation at beat_21
 - **NEVER stop generating beats early** - if a dialog choice targets "beat_22", you MUST include beat_22 in your output
-- Plan your beat count BEFORE generating - know exactly how many beats you need
 - The system will detect and report missing beat references as ERRORS (will cause import failure!)
 
 ## Concrete Beat Examples (Follow This Exact JSON Format)
 
 🚨🚨🚨 **CRITICAL - CONNECTIONS RULE** 🚨🚨🚨
 
-**ONLY these beat types should have a "connections" array:**
-- titleScreen, infoText, durScreen, setVariable, addRemoveInventory, videoBeat, keypad
-These are single-path beats that need "connections" to specify the next beat.
+**Single-connection beats carry a beat-level "connections" array** (connectionType "single" in the reference below — e.g. titleScreen, infoText, durScreen, explanation, setVariable, addRemoveInventory, setTimer, updateAffect, videoBeat, keypad, aiInfoText, aiDurScreen, onlineContent). inputText is the exception: it uses parameters.connection.
 - ⚠️ Use "targetId" in connections: { "targetId": "beat_X" } NOT { "target": "beat_X" }
 
 **NEVER add "connections" array to these beat types (targets are IN the choices/props):**
+- multiChoice → targets are in choices[].target (NO connections array!)
+- randomTarget → branches are in choices[] (NO connections array!)
 - movementChoice → targets are in choices[].target (NO connections array!)
 - dialogTree → targets are in dialogTree.choices[].target (NO connections array!)
 - pickProp → targets are in props[].target (NO connections array!)
@@ -2355,19 +2281,11 @@ prose should never connect them first.
     parts.push(`Additional requirements: ${request.context}`);
   }
 
-  // Multi-language section
+  // Story language. Further languages are added in the app after generation
+  // (Translate), which builds complete translation resources — a generated
+  // "translations" array was never imported.
   if (request.languages && request.languages.length > 0) {
-    const primary = request.languages[0];
-    const additional = request.languages.slice(1);
-    if (additional.length > 0) {
-      parts.push(`🌐 MULTI-LANGUAGE STORY
-Write the story content in ${primary}.
-Include a "translations" array with complete translations for: ${additional.join(', ')}.
-Use "displayName" on pickProp props and "displayText" on movementChoice choices for translation-safe labels.
-Translate ALL player-visible text including beat text, button labels, choice text, item names/descriptions, and character names.`);
-    } else {
-      parts.push(`🌐 LANGUAGE: Write all story content in ${primary}.`);
-    }
+    parts.push(`🌐 LANGUAGE: Write all story content in ${request.languages[0]}.`);
   }
 
   // AI-powered beats section
@@ -2399,26 +2317,16 @@ Remember to:
 - Use invisible beats (setVariable, conditionBeat) for logic
 - Create reconvergent paths (branches that merge back)
 - Track important decisions in variables
-- Use appropriate beat types: dialogTree is the DEFAULT for ANY multi-option choice (conversations, decisions, actions, branches). Only use movementChoice when choices are spatial hotspots on a background image.
+- Use appropriate beat types: multiChoice is the default for a one-screen choice; dialogTree when the conversation needs follow-up turns; movementChoice only when choices are places on a background image.
 - Design multiple endings based on accumulated state
-- For puzzles/codes: inputText → conditionBeat (inputText stores answer, conditionBeat checks it!)
+- For codes: keypad for numeric codes; inputText → conditionBeat for text passwords
 
-🚨 MANDATORY COUNTER RULE:
-- If you add counter effects to choices (counter/counterOperation/counterValue), you MUST create a conditionBeat
-- The conditionBeat checks the counter value and routes to different endings
-- Example: conditionBeat checks "cluesFound >= 3" → good ending vs bad ending
-- WITHOUT a conditionBeat, counters serve no purpose!
+Counter rule (recap): counters that decide the outcome are read by a conditionBeat before the endings, e.g. "cluesFound >= 3" → good ending vs bad ending.
 
 CRITICAL - Beat ID Consistency:
 - Every target ID (in choices[].target, connection.target, etc.) MUST reference a beat you actually create
 - Use simple sequential IDs: beat_0, beat_1, beat_2, ... beat_N
 - The system will detect and report any missing beat references
-
-IMPORTANT: Respond with ONLY valid JSON. Ensure:
-- Every property name has format "name": value (colon AFTER the closing quote)
-- All strings are properly quoted
-- No trailing commas
-- All brackets and braces are properly closed
 
 🔍 VERIFICATION CHECKLIST (check each before outputting):
 1. beat_0 is titleScreen
@@ -2427,7 +2335,7 @@ IMPORTANT: Respond with ONLY valid JSON. Ensure:
 4. EVERY beat (except beat_0) is reachable — at least one other beat has it as a target
 5. dialogTree beats have: dialogTree.id, dialogTree.speaker, dialogTree.text, dialogTree.choices (array)
 6. Single-connection beats (infoText, durScreen, setVariable, etc.) use connections array with ONE entry
-7. Multi-connection beats (dialogTree, movementChoice, pickProp) have targets INSIDE parameters — NO connections array
+7. Multi-connection beats (multiChoice, dialogTree, movementChoice, pickProp, hyperText, randomTarget) have targets INSIDE parameters — NO connections array
 8. Does the story length feel right for the requested size (short/medium/long)?
 9. Does the branching complexity match what was requested?
 

@@ -38,7 +38,7 @@ npm run test:ui -w @asaps/builder   # Open Vitest UI for builder
 npm run test:coverage -w @asaps/core # Run core tests with coverage
 ```
 
-### ⚠️ CRITICAL: How to Run Tests Correctly
+### Running tests
 
 **NEVER run `npx vitest run` from the monorepo root.** There is no root-level `vitest.config` file, so vitest will run all test files without the per-workspace environment settings. This causes 200+ phantom failures because builder and renderer tests need `jsdom` environment (set in their own `vitest.config.ts` files) but vitest defaults to `node` when run from root.
 
@@ -69,13 +69,13 @@ The app displays its version as `v{version}.{buildNumber}` (e.g., `v0.9.17.23`) 
 - **Convention**: When discussing builds with the user, always reference the full version including build number (e.g., "build 0.9.17.23"). The build number identifies exactly which CI build is running.
 - **Local dev**: Local dev server reads the current value from `build-number.json` but does NOT increment it. Only CI increments.
 
-## ⚠️ CRITICAL: Rebuild After Code Changes
+## Rebuild after changing core or renderer
 
-**This is a monorepo where packages import from compiled `dist/` folders, NOT source files. You MUST rebuild after making changes!**
+Packages import each other's compiled `dist/` folders, not source files, so edits to core or renderer have no effect until rebuilt.
 
 ### After modifying `packages/core/src/`:
 ```bash
-npm run build:core       # ALWAYS run this after changing core
+npm run build:core       # after changing core
 ```
 
 ### After modifying `packages/renderer/src/`:
@@ -100,14 +100,14 @@ No rebuild needed - Vite HMR handles it automatically during development.
 | Multiple packages | `npm run build` |
 
 ### Dev Server Management
-**Always restart the dev server after rebuilding packages.** The dev server caches the old builds.
+After changing core or renderer: stop the dev server, build, then start it
+again — it caches the old builds. Do this without asking the user.
 
 ```bash
-# Kill existing server and restart
-pkill -f "vite" 2>/dev/null; sleep 1; npm run dev > /dev/null 2>&1 &
+pkill -f "vite"
+npm run build:core          # or `npm run build` after renderer changes
+npm run dev > /dev/null 2>&1 &
 ```
-
-Do this automatically when making changes to core or renderer packages - don't ask the user to restart.
 
 **Do not run `npm run build` while the dev server is up.** Stop it first. The
 builder resolves `@asaps/*` through workspace symlinks to each package's
@@ -126,8 +126,8 @@ pkill -f "vite"; rm -rf packages/builder/node_modules/.vite node_modules/.vite
 npm run dev > /dev/null 2>&1 &
 ```
 
-Rule out this cause *before* investigating the import as a real breakage. It
-has cost time twice. (Related: the Preview Window separately needs closing and
+Rule out this cause *before* investigating the import as a real breakage.
+(Related: the Preview Window separately needs closing and
 reopening after a rebuild — a page reload is not enough.)
 
 ## Architecture Overview
@@ -162,17 +162,10 @@ The beat system uses a **Template Method Pattern** where all beats extend a base
 3. **Execution Flow**: `onEnter()` → `performAction()` → `onExit()`
 4. **Beat Registry**: Factory pattern for beat creation and registration
 
-**Beat Categories:**
-- **Visible Beats**: TitleScreen, IntroText, DialogTree, DurScreen (timed), DialogTree, MovementChoice, PickProp, HyperText, VideoBeat, inputText, EndScreen
-- **Invisible Beats**: SetVariable, ConditionBeat (logic/background operations), AddRemoveInventory (manipulate inventory), RandomTarget, SetTimer
+**Beat catalog:** `beat-definitions/core-beats.json` — each type's `category`
+says whether it is visible or invisible (logic-only).
 
-### Creating New Beat Types
-
-1. Extend the base `Beat` class in `packages/core/src/beats/`
-2. Implement required abstract methods (`performAction`, `getParameters`, `updateParameters`)
-3. Register in `BeatTypeRegistry.registerDefaultBeats()`
-4. Add renderer support in the `IRenderer` interface
-5. Update beat definitions in `beat-definitions/core-beats.json`
+New beat types: see "Adding a New Beat Type" below.
 
 ### State Management
 
@@ -182,9 +175,9 @@ The beat system uses a **Template Method Pattern** where all beats extend a base
 
 ### File Processing
 
-- **ASML XML**: Parsed using DOM-based XML processing
+- **Native format**: ASML 2.0 (JSON) in `.asaps` zips; ASML 1.0 XML is import-only (`packages/core/src/xml/`)
 - **Import/Export**: File handling through browser APIs and JSZip
-- **Storage**: IndexedDB for local story storage
+- **Storage**: web builds keep projects in IndexedDB; desktop keeps them as project folders
 
 ### Development Workflow
 
@@ -209,18 +202,13 @@ The system maintains backward compatibility with legacy ASML files:
 
 ## Release Checklist (verify BEFORE tagging)
 
-The Aug 2026 retrospective found verification consistently trailing release:
-v0.9.89 shipped two days before its verification plan started, and the sweep
-then found ~20 user-visible bugs in the released build — including a hole in
-the release's headline feature. The rounds work; they have to run on the
-candidate, not on the aftermath.
+Run these on the release candidate before tagging, not after: checks run
+after a release find bugs users already have.
 
 Before `git tag`:
 
 1. **Play a generated story end to end** in the Preview Window — not just its
-   opening. Round 2 of the v0.9.89 plan found a story that imported cleanly
-   and dead-ended at its first decision; Round 1 had "passed" it without
-   playing it.
+   opening: a story can import cleanly and dead-end at its first decision.
 2. **Device-preset sweep**: the changed surface at Desktop / Tablet both /
    Phone both, in both layout modes. Measure geometry (rects, overlap,
    containment in the visible pane), don't eyeball. A stage hanging off its
@@ -233,7 +221,7 @@ Before `git tag`:
 5. If the updater changed: remember the fix ships one release late — the hop
    INTO the release runs the old updater. Say so in the notes.
 
-## ⚠️ AI Generation Must Learn New Features IN THE SAME CHANGE
+## AI generation learns new features in the same change
 
 When a change adds or alters something the AI generation paths could use —
 a new beat parameter, an effect type, a formatting capability, a character
@@ -254,9 +242,8 @@ the AI-generation guidance is part of that change, not a follow-up:
    - `packages/core/src/prompts/affectPrompt.ts` (affect features — has a
      byte-compare mirror in `mcp-server-desktop/src/index.ts`; the tripwire
      test enforces sync, arrow points core → server)
-3. The Aug 2026 precedent: dialog-layout guidance went stale for a month and
-   generated stories used a dead pattern. The fix commit (ef680757) exists
-   because this rule didn't.
+3. Prompt guidance that lags the schema makes generated stories use dead
+   patterns (dialog-layout guidance once stayed stale for a month).
 
 ## Coding Principles
 
@@ -286,8 +273,8 @@ Use a single source of truth whenever possible. UI components like the beat insp
 3. ReactFlow graph customization in canvas components
 4. Tailwind CSS for styling
 
-### Working with ASML XML
-1. XML parsing in `packages/core/src/xml/`
+### Working with ASML
+1. ASML 1.0 XML import in `packages/core/src/xml/`
 2. Story serialization in `packages/core/src/engine/`
 3. Import/export logic in builder components
 
@@ -299,10 +286,9 @@ Use a single source of truth whenever possible. UI components like the beat insp
 
 ### Preview System
 
-**IMPORTANT**: The app uses a **separate Preview Window** for story testing, NOT the old StoryPreview component.
+Story testing runs in a separate Preview Window.
 
 - **PreviewWindow** (`packages/builder/src/pages/PreviewWindow.tsx`): The current preview system. Opens in a separate browser window. Logs use `[PreviewWindow]` prefix.
-- **StoryPreview** (`packages/builder/src/components/preview/StoryPreview.tsx`): DEPRECATED. The old modal-based preview.
 - **VisualBeatEditor** (`packages/builder/src/components/visual/VisualBeatEditor.tsx`): The visual editor that shows beat layout with selection handles. Uses `editorMode={true}`.
 
 When working on preview-related issues:

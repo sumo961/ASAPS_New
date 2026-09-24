@@ -62,8 +62,7 @@ describe('buildDialogGenerationSystemPrompt', () => {
   });
 
   it('warns off the legacy presentationMode instead of teaching it', () => {
-    expect(prompt).toMatch(/older "presentationMode" still parses but layoutTemplate wins/);
-    expect(prompt).toMatch(/"positioned" value is now "stacked"/);
+    expect(prompt).toMatch(/do not emit "presentationMode"/);
   });
 
   it('documents the effects array, not just the counter shorthand', () => {
@@ -95,9 +94,9 @@ describe('buildDialogGenerationSystemPrompt', () => {
     expect(prompt).toContain('"conditions"');
   });
 
-  it('documents counter effects on choices (counter/counterOperation/counterValue)', () => {
-    expect(prompt).toContain('counterOperation');
-    expect(prompt).toContain('counterValue');
+  it('teaches counter changes as effects, not the legacy flat shorthand', () => {
+    expect(prompt).toContain('incrementCounter');
+    expect(prompt).not.toContain('counterOperation');
   });
 });
 

@@ -42,9 +42,9 @@ TOOL: get_beat_type_schema
 Returns a beat type's exact parameters (names, types, required fields,
 allowed values, nested shapes such as an aiConversation's directions).
 Call it before proposing addBeat / replaceBeat / updateParams for a beat
-type whose parameters you have not seen in this conversation. NEVER ask the
-author for parameter or field names — look them up; the app refuses names
-the beat type does not have.
+type whose parameters you have not seen in this conversation. Look parameter
+and field names up rather than asking the author; the app refuses names the
+beat type does not have.
 ` : `
 Parameter names: use only names you have seen in this story's beats. If you
 need a beat type whose parameters you don't know, say so and propose an
@@ -89,8 +89,8 @@ HOW TO COLLABORATE
   them.
 - Ground every observation in the actual story above. Quote beat names/ids.
   If the author asks about something the digest doesn't show (exact wording
-  of a long text, a detail beyond the snippet), say what you can see and ask
-  them to paste the relevant text.
+  of a long text, a detail beyond the snippet), say what you can see and
+  ${opts.beatContentToolAvailable ? 'read the beat with get_beat_content' : 'ask them to paste the relevant text'}.
 - Be concrete. "Make the protagonist more sinister" should produce specific,
   actionable options: which beats to touch, what kind of line or choice to
   add, which variable/counter could track it, where a branch would pay off.
@@ -171,9 +171,9 @@ Rules for proposals:
     bipolar ladder a band covering ZERO — sentiments start at zero, and a
     ladder without one opens the story calling someone wary before anything
     has happened.
-  - 🚨 NEVER propose a setCounter/incrementCounter effect against a counter
-    the digest marks "[reads …, read-only]". The write is discarded by the
-    next appraisal. Move the feeling instead (addSentiment / nudgeMood /
+  - Don't propose a setCounter/incrementCounter effect against a counter
+    the digest marks "[reads …, read-only]": the next appraisal discards the
+    write (and the app refuses it). Move the feeling instead (addSentiment / nudgeMood /
     fireEmotion) and the meter follows.
 - WIRING — what choices DO and WHEN they show. The digest lists every
   option under its beat by id ("choice c2 …", "prop …", "hotspot …", dialog
@@ -233,9 +233,8 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
 - Use 'addNote' when a change is too big or too subjective to make directly
   (e.g. "rework this scene's tone") — the note lands on the beat for the
   author to act on.
-- Beat text in the digest ending in '…' is TRUNCATED. Do not propose
-  'editText' that would overwrite text you cannot fully see — ask the author
-  to paste it, or use 'addNote' describing the change instead.
+- Beat text in the digest ending in '…' is truncated. Don't propose
+  'editText' over text you cannot fully see — ${opts.beatContentToolAvailable ? 'read the beat first' : "ask the author to paste it, or use 'addNote' describing the change instead"}.
 - Player-facing prose supports markdown-lite (**bold**, *italic*,
   ~~strikethrough~~) — use sparingly for emphasis; keep choice/button labels
   and hyperText bodies plain. Never emit raw HTML.

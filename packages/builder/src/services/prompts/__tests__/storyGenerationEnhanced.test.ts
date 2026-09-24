@@ -18,6 +18,7 @@
  *   - getEnhancedStoryExample: a valid, parseable few-shot example whose
  *     structure matches what the system prompt instructs.
  */
+import { BUILT_IN_THEMES } from '@asaps/core';
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -95,17 +96,17 @@ describe('buildEnhancedStoryGenerationSystemPrompt', () => {
       expect(prompt).toMatch(/Counter \+ ConditionBeat Pattern/i);
     });
 
-    it('explains counter choice properties (counter/counterOperation/counterValue)', () => {
-      expect(prompt).toContain('counterOperation');
-      expect(prompt).toContain('counterValue');
+    it('teaches counter changes as canonical effects, not the legacy flat fields', () => {
+      // The flat counter/counterOperation/counterValue shape is migrated on
+      // import, cannot carry "character", and turns "subtract" into an add.
+      expect(prompt).toContain('"type": "incrementCounter"');
+      expect(prompt).not.toContain('counterOperation');
     });
   });
 
   describe('theme guide', () => {
-    it('embeds the three built-in theme ids', () => {
-      expect(prompt).toContain('builtin-visual-novel');
-      expect(prompt).toContain('builtin-twine');
-      expect(prompt).toContain('builtin-point-and-click');
+    it('offers every built-in theme preset', () => {
+      for (const t of BUILT_IN_THEMES) expect(prompt).toContain(t.meta.id);
     });
 
     it('keeps the color-contrast guidance', () => {
@@ -218,10 +219,11 @@ describe('buildEnhancedStoryGenerationSystemPrompt', () => {
     });
   });
 
-  describe('multi-language support section', () => {
-    it('documents the translations output format', () => {
-      expect(prompt).toContain('Multi-Language');
-      expect(prompt).toMatch(/Translation Output Format/i);
+  describe('languages', () => {
+    it('asks for translatable labels but no generated translations (they were never imported)', () => {
+      expect(prompt).toContain('Translatable Labels');
+      expect(prompt).not.toMatch(/Translation Output Format/i);
+      expect(prompt).not.toContain('"translations": [');
     });
   });
 
@@ -323,11 +325,10 @@ describe('buildEnhancedUserPrompt', () => {
       expect(out).not.toContain('"translations" array');
     });
 
-    it('multiple languages → translations array with the additional languages listed', () => {
+    it('multiple languages → the story is written in the first; no translations requested', () => {
       const out = buildEnhancedUserPrompt({ ...base, languages: ['en', 'de', 'fr'] });
-      expect(out).toMatch(/Write the story content in en/);
-      expect(out).toContain('"translations" array');
-      expect(out).toContain('de, fr');
+      expect(out).toContain('LANGUAGE: Write all story content in en');
+      expect(out).not.toContain('translations');
     });
 
     it('empty languages array adds no language section', () => {
@@ -355,12 +356,8 @@ describe('buildEnhancedUserPrompt', () => {
   describe('always-present trailer', () => {
     const out = buildEnhancedUserPrompt(base);
 
-    it('repeats the mandatory counter rule', () => {
-      expect(out).toMatch(/MANDATORY COUNTER RULE/);
-    });
-
-    it('demands ONLY valid JSON output', () => {
-      expect(out).toMatch(/Respond with ONLY valid JSON/);
+    it('recaps the counter rule', () => {
+      expect(out).toMatch(/Counter rule \(recap\)/);
     });
 
     it('includes the verification checklist (beat_0 titleScreen, reachability)', () => {
