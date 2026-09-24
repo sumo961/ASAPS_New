@@ -112,6 +112,7 @@ import { getTTSService } from './services/tts';
 import { getSavedTTSConfig } from './hooks/useTTS';
 import { notify, confirmAction, errorMessage } from './utils/notify';
 import { undoCommandAction } from './utils/undoNotice';
+import { resolveExportSpeech } from './utils/exportSpeech';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -7082,6 +7083,17 @@ function App() {
           projectName={currentProject.name}
           availableBeats={state.beats.map((b: any) => ({ id: b.id, name: b.name, type: b.type }))}
           selectedBeatId={selectedBeat?.id}
+          exportSpeech={resolveExportSpeech(globalSettings)}
+          onExportSpeechChange={(enabled) => {
+            const base = globalSettingsRef.current ?? globalSettings;
+            if (!base) return;
+            void getCommandManager().execute(new UpdateGlobalSettingsCommand(
+              base,
+              { ...base, tts: { ...(base.tts || {}), exportSpeech: enabled } } as GlobalSettings,
+              globalSettingsMutationsRef.current,
+              enabled ? 'Exported player reads text aloud' : 'Exported player stays silent',
+            ));
+          }}
         />
       )}
 

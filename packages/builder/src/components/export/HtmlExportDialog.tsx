@@ -20,6 +20,10 @@ interface HtmlExportDialogProps {
   availableBeats?: Array<{ id: string; name?: string; type?: string }>;
   /** Currently-selected beat in the builder, used as the dropdown's default. */
   selectedBeatId?: string;
+  /** Project setting: the exported player reads text aloud (globalSettings.tts.exportSpeech). */
+  exportSpeech?: boolean;
+  /** Persist a changed exportSpeech into the project. */
+  onExportSpeechChange?: (enabled: boolean) => void;
 }
 
 export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
@@ -29,6 +33,8 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   projectName,
   availableBeats = [],
   selectedBeatId,
+  exportSpeech = true,
+  onExportSpeechChange,
 }) => {
   const [mode, setMode] = useState<'folder' | 'single-file'>('folder');
   const [enableAI, setEnableAI] = useState(true);
@@ -179,12 +185,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsBaseUrl: savedTTS?.baseUrl,
         ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
         ttsSpeakerVoices: speakerVoices,
-        // Honour the builder's TTS toggle — same key the Header reads.
-        // Default true if the user has never touched the toggle so existing
-        // workflows keep working; explicit false ships a silent player.
-        ttsEnabled: typeof window !== 'undefined'
-          ? localStorage.getItem('asaps_tts_enabled') !== 'false'
-          : true,
+        // Project setting (tts.exportSpeech) — the same project exports the
+        // same player on every machine (UX-Eval B3).
+        ttsEnabled: exportSpeech,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -233,7 +236,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
+  }, [mode, enableAI, aiProvider, aiApiKey, aiAccess, aiProxyUrl, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech]);
 
   // Called from the size-warning banner's "Continue anyway" button.
   // Reuses the pre-computed zip so the user isn't waiting for it twice.
@@ -272,9 +275,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsBaseUrl: savedTTS?.baseUrl,
         ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
         ttsSpeakerVoices: speakerVoices,
-        ttsEnabled: typeof window !== 'undefined'
-          ? localStorage.getItem('asaps_tts_enabled') !== 'false'
-          : true,
+        ttsEnabled: exportSpeech,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,
         enableAIOnTheFly: enableAIOnTheFly && hasAIConfig,
         showSessionLog,
@@ -289,7 +290,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
     } finally {
       setExporting(false);
     }
-  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId]);
+  }, [sizeWarning, mode, enableAI, aiProvider, aiApiKey, aiBaseUrl, aiModel, projectId, projectName, onClose, includedTranslations, enableAIOnTheFly, showSessionLog, translationState.translations, startBeatId, exportSpeech]);
 
   const handleSwitchToFolder = useCallback(() => {
     setSizeWarning(null);
@@ -728,6 +729,28 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                     Configure an AI provider with API key above to enable this.
                   </div>
                 )}
+              </div>
+            </label>
+          </div>
+
+          {/* Read-aloud option — a PROJECT setting (saved with the story),
+              so every machine exports the same player. */}
+          <div className="border rounded-lg p-3">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={exportSpeech}
+                onChange={e => onExportSpeechChange?.(e.target.checked)}
+                className="mt-1"
+              />
+              <div>
+                <div className="text-sm font-medium text-gray-900">
+                  Read text aloud in the exported player
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  Uses the text-to-speech voices set up for this story; players can still mute it.
+                  Saved with the project, so everyone who exports it gets the same player.
+                </div>
               </div>
             </label>
           </div>

@@ -139,6 +139,13 @@ export interface GlobalSettings {
     defaultVoiceId?: string;
     readPrompts?: boolean;
     speakerVoices?: Record<string, Record<string, string>>;  // providerKey → { speaker → voiceId }
+    /**
+     * Whether an EXPORTED player reads text aloud. A project setting (it
+     * decides what the export contains — UX-Eval B3): before, the builder's
+     * device-level TTS toggle decided it, so two authors exporting the same
+     * project got different players. Unset = seeded once from that toggle.
+     */
+    exportSpeech?: boolean;
   };
   speakerDisplay?: {
     showNames?: boolean;                       // Master toggle: show speaker names globally (default derived from nameStyle)
