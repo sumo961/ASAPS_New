@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSTTService, WebSpeechSTTProvider, WhisperSTTProvider, LocalSTTProvider, VoskSTTProvider, WhisperCppSTTProvider } from '../services/stt';
 import type { STTProviderType, STTTranscriptionResult } from '../types/stt';
+import { machineStorage } from '../utils/machineStorage';
 
 const STT_CONFIG_STORAGE_KEY = 'asaps_stt_config';
 
@@ -22,7 +23,7 @@ export interface SavedSTTConfig {
 
 function loadSavedConfig(): SavedSTTConfig | null {
   try {
-    const saved = localStorage.getItem(STT_CONFIG_STORAGE_KEY);
+    const saved = machineStorage.getItem(STT_CONFIG_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch (error) {
     console.warn('[useSTT] Failed to load saved config:', error);
@@ -32,7 +33,7 @@ function loadSavedConfig(): SavedSTTConfig | null {
 
 function saveConfig(config: SavedSTTConfig): void {
   try {
-    localStorage.setItem(STT_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    machineStorage.setItem(STT_CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch (error) {
     console.warn('[useSTT] Failed to save config:', error);
   }
@@ -40,7 +41,7 @@ function saveConfig(config: SavedSTTConfig): void {
 
 export function clearSavedSTTConfig(): void {
   try {
-    localStorage.removeItem(STT_CONFIG_STORAGE_KEY);
+    machineStorage.removeItem(STT_CONFIG_STORAGE_KEY);
   } catch {
     // ignore
   }

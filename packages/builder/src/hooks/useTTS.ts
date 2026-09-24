@@ -11,6 +11,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getTTSService, WebSpeechProvider, OpenAITTSProvider, ElevenLabsProvider, CustomTTSProvider, LocalTTSProvider } from '../services/tts';
 import type { TTSProviderType } from '../types/tts';
+import { machineStorage } from '../utils/machineStorage';
 
 const TTS_CONFIG_STORAGE_KEY = 'asaps_tts_config';
 
@@ -29,7 +30,7 @@ export interface SavedTTSConfig {
 
 function loadSavedConfig(): SavedTTSConfig | null {
   try {
-    const saved = localStorage.getItem(TTS_CONFIG_STORAGE_KEY);
+    const saved = machineStorage.getItem(TTS_CONFIG_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch (error) {
     console.warn('[useTTS] Failed to load saved config:', error);
@@ -39,7 +40,7 @@ function loadSavedConfig(): SavedTTSConfig | null {
 
 function saveConfig(config: SavedTTSConfig): void {
   try {
-    localStorage.setItem(TTS_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    machineStorage.setItem(TTS_CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch (error) {
     console.warn('[useTTS] Failed to save config:', error);
   }
@@ -47,7 +48,7 @@ function saveConfig(config: SavedTTSConfig): void {
 
 export function clearSavedTTSConfig(): void {
   try {
-    localStorage.removeItem(TTS_CONFIG_STORAGE_KEY);
+    machineStorage.removeItem(TTS_CONFIG_STORAGE_KEY);
   } catch {
     // ignore
   }

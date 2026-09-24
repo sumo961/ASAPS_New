@@ -55,6 +55,38 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
   },
 
+  // Machine store (UX-Eval B3): API keys and provider configs, encrypted at
+  // rest by the main process. The snapshot is read ONCE, synchronously,
+  // before page scripts run; writes go through the main process, which
+  // broadcasts them to every window (onChanged keeps each cache current).
+  machineStore: (() => {
+    let state: { values: Record<string, string>; encrypted: boolean } = { values: {}, encrypted: false };
+    try {
+      state = ipcRenderer.sendSync('machine-store:snapshot') || state;
+    } catch {
+      /* main process not answering — behave as an empty store */
+    }
+    const listeners = new Set<(key: string, value: string | null) => void>();
+    ipcRenderer.on('machine-store:changed', (_e, key: string, value: string | null) => {
+      if (value === null) delete state.values[key];
+      else state.values[key] = value;
+      for (const l of listeners) l(key, value);
+    });
+    return {
+      get: (key: string): string | null => (key in state.values ? state.values[key] : null),
+      set: (key: string, value: string | null): Promise<boolean> => {
+        if (value === null) delete state.values[key];
+        else state.values[key] = value;
+        return ipcRenderer.invoke('machine-store:set', key, value);
+      },
+      isEncrypted: (): boolean => state.encrypted,
+      onChanged: (cb: (key: string, value: string | null) => void) => {
+        listeners.add(cb);
+        return () => { listeners.delete(cb); };
+      },
+    };
+  })(),
+
   // API server operations
   apiServer: {
     getStatus: () => ipcRenderer.invoke('api-server:status'),

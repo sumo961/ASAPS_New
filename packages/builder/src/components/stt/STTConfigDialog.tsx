@@ -10,6 +10,7 @@ import { X, Key, CheckCircle, AlertCircle, Trash2, Mic, Server, Link2 } from 'lu
 import { getSavedSTTConfig, clearSavedSTTConfig } from '../../hooks/useSTT';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import type { STTProviderType } from '../../types/stt';
+import { keyStorageNote } from '../../utils/keyStorageNote';
 
 type STTProviderTab = 'web-speech' | 'whisper' | 'local' | 'vosk' | 'whisper-cpp';
 
@@ -542,7 +543,7 @@ export const STTConfigDialog: React.FC<STTConfigDialogProps> = ({
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start justify-between">
               <p className="text-sm text-blue-900 flex-1">
-                <strong>Note:</strong> Your API key is saved in browser storage only.
+                <strong>Note:</strong> {keyStorageNote()}
               </p>
               <button
                 type="button"

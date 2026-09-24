@@ -14,6 +14,7 @@ import {
   clearSavedBraveApiKey,
 } from './ideator/braveConfig';
 import { defaultStoryMaxTokensFor } from '../../services/providers/ClaudeProvider';
+import { keyStorageNote } from '../../utils/keyStorageNote';
 
 // Provider presets for easy configuration
 type ProviderType = 'claude' | 'openai' | 'local';
@@ -647,8 +648,7 @@ export const AIConfigDialog: React.FC<AIConfigDialogProps> = ({ isOpen, onClose,
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start justify-between">
               <p className="text-sm text-blue-900 flex-1">
-                <strong>Note:</strong> Your API key is saved in browser storage and will persist across sessions.
-                Use the button to clear saved credentials.
+                <strong>Note:</strong> {keyStorageNote()} Use the button to clear saved credentials.
               </p>
               <button
                 type="button"

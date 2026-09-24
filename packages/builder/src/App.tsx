@@ -113,6 +113,7 @@ import { getSavedTTSConfig } from './hooks/useTTS';
 import { notify, confirmAction, errorMessage } from './utils/notify';
 import { undoCommandAction } from './utils/undoNotice';
 import { resolveExportSpeech } from './utils/exportSpeech';
+import { machineStorage } from './utils/machineStorage';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -222,7 +223,7 @@ function applyProjectAIDefaults(globalSettings: any): void {
     if (dropped !== undefined) {
       console.warn(`[App] Project AI defaults carried a legacy Max Tokens ${dropped} (automatic is ${automatic}); ignored.`);
     }
-    localStorage.setItem('asaps_ai_config', JSON.stringify(config));
+    machineStorage.setItem('asaps_ai_config', JSON.stringify(config));
     console.log('[App] Applied project-level AI defaults:', ai.providerType || ai.provider);
   } catch { /* ignore localStorage errors */ }
 }

@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage } from 'electron';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
@@ -8,6 +8,7 @@ import { startWatching, stopWatching } from './fileWatcher';
 import { execFile, spawn } from 'child_process';
 import { release as osRelease } from 'os';
 import { buildBugReportUrl, ISSUES_REPO_URL } from './bugReport';
+import { MachineStore } from './machineStore';
 
 /** Injected by vite.config.ts from build-number.json (0 when absent). */
 declare const __BUILD_NUMBER__: number;
@@ -1157,6 +1158,46 @@ ipcMain.handle('shell:open-external', async (_, url: string) => {
 
 ipcMain.handle('shell:show-item-in-folder', async (_, path: string) => {
   shell.showItemInFolder(path);
+});
+
+// ---- Machine store (UX-Eval B3): API keys / provider configs encrypted
+// at rest with the OS keychain, shared by every window. Created lazily —
+// safeStorage needs the app to be ready, and the first caller is a
+// window's preload, which only exists after ready.
+let machineStore: MachineStore | null = null;
+function getMachineStore(): MachineStore {
+  if (machineStore) return machineStore;
+  const file = join(app.getPath('userData'), 'machine-store.json');
+  machineStore = new MachineStore(safeStorage, {
+    read: () => (existsSync(file) ? readFileSync(file, 'utf-8') : null),
+    write: (contents) => {
+      // Atomic: a torn file would lose every key at once.
+      const tmp = `${file}.tmp`;
+      writeFileSync(tmp, contents, { encoding: 'utf-8', mode: 0o600 });
+      renameSync(tmp, file);
+    },
+  });
+  return machineStore;
+}
+// Synchronous on purpose: preload hydrates the renderer's cache before any
+// page script runs, so the existing synchronous config readers keep working.
+ipcMain.on('machine-store:snapshot', (event) => {
+  try {
+    const store = getMachineStore();
+    event.returnValue = { values: store.snapshot(), encrypted: store.isEncrypted() };
+  } catch (err) {
+    console.error('[main] machine-store snapshot failed:', err);
+    event.returnValue = { values: {}, encrypted: false };
+  }
+});
+ipcMain.handle('machine-store:set', (_event, key: string, value: string | null) => {
+  const ok = getMachineStore().set(key, typeof value === 'string' ? value : null);
+  if (ok) {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('machine-store:changed', key, typeof value === 'string' ? value : null);
+    }
+  }
+  return ok;
 });
 
 ipcMain.handle('app:get-path', async (_, name: string) => {

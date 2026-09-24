@@ -21,6 +21,7 @@ import type {
   ChatWithToolsRequest,
   ChatWithToolsResponse,
 } from '../types/ai';
+import { machineStorage } from '../utils/machineStorage';
 
 // Storage key for AI configuration
 const AI_CONFIG_STORAGE_KEY = 'asaps_ai_config';
@@ -56,7 +57,7 @@ export interface SavedAIConfig {
  */
 function loadSavedConfig(): SavedAIConfig | null {
   try {
-    const saved = localStorage.getItem(AI_CONFIG_STORAGE_KEY);
+    const saved = machineStorage.getItem(AI_CONFIG_STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved) as SavedAIConfig;
       // One-time migration of a legacy Max Tokens that silently capped the
@@ -69,7 +70,7 @@ function loadSavedConfig(): SavedAIConfig | null {
             `${config.model ?? 'the configured model'}); the budget is automatic again. ` +
             'Set it deliberately in AI settings if you really want a cap.',
         );
-        localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(config));
+        machineStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(config));
       }
       return config;
     }
@@ -84,7 +85,7 @@ function loadSavedConfig(): SavedAIConfig | null {
  */
 function saveConfig(config: SavedAIConfig): void {
   try {
-    localStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(config));
+    machineStorage.setItem(AI_CONFIG_STORAGE_KEY, JSON.stringify(config));
     console.log('[useAI] Configuration saved to localStorage');
   } catch (error) {
     console.warn('[useAI] Failed to save config:', error);
@@ -96,7 +97,7 @@ function saveConfig(config: SavedAIConfig): void {
  */
 export function clearSavedAIConfig(): void {
   try {
-    localStorage.removeItem(AI_CONFIG_STORAGE_KEY);
+    machineStorage.removeItem(AI_CONFIG_STORAGE_KEY);
     console.log('[useAI] Configuration cleared from localStorage');
   } catch (error) {
     console.warn('[useAI] Failed to clear config:', error);

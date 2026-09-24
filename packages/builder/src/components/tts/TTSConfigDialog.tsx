@@ -10,6 +10,7 @@ import { X, Key, CheckCircle, AlertCircle, Server, Trash2, Play, Volume2, Cpu } 
 import { getSavedTTSConfig, clearSavedTTSConfig } from '../../hooks/useTTS';
 import { getTTSService, WebSpeechProvider, LOCAL_TTS_PRESETS } from '../../services/tts';
 import type { TTSProviderType, TTSVoiceInfo } from '../../types/tts';
+import { keyStorageNote } from '../../utils/keyStorageNote';
 
 type TTSProviderTab = 'web-speech' | 'openai' | 'elevenlabs' | 'custom' | 'local';
 
@@ -554,8 +555,7 @@ export const TTSConfigDialog: React.FC<TTSConfigDialogProps> = ({
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start justify-between">
               <p className="text-sm text-blue-900 flex-1">
-                <strong>Note:</strong> Your API key is saved in browser storage only.
-                Use the button to clear saved credentials.
+                <strong>Note:</strong> {keyStorageNote()} Use the button to clear saved credentials.
               </p>
               <button
                 type="button"
