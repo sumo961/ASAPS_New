@@ -31,6 +31,7 @@ import {
 } from './components/characters/CharacterDevelopmentDialog';
 import { BulkRelinkDialog } from './components/characters/BulkRelinkDialog';
 import { findReferencesByName, relinkReferences } from './components/characters/relinkReferences';
+import { detectRenames, planLinkedSpeakerRefresh, renameSpeakerVoices } from './components/characters/renameCharacter';
 import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
@@ -622,6 +623,8 @@ function App() {
   const [bulkRelink, setBulkRelink] = useState<{
     character: { id: string; name?: string; displayName?: string };
     matches: import('./components/characters/relinkReferences').ReferenceMatch[];
+    /** Set when the prompt follows a rename: the label the character had before. */
+    renamedFrom?: string;
   } | null>(null);
 
   // Translation state
@@ -5048,15 +5051,74 @@ function App() {
   const handleCharactersChange = useCallback((newCharacters: Character[]) => {
     // Snapshot previous characters BEFORE applying, so undo can restore them.
     const oldCharacters = characters;
-    applyCharactersChange(newCharacters);
-    const cmd = new UpdateCharactersCommand(
-      oldCharacters,
-      newCharacters,
-      charactersMutationsRef.current,
-      'Edit characters'
+    const renames = detectRenames(oldCharacters, newCharacters);
+
+    if (renames.length === 0) {
+      applyCharactersChange(newCharacters);
+      const cmd = new UpdateCharactersCommand(
+        oldCharacters,
+        newCharacters,
+        charactersMutationsRef.current,
+        'Edit characters'
+      );
+      getCommandManager().pushWithoutExecute(cmd);
+      return;
+    }
+
+    // Rename (UX-Eval B12): the character change, every linked speaker copy
+    // that now shows a stale name, and the TTS voice assignment move together
+    // as ONE undoable step. Free-text mentions of the old name are offered
+    // afterwards, never changed silently.
+    const beatsNow = (beatsRef.current || state.beats) as any[];
+    const commands: any[] = [
+      new UpdateCharactersCommand(oldCharacters, newCharacters, charactersMutationsRef.current, 'Edit characters'),
+    ];
+    const plan = new Map<string, { speaker?: string; parameters?: Record<string, any> }>();
+    for (const r of renames) {
+      for (const [beatId, updates] of planLinkedSpeakerRefresh(beatsNow, r.after)) {
+        const merged = plan.get(beatId) || {};
+        plan.set(beatId, { ...merged, ...updates });
+      }
+    }
+    for (const [beatId, updates] of plan) {
+      const beat = beatsNow.find((b) => b.id === beatId);
+      if (!beat) continue;
+      const oldValues: Record<string, any> = {};
+      for (const key of Object.keys(updates)) {
+        const val = (beat as any)[key];
+        oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
+      }
+      commands.push(new UpdateBeatCommand(beatId, oldValues, updates as any, stableMutations.current));
+    }
+    const currentSettings = globalSettingsRef.current ?? globalSettings;
+    const voices = currentSettings?.tts?.speakerVoices as Record<string, Record<string, string>> | undefined;
+    const movedVoices = renameSpeakerVoices(voices, renames);
+    if (currentSettings && movedVoices !== voices) {
+      commands.push(new UpdateGlobalSettingsCommand(
+        currentSettings,
+        { ...currentSettings, tts: { ...currentSettings.tts, speakerVoices: movedVoices } } as GlobalSettings,
+        globalSettingsMutationsRef.current,
+        'Move voice to renamed character'
+      ));
+    }
+    const label = renames.length === 1
+      ? `Rename ${renames[0].oldLabel} to ${renames[0].newLabel}`
+      : `Rename ${renames.length} characters`;
+    void getCommandManager().execute(new BatchCommand(commands, label));
+    console.log(`[App] ${label}: ${plan.size} linked beat(s) refreshed${movedVoices !== voices ? ', voice moved' : ''}`);
+
+    // Free-text references that still spell the OLD name: offer to link them
+    // (existing bulk-relink prompt). One rename at a time — the common case.
+    const r = renames[0];
+    const matches = findReferencesByName(
+      beatsNow,
+      { id: r.after.id, name: r.before.name, displayName: r.before.displayName },
+      newCharacters as any,
     );
-    getCommandManager().pushWithoutExecute(cmd);
-  }, [characters, applyCharactersChange]);
+    if (matches.length > 0) {
+      setBulkRelink({ character: r.after, matches, renamedFrom: r.oldLabel });
+    }
+  }, [characters, applyCharactersChange, state.beats, globalSettings]);
 
   // Apply a global-settings update without touching the command history.
   // Used as the mutation callback by UpdateGlobalSettingsCommand.
@@ -5135,15 +5197,28 @@ function App() {
         updateById.set(beatsAfter[i].id, beatsAfter[i]);
       }
     }
+    // One undoable step for the whole relink.
+    const commands: any[] = [];
     for (const [id, updated] of updateById) {
       const updates: Record<string, any> = {};
       if (updated.speaker !== undefined) updates.speaker = updated.speaker;
       if (updated.characterRef !== undefined) updates.characterRef = updated.characterRef;
       if (updated.parameters) updates.parameters = updated.parameters;
-      actionsRef.current.updateBeat(id, updates as any);
+      const before = beatsBefore.find((b: any) => b.id === id);
+      const oldValues: Record<string, any> = {};
+      for (const key of Object.keys(updates)) {
+        const val = before ? (before as any)[key] : undefined;
+        oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
+      }
+      commands.push(new UpdateBeatCommand(id, oldValues, updates as any, stableMutations.current));
+    }
+    if (commands.length > 0) {
+      const name = bulkRelink.character.displayName || bulkRelink.character.name || bulkRelink.character.id;
+      void getCommandManager().execute(new BatchCommand(commands, `Link ${commands.length} reference${commands.length === 1 ? '' : 's'} to ${name}`));
+      markChanged();
     }
     setBulkRelink(null);
-  }, [bulkRelink]);
+  }, [bulkRelink, markChanged]);
 
   const handleOpenAssetManager = useCallback(() => {
     setShowAssetManager(true);
@@ -7050,6 +7125,7 @@ function App() {
         <BulkRelinkDialog
           character={bulkRelink.character}
           matches={bulkRelink.matches}
+          renamedFrom={bulkRelink.renamedFrom}
           onConfirm={handleBulkRelinkConfirm}
           onSkip={() => setBulkRelink(null)}
         />

@@ -23,9 +23,11 @@ interface Props {
   matches: ReadonlyArray<ReferenceMatch>;
   onConfirm: () => void;
   onSkip: () => void;
+  /** Set when the prompt follows a rename: the name the character had before. */
+  renamedFrom?: string;
 }
 
-export const BulkRelinkDialog: React.FC<Props> = ({ character, matches, onConfirm, onSkip }) => {
+export const BulkRelinkDialog: React.FC<Props> = ({ character, matches, onConfirm, onSkip, renamedFrom }) => {
   const displayName = character.displayName || character.name || character.id;
   const count = matches.length;
 
@@ -34,19 +36,32 @@ export const BulkRelinkDialog: React.FC<Props> = ({ character, matches, onConfir
       <div style={dialogStyle} onClick={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
           <h2 style={{ margin: 0, fontSize: 16, color: '#e2e8f0' }}>
-            Link existing references?
+            {renamedFrom ? 'Update mentions of the old name?' : 'Link existing references?'}
           </h2>
         </div>
         <div style={bodyStyle}>
-          <p style={paragraphStyle}>
-            <strong>{displayName}</strong> is now a defined Character.{' '}
-            {count === 1
-              ? 'There is 1 other reference to this name in the project that could be linked too.'
-              : `There are ${count} other references to this name in the project that could be linked too.`}
-            {' '}
-            Linked references will follow renames and feed character-aware features (TTS routing, dossier
-            building, per-character inventory). You can always unlink individual references afterward.
-          </p>
+          {renamedFrom ? (
+            <p style={paragraphStyle}>
+              <strong>{renamedFrom}</strong> is now <strong>{displayName}</strong>. Every speaker linked to
+              this character already shows the new name.{' '}
+              {count === 1
+                ? `1 place still says "${renamedFrom}" as plain text, not linked to any character.`
+                : `${count} places still say "${renamedFrom}" as plain text, not linked to any character.`}
+              {' '}
+              If they mean this character, link them and they will show {displayName} too. Keep them as
+              they are if "{renamedFrom}" is meant to be someone else.
+            </p>
+          ) : (
+            <p style={paragraphStyle}>
+              <strong>{displayName}</strong> is now a defined Character.{' '}
+              {count === 1
+                ? 'There is 1 other reference to this name in the project that could be linked too.'
+                : `There are ${count} other references to this name in the project that could be linked too.`}
+              {' '}
+              Linked references will follow renames and feed character-aware features (TTS routing, dossier
+              building, per-character inventory). You can always unlink individual references afterward.
+            </p>
+          )}
           <div style={listStyle}>
             {matches.map((m, i) => (
               <div key={`${m.beatId}-${i}`} style={listItemStyle}>
@@ -58,10 +73,12 @@ export const BulkRelinkDialog: React.FC<Props> = ({ character, matches, onConfir
         </div>
         <div style={footerStyle}>
           <button onClick={onSkip} style={secondaryBtnStyle}>
-            Keep as free text
+            {renamedFrom ? `Keep "${renamedFrom}"` : 'Keep as free text'}
           </button>
           <button onClick={onConfirm} style={primaryBtnStyle}>
-            Link {count === 1 ? '1 reference' : `${count} references`}
+            {renamedFrom
+              ? `Link and rename ${count === 1 ? '1 place' : `${count} places`}`
+              : `Link ${count === 1 ? '1 reference' : `${count} references`}`}
           </button>
         </div>
       </div>

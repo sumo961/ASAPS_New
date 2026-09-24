@@ -171,8 +171,12 @@ export abstract class Beat {
         type: this.type,
       });
 
-      // Set speaker info in renderer state for TTS routing and display
-      renderer.setState('beatSpeaker', this.speaker || '');
+      // Set speaker info in renderer state for TTS routing and display.
+      // A speaker LINKED to a character (characterRef) shows the character's
+      // current name — the stored speaker text is only a copy taken when the
+      // link was made, and it went stale when the character was renamed
+      // (UX-Eval B12). Free-text speakers show exactly what the author typed.
+      renderer.setState('beatSpeaker', Beat.linkedSpeakerName(this.characterRef, this.speaker, context));
       renderer.setState('showSpeaker', this.showSpeaker);
 
       // Background fit for this beat's background image. Always set —
@@ -587,6 +591,25 @@ export abstract class Beat {
     });
 
     return text;
+  }
+
+  /**
+   * Display name for a speaker site: the linked character's CURRENT name
+   * (variant-merged, displayName before name) when `characterRef` resolves
+   * to a defined character, else the stored free-text speaker unchanged.
+   * Shared by Beat.execute and DialogTreeBeat's per-node speakers.
+   */
+  static linkedSpeakerName(
+    characterRef: string | undefined,
+    storedSpeaker: string | undefined,
+    context: { getMergedCharacter?: (ref: string) => any } | null | undefined,
+  ): string {
+    if (characterRef && context && typeof context.getMergedCharacter === 'function') {
+      const ch = context.getMergedCharacter(characterRef);
+      const name = ch && (ch.displayName || ch.name);
+      if (typeof name === 'string' && name) return name;
+    }
+    return storedSpeaker || '';
   }
 
   /**

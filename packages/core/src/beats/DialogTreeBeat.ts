@@ -578,7 +578,11 @@ export class DialogTreeBeat extends Beat {
       }
 
       // Process text with variable interpolation
-      const processedSpeaker = this.processText(this.currentNode.speaker, context);
+      // Linked node speakers show the character's current name (B12).
+      const processedSpeaker = this.processText(
+        Beat.linkedSpeakerName((this.currentNode as any).characterRef, this.currentNode.speaker, context as any),
+        context,
+      );
       const processedText = this.processText(this.currentNode.text, context);
 
       // P3-3c-9 — per-node spatial detection (computed BEFORE renderDialog

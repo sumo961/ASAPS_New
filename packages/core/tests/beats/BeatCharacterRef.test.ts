@@ -192,3 +192,41 @@ describe('DialogTreeBeat — characterRef on dialog nodes', () => {
     expect('characterRef' in beat.dialogTree).toBe(false);
   });
 });
+
+describe('Beat.linkedSpeakerName — linked speakers show the current character name (B12)', () => {
+  const ctx = {
+    getMergedCharacter: (ref: string) =>
+      ref === 'char_1' ? { id: 'char_1', name: 'Granny', displayName: 'Grandma Rose' } : undefined,
+  };
+
+  it('uses the linked character\'s current display name over the stored copy', () => {
+    expect(Beat.linkedSpeakerName('char_1', 'Granny (old copy)', ctx)).toBe('Grandma Rose');
+  });
+
+  it('keeps free-text speakers exactly as typed', () => {
+    expect(Beat.linkedSpeakerName(undefined, 'The Guard', ctx)).toBe('The Guard');
+  });
+
+  it('falls back to the stored text when the link does not resolve or there is no context', () => {
+    expect(Beat.linkedSpeakerName('char_gone', 'Old Name', ctx)).toBe('Old Name');
+    expect(Beat.linkedSpeakerName('char_1', 'Old Name', null)).toBe('Old Name');
+    expect(Beat.linkedSpeakerName(undefined, undefined, ctx)).toBe('');
+  });
+
+  it('execute publishes the resolved name as beatSpeaker', async () => {
+    const beat = new TestBeat({
+      id: 'b1', name: 'Test', type: 'test', characterRef: 'char_1', speaker: 'Granny',
+    } as any);
+    const states: Record<string, unknown> = {};
+    const renderer: any = new Proxy({}, {
+      get: (_t, prop) => prop === 'setState'
+        ? (k: string, v: unknown) => { states[k] = v; }
+        : prop === 'getState' ? (k: string) => states[k] : () => undefined,
+    });
+    const context: any = new Proxy({ getMergedCharacter: ctx.getMergedCharacter }, {
+      get: (t: any, prop) => (prop in t ? t[prop] : () => undefined),
+    });
+    try { await beat.execute(context, renderer); } catch { /* the stub context is minimal; only beatSpeaker matters */ }
+    expect(states.beatSpeaker).toBe('Grandma Rose');
+  });
+});
