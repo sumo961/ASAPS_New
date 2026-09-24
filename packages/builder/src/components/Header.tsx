@@ -26,6 +26,7 @@ import { useSTT } from '../hooks/useSTT';
 import { getSTTService } from '../services/stt';
 import { getLanguageDisplayName } from '../utils/languageCatalog';
 import { notify, confirmAction } from '../utils/notify';
+import { AppPreferencesDialog } from './settings/AppPreferencesDialog';
 
 /**
  * ASML 1.0 (XML) is frozen legacy (Tier-5 item 14): an export silently drops
@@ -185,6 +186,14 @@ export const Header: React.FC<HeaderProps> = ({
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  // App Preferences (machine scope, UX-Eval B3) — opened from Tools and the
+  // desktop app menu.
+  const [showAppPreferences, setShowAppPreferences] = useState(false);
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onMenuAppPreferences) return;
+    return api.onMenuAppPreferences(() => setShowAppPreferences(true));
+  }, []);
   const [showTTSConfig, setShowTTSConfig] = useState(false);
   const [showTTSMenu, setShowTTSMenu] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<Array<{ id: string; name: string }>>([]);
@@ -610,7 +619,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Tools Menu */}
-          {(onMergeDialogTrees || onHelperCommands) && (
+          {(
             <div className="relative">
               <button
                 className="px-3 py-1.5 bg-white text-gray-700 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
@@ -629,6 +638,18 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => setShowToolsMenu(false)}
                   />
                   <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                    <button
+                      onClick={() => {
+                        setShowAppPreferences(true);
+                        setShowToolsMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Settings for this computer: AI and voice providers, keys, updates, Claude Desktop"
+                    >
+                      <Settings className="w-4 h-4" />
+                      App Preferences…
+                    </button>
+                    {(onHelperCommands || onMergeDialogTrees) && <div className="my-1 border-t border-gray-100" />}
                     {onHelperCommands && (
                       <button
                         onClick={() => {
@@ -709,10 +730,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-1.5"
               onClick={onSettings}
-              title="Configure stage size, typography, colors, and global story settings"
+              title="Story Settings (⌘,) — stage size, typography, colors and everything else that travels with this story"
             >
               <Settings className="w-4 h-4" />
-              Settings
+              Story Settings
             </button>
           )}
 
@@ -1213,6 +1234,13 @@ export const Header: React.FC<HeaderProps> = ({
       />
 
       {/* AI Configuration Dialog */}
+      <AppPreferencesDialog
+        isOpen={showAppPreferences}
+        onClose={() => setShowAppPreferences(false)}
+        onOpenAIConfig={() => setShowAIConfig(true)}
+        onOpenTTSConfig={() => setShowTTSConfig(true)}
+        onOpenSTTConfig={() => setShowSTTConfig(true)}
+      />
       <AIConfigDialog
         isOpen={showAIConfig}
         onClose={() => setShowAIConfig(false)}

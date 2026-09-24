@@ -1723,7 +1723,7 @@ function App() {
   useEffect(() => {
     // MCP WebSocket integration is disabled by default to reduce noise
     // In Electron: Enable via app menu "Enable MCP Integration"
-    // In web: Enable via localStorage.setItem('asaps_mcp_enabled', 'true')
+    // In web: App Preferences → Claude Desktop integration (asaps_mcp_enabled)
 
     // Shared state for cleanup and connection control
     let isCleanedUp = false;
@@ -1842,10 +1842,9 @@ function App() {
       connectWebSocket();
     };
 
-    // Listen for setting changes from Electron menu
-    let unsubscribeMcpSetting: (() => void) | undefined;
-    if (window.electronAPI?.onMcpSettingChanged) {
-      unsubscribeMcpSetting = window.electronAPI.onMcpSettingChanged((enabled) => {
+    // MCP on/off: Electron menu / App Preferences (IPC) or, in the browser
+    // build, App Preferences' toggle (window event) — one handler for both.
+    const applyMcpSetting = (enabled: boolean) => {
         console.log('[App] MCP setting changed:', enabled);
         mcpShouldBeEnabled = enabled; // Update the flag so retry loops stop
 
@@ -1862,7 +1861,14 @@ function App() {
             wsRef.current = null;
           }
         }
-      });
+    };
+    let unsubscribeMcpSetting: (() => void) | undefined;
+    if (window.electronAPI?.onMcpSettingChanged) {
+      unsubscribeMcpSetting = window.electronAPI.onMcpSettingChanged(applyMcpSetting);
+    } else {
+      const onWebMcp = (e: Event) => applyMcpSetting(!!(e as CustomEvent).detail?.enabled);
+      window.addEventListener('asaps:mcp-setting-changed', onWebMcp);
+      unsubscribeMcpSetting = () => window.removeEventListener('asaps:mcp-setting-changed', onWebMcp);
     }
 
     // Listen for story injection from Electron IPC (when running as desktop app)

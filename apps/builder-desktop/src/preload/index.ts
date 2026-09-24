@@ -96,6 +96,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   settings: {
     getMcpEnabled: () => ipcRenderer.invoke('settings:get-mcp-enabled'),
     setMcpEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:set-mcp-enabled', enabled),
+    getAutoUpdateEnabled: () => ipcRenderer.invoke('settings:get-auto-update-enabled'),
+    setAutoUpdateEnabled: (enabled: boolean) => ipcRenderer.invoke('settings:set-auto-update-enabled', enabled),
+  },
+  onMenuAppPreferences: (callback: () => void) => {
+    ipcRenderer.on('menu:app-preferences', callback);
+    return () => ipcRenderer.removeListener('menu:app-preferences', callback);
   },
   onMcpSettingChanged: (callback: (enabled: boolean) => void) => {
     const handler = (_: unknown, enabled: boolean) => callback(enabled);
@@ -429,6 +435,8 @@ declare global {
       settings: {
         getMcpEnabled: () => Promise<boolean>;
         setMcpEnabled: (enabled: boolean) => Promise<boolean>;
+        getAutoUpdateEnabled: () => Promise<boolean>;
+        setAutoUpdateEnabled: (enabled: boolean) => Promise<boolean>;
       };
       onMcpSettingChanged: (callback: (enabled: boolean) => void) => () => void;
       onMenuNewProject: (callback: () => void) => () => void;

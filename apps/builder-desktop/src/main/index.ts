@@ -513,6 +513,13 @@ function createMenu(): void {
             submenu: [
               { role: 'about' as const },
               { type: 'separator' as const },
+              // Machine-scope settings (UX-Eval B3). ⌘, stays Story Settings.
+              {
+                label: 'App Preferences…',
+                accelerator: 'CmdOrCtrl+Alt+,',
+                click: () => mainWindow?.webContents.send('menu:app-preferences'),
+              },
+              { type: 'separator' as const },
               {
                 id: 'mcp-toggle',
                 label: 'Enable MCP Integration',
@@ -550,6 +557,12 @@ function createMenu(): void {
           {
             label: 'Settings',
             submenu: [
+              {
+                label: 'App Preferences…',
+                accelerator: 'CmdOrCtrl+Alt+,',
+                click: () => mainWindow?.webContents.send('menu:app-preferences'),
+              },
+              { type: 'separator' as const },
               {
                 id: 'mcp-toggle',
                 label: 'Enable MCP Integration',
@@ -1225,7 +1238,20 @@ ipcMain.handle('settings:set-mcp-enabled', async (_, enabled: boolean) => {
       mcpItem.checked = enabled;
     }
   }
+  // Tell the page, the same way the menu checkbox does — App Preferences'
+  // toggle goes through here and must (dis)connect immediately.
+  mainWindow?.webContents.send('settings:mcp-changed', appSettings.mcpEnabled);
   return appSettings.mcpEnabled;
+});
+
+// Automatic update checks — App Preferences mirrors the menu checkbox.
+ipcMain.handle('settings:get-auto-update-enabled', async () => appSettings.autoUpdateEnabled);
+ipcMain.handle('settings:set-auto-update-enabled', async (_, enabled: boolean) => {
+  appSettings.autoUpdateEnabled = !!enabled;
+  saveAppSettings(appSettings);
+  const item = Menu.getApplicationMenu()?.getMenuItemById('auto-update-toggle');
+  if (item) item.checked = appSettings.autoUpdateEnabled;
+  return appSettings.autoUpdateEnabled;
 });
 
 // ============================================================================

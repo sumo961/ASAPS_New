@@ -3587,6 +3587,7 @@ The ASAPS Desktop app (built with Electron) provides additional capabilities:
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
+- **Two kinds of settings** - **Story Settings** (⌘, or the purple header button) holds everything saved with the story — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, and the Claude Desktop (MCP) integration.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 
 ---

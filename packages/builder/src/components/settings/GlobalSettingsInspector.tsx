@@ -424,7 +424,10 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Global Settings</h2>
+            <div>
+              <h2 className="text-lg font-semibold">Story Settings</h2>
+              <p className="text-xs text-gray-500">Saved with this story — everyone who opens or exports it gets the same result. Settings for this computer are in Tools → App Preferences.</p>
+            </div>
           </div>
           <button
             onClick={onClose}
