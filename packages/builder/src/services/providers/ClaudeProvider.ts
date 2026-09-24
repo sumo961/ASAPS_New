@@ -730,9 +730,11 @@ Respond with JSON in this format:
       }));
 
     // `temperature` omitted — newer Anthropic models reject it as deprecated.
+    // Adaptive-thinking models spend thinking tokens against max_tokens; a
+    // cap sized for a thinking-off reply truncates or empties the turn.
     const requestBody = {
       model: this.model,
-      max_tokens: request.maxTokens ?? 1000,
+      max_tokens: Math.max(request.maxTokens ?? 1000, this.requiresAdaptiveThinking() ? 8192 : 0),
       system: request.systemPrompt,
       messages: claudeMessages,
     };

@@ -678,7 +678,8 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           }
           var relayData = await relayResp.json();
           if (config.provider === 'anthropic') {
-            return (relayData.content && relayData.content[0] && relayData.content[0].text) || '';
+            var relayText = (relayData.content || []).find(function (b) { return b && b.type === 'text'; });
+            return (relayText && relayText.text) || '';
           }
           return (relayData.choices && relayData.choices[0] && relayData.choices[0].message && relayData.choices[0].message.content) || '';
         }
@@ -702,7 +703,8 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           });
           if (!resp.ok) throw new Error('Anthropic API error ' + resp.status);
           var data = await resp.json();
-          return (data.content && data.content[0] && data.content[0].text) || '';
+          var textBlock = (data.content || []).find(function (b) { return b && b.type === 'text'; });
+          return (textBlock && textBlock.text) || '';
         } else {
           var url;
           if (config.baseUrl) url = config.baseUrl.replace(/\\/$/, '') + '/chat/completions';
@@ -855,7 +857,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
 
               show('ai-progress', 'Translating: ' + translated + '/' + keys.length + ' strings...');
 
-              var sysPrompt = 'Translate the following JSON values to ' + language + '. Keep keys unchanged. Return ONLY valid JSON. Preserve any {{variables}} or HTML tags.';
+              var sysPrompt = 'Translate the JSON values to ' + language + '. Keep keys unchanged. Keep HTML tags and variable references exactly as written (\${name}, $name$, {name}) — the name inside is not translated, or substitution breaks — and keep the formatting markers **bold**, *italic*, ~~strikethrough~~. Return a single JSON object with the same keys.';
               var response = await callAI(sysPrompt, JSON.stringify(batch, null, 2), config);
 
               // Parse response

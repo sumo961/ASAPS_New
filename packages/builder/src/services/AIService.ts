@@ -29,7 +29,7 @@ import type {
   HelperCommandResponse,
   StructuredAction,
 } from '../types/helperCommand';
-import { buildBeatTypeDigest } from './beatSchemaVocabulary';
+import { buildBeatTypeDigest, getVisibleBeatTypeIds, getInvisibleBeatTypeIds } from './beatSchemaVocabulary';
 import { normalizeBeat } from '@asaps/core';
 import { getAIValidator } from './AIValidator';
 import { normalizeStory } from '@asaps/core';
@@ -1922,8 +1922,8 @@ ${request.originalText}
       : 'none';
 
     // Build visible/invisible beat info
-    const visibleTypes = context.visibleBeatTypes?.join(', ') || 'titleScreen, infoText, dialogTree, movementChoice, pickProp, durScreen, endScreen, inputText, hyperText, videoBeat, aiDialogTree, aiSummary, onlineContent';
-    const invisibleTypes = context.invisibleBeatTypes?.join(', ') || 'setVariable, conditionBeat, addRemoveInventory, randomTarget, setTimer, aiCondition';
+    const visibleTypes = (context.visibleBeatTypes ?? getVisibleBeatTypeIds()).join(', ');
+    const invisibleTypes = (context.invisibleBeatTypes ?? getInvisibleBeatTypeIds()).join(', ');
 
     return `You are an AI assistant that interprets natural language commands for bulk story operations in an interactive narrative authoring tool.
 
@@ -1996,9 +1996,7 @@ TRANSITIONS:
 - When user says "all beats", filter to only visible beat types for transitions
 
 FILTERING TO VISIBLE BEATS:
-- When user says "all visible beats" or "visible beats", you MUST include ALL visible beat types in filters.beatTypes
-- Copy this EXACT list: ["titleScreen", "infoText", "dialogTree", "movementChoice", "pickProp", "durScreen", "endScreen", "inputText", "hyperText", "videoBeat", "aiDialogTree", "aiSummary", "onlineContent"]
-- Do NOT omit any types from this list - endScreen, infoText, aiSummary are all visible beat types
+- When the user says "visible beats", put every type from the VISIBLE beat types list above into filters.beatTypes.
 - For transitions AND backgrounds, always filter to visible beat types only
 
 BACKGROUNDS:

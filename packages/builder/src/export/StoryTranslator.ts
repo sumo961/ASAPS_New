@@ -718,7 +718,8 @@ async function callAnthropic(
       'Try translating fewer beats at a time, or use a model with a larger output budget.'
     );
   }
-  return data.content?.[0]?.text || '';
+  // By block type: Claude 5 models think by default and a thinking block can come first.
+  return data.content?.find((b: { type?: string }) => b.type === 'text')?.text || '';
 }
 
 /**

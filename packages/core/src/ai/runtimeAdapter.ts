@@ -443,7 +443,9 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       // off where the model supports it (Fable always thinks and rejects
       // 'disabled', so it is deliberately NOT matched; pre-5 models treat
       // an omitted param as off already and need nothing).
-      if (/claude-(sonnet-5|opus-5)/.test(String(model))) {
+      // Exactly Sonnet 5 / Opus 5: Opus 5.5 (claude-opus-5-5) always thinks
+      // and rejects 'disabled' too.
+      if (/claude-(sonnet-5|opus-5)(?!-\d)/.test(String(model))) {
         body.thinking = { type: 'disabled' };
       }
       const response = await transport(body);
@@ -515,6 +517,12 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         const claudeMessages = request.messages
           .filter(m => m.role !== 'system')
           .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+        // A trailing assistant turn is a prefill, which Claude 4.6+/5 reject
+        // with a 400 (e.g. the aiConversation closing line, generated right
+        // after the NPC's last reply). End on a user turn.
+        if (claudeMessages.length > 0 && claudeMessages[claudeMessages.length - 1].role === 'assistant') {
+          claudeMessages.push({ role: 'user', content: '(The scene continues.)' });
+        }
         const text = await complete({
           systemPrompt: request.systemPrompt,
           messages: claudeMessages.length > 0
@@ -529,9 +537,11 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         role: m.role,
         content: m.content,
       }));
-      // Ensure at least one user message
+      // Ensure at least one user message, and end on one (see above)
       if (!messages.some(m => m.role === 'user')) {
         messages.push({ role: 'user', content: 'Begin.' });
+      } else if (messages[messages.length - 1].role === 'assistant') {
+        messages.push({ role: 'user', content: '(The scene continues.)' });
       }
       const text = await complete({
         systemPrompt: request.systemPrompt,

@@ -301,11 +301,12 @@ export function useCoDesigner() {
       }
       if (result?.text == null) {
         result = await generateConversationTurn({
-          systemPrompt,
+          // No tools on this path — build the prompt without the tool section.
+          systemPrompt: useTools ? buildCoDesignerSystemPrompt(state.context, { beatContentToolAvailable: false }) : systemPrompt,
           messages: transcript,
-          // Concrete design advice with options runs longer than interview
-          // turns; reasoning models also need headroom on top.
-          maxTokens: 4000,
+          // Proposal blocks can carry whole dialog trees; reasoning models
+          // also need headroom on top (same budget as the tool path).
+          maxTokens: 8192,
         });
       }
 

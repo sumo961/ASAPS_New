@@ -55,6 +55,24 @@ describe('generateContent', () => {
     expect(bodies[3].thinking).toBeUndefined(); // haiku-4-5
   });
 
+  it('never sends thinking:disabled to claude-opus-5-5 (always thinks; disabled is a 400)', async () => {
+    const { transport, calls } = stub(anthropicReply('ok'));
+    await createRuntimeAIService({ family: 'anthropic', model: 'claude-opus-5-5', transport }).generateContent('hi');
+    expect(calls[0].thinking).toBeUndefined();
+  });
+
+  it('conversation turns always end on a user turn (a trailing assistant turn is a prefill)', async () => {
+    for (const family of ['anthropic', 'openai'] as const) {
+      const { transport, calls } = stub(family === 'anthropic' ? anthropicReply('Bye.') : openaiReply('Bye.'));
+      const svc = createRuntimeAIService({ family, transport });
+      await svc.generateConversationTurn({ systemPrompt: 'close the scene', messages: [
+        { role: 'assistant', content: 'Hello.' }, { role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Go on.' },
+      ] });
+      const msgs = calls[0].messages as Array<{ role: string }>;
+      expect(msgs[msgs.length - 1].role).toBe('user');
+    }
+  });
+
   it('openai family: reasoning default model uses max_completion_tokens, no system message', async () => {
     const { transport, calls } = stub(openaiReply('hello'));
     const svc = createRuntimeAIService({ family: 'openai', transport });

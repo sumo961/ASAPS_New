@@ -136,7 +136,7 @@ Respond with ONLY the category name, nothing else.`;
     }
 
     const data = await response.json();
-    return data.content?.[0]?.text || '';
+    return data.content?.find((b: { type?: string }) => b.type === 'text')?.text || '';
   }
 
   private async callOpenAIWithSystem(
@@ -201,7 +201,7 @@ Respond with ONLY the category name, nothing else.`;
     }
 
     const data = await response.json();
-    return data.content?.[0]?.text || '';
+    return data.content?.find((b: { type?: string }) => b.type === 'text')?.text || '';
   }
 
   private extractJSON(text: string): string {

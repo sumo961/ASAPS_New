@@ -332,14 +332,14 @@ describe('PlayerContextBuilder', () => {
       expect(summary).toContain('chose "Climb the tree"');
     });
 
-    it('includes the explicit "no AI discussions" footer note for visited beats', () => {
-      // Critical AI-prompting detail: without this footnote, the
-      // AI confidently invents conversations that never happened
-      // (the "AI car" hallucination the source notes).
+    it('says scene titles are not a record of what was said', () => {
+      // Without this, a model reading scene titles invents conversations
+      // that never happened. (It must not claim that no AI conversations
+      // occurred: aiConversation / aiDialogTree beats make that false.)
       const ctx = makeRichContext();
       const summary = new PlayerContextBuilder(ctx).buildJourneySummary();
-      expect(summary).toContain('## IMPORTANT NOTE');
-      expect(summary).toMatch(/Do NOT invent or mention/i);
+      expect(summary).toMatch(/not a record of what was said/);
+      expect(summary).not.toMatch(/no AI or automated discussions/);
     });
 
     it('omits sections when their toggle is false', () => {

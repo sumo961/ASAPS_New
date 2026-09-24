@@ -541,7 +541,7 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
     }
   ]
 }
-(Give the root 2-4 choices, and likewise at each deeper turn — the example shows one branch for brevity, but you must expand every choice.)`;
+(The example shows one branch for brevity — expand every choice the same way.)`;
 
     console.log(`[AIDialogTreeBeat ${this.id}] Generating dialog tree...`);
 

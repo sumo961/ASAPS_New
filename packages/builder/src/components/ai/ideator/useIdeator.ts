@@ -270,6 +270,8 @@ export function useIdeator(_opts: UseIdeatorOptions = {}) {
         const result = await generateConversationTurn({
           systemPrompt,
           messages: transcript,
+          // Claude 5 / GPT-5+ reason by default; thinking counts toward the cap.
+          maxTokens: 8192,
         });
         rawText = result?.text ?? null;
       }

@@ -327,15 +327,10 @@ ${choiceLines.join('\n')}`);
     // Full journey path with beat type context
     if (includeVisitedBeats) {
       const journeyPath = this.getBeatDescriptions(history);
-      sections.push(`## Journey Path (scene names only - no AI or automated discussions occurred)
+      sections.push(`## Journey Path (scene titles, in order)
 ${journeyPath.join(' → ')}`);
 
-      // Important note for AI
-      sections.push(`## IMPORTANT NOTE
-The journey path above shows scene/topic names the player visited.
-These are NOT conversations or discussions - they are screen titles.
-Do NOT invent or mention any "AI discussions", "AI car" content, or similar.
-Only reference actual choices (from counters/variables) and locations visited.`);
+      sections.push(`Scene titles name screens the player passed through; they are not a record of what was said there. Describe events only from the choices, variables and counters above.`);
     }
 
     return sections.join('\n\n');
