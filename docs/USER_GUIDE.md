@@ -179,7 +179,7 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 **The `.asapst` file format.** Under the hood a template is a normal `.asaps` project zip flagged as a template — think of Word's `.dotx` document templates. Importing or double-clicking a `.asapst` file never opens it directly; it always instantiates a fresh copy as a new project. That makes templates safe to distribute: a lecturer can export a rehearsal scenario as a `.asapst`, share it with a class, and every student who imports it gets their own independent copy to work in.
 
-**Make your own templates.** Use **Export → Export as Template (.asapst)** to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
+**Make your own templates.** Use **Export → Template (.asapst)** (under *Share for editing*) to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
 
 **Bundled templates.** ASAPS ships with two:
 
@@ -2804,6 +2804,11 @@ editor), ASAPS warns you once and tells you which copy wins if you save.
 
 ### Export Options
 
+The **Export** menu is grouped by what the person receiving it will do:
+
+- **Publish for players** — **Web page (HTML)…** gives them a player that runs in any browser, whether it's a playtest draft or the finished story. The export dialog suggests **One file** (easiest to send) for stories whose pictures and sounds are small, and **Folder** (for a website; loads media as needed, much kinder to phones) for media-heavy ones, and says why. You can always pick the other.
+- **Share for editing** — **Project file (.asaps)** is the whole project for someone who has ASAPS, and it is also your backup. **Template (.asapst)** is a starting point: everyone who opens it gets their own copy. If the project is on GitHub, **Share GitHub project…** invites a collaborator by their GitHub username (GitHub has no invite links for single projects) and copies a ready-to-send message with the link and the one step they take: **File → Open Project from GitHub…**.
+
 | Format | Description | Use Case |
 |--------|-------------|----------|
 | ASAPS Project (.asaps) | Complete project + all assets — one file (a zip inside, but the `.asaps` extension means double-clicking opens it in ASAPS, Safari doesn't auto-extract it, and Windows doesn't offer the zip viewer) | Backups, sharing with collaborators |
@@ -2811,13 +2816,13 @@ editor), ASAPS warns you once and tells you which copy wins if you save.
 | ASML 1.0 (.asml, XML) — **legacy** | XML narrative structure only. **Frozen serialization**: newer features (character variants and stances, affect, responsive slot layout, counter bindings, themes) are NOT written and won't come back on re-import | Compatibility with the original ASAPS only — the Project zip carries ASML 2.0 (JSON), the native format |
 | HTML (.html) | Self-contained playable file | Distribution, embedding, sharing |
 
-**Export as Template (.asapst).** Pick **Export → Export as Template (.asapst)** to turn the open project into a distributable template — like Word's `.dotx`. A lecturer can share a rehearsal scenario with a class this way: every student who imports (or double-clicks) the file gets their own independent copy to work in, and the master file stays pristine. See [Templates](#templates) in Part 1 for how templates behave on the receiving end.
+**Export as Template (.asapst).** Pick **Export → Template (.asapst)** to turn the open project into a distributable template — like Word's `.dotx`. A lecturer can share a rehearsal scenario with a class this way: every student who imports (or double-clicks) the file gets their own independent copy to work in, and the master file stays pristine. See [Templates](#templates) in Part 1 for how templates behave on the receiving end.
 
 ### HTML Export
 
 Export your story as a single standalone HTML file that anyone can open in a browser—no server needed.
 
-1. Click **Export → Export as HTML**
+1. Click **Export → Web page (HTML)…** (under *Publish for players*)
 2. Configure options:
    - **Title** - Page title
    - **Include splash screen** - Show a start screen before the story begins
@@ -3850,10 +3855,10 @@ AI features can work with cloud services (Claude or OpenAI) which require an API
 Yes! Configure TTS for voice output and STT for voice input. In AI Conversation beats with voice input enabled, the NPC speaks via TTS, the player responds by voice (STT), and the cycle continues naturally. This works with both cloud and local providers.
 
 ### How do I share my story with others?
-Use **Export → Export as HTML** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
+Use **Export → Web page (HTML)…** to create a standalone playable file. Recipients just open it in any browser—no ASAPS installation needed.
 
 ### How do I share a project for others to *build on* (e.g., with students)?
-Use **Export → Export as Template (.asapst)**. Unlike a normal project zip, importing a `.asapst` always creates the recipient's own fresh copy — the template file is never edited, so everyone starts from the same clean scenario. Perfect for classroom exercises and reusable starting points. See [Templates](#templates).
+Use **Export → Template (.asapst)**. Unlike a normal project zip, importing a `.asapst` always creates the recipient's own fresh copy — the template file is never edited, so everyone starts from the same clean scenario. Perfect for classroom exercises and reusable starting points. See [Templates](#templates).
 
 ### How do I collaborate with a team?
 The fastest path: one author uses **File → New Project on GitHub…** to create the project and publish it to GitHub in one step, then invites collaborators on github.com. Each collaborator uses **File → Open Project from GitHub…** to clone the repo and start working. Commit, push, and pull all happen from the **VCS panel** at the bottom of the app. Advisory editing locks (purple dots on beats someone else is editing) help you avoid stepping on each other's toes. See [Part 9: Version Control & Collaboration](#part-9-version-control--collaboration) for the full walkthrough.

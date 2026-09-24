@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
+import { Github, Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
 import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
 import type { AIEditLedger } from '../types/aiEdits';
 import { ProjectSelector } from './ProjectSelector';
@@ -27,6 +27,9 @@ import { getSTTService } from '../services/stt';
 import { getLanguageDisplayName } from '../utils/languageCatalog';
 import { notify, confirmAction } from '../utils/notify';
 import { AppPreferencesDialog } from './settings/AppPreferencesDialog';
+import { availablePublishTargets } from '../export/publishTargets';
+import { ShareGitHubDialog } from './vcs/ShareGitHubDialog';
+import { useVCSStatus } from '../vcs/VCSStatusProvider';
 
 /**
  * ASML 1.0 (XML) is frozen legacy (Tier-5 item 14): an export silently drops
@@ -40,7 +43,7 @@ function confirmLegacyAsmlExport(): Promise<boolean> {
       + 'carried in the project file.\n\n'
       + 'An XML export leaves out newer features \u2014 character variants and stances, affect (mood, sentiments, '
       + 'traits), responsive slot layout, counter bindings, themes and more \u2014 and opening it later will not '
-      + 'restore them. For a complete copy, use Export Project (.asaps).',
+      + 'restore them. For a complete copy, use Export \u2192 Project file (.asaps).',
     confirmLabel: 'Export ASML 1.0 anyway',
   });
 }
@@ -189,6 +192,8 @@ export const Header: React.FC<HeaderProps> = ({
   // App Preferences (machine scope, UX-Eval B3) — opened from Tools and the
   // desktop app menu.
   const [showAppPreferences, setShowAppPreferences] = useState(false);
+  const [showShareGitHub, setShowShareGitHub] = useState(false);
+  const vcs = useVCSStatus();
   useEffect(() => {
     const api = (window as any).electronAPI;
     if (!api?.onMenuAppPreferences) return;
@@ -533,18 +538,54 @@ export const Header: React.FC<HeaderProps> = ({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowExportMenu(false)}
                 />
-                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                <div className="absolute left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                  {/* Organised by what the RECIPIENT does (UX-Eval B6, reframed
+                      2026-09-24): players get a player (draft or final work —
+                      the same artifact), editors get the project. Publishing is
+                      a target list (export/publishTargets) so the planned app
+                      project joins it without a new top-level item. */}
+                  <div className="px-4 pt-1 pb-1 text-[10px] font-semibold tracking-wide text-gray-400">
+                    PUBLISH FOR PLAYERS
+                  </div>
+                  {availablePublishTargets().map((target) => {
+                    const run = target.id === 'web' ? onExportHtml : undefined;
+                    if (!run) return null;
+                    return (
+                      <button
+                        key={target.id}
+                        onClick={() => {
+                          run();
+                          setShowExportMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-3"
+                      >
+                        <Globe className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>
+                          <span className="block">{target.label}</span>
+                          <span className="block text-xs text-gray-500">{target.description}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+
+                  <div className="my-2 border-t border-gray-200" />
+                  <div className="px-4 pt-1 pb-1 text-[10px] font-semibold tracking-wide text-gray-400">
+                    SHARE FOR EDITING
+                  </div>
                   {onExportZip && (
                     <button
                       onClick={() => {
                         onExportZip();
                         setShowExportMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export the complete project as one .asaps file — ASML 2.0, double-clickable, everything included"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-3"
+                      title="The complete project as one .asaps file (ASML 2.0) — double-clickable, everything included"
                     >
-                      <Download className="w-4 h-4" />
-                      Export Project (.asaps)
+                      <Download className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <span className="block">Project file (.asaps)</span>
+                        <span className="block text-xs text-gray-500">Everything, for someone with ASAPS — also your backup</span>
+                      </span>
                     </button>
                   )}
                   {onExportTemplate && (
@@ -553,29 +594,32 @@ export const Header: React.FC<HeaderProps> = ({
                         onExportTemplate();
                         setShowExportMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                      title="Export as a distributable template (.asapst) — anyone importing it gets their own copy; your master file is never edited"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-3"
+                      title="A distributable template (.asapst) — anyone opening it gets their own copy; your master file is never edited"
                     >
-                      <Download className="w-4 h-4" />
-                      Export as Template (.asapst)
+                      <Download className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <span className="block">Template (.asapst)</span>
+                        <span className="block text-xs text-gray-500">A starting point — everyone who opens it gets their own copy</span>
+                      </span>
                     </button>
                   )}
-                  {onExportHtml && (
-                    <>
-                      <div className="my-2 border-t border-gray-200" />
-                      <button
-                        onClick={() => {
-                          onExportHtml();
-                          setShowExportMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
-                        title="Export as standalone HTML for web embedding"
-                      >
-                        <Globe className="w-4 h-4" />
-                        Export as HTML
-                      </button>
-                    </>
+                  {vcs?.hasRemote && vcs.projectPath && (
+                    <button
+                      onClick={() => {
+                        setShowShareGitHub(true);
+                        setShowExportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-start gap-3"
+                    >
+                      <Github className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <span className="block">Share GitHub project…</span>
+                        <span className="block text-xs text-gray-500">Invite a collaborator and copy the link with instructions</span>
+                      </span>
+                    </button>
                   )}
+
                   {/* Tier-5 item 14 (decision 2026-08-02, built 2026-08-18,
                       semantics corrected same day): ASML itself is NOT
                       legacy — the native JSON project format IS ASML 2.0.
@@ -1234,6 +1278,14 @@ export const Header: React.FC<HeaderProps> = ({
       />
 
       {/* AI Configuration Dialog */}
+      {vcs?.projectPath && (
+        <ShareGitHubDialog
+          isOpen={showShareGitHub}
+          onClose={() => setShowShareGitHub(false)}
+          projectPath={vcs.projectPath}
+          storyTitle={title || 'Untitled story'}
+        />
+      )}
       <AppPreferencesDialog
         isOpen={showAppPreferences}
         onClose={() => setShowAppPreferences(false)}

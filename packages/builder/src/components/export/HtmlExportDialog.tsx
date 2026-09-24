@@ -10,6 +10,7 @@ import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
+import { recommendWebExportMode } from '../../export/webExportMode';
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ interface HtmlExportDialogProps {
   exportSpeech?: boolean;
   /** Persist a changed exportSpeech into the project. */
   onExportSpeechChange?: (enabled: boolean) => void;
+  /** Total size of the project's media in bytes — drives the suggested output. */
+  mediaBytes?: number;
 }
 
 export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
@@ -35,8 +38,15 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   selectedBeatId,
   exportSpeech = true,
   onExportSpeechChange,
+  mediaBytes,
 }) => {
-  const [mode, setMode] = useState<'folder' | 'single-file'>('folder');
+  // Suggested output follows the story's media size (UX-Eval B6 reframed):
+  // one file for small stories, a folder when phones would struggle.
+  const suggestion = recommendWebExportMode(mediaBytes);
+  const [mode, setMode] = useState<'folder' | 'single-file'>(suggestion.mode);
+  useEffect(() => {
+    if (isOpen) setMode(recommendWebExportMode(mediaBytes).mode);
+  }, [isOpen, mediaBytes]);
   const [enableAI, setEnableAI] = useState(true);
   const [aiProvider, setAiProvider] = useState<AIProvider>('openai');
   const [aiApiKey, setAiApiKey] = useState('');
@@ -381,9 +391,9 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                 }`}
               >
                 <FolderOpen className={`w-6 h-6 mb-2 ${mode === 'folder' ? 'text-blue-500' : 'text-gray-400'}`} />
-                <div className="font-medium text-gray-900">Folder (ZIP)</div>
+                <div className="font-medium text-gray-900">Folder — for a website</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Separate files, better for large stories
+                  Loads pictures and sounds as needed; upload it to a web server (zipped)
                 </div>
               </button>
 
@@ -396,12 +406,15 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                 }`}
               >
                 <FileText className={`w-6 h-6 mb-2 ${mode === 'single-file' ? 'text-blue-500' : 'text-gray-400'}`} />
-                <div className="font-medium text-gray-900">Single File</div>
+                <div className="font-medium text-gray-900">One file — easiest to send</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  One HTML file with everything inline
+                  Everything inside one HTML file; opens by double-click
                 </div>
               </button>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {mode === suggestion.mode ? 'Suggested: ' : 'Suggested was the other option. '}{suggestion.reason}
+            </p>
           </div>
 
           {/* AI Settings */}

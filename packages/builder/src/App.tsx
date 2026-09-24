@@ -7091,6 +7091,7 @@ function App() {
           availableBeats={state.beats.map((b: any) => ({ id: b.id, name: b.name, type: b.type }))}
           selectedBeatId={selectedBeat?.id}
           exportSpeech={resolveExportSpeech(globalSettings)}
+          mediaBytes={assets.reduce((sum, a: any) => sum + (typeof a.size === 'number' ? a.size : 0), 0)}
           onExportSpeechChange={(enabled) => {
             const base = globalSettingsRef.current ?? globalSettings;
             if (!base) return;
