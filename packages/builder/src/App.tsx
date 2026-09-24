@@ -17,6 +17,8 @@ import { ideatorWindowManager } from './services/IdeatorWindowManager';
 import { coDesignerWindowManager } from './services/CoDesignerWindowManager';
 import { buildStoryDigest } from './utils/storyDigest';
 import { applyChangeProposals } from './utils/applyChangeProposals';
+import { findWiringSite } from './utils/choiceWiring';
+import { describeEffect, describeCondition } from './utils/wiringVocabulary';
 import { buildStructuralSummary } from './utils/structuralSummary';
 import { buildWorkspaceKG } from './components/knowledgeGraph/kgAdapter';
 import { CODESIGNER_CONTEXT_KEY } from './components/ai/codesigner/useCoDesigner';
@@ -5954,6 +5956,28 @@ function App() {
               for (const k of Object.keys(p.updates || {})) subset[k] = (c as any)[k];
               return { index, current: JSON.stringify(subset) };
             }
+            case 'setChoiceEffects':
+            case 'setChoiceConditions': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+              const site = findWiringSite(params as any, String(p.choiceId));
+              if (!site) return { index, current: null, error: `option ${p.choiceId} not found` };
+              const list = p.kind === 'setChoiceEffects' ? site.effects : site.conditions;
+              const fmt = p.kind === 'setChoiceEffects' ? describeEffect : describeCondition;
+              return { index, current: list.length ? list.map((x: any) => fmt(x)).join('; ') : '(none)' };
+            }
+            case 'setRequirements': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const req = ((beat as any).requires || []) as any[];
+              return {
+                index,
+                current: req.length
+                  ? req.map(r => describeCondition(r.condition || {})).join((beat as any).requiresMode === 'any' ? ' or ' : ' and ')
+                  : '(no gate)',
+              };
+            }
             default:
               return { index, current: null }; // addBeat — nothing to diff
           }
@@ -5990,6 +6014,9 @@ function App() {
           name: beat.name,
           parameters: params,
           notes: (beat as any).notes || undefined,
+          // Entry gate — a top-level beat field, not a parameter.
+          requires: (beat as any).requires?.length ? (beat as any).requires : undefined,
+          requiresMode: (beat as any).requires?.length ? (beat as any).requiresMode : undefined,
           connections,
           defaultTarget: beat.defaultTarget || undefined,
         }, null, 2);

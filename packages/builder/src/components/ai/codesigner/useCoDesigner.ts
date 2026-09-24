@@ -301,8 +301,18 @@ export function useCoDesigner() {
         return;
       }
 
-      const { cleanText, proposalSet, droppedCount } = extractProposalsFromReply(result.text);
+      const { cleanText, proposalSet, droppedCount, problems } = extractProposalsFromReply(result.text);
       addMessage({ role: 'assistant', content: cleanText || '(proposed changes below)' });
+      if (problems?.length) {
+        // Wiring the engine would ignore (e.g. a sentiment effect with no
+        // emotion) is refused rather than applied as a silent no-op. Say so
+        // in the chat: it stays in the transcript, so the model sees it on
+        // the next turn and the author can simply ask it to fix them.
+        addMessage({
+          role: 'assistant',
+          content: `(Left out ${problems.length} proposed change${problems.length === 1 ? '' : 's'} that would not work in the player:\n${problems.map((x) => `• ${x}`).join('\n')})`,
+        });
+      }
       if (proposalSet) {
         // One line per turn for anyone watching the console: what the model
         // proposed, before the author touches it (the apply is logged in the

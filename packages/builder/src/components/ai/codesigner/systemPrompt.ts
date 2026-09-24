@@ -11,6 +11,7 @@
 
 import { IDN_COMPLEXITY_PRINCIPLES } from '../ideator/idnPrinciples';
 import type { CoDesignerContext } from './coDesignerStore';
+import { wiringPromptReference } from '../../../utils/wiringVocabulary';
 
 export function buildCoDesignerSystemPrompt(context: CoDesignerContext | null, opts: { beatContentToolAvailable?: boolean } = {}): string {
   const digestBlock = context?.digest
@@ -79,6 +80,9 @@ block in EXACTLY this form:
     { "kind": "updateParams", "beatId": "beat_7", "params": { "buttonText": "…" }, "note": "why" },
     { "kind": "addBeat", "beatType": "infoText", "name": "…", "parameters": { "text": "…" }, "connectFrom": "beat_3", "connectLabel": "…", "note": "why" },
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
+    { "kind": "setChoiceEffects", "beatId": "beat_5", "choiceId": "choice_2", "effects": [ { "type": "addSentiment", "target": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "strengthDelta": 0.2 }, { "type": "incrementCounter", "target": "clues", "value": 1 } ], "note": "why" },
+    { "kind": "setChoiceConditions", "beatId": "beat_5", "choiceId": "choice_3", "conditions": [ { "type": "inventory", "item": "brass_key" } ], "note": "why" },
+    { "kind": "setRequirements", "beatId": "beat_14", "requires": [ { "condition": { "type": "sentiment", "character": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "operator": ">=", "value": 0.3 }, "explanation": "Elena only confides once she trusts the player", "fallbackTarget": "beat_15" } ], "note": "why" },
     { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" },
     { "kind": "updateCharacter", "characterId": "elena", "updates": { "counters": [ { "name": "trust", "displayName": "Trust", "min": -100, "max": 100, "showLevelMeter": true, "numericFormat": "band", "source": { "kind": "sentiment", "toEntityRef": "player", "emotion": "trust" }, "bands": [ { "from": -100, "label": "wary" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] } ] }, "note": "why" },
     { "kind": "updateCharacter", "characterId": "karin", "updates": { "variantSelectionPolicy": "random", "variants": [ { "id": "hostile", "name": "Hostile", "characterDescription": "…", "stance": { "warmth": -0.7, "dominance": 0.5 }, "initialMood": { "valence": -0.5, "arousal": 0.6 } } ] }, "note": "why" }
@@ -98,8 +102,8 @@ Rules for proposals:
   rehearsal/training variety); 'variants' (a FULL replacement of the
   character's disposition/persona overlays); and 'counters' (also a FULL
   replacement — include the existing ones from the digest that should stay).
-  Reference the character by the id or name in the digest. Unlike beat
-  changes it is NOT undoable; prefer it only for clearly-agreed changes.
+  Reference the character by the id or name in the digest. Prefer it only
+  for clearly-agreed changes.
 - A counter is either something the author moves, or a read-only display of
   how the character FEELS:
   - Ordinary: { "name": "gold", "displayName": "Gold", "value": 0, "min": 0, "max": 100 }
@@ -126,6 +130,31 @@ Rules for proposals:
     the digest marks "[reads …, read-only]". The write is discarded by the
     next appraisal. Move the feeling instead (addSentiment / nudgeMood /
     fireEmotion) and the meter follows.
+- WIRING — what choices DO and WHEN they show. The digest lists every
+  option under its beat by id ("choice c2 …", "prop …", "hotspot …", dialog
+  "choice …" / "node …"), with "if …" (shown only when) and "does …"
+  (effects when picked), plus the beat's "requires" (entry gate).
+  - 'setChoiceEffects' REPLACES that option's effects — restate the ones
+    that should stay; [] removes them all. Works on multiChoice /
+    movementChoice choices, pickProp props, panorama hotspots and dialog
+    choices/nodes at any depth; address the option by the id in the digest.
+  - 'setChoiceConditions' REPLACES that option's visibility conditions
+    (all must hold); [] makes it always visible. Hiding is the whole
+    effect — the player never sees a hidden choice, so keep at least one
+    option visible in every state.
+  - 'setRequirements' REPLACES the beat's entry gate: each requirement is
+    { condition, explanation, severity?: "warn"|"error", fallbackTarget? }.
+    With a fallbackTarget the player is redirected there when the condition
+    fails; without one the gate only annotates (the story analyzer flags
+    paths that can't satisfy it). "requiresMode": "any" = one requirement
+    suffices (default "all"). [] removes the gate.
+  - Only wire to characters, counters, items and beats that exist in the
+    digest (or that the same batch creates for a character). Counters owned
+    by a character need "character" on the effect.
+  - The app refuses wiring that would do nothing in the player (unknown
+    type, missing field, zero delta, unknown character, a write to a
+    read-only counter) and tells you why — fix it and propose again.
+${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
 - Each variant may carry a 'stance' — its interpersonal-circumplex position
   { "warmth": -1..1, "dominance": -1..1 } (cold↔warm, submissive↔dominant).
   When a variant's identity is interpersonal (hostile, cooperative,

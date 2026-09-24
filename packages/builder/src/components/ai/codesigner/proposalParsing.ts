@@ -20,6 +20,14 @@ import {
   slugify,
 } from '../../../services/prompts/characterGeneration';
 import { normalizeStance } from '../../../services/prompts/interpersonalStance';
+import {
+  normalizeEffect,
+  normalizeCondition,
+  normalizeRequirement,
+  normalizeList,
+  describeEffect,
+  describeCondition,
+} from '../../../utils/wiringVocabulary';
 
 /**
  * Validate + clamp the affect fields of an updateCharacter proposal. Numeric
@@ -124,7 +132,17 @@ function normalizeCharacterUpdates(rawUpdates: any): Record<string, unknown> {
 
 const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 
-const VALID_KINDS = new Set(['editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter']);
+const VALID_KINDS = new Set([
+  'editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter',
+  'setChoiceEffects', 'setChoiceConditions', 'setRequirements',
+]);
+
+/** Warnings from the last normalizeProposal rejection (why an entry was dropped). */
+const lastProblems: string[] = [];
+function reject(kind: string, problem: string): null {
+  lastProblems.push(`${kind}: ${problem}`);
+  return null;
+}
 
 function normalizeProposal(raw: any): ChangeProposal | null {
   if (!raw || typeof raw !== 'object' || !VALID_KINDS.has(raw.kind)) return null;
@@ -150,6 +168,32 @@ function normalizeProposal(raw: any): ChangeProposal | null {
     case 'addNote':
       if (typeof raw.beatId !== 'string' || typeof raw.note !== 'string' || !raw.note.trim()) return null;
       return { kind: 'addNote', beatId: raw.beatId, note: raw.note };
+    case 'setChoiceEffects':
+    case 'setChoiceConditions': {
+      const choiceId = raw.choiceId ?? raw.optionId ?? raw.propId ?? raw.hotspotId;
+      if (typeof raw.beatId !== 'string' || (typeof choiceId !== 'string' && typeof choiceId !== 'number')) {
+        return reject(raw.kind, 'needs beatId and choiceId');
+      }
+      const isEffects = raw.kind === 'setChoiceEffects';
+      const list = normalizeList(isEffects ? raw.effects : raw.conditions, isEffects ? normalizeEffect : normalizeCondition);
+      if (!list.ok) return reject(raw.kind, list.problem);
+      const note = typeof raw.note === 'string' ? raw.note : undefined;
+      return isEffects
+        ? { kind: 'setChoiceEffects', beatId: raw.beatId, choiceId: String(choiceId), effects: list.value, note }
+        : { kind: 'setChoiceConditions', beatId: raw.beatId, choiceId: String(choiceId), conditions: list.value, note };
+    }
+    case 'setRequirements': {
+      if (typeof raw.beatId !== 'string') return reject(raw.kind, 'needs beatId');
+      const list = normalizeList(raw.requires ?? raw.requirements, normalizeRequirement);
+      if (!list.ok) return reject(raw.kind, list.problem);
+      return {
+        kind: 'setRequirements',
+        beatId: raw.beatId,
+        requires: list.value,
+        requiresMode: raw.requiresMode === 'any' ? 'any' : raw.requiresMode === 'all' ? 'all' : undefined,
+        note: typeof raw.note === 'string' ? raw.note : undefined,
+      };
+    }
     case 'updateCharacter': {
       if (typeof raw.characterId !== 'string' || !raw.updates || typeof raw.updates !== 'object') return null;
       const updates = normalizeCharacterUpdates(raw.updates);
@@ -167,6 +211,8 @@ export interface ExtractedProposals {
   proposalSet: ChangeProposalSet | null;
   /** Count of entries dropped by validation (surfaced as a hint). */
   droppedCount: number;
+  /** Why wiring entries were dropped (e.g. "setChoiceEffects: #1: addSentiment needs sentimentEmotion"). */
+  problems?: string[];
 }
 
 export function extractProposalsFromReply(text: string): ExtractedProposals {
@@ -177,10 +223,12 @@ export function extractProposalsFromReply(text: string): ExtractedProposals {
   try {
     const parsed = parseJSONWithRepair<any>(match[1]);
     const rawList = Array.isArray(parsed?.proposals) ? parsed.proposals : [];
+    lastProblems.length = 0;
     const proposals = rawList.map(normalizeProposal).filter(Boolean) as ChangeProposal[];
     const droppedCount = rawList.length - proposals.length;
+    const problems = lastProblems.length ? [...lastProblems] : undefined;
     if (proposals.length === 0) {
-      return { cleanText, proposalSet: null, droppedCount };
+      return { cleanText, proposalSet: null, droppedCount, problems };
     }
     return {
       cleanText,
@@ -190,6 +238,7 @@ export function extractProposalsFromReply(text: string): ExtractedProposals {
         proposals,
       },
       droppedCount,
+      problems,
     };
   } catch {
     return { cleanText, proposalSet: null, droppedCount: 0 };
@@ -212,6 +261,18 @@ export function describeProposal(p: ChangeProposal): string {
     }
     case 'addNote':
       return `Add design note to ${p.beatId}`;
+    case 'setChoiceEffects':
+      return p.effects.length
+        ? `On ${p.beatId} › ${p.choiceId}: ${p.effects.map((e) => describeEffect(e)).join('; ')}`
+        : `On ${p.beatId} › ${p.choiceId}: remove all effects`;
+    case 'setChoiceConditions':
+      return p.conditions.length
+        ? `Show ${p.beatId} › ${p.choiceId} only if ${p.conditions.map((c) => describeCondition(c)).join(' and ')}`
+        : `Always show ${p.beatId} › ${p.choiceId}`;
+    case 'setRequirements':
+      return p.requires.length
+        ? `Gate ${p.beatId}: requires ${p.requires.map((r: any) => describeCondition(r.condition) + (r.fallbackTarget ? ` (else → ${r.fallbackTarget})` : '')).join(p.requiresMode === 'any' ? ' or ' : ' and ')}`
+        : `Remove the entry gate on ${p.beatId}`;
     case 'updateCharacter': {
       const parts: string[] = [];
       const u = p.updates as any;

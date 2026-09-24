@@ -392,46 +392,31 @@ export interface GeoPoint {
   radiusMeters?: number;
 }
 
+/**
+ * Every effect type the engine applies (StoryContext.applyEffect). The ONE
+ * runtime list: `Effect['type']` derives from it, the schema's `effect`
+ * customType and the Co-Designer's effect vocabulary are checked against it
+ * by tests, so a new effect type cannot silently stay unknown to the AI
+ * authoring paths.
+ *
+ *  - setVariable / addInventory / removeInventory / incrementCounter / setCounter
+ *  - nudgeMood / addSentiment — character affect inline on any effect host
+ *  - fireEmotion — emotion at a character, auto-nudges mood per palette
+ *  - addReflection — append to a character's reflection memory
+ *  - setGoalStatus — flip a character goal (fires pride/shame/… unless suppressed)
+ *  - setCharacterVariant — switch the active persona variant
+ *  - bookmarkAffectState — snapshot affect under a bookmark name (for baselines)
+ *  - playSound — one-shot sound (asset id, preset or URL; value = volume)
+ */
+export const EFFECT_TYPES = [
+  'setVariable', 'addInventory', 'removeInventory', 'incrementCounter', 'setCounter',
+  'nudgeMood', 'addSentiment', 'fireEmotion', 'addReflection', 'setGoalStatus',
+  'setCharacterVariant', 'bookmarkAffectState', 'playSound',
+] as const;
+export type EffectType = (typeof EFFECT_TYPES)[number];
+
 export interface Effect {
-  type:
-    | 'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter'
-    // Step 4 / Phase A: character affect effects so dialog choices, dialog
-    // nodes, and other effect hosts can update mood and sentiments inline
-    // without needing a separate UpdateAffect beat in the graph.
-    | 'nudgeMood' | 'addSentiment'
-    // Step 5: fire an emotion at a character (auto-nudges mood per palette
-    // weights). The same authoring shortcut as nudgeMood/addSentiment, but
-    // routed through the emotion model so palette changes take effect.
-    | 'fireEmotion'
-    // Step 7 / Mode B: append a reflection to a character's memory. Used by
-    // characters whose dossierPolicy is 'reflection' so the LLM sees recent
-    // felt-experience alongside (or instead of) the structured dossier.
-    | 'addReflection'
-    // Step 8 — change the runtime status of a named goal on a character.
-    // Triggers GAMYGDALA-style emotion firing (pride/joy on 'met',
-    // shame/sadness on 'failed') unless `suppressEmotion` is set.
-    | 'setGoalStatus'
-    // Switch which variant is active for a character. Use on a player-
-    // facing choice (e.g. "play as a man" / "play as a woman") or in a
-    // story-start branch to lock in a persona. By default this re-seeds
-    // the character's mood / sentiments from the variant's authored
-    // values; set `suppressSeed` to keep accumulated affect.
-    | 'setCharacterVariant'
-    // Snapshot the current mood / emotion / sentiment values of one
-    // character (or every character) under a bookmark name. The bookmark
-    // is then a stable point of comparison for future condition checks
-    // — "trust toward player has improved since the reunion-scene
-    // bookmark" reads as `(current trust) - (bookmarked trust) >= …`.
-    // The bookmark name is the canonical handle: writing the same name
-    // again overwrites the prior snapshot.
-    | 'bookmarkAffectState'
-    // Play a one-shot sound. `target` is a sound asset id, preset sound id,
-    // or URL; `value` optionally carries a 0..1 volume. Applied as a
-    // decoupled signal: StoryContext emits 'playSound' and the host bridges
-    // it to the renderer's audio pipeline (core stays audio-free). The
-    // roadmap's location-triggered-sound gap: effect hosts (GPS/indoor
-    // location entries, dialog choices, dialog nodes) all gain it at once.
-    | 'playSound';
+  type: EffectType;
   target: string;
   value?: any;
   /**

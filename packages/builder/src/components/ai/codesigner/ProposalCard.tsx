@@ -13,6 +13,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import type { ChangeProposalSet, ChangeProposal } from './types';
 import type { ProposalPreviewEntry } from './coDesignerStore';
 import { describeProposal } from './proposalParsing';
+import { describeEffect, describeCondition } from '../../../utils/wiringVocabulary';
 
 interface ProposalCardProps {
   proposalSet: ChangeProposalSet;
@@ -68,6 +69,28 @@ function proposalDetail(p: ChangeProposal): string | null {
       }
       return parts.join(' · ') || null;
     }
+    // Wiring: the headline already spells the change out; the old→new diff
+    // (same wording, from the main window) shows what it replaces.
+    case 'setChoiceEffects':
+    case 'setChoiceConditions':
+    case 'setRequirements':
+      return null;
+  }
+}
+
+/** New wiring in the same wording the main window uses for the current value. */
+function wiringNextValue(p: ChangeProposal): string | null {
+  switch (p.kind) {
+    case 'setChoiceEffects':
+      return p.effects.length ? p.effects.map((e) => describeEffect(e)).join('; ') : '(none)';
+    case 'setChoiceConditions':
+      return p.conditions.length ? p.conditions.map((c) => describeCondition(c)).join('; ') : '(none)';
+    case 'setRequirements':
+      return p.requires.length
+        ? p.requires.map((r: any) => describeCondition(r.condition || {})).join(p.requiresMode === 'any' ? ' or ' : ' and ')
+        : '(no gate)';
+    default:
+      return null;
   }
 }
 
@@ -121,7 +144,7 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
             p.kind === 'editText' ? p.newValue :
             p.kind === 'updateParams' ? JSON.stringify(p.params) :
             p.kind === 'updateCharacter' ? JSON.stringify(p.updates) :
-            null;
+            wiringNextValue(p);
           const showDiff = pv && pv.current !== null && nextValue !== null;
           return (
             <label

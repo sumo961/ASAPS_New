@@ -11,6 +11,62 @@
 import type { ChangeProposal, ProposalApplyResult } from '../components/ai/codesigner/types';
 import { getAllBeatTypeIds } from '../services/beatSchemaVocabulary';
 import { applyStanceToTraits } from '../services/prompts/interpersonalStance';
+import { setSiteField } from './choiceWiring';
+import { describeEffect, describeCondition } from './wiringVocabulary';
+
+/** Effect types whose `target` names a character. */
+const CHARACTER_TARGET_EFFECTS = new Set([
+  'nudgeMood', 'addSentiment', 'fireEmotion', 'addReflection', 'setGoalStatus', 'setCharacterVariant',
+]);
+/** Condition types whose `character` field names a character. */
+const CHARACTER_CONDITIONS = new Set(['mood', 'emotion', 'sentiment', 'trait', 'goal', 'characterVariant']);
+
+type Char = NonNullable<ApplyContext['characters']>[number];
+
+/**
+ * Check wiring against the live story. Returns a problem or null.
+ * Catches what the engine would silently ignore or misroute: unknown
+ * characters, writes to a counter that is bound to an affect source (it is
+ * derived — the next read overwrites the write), gates that send the player
+ * to a beat that does not exist.
+ */
+function wiringProblem(
+  effects: Array<Record<string, any>>,
+  conditions: Array<Record<string, any>>,
+  ctx: ApplyContext,
+  beatExists: (id: string) => boolean,
+): string | null {
+  const chars = ctx.characters;
+  const findChar = (ref: string): Char | undefined =>
+    chars?.find((c) => c.id === ref || c.name === ref || c.displayName === ref);
+  const charOk = (ref: unknown) => !chars || ref === 'player' || (typeof ref === 'string' && !!findChar(ref));
+
+  for (const e of effects) {
+    if (CHARACTER_TARGET_EFFECTS.has(e.type) && !charOk(e.target)) {
+      return `${describeEffect(e)}: no character "${e.target}"`;
+    }
+    if (e.type === 'addSentiment' && !charOk(e.sentimentTarget)) {
+      return `${describeEffect(e)}: no character "${e.sentimentTarget}"`;
+    }
+    if ((e.type === 'incrementCounter' || e.type === 'setCounter') && e.character) {
+      const owner = findChar(String(e.character));
+      if (chars && !owner) return `${describeEffect(e)}: no character "${e.character}"`;
+      const counter = (owner as any)?.counters?.find((k: any) => k?.name === e.target);
+      if (counter?.source) {
+        return `${describeEffect(e)}: ${e.target} is read from ${owner?.displayName || owner?.name}'s ${counter.source.kind} — it can't be set; change the ${counter.source.kind} instead`;
+      }
+    }
+  }
+  for (const c of conditions) {
+    if (CHARACTER_CONDITIONS.has(c.type) && !charOk(c.character)) {
+      return `${describeCondition(c)}: no character "${c.character}"`;
+    }
+    if (c.type === 'visitedBeat' && !beatExists(String(c.beatId))) {
+      return `${describeCondition(c)}: no beat "${c.beatId}"`;
+    }
+  }
+  return null;
+}
 
 export interface ApplyContext {
   /** Live beats (id, name, getParameters for validation + positioning). */
@@ -34,7 +90,7 @@ export interface ApplyContext {
   connectBeats: (sourceId: string, targetId: string, label?: string) => void;
   /** Live characters for validation (id / ref name / display name) plus
    *  base traits — needed to derive a variant's E/A from its stance. */
-  characters?: Array<{ id?: string; name?: string; displayName?: string; traits?: Record<string, number> }>;
+  characters?: Array<{ id?: string; name?: string; displayName?: string; traits?: Record<string, number>; counters?: Array<Record<string, unknown>> }>;
   /** Character field update (NOT in the undo history — noted in the result). */
   updateCharacter?: (characterId: string, updates: Record<string, unknown>) => void;
 }
@@ -46,6 +102,13 @@ export function applyChangeProposals(
   const results: ProposalApplyResult[] = [];
   const findBeat = (id: string) => ctx.beats.find(b => b.id === id);
   const knownTypes = new Set(getAllBeatTypeIds());
+  // Parameters as this batch leaves them. updateBeat lands through React
+  // state, so two proposals on the same beat's choices would otherwise both
+  // start from the original list and the second would undo the first.
+  const pendingParams = new Map<string, Record<string, any>>();
+  const paramsOf = (beat: ApplyContext['beats'][number]): Record<string, any> =>
+    pendingParams.get(beat.id) ?? (beat.getParameters?.() as Record<string, any>) ?? {};
+  const beatExists = (id: string) => !!findBeat(id);
 
   proposals.forEach((p, index) => {
     try {
@@ -109,6 +172,67 @@ export function applyChangeProposals(
             }
           }
           results.push({ index, ok: true, detail: `Added ${p.beatType} "${p.name}" (${newBeat.id})` });
+          return;
+        }
+
+        case 'setChoiceEffects':
+        case 'setChoiceConditions': {
+          const beat = findBeat(p.beatId);
+          if (!beat) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          const isEffects = p.kind === 'setChoiceEffects';
+          const list = isEffects ? p.effects : p.conditions;
+          const problem = wiringProblem(isEffects ? list : [], isEffects ? [] : list, ctx, beatExists);
+          if (problem) {
+            results.push({ index, ok: false, detail: problem });
+            return;
+          }
+          const params = paramsOf(beat);
+          const patch = setSiteField(params, p.choiceId, isEffects ? 'effects' : 'conditions', list);
+          if (!patch.ok) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${patch.problem}` });
+            return;
+          }
+          pendingParams.set(beat.id, { ...params, ...patch.parametersPatch });
+          ctx.updateBeat(p.beatId, { parameters: patch.parametersPatch });
+          const where = `${beat.name || p.beatId} › ${patch.site.label ? `"${patch.site.label.slice(0, 40)}"` : p.choiceId}`;
+          results.push({
+            index, ok: true,
+            detail: isEffects
+              ? (list.length ? `${where}: ${list.map((e) => describeEffect(e)).join('; ')}` : `${where}: effects removed`)
+              : (list.length ? `${where} shows only if ${list.map((c) => describeCondition(c)).join(' and ')}` : `${where} always shown`),
+          });
+          return;
+        }
+
+        case 'setRequirements': {
+          const beat = findBeat(p.beatId);
+          if (!beat) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          const problem = wiringProblem([], p.requires.map((r: any) => r.condition), ctx, beatExists);
+          if (problem) {
+            results.push({ index, ok: false, detail: problem });
+            return;
+          }
+          const badFallback = p.requires.find((r: any) => r.fallbackTarget && !beatExists(r.fallbackTarget)) as any;
+          if (badFallback) {
+            results.push({ index, ok: false, detail: `fallback beat "${badFallback.fallbackTarget}" not found` });
+            return;
+          }
+          ctx.updateBeat(p.beatId, {
+            requires: p.requires.length ? p.requires : undefined,
+            requiresMode: p.requiresMode ?? 'all',
+          });
+          results.push({
+            index, ok: true,
+            detail: p.requires.length
+              ? `${beat.name || p.beatId} requires ${p.requires.map((r: any) => describeCondition(r.condition)).join(p.requiresMode === 'any' ? ' or ' : ' and ')}`
+              : `Entry gate removed from ${beat.name || p.beatId}`,
+          });
           return;
         }
 

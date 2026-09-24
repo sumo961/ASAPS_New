@@ -98,10 +98,10 @@
       "notes": "If assetId is provided, prop is rendered as clickable graphic from assets. Otherwise rendered as button. Counter fields allow direct counter modification. soundEffect plays when this prop is selected. locationName optionally references a hotspot or prop from beat.locations by name for Visual Editor association. inventoryName overrides the item name added to inventory (defaults to locationName or name). displayName overrides the label shown on hotspots (defaults to name). Useful for translations where name must stay as internal key. conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
     "condition": {
-      "description": "Condition for beat logic",
+      "description": "Condition for beat logic, choice visibility (\"show only if…\") and requirements. The type list mirrors conditionTypes (a test keeps them equal); conditionTypes lists each type's required and optional fields.",
       "schema": {
-        "type": "'variable' | 'inventory' | 'counter' | 'counterCompare' | 'timer' | 'visitedBeat'",
-        "operator": "'==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'has'",
+        "type": "'variable' | 'counter' | 'counterCompare' | 'timer' | 'inventory' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'emotion' | 'sentiment' | 'trait' | 'goal' | 'characterVariant' | 'gpsProximity' | 'indoorProximity' | 'permissionGranted'",
+        "operator": "'==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not'",
         "variableName": "string",
         "value": "any",
         "counter1": "string?",
@@ -111,11 +111,28 @@
       }
     },
     "effect": {
-      "description": "Effect to apply to story state",
+      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
       "schema": {
-        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter'",
+        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound'",
         "target": "string",
-        "value": "any?"
+        "value": "any?",
+        "character": "string?",
+        "sentimentTarget": "string?",
+        "sentimentEmotion": "string?",
+        "strengthDelta": "number?",
+        "valenceDelta": "number?",
+        "arousalDelta": "number?",
+        "emotion": "string?",
+        "emotionDelta": "number?",
+        "reflectionText": "string?",
+        "reflectionSalience": "number?",
+        "goalId": "string?",
+        "goalStatus": "'open' | 'met' | 'failed' | 'abandoned'?",
+        "suppressEmotion": "boolean?",
+        "variantId": "string?",
+        "suppressSeed": "boolean?",
+        "bookmarkName": "string?",
+        "scope": "'all' | 'character'?"
       }
     },
     "connection": {
@@ -941,7 +958,10 @@
         "question": {
           "type": "string",
           "required": true,
-          "ui": {"control": "textarea", "rows": 3},
+          "ui": {
+            "control": "textarea",
+            "rows": 3
+          },
           "default": "What do you say?",
           "description": "Prompt text shown above the choice buttons. Supports markdown-lite formatting: **bold**, *italic*, ~~strikethrough~~ — use sparingly, for emphasis a reader should feel."
         },
@@ -1080,7 +1100,10 @@
         "question": {
           "type": "string",
           "required": true,
-          "ui": {"control": "textarea", "rows": 3},
+          "ui": {
+            "control": "textarea",
+            "rows": 3
+          },
           "default": "Where do you want to go?",
           "description": "Question prompt"
         },
@@ -1207,7 +1230,10 @@
         "question": {
           "type": "string",
           "required": true,
-          "ui": {"control": "textarea", "rows": 3},
+          "ui": {
+            "control": "textarea",
+            "rows": 3
+          },
           "default": "What do you want to interact with?",
           "description": "Interaction prompt"
         },

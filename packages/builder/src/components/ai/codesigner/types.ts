@@ -46,6 +46,31 @@ export type ChangeProposal =
       note: string;
     }
   | {
+      /** FULL replacement of one option's effects (what picking it does).
+       *  Options: a choice, prop, hotspot, or dialog node/choice — by id. */
+      kind: 'setChoiceEffects';
+      beatId: string;
+      choiceId: string;
+      effects: Array<Record<string, unknown>>;
+      note?: string;
+    }
+  | {
+      /** FULL replacement of one option's visibility conditions ([] = always shown). */
+      kind: 'setChoiceConditions';
+      beatId: string;
+      choiceId: string;
+      conditions: Array<Record<string, unknown>>;
+      note?: string;
+    }
+  | {
+      /** FULL replacement of a beat's entry requirements (the gate; [] removes it). */
+      kind: 'setRequirements';
+      beatId: string;
+      requires: Array<Record<string, unknown>>;
+      requiresMode?: 'all' | 'any';
+      note?: string;
+    }
+  | {
       kind: 'updateCharacter';
       /** Character id, ref name, or display name as shown in the digest. */
       characterId: string;

@@ -8,6 +8,9 @@
  * branch?") are answerable without tools.
  */
 
+import { listWiringSites } from './choiceWiring';
+import { describeEffect, describeCondition } from './wiringVocabulary';
+
 export interface DigestBeat {
   id: string;
   type: string;
@@ -17,6 +20,9 @@ export interface DigestBeat {
   parameters?: Record<string, unknown>;
   getConnections?: () => Array<{ targetId?: string; label?: string }>;
   defaultTarget?: string;
+  /** Entry gate (top-level beat field, not a parameter). */
+  requires?: Array<{ condition?: Record<string, unknown>; fallbackTarget?: string }>;
+  requiresMode?: 'all' | 'any';
 }
 
 export interface DigestCharacter {
@@ -99,6 +105,44 @@ function connectionLines(beat: DigestBeat): string {
   return targets.length > 0 ? ` → ${targets.join(', ')}` : '';
 }
 
+const SITE_WORD: Record<string, string> = {
+  choice: 'choice', prop: 'prop', hotspot: 'hotspot', dialogNode: 'node', dialogChoice: 'choice',
+};
+
+/**
+ * The beat's wiring, one indented line per option: its id (what wiring
+ * proposals address), label, target, show-only-if conditions and effects.
+ * Dialog nodes are listed only when they carry wiring of their own; every
+ * dialog choice is listed so it can be addressed.
+ */
+function wiringLines(beat: DigestBeat): string[] {
+  const out: string[] = [];
+  const req = Array.isArray(beat.requires) ? beat.requires : [];
+  if (req.length > 0) {
+    const joiner = beat.requiresMode === 'any' ? ' OR ' : ' AND ';
+    out.push(`    requires: ${req.map((r) => describeCondition((r.condition || {}) as any) + (r.fallbackTarget ? ` (else → ${r.fallbackTarget})` : '')).join(joiner)}`);
+  }
+  for (const site of listWiringSites(beatParams(beat) as any)) {
+    const wired = site.conditions.length > 0 || site.effects.length > 0 || !!site.legacyCounter;
+    if (site.kind === 'dialogNode' && !wired) continue;
+    const label = site.label.trim().replace(/\s+/g, ' ');
+    const bits: string[] = [];
+    if (site.conditions.length) bits.push(`if ${site.conditions.map((c) => describeCondition(c)).join(' and ')}`);
+    if (site.effects.length) bits.push(`does ${site.effects.map((e) => describeEffect(e)).join('; ')}`);
+    if (site.legacyCounter) {
+      const lc = site.legacyCounter;
+      bits.push(`legacy counter ${lc.counter} ${lc.operation === 'set' ? '=' : '+='} ${String(lc.value)}`);
+    }
+    out.push(
+      `    ${'  '.repeat(site.depth)}${SITE_WORD[site.kind]} ${site.id}` +
+      `${label ? ` "${label.length > 50 ? `${label.slice(0, 50)}…` : label}"` : ''}` +
+      `${site.target ? ` → ${site.target}` : ''}` +
+      `${bits.length ? ` — ${bits.join(' — ')}` : ''}`,
+    );
+  }
+  return out;
+}
+
 /**
  * Build the digest. Never throws — a beat that resists serialization is
  * listed by id/type only.
@@ -176,7 +220,7 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
     lines.push('', `CLUSTERS: ${input.clusters.map(c => c.name || c.id).filter(Boolean).join(', ')}`);
   }
 
-  lines.push('', 'BEATS (id [type] "name" — text — → connections):');
+  lines.push('', 'BEATS (id [type] "name" — text — → connections; indented: entry gate, then each option by id — if = shown only when, does = effects when picked):');
   const beatLines: string[] = [];
   for (const beat of input.beats) {
     try {
@@ -184,7 +228,8 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
       const cluster = beat.cluster ? ` {cluster: ${beat.cluster}}` : '';
       beatLines.push(
         `- ${beat.id} [${beat.type}]${beat.name ? ` "${beat.name}"` : ''}${cluster}` +
-        `${snippet ? ` — ${snippet}` : ''}${connectionLines(beat)}`
+        `${snippet ? ` — ${snippet}` : ''}${connectionLines(beat)}` +
+        wiringLines(beat).map((l) => `\n${l}`).join('')
       );
     } catch {
       beatLines.push(`- ${beat.id} [${beat.type}]`);
