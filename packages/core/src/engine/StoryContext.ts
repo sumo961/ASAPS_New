@@ -544,6 +544,16 @@ export class StoryContext extends EventEmitter {
     return owner;
   }
 
+  /**
+   * Is `name` a counter this story can read? True for a story-global counter
+   * once something has written it, and for a counter declared on exactly one
+   * character (which reads its seeded value from the start).
+   */
+  hasCounter(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.state.counters, name)
+      || this.resolveImplicitCounterOwner(name) !== null;
+  }
+
   getCounter(name: string): number {
     const owner = this.resolveImplicitCounterOwner(name);
     if (owner) return this.getCharacterCounter(owner, name);

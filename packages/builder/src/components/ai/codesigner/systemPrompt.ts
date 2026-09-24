@@ -12,6 +12,7 @@
 import { IDN_COMPLEXITY_PRINCIPLES } from '../ideator/idnPrinciples';
 import type { CoDesignerContext } from './coDesignerStore';
 import { wiringPromptReference } from '../../../utils/wiringVocabulary';
+import { beatTypeCatalog } from '../../../utils/beatTypeReference';
 
 export function buildCoDesignerSystemPrompt(context: CoDesignerContext | null, opts: { beatContentToolAvailable?: boolean } = {}): string {
   const digestBlock = context?.digest
@@ -49,6 +50,28 @@ Parameter names: use only names you have seen in this story's beats. If you
 need a beat type whose parameters you don't know, say so and propose an
 addNote instead of guessing — the app refuses unknown parameter names.
 `}
+BEAT TYPES AVAILABLE IN ASAPS (design with these; don't invent workarounds for
+something one of them already does — e.g. randomTarget IS the random branch):
+${beatTypeCatalog()}
+
+STORY STATE — what exists and how to use it
+- Story COUNTERS (numbers, story-wide) need NO declaration: the first
+  incrementCounter / setCounter effect creates them at 0. The digest lists the
+  ones in use. Give a starting value with a setCounter effect on an early
+  choice, or a setVariable beat with "type": "counter", "operation": "set".
+  A story counter can be shown as a meter via Project Settings → HUD
+  (countdown meter) — tell the author; you cannot set that.
+- Story VARIABLES (text / yes-no / numbers) are declared in Project Settings;
+  propose 'defineVariable' for a new one. setVariable effects and setVariable
+  beats change them.
+- A randomTarget only PICKS the next beat — its branches carry no effects.
+  To record which branch ran, start each branch with a setVariable beat (or
+  put the state change on that branch's first choices).
+- Character counters live on a character (updateCharacter "counters") and
+  can show as that character's meter.
+- Show a value in player-facing text with \${name} — "Time left: \${Clock}
+  min." Works for variables AND counters. Always write \${name}, never {name}.
+
 HOW TO COLLABORATE
 - The digest may end with a STORY STRUCTURE section derived from the actual
   story graph (state dependencies, choices, narrative vectors, flow
@@ -94,6 +117,7 @@ block in EXACTLY this form:
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
     { "kind": "setChoiceEffects", "beatId": "beat_5", "choiceId": "choice_2", "effects": [ { "type": "addSentiment", "target": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "strengthDelta": 0.2 }, { "type": "incrementCounter", "target": "clues", "value": 1 } ], "note": "why" },
     { "kind": "setChoiceConditions", "beatId": "beat_5", "choiceId": "choice_3", "conditions": [ { "type": "inventory", "item": "brass_key" } ], "note": "why" },
+    { "kind": "defineVariable", "name": "caseVariant", "defaultValue": "", "description": "which case version this playthrough uses", "note": "why" },
     { "kind": "editChoiceText", "beatId": "beat_3", "choiceId": "choice_2", "text": "Call now — the school says the boy hasn't come home", "note": "why" },
     { "kind": "addChoice", "beatId": "beat_3", "parentId": "choice_1", "choice": { "text": "…", "target": "beat_24", "effects": [ { "type": "incrementCounter", "target": "Tension", "value": 1 } ] }, "note": "why" },
     { "kind": "replaceBeat", "beatId": "beat_27", "parameters": { "dialogTree": { "id": "n0", "speaker": "Parent", "text": "…", "choices": [ { "id": "c1", "text": "…", "target": "beat_32", "effects": [] }, { "id": "c2", "text": "…", "dialogNode": { "id": "n1", "speaker": "Parent", "text": "…", "choices": [ { "id": "c2a", "text": "…", "target": "beat_33" } ] } } ] } }, "note": "why" },
@@ -163,9 +187,9 @@ Rules for proposals:
     fails; without one the gate only annotates (the story analyzer flags
     paths that can't satisfy it). "requiresMode": "any" = one requirement
     suffices (default "all"). [] removes the gate.
-  - Only wire to characters, counters, items and beats that exist in the
-    digest (or that the same batch creates for a character). Counters owned
-    by a character need "character" on the effect.
+  - Characters, items and beats must exist in the digest. Story counters are
+    created by their first effect (see STORY STATE); counters owned by a
+    character need "character" on the effect.
   - The app refuses wiring that would do nothing in the player (unknown
     type, missing field, zero delta, unknown character, a write to a
     read-only counter) and tells you why — fix it and propose again.

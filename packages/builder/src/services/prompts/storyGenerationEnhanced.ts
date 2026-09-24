@@ -797,6 +797,7 @@ Fictional time condition example (CORRECT format):
     - action: What happens (steer the conversation, exit to a beat, set a variable, or combinations)
     - npcExitMessage: Optional prompt for farewell when exiting via this direction
   - fallbackExitTarget: Beat to go to when maxTurns reached
+  - fallbackExitMessage: Instruction for the NPC's closing line when maxTurns is reached (e.g. "say time is up and suggest continuing next week") — set it so a capped conversation ends with a line instead of stopping mid-exchange
   - openingLine: Fixed opening NPC line (if empty, AI generates one). If this is the interactor's first meeting with the NPC, introduce them here — scenario and npcPersonality are invisible to the interactor
   - Do NOT set enableVoiceInput (leave it out — voice input stays off; it only works once the author has configured a speech-to-text server)
   - systemInstructions: Additional instructions for the AI
@@ -868,6 +869,10 @@ Player-facing prose supports a small markdown subset, rendered in every view
 - Where it does NOT work (write plain text): choice/button labels, and
   hyperText body text (link words must match the text exactly).
 - Never emit raw HTML — it renders as literal text, escaped.
+- Show a variable's or counter's CURRENT value in text with \${name}, e.g.
+  "Time remaining: \${Clock} minutes." (exact name, case-sensitive). Works in
+  the same places as the formatting above. A counter shows once something has
+  set it — give it a starting value on an early beat.
 
 ## Beat Notes (Author Annotations) - USE LIBERALLY!
 
@@ -2371,7 +2376,7 @@ You may use these advanced beat types that leverage AI at runtime:
 - **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)
   Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, wordsPerMinute, minDuration, maxDuration
 - **aiConversation**: Real-time AI conversation with author-defined steering rules
-  Parameters: scenario, npcName, npcPersonality, maxTurns, directions (steering rules with triggers and actions), fallbackExitTarget, openingLine, systemInstructions
+  Parameters: scenario, npcName, npcPersonality, maxTurns, directions (steering rules with triggers and actions), fallbackExitTarget, fallbackExitMessage, openingLine, systemInstructions
 
 Use these sparingly for dynamic, personalized experiences. They require an AI API key and internet at runtime.`);
   } else {

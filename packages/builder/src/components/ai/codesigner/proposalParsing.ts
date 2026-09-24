@@ -173,7 +173,7 @@ const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 const VALID_KINDS = new Set([
   'editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter',
   'setChoiceEffects', 'setChoiceConditions', 'setRequirements',
-  'editChoiceText', 'addChoice', 'replaceBeat',
+  'editChoiceText', 'addChoice', 'replaceBeat', 'defineVariable',
 ]);
 
 /** Warnings from the last normalizeProposal rejection (why an entry was dropped). */
@@ -220,6 +220,13 @@ function normalizeProposal(raw: any): ChangeProposal | null {
       return isEffects
         ? { kind: 'setChoiceEffects', beatId: raw.beatId, choiceId: String(choiceId), effects: list.value, note }
         : { kind: 'setChoiceConditions', beatId: raw.beatId, choiceId: String(choiceId), conditions: list.value, note };
+    }
+    case 'defineVariable': {
+      const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return reject(raw.kind, `"${raw.name}" is not a usable name (letters, digits, _; no spaces) — placeholders are \${name}`);
+      const v = raw.defaultValue ?? raw.initialValue ?? raw.value;
+      const defaultValue = typeof v === 'number' || typeof v === 'boolean' ? v : typeof v === 'string' ? v : '';
+      return { kind: 'defineVariable', name, defaultValue, description: typeof raw.description === 'string' ? raw.description : undefined, note: typeof raw.note === 'string' ? raw.note : undefined };
     }
     case 'editChoiceText': {
       const choiceId = raw.choiceId ?? raw.optionId ?? raw.nodeId;
@@ -351,6 +358,8 @@ export function describeProposal(p: ChangeProposal): string {
       return p.conditions.length
         ? `Show ${p.beatId} › ${p.choiceId} only if ${p.conditions.map((c) => describeCondition(c)).join(' and ')}`
         : `Always show ${p.beatId} › ${p.choiceId}`;
+    case 'defineVariable':
+      return `Declare story variable ${p.name} = ${JSON.stringify(p.defaultValue)}`;
     case 'editChoiceText':
       return `Reword ${p.beatId} › ${p.choiceId}: "${p.text.length > 80 ? `${p.text.slice(0, 77)}…` : p.text}"`;
     case 'addChoice':

@@ -17,6 +17,7 @@ import { ideatorWindowManager } from './services/IdeatorWindowManager';
 import { coDesignerWindowManager } from './services/CoDesignerWindowManager';
 import { buildStoryDigest } from './utils/storyDigest';
 import { applyChangeProposals } from './utils/applyChangeProposals';
+import { mergeGeneratedVariables } from './utils/generatedVariables';
 import { findWiringSite } from './utils/choiceWiring';
 import { describeEffect, describeCondition } from './utils/wiringVocabulary';
 import { buildStructuralSummary } from './utils/structuralSummary';
@@ -6144,6 +6145,15 @@ function App() {
         return newBeat;
       },
       connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
+      defineVariable: (v) => {
+        const base = globalSettingsRef.current ?? globalSettings;
+        const next = mergeGeneratedVariables(base, [{ name: v.name, initialValue: v.defaultValue, description: v.description }]);
+        const before = (base as any).variables?.length ?? 0;
+        if (!next || ((next as any).variables?.length ?? 0) === before) return false;
+        globalSettingsRef.current = next;
+        setGlobalSettings(next);
+        return true;
+      },
       characters: characters as any,
       updateCharacter: (characterId, updates) => {
         workingChars = workingChars.map(c => (c.id === characterId ? { ...c, ...updates } as Character : c));

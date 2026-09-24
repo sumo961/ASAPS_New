@@ -100,6 +100,8 @@ export interface ApplyContext {
   /** Live characters for validation (id / ref name / display name) plus
    *  base traits — needed to derive a variant's E/A from its stance. */
   characters?: Array<{ id?: string; name?: string; displayName?: string; traits?: Record<string, number>; counters?: Array<Record<string, unknown>> }>;
+  /** Declare a story variable; false when one by that name already exists. */
+  defineVariable?: (v: { name: string; defaultValue: string | number | boolean; description?: string }) => boolean;
   /** Character field update (NOT in the undo history — noted in the result). */
   updateCharacter?: (characterId: string, updates: Record<string, unknown>) => void;
 }
@@ -223,6 +225,18 @@ export function applyChangeProposals(
               ? (list.length ? `${where}: ${list.map((e) => describeEffect(e)).join('; ')}` : `${where}: effects removed`)
               : (list.length ? `${where} shows only if ${list.map((c) => describeCondition(c)).join(' and ')}` : `${where} always shown`),
           });
+          return;
+        }
+
+        case 'defineVariable': {
+          if (!ctx.defineVariable) {
+            results.push({ index, ok: false, detail: 'Variables cannot be declared from here' });
+            return;
+          }
+          const added = ctx.defineVariable({ name: p.name, defaultValue: p.defaultValue, description: p.description });
+          results.push(added
+            ? { index, ok: true, detail: `Declared story variable ${p.name} (starts as ${JSON.stringify(p.defaultValue)}) — see Project Settings → Variables` }
+            : { index, ok: true, detail: `Story variable ${p.name} already exists — left as it is` });
           return;
         }
 

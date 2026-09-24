@@ -5710,6 +5710,16 @@
           "required": false,
           "description": "Beat to go to when max turns are reached — the bare beat id as a string (e.g. \"beat_12\"), not a { target } object"
         },
+        "fallbackExitMessage": {
+          "type": "string",
+          "required": false,
+          "description": "Instruction for the NPC's closing line when Max Turns is reached (e.g. \"apologise that time is up and suggest meeting again next week\"). The NPC says it before the story moves to the fallback exit, so the conversation ends instead of stopping mid-exchange. Empty = no closing line. Direction exits have their own actionExitMessage.",
+          "ui": {
+            "control": "textarea",
+            "rows": 2,
+            "label": "Closing line when turns run out"
+          }
+        },
         "includeVariables": {
           "type": "boolean",
           "required": false,

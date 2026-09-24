@@ -76,6 +76,8 @@ function proposalDetail(p: ChangeProposal): string | null {
     case 'setRequirements':
     case 'editChoiceText':
       return null;
+    case 'defineVariable':
+      return p.description ? `"${p.description.slice(0, 140)}"` : null;
     case 'addChoice': {
       const bits: string[] = [];
       if (p.choice.conditions?.length) bits.push(`shown if ${p.choice.conditions.map((c) => describeCondition(c)).join(' and ')}`);

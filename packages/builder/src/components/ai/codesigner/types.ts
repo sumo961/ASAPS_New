@@ -63,6 +63,15 @@ export type ChangeProposal =
       note?: string;
     }
   | {
+      /** Declare a story variable in Project Settings (name, starting value).
+       *  Story COUNTERS need no declaration — the first counter effect makes them. */
+      kind: 'defineVariable';
+      name: string;
+      defaultValue: string | number | boolean;
+      description?: string;
+      note?: string;
+    }
+  | {
       /** Rewrite one option's player-facing label (choice / prop / hotspot / dialog node or choice); wiring kept. */
       kind: 'editChoiceText';
       beatId: string;

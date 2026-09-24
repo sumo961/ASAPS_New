@@ -119,3 +119,17 @@ export function beatParameterProblem(beatType: string, params: Record<string, un
   }
   return null;
 }
+
+/**
+ * Every beat type, one line each (id, display name, what it is for) — so a
+ * model knows what EXISTS (e.g. randomTarget) before it designs around a
+ * gap. Parameters come from beatTypeReference on demand.
+ */
+export function beatTypeCatalog(): string {
+  return Object.entries(BEAT_TYPES)
+    .map(([id, t]) => {
+      const desc = String(t.description ?? '').replace(/\s+/g, ' ').trim();
+      return `- ${id}${t.displayName ? ` ("${t.displayName}"` + (t.category === 'invisible' ? ', invisible' : '') + ')' : ''}: ${desc.length > 150 ? `${desc.slice(0, 147)}…` : desc}`;
+    })
+    .join('\n');
+}

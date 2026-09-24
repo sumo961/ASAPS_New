@@ -34,7 +34,7 @@ describe('buildStoryDigest', () => {
     expect(digest).toContain('STORY: "Test Story"');
     expect(digest).toContain('2 beats, 1 characters');
     expect(digest).toContain('- Elena (id: c1; ref: elena; 3 traits; counters: trust)');
-    expect(digest).toContain('VARIABLES: score');
+    expect(digest).toContain('VARIABLES (declared in Project Settings): score');
     expect(digest).toContain('- b1 [infoText] "Opening" — It was a dark and stormy night. → b2 ("Continue")');
     expect(digest).toContain('- b2 [endScreen] "The End" — Fin');
   });

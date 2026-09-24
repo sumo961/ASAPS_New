@@ -105,6 +105,45 @@ function connectionLines(beat: DigestBeat): string {
   return targets.length > 0 ? ` → ${targets.join(', ')}` : '';
 }
 
+/**
+ * Story-level state the story USES: counters (no declaration exists for a
+ * story counter — the first counter effect creates it) and variables, found
+ * in option wiring, entry gates, Set Variable/Counter beats and condition
+ * beats. Counters declared on a character are that character's, not listed.
+ */
+function storyStateInUse(beats: DigestBeat[], characters: DigestCharacter[] = []): { counters: string[]; variables: string[] } {
+  const charCounters = new Set(characters.flatMap((c) => (c.counters ?? []).map((k) => k.name).filter(Boolean) as string[]));
+  const counters = new Set<string>();
+  const variables = new Set<string>();
+  const effect = (e: any) => {
+    if (!e || typeof e.target !== 'string') return;
+    if ((e.type === 'incrementCounter' || e.type === 'setCounter') && !e.character) counters.add(e.target);
+    if (e.type === 'setVariable') variables.add(e.target);
+  };
+  const condition = (c: any) => {
+    const name = c?.variableName ?? c?.variable ?? c?.counter;
+    if (typeof name !== 'string' || !name) return;
+    if (c.type === 'counter' || c.conditionType === 'counter') counters.add(name);
+    if (c.type === 'variable' || c.conditionType === 'variable') variables.add(name);
+  };
+  for (const b of beats) {
+    const p = beatParams(b) as any;
+    for (const site of listWiringSites(p)) {
+      site.effects.forEach(effect);
+      site.conditions.forEach(condition);
+      if (site.legacyCounter) counters.add(site.legacyCounter.counter);
+    }
+    for (const r of Array.isArray(b.requires) ? b.requires : []) condition(r.condition);
+    if (b.type === 'setVariable' && typeof p.name === 'string' && p.name) {
+      if (p.type === 'counter' && !p.character) counters.add(p.name);
+      else if (p.type !== 'fictionalTime' && p.type !== 'counter') variables.add(p.name);
+    }
+    if (b.type === 'conditionBeat') condition(p.condition ?? p);
+  }
+  for (const n of charCounters) counters.delete(n);
+  return { counters: [...counters].sort(), variables: [...variables].sort() };
+}
+
 const SITE_WORD: Record<string, string> = {
   choice: 'choice', prop: 'prop', hotspot: 'hotspot', dialogNode: 'node', dialogChoice: 'choice',
 };
@@ -212,8 +251,17 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
     }
   }
 
-  if (input.variables && input.variables.length > 0) {
-    lines.push('', `VARIABLES: ${input.variables.map(v => v.name).filter(Boolean).join(', ')}`);
+  const declared = (input.variables ?? []).map(v => v.name).filter(Boolean) as string[];
+  if (declared.length > 0) {
+    lines.push('', `VARIABLES (declared in Project Settings): ${declared.join(', ')}`);
+  }
+  const inUse = storyStateInUse(input.beats, input.characters);
+  const undeclared = inUse.variables.filter(v => !declared.includes(v));
+  if (undeclared.length > 0) {
+    lines.push(`VARIABLES used but not declared: ${undeclared.join(', ')}`);
+  }
+  if (inUse.counters.length > 0) {
+    lines.push(`STORY COUNTERS (story-wide, no declaration needed): ${inUse.counters.join(', ')}`);
   }
 
   if (input.clusters && input.clusters.length > 0) {

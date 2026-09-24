@@ -62,6 +62,8 @@ export interface AIConversationBeatParams {
   /** Conversation directions — steering rules for the AI */
   directions: ConversationDirection[];
 
+  /** Prompt for the NPC's closing line when maxTurns is reached (empty = end without one) */
+  fallbackExitMessage?: string;
   /** Fallback exit target when maxTurns reached */
   fallbackExitTarget?: string;
 
@@ -92,6 +94,7 @@ export class AIConversationBeat extends Beat {
   public maxTurns: number;
   public directions: ConversationDirection[];
   public fallbackExitTarget?: string;
+  public fallbackExitMessage?: string;
   public systemInstructions?: string;
   public openingLine?: string;
   public enableVoiceInput: boolean;
@@ -121,6 +124,7 @@ export class AIConversationBeat extends Beat {
       d.trigger ? d : AIConversationBeat.unflattenDirection(d)
     );
     this.fallbackExitTarget = params.fallbackExitTarget || config.fallbackExitTarget;
+    this.fallbackExitMessage = params.fallbackExitMessage || (config as any).fallbackExitMessage;
     this.systemInstructions = params.systemInstructions || config.systemInstructions;
     this.openingLine = params.openingLine || config.openingLine;
     // Off unless the author switched it on: the mic only works with a
@@ -144,6 +148,7 @@ export class AIConversationBeat extends Beat {
       // Output directions in flattened format for the schema-driven inspector
       directions: this.directions.map(d => AIConversationBeat.flattenDirection(d)),
       fallbackExitTarget: this.fallbackExitTarget,
+      ...(this.fallbackExitMessage ? { fallbackExitMessage: this.fallbackExitMessage } : {}),
       systemInstructions: this.systemInstructions,
       openingLine: this.openingLine,
       enableVoiceInput: this.enableVoiceInput,
@@ -169,6 +174,7 @@ export class AIConversationBeat extends Beat {
       this.clearConnections();
     }
     if (params.fallbackExitTarget !== undefined) this.fallbackExitTarget = params.fallbackExitTarget;
+    if (params.fallbackExitMessage !== undefined) this.fallbackExitMessage = params.fallbackExitMessage;
     if (params.systemInstructions !== undefined) this.systemInstructions = params.systemInstructions;
     if (params.openingLine !== undefined) this.openingLine = params.openingLine;
     if (params.enableVoiceInput !== undefined) this.enableVoiceInput = params.enableVoiceInput;
@@ -810,6 +816,27 @@ export class AIConversationBeat extends Beat {
 
       // Max turns reached — fallback exit
       console.log(`[AIConversationBeat ${this.id}] Max turns (${this.maxTurns}) reached`);
+      // A closing line, so the conversation ends instead of stopping
+      // mid-exchange — the counterpart of a direction exit's exitMessage.
+      if (this.fallbackExitMessage?.trim()) {
+        try {
+          const closingPrompt = `You are ${npcDisplayName}. ${this.npcPersonality || ''}\n\n` +
+            `SCENARIO: ${this.scenario}\n\n` +
+            `The conversation has to end now. Say a brief closing line that wraps it up naturally, ` +
+            `consistent with everything said so far. Instruction: ${this.fallbackExitMessage}\n` +
+            `Keep it to 1-2 sentences. Respond in the SAME LANGUAGE as the conversation.\n` +
+            `Respond with ONLY the dialog text — no JSON, no metadata, no stage directions.`;
+          const closing = await this.generateNPCResponse(aiService, closingPrompt, conversationHistory);
+          if (closing.trim()) {
+            conversationHistory.push({ role: 'npc', text: closing, turnNumber });
+            await renderer.renderDialog(npcDisplayName, closing, undefined, Array.from(this.locations.values()));
+            await waitForTTS(renderer);
+            await waitForReadingTime(renderer, closing);
+          }
+        } catch (err) {
+          console.warn(`[AIConversationBeat ${this.id}] Closing line generation failed:`, err);
+        }
+      }
       context.recordTimelineEvent({
         type: 'branch',
         beatId: this.id,

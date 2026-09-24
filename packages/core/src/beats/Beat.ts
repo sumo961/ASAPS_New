@@ -571,24 +571,31 @@ export abstract class Beat {
   protected processText(text: string, context: StoryContext): string {
     if (!text) return text;
 
-    // Replace ${variableName} format
-    text = text.replace(/\$\{([^}]+)\}/g, (match, varName) => {
-      const value = context.getVariable(varName.trim());
+    // A placeholder names a variable or a counter — authors write "Time
+    // left: ${Clock}" without caring which store Clock lives in, and
+    // counters used to show up literally. Variables win on a name clash
+    // (the long-standing behaviour).
+    const valueOf = (name: string): unknown => {
+      const v = context.getVariable(name);
+      if (v !== undefined && v !== null) return v;
+      const c = context as { hasCounter?: (n: string) => boolean; getCounter?: (n: string) => number };
+      if (typeof c.hasCounter === 'function' && c.hasCounter(name) && typeof c.getCounter === 'function') {
+        return c.getCounter(name);
+      }
+      return undefined;
+    };
+    const sub = (match: string, name: string) => {
+      const value = valueOf(name.trim());
       return value !== undefined && value !== null ? String(value) : match;
-    });
+    };
 
-    // Replace $variableName$ format (legacy)
-    text = text.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)\$/g, (match, varName) => {
-      const value = context.getVariable(varName);
-      return value !== undefined && value !== null ? String(value) : match;
-    });
-
-    // Replace {variableName} format (AI-generated content often uses this)
-    // Only match if the variable exists to avoid replacing unrelated braces
-    text = text.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (match, varName) => {
-      const value = context.getVariable(varName.trim());
-      return value !== undefined && value !== null ? String(value) : match;
-    });
+    // ${name} — the documented form
+    text = text.replace(/\$\{([^}]+)\}/g, sub);
+    // $name$ (legacy)
+    text = text.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)\$/g, sub);
+    // {name} (AI-generated content often uses this). Only replaced when the
+    // name resolves, so unrelated braces are left alone.
+    text = text.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, sub);
 
     return text;
   }
