@@ -1355,6 +1355,9 @@ export const PreviewWindow: React.FC = () => {
       const playerChar = previewData.characters?.find(c => c.role === 'player');
       const playerSpeakerKey = playerChar ? (playerChar.displayName || playerChar.name) : 'Interactor';
 
+      // Story setting (Story Settings → Sound): speak choice questions and
+      // input prompts too. Default on — exported players always did.
+      getTTSService().setReadPrompts((previewData?.settings as any)?.tts?.readPrompts !== false);
       reactRenderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
         const svc = getTTSService();
         console.log(`[PreviewWindow] TTS callback fired: speaker="${speaker}", isPrompt=${isPrompt}, enabled=${svc.isEnabled()}, text="${text.substring(0, 50)}..."`);

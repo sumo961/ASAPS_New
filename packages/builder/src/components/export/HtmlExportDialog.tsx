@@ -184,6 +184,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsModel: savedTTS?.model,
         ttsBaseUrl: savedTTS?.baseUrl,
         ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
+        ttsReadPrompts: ttsSettings?.readPrompts !== false,
         ttsSpeakerVoices: speakerVoices,
         // Project setting (tts.exportSpeech) — the same project exports the
         // same player on every machine (UX-Eval B3).
@@ -274,6 +275,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         ttsModel: savedTTS?.model,
         ttsBaseUrl: savedTTS?.baseUrl,
         ttsDefaultVoiceId: savedTTS?.defaultVoiceId,
+        ttsReadPrompts: ttsSettings?.readPrompts !== false,
         ttsSpeakerVoices: speakerVoices,
         ttsEnabled: exportSpeech,
         existingTranslations: selectedTranslations.length > 0 ? selectedTranslations : undefined,

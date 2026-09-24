@@ -452,10 +452,12 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const ttsService = new WebTTSService();
         if (ttsService.isConfigured()) {
           console.log('[WebPlayer] Setting up TTS service...');
-          renderer.setTTSSpeakCallback((text, speaker) => {
-            if (ttsService.isEnabled()) {
-              ttsService.speak(text, speaker);
-            }
+          renderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
+            if (!ttsService.isEnabled()) return;
+            // Questions / input prompts follow the story's "read prompts
+            // aloud" setting (same rule as the Preview Window).
+            if (isPrompt && !ttsService.readsPrompts()) return;
+            ttsService.speak(text, speaker);
           });
           renderer.setTTSStopCallback(() => ttsService.stop());
           // Set TTS language: use explicit language prop (from translation switch),

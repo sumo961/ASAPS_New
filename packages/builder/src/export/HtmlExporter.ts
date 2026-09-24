@@ -995,6 +995,8 @@ export interface HtmlExportOptions {
   ttsSpeakerVoices?: Record<string, string>;
   /** Default voice ID */
   ttsDefaultVoiceId?: string;
+  /** Speak choice questions and input prompts too (globalSettings.tts.readPrompts; default true). */
+  ttsReadPrompts?: boolean;
   /**
    * Whether TTS should be enabled at playback time. Mirrors the
    * builder's TTS toggle. Default true (backward-compat with exports
@@ -1161,9 +1163,10 @@ async function exportAsSingleFile(
         speakerVoices: options.ttsSpeakerVoices || undefined,
         defaultVoiceId: options.ttsDefaultVoiceId || undefined,
         enabled: ttsEnabledFlag,
+        readPrompts: options.ttsReadPrompts !== false,
       })
     : options.ttsProvider === 'web-speech'
-      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag })
+      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag, readPrompts: options.ttsReadPrompts !== false })
       : 'null';
 
   // Get mobile settings from project
@@ -1215,9 +1218,10 @@ async function exportAsFolder(
         speakerVoices: options.ttsSpeakerVoices || undefined,
         defaultVoiceId: options.ttsDefaultVoiceId || undefined,
         enabled: ttsEnabledFlag,
+        readPrompts: options.ttsReadPrompts !== false,
       })
     : options.ttsProvider === 'web-speech'
-      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag })
+      ? JSON.stringify({ provider: 'web-speech', enabled: ttsEnabledFlag, readPrompts: options.ttsReadPrompts !== false })
       : 'null';
 
   // Get mobile settings from project
@@ -1514,9 +1518,10 @@ export async function downloadHtmlExport(
         baseUrl: options.ttsBaseUrl || undefined,
         speakerVoices: options.ttsSpeakerVoices || undefined,
         defaultVoiceId: options.ttsDefaultVoiceId || undefined,
+        readPrompts: options.ttsReadPrompts !== false,
       })
     : options.ttsProvider === 'web-speech'
-      ? JSON.stringify({ provider: 'web-speech' })
+      ? JSON.stringify({ provider: 'web-speech', readPrompts: options.ttsReadPrompts !== false })
       : 'null';
 
   // Get mobile settings from project

@@ -137,6 +137,8 @@ export interface GlobalSettings {
     model?: string;
     baseUrl?: string;
     defaultVoiceId?: string;
+    /** Also speak choice questions and input prompts aloud (Preview + exported
+     *  players). Unset = true — exported players always spoke them. */
     readPrompts?: boolean;
     speakerVoices?: Record<string, Record<string, string>>;  // providerKey → { speaker → voiceId }
     /**
@@ -425,12 +427,6 @@ export interface ProjectSettings {
     backgroundColor?: string;
   };
 
-  /** Editor preferences */
-  editor?: {
-    gridSnap?: boolean;
-    gridSize?: number;
-    showGrid?: boolean;
-  };
 }
 
 // ============================================================================

@@ -742,6 +742,35 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           {activeTab === 'project' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Project Settings</h3>
+
+              {/* Suggested AI setup (globalSettings.ai) — was saved with the
+                  story but visible nowhere (UX-Eval B3). Recorded from the
+                  author's AI configuration, never with keys; a collaborator
+                  who opens the story without an AI setup of their own
+                  starts from it. */}
+              {settings.ai && (settings.ai.provider || settings.ai.providerType || settings.ai.model) && (
+                <div className="p-3 border rounded-lg bg-purple-50 border-purple-200 flex items-start gap-3">
+                  <div className="flex-1 text-sm">
+                    <div className="font-medium text-gray-800">Suggested AI setup for this story</div>
+                    <div className="text-gray-700 mt-0.5">
+                      {[settings.ai.providerType || settings.ai.provider, settings.ai.model, settings.ai.reasoningEffort ? `reasoning ${settings.ai.reasoningEffort}` : null]
+                        .filter(Boolean).join(' \u00b7 ')}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Saved from your AI configuration, without any key. Someone who opens this story without an AI
+                      setup of their own starts from this suggestion and adds their own key.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleChange('ai', undefined, undefined)}
+                    className="px-2.5 py-1 text-xs border border-purple-300 rounded hover:bg-purple-100 text-purple-800 flex-shrink-0"
+                    title="Remove the suggestion from this story"
+                  >
+                    Stop suggesting
+                  </button>
+                </div>
+              )}
               
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -2772,6 +2801,21 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           {activeTab === 'sound' && (
             <div className="space-y-4">
               <h3 className="font-medium text-gray-700 mb-3">Sound Settings</h3>
+              <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={settings.tts?.readPrompts !== false}
+                  onChange={(e) => handleChange('tts', 'readPrompts', e.target.checked)}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-700">Read questions and prompts aloud</span>
+                  <span className="block text-xs text-gray-500">
+                    When text-to-speech is on, also speak choice questions and input prompts — not only the story text.
+                    Helps players who can’t read the screen. Applies to the Preview Window and exported players.
+                  </span>
+                </span>
+              </label>
               
               <div className="space-y-4">
                 <div className="relative">

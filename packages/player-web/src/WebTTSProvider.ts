@@ -17,6 +17,11 @@ export interface TTSConfig {
   /** Default voice ID */
   defaultVoiceId?: string;
   /**
+   * Also speak choice questions and input prompts (project setting
+   * tts.readPrompts). Undefined = true: exports before this field spoke them.
+   */
+  readPrompts?: boolean;
+  /**
    * Author's TTS toggle state at export time. When false, the player
    * stays silent unless the listener explicitly enables TTS via export
    * UI. Undefined defaults to true for backward compat with old exports.
@@ -61,6 +66,11 @@ export class WebTTSService {
       this.enabled = this.config.enabled !== false;
       console.log(`[WebTTS] Initialized with provider: ${this.config.provider}, enabled: ${this.enabled}`);
     }
+  }
+
+  /** Whether prompts (questions, input prompts) are spoken as well as story text. */
+  readsPrompts(): boolean {
+    return this.config?.readPrompts !== false;
   }
 
   isConfigured(): boolean {
