@@ -1,5 +1,110 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-24: The UX-evaluation release — safe renames, no blocking dialogs, settings scopes, encrypted keys, one asset system, a clearer Export menu (v0.9.102)
+
+### Overview
+
+The six remaining items from the August UX evaluation (UX-Eval-1.0 §4.C:
+B12, B4, B3, B7, B11, B6 — built in that agreed order), plus three smaller
+features: Help ▸ Report a Bug…, Apple Intelligence via macOS 27's `fm serve`
+on the Local provider, and a GitHub-project share. Renaming a character no
+longer breaks the story; the builder has no native alert/confirm left (102
+removed, lint-enforced) — news arrives as notices, undoable deletes carry
+Undo; settings split into **Project Settings** (travels with the project)
+and **App Preferences** (this computer); API keys in the desktop app moved
+out of plain-text localStorage into an encrypted machine store; images got
+the same doors as sounds; the character editor opens on who the character
+is; and the Export menu is organised by what the recipient does.
+
+### B12 — renaming a character keeps the story intact
+
+A speaker picked from the character list stores the character's id AND a
+copy of its name, and the player showed the copy — so renames left linked
+beats showing the old name and the TTS voice (keyed by name) stopped
+matching. The runtime now shows a linked speaker's current name
+(`Beat.linkedSpeakerName`, beats and dialog nodes). A rename is one undo
+step: character change, refreshed linked copies, voice moved. Free-text
+mentions of the old name are offered through the bulk-relink prompt in a
+rename variant, never changed silently. Finding: generated stories store
+speakers as free text, so the prompt is the common path.
+
+**Files modified:** `packages/core/src/beats/{Beat.ts,DialogTreeBeat.ts}`, `packages/builder/src/components/characters/{renameCharacter.ts,BulkRelinkDialog.tsx}`, `packages/builder/src/App.tsx`
+
+### B4 — no blocking dialogs
+
+`utils/notify.ts` (success/info/warning/error notices, errors sticky; one
+optional action) and `confirmAction()` (in-app, named buttons, Cancel
+focused on destructive ones), rendered by `NoticeHost` in every window.
+Undoable deletes (beats, VE elements, layout reset, characters, variants)
+lost their confirm and show "Deleted X · Undo", bound to that exact command
+(`utils/undoNotice`). Modals remain only where earned: deletes that break
+links, git history rewrites, layout switch, replacing the workspace,
+removing a translation / asset / animation / session. The Move-library
+chain became one confirm; the external-file-change alert became a sticky
+notice with **Reload from disk**. Multi-beat delete is one undo step.
+ESLint `no-alert` is an error in the builder; CLAUDE.md records the rule.
+
+**Files modified:** `packages/builder/src/utils/{notify.ts,undoNotice.ts,confirmBeatDelete.ts}`, `packages/builder/src/components/feedback/NoticeHost.tsx`, `packages/builder/src/main.tsx`, 29 call-site files, `eslint.config.js`, `CLAUDE.md`
+
+### B3 — settings scopes and encrypted keys
+
+One canonical `GlobalSettings` type (the settings panel's private copy had
+diverged). "Read text aloud in the exported player" is a project setting in
+the export dialog (was a device toggle; unset projects are seeded once from
+it). API keys (AI, TTS, STT, Brave) live in `<userData>/machine-store.json`,
+encrypted with Electron safeStorage — macOS Keychain, Windows Data
+Protection (per user account), Linux keyring — shared by all windows; the
+localStorage copy is migrated and deleted only after a confirmed write.
+**Project Settings** (renamed from Settings; ⌘,) vs new **App Preferences**
+(Tools / ⌘⌥,: providers, keys, updates, Claude Desktop MCP toggle — now
+also in the browser build). `tts.readPrompts` wired end to end (Preview and
+exported players agree), the project's suggested AI setup is visible and
+clearable, dead editor grid settings removed.
+
+**Files modified:** `packages/builder/src/storage/types.ts`, `apps/builder-desktop/src/main/{machineStore.ts,index.ts}`, `apps/builder-desktop/src/preload/index.ts`, `packages/builder/src/utils/{machineStorage.ts,keyStorageNote.ts,exportSpeech.ts}`, `packages/builder/src/components/settings/{AppPreferencesDialog.tsx,GlobalSettingsInspector.tsx}`, `packages/builder/src/hooks/{useAI,useTTS,useSTT}.ts`, `packages/player-web/src/{WebPlayer.tsx,WebTTSProvider.ts}`, `packages/builder/src/export/HtmlExporter.ts`
+
+### B7 — one asset system
+
+Background Image sits beside Background Sound in the Inspector (thumbnail,
+change, remove; same storage as the Visual Editor). The Character Editor's
+private image grid (no upload) is replaced by the shared picker. One
+accept-rule module for every file picker; one shared list of beats with a
+stage.
+
+**Files modified:** `packages/builder/src/components/Inspector.tsx`, `packages/builder/src/components/characters/CharacterEditor.tsx`, `packages/builder/src/components/assets/{AssetSelectionModal,AssetManager}.tsx`, `packages/builder/src/utils/{visualBeatTypes,assetAccept}.ts`
+
+### B11 — character editor basics
+
+The Basic tab opens with the portrait beside Display Name and Name ("Code
+Name" retired); the frozen ID is a footer line. States and Counters show
+in advanced mode or whenever the character uses them.
+
+**Files modified:** `packages/builder/src/components/characters/CharacterEditor.tsx`
+
+### B6 — Export menu by recipient; GitHub share
+
+**Publish for players** (Web page — a target list, `export/publishTargets`,
+where the planned app project is defined but hidden) and **Share for
+editing** (Project file — also your backup; Template; Share GitHub
+project…). The web export suggests one file or a folder from the story's
+media size and says why. Share GitHub project invites a collaborator by
+username (GitHub has no per-repository invite links) and copies a
+ready-to-send message.
+
+**Files modified:** `packages/builder/src/components/Header.tsx`, `packages/builder/src/export/{publishTargets,webExportMode}.ts`, `packages/builder/src/components/vcs/ShareGitHubDialog.tsx`, `packages/builder/src/utils/githubShare.ts`, `packages/builder/src/components/export/HtmlExportDialog.tsx`
+
+### Also in this release
+
+- **Help ▸ Report a Bug…** opens a GitHub issue form with version, build,
+  OS and runtime prefilled; **Known Issues** lists open bugs.
+- **Apple Intelligence (macOS 27)**: the Local provider explains `fm serve`;
+  every direct local call sends `stream:false` (fm streams otherwise).
+  Unverified on a real macOS 27.
+
+**Files modified:** `apps/builder-desktop/src/main/bugReport.ts`, `.github/ISSUE_TEMPLATE/`, `packages/builder/src/components/ai/AIConfigDialog.tsx`, `packages/builder/src/services/providers/OpenAIProvider.ts`
+
+---
+
 ## 2026-09-16: Electron 43 in the shipped app — the pin that drifted (v0.9.101)
 
 ### Overview

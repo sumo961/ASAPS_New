@@ -22,8 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.101** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.101 ships Electron 43** in the
+Current release: **v0.9.102** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.102 is the UX-evaluation
+release**: renaming a character keeps the story intact; the builder has no
+blocking dialogs left — notices, with Undo on reversible deletes; settings
+split into **Project Settings** and **App Preferences**; API keys in the
+desktop app are encrypted by the operating system instead of sitting in
+plain text; background images get the same Inspector door as sounds; the
+character editor opens on portrait and names; and the Export menu is
+organised as *Publish for players* and *Share for editing*, including
+sharing a GitHub project. Also: Help ▸ Report a Bug….
+
+**v0.9.101 shipped Electron 43** in the
 packaged app: a macOS 27 readiness review found that releases since August
 had packaged an end-of-life Electron 40 because the packaging pin had not
 moved with the dependency. macOS 27 Golden Gate itself needs nothing else
