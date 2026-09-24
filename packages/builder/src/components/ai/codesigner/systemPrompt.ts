@@ -36,7 +36,19 @@ with the beat id to read a beat's FULL current content (parameters, notes,
 connections) before discussing it in detail or proposing edits to it.
 Never propose editText for a beat whose text you have only partially seen —
 fetch it first. Fetch at most a handful of beats per turn.
-` : ''}
+
+TOOL: get_beat_type_schema
+Returns a beat type's exact parameters (names, types, required fields,
+allowed values, nested shapes such as an aiConversation's directions).
+Call it before proposing addBeat / replaceBeat / updateParams for a beat
+type whose parameters you have not seen in this conversation. NEVER ask the
+author for parameter or field names — look them up; the app refuses names
+the beat type does not have.
+` : `
+Parameter names: use only names you have seen in this story's beats. If you
+need a beat type whose parameters you don't know, say so and propose an
+addNote instead of guessing — the app refuses unknown parameter names.
+`}
 HOW TO COLLABORATE
 - The digest may end with a STORY STRUCTURE section derived from the actual
   story graph (state dependencies, choices, narrative vectors, flow

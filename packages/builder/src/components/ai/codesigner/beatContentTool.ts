@@ -10,6 +10,36 @@
  */
 
 import type { CoDesignerWireMessage } from './types';
+import { beatTypeReference } from '../../../utils/beatTypeReference';
+
+export const GET_BEAT_TYPE_SCHEMA_TOOL_NAME = 'get_beat_type_schema';
+
+/**
+ * get_beat_type_schema — a beat type's parameters (names, types, required,
+ * allowed values, nested item shapes) from the schema. Answered locally:
+ * the schema ships with the app, so there is no main-window round-trip.
+ */
+export const getBeatTypeSchemaToolSpec = {
+  name: GET_BEAT_TYPE_SCHEMA_TOOL_NAME,
+  description:
+    'Get the exact parameter names and shapes for one beat type (e.g. ' +
+    '"aiConversation", "dialogTree", "infoText"). Call it BEFORE proposing ' +
+    'addBeat, replaceBeat or updateParams for a beat type whose parameters ' +
+    'you have not already seen in this conversation — the app refuses ' +
+    'parameter names the beat type does not have. Never ask the author for ' +
+    'field names; look them up here.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      beatType: { type: 'string', description: 'Beat type id, e.g. "aiConversation".' },
+    },
+    required: ['beatType'],
+  },
+};
+
+export function getBeatTypeSchema(beatType: string): string {
+  return beatTypeReference(beatType);
+}
 
 export const GET_BEAT_CONTENT_TOOL_NAME = 'get_beat_content';
 

@@ -20,6 +20,9 @@ import {
 import { extractProposalsFromReply, describeProposal } from './proposalParsing';
 import {
   GET_BEAT_CONTENT_TOOL_NAME,
+  GET_BEAT_TYPE_SCHEMA_TOOL_NAME,
+  getBeatTypeSchemaToolSpec,
+  getBeatTypeSchema,
   fetchBeatContent,
   getBeatContentToolSpec,
   resolveBeatContentReply,
@@ -268,8 +271,18 @@ export function useCoDesigner() {
           result = await generateChatWithTools({
             systemPrompt,
             messages: transcript,
-            tools: [getBeatContentToolSpec],
+            tools: [getBeatContentToolSpec, getBeatTypeSchemaToolSpec],
             executeTool: async (name: string, input: any) => {
+              if (name === GET_BEAT_TYPE_SCHEMA_TOOL_NAME) {
+                const beatType = String(input?.beatType ?? '');
+                addMessage({
+                  role: 'assistant',
+                  content: '',
+                  kind: 'tool_use',
+                  toolMeta: { type: 'get_beat_type_schema', query: beatType, resultCount: 1 },
+                });
+                return getBeatTypeSchema(beatType);
+              }
               if (name !== GET_BEAT_CONTENT_TOOL_NAME) return `Unknown tool: ${name}`;
               const beatId = String(input?.beatId ?? '');
               addMessage({

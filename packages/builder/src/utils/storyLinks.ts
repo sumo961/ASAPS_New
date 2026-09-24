@@ -166,6 +166,10 @@ export function beatLinks(beat: any): StoryLink[] {
   push(out, id, p.fallbackExitTarget, 'param-target', 'Max turns', false, 'fallbackExitTarget');
   if (Array.isArray(p.directions)) {
     p.directions.forEach((d: any, di: number) => {
+      // The Inspector's flat form (actionExitTarget), which the beat converts
+      // to the nested one on load — written by the editor and by AI paths
+      // that follow the schema's itemSchema.
+      push(out, id, d?.actionExitTarget, 'param-target', d?.name || d?.id, false, `directions[${di}].actionExitTarget`);
       const action = d?.action;
       if (!action) return;
       push(out, id, action.exitTarget, 'param-target', d.name || d.id, false, `directions[${di}].action.exitTarget`);

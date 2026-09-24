@@ -5708,7 +5708,7 @@
         "fallbackExitTarget": {
           "type": "connection",
           "required": false,
-          "description": "Target beat when max turns reached"
+          "description": "Beat to go to when max turns are reached — the bare beat id as a string (e.g. \"beat_12\"), not a { target } object"
         },
         "includeVariables": {
           "type": "boolean",

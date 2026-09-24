@@ -22,7 +22,7 @@ import { beatLinks } from './storyLinks';
 const TARGET_KEYS = new Set([
   'target', 'targetId', 'next', 'defaultTarget', 'trueTarget', 'falseTarget',
   'trueConnection', 'falseConnection', 'timerTarget', 'failTarget', 'targetBeatId',
-  'exitTarget', 'fallbackExitTarget', 'fallbackTarget',
+  'exitTarget', 'actionExitTarget', 'fallbackExitTarget', 'fallbackTarget',
 ]);
 /** Arrays whose string entries are beat ids (randomTarget choices, QR jumps). */
 const TARGET_ARRAYS = new Set(['choices', 'qrJumpTargets']);

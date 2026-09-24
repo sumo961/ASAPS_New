@@ -14,6 +14,7 @@ import { applyStanceToTraits } from '../services/prompts/interpersonalStance';
 import { setSiteField, labelFieldOf, addOption, listWiringSites } from './choiceWiring';
 import { redirectIncoming, retargetValue } from './redirectIncoming';
 import { beatLinks } from './storyLinks';
+import { beatParameterProblem } from './beatTypeReference';
 import { describeEffect, describeCondition } from './wiringVocabulary';
 
 /** Effect types whose `target` names a character. */
@@ -138,6 +139,11 @@ export function applyChangeProposals(
             results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
             return;
           }
+          const paramProblem = beat.type ? beatParameterProblem(beat.type, p.params, false) : null;
+          if (paramProblem) {
+            results.push({ index, ok: false, detail: paramProblem });
+            return;
+          }
           ctx.updateBeat(p.beatId, { parameters: p.params });
           results.push({
             index, ok: true,
@@ -149,6 +155,11 @@ export function applyChangeProposals(
         case 'addBeat': {
           if (!knownTypes.has(p.beatType)) {
             results.push({ index, ok: false, detail: `Unknown beat type "${p.beatType}"` });
+            return;
+          }
+          const addProblem = beatParameterProblem(p.beatType, p.parameters ?? {}, true);
+          if (addProblem) {
+            results.push({ index, ok: false, detail: addProblem });
             return;
           }
           const anchor = p.connectFrom ? findBeat(p.connectFrom) : undefined;
@@ -281,6 +292,11 @@ export function applyChangeProposals(
           const beatType = p.beatType || old.type;
           if (!beatType || !knownTypes.has(beatType)) {
             results.push({ index, ok: false, detail: `Unknown beat type "${beatType}"` });
+            return;
+          }
+          const newProblem = beatParameterProblem(beatType, p.parameters, true);
+          if (newProblem) {
+            results.push({ index, ok: false, detail: newProblem });
             return;
           }
           // The new version's own links: to existing beats, or to the old id
