@@ -13,6 +13,7 @@
 
 import React from 'react';
 import { Sparkles, RotateCcw, History, Download, FilePlus } from 'lucide-react';
+import { notify } from '../../../utils/notify';
 
 interface IdeatorHeaderProps {
   onReset: () => void;
@@ -32,20 +33,18 @@ export const IdeatorHeader: React.FC<IdeatorHeaderProps> = ({
   disableReset,
   canExport,
 }) => {
+  // Both are reversible — the current conversation stays in Past
+  // Sessions — so no confirm, just say where it went (UX-Eval B4).
   const handleReset = () => {
     if (disableReset) return;
-    const confirmed = window.confirm(
-      'Reset the conversation? The current transcript will be discarded. (It will remain in Past Sessions until you delete it there.)'
-    );
-    if (confirmed) onReset();
+    onReset();
+    notify.info('Conversation reset. The previous one is in Past Sessions.');
   };
 
   const handleNew = () => {
     if (disableReset) return;
-    const confirmed = window.confirm(
-      'Start a new conversation? The current one will be saved in Past Sessions — you can come back to it any time.'
-    );
-    if (confirmed) onNewSession();
+    onNewSession();
+    notify.info('New conversation started. The previous one is in Past Sessions.');
   };
 
   return (

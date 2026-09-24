@@ -4,6 +4,7 @@ import App from './App';
 import { PersistenceProvider, usePersistence } from './contexts/PersistenceContext';
 import { TranslationProvider } from './contexts/TranslationContext';
 import { VCSStatusProvider } from './vcs/VCSStatusProvider';
+import { NoticeHost } from './components/feedback/NoticeHost';
 import './styles/main.css';
 
 /**
@@ -50,6 +51,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <VCSBridge>
           <App />
         </VCSBridge>
+        {/* App-wide notices + confirms (utils/notify.ts) — every window
+            (editor, Preview, pop-outs) renders through this entry point. */}
+        <NoticeHost />
       </TranslationProvider>
     </PersistenceProvider>
   </React.StrictMode>

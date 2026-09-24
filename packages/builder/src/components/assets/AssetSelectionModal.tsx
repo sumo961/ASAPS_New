@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Grid, List, Upload, ExternalLink, Search, Trash2 } from 'lucide-react';
 import type { Asset } from './AssetManager';
+import { confirmAction } from '../../utils/notify';
 
 interface AssetSelectionModalProps {
   isOpen: boolean;
@@ -248,11 +249,15 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
 
   // Per-item delete handler. Confirms first, then removes. Click handlers on
   // the card/row select the asset for use — stopPropagation prevents that.
-  const handleRemoveAsset = (e: React.MouseEvent, asset: Asset) => {
+  const handleRemoveAsset = async (e: React.MouseEvent, asset: Asset) => {
     e.stopPropagation();
-    if (confirm(`Remove "${asset.name}" from the project?`)) {
-      onAssetRemove(asset.id);
-    }
+    const ok = await confirmAction({
+      title: `Remove "${asset.name}" from the project?`,
+      message: 'Beats that use it will show a missing asset. This cannot be undone.',
+      confirmLabel: 'Remove asset',
+      destructive: true,
+    });
+    if (ok) onAssetRemove(asset.id);
   };
 
   // Get file accept string based on subType

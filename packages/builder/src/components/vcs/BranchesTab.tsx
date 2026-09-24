@@ -10,6 +10,7 @@ import {
   gitListRemotes, gitAddRemote,
   type GitBranch,
 } from '../../vcs/GitAdapter';
+import { confirmAction } from '../../utils/notify';
 
 export const BranchesTab: React.FC = () => {
   const vcs = useVCSStatus();
@@ -45,7 +46,11 @@ export const BranchesTab: React.FC = () => {
   const handleSwitch = useCallback(async (branchName: string) => {
     if (!vcs?.projectPath) return;
     if (vcs.isDirty) {
-      const confirmed = window.confirm('You have unsaved changes. Switch branch anyway?');
+      const confirmed = await confirmAction({
+        title: `Switch to "${branchName}"?`,
+        message: 'You have changes that are not committed yet. Commit them first to be sure they come back with this branch.',
+        confirmLabel: 'Switch anyway',
+      });
       if (!confirmed) return;
     }
     const result = await gitSwitchBranch(vcs.projectPath, branchName);
@@ -68,7 +73,10 @@ export const BranchesTab: React.FC = () => {
 
   const handleMerge = useCallback(async (branchName: string) => {
     if (!vcs?.projectPath) return;
-    const confirmed = window.confirm(`Merge "${branchName}" into current branch?`);
+    const confirmed = await confirmAction({
+      title: `Merge "${branchName}" into the current branch?`,
+      confirmLabel: 'Merge',
+    });
     if (!confirmed) return;
     const result = await gitMerge(vcs.projectPath, branchName);
     if (result.success) {

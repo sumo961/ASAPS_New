@@ -69,6 +69,7 @@ import type { Character } from '../../types/character';
 import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
+import { notifyUndoable } from '../../utils/undoNotice';
 
 
 /**
@@ -5169,6 +5170,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     `Delete ${elementToDelete?.type || 'element'}`
                   );
                   getCommandManager().pushWithoutExecute(cmd);
+                  notifyUndoable(`Deleted "${elementToDelete?.name || 'element'}".`);
                 }}
                 onElementAdd={(type) => {
                   const stageWidth = projectSettings?.width || 1024;
@@ -6850,12 +6852,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               // computed by initializeLocationsFromSchema. Useful when a
               // layout-math fix lands and the user wants to opt this beat
               // into the new defaults without deleting and re-adding it.
-              // Destructive (any manual edits are lost) — confirm first.
+              // Reversible: the reset is one undo step, so no confirm —
+              // the notice below carries an Undo button (UX-Eval B4).
               if (!beat) return;
-              const confirmed = window.confirm(
-                "Reset this beat's element positions to the default layout? Manual position edits on this beat will be lost. This goes into the undo history."
-              );
-              if (!confirmed) return;
               const params = beat.getParameters ? beat.getParameters() : {};
               // Clear the persisted locations so the initializer recomputes
               // from scratch (the function skips beats that already have
@@ -6873,6 +6872,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               setHasChanges(true);
               setSelectedElementIds([]);
               commitSnapshot('Reset layout to default');
+              notifyUndoable('Element positions reset to the default layout.');
             }}
           />
         )}

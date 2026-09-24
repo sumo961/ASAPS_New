@@ -16,6 +16,8 @@
  *      so they regenerate cleanly instead of rendering as nothing.
  */
 
+import { notify } from './notify';
+
 /** Canonical renderer location kinds (mirrors core Location['kind']). */
 const VALID_LOCATION_KINDS = new Set([
   'text', 'hotspot', 'prop', 'character', 'button',
@@ -135,15 +137,10 @@ export function notifyIfCorrupted(project: any): CorruptionReport {
   if (report.corrupted && !_notifiedProjects.has(id)) {
     _notifiedProjects.add(id);
     console.warn('[projectRepair] Auto-repaired corrupted project:', report.issues);
-    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-      try {
-        window.alert(
-          'This project had some corrupted data and was automatically repaired:\n\n• ' +
-          report.issues.join('\n• ') +
-          '\n\nSave the project to keep the repairs.'
-        );
-      } catch { /* headless / non-interactive — the console warning is enough */ }
-    }
+    notify.warning('This project had some damaged data, which was repaired automatically. Save the project to keep the repairs.', {
+      detail: '• ' + report.issues.join('\n• '),
+      sticky: true,
+    });
   }
   return report;
 }

@@ -25,6 +25,24 @@ import { getTTSService } from '../services/tts';
 import { useSTT } from '../hooks/useSTT';
 import { getSTTService } from '../services/stt';
 import { getLanguageDisplayName } from '../utils/languageCatalog';
+import { notify, confirmAction } from '../utils/notify';
+
+/**
+ * ASML 1.0 (XML) is frozen legacy (Tier-5 item 14): an export silently drops
+ * everything newer. One shared, in-app confirm for both legacy menu items.
+ */
+function confirmLegacyAsmlExport(): Promise<boolean> {
+  return confirmAction({
+    title: 'Export legacy ASML 1.0 (XML)?',
+    message:
+      'ASML 1.0 is kept for compatibility with the original ASAPS. ASAPS Modern\u2019s native format is ASML 2.0, '
+      + 'carried in the project file.\n\n'
+      + 'An XML export leaves out newer features \u2014 character variants and stances, affect (mood, sentiments, '
+      + 'traits), responsive slot layout, counter bindings, themes and more \u2014 and opening it later will not '
+      + 'restore them. For a complete copy, use Export Project (.asaps).',
+    confirmLabel: 'Export ASML 1.0 anyway',
+  });
+}
 
 interface HeaderProps {
   title: string;
@@ -245,7 +263,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleLoadProject = async (projectId: string) => {
     const success = await load(projectId);
     if (!success) {
-      alert('Failed to load project');
+      notify.error('Could not load the project.');
     }
   };
 
@@ -362,13 +380,10 @@ export const Header: React.FC<HeaderProps> = ({
               // (Save / Discard / Cancel) via the App-side interceptor, not a
               // 2-way confirm that can't express "discard".
               if (onInterceptNewProject && onInterceptNewProject()) return;
-              if (hasUnsavedChanges && onSave) {
-                const proceed = window.confirm(
-                  'You have unsaved changes in the current project. Save them before continuing?\n\nOK to save and continue, Cancel to stay here.'
-                );
-                if (!proceed) return;
-                onSave();
-              }
+              // Named project with unsaved edits: save, then continue. The
+              // old 2-way confirm only offered "save and continue" or "stay"
+              // \u2014 saving is the answer either way (UX-Eval B4).
+              if (hasUnsavedChanges && onSave) onSave();
               setShowNewProjectPicker(true);
             }}
             className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
@@ -566,18 +581,9 @@ export const Header: React.FC<HeaderProps> = ({
                     LEGACY — ASML 1.0 (XML)
                   </div>
                   <button
-                    onClick={() => {
-                      if (window.confirm(
-                        'ASML 1.0 (XML) is the legacy serialization, kept for compatibility with the original ASAPS. '
-                        + 'ASAPS Modern\u2019s native format is ASML 2.0 (JSON), carried in the project zip.\n\n'
-                        + 'An XML export does NOT include newer features: character variants and stances, '
-                        + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
-                        + 'and more. Opening this file later will not restore them.\n\n'
-                        + 'For a complete copy of your project, use "Export Project (.asaps)".\n\nExport ASML 1.0 anyway?'
-                      )) {
-                        onExport();
-                      }
+                    onClick={async () => {
                       setShowExportMenu(false);
+                      if (await confirmLegacyAsmlExport()) onExport();
                     }}
                     className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
                     title="Legacy: export as ASML 1.0 (XML) — newer features are not included"
@@ -587,18 +593,9 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                   {onExportAsmlWithAssets && (
                     <button
-                      onClick={() => {
-                        if (window.confirm(
-                          'ASML 1.0 (XML) is the legacy serialization, kept for compatibility with the original ASAPS. '
-                        + 'ASAPS Modern\u2019s native format is ASML 2.0 (JSON), carried in the project zip.\n\n'
-                          + 'An XML export does NOT include newer features: character variants and stances, '
-                          + 'affect (mood/sentiments/traits), responsive slot layout, counter bindings, themes, '
-                          + 'and more. Opening this file later will not restore them.\n\n'
-                          + 'For a complete copy of your project, use "Export Project (.asaps)".\n\nExport ASML 1.0 anyway?'
-                        )) {
-                          onExportAsmlWithAssets();
-                        }
+                      onClick={async () => {
                         setShowExportMenu(false);
+                        if (await confirmLegacyAsmlExport()) onExportAsmlWithAssets();
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-500 hover:bg-gray-50 transition-colors flex items-center gap-3"
                       title="Legacy: export ASML 1.0 (XML) with asset folders — newer features are not included"
@@ -1014,7 +1011,7 @@ export const Header: React.FC<HeaderProps> = ({
               if (!currentProjectId) return;
               const savedConfig = getSavedAIConfig();
               if (!savedConfig?.apiKey) {
-                alert('Please configure an AI provider with an API key in the AI Settings first.');
+                notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
                 return;
               }
               try {
@@ -1057,7 +1054,7 @@ export const Header: React.FC<HeaderProps> = ({
               if (!currentProjectId) return;
               const savedConfig = getSavedAIConfig();
               if (!savedConfig?.apiKey) {
-                alert('Please configure an AI provider with an API key in the AI Settings first.');
+                notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
                 return;
               }
               try {
@@ -1132,13 +1129,9 @@ export const Header: React.FC<HeaderProps> = ({
         // time the user clicks the prompt anyway, but the explicit
         // call protects the rare just-edited-then-jumped case.
         const guardCreate = (action: () => void) => {
-          if (hasUnsavedChanges && onSave) {
-            const proceed = window.confirm(
-              'You have unsaved changes in the current project. Save them before continuing?\n\nOK to save and continue, Cancel to stay here.'
-            );
-            if (!proceed) return;
-            onSave();
-          }
+          // Save-then-proceed without asking (the old confirm's only
+          // non-"stay" answer was "save and continue").
+          if (hasUnsavedChanges && onSave) onSave();
           action();
         };
         return (

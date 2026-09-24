@@ -18,6 +18,7 @@ import {
   Package,
   Mountain,
 } from 'lucide-react';
+import { notify, errorMessage } from '../../utils/notify';
 
 /**
  * Phase 3.3 — iOS-style multi-resource asset variant. Points to
@@ -178,7 +179,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
       const fileType = getFileTypeFromMime(blob.type);
 
       if (!fileType) {
-        alert('Unsupported file type from URL');
+        notify.warning('That URL is not a supported asset type.', { detail: blob.type || 'unknown type' });
         return;
       }
 
@@ -219,7 +220,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
       setShowUrlDialog(false);
     } catch (error) {
       console.error('Failed to load asset from URL:', error);
-      alert('Failed to load asset from URL. Please check the URL and try again.');
+      notify.error('Could not load an asset from that URL. Check the address and try again.', { detail: errorMessage(error) });
     }
   };
 

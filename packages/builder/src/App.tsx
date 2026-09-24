@@ -110,6 +110,8 @@ import { applyTranslationResource, extractCharacterDisplayNameTranslations } fro
 import { extractSpeakers } from './utils/speakerUtils';
 import { getTTSService } from './services/tts';
 import { getSavedTTSConfig } from './hooks/useTTS';
+import { notify, confirmAction, errorMessage } from './utils/notify';
+import { undoCommandAction } from './utils/undoNotice';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -1048,7 +1050,7 @@ function App() {
             } else if (newName.trim()) {
               return doImport({ generateNewId: true, newName: newName.trim() });
             } else {
-              alert('Please enter a valid name');
+              notify.warning('Enter a name for the imported project.');
               return;
             }
           }
@@ -1064,7 +1066,7 @@ function App() {
         await doImport({ generateNewId: false });
       } catch (error) {
         console.error('[Electron] Failed to open project:', error);
-        alert(`Failed to open project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        notify.error('Could not open the project.', { detail: errorMessage(error) });
       }
     };
 
@@ -1134,10 +1136,10 @@ function App() {
         const newProjectId = await saveCurrent(projectName);
         console.log('[Electron] Project saved with new ID:', newProjectId);
 
-        alert(`Project saved as "${projectName}"`);
+        notify.success(`Project saved as "${projectName}".`);
       } catch (error) {
         console.error('[Electron] Save As failed:', error);
-        alert(`Failed to save project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        notify.error('Could not save the project.', { detail: errorMessage(error) });
       }
     });
 
@@ -1189,13 +1191,13 @@ function App() {
           }
           resumeAutoSaveAfterLoadRef.current = false;
           resumeAutoSave();
-          alert('Failed to open project folder. Make sure it contains a valid ASAPS project.');
+          notify.error('Could not open that folder. Make sure it contains an ASAPS project.');
         }
       } catch (error) {
         console.error('[Electron] Failed to open project folder:', error);
         resumeAutoSaveAfterLoadRef.current = false;
         resumeAutoSave();
-        alert(`Failed to open project folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        notify.error('Could not open the project folder.', { detail: errorMessage(error) });
       }
     });
 
@@ -1209,22 +1211,20 @@ function App() {
           console.log('[Electron] Project saved as directory successfully');
           const currentVcs = vcsRef.current;
           if (!wasDirectory && currentVcs) {
-            setTimeout(() => {
-              alert('Project converted to folder format \u2014 version control is now available.');
-            }, 200);
+            notify.success('Project saved as a folder \u2014 version control is now available.', { detail: folderPath });
           } else {
-            alert(`Project saved to folder: ${folderPath}`);
+            notify.success('Project saved to folder.', { detail: folderPath });
           }
           // Initialize VCS tracking for the new directory
           if (currentVcs) {
             await currentVcs.initialize(folderPath);
           }
         } else {
-          alert('Failed to save project as folder.');
+          notify.error('Could not save the project as a folder.');
         }
       } catch (error) {
         console.error('[Electron] Failed to save as folder:', error);
-        alert(`Failed to save project as folder: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        notify.error('Could not save the project as a folder.', { detail: errorMessage(error) });
       }
     });
 
@@ -1238,7 +1238,9 @@ function App() {
       if (dir) {
         (window.electronAPI as any).shell?.showItemInFolder?.(dir);
       } else {
-        alert('This project lives in the app\u2019s own storage, not in a folder yet.\n\nUse File \u2192 Save As Folder\u2026 to give it one, or run "Move library to disk" in the Project Browser.');
+        notify.info('This project lives in the app\u2019s own storage, not in a folder yet.', {
+          detail: 'Use File \u2192 Save As Folder\u2026 to give it one, or run "Move library to disk" in the Project Browser.',
+        });
       }
     });
 
@@ -1308,7 +1310,10 @@ function App() {
   useEffect(() => {
     const handler = (e: Event) => {
       const dirPath = (e as CustomEvent).detail?.dirPath;
-      alert(`The project folder could not be found:\n${dirPath}\n\nThe project has been reverted to local storage mode. Re-open the folder to restore version control.`);
+      notify.warning('The project folder could not be found, so the project is back in the app\u2019s own storage. Re-open the folder to restore version control.', {
+        detail: dirPath,
+        sticky: true,
+      });
     };
     window.addEventListener('asaps:stale-directory', handler);
     return () => window.removeEventListener('asaps:stale-directory', handler);
@@ -1352,8 +1357,14 @@ function App() {
         resumeAutoSave();
       }
     };
+    // Same reload serves the external-change notice's "Reload from disk"
+    // action (PersistenceContext) — files changed by sync / git / an editor.
     window.addEventListener('asaps:git-reset', handler);
-    return () => window.removeEventListener('asaps:git-reset', handler);
+    window.addEventListener('asaps:reloadFromDisk', handler);
+    return () => {
+      window.removeEventListener('asaps:git-reset', handler);
+      window.removeEventListener('asaps:reloadFromDisk', handler);
+    };
   }, [projectFormat, projectPath, openDirectoryProject, pauseAutoSave, resumeAutoSave]);
 
   /**
@@ -2838,7 +2849,7 @@ function App() {
       }
     } catch (error) {
       console.error('[App] >>> FAILED to load project:', error);
-      alert('Failed to load project. See console for details.');
+      notify.error('Could not load the project.', { detail: errorMessage(error) });
     }
 
     // Resume auto-save if it was paused by the git-reset handler.
@@ -3030,7 +3041,11 @@ function App() {
     if (!beatToDelete) return;
 
     const cmd = new DeleteBeatCommand(beatToDelete, stableMutations.current);
-    getCommandManager().execute(cmd);
+    // Notice bound to THIS command once it is recorded (execute records
+    // after its async work) — "Deleted X · Undo" replaces confirm-first.
+    void getCommandManager().execute(cmd).then(() =>
+      notify.success(`Deleted "${beatToDelete.name || beatId}".`, { action: undoCommandAction(cmd) }),
+    );
     setSelectedBeat(null);
     markChanged();
     reportBrokenLinksAfterDelete(state.beats.filter(b => b.id !== beatId));
@@ -3327,15 +3342,25 @@ function App() {
     markChanged();
   }, [actions, state.beats, markChanged]);
 
-  /** Multi-beat delete (one undoable command per beat). */
+  /** Multi-beat delete — one undoable step for the whole selection. */
   const handleBeatsDelete = useCallback((beatIds: string[]) => {
     const idSet = new Set(beatIds);
     const toDelete = state.beats.filter(b => idSet.has(b.id));
     if (toDelete.length === 0) return;
-    for (const beat of toDelete) {
-      const cmd = new DeleteBeatCommand(beat, stableMutations.current);
-      getCommandManager().execute(cmd);
-    }
+    // One undo step for the whole selection (was one per beat, so ⌘Z
+    // restored them one at a time).
+    const batch = toDelete.length === 1
+      ? new DeleteBeatCommand(toDelete[0], stableMutations.current)
+      : new BatchCommand(
+          toDelete.map(beat => new DeleteBeatCommand(beat, stableMutations.current)),
+          `Delete ${toDelete.length} beats`,
+        );
+    void getCommandManager().execute(batch).then(() =>
+      notify.success(
+        toDelete.length === 1 ? `Deleted "${toDelete[0].name || toDelete[0].id}".` : `Deleted ${toDelete.length} beats.`,
+        { action: undoCommandAction(batch) },
+      ),
+    );
     setSelectedBeat(null);
     markChanged();
     reportBrokenLinksAfterDelete(state.beats.filter(b => !idSet.has(b.id)));
@@ -3401,7 +3426,12 @@ function App() {
     const safeBeatId = beatId.replace(/[^a-zA-Z0-9_-]/g, '_');
     const file = allFiles.find(f => f.includes(`_${beatId}.json`) || f.includes(`_${safeBeatId}.json`));
     if (file) {
-      const confirmed = window.confirm(`Revert changes to "${file}"? This cannot be undone.`);
+      const confirmed = await confirmAction({
+        title: 'Discard this beat\u2019s uncommitted changes?',
+        message: `${file} goes back to its last committed state. This cannot be undone.`,
+        confirmLabel: 'Discard changes',
+        destructive: true,
+      });
       if (confirmed) {
         await vcsCtx.revertFiles([file]);
       }
@@ -4152,7 +4182,7 @@ function App() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export story. See console for details.');
+      notify.error('Could not export the story.', { detail: errorMessage(error) });
     }
   }, [actions, state.title, assets, characters]);
 
@@ -4194,7 +4224,7 @@ function App() {
           loadedProjectIdRef.current = newProjectId;
           console.log('[App] ASML import - Created new project:', newProjectId, 'with title:', importedTitle);
 
-          alert('Story imported successfully!');
+          notify.success(`Imported "${importedTitle}".`);
         }
       } catch (error) {
         // Log full error details for debugging
@@ -4206,7 +4236,7 @@ function App() {
           console.error('Non-Error thrown:', JSON.stringify(error, null, 2));
         }
         const errorMsg = error instanceof Error ? error.message : String(error);
-        alert(`Failed to import story: ${errorMsg}`);
+        notify.error('Could not import the story.', { detail: errorMsg });
       }
     };
 
@@ -4387,28 +4417,32 @@ function App() {
       console.log(`[App] ASML import - Reassociated ${migratedCount} assets from ${tempProjectId} to ${newProjectId}`);
 
       // Show summary
-      let message = 'Story imported successfully!';
+      const details: string[] = [];
+      let problems = false;
       if (importResult.assetStats) {
         const stats = importResult.assetStats;
-        message += `\n\nAssets imported:`;
-        message += `\n- Backgrounds: ${stats.backgroundsImported}`;
-        message += `\n- Props: ${stats.propsImported}`;
-        message += `\n- Sounds: ${stats.soundsImported}`;
-        message += `\n- Characters: ${stats.charactersCreated} (${stats.characterImagesImported} images)`;
+        details.push(
+          `Backgrounds ${stats.backgroundsImported} · Props ${stats.propsImported} · Sounds ${stats.soundsImported} · `
+          + `Characters ${stats.charactersCreated} (${stats.characterImagesImported} images)`,
+        );
         if (stats.totalFilesMissing > 0) {
-          message += `\n\nWarning: ${stats.totalFilesMissing} files were not found`;
+          details.push(`${stats.totalFilesMissing} file${stats.totalFilesMissing === 1 ? ' was' : 's were'} not found.`);
+          problems = true;
         }
       }
       if (importResult.errors.length > 0) {
-        message += `\n\nWarnings: ${importResult.errors.length} issues`;
+        details.push(`${importResult.errors.length} import warning${importResult.errors.length === 1 ? '' : 's'} (details in the console).`);
         console.warn('Import warnings:', importResult.errors);
+        problems = true;
       }
-
-      alert(message);
+      (problems ? notify.warning : notify.success)(
+        problems ? 'Story imported, with some problems.' : 'Story imported.',
+        { detail: details.join('\n') || undefined, sticky: problems },
+      );
     } catch (error) {
       console.error('Import failed:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      alert(`Failed to import story: ${errorMsg}`);
+      notify.error('Could not import the story.', { detail: errorMsg });
     }
 
     // Clear import state
@@ -4535,18 +4569,19 @@ function App() {
 
       // Show success message with stats
       const warningCount = result.warnings.length;
-      let message = `Successfully imported "${result.title}" with ${result.beats.length} beats.`;
-      if (warningCount > 0) {
-        message += `\n\n${warningCount} warnings during import. Check console for details.`;
-        console.log('[Twine Import] Warnings:', result.warnings);
-      }
-      alert(message);
+      if (warningCount > 0) console.log('[Twine Import] Warnings:', result.warnings);
+      (warningCount > 0 ? notify.warning : notify.success)(
+        `Imported "${result.title}" with ${result.beats.length} beats.`,
+        warningCount > 0
+          ? { detail: `${warningCount} import warning${warningCount === 1 ? '' : 's'} (details in the console).` }
+          : undefined,
+      );
     } catch (error) {
       console.error('Twine import failed:', error);
       // Clear pending flag on error
       pendingNewProjectIdRef.current = null;
       const errorMsg = error instanceof Error ? error.message : String(error);
-      alert(`Failed to import Twine story: ${errorMsg}`);
+      notify.error('Could not import the Twine story.', { detail: errorMsg });
     }
   }, [actions, saveCurrent]);
 
@@ -4559,7 +4594,7 @@ function App() {
 
   const handleExportZip = useCallback(async () => {
     if (!currentProject) {
-      alert('No project loaded. Please save or create a project first.');
+      notify.warning('Open or create a project first.');
       return;
     }
 
@@ -4570,10 +4605,10 @@ function App() {
       // Then export as ZIP
       await downloadProjectAsZip(currentProject.id, currentProject.name);
 
-      alert('Project exported successfully!');
+      notify.success(`Exported "${currentProject.name}" as a project file.`);
     } catch (error) {
       console.error('ZIP export failed:', error);
-      alert('Failed to export project as ZIP. See console for details.');
+      notify.error('Could not export the project file.', { detail: errorMessage(error) });
     }
   }, [currentProject, saveNow]);
 
@@ -4581,17 +4616,17 @@ function App() {
   // importing the file gets their own copy; the master is never edited.
   const handleExportTemplate = useCallback(async () => {
     if (!currentProject) {
-      alert('No project loaded. Please save or create a project first.');
+      notify.warning('Open or create a project first.');
       return;
     }
 
     try {
       await saveNow();
       await downloadProjectAsZip(currentProject.id, currentProject.name, { asTemplate: true });
-      alert('Template exported. Anyone who imports this .asapst file gets their own copy of the project — the file itself is never edited.');
+      notify.success('Template exported.', { detail: 'Anyone who opens this .asapst file gets their own copy of the project \u2014 the file itself is never edited.' });
     } catch (error) {
       console.error('Template export failed:', error);
-      alert('Failed to export template. See console for details.');
+      notify.error('Could not export the template.', { detail: errorMessage(error) });
     }
   }, [currentProject, saveNow]);
 
@@ -4615,10 +4650,10 @@ function App() {
         storedAssets
       );
 
-      alert('ASML with assets exported successfully!');
+      notify.success('Exported ASML 1.0 with assets.');
     } catch (error) {
       console.error('Export ASML with assets failed:', error);
-      alert('Failed to export ASML with assets. See console for details.');
+      notify.error('Could not export ASML with assets.', { detail: errorMessage(error) });
     }
   }, [actions, assets, characters, state.title, currentProject]);
 
@@ -4646,14 +4681,14 @@ function App() {
         } else if (choice.trim()) {
           return doImport({ generateNewId: true, newName: choice.trim() });
         } else {
-          alert('Please enter a valid name or "OVERWRITE"');
+          notify.warning('Enter a new name, or OVERWRITE to replace the existing project.');
           return;
         }
       }
 
       if (result.success && result.projectId) {
         await loadProject(result.projectId);
-        alert('Project imported successfully!');
+        notify.success('Project opened.');
       } else if (result.error) {
         throw new Error(result.error);
       }
@@ -4663,7 +4698,7 @@ function App() {
       await doImport({ generateNewId: false, ...(importOptions ?? {}) });
     } catch (error) {
       console.error('ZIP import failed:', error);
-      alert(`Failed to import project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      notify.error('Could not open the project file.', { detail: errorMessage(error) });
     }
   }, [loadProject]);
   handleImportZipFileRef.current = handleImportZipFile;
@@ -4754,7 +4789,7 @@ function App() {
   // Toggle preview window (separate window mode)
   const handleTogglePreviewWindow = useCallback(() => {
     if (state.beats.length === 0) {
-      alert('Please add some beats to your story first!');
+      notify.info('Add some beats to your story first \u2014 then the preview has something to play.');
       return;
     }
 
@@ -5242,7 +5277,7 @@ function App() {
    * confirmation with the per-beat summary, then commits both the
    * setting and the migrated beats in one user-visible step.
    */
-  const handleRequestLayoutModeChange = useCallback((target: 'fixed' | 'responsive') => {
+  const handleRequestLayoutModeChange = useCallback(async (target: 'fixed' | 'responsive') => {
     const current = resolveLayoutMode(globalSettings, state.beats);
     if (current === target) return;
     const projectWidth = globalSettings?.project?.width || 1024;
@@ -5274,12 +5309,12 @@ function App() {
       ? `\n  …and ${result.summary.length - 8} more`
       : '';
     const message =
-      `Switch to ${targetLabel}?\n\n` +
       (changeCount > 0
         ? `${changeCount} beat${changeCount === 1 ? '' : 's'} will be migrated:\n${preview}${overflow}\n\n`
-        : 'No beats need changes — only the project flag will be updated.\n\n') +
-      'This is undoable but destructive — make sure you have a save.';
-    if (!window.confirm(message)) return;
+        : 'No beats need changes \u2014 only the project setting changes.\n\n') +
+      'Undo reverts it, but the migration rewrites element positions \u2014 make sure you have a save.';
+    // Layout-mode switch is one of the few decisions that earns a modal (§3.6).
+    if (!(await confirmAction({ title: `Switch to ${targetLabel}?`, message, confirmLabel: `Switch to ${targetLabel}` }))) return;
 
     const oldSettings = globalSettings;
     const newSettings: any = {
@@ -5396,7 +5431,7 @@ function App() {
           console.log('[App] Saved beats to new project');
         }
 
-        alert('Project saved successfully!');
+        notify.success(`Project saved as "${name}".`);
         return;
       }
 
@@ -5408,10 +5443,10 @@ function App() {
       // convergence rule as the Browser card's rename-in-place.
       actions.setTitle(name);
       await saveCurrent(name, description);
-      alert('Project saved successfully!');
+      notify.success(`Project saved as "${name}".`);
     } catch (error) {
       console.error('Failed to save project:', error);
-      alert('Failed to save project. Please try again.');
+      notify.error('Could not save the project. Please try again.', { detail: errorMessage(error) });
     }
   }, [saveCurrent, currentProject, createProject, syncProjectData, setIsUntitledProject, storage, actions]);
 
@@ -5695,12 +5730,13 @@ function App() {
     // Ask before replacing a non-empty workspace.
     const existingBeatCount = beatsRef.current.length;
     if (existingBeatCount > 0) {
-      const ok = window.confirm(
-        `Load the generated story "${storyTitle}" now?\n\n` +
-        `This replaces the current workspace (${existingBeatCount} beat${existingBeatCount === 1 ? '' : 's'}) ` +
-        `with the generated story as a new project.\n` +
-        `Your current project is kept in the Project Library.`
-      );
+      const ok = await confirmAction({
+        title: `Open the generated story "${storyTitle}"?`,
+        message: `It opens as a new project in place of the current workspace (${existingBeatCount} beat${existingBeatCount === 1 ? '' : 's'}). `
+          + 'Your current project stays in the Project Library.',
+        confirmLabel: 'Open generated story',
+        cancelLabel: 'Keep current workspace',
+      });
       if (!ok) {
         console.log('[App] Generated story discarded — user kept the current workspace');
         return;
@@ -5774,9 +5810,7 @@ function App() {
       console.log('[App] Ideator submitted request:', request);
       const aiService = getAIService();
       if (!aiService.isReady()) {
-        alert(
-          'AI service is not configured. Open AI → Configure AI and add an API key before using Ideator.'
-        );
+        notify.warning('AI is not set up yet. Open AI \u2192 Configure AI and add an API key, then send the Ideator request again.', { sticky: true });
         return;
       }
 
@@ -5793,7 +5827,7 @@ function App() {
         console.error('[App] Ideator handoff failed:', error);
         const message = error instanceof Error ? error.message : String(error);
         ideatorWindowManager.notifyGenerationFailed(message);
-        alert(`Failed to generate story from Ideator prompt:\n${message}`);
+        notify.error('Could not generate the story from the Ideator request.', { detail: message });
       }
     },
     [handleStoryGenerated, markChanged]
@@ -7082,7 +7116,7 @@ function App() {
                 resumeAutoSaveAfterLoadRef.current = false;
                 resumeAutoSave();
                 console.warn('[App] Not a valid ASAPS directory project:', clonedPath);
-                alert('Repository cloned successfully!\n\nNote: This does not appear to be an ASAPS directory-format project.');
+                notify.warning('Repository cloned, but it does not look like an ASAPS project folder.', { detail: clonedPath, sticky: true });
               }
               // VCS will be auto-initialized by the projectFormat/projectPath effect
               console.log('[App] Post-clone setup complete (VCS auto-init will follow)');
@@ -7090,7 +7124,7 @@ function App() {
               resumeAutoSaveAfterLoadRef.current = false;
               resumeAutoSave();
               console.error('[App] Failed to open cloned project:', error);
-              alert(`Failed to open cloned project: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              notify.error('The repository was cloned but could not be opened.', { detail: errorMessage(error) });
             }
           }}
           onClose={() => setShowCloneRepoDialog(false)}
@@ -7113,7 +7147,7 @@ function App() {
               resumeAutoSaveAfterLoadRef.current = false;
               resumeAutoSave();
               console.error('[App] Failed to open newly-created GitHub project:', error);
-              alert(`Project was created but failed to open: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              notify.error('The GitHub project was created but could not be opened.', { detail: errorMessage(error) });
             }
           }}
         />

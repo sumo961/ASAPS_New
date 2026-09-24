@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { gitLog, getGitStatus, type GitLogEntry } from '../../vcs/GitAdapter';
+import { confirmAction } from '../../utils/notify';
 
 interface HistoryTabProps {
   onViewDiff?: (filePath: string, ref?: string) => void;
@@ -57,9 +58,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onViewDiff, filterFile }
     if (untrackedCount > 0) parts.push(`${untrackedCount} untracked file(s) will be DELETED`);
     const detail = parts.length > 0 ? `\n\n${parts.join('\n')}` : '';
 
-    const confirmed = window.confirm(
-      `Reset to commit ${commitHash.substring(0, 7)}?\n\nThis will discard ALL uncommitted changes and cannot be undone.${detail}`
-    );
+    const confirmed = await confirmAction({
+      title: `Reset to commit ${commitHash.substring(0, 7)}?`,
+      message: `This discards all uncommitted changes and cannot be undone.${detail}`,
+      confirmLabel: 'Reset',
+      destructive: true,
+    });
     if (!confirmed) return;
 
     setIsResetting(true);

@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { Save, X, FolderOpen } from 'lucide-react';
+import { notify, errorMessage } from '../utils/notify';
 
 export interface SaveProjectDialogProps {
   /** Open/closed state */
@@ -34,7 +35,7 @@ export const SaveProjectDialog: React.FC<SaveProjectDialogProps> = ({
 
   const handleSave = async () => {
     if (!projectName.trim()) {
-      alert('Please enter a project name');
+      notify.warning('A project needs a name.');
       return;
     }
     setIsSaving(true);
@@ -45,7 +46,7 @@ export const SaveProjectDialog: React.FC<SaveProjectDialogProps> = ({
       onClose();
     } catch (error) {
       console.error('[SaveProjectDialog] Failed to save project:', error);
-      alert('Failed to save project. Please try again.');
+      notify.error('Could not save the project. Please try again.', { detail: errorMessage(error) });
     } finally {
       setIsSaving(false);
     }

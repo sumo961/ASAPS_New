@@ -11,6 +11,7 @@ import {
   listSessions,
   type CoDesignerSession,
 } from './coDesignerSessionStore';
+import { confirmAction } from '../../../utils/notify';
 
 interface CoDesignerSessionsPanelProps {
   open: boolean;
@@ -71,7 +72,13 @@ export const CoDesignerSessionsPanel: React.FC<CoDesignerSessionsPanelProps> = (
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!window.confirm('Delete this conversation permanently?')) return;
+      const ok = await confirmAction({
+        title: 'Delete this conversation?',
+        message: 'It is removed from this machine permanently.',
+        confirmLabel: 'Delete conversation',
+        destructive: true,
+      });
+      if (!ok) return;
       await deleteSession(id);
       void reload();
     },

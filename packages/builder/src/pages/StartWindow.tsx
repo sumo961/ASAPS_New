@@ -19,6 +19,7 @@
 import React from 'react';
 import { ProjectLibrary } from '../components/ProjectLibrary';
 import { importProjectFromZip } from '../utils/projectZipManager';
+import { notify, errorMessage } from '../utils/notify';
 
 // macOS Electron uses `titleBarStyle: 'hiddenInset'` which puts the
 // red/yellow/green traffic-light buttons inside the content area at
@@ -89,10 +90,10 @@ export const StartWindow: React.FC = () => {
       if (result.success && result.projectId) {
         dispatchPick({ openProject: result.projectId });
       } else if (result.error) {
-        alert(`Import failed: ${result.error}`);
+        notify.error('Import failed', { detail: result.error });
       }
     } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      notify.error('Import failed', { detail: errorMessage(err) });
     }
   };
 

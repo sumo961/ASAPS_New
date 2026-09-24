@@ -12,6 +12,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Folder, Library } from 'lucide-react';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import type { Project } from '../storage/types';
+import { notify } from '../utils/notify';
 
 export interface ProjectSelectorProps {
   /** Called when user wants to open full project library */
@@ -96,7 +97,7 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
     setIsOpen(false);
     const success = await load(projectId);
     if (!success) {
-      alert('Failed to load project');
+      notify.error('Could not load the project.');
     }
   };
 

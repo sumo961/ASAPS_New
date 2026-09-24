@@ -54,6 +54,16 @@ export default tseslint.config(
     }
   },
   {
+    // UX-Eval B4: native alert() / confirm() / prompt() block every window
+    // and interrupt for news the UI can show ambiently. Use
+    // packages/builder/src/utils/notify.ts (notify.* / confirmAction).
+    files: ['packages/builder/src/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
+    rules: {
+      'no-alert': 'error'
+    }
+  },
+  {
     ignores: [
       '**/dist/**',
       '**/build/**',

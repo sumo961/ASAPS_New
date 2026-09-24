@@ -172,6 +172,7 @@ interface InspectorProps {
 // third edge because multiChoice was missing from this list while its sibling
 // movementChoice was in it). Single source for both save paths.
 import { PARAMETER_DERIVED_TYPES } from '../utils/beatConnectionModel';
+import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 
 const MIN_INSPECTOR_WIDTH = 280;
 const DEFAULT_INSPECTOR_WIDTH = 320;
@@ -1697,11 +1698,12 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     // Confirm ONLY when the delete breaks links elsewhere — a clean delete
-    // is undoable (⌘Z) and needs no interruption.
+    // is undoable (⌘Z, and the "Deleted … · Undo" notice) and needs no
+    // interruption.
     const impact = describeDeleteImpact?.([beat.id]);
-    if (!impact || window.confirm(`Delete "${beat.name}"?\n\n${impact}`)) {
+    if (!impact || await confirmBeatDelete(`Delete "${beat.name}"?`, impact)) {
       onDelete(beat.id);
     }
   };

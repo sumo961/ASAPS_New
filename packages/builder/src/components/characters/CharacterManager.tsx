@@ -23,6 +23,8 @@ import { CharacterEditor } from './CharacterEditor';
 import type { HudOverlaySettings } from './HudLayoutPreview';
 import { EmotionPaletteEditor } from './EmotionPaletteEditor';
 import { DEFAULT_EMOTION_PALETTE, matchPersonalityArchetype, type EmotionDefinition } from '@asaps/core';
+import { notify, errorMessage } from '../../utils/notify';
+import { notifyUndoable } from '../../utils/undoNotice';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -279,10 +281,8 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   const handleVariantRemove = (character: Character, variantId: string) => {
     const variant = character.variants?.find((v) => v.id === variantId);
     if (!variant) return;
-    const ok = confirm(
-      `Remove variant "${variant.name || variantId}" from ${character.displayName || character.name}?\n\nThe variant's overrides (traits, mood, portrait) will be lost. Other variants and the base character are unaffected.`,
-    );
-    if (!ok) return;
+    // Undoable (character edits are one undo step) — no confirm; the
+    // notice below carries Undo (UX-Eval B4).
     const nextVariants = (character.variants || []).filter((v) => v.id !== variantId);
     const updated: Character = {
       ...character,
@@ -291,17 +291,21 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
       updatedAt: new Date().toISOString(),
     };
     onCharactersChange(characters.map((c) => (c.id === character.id ? updated : c)));
+    notifyUndoable(`Removed variant "${variant.name || variantId}" from ${character.displayName || character.name}.`);
   };
 
   const handleCharacterRemove = (id: string) => {
     const target = characters.find((c: Character) => c.id === id);
     const label = target ? `"${target.displayName || target.name}"` : 'this character';
-    if (confirm(`Remove character ${label}?\n\nBeats that reference it as a speaker keep the name but lose the character's settings.`)) {
-      onCharactersChange(characters.filter((c: Character) => c.id !== id));
-      if (selectedCharacter?.id === id) {
-        selectCharacter(null);
-      }
+    // Undoable — no confirm; the notice carries Undo (UX-Eval B4).
+    onCharactersChange(characters.filter((c: Character) => c.id !== id));
+    if (selectedCharacter?.id === id) {
+      selectCharacter(null);
     }
+    notifyUndoable(
+      `Removed character ${label}.`,
+      'Beats that use it as a speaker keep the name but lose the character\u2019s settings.',
+    );
   };
 
   const handleImport = () => {
@@ -316,9 +320,9 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           try {
             const importedCharacters = JSON.parse(event.target?.result as string);
             onCharactersChange([...characters, ...importedCharacters]);
-            alert('Characters imported successfully!');
+            notify.success(`Imported ${Array.isArray(importedCharacters) ? importedCharacters.length : 0} character${Array.isArray(importedCharacters) && importedCharacters.length === 1 ? '' : 's'}.`);
           } catch (error) {
-            alert('Failed to import characters. Please check the file format.');
+            notify.error('Could not import characters \u2014 the file is not a character list.', { detail: errorMessage(error) });
           }
         };
         reader.readAsText(file);

@@ -12,6 +12,7 @@ import { MissingAssetsDialog } from './MissingAssetsDialog';
 import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
+import { notify } from '../../utils/notify';
 
 interface GlobalSettings {
   project: {
@@ -267,7 +268,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
         setMissingAssetsResult(result);
       } else {
         // Brief success feedback — no missing assets
-        alert(`All ${result.valid.length} assets are present.`);
+        notify.success(`All ${result.valid.length} assets are present.`);
       }
     } catch (err) {
       console.error('[GlobalSettingsInspector] Asset validation failed:', err);

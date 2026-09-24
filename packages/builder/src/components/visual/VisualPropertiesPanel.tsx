@@ -2211,9 +2211,8 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Delete "${element.name}"?`)) {
-                              onElementDelete(element.id);
-                            }
+                            // Undoable — VisualWorkspace shows "Deleted … · Undo".
+                            onElementDelete(element.id);
                           }}
                           className="p-1 hover:bg-red-50 rounded"
                           title="Delete"

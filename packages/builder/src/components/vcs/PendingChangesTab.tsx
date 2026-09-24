@@ -7,6 +7,7 @@ import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { gitConfigSet, gitConfigGet, gitStage, gitStageAll } from '../../vcs/GitAdapter';
 import type { GitFileStatus } from '../../vcs/GitAdapter';
 import { useTranslationState } from '../../contexts/TranslationContext';
+import { confirmAction } from '../../utils/notify';
 
 const statusIcons: Record<string, { icon: string; color: string }> = {
   M: { icon: 'M', color: '#f59e0b' },
@@ -63,7 +64,12 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
 
   const handleRevert = useCallback(async (files: string[]) => {
     if (!vcs) return;
-    const confirmed = window.confirm(`Discard changes to ${files.length} file(s)? This cannot be undone.`);
+    const confirmed = await confirmAction({
+      title: `Discard changes to ${files.length === 1 ? '1 file' : `${files.length} files`}?`,
+      message: 'The files go back to their last committed state. This cannot be undone.',
+      confirmLabel: 'Discard changes',
+      destructive: true,
+    });
     if (confirmed) {
       const result = await vcs.revertFiles(files);
       if (result.success) {
@@ -79,9 +85,12 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     if (!vcs?.cleanUntrackedFiles) return;
     const fileList = files.slice(0, 10).join('\n  ');
     const suffix = files.length > 10 ? `\n  ...and ${files.length - 10} more` : '';
-    const confirmed = window.confirm(
-      `Delete ${files.length} untracked file(s)? This cannot be undone.\n\n  ${fileList}${suffix}`
-    );
+    const confirmed = await confirmAction({
+      title: `Delete ${files.length === 1 ? '1 untracked file' : `${files.length} untracked files`}?`,
+      message: `These files were never committed, so this cannot be undone.\n\n  ${fileList}${suffix}`,
+      confirmLabel: 'Delete files',
+      destructive: true,
+    });
     if (confirmed) {
       await vcs.cleanUntrackedFiles(files);
     }

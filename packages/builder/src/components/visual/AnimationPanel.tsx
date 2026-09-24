@@ -15,6 +15,7 @@ import { SlotAnimationsEditor } from './SlotAnimationsEditor';
 import { Play, Edit, Trash2, Plus } from 'lucide-react';
 import type { VisualElement } from './VisualBeatEditor';
 import type { Character } from '../../types/character';
+import { notify, confirmAction } from '../../utils/notify';
 
 interface AnimationPanelProps {
   /** Current animations for this beat */
@@ -97,7 +98,7 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
 
   const handleAddAnimation = () => {
     if (!selectedElementId) {
-      alert('Please select an element to animate');
+      notify.warning('Select an element to animate first.');
       return;
     }
 
@@ -111,8 +112,14 @@ export const AnimationPanel: React.FC<AnimationPanelProps> = ({
     setIsEditorOpen(true);
   };
 
-  const handleDeleteAnimation = (animationId: string) => {
-    if (confirm('Are you sure you want to delete this animation?')) {
+  const handleDeleteAnimation = async (animationId: string) => {
+    const ok = await confirmAction({
+      title: 'Delete this animation?',
+      message: 'Animations are not part of the undo history, so this cannot be undone.',
+      confirmLabel: 'Delete animation',
+      destructive: true,
+    });
+    if (ok) {
       onAnimationsChange(animations.filter(a => a.id !== animationId));
     }
   };

@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Compass, FilePlus, History, RefreshCw } from 'lucide-react';
+import { notify } from '../../../utils/notify';
 
 interface CoDesignerHeaderProps {
   projectTitle?: string;
@@ -26,12 +27,11 @@ export const CoDesignerHeader: React.FC<CoDesignerHeaderProps> = ({
   onOpenSessions,
   disableActions,
 }) => {
+  // Reversible — the current conversation stays in Past Sessions.
   const handleNew = () => {
     if (disableActions) return;
-    const confirmed = window.confirm(
-      'Start a new conversation? The current one stays in Past Sessions — you can come back to it any time.'
-    );
-    if (confirmed) onNewSession();
+    onNewSession();
+    notify.info('New conversation started. The previous one is in Past Sessions.');
   };
 
   return (

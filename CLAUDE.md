@@ -263,6 +263,9 @@ the AI-generation guidance is part of that change, not a follow-up:
 ### Prefer Signal-Based Over Time-Based Solutions
 Never use `setTimeout` or arbitrary delays to coordinate between async operations. Use deterministic signals instead — ref flags, events, callbacks, or promises. Time-based solutions are fragile and break with slow connections, large projects, or varying system performance. For example, use a ref flag that one operation sets and another checks, rather than assuming "2 seconds is enough."
 
+### No Native alert() / confirm() / prompt()
+They freeze every window and interrupt for news the UI can show ambiently (UX-Eval B4; `no-alert` is an ESLint error in the builder). Use `packages/builder/src/utils/notify.ts`: `notify.success/info/warning/error` for news (errors stay until dismissed), `notifyUndoable` / `undoCommandAction(cmd)` for a "Deleted X · Undo" notice instead of confirm-before-delete on anything undoable, and `await confirmAction({...})` only where a modal is earned (data that cannot come back, git history rewrites, layout-mode switch, replacing the workspace, deletes that break links). Name the confirm button after the action, never "OK".
+
 ### Prefer Schema-Driven Over Hardcoded Logic
 Use a single source of truth whenever possible. UI components like the beat inspector should be built dynamically from the beat schema (`beat-definitions/core-beats.json`) rather than having hardcoded conditional sections for every beat type. When a new beat type is added or a parameter changes, only the schema should need updating — the UI should adapt automatically. This applies broadly: prefer data-driven rendering, validation, and behavior over scattered if/else or switch/case blocks tied to specific types.
 

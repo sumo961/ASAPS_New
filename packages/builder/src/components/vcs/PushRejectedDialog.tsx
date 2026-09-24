@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { gitPull, gitPush } from '../../vcs/GitAdapter';
 import { MergeConflictDialog } from './MergeConflictDialog';
+import { confirmAction } from '../../utils/notify';
 
 interface PushRejectedDialogProps {
   errorMessage: string;
@@ -35,12 +36,14 @@ export const PushRejectedDialog: React.FC<PushRejectedDialogProps> = ({ errorMes
 
   const handleForcePush = async () => {
     if (!vcs?.forcePush) return;
-    const confirmed = window.confirm(
-      'Force push will overwrite the remote history with your local state.\n\n' +
-      'This is safe after a reset (to sync the remote with your restored state), ' +
-      'but destructive if others have pushed commits you don\'t have.\n\n' +
-      'Continue with force push?'
-    );
+    const confirmed = await confirmAction({
+      title: 'Force push?',
+      message: 'Force push overwrites the remote history with your local state. '
+        + 'That is safe after a reset, to bring the remote in line with your restored state, '
+        + 'but it destroys any commits others have pushed that you don\u2019t have.',
+      confirmLabel: 'Force push',
+      destructive: true,
+    });
     if (!confirmed) return;
     setError(null);
     setPhase('pushing');

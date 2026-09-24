@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Link, X, Palette, Underline as UnderlineIcon } from 'lucide-react';
 import { Beat } from '@asaps/core';
+import { notify } from '../utils/notify';
 
 /**
  * Word-based hyperlink format (canonical storage format)
@@ -125,7 +126,7 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
     );
 
     if (hasExisting) {
-      alert('This word already has a hyperlink.');
+      notify.info(`"${selection.word}" already has a hyperlink.`);
       setSelection(null);
       return;
     }

@@ -24,6 +24,7 @@ import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
 import { CLUSTER_HEADER_H } from './graphStyle';
 import { resolveBeatDrop, toContentRelative, clusterAt } from './clusterDrop';
+import { confirmBeatDelete } from '../../utils/confirmBeatDelete';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -577,15 +578,20 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           // delete is undoable (⌘Z) and needs no interruption.
           if (multiTarget && onBeatsDelete) {
             const impact = describeDeleteImpact?.(multiTarget);
-            if (!impact || window.confirm(`Delete ${multiTarget.length} selected beats?\n\n${impact}`)) {
-              onBeatsDelete(multiTarget);
-            }
+            void (async () => {
+              if (!impact || await confirmBeatDelete(`Delete ${multiTarget.length} selected beats?`, impact)) {
+                onBeatsDelete(multiTarget);
+              }
+            })();
           } else if (contextMenu.beatId && onBeatDelete) {
             const beat = beats.find(b => b.id === contextMenu.beatId);
             const impact = describeDeleteImpact?.([contextMenu.beatId]);
-            if (!impact || window.confirm(`Delete beat "${beat?.name || contextMenu.beatId}"?\n\n${impact}`)) {
-              onBeatDelete(contextMenu.beatId);
-            }
+            const targetId = contextMenu.beatId;
+            void (async () => {
+              if (!impact || await confirmBeatDelete(`Delete beat "${beat?.name || targetId}"?`, impact)) {
+                onBeatDelete(targetId);
+              }
+            })();
           }
           break;
       }
@@ -803,16 +809,20 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       if (multi && onBeatsDelete) {
         event.preventDefault();
         const impact = describeDeleteImpact?.(multi);
-        if (!impact || window.confirm(`Delete ${multi.length} selected beats?\n\n${impact}`)) {
-          onBeatsDelete(multi);
-        }
+        void (async () => {
+          if (!impact || await confirmBeatDelete(`Delete ${multi.length} selected beats?`, impact)) {
+            onBeatsDelete(multi);
+          }
+        })();
       } else if (singleId && onBeatDelete) {
         event.preventDefault();
         const beat = beats.find(b => b.id === singleId);
         const impact = describeDeleteImpact?.([singleId]);
-        if (!impact || window.confirm(`Delete beat "${beat?.name || singleId}"?\n\n${impact}`)) {
-          onBeatDelete(singleId);
-        }
+        void (async () => {
+          if (!impact || await confirmBeatDelete(`Delete beat "${beat?.name || singleId}"?`, impact)) {
+            onBeatDelete(singleId);
+          }
+        })();
       }
     }
   }, [multiSelectedIds, selectedBeat, beats, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, hasBeatClipboard, onBeatDelete, onBeatsDelete, describeDeleteImpact, reactFlowInstance]);

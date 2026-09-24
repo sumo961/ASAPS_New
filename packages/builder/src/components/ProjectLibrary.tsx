@@ -21,6 +21,7 @@ import { migrateLibraryToDisk } from '../utils/libraryMigration';
 import { isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
 import { useStorageQuota } from '../hooks/useStorageQuota';
 import { usePersistedState } from '../utils/persistedState';
+import { notify, confirmAction, errorMessage } from '../utils/notify';
 
 export interface ProjectLibraryProps {
   /** Called when a project is selected to load */
@@ -148,7 +149,7 @@ const ProjectCard: React.FC<{
     }
     if (renameValue.trim().length === 0) {
       console.log('[ProjectLibrary] Name empty, showing error');
-      alert('Project name cannot be empty');
+      notify.warning('A project needs a name.');
       return;
     }
     console.log('[ProjectLibrary] Starting rename to:', renameValue.trim());
@@ -159,7 +160,7 @@ const ProjectCard: React.FC<{
       setIsRenaming(false);
     } catch (error) {
       console.error('[ProjectLibrary] Rename failed:', error);
-      alert('Failed to rename project');
+      notify.error('Could not rename the project.', { detail: errorMessage(error) });
     } finally {
       setIsSavingRename(false);
     }
@@ -510,42 +511,49 @@ const MigrateLibraryButton: React.FC<{
   if (!isElectronWithFS()) return null;
 
   const run = async () => {
-    if (!window.confirm(
-      'Move your library to disk?\n\n'
-      + 'Every project stored in the app is written to ~/Documents/ASAPS Projects '
-      + 'as a folder of ordinary files (one file per beat — Time Machine, sync and git '
-      + 'all work on them). The app keeps using the folders from then on. Nothing is '
-      + 'deleted, and a project that fails to convert stays exactly where it was.\n\n'
-      + 'The currently open project is left in place — convert it with File → Save As Folder.'
-    )) return;
-    setBusy(true);
+    // ONE decision (was confirm → confirm → alert): the cloud-sync note is
+    // advice, not a gate, so it rides in the same dialog. Atomic writes make
+    // synced folders workable, but simultaneous edits from two machines
+    // still race at the sync layer — the author should know which world
+    // they are in.
+    let synced = false;
     try {
       const documents = await (window as any).electronAPI.app.getPath('documents');
       const { isLikelySyncedPath } = await import('../utils/newProjectRegistry');
-      if (isLikelySyncedPath(documents)) {
-        // Advice, not a gate: atomic writes make synced folders workable,
-        // but simultaneous edits from two machines still race at the sync
-        // layer, and the author should know which world they are in.
-        if (!window.confirm(
-          'Heads up: your Documents folder appears to be inside a cloud-synced location.\n\n'
-          + 'Project folders there sync like any other files — handy for backup, but if the same '
-          + 'project is edited on two machines at once, the sync service decides what survives.\n\nContinue?'
-        )) { setBusy(false); return; }
-      }
+      synced = isLikelySyncedPath(documents);
+    } catch { /* unknown location — no sync note */ }
+    const ok = await confirmAction({
+      title: 'Move your library to disk?',
+      message:
+        'Every project stored in the app is written to ~/Documents/ASAPS Projects as a folder of ordinary files '
+        + '(one file per beat \u2014 Time Machine, sync and git all work on them). The app keeps using the folders '
+        + 'from then on. Nothing is deleted, and a project that fails to convert stays where it was.\n\n'
+        + 'The open project is left in place \u2014 convert it with File \u2192 Save As Folder.'
+        + (synced
+          ? '\n\nNote: your Documents folder is inside a cloud-synced location. That is fine for backup, but if the '
+            + 'same project is edited on two machines at once, the sync service decides which edit survives.'
+          : ''),
+      confirmLabel: 'Move library to disk',
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
       const result = await migrateLibraryToDisk(storage, {
         currentProjectId,
         onProgress: (p) => setProgress(`${p.done}/${p.total} — ${p.currentName}`),
       });
-      const lines = [`Moved ${result.migrated} project${result.migrated === 1 ? '' : 's'} to disk.`];
-      if (result.skippedCurrent) lines.push('The open project stays put — File → Save As Folder converts it.');
+      const details: string[] = [];
+      if (result.skippedCurrent) details.push('The open project stays put \u2014 File \u2192 Save As Folder converts it.');
       if (result.failures.length) {
-        lines.push(`${result.failures.length} failed and stayed in app storage:`);
-        for (const f of result.failures.slice(0, 5)) lines.push(`  • ${f.name}: ${f.error}`);
+        details.push(`${result.failures.length} failed and stayed in app storage:`);
+        for (const f of result.failures.slice(0, 5)) details.push(`  \u2022 ${f.name}: ${f.error}`);
       }
-      alert(lines.join('\n'));
+      const summary = `Moved ${result.migrated} project${result.migrated === 1 ? '' : 's'} to disk.`;
+      if (result.failures.length) notify.warning(summary, { detail: details.join('\n'), sticky: true });
+      else notify.success(summary, { detail: details.join('\n') || undefined });
       onDone();
     } catch (e) {
-      alert(`Migration failed: ${e instanceof Error ? e.message : 'unknown error'}`);
+      notify.error('Moving the library to disk failed.', { detail: errorMessage(e) });
     } finally {
       setBusy(false);
       setProgress(null);
@@ -637,14 +645,14 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
         const files = await collectDroppedDirectory(entry as FileSystemDirectoryEntry);
         const rezipped = await rezipUnzippedProject(files, entry.name);
         if (!rezipped) {
-          alert(`"${entry.name}" doesn't look like an ASAPS project — no project.json found inside.`);
+          notify.warning(`"${entry.name}" doesn\u2019t look like an ASAPS project \u2014 there is no project.json inside.`);
           return;
         }
         await onImportZipFile!(rezipped);
         if (isModal) onClose?.();
       } catch (err) {
         console.error('[ProjectLibrary] Folder drop failed:', err);
-        alert(`Could not read the dropped folder: ${err instanceof Error ? err.message : 'unknown error'}`);
+        notify.error('Could not read the dropped folder.', { detail: errorMessage(err) });
       }
       return;
     }
@@ -656,7 +664,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
     // obvious mismatches here to fail fast.
     const name = file.name.toLowerCase();
     if (!name.endsWith('.zip') && !name.endsWith('.asaps') && !name.endsWith('.asaps.zip') && !name.endsWith('.asapst') && !name.endsWith('.json')) {
-      alert(`Only .zip / .asaps / .asapst / project.json files are supported for drag-drop import.\nReceived: ${file.name}`);
+      notify.warning('Drop an ASAPS project file here: .asaps, .asapst, .zip, or a project.json.', { detail: `Received: ${file.name}` });
       return;
     }
     await onImportZipFile!(file);
@@ -710,11 +718,11 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
           onCurrentProjectDeleted();
         }
       } else {
-        alert('Failed to delete project');
+        notify.error('Could not delete the project.');
       }
     } catch (error) {
       console.error('[ProjectLibrary] Delete failed:', error);
-      alert('Failed to delete project');
+      notify.error('Could not delete the project.', { detail: errorMessage(error) });
     }
   };
 
@@ -814,7 +822,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
       }
     } catch (error) {
       console.error('[ProjectLibrary] Bulk delete failed:', error);
-      alert('Some projects failed to delete');
+      notify.error('Some projects could not be deleted.', { detail: errorMessage(error) });
     }
   };
 

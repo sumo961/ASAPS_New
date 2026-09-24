@@ -9,6 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Play, Trash2 } from 'lucide-react';
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
 import { COMMON_LANGUAGES, ALL_LANGUAGES } from '../../utils/languageCatalog';
+import { confirmAction } from '../../utils/notify';
 
 /**
  * Get filtered suggestions for the custom language search.
@@ -238,9 +239,15 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                   )}
                   {onDeleteTranslation && (
                     <button
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        if (window.confirm(`Remove the ${t.languageName} translation? This cannot be undone.`)) {
+                        const ok = await confirmAction({
+                          title: `Remove the ${t.languageName} translation?`,
+                          message: 'All translated strings for this language are deleted. This cannot be undone.',
+                          confirmLabel: 'Remove translation',
+                          destructive: true,
+                        });
+                        if (ok) {
                           onDeleteTranslation(t.languageCode);
                           setShowDropdown(false);
                         }

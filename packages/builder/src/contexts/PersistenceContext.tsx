@@ -16,6 +16,7 @@ import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
 import { DirectoryAdapter, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
 import { markProjectNew, consumeProjectNew, sanitizeFolderName } from '../utils/newProjectRegistry';
 import { findUniqueProjectName } from '../utils/uniqueProjectName';
+import { notify } from '../utils/notify';
 
 // ============================================================================
 // Context Types
@@ -328,12 +329,22 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         window.dispatchEvent(new CustomEvent('asaps:externalProjectChange', {
           detail: { projectId, files: events.map((e) => e.path) },
         }));
-        alert(
-          'This project\u2019s files changed outside ASAPS (sync, git, or another editor).\n\n'
-          + `Changed: ${files}${events.length > 3 ? ` and ${events.length - 3} more` : ''}\n\n`
-          + 'Your open copy still shows the state from before the change. If the outside '
-          + 'edit matters, reopen the project from the library to load it \u2014 saving now '
-          + 'will overwrite the outside change.'
+        // Non-blocking banner-style notice with the fix one click away
+        // (UX-Eval B4, §3.6) — was a modal alert.
+        notify.warning(
+          'This project\u2019s files changed outside ASAPS (sync, git, or another editor). '
+          + 'You are still looking at the version from before the change \u2014 saving now would overwrite it.',
+          {
+            detail: `Changed: ${files}${events.length > 3 ? ` and ${events.length - 3} more` : ''}`,
+            sticky: true,
+            action: {
+              label: 'Reload from disk',
+              run: () => {
+                externalWarnedRef.current.delete(projectId);
+                window.dispatchEvent(new CustomEvent('asaps:reloadFromDisk'));
+              },
+            },
+          },
         );
       });
     } catch (e) {

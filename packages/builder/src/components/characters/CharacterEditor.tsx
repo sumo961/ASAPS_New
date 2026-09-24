@@ -44,6 +44,7 @@ import { CounterSourceEditor } from './CounterSourceEditor';
 import { HudLayoutPreview, type HudOverlaySettings } from './HudLayoutPreview';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
+import { confirmAction } from '../../utils/notify';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -170,8 +171,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     // Don't set hasChanges to false here - wait for the parent update to confirm
   };
 
-  const handleClose = () => {
-    if (hasChanges && !confirm('You have unsaved changes. Are you sure you want to close?')) {
+  const handleClose = async () => {
+    if (hasChanges && !(await confirmAction({
+      title: 'Discard your changes to this character?',
+      message: 'They have not been saved yet.',
+      confirmLabel: 'Discard changes',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    }))) {
       return;
     }
     onClose();

@@ -24,6 +24,7 @@ import {
 } from '../export/StoryTranslator';
 import type { TranslationAIConfig } from '../export/StoryTranslator';
 import { loadNotoFonts } from '../utils/fontRegistry';
+import { notify, errorMessage } from '../utils/notify';
 
 export interface TranslationState {
   /** Source (authoring) language of the project — BCP-47, default 'en'.
@@ -512,9 +513,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       // like the run silently died and reverted.
       if (failures.count > 0) {
         const msg = failures.lastError instanceof Error ? failures.lastError.message : String(failures.lastError);
-        alert(
-          `Translation partially completed: ${failures.count} string(s) could not be translated and remain marked untranslated.\n\n` +
-          `Last error: ${msg}\n\nRun Continue again to retry the remaining strings.`
+        notify.warning(
+          `Translation partly done: ${failures.count} string${failures.count === 1 ? '' : 's'} could not be translated and stay marked untranslated. Run Continue again to retry them.`,
+          { detail: `Last error: ${msg}`, sticky: true },
         );
       }
     } catch (error) {
@@ -522,10 +523,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
       setGenerationProgress(
         error instanceof Error ? `Error: ${error.message}` : 'Translation failed'
       );
-      alert(
-        'Translation failed before any strings could be translated: ' +
-        (error instanceof Error ? error.message : String(error))
-      );
+      notify.error('Translation failed before any strings could be translated.', { detail: errorMessage(error) });
     } finally {
       setIsGenerating(false);
     }

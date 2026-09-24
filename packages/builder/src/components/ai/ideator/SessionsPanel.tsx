@@ -13,6 +13,7 @@ import {
   type IdeatorSession,
 } from './ideatorSessionStore';
 import { exportSessionMarkdown } from './exportTranscript';
+import { confirmAction } from '../../../utils/notify';
 
 interface SessionsPanelProps {
   open: boolean;
@@ -79,9 +80,12 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
 
   const handleDelete = useCallback(
     async (id: string) => {
-      const confirmed = window.confirm(
-        'Delete this saved session? The transcript will be permanently removed from this machine.'
-      );
+      const confirmed = await confirmAction({
+        title: 'Delete this saved session?',
+        message: 'The transcript is removed from this machine permanently.',
+        confirmLabel: 'Delete session',
+        destructive: true,
+      });
       if (!confirmed) return;
       try {
         await deleteSession(id);
