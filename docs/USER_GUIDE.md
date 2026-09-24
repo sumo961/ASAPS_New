@@ -1221,11 +1221,16 @@ You can ignore all of this and ship a perfectly good story with just names and p
 
 1. Click **Characters** in the header
 2. Click **Add Character**
-3. Fill in the basics:
-   - **Name** - Internal identifier (e.g., "elena")
+3. Fill in the basics — the Basic tab opens with the portrait and the two names:
+   - **Portrait** - Click the square to pick or upload the picture shown beside this character's lines
    - **Display Name** - What interactors see (e.g., "Elena Blackwood")
+   - **Name** - How you and the AI refer to the character while writing — in the speaker picker, AI prompts and exports (e.g., "elena")
    - **Role** - Player, NPC, or Companion
    - **Description** - Notes for yourself
+
+   The character's fixed **ID** is shown in small print at the bottom of the Basic tab; conditions and saved games refer to it, so it never changes.
+
+   The **States** and **Counters** tabs belong to the advanced mode: they appear when your Inspector is set to advanced, or as soon as the character uses them. In basic mode, **More: States, Counters…** at the end of the tab row reveals them.
 
 Prefer to *describe* the person instead of filling in fields? The template picker that opens on **Add Character** includes a **✨ Generate with AI** card — write a plain-language brief and the AI drafts the whole profile for you. See [AI Character Development](#ai-character-development).
 

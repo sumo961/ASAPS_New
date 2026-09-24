@@ -46,6 +46,7 @@ import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 import { confirmAction } from '../../utils/notify';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
+import { getUiTier, setUiTier } from '../../utils/uiTier';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -103,6 +104,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   allCharacters = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'basic' | 'visual' | 'states' | 'counters' | 'inventory' | 'affect' | 'translations'>(focusVariantId ? 'affect' : 'basic');
+  // Disclosure tier (author preference, utils/uiTier — the same switch as
+  // the Inspector's). The stat-machine tabs (States, Counters) show in the
+  // advanced tier, or whenever this character already uses them, so no
+  // authored data is ever hidden (UX-Eval B11).
+  const [uiTier, setUiTierState] = useState(getUiTier);
+  const showStatMachineTabs = uiTier === 'advanced'
+    || (character.states ?? []).some((st: any, i: number) => i > 0 || !!st?.visual?.image || !!st?.visual?.assetId)
+    || (character.counters?.length ?? 0) > 0;
   // Who a suggested opening stance points at. Empty = first available.
   const [openingStanceTarget, setOpeningStanceTarget] = useState('');
   /**
@@ -188,59 +197,54 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
   // Basic Info Tab
   const renderBasicTab = () => (
     <div className="space-y-4">
-      {/* ID — the canonical reference key. Frozen after creation because
-          conditions, sentiments, AI prompts, and saved-state snapshots
-          all key off this value; renaming would break references. Shown
-          read-only so authors can verify what's referenced from elsewhere
-          (e.g. when the Inspector's Toward / Character autocomplete shows
-          the lowercase slug, this is what they're seeing). */}
-      <div>
-        <label className="block text-sm font-medium mb-1">ID</label>
-        <input
-          type="text"
-          value={editedCharacter.id}
-          readOnly
-          className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-700 font-mono text-sm cursor-not-allowed"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Frozen after creation. Used everywhere a character is referenced —
-          conditions, sentiment targets, AI prompts, save-state.
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Code Name</label>
-        <input
-          type="text"
-          value={editedCharacter.name}
-          onChange={(e) => setEditedCharacter({ ...editedCharacter, name: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., player, old_wizard"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Short label used in AI prompts and exports. Often matches the ID
-          in lowercase but can differ — this is editable, the ID is not.
-        </p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">Display Name</label>
-        <input
-          type="text"
-          value={editedCharacter.displayName}
-          onChange={(e) => {
-                console.log('[Editor] typing', e.target.value);       // Is there something happening?
-
-            //setEditedCharacter({ ...editedCharacter, displayName: e.target.value });
-            setEditedCharacter(prev => {
-                const next = { ...prev, displayName: e.target.value };
-                console.log('[Editor] state after set', next); // ← add this
-                return next;
-            });
-          }}
-          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., Player, Old Wizard"
-        />
+      {/* Who this is, first (UX-Eval B11): portrait + the two names. The
+          frozen ID moved to the footer line at the end of this tab. */}
+      <div className="flex items-start gap-4">
+        <button
+          type="button"
+          onClick={() => setShowAssetPicker('portrait')}
+          className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 hover:border-blue-400 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0"
+          title="Choose the portrait shown beside this character's lines"
+        >
+          {resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets) ? (
+            <img
+              src={resolveImageUrl(editedCharacter.portrait?.assetId, editedCharacter.portrait?.image, assets)}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-xs text-gray-500 px-2 text-center leading-tight">Add portrait</span>
+          )}
+        </button>
+        <div className="flex-1 space-y-3 min-w-0">
+          <div>
+            <label className="block text-sm font-medium mb-1">Display Name</label>
+            <input
+              type="text"
+              value={editedCharacter.displayName}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEditedCharacter(prev => ({ ...prev, displayName: value }));
+              }}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Old Wizard"
+            />
+            <p className="text-xs text-gray-500 mt-1">What players see next to this character’s lines.</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input
+              type="text"
+              value={editedCharacter.name}
+              onChange={(e) => setEditedCharacter({ ...editedCharacter, name: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., old_wizard"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              How you and the AI refer to this character while writing — in the speaker picker, AI prompts and exports.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div>
@@ -299,6 +303,15 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         />
         <p className="text-xs text-gray-500 mt-1">Separate with commas</p>
       </div>
+
+      {/* ID — the canonical reference key, frozen after creation because
+          conditions, sentiments, AI prompts and saved-state snapshots key
+          off it. A footer detail, not the first thing an author meets. */}
+      <p className="pt-3 border-t text-xs text-gray-400 flex items-center gap-2">
+        <span>ID</span>
+        <code className="font-mono text-gray-500 select-all">{editedCharacter.id}</code>
+        <span>· fixed; conditions and saved games refer to it.</span>
+      </p>
     </div>
   );
 
@@ -3383,8 +3396,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           {[
             { id: 'basic' as const, label: 'Basic', icon: User },
             { id: 'visual' as const, label: 'Visual', icon: Image },
-            { id: 'states' as const, label: 'States', icon: Layers },
-            { id: 'counters' as const, label: 'Counters', icon: Calculator },
+            ...(showStatMachineTabs ? [
+              { id: 'states' as const, label: 'States', icon: Layers },
+              { id: 'counters' as const, label: 'Counters', icon: Calculator },
+            ] : []),
             { id: 'inventory' as const, label: 'Inventory', icon: Package },
             { id: 'affect' as const, label: 'Affect', icon: Heart },
             ...(translationState.translations.length > 0
@@ -3404,6 +3419,16 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
               {tab.label}
             </button>
           ))}
+          {!showStatMachineTabs && (
+            <button
+              type="button"
+              onClick={() => { setUiTier('advanced'); setUiTierState('advanced'); }}
+              className="ml-auto px-3 py-2 text-xs text-gray-500 hover:text-blue-600"
+              title="Show the States and Counters tabs (advanced mode, remembered for all characters)"
+            >
+              More: States, Counters…
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
