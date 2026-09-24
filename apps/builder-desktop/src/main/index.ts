@@ -513,7 +513,7 @@ function createMenu(): void {
             submenu: [
               { role: 'about' as const },
               { type: 'separator' as const },
-              // Machine-scope settings (UX-Eval B3). ⌘, stays Story Settings.
+              // Machine-scope settings (UX-Eval B3). ⌘, stays Project Settings.
               {
                 label: 'App Preferences…',
                 accelerator: 'CmdOrCtrl+Alt+,',
@@ -703,7 +703,7 @@ function createMenu(): void {
         // Menu-bar parity for toolbar workhorses (UX eval §3.4): Story
         // Settings had NO menu item and no shortcut at all.
         {
-          label: 'Story Settings…',
+          label: 'Project Settings…',
           accelerator: 'CmdOrCtrl+,',
           click: () => mainWindow?.webContents.send('menu:story-settings'),
         },

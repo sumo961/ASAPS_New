@@ -1,6 +1,6 @@
 /**
  * App Preferences — the MACHINE scope (UX-Eval B3): everything that is about
- * this computer rather than a story. Story Settings (⌘,) is the project
+ * this computer rather than a story. Project Settings (⌘,) is the project
  * scope; the rule that separates them is "if two authors opening the same
  * project could see different players or exports, it belongs to the
  * project".
@@ -147,7 +147,7 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
           <div>
             <h2 id="app-prefs-title" className="text-lg font-semibold text-gray-900">App Preferences</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Settings for this computer. Settings that travel with a story are in Story Settings (⌘,).
+              Settings for this computer. Settings that travel with a project are in Project Settings (⌘,).
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">

@@ -774,10 +774,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               className="px-3 py-1.5 bg-purple-500 text-white rounded-lg text-sm font-medium hover:bg-purple-600 transition-colors flex items-center gap-1.5"
               onClick={onSettings}
-              title="Story Settings (⌘,) — stage size, typography, colors and everything else that travels with this story"
+              title="Project Settings (⌘,) — stage size, typography, colors and everything else that travels with this project"
             >
               <Settings className="w-4 h-4" />
-              Story Settings
+              Project Settings
             </button>
           )}
 
