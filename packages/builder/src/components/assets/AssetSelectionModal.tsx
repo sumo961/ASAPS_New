@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Grid, List, Upload, ExternalLink, Search, Trash2 } from 'lucide-react';
 import type { Asset } from './AssetManager';
 import { confirmAction } from '../../utils/notify';
+import { acceptFor } from '../../utils/assetAccept';
 
 interface AssetSelectionModalProps {
   isOpen: boolean;
@@ -9,8 +10,9 @@ interface AssetSelectionModalProps {
   onSelect: (asset: Asset) => void;
   assets: Asset[];
   onAssetAdd: (asset: Asset) => Promise<boolean>;
-  onAssetRemove: (assetId: string) => void;
-  onAssetUpdate: (assetId: string, updates: Partial<Asset>) => void;
+  /** Omit to hide the remove buttons (e.g. inside the Character Editor). */
+  onAssetRemove?: (assetId: string) => void;
+  onAssetUpdate?: (assetId: string, updates: Partial<Asset>) => void;
   assetType?: 'image' | 'audio' | 'video' | 'font';
   assetSubType?: string;
   title?: string;
@@ -46,7 +48,13 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
   });
 
   // FIXED: Enhanced filtering based on type, subtype, and search
-  const filteredAssets = assets.filter(asset => {
+  const filteredAssets = assets.filter(rawAsset => {
+    // Legacy assets may carry a MIME type ('image/png') instead of the
+    // primary type ('image'); compare on the primary type so they still
+    // appear (the Character Editor's old private grid accepted them).
+    const asset = typeof rawAsset.type === 'string' && rawAsset.type.includes('/')
+      ? { ...rawAsset, type: rawAsset.type.split('/')[0] as Asset['type'] }
+      : rawAsset;
     // Filter by main type first
     if (assetType && asset.type !== assetType) return false;
     
@@ -257,22 +265,12 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
       confirmLabel: 'Remove asset',
       destructive: true,
     });
-    if (ok) onAssetRemove(asset.id);
+    if (ok) onAssetRemove?.(asset.id);
   };
 
   // Get file accept string based on subType
-  const getFileAccept = () => {
-    // Any image works as a background — must match the browse filter above,
-    // which already accepts JPG/PNG/WebP/SVG (the old JPG-only accept made
-    // the same PNG selectable from the grid but greyed out in the dialog).
-    if (assetSubType === 'background') return 'image/*';
-    if (assetSubType === 'character' || assetSubType === 'prop') return '.png';
-    if (assetSubType === 'sfx' || assetSubType === 'sound') return 'audio/*';
-    if (assetType === 'video') return 'video/*';
-    if (assetType === 'audio') return 'audio/*';
-    if (assetType === 'font') return '.ttf,.otf,.woff,.woff2';
-    return 'image/*';
-  };
+  // One accept-rule for every picker (utils/assetAccept).
+  const getFileAccept = () => acceptFor(assetType, assetSubType);
 
   return (
     <div className="fixed inset-0 z-[60] bg-black bg-opacity-50 flex items-center justify-center">
@@ -381,13 +379,13 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
                   }}
                 >
                   {/* Delete button — appears on hover */}
-                  <button
+                  {onAssetRemove && <button
                     onClick={(e) => handleRemoveAsset(e, asset)}
                     className="absolute top-2 right-2 z-10 p-1.5 bg-white rounded-full shadow-sm hover:bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity"
                     title={`Remove "${asset.name}" from project`}
                   >
                     <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                  </button>
+                  </button>}
                   <div className="aspect-square bg-gray-100 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
                     {getAssetPreview(asset)}
                   </div>
@@ -437,13 +435,13 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({
                       {asset.subType && ` • ${asset.subType}`}
                     </p>
                   </div>
-                  <button
+                  {onAssetRemove && <button
                     onClick={(e) => handleRemoveAsset(e, asset)}
                     className="p-2 text-red-500 hover:bg-red-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                     title={`Remove "${asset.name}" from project`}
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </button>}
                 </div>
               ))}
             </div>

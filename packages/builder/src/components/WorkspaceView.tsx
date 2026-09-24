@@ -8,6 +8,7 @@ import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
 import { usePersistedState } from '../utils/persistedState';
+import { supportsVisualEditor as supportsVisualBeat } from '../utils/visualBeatTypes';
 
 interface WorkspaceViewProps {
   projectId?: string;
@@ -145,41 +146,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
 
   const showKnowledgeGraph = globalSettings?.features?.showKnowledgeGraph === true;
 
-  // Check if selected beat supports visual editing
-  const supportsVisualEditor = (beat: Beat | null) => {
-    if (!beat) return false;
-    const visualBeatTypes = [
-      'titleScreen',
-      'infoText',
-      'durScreen',
-      'pickProp',
-      'movementChoice',
-      'multiChoice',
-      'dialogTree',
-      'endScreen',
-      'videoBeat',
-      'inputText',
-      'hyperText',
-      'onlineContent',
-      'aiDialogTree',
-      'aiSummary',
-      'aiInfoText',
-      'aiDurScreen',
-      'aiConversation',
-      'keypad',
-      'panorama',
-      'gpsLocation',
-      'indoorLocation',
-      // Camera/embed slot-mode beats — the VE renders editor placeholders
-      // for their webview/camera/AR slots; they were missing from this gate
-      // (found during the Web View verification round, same gap class as
-      // aiConversation before v0.9.82).
-      'webView',
-      'qrScan',
-      'arBeat'
-    ];
-    return visualBeatTypes.includes(beat.type);
-  };
+  // Check if selected beat supports visual editing (shared list, utils/visualBeatTypes)
+  const supportsVisualEditor = (beat: Beat | null) => supportsVisualBeat(beat?.type);
 
   const showVisualTab = supportsVisualEditor(selectedBeat);
 

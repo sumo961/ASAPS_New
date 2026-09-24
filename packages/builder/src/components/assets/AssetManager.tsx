@@ -19,6 +19,7 @@ import {
   Mountain,
 } from 'lucide-react';
 import { notify, errorMessage } from '../../utils/notify';
+import { ACCEPT, ACCEPT_ANY } from '../../utils/assetAccept';
 
 /**
  * Phase 3.3 — iOS-style multi-resource asset variant. Points to
@@ -87,10 +88,10 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
 
   const assetTypes = [
     { type: 'all', label: 'All Assets', icon: Folder, color: 'gray' },
-    { type: 'image', label: 'Images', icon: Image, color: 'green', accept: '.jpg,.jpeg,.png,.gif,.svg,.webp' },
-    { type: 'audio', label: 'Audio', icon: Music, color: 'blue', accept: '.mp3,.ogg,.wav,.m4a' },
-    { type: 'video', label: 'Videos', icon: Film, color: 'purple', accept: '.mp4,.webm,.mov' },
-    { type: 'font', label: 'Fonts', icon: Type, color: 'orange', accept: '.ttf,.otf,.woff,.woff2' },
+    { type: 'image', label: 'Images', icon: Image, color: 'green', accept: ACCEPT.image },
+    { type: 'audio', label: 'Audio', icon: Music, color: 'blue', accept: ACCEPT.audio },
+    { type: 'video', label: 'Videos', icon: Film, color: 'purple', accept: ACCEPT.video },
+    { type: 'font', label: 'Fonts', icon: Type, color: 'orange', accept: ACCEPT.font },
   ];
 
   const getAssetIcon = (type: string) => {
@@ -440,7 +441,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={handleFileUpload}
           className="hidden"
-          accept=".jpg,.jpeg,.png,.gif,.svg,.webp,.mp3,.ogg,.wav,.m4a,.mp4,.webm,.mov,.ttf,.otf,.woff,.woff2"
+          accept={ACCEPT_ANY}
         />
 
         {/* Type-specific hidden file inputs */}
@@ -450,7 +451,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e, 'character')}
           className="hidden"
-          accept=".png"
+          accept={ACCEPT.sprite}
         />
         <input
           ref={propInputRef}
@@ -458,7 +459,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e, 'prop')}
           className="hidden"
-          accept=".png"
+          accept={ACCEPT.sprite}
         />
         <input
           ref={backgroundInputRef}
@@ -466,7 +467,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e, 'background')}
           className="hidden"
-          accept="image/*"
+          accept={ACCEPT.background}
         />
         <input
           ref={videoInputRef}
@@ -474,7 +475,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={handleFileUpload}
           className="hidden"
-          accept=".mp4,.webm,.mov"
+          accept={ACCEPT.video}
         />
         <input
           ref={audioInputRef}
@@ -482,7 +483,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={(e) => handleFileUpload(e, 'music')}
           className="hidden"
-          accept=".mp3,.ogg,.wav,.m4a"
+          accept={ACCEPT.audio}
         />
         <input
           ref={fontInputRef}
@@ -490,7 +491,7 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
           multiple
           onChange={handleFileUpload}
           className="hidden"
-          accept=".ttf,.otf,.woff,.woff2"
+          accept={ACCEPT.font}
         />
       </div>
 

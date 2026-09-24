@@ -45,6 +45,7 @@ import { HudLayoutPreview, type HudOverlaySettings } from './HudLayoutPreview';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 import { confirmAction } from '../../utils/notify';
+import { AssetSelectionModal } from '../assets/AssetSelectionModal';
 
 /**
  * Helper to resolve fresh image URL from assets using assetId.
@@ -1874,99 +1875,74 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
     </div>
   );
 
-  // Asset Picker Modal
+  // Asset picker — the SHARED picker (UX-Eval B7): it uploads, searches and
+  // filters like every other door. The Character Editor's private grid had
+  // no upload, a dead end on projects without images.
+  const applyPickedAsset = (asset: { id: string; url: string }) => {
+    if (showAssetPicker === 'default') {
+      // Save both URL (for display) and assetId (for persistence)
+      setEditedCharacter({
+        ...editedCharacter,
+        visual: { ...editedCharacter.visual, defaultImage: asset.url, defaultAssetId: asset.id }
+      });
+    } else if (showAssetPicker === 'portrait') {
+      setEditedCharacter({
+        ...editedCharacter,
+        portrait: { image: asset.url, assetId: asset.id }
+      });
+    } else if (showAssetPicker === 'spritesheet') {
+      const newVisual = { ...editedCharacter.visual };
+      if (!newVisual.spriteSheet) {
+        newVisual.spriteSheet = {
+          url: asset.url,
+          assetId: asset.id,
+          frameWidth: 32,
+          frameHeight: 32,
+          animations: []
+        };
+      } else {
+        newVisual.spriteSheet = { ...newVisual.spriteSheet, url: asset.url, assetId: asset.id };
+      }
+      setEditedCharacter({ ...editedCharacter, visual: newVisual });
+    } else if (showAssetPicker?.startsWith('state_')) {
+      const stateId = showAssetPicker.replace('state_', '');
+      const newStates = editedCharacter.states.map(s => {
+        if (s.id === stateId) {
+          return { ...s, visual: { ...s.visual, image: asset.url, assetId: asset.id } };
+        }
+        return s;
+      });
+      setEditedCharacter({ ...editedCharacter, states: newStates });
+    } else if (showAssetPicker?.startsWith('inventory_')) {
+      const itemId = showAssetPicker.replace('inventory_', '');
+      const newInventory = editedCharacter.inventory.map(item => {
+        if (item.id === itemId) {
+          return { ...item, icon: asset.url, assetId: asset.id };
+        }
+        return item;
+      });
+      setEditedCharacter({ ...editedCharacter, inventory: newInventory });
+    }
+    setShowAssetPicker(null);
+  };
+
   const renderAssetPicker = () => {
     if (!showAssetPicker) return null;
-
-    // Fixed: Check for MIME types that start with 'image/'
-    const imageAssets = assets.filter(a => 
-      a.type?.startsWith('image/') || 
-      a.type === 'image' || 
-      // Fallback: check file extension if type is missing
-      (!a.type && a.url && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(a.url))
-    );
-
+    const title =
+      showAssetPicker === 'portrait' ? 'Select portrait'
+      : showAssetPicker === 'spritesheet' ? 'Select sprite sheet'
+      : showAssetPicker.startsWith('inventory_') ? 'Select item icon'
+      : 'Select character image';
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-4 max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Select Image</h3>
-            <button
-              onClick={() => setShowAssetPicker(null)}
-              className="p-1 hover:bg-gray-100 rounded"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-4 gap-4">
-              {imageAssets.map(asset => (
-                <div
-                  key={asset.id}
-                  onClick={() => {
-                    if (showAssetPicker === 'default') {
-                      // Save both URL (for display) and assetId (for persistence)
-                      setEditedCharacter({
-                        ...editedCharacter,
-                        visual: { ...editedCharacter.visual, defaultImage: asset.url, defaultAssetId: asset.id }
-                      });
-                    } else if (showAssetPicker === 'portrait') {
-                      setEditedCharacter({
-                        ...editedCharacter,
-                        portrait: { image: asset.url, assetId: asset.id }
-                      });
-                    } else if (showAssetPicker === 'spritesheet') {
-                      const newVisual = { ...editedCharacter.visual };
-                      if (!newVisual.spriteSheet) {
-                        newVisual.spriteSheet = {
-                          url: asset.url,
-                          assetId: asset.id,
-                          frameWidth: 32,
-                          frameHeight: 32,
-                          animations: []
-                        };
-                      } else {
-                        newVisual.spriteSheet = { ...newVisual.spriteSheet, url: asset.url, assetId: asset.id };
-                      }
-                      setEditedCharacter({ ...editedCharacter, visual: newVisual });
-                    } else if (showAssetPicker?.startsWith('state_')) {
-                      const stateId = showAssetPicker.replace('state_', '');
-                      const newStates = editedCharacter.states.map(s => {
-                        if (s.id === stateId) {
-                          // Save both URL (for display) and assetId (for persistence)
-                          return { ...s, visual: { ...s.visual, image: asset.url, assetId: asset.id } };
-                        }
-                        return s;
-                      });
-                      setEditedCharacter({ ...editedCharacter, states: newStates });
-                    } else if (showAssetPicker?.startsWith('inventory_')) {
-                      const itemId = showAssetPicker.replace('inventory_', '');
-                      const newInventory = editedCharacter.inventory.map(item => {
-                        if (item.id === itemId) {
-                          // Save both URL (for display) and assetId (for persistence)
-                          return { ...item, icon: asset.url, assetId: asset.id };
-                        }
-                        return item;
-                      });
-                      setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                    }
-                    setShowAssetPicker(null);
-                  }}
-                  className="cursor-pointer hover:opacity-80 border rounded-lg overflow-hidden"
-                >
-                  <img 
-                    src={asset.url} 
-                    alt={asset.name}
-                    className="w-full h-32 object-cover"
-                  />
-                  <div className="p-2 text-xs truncate">{asset.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <AssetSelectionModal
+        isOpen
+        onClose={() => setShowAssetPicker(null)}
+        onSelect={(asset) => applyPickedAsset(asset)}
+        assets={assets as any}
+        onAssetAdd={onAssetAdd ?? (async () => false)}
+        assetType="image"
+        title={title}
+      />
     );
   };
 

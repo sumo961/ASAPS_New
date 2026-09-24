@@ -173,6 +173,7 @@ interface InspectorProps {
 // movementChoice was in it). Single source for both save paths.
 import { PARAMETER_DERIVED_TYPES } from '../utils/beatConnectionModel';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
+import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 
 const MIN_INSPECTOR_WIDTH = 280;
 const DEFAULT_INSPECTOR_WIDTH = 320;
@@ -1907,6 +1908,61 @@ export const Inspector: React.FC<InspectorProps> = ({
                     />
                   )}
                 </div>
+
+                {/* Background Image — beside Background Sound (UX-Eval B7):
+                    the same door for both kinds of media. Stored where the
+                    Visual Editor keeps it: parameters.node, with
+                    backgroundAssetId kept in step. Only for beats whose
+                    stage can show one (utils/visualBeatTypes). */}
+                {supportsBackgroundImage(beat.type) && (() => {
+                  const bgId = (localBeat.parameters?.node || localBeat.parameters?.backgroundAssetId || '') as string;
+                  const bgAsset = bgId ? assets?.find(a => a.id === bgId) : undefined;
+                  const pick = () => handleAssetSelection('background', (asset) => {
+                    handleParametersChange({ node: asset.id, backgroundAssetId: asset.id });
+                  });
+                  return (
+                    <div>
+                      <label
+                        className="block text-sm font-medium text-gray-700 mb-1"
+                        title="The image behind this beat's text and buttons. Also editable in the Visual Editor."
+                      >
+                        <Image className="w-4 h-4 inline mr-1" />
+                        Background Image
+                      </label>
+                      {bgId ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center gap-2 px-2 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-sm min-w-0">
+                            {bgAsset?.url && (
+                              <img src={bgAsset.url} alt="" className="w-10 h-7 object-cover rounded flex-shrink-0" />
+                            )}
+                            <span className="truncate">{bgAsset?.name || `${bgId.substring(0, 8)}\u2026 (missing)`}</span>
+                          </div>
+                          <button
+                            onClick={pick}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                            title="Change background image"
+                          >
+                            Change
+                          </button>
+                          <button
+                            onClick={() => handleParametersChange({ node: '', backgroundAssetId: '' })}
+                            className="px-2 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+                            title="Remove background image"
+                          >
+                            {'\u2715'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={pick}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+                        >
+                          Add Background Image
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* BEAT-SPECIFIC PARAMETERS - SCHEMA DRIVEN */}
 
