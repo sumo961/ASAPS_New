@@ -173,7 +173,7 @@ const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 const VALID_KINDS = new Set([
   'editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter',
   'setChoiceEffects', 'setChoiceConditions', 'setRequirements',
-  'editChoiceText', 'addChoice', 'replaceBeat', 'defineVariable',
+  'editChoiceText', 'addChoice', 'replaceBeat', 'defineVariable', 'setLinkEffects',
 ]);
 
 /** Warnings from the last normalizeProposal rejection (why an entry was dropped). */
@@ -189,9 +189,14 @@ function normalizeProposal(raw: any): ChangeProposal | null {
     case 'editText':
       if (typeof raw.beatId !== 'string' || typeof raw.param !== 'string' || typeof raw.newValue !== 'string') return null;
       return { kind: 'editText', beatId: raw.beatId, param: raw.param, newValue: raw.newValue, note: typeof raw.note === 'string' ? raw.note : undefined };
-    case 'updateParams':
+    case 'updateParams': {
       if (typeof raw.beatId !== 'string' || !raw.params || typeof raw.params !== 'object') return null;
-      return { kind: 'updateParams', beatId: raw.beatId, params: raw.params, note: typeof raw.note === 'string' ? raw.note : undefined };
+      // Wiring inside the patch (random branches, choices, a dialog tree)
+      // gets the same checks as the dedicated wiring proposals.
+      const n = normalizeParamsWiring(raw.params);
+      if (!n.ok) return reject(raw.kind, n.problem);
+      return { kind: 'updateParams', beatId: raw.beatId, params: n.value, note: typeof raw.note === 'string' ? raw.note : undefined };
+    }
     case 'addBeat':
       if (typeof raw.beatType !== 'string' || typeof raw.name !== 'string') return null;
       return {
@@ -220,6 +225,16 @@ function normalizeProposal(raw: any): ChangeProposal | null {
       return isEffects
         ? { kind: 'setChoiceEffects', beatId: raw.beatId, choiceId: String(choiceId), effects: list.value, note }
         : { kind: 'setChoiceConditions', beatId: raw.beatId, choiceId: String(choiceId), conditions: list.value, note };
+    }
+    case 'setLinkEffects': {
+      if (typeof raw.beatId !== 'string') return reject(raw.kind, 'needs beatId');
+      const list = normalizeList(raw.effects, normalizeEffect);
+      if (!list.ok) return reject(raw.kind, list.problem);
+      return {
+        kind: 'setLinkEffects', beatId: raw.beatId,
+        targetId: typeof raw.targetId === 'string' && raw.targetId.trim() ? raw.targetId.trim() : undefined,
+        effects: list.value, note: typeof raw.note === 'string' ? raw.note : undefined,
+      };
     }
     case 'defineVariable': {
       const name = typeof raw.name === 'string' ? raw.name.trim() : '';
@@ -358,6 +373,10 @@ export function describeProposal(p: ChangeProposal): string {
       return p.conditions.length
         ? `Show ${p.beatId} › ${p.choiceId} only if ${p.conditions.map((c) => describeCondition(c)).join(' and ')}`
         : `Always show ${p.beatId} › ${p.choiceId}`;
+    case 'setLinkEffects':
+      return p.effects.length
+        ? `When leaving ${p.beatId}${p.targetId ? ` for ${p.targetId}` : ''}: ${p.effects.map((e) => describeEffect(e)).join('; ')}`
+        : `Remove effects from ${p.beatId}'s link`;
     case 'defineVariable':
       return `Declare story variable ${p.name} = ${JSON.stringify(p.defaultValue)}`;
     case 'editChoiceText':

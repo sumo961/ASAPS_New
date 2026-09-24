@@ -153,6 +153,10 @@ export interface Connection {
   targetId: string;
   condition?: Condition;
   label?: string;
+  /** Applied when the player moves along this link (a linear beat's
+   *  "Continue"). Stored links only — links derived from
+   *  choices carry their effects on the choice. */
+  effects?: Effect[];
 }
 
 /**

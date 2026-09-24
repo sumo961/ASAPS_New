@@ -76,6 +76,8 @@ function proposalDetail(p: ChangeProposal): string | null {
     case 'setRequirements':
     case 'editChoiceText':
       return null;
+    case 'setLinkEffects':
+      return null;
     case 'defineVariable':
       return p.description ? `"${p.description.slice(0, 140)}"` : null;
     case 'addChoice': {
@@ -114,6 +116,8 @@ function wiringNextValue(p: ChangeProposal): string | null {
         : '(no gate)';
     case 'editChoiceText':
       return p.text;
+    case 'setLinkEffects':
+      return p.effects.length ? p.effects.map((e) => describeEffect(e)).join('; ') : '(none)';
     default:
       return null;
   }

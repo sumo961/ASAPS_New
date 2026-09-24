@@ -228,6 +228,55 @@ export function applyChangeProposals(
           return;
         }
 
+        case 'setLinkEffects': {
+          const beat = findBeat(p.beatId);
+          if (!beat) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          const problem = wiringProblem(p.effects, [], ctx, beatExists);
+          if (problem) {
+            results.push({ index, ok: false, detail: problem });
+            return;
+          }
+          // A beat whose exits are its options (choices, dialog, props,
+          // random branches) keeps only a derived copy of its links; effects
+          // written there would fire on top of the option's own.
+          if (listWiringSites(paramsOf(beat)).length > 0) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}'s exits are its options — use setChoiceEffects on the option instead` });
+            return;
+          }
+          const json = (typeof beat.toJSON === 'function' ? beat.toJSON() : beat) as Record<string, any>;
+          const links: Array<Record<string, any>> = Array.isArray(json.connections) ? json.connections : [];
+          const matches = p.targetId ? links.filter((l) => l.targetId === p.targetId) : links;
+          if (matches.length !== 1) {
+            results.push({
+              index, ok: false,
+              detail: links.length === 0
+                ? `${beat.name || p.beatId} has no link of its own — its exits live on its choices; use setChoiceEffects`
+                : p.targetId
+                  ? `${beat.name || p.beatId} has no link to ${p.targetId} (links: ${links.map((l) => l.targetId).join(', ')})`
+                  : `${beat.name || p.beatId} has ${links.length} links — say which with targetId (${links.map((l) => l.targetId).join(', ')})`,
+            });
+            return;
+          }
+          const chosen = matches[0];
+          const next = links.map((l) => {
+            if (l !== chosen) return l;
+            const copy = { ...l };
+            if (p.effects.length) copy.effects = p.effects; else delete copy.effects;
+            return copy;
+          });
+          ctx.updateBeat(p.beatId, { connections: next });
+          results.push({
+            index, ok: true,
+            detail: p.effects.length
+              ? `Leaving ${beat.name || p.beatId} → ${chosen.targetId} now does: ${p.effects.map((e) => describeEffect(e)).join('; ')}`
+              : `Removed the effects on ${beat.name || p.beatId} → ${chosen.targetId}`,
+          });
+          return;
+        }
+
         case 'defineVariable': {
           if (!ctx.defineVariable) {
             results.push({ index, ok: false, detail: 'Variables cannot be declared from here' });

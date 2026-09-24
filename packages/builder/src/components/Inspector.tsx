@@ -3386,76 +3386,107 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </>
                 )}
 
-                {/* Random Target Beat */}
-                {beat.type === 'randomTarget' && (
+                {/* Random Target Beat — branches: target, weight, effects */}
+                {beat.type === 'randomTarget' && (() => {
+                  type Branch = { target: string; weight?: number; effects?: any[]; label?: string };
+                  const branches: Branch[] = (localBeat.parameters?.choices || []).map((c: any) =>
+                    typeof c === 'string' ? { target: c } : { ...c, target: c?.target || c?.targetId || '' });
+                  // Plain branches are stored as bare beat ids, as before.
+                  const save = (next: Branch[]) => handleParameterChange('choices', next.map((b) =>
+                    b.weight === undefined && !b.effects?.length && !b.label ? b.target : b));
+                  const setBranch = (i: number, patch: Partial<Branch>) => {
+                    const next = branches.map((b, k) => (k === i ? { ...b, ...patch } : b));
+                    for (const b of next) {
+                      if (b.weight === undefined) delete b.weight;
+                      if (!b.effects?.length) delete b.effects;
+                    }
+                    save(next);
+                  };
+                  const totalWeight = branches.reduce((a, b) => a + (b.weight ?? 1), 0);
+                  return (
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-sm font-medium text-gray-700">
-                        Random Target Beats
+                        Random Branches
                       </label>
                       <button
-                        onClick={() => {
-                          const currentChoices = localBeat.parameters?.choices || [];
-                          handleParameterChange('choices', [...currentChoices, '']);
-                        }}
+                        onClick={() => save([...branches, { target: '' }])}
                         className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
-                        Add Target
+                        Add Branch
                       </button>
                     </div>
-                    
-                    {localBeat.parameters?.choices?.length === 0 && (
+
+                    {branches.length === 0 && (
                       <div className="text-sm text-gray-500 italic py-2">
-                        No random targets. Click "Add Target" to add one.
+                        No branches yet. Click "Add Branch" to add one.
                       </div>
                     )}
-                    
-                    <div className="space-y-2">
-                      {(localBeat.parameters?.choices || []).map((choice: string, index: number) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="block text-xs text-gray-600 mb-1">
-                              Target {index + 1}
-                            </label>
-                            <select
-                              value={choice || ''}
-                              onChange={(e) => {
-                                const newChoices = [...(localBeat.parameters?.choices || [])];
-                                newChoices[index] = e.target.value;
-                                handleParameterChange('choices', newChoices);
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+
+                    <div className="space-y-3">
+                      {branches.map((branch, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-2 space-y-2">
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <label className="block text-xs text-gray-600 mb-1">Branch {index + 1}</label>
+                              <select
+                                value={branch.target || ''}
+                                onChange={(e) => setBranch(index, { target: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                              >
+                                <option value="">Select target beat...</option>
+                                {availableTargets.map(target => (
+                                  <option key={target.id} value={target.id}>
+                                    {target.name} ({target.type})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-20">
+                              <label className="block text-xs text-gray-600 mb-1" title="Relative likelihood: 2 = twice as likely as 1; 0 = never">Weight</label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={branch.weight ?? 1}
+                                onChange={(e) => {
+                                  const v = Number(e.target.value);
+                                  setBranch(index, { weight: Number.isFinite(v) && v >= 0 && v !== 1 ? v : undefined });
+                                }}
+                                className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm"
+                              />
+                            </div>
+                            <button
+                              onClick={() => save(branches.filter((_, i) => i !== index))}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded"
+                              title="Remove branch"
                             >
-                              <option value="">Select target beat...</option>
-                              {availableTargets.map(target => (
-                                <option key={target.id} value={target.id}>
-                                  {target.name} ({target.type})
-                                </option>
-                              ))}
-                            </select>
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
-                          <button
-                            onClick={() => {
-                              const newChoices = (localBeat.parameters?.choices || []).filter((_: any, i: number) => i !== index);
-                              handleParameterChange('choices', newChoices);
-                            }}
-                            className="mt-5 p-2 text-red-500 hover:bg-red-50 rounded"
-                            title="Remove target"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                          <div className="text-xs text-gray-500">
+                            {totalWeight > 0 ? `${Math.round(((branch.weight ?? 1) / totalWeight) * 100)}% of playthroughs` : 'Never drawn'}
+                          </div>
+                          <div className="p-2 bg-blue-50 rounded space-y-2">
+                            <div className="text-xs font-medium text-blue-700">When this branch is drawn (optional)</div>
+                            <ChoiceEffectsEditor
+                              effects={branch.effects || []}
+                              onChange={(newEffects) => setBranch(index, { effects: newEffects })}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                              availableCharacters={characters}
+                              emotionPalette={emotionPalette}
+                              compact
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
-                    
-                    {localBeat.parameters?.choices?.length > 0 && (
-                      <div className="text-xs text-gray-500 mt-2">
-                        The beat will randomly select one of these targets.
-                      </div>
-                    )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Add/Remove Inventory Beat - handled by SchemaFormGenerator */}
 
@@ -5092,9 +5123,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                             value={localBeat.connections?.[0]?.targetId || localBeat.defaultTarget || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
+                              // Keep the link's other fields (its effects)
+                              // when only the target changes.
+                              const prior = localBeat.connections?.[0] || {};
                               const updatedBeat = {
                                 ...localBeat,
-                                connections: targetId ? [{ targetId, label: '' }] : [],
+                                connections: targetId ? [{ ...prior, targetId, label: prior.label || '' }] : [],
                                 defaultTarget: targetId || undefined
                               };
                               setLocalBeat(updatedBeat);
@@ -5113,6 +5147,30 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                         </div>
+                        {/* Effects on this link: run when the player continues
+                            (e.g. start a counter, record a route). */}
+                        {!!localBeat.connections?.[0]?.targetId && (
+                          <div className="p-2 bg-blue-50 rounded space-y-2">
+                            <div className="text-xs font-medium text-blue-700">When the player continues (optional)</div>
+                            <ChoiceEffectsEditor
+                              effects={localBeat.connections[0].effects || []}
+                              onChange={(newEffects) => {
+                                const conn = { ...localBeat.connections[0] };
+                                if (newEffects.length) conn.effects = newEffects; else delete conn.effects;
+                                const updatedBeat = { ...localBeat, connections: [conn, ...localBeat.connections.slice(1)] };
+                                setLocalBeat(updatedBeat);
+                                setHasChanges(true);
+                                rebuildConnectionsAndUpdate(updatedBeat);
+                              }}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                              availableCharacters={characters}
+                              emotionPalette={emotionPalette}
+                              compact
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

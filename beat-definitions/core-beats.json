@@ -136,7 +136,7 @@
       }
     },
     "connection": {
-      "description": "Single connection for linear beats",
+      "description": "A link to the next beat. Its effects run when the player moves along it — e.g. an infoText's Continue link. (Links made by choices, props and dialog carry their effects on the choice instead.)",
       "schema": {
         "target": "string",
         "label": "string?",
@@ -2506,14 +2506,37 @@
       "category": "invisible",
       "displayName": "Random Target",
       "icon": "🎲",
-      "description": "Randomly select next beat from choices",
+      "description": "Randomly picks the next beat — the random branch. Each branch can set state when drawn (effects) and be more or less likely (weight), e.g. draw case variant A/B/C and record which one in a variable.",
       "connectionType": "multiple",
       "parameters": {
         "choices": {
           "type": "array<connection>",
           "required": true,
           "minItems": 2,
-          "description": "Array of possible target beats"
+          "description": "The branches. Each is a bare beat id (\"beat_12\") or an object { \"target\": \"beat_12\", \"weight\": 2, \"effects\": [ … ] } — weight defaults to 1 (0 = never drawn), effects run when that branch is drawn (same effect shapes as choices). Use bare ids when no branch needs either.",
+          "itemSchema": {
+            "target": {
+              "type": "string",
+              "required": true,
+              "description": "Beat id this branch leads to"
+            },
+            "weight": {
+              "type": "number",
+              "required": false,
+              "default": 1,
+              "description": "Relative likelihood (2 = twice as likely as a weight-1 branch; 0 = never)"
+            },
+            "effects": {
+              "type": "effect[]",
+              "required": false,
+              "description": "Applied when this branch is drawn"
+            },
+            "label": {
+              "type": "string",
+              "required": false,
+              "description": "Name for the branch shown on the graph edge"
+            }
+          }
         }
       },
       "transitions": false,

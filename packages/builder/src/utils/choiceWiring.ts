@@ -8,6 +8,10 @@
  *   - panorama                       parameters.hotspots[]
  *   - dialogTree / aiDialogTree      parameters.dialogTree — every node and
  *                                    every choice, at any depth
+ *   - randomTarget                   parameters.choices[] branches (bare beat
+ *                                    ids or { target, weight, effects }); they
+ *                                    have no ids, so they are addressed as
+ *                                    branch_1, branch_2, … in order
  *
  * Used by the Co-Designer (setChoiceEffects / setChoiceConditions proposals)
  * and by the story digest that shows the model the current wiring.
@@ -15,7 +19,7 @@
 
 type Json = Record<string, any>;
 
-export type WiringSiteKind = 'choice' | 'prop' | 'hotspot' | 'dialogNode' | 'dialogChoice';
+export type WiringSiteKind = 'choice' | 'prop' | 'hotspot' | 'dialogNode' | 'dialogChoice' | 'branch';
 
 export interface WiringSite {
   kind: WiringSiteKind;
@@ -68,9 +72,33 @@ function walkDialog(node: Json | undefined, depth: number, out: WiringSite[]): v
   }
 }
 
+/** A randomTarget branch list: bare ids, or objects with a target and no id/text. */
+function isBranchList(list: unknown): list is Array<string | Json> {
+  return Array.isArray(list) && list.length > 0 && list.every((c) =>
+    typeof c === 'string' || (c && typeof c === 'object' && (c as Json).id === undefined && (c as Json).text === undefined
+      && typeof ((c as Json).target ?? (c as Json).targetId) === 'string'));
+}
+
+function branchSites(list: Array<string | Json>): WiringSite[] {
+  return list.map((c, i) => {
+    const o: Json = typeof c === 'string' ? { target: c } : c;
+    const target = o.target ?? o.targetId;
+    return {
+      kind: 'branch' as const,
+      id: `branch_${i + 1}`,
+      label: o.weight !== undefined && o.weight !== 1 ? `weight ${o.weight}` : '',
+      target,
+      conditions: [],
+      effects: Array.isArray(o.effects) ? o.effects : [],
+      depth: 0,
+    };
+  });
+}
+
 /** Every wiring site on a beat, in reading order. */
 export function listWiringSites(parameters: Json | undefined): WiringSite[] {
   const p = parameters ?? {};
+  if (isBranchList(p.choices)) return branchSites(p.choices);
   const out: WiringSite[] = [];
   for (const { param, kind } of FLAT_LISTS) {
     for (const o of Array.isArray(p[param]) ? p[param] : []) {
@@ -168,6 +196,19 @@ export function setSiteField(
   if (sites.length > 1) return { ok: false, problem: `option id "${siteId}" is used ${sites.length} times on this beat` };
 
   const target = sites[0];
+  if (target.kind === 'branch') {
+    if (field === 'conditions') return { ok: false, problem: 'random branches have no conditions — every branch can be drawn (use weight 0 to disable one)' };
+    if (field !== 'effects' && field !== 'weight') return { ok: false, problem: 'a random branch has no text — change what it does (effects) or its weight' };
+    const index = Number(siteId.slice('branch_'.length)) - 1;
+    const list = (p.choices as Array<string | Json>).map((c, i) => {
+      if (i !== index) return c;
+      const o: Json = typeof c === 'string' ? { target: c } : { ...c };
+      o[field] = value;
+      if (field === 'effects' && Array.isArray(value) && value.length === 0) delete o.effects;
+      return o;
+    });
+    return { ok: true, parametersPatch: { choices: list }, site: target };
+  }
   if (target.kind === 'dialogNode' || target.kind === 'dialogChoice') {
     const hits = { n: 0 };
     const tree = replaceInDialog(p.dialogTree, siteId, field, value, hits);
@@ -224,6 +265,9 @@ export function addOption(parameters: Json | undefined, option: NewOption, paren
   if (option.conditions?.length) entry.conditions = option.conditions;
   if (option.dialogNode) entry.dialogNode = option.dialogNode;
 
+  if (isBranchList(p.choices)) {
+    return { ok: false, problem: 'this is a random branch list — change its branches with updateParams "choices" (each { target, weight?, effects? })' };
+  }
   if (p.dialogTree && typeof p.dialogTree === 'object') {
     const rootId = String(p.dialogTree.id);
     const parent = parentId ?? rootId;

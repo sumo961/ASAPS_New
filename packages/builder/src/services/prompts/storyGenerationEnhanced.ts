@@ -134,6 +134,9 @@ const BEAT_TYPE_GUIDE = `
 - ⚠️ CRITICAL: Connection goes in "connections" array at beat level, NOT inside parameters!
 - ❌ WRONG: "parameters": { "text": "...", "duration": 3, "connection": { "target": "beat_5" } }
 - ✓ CORRECT: "parameters": { "text": "...", "duration": 3 }, "connections": [{ "targetId": "beat_5" }]
+- A single link (durScreen, infoText, any one-exit beat) may carry effects that run when the story
+  moves on: "connections": [{ "targetId": "beat_5", "effects": [ … ] }] — same effect shapes as
+  choices, e.g. start a counter or record that this scene was seen.
 - Connections: Single → auto-advances after duration
 - Example: "Three days later..." (3s) → dialogTree
 
@@ -713,11 +716,17 @@ Fictional time condition example (CORRECT format):
   - Add from NPC gift: { "item": "reward_coin", "action": "add", "character": "player" }
   - Transfer: { "item": "sword", "action": "transfer", "fromChar": "player", "toChar": "companion", "character": "player" }
 
-**randomTarget** - Random path selection
-- Use: Randomness, procedural elements, replayability
-- Parameters: targets (array of {targetId, weight})
+**randomTarget** - Random path selection (the random branch)
+- Use: Randomness, procedural elements, replayability, case/scenario variants
+- Parameters: choices — array of branches, each a bare beat id ("beat_7") or
+  { "target": "beat_7", "weight": 2, "effects": [ … ] }
+  - weight: relative likelihood (default 1; 0 = never drawn)
+  - effects: run when that branch is drawn — same effect shapes as choices.
+    Use them to RECORD the draw (setVariable caseVariant = "B") or to seed
+    state for that variant (setCounter Clock = 180)
 - Connections: Multiple → randomly picks one
-- Pattern: Add variety, random encounters
+- Pattern: Add variety, random encounters; per-playthrough variants whose
+  later beats check the recorded variable
 - Example: "You wander the forest" → randomTarget → [encounter wolf | find camp | get lost]
 
 **setTimer** - Background countdown

@@ -511,36 +511,11 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         }
       }
       
-      // Special handling for randomTarget beats - show all choices
-      if (beat.type === 'randomTarget' && params.choices) {
-        params.choices.forEach((choice: any, index: number) => {
-          if (choice.target) {
-            const choiceEdgeId = `${beat.id}-choice-${choice.target}`;
-            const edge = createEdge(beat.id, choice.target, {
-                id: choiceEdgeId,
-                type: 'custom',
-                animated: false,
-                label: `Random ${index + 1}`,
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                },
-                style: {
-                  stroke: '#a855f7', // Purple for random choices
-                  strokeWidth: 2,
-                },
-                data: {
-                  isRandom: true,
-                },
-              });
-            if (edge && !edgeIds.has(edge.id)) {
-              edgeIds.add(edge.id);
-              allEdges.push(edge);
-            }
-          }
-        });
-      }
+      // randomTarget: its branches are ordinary links (RandomTargetBeat
+      // builds one per branch, labelled "Random N"), drawn by the regular
+      // connection pass below. A separate emitter here only ever fired for
+      // object-form branches and doubled every edge once branches could
+      // carry weights/effects.
 
       // Special handling for movementChoice beats - show all location choices
       if (beat.type === 'movementChoice' && params.choices) {

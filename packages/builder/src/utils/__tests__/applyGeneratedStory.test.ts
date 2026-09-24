@@ -28,6 +28,7 @@ function fakeBeat(type: string, position: any, options: any) {
     updateParameters(p: any) { this.params = { ...this.params, ...p }; },
     addConnection(c: any) { this.connections.push(c); },
     getConnections() { return this.connections; },
+    getConnectionsForEdit() { return this.connections; },
   };
 }
 
@@ -215,5 +216,21 @@ describe('applyGeneratedStory — 2026-09-08 dragon-story regressions', () => {
     const finale = loaded.clusters.find((c: any) => c.id === 'Finale');
     expect(finale.containerBounds.width).toBeGreaterThan(0);
     expect(deps.requestClusterArrange).toHaveBeenCalled();
+  });
+
+  it('keeps effects on a linear beat\'s link (connections[] and parameters.connection)', async () => {
+    const deps = makeDeps();
+    const fx = [{ type: 'setCounter', target: 'Clock', value: 240 }];
+    await applyGeneratedStory({
+      metadata: { title: 'T', firstBeatId: 'a' },
+      beats: [
+        { id: 'a', type: 'infoText', parameters: { text: 'x' }, connections: [{ targetId: 'b', effects: fx }] },
+        { id: 'b', type: 'infoText', parameters: { text: 'y', connection: { target: 'c', effects: fx } } },
+        { id: 'c', type: 'endScreen', parameters: {} },
+      ],
+    } as any, deps, { fallbackTitle: 'x' });
+    const beats = deps.loaded[0].beats as any[];
+    expect(beats.find((b) => b.id === 'a').connections[0]).toMatchObject({ targetId: 'b', effects: fx });
+    expect(beats.find((b) => b.id === 'b').connections[0]).toMatchObject({ targetId: 'c', effects: fx });
   });
 });

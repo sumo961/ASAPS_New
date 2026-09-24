@@ -145,7 +145,7 @@ function storyStateInUse(beats: DigestBeat[], characters: DigestCharacter[] = []
 }
 
 const SITE_WORD: Record<string, string> = {
-  choice: 'choice', prop: 'prop', hotspot: 'hotspot', dialogNode: 'node', dialogChoice: 'choice',
+  choice: 'choice', prop: 'prop', hotspot: 'hotspot', dialogNode: 'node', dialogChoice: 'choice', branch: 'random',
 };
 
 /**
@@ -161,6 +161,14 @@ function wiringLines(beat: DigestBeat): string[] {
     const joiner = beat.requiresMode === 'any' ? ' OR ' : ' AND ';
     out.push(`    requires: ${req.map((r) => describeCondition((r.condition || {}) as any) + (r.fallbackTarget ? ` (else → ${r.fallbackTarget})` : '')).join(joiner)}`);
   }
+  // Effects on the beat's own links (e.g. an infoText's Continue).
+  try {
+    for (const c of (typeof beat.getConnections === 'function' ? beat.getConnections() : []) as any[]) {
+      if (Array.isArray(c?.effects) && c.effects.length > 0) {
+        out.push(`    continue → ${c.targetId} — does ${c.effects.map((e: any) => describeEffect(e)).join('; ')}`);
+      }
+    }
+  } catch { /* digest never throws */ }
   for (const site of listWiringSites(beatParams(beat) as any)) {
     const wired = site.conditions.length > 0 || site.effects.length > 0 || !!site.legacyCounter;
     if (site.kind === 'dialogNode' && !wired) continue;

@@ -1,108 +1,115 @@
 import { Beat } from './Beat';
-import type { BeatConfig } from '../types';
+import type { BeatConfig, Effect } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { RandomTargetParameters } from '../generated/beat-types';
 
+/**
+ * One way out of a random branch. `effects` run when this branch is drawn
+ * (e.g. record which case variant this playthrough uses); `weight` makes a
+ * branch more or less likely (default 1; 0 = never drawn).
+ */
+export interface RandomBranch {
+  target: string;
+  weight?: number;
+  effects?: Effect[];
+  label?: string;
+}
+
+/**
+ * Every shape a random branch has been stored in: a bare beat id (the
+ * original and still the common form), { target } / { id, target } (legacy
+ * import), { targetId } (Connection form), and the full RandomBranch.
+ */
+function toBranch(raw: any): RandomBranch | null {
+  if (typeof raw === 'string') return raw ? { target: raw } : null;
+  if (!raw || typeof raw !== 'object') return null;
+  const target = raw.target || raw.targetId || raw.id;
+  if (typeof target !== 'string' || !target) return null;
+  const b: RandomBranch = { target };
+  if (typeof raw.weight === 'number' && Number.isFinite(raw.weight) && raw.weight >= 0) b.weight = raw.weight;
+  if (Array.isArray(raw.effects) && raw.effects.length > 0) b.effects = raw.effects;
+  if (typeof raw.label === 'string' && raw.label) b.label = raw.label;
+  return b;
+}
+
 export class RandomTargetBeat extends Beat {
-  private choices: string[];
+  private branches: RandomBranch[];
 
   constructor(config: BeatConfig & {
-    choices?: string[] | Array<{ id: string; target: string }>;
+    choices?: Array<string | Record<string, unknown>>;
     parameters?: Partial<RandomTargetParameters>;
   }) {
     super(config);
-    const params = config.parameters || {};
-
-    // Handle both formats: array of strings or array of Connection objects
-    let choices = params.choices || config.choices || [];
-
-    // Convert Connection format to string format if needed
-    if (choices.length > 0 && typeof choices[0] === 'object' && 'targetId' in choices[0]) {
-      // Connection[] format
-      choices = choices.map((c: any) => c.targetId).filter(Boolean);
-    } else if (choices.length > 0 && typeof choices[0] === 'object') {
-      // Legacy object format { id, target }
-      choices = choices.map((c: any) => c.target || c.id || c).filter(Boolean);
-    }
-
-    this.choices = choices as string[];
-
-    // Create connections for each choice
+    const params = (config.parameters || {}) as any;
+    // `targets` is what the story generator taught for a year ("targets:
+    // [{targetId, weight}]"); the runtime only read `choices`, so those
+    // beats had no branches. Accept it.
+    const raw = params.choices || config.choices || params.targets || (config as any).targets || [];
+    this.branches = (Array.isArray(raw) ? raw : []).map(toBranch).filter(Boolean) as RandomBranch[];
     this.updateConnections();
   }
-  
+
   private updateConnections(): void {
-    // Clear existing connections
+    // Graph links, one per branch. Effects stay on the branch (applied in
+    // performAction), NOT on these links — so they can't fire twice.
     this.connections = [];
-    
-    // Add connection for each valid choice
-    this.choices.forEach((choice, index) => {
-      if (choice) {
-        this.addConnection({
-          targetId: choice,
-          label: `Random ${index + 1}`
-        });
-      }
+    this.branches.forEach((b, index) => {
+      const weight = b.weight !== undefined && b.weight !== 1 ? ` (×${b.weight})` : '';
+      this.addConnection({ targetId: b.target, label: b.label || `Random ${index + 1}${weight}` });
     });
   }
 
   getParameters(): Record<string, any> {
+    // Plain branches stay plain beat ids: stories that never use weights or
+    // effects save exactly as before (and older builds can still read them).
+    const plain = this.branches.every((b) => b.weight === undefined && !b.effects && !b.label);
     return {
-      choices: this.choices
+      choices: plain ? this.branches.map((b) => b.target) : this.branches.map((b) => ({ ...b })),
     };
   }
 
   updateParameters(params: Record<string, any>): void {
-    if (params.choices !== undefined) {
-      // Handle both formats
-      let choices = params.choices;
-      if (choices.length > 0 && typeof choices[0] === 'object') {
-        choices = choices.map((c: any) => c.target || c.id || c).filter(Boolean);
-      }
-      this.choices = choices;
-      
-      // Update connections when choices change
+    const incoming = params.choices !== undefined ? params.choices : params.targets;
+    if (incoming !== undefined) {
+      this.branches = (Array.isArray(incoming) ? incoming : []).map(toBranch).filter(Boolean) as RandomBranch[];
       this.updateConnections();
     }
   }
-  
-  // toXML(doc: Document): Element {
-  //   const element = super.toXML(doc);
-    
-  //   // Add choice elements for export
-  //   const functionEl = element.querySelector('function');
-  //   if (functionEl && this.choices) {
-  //     this.choices.forEach((choice) => {
-  //       if (choice) {
-  //         const choiceEl = doc.createElement('choice');
-  //         choiceEl.setAttribute('targetBeat', choice);
-  //         functionEl.appendChild(choiceEl);
-  //       }
-  //     });
-  //   }
-    
-  //   return element;
-  // }
+
+  /** Weighted draw; weights default to 1, and all-zero falls back to an even draw. */
+  private draw(): RandomBranch | null {
+    if (this.branches.length === 0) return null;
+    const weights = this.branches.map((b) => (b.weight === undefined ? 1 : b.weight));
+    const total = weights.reduce((a, w) => a + w, 0);
+    if (total <= 0) return this.branches[Math.floor(Math.random() * this.branches.length)];
+    let r = Math.random() * total;
+    for (let i = 0; i < this.branches.length; i++) {
+      r -= weights[i];
+      if (r < 0 && weights[i] > 0) return this.branches[i];
+    }
+    // Float edge: the last branch that can be drawn.
+    for (let i = this.branches.length - 1; i >= 0; i--) if (weights[i] > 0) return this.branches[i];
+    return this.branches[this.branches.length - 1];
+  }
 
   protected async performAction(
     context: StoryContext,
-    renderer: IRenderer
+    _renderer: IRenderer
   ): Promise<string | null> {
-    // Filter valid choices
-    const validChoices = this.choices.filter(c => c);
-    
-    if (validChoices.length === 0) {
+    const branch = this.draw();
+    if (!branch) {
       console.warn(`RandomTargetBeat ${this.id} has no valid choices`);
       return this.getNextBeat(context);
     }
-
-    // Pick a random choice
-    const randomIndex = Math.floor(Math.random() * validChoices.length);
-    const selectedChoice = validChoices[randomIndex];
-    
-    console.log(`RandomTargetBeat ${this.id}: Randomly selected choice ${randomIndex + 1} -> ${selectedChoice}`);
-    
-    return selectedChoice;
+    for (const effect of branch.effects ?? []) {
+      try {
+        context.applyEffect(effect);
+      } catch (err) {
+        console.warn(`RandomTargetBeat ${this.id}: effect failed`, effect, err);
+      }
+    }
+    console.log(`RandomTargetBeat ${this.id}: drew -> ${branch.target}${branch.effects?.length ? ` (${branch.effects.length} effect(s))` : ''}`);
+    return branch.target;
   }
 }

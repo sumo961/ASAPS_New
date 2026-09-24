@@ -329,6 +329,8 @@ export abstract class Beat {
 
       const nextBeatId = await this.performAction(context, renderer);
 
+      this.applyTakenLinkEffects(nextBeatId, context);
+
       await this.onExit(context, renderer);
       
       context.markBeatVisited(this.id);
@@ -652,6 +654,30 @@ export abstract class Beat {
       name: this.speaker || '',
       character: null,
     };
+  }
+
+  /**
+   * Apply the effects of the stored link the story is leaving by. Several
+   * links to the same beat: the first whose condition holds, else the first
+   * unconditional one. Only STORED links (this.connections) — links derived
+   * from choices/props/dialog carry effects on the option itself, applied
+   * by that beat, so nothing fires twice.
+   */
+  protected applyTakenLinkEffects(nextBeatId: string | null, context: StoryContext): void {
+    if (!nextBeatId || !Array.isArray(this.connections)) return;
+    const candidates = this.connections.filter((c) => c?.targetId === nextBeatId);
+    if (candidates.length === 0) return;
+    const taken = candidates.find((c) => c.condition && context.checkCondition(c.condition))
+      ?? candidates.find((c) => !c.condition)
+      ?? candidates[0];
+    if (!Array.isArray(taken.effects) || taken.effects.length === 0) return;
+    for (const effect of taken.effects) {
+      try {
+        context.applyEffect(effect);
+      } catch (err) {
+        console.warn(`[Beat ${this.id}] Link effect failed:`, effect, err);
+      }
+    }
   }
 
   toJSON(): any {

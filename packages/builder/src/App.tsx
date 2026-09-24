@@ -4761,6 +4761,9 @@ function App() {
         targetId: conn.targetId,
         label: conn.label,
         condition: conn.condition,
+        // Link effects (e.g. on an infoText's Continue) — dropped here, the
+        // Preview Window and exports never applied them.
+        ...(conn.effects?.length ? { effects: conn.effects } : {}),
       })) || [],
       locations: beat.locations ? Array.from(beat.locations.values()) : [],
       animations: beat.animations || [],
@@ -5975,6 +5978,14 @@ function App() {
               const site = findWiringSite(params as any, String(p.choiceId));
               if (!site) return { index, current: null, error: `option ${p.choiceId} not found` };
               return { index, current: site.label };
+            }
+            case 'setLinkEffects': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const links = (beat.connections || []) as any[];
+              const link = p.targetId ? links.find(l => l.targetId === p.targetId) : links.length === 1 ? links[0] : null;
+              if (!link) return { index, current: null };
+              return { index, current: link.effects?.length ? link.effects.map((e: any) => describeEffect(e)).join('; ') : '(none)' };
             }
             case 'addChoice':
             case 'replaceBeat': {

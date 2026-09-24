@@ -55,6 +55,16 @@ export type ChangeProposal =
       note?: string;
     }
   | {
+      /** FULL replacement of the effects on a beat's own link (a linear beat's
+       *  Continue) — run when the player moves on. targetId picks the link
+       *  when the beat has several. */
+      kind: 'setLinkEffects';
+      beatId: string;
+      targetId?: string;
+      effects: Array<Record<string, unknown>>;
+      note?: string;
+    }
+  | {
       /** FULL replacement of one option's visibility conditions ([] = always shown). */
       kind: 'setChoiceConditions';
       beatId: string;

@@ -64,9 +64,14 @@ STORY STATE — what exists and how to use it
 - Story VARIABLES (text / yes-no / numbers) are declared in Project Settings;
   propose 'defineVariable' for a new one. setVariable effects and setVariable
   beats change them.
-- A randomTarget only PICKS the next beat — its branches carry no effects.
-  To record which branch ran, start each branch with a setVariable beat (or
-  put the state change on that branch's first choices).
+- A randomTarget's branches can carry effects (run when drawn) and a weight
+  (default 1; 0 = never). The digest lists them as "random branch_1 …";
+  'setChoiceEffects' with "choiceId": "branch_2" sets what a branch does. To
+  create or reweight branches, updateParams "choices": [ "beat_7",
+  { "target": "beat_8", "weight": 2, "effects": [ … ] } ].
+- A linear beat's link (an infoText's Continue) can carry effects too:
+  'setLinkEffects' { "beatId", "effects", "targetId"? }. The digest shows them
+  as "continue → …". Beats whose exits are choices use setChoiceEffects.
 - Character counters live on a character (updateCharacter "counters") and
   can show as that character's meter.
 - Show a value in player-facing text with \${name} — "Time left: \${Clock}
@@ -116,6 +121,7 @@ block in EXACTLY this form:
     { "kind": "addBeat", "beatType": "infoText", "name": "…", "parameters": { "text": "…" }, "connectFrom": "beat_3", "connectLabel": "…", "note": "why" },
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
     { "kind": "setChoiceEffects", "beatId": "beat_5", "choiceId": "choice_2", "effects": [ { "type": "addSentiment", "target": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "strengthDelta": 0.2 }, { "type": "incrementCounter", "target": "clues", "value": 1 } ], "note": "why" },
+    { "kind": "setLinkEffects", "beatId": "beat_4", "effects": [ { "type": "setCounter", "target": "Clock", "value": 240 } ], "note": "why" },
     { "kind": "setChoiceConditions", "beatId": "beat_5", "choiceId": "choice_3", "conditions": [ { "type": "inventory", "item": "brass_key" } ], "note": "why" },
     { "kind": "defineVariable", "name": "caseVariant", "defaultValue": "", "description": "which case version this playthrough uses", "note": "why" },
     { "kind": "editChoiceText", "beatId": "beat_3", "choiceId": "choice_2", "text": "Call now — the school says the boy hasn't come home", "note": "why" },

@@ -372,6 +372,21 @@ export async function applyGeneratedStory(
       sourceBeat.addConnection({ targetId: conn.target, label: conn.label || `To ${targetBeat.name}` });
     }
   }
+  // Link effects ("connection": { "target", "effects" } on a linear beat, or
+  // effects on a connections[] entry): storyLinks carries target + label
+  // only, so copy them onto the links just made — the engine applies them
+  // when the player continues.
+  for (const raw of (Array.isArray(story.beats) ? story.beats : []) as any[]) {
+    const src = beatMap.get(raw?.id);
+    if (!src) continue;
+    const withEffects = [raw.parameters?.connection, ...(Array.isArray(raw.connections) ? raw.connections : [])]
+      .filter((c: any) => c && Array.isArray(c.effects) && c.effects.length > 0);
+    for (const c of withEffects) {
+      const target = c.target ?? c.targetId;
+      const link = src.getConnectionsForEdit().find((l) => l.targetId === target);
+      if (link) link.effects = c.effects;
+    }
+  }
 
   // 10. The single batch load. Clusters ride along (loadStoryData takes
   //     them) instead of an addCluster per cluster after the fact.

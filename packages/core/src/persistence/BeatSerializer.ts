@@ -142,6 +142,7 @@ export function serializeBeat(beat: Beat): SerializedBeat {
       const conn: any = { targetId: c.targetId };
       if (c.label) conn.label = c.label;
       if (c.condition) conn.condition = c.condition;
+      if (Array.isArray(c.effects) && c.effects.length > 0) conn.effects = c.effects;
       return conn;
     }),
     ...(raw.cluster ? { cluster: raw.cluster } : {}),
@@ -183,6 +184,7 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
       const conn: any = { targetId: c.targetId };
       if (c.label) conn.label = c.label;
       if (c.condition) conn.condition = c.condition;
+      if (Array.isArray(c.effects) && c.effects.length > 0) conn.effects = c.effects;
       return conn;
     }),
     ...(raw.cluster ? { cluster: raw.cluster } : {}),
