@@ -63,6 +63,44 @@ export type ChangeProposal =
       note?: string;
     }
   | {
+      /** Rewrite one option's player-facing label (choice / prop / hotspot / dialog node or choice); wiring kept. */
+      kind: 'editChoiceText';
+      beatId: string;
+      choiceId: string;
+      text: string;
+      note?: string;
+    }
+  | {
+      /** Add one option: to a choices[] beat, or to a dialog node (root unless parentId). */
+      kind: 'addChoice';
+      beatId: string;
+      /** Dialog only: node id — or a choice id that continues into a node. */
+      parentId?: string;
+      choice: {
+        id?: string;
+        text: string;
+        target?: string;
+        effects?: Array<Record<string, unknown>>;
+        conditions?: Array<Record<string, unknown>>;
+        dialogNode?: Record<string, unknown>;
+      };
+      note?: string;
+    }
+  | {
+      /** A NEW VERSION of a beat, side by side: the new beat is added, every
+       *  link INTO the old beat moves to it, and the old one stays, renamed
+       *  "… (replaced)", for the author to compare and delete. */
+      kind: 'replaceBeat';
+      beatId: string;
+      /** Defaults to the old beat's type (e.g. dialogTree → aiConversation is allowed). */
+      beatType?: string;
+      /** Defaults to the old beat's name. */
+      name?: string;
+      /** Complete parameters of the new version (e.g. a whole dialogTree). */
+      parameters: Record<string, unknown>;
+      note?: string;
+    }
+  | {
       /** FULL replacement of a beat's entry requirements (the gate; [] removes it). */
       kind: 'setRequirements';
       beatId: string;

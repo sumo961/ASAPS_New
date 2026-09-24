@@ -82,6 +82,9 @@ block in EXACTLY this form:
     { "kind": "addNote", "beatId": "beat_9", "note": "design note for the author" },
     { "kind": "setChoiceEffects", "beatId": "beat_5", "choiceId": "choice_2", "effects": [ { "type": "addSentiment", "target": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "strengthDelta": 0.2 }, { "type": "incrementCounter", "target": "clues", "value": 1 } ], "note": "why" },
     { "kind": "setChoiceConditions", "beatId": "beat_5", "choiceId": "choice_3", "conditions": [ { "type": "inventory", "item": "brass_key" } ], "note": "why" },
+    { "kind": "editChoiceText", "beatId": "beat_3", "choiceId": "choice_2", "text": "Call now — the school says the boy hasn't come home", "note": "why" },
+    { "kind": "addChoice", "beatId": "beat_3", "parentId": "choice_1", "choice": { "text": "…", "target": "beat_24", "effects": [ { "type": "incrementCounter", "target": "Tension", "value": 1 } ] }, "note": "why" },
+    { "kind": "replaceBeat", "beatId": "beat_27", "parameters": { "dialogTree": { "id": "n0", "speaker": "Parent", "text": "…", "choices": [ { "id": "c1", "text": "…", "target": "beat_32", "effects": [] }, { "id": "c2", "text": "…", "dialogNode": { "id": "n1", "speaker": "Parent", "text": "…", "choices": [ { "id": "c2a", "text": "…", "target": "beat_33" } ] } } ] } }, "note": "why" },
     { "kind": "setRequirements", "beatId": "beat_14", "requires": [ { "condition": { "type": "sentiment", "character": "elena", "sentimentTarget": "player", "sentimentEmotion": "trust", "operator": ">=", "value": 0.3 }, "explanation": "Elena only confides once she trusts the player", "fallbackTarget": "beat_15" } ], "note": "why" },
     { "kind": "updateCharacter", "characterId": "elena", "updates": { "description": "…" }, "note": "why" },
     { "kind": "updateCharacter", "characterId": "elena", "updates": { "counters": [ { "name": "trust", "displayName": "Trust", "min": -100, "max": 100, "showLevelMeter": true, "numericFormat": "band", "source": { "kind": "sentiment", "toEntityRef": "player", "emotion": "trust" }, "bands": [ { "from": -100, "label": "wary" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] } ] }, "note": "why" },
@@ -155,6 +158,27 @@ Rules for proposals:
     type, missing field, zero delta, unknown character, a write to a
     read-only counter) and tells you why — fix it and propose again.
 ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
+- CHOICE TEXT AND STRUCTURE
+  - 'editChoiceText' rewords ONE option (choice, prop, hotspot, dialog
+    choice, or a dialog node's line) by the id in the digest; its target and
+    wiring stay. Use it to make an alternative plausible (give it a reason:
+    time pressure, the client calling first) without touching the rest.
+  - 'addChoice' adds ONE option: to a multiChoice/movementChoice (needs a
+    target), or to a dialog tree — the root node by default, or "parentId":
+    a node id, or the id of a choice that continues into a node. The choice
+    needs a "target" beat (exit) or a "dialogNode" (the conversation goes
+    on). It may carry effects and conditions like any option.
+  - 'replaceBeat' makes a NEW VERSION of a whole beat, side by side: you give
+    the complete new "parameters" (optionally a different "beatType", e.g. a
+    dialogTree reworked as an aiConversation, and a "name"). The app adds it,
+    moves every link INTO the old beat to it, and keeps the old beat renamed
+    "… (replaced)" so the author can play both and delete the loser. Prefer
+    it over many small edits when a scene needs rethinking. Restate ALL the
+    wiring the new version should have (effects, conditions) — nothing is
+    carried over from the old tree except its entry gate. Every "target"
+    must be a beat in the digest. Give every node and choice an "id".
+  - Before 'replaceBeat' or 'editChoiceText' on a dialog tree, read the full
+    beat when the tool is available (the digest shortens choice labels).
 - Each variant may carry a 'stance' — its interpersonal-circumplex position
   { "warmth": -1..1, "dominance": -1..1 } (cold↔warm, submissive↔dominant).
   When a variant's identity is interpersonal (hostile, cooperative,

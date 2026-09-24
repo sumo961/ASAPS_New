@@ -11,7 +11,9 @@
 import type { ChangeProposal, ProposalApplyResult } from '../components/ai/codesigner/types';
 import { getAllBeatTypeIds } from '../services/beatSchemaVocabulary';
 import { applyStanceToTraits } from '../services/prompts/interpersonalStance';
-import { setSiteField } from './choiceWiring';
+import { setSiteField, labelFieldOf, addOption, listWiringSites } from './choiceWiring';
+import { redirectIncoming, retargetValue } from './redirectIncoming';
+import { beatLinks } from './storyLinks';
 import { describeEffect, describeCondition } from './wiringVocabulary';
 
 /** Effect types whose `target` names a character. */
@@ -72,7 +74,13 @@ export interface ApplyContext {
   /** Live beats (id, name, getParameters for validation + positioning). */
   beats: Array<{
     id: string;
+    type?: string;
     name?: string;
+    requires?: Array<Record<string, unknown>>;
+    requiresMode?: 'all' | 'any';
+    connections?: Array<Record<string, unknown>>;
+    defaultTarget?: string;
+    toJSON?: () => Record<string, any>;
     x?: number;
     y?: number;
     notes?: string;
@@ -203,6 +211,133 @@ export function applyChangeProposals(
             detail: isEffects
               ? (list.length ? `${where}: ${list.map((e) => describeEffect(e)).join('; ')}` : `${where}: effects removed`)
               : (list.length ? `${where} shows only if ${list.map((c) => describeCondition(c)).join(' and ')}` : `${where} always shown`),
+          });
+          return;
+        }
+
+        case 'editChoiceText': {
+          const beat = findBeat(p.beatId);
+          if (!beat) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          const params = paramsOf(beat);
+          const field = labelFieldOf(params, p.choiceId);
+          const patch = setSiteField(params, p.choiceId, field, p.text);
+          if (!patch.ok) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${patch.problem}` });
+            return;
+          }
+          pendingParams.set(beat.id, { ...params, ...patch.parametersPatch });
+          ctx.updateBeat(p.beatId, { parameters: patch.parametersPatch });
+          results.push({ index, ok: true, detail: `Reworded ${patch.site.kind === 'dialogNode' ? 'line' : 'choice'} on ${beat.name || p.beatId}: "${p.text.slice(0, 60)}${p.text.length > 60 ? '…' : ''}"` });
+          return;
+        }
+
+        case 'addChoice': {
+          const beat = findBeat(p.beatId);
+          if (!beat) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          const targets = beatLinks({ id: '_', parameters: { dialogTree: { id: '_', choices: [p.choice] } } }).map((l) => l.target);
+          const missing = targets.filter((t) => !beatExists(t));
+          if (missing.length) {
+            results.push({ index, ok: false, detail: `target beat ${missing.map((m) => `"${m}"`).join(', ')} not found` });
+            return;
+          }
+          const nested = p.choice.dialogNode ? listWiringSites({ dialogTree: p.choice.dialogNode }) : [];
+          const problem = wiringProblem(
+            [...(p.choice.effects ?? []), ...nested.flatMap((s) => s.effects)],
+            [...(p.choice.conditions ?? []), ...nested.flatMap((s) => s.conditions)],
+            ctx, beatExists,
+          );
+          if (problem) {
+            results.push({ index, ok: false, detail: problem });
+            return;
+          }
+          const params = paramsOf(beat);
+          const added = addOption(params, p.choice as any, p.parentId);
+          if (!added.ok) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${added.problem}` });
+            return;
+          }
+          pendingParams.set(beat.id, { ...params, ...added.parametersPatch });
+          ctx.updateBeat(p.beatId, { parameters: added.parametersPatch });
+          results.push({ index, ok: true, detail: `Added choice "${p.choice.text.slice(0, 50)}" (${added.id}) to ${beat.name || p.beatId}` });
+          return;
+        }
+
+        case 'replaceBeat': {
+          const old = findBeat(p.beatId);
+          if (!old) {
+            results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
+            return;
+          }
+          if (ctx.beats[0]?.id === old.id) {
+            results.push({ index, ok: false, detail: `${old.name || old.id} is where the story starts — edit it in place instead` });
+            return;
+          }
+          const beatType = p.beatType || old.type;
+          if (!beatType || !knownTypes.has(beatType)) {
+            results.push({ index, ok: false, detail: `Unknown beat type "${beatType}"` });
+            return;
+          }
+          // The new version's own links: to existing beats, or to the old id
+          // (a self-loop — it becomes a loop on the new version).
+          const outgoing = beatLinks({ id: '_', parameters: p.parameters }).map((l) => l.target);
+          const missing = [...new Set(outgoing.filter((t) => t !== old.id && !beatExists(t)))];
+          if (missing.length) {
+            results.push({ index, ok: false, detail: `the new version links to missing beat${missing.length > 1 ? 's' : ''} ${missing.join(', ')}` });
+            return;
+          }
+          const sites = listWiringSites(p.parameters as any);
+          const problem = wiringProblem(sites.flatMap((s) => s.effects), sites.flatMap((s) => s.conditions), ctx, beatExists);
+          if (problem) {
+            results.push({ index, ok: false, detail: problem });
+            return;
+          }
+          const oldName = old.name || old.id;
+          const created = ctx.addBeat(beatType, { x: old.x || 0, y: (old.y || 0) + 220 }, p.name || oldName);
+          if (!created) {
+            results.push({ index, ok: false, detail: `Could not create the new ${beatType} beat` });
+            return;
+          }
+          const oldJson = (typeof old.toJSON === 'function' ? old.toJSON() : old) as Record<string, any>;
+          const newUpdates: Record<string, unknown> = {
+            parameters: retargetValue(p.parameters, old.id, created.id),
+            notes: `[Co-Designer] New version of "${oldName}" (${old.id}). Links into the old beat now lead here; play both, then delete the one you don't keep.${p.note ? `\n\n${p.note}` : ''}`,
+          };
+          // The gate belongs to the beat's place in the story — carry it over.
+          if (Array.isArray(oldJson.requires) && oldJson.requires.length) {
+            newUpdates.requires = retargetValue(oldJson.requires, old.id, created.id);
+            newUpdates.requiresMode = oldJson.requiresMode ?? 'all';
+          }
+          // Same type, no links of its own in the new parameters: keep the
+          // old beat's exits (infoText etc. keep them on the beat, not in
+          // parameters), or the new version would dead-end.
+          if (outgoing.length === 0 && beatType === old.type && Array.isArray(oldJson.connections) && oldJson.connections.length) {
+            newUpdates.connections = retargetValue(structuredClone(oldJson.connections), old.id, created.id);
+            if (oldJson.defaultTarget) newUpdates.defaultTarget = oldJson.defaultTarget === old.id ? created.id : oldJson.defaultTarget;
+          }
+          ctx.updateBeat(created.id, newUpdates);
+
+          const serialized = ctx.beats.map((b) => {
+            const j = (typeof b.toJSON === 'function' ? b.toJSON() : b) as Record<string, any>;
+            return { id: b.id, parameters: paramsOf(b), connections: j.connections, defaultTarget: j.defaultTarget, requires: j.requires };
+          });
+          const moved = redirectIncoming(serialized, old.id, created.id);
+          for (const u of moved.updates) {
+            const src = findBeat(u.beatId);
+            if (src && u.updates.parameters) pendingParams.set(u.beatId, { ...paramsOf(src), ...u.updates.parameters });
+            ctx.updateBeat(u.beatId, u.updates);
+          }
+          ctx.updateBeat(old.id, { name: `${oldName} (replaced)` });
+          const sources = moved.updates.length;
+          results.push({
+            index, ok: true,
+            detail: `New version of "${oldName}" added (${created.id}); ${moved.links} link${moved.links === 1 ? '' : 's'} from ${sources} beat${sources === 1 ? '' : 's'} now lead to it. The old beat is kept as "${oldName} (replaced)" — delete it once you've compared.` +
+              (moved.leftovers.length ? ` ${moved.leftovers.length} link(s) still point at the old beat (${moved.leftovers.map((l) => l.source).join(', ')}).` : ''),
           });
           return;
         }

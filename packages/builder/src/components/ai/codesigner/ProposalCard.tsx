@@ -74,8 +74,29 @@ function proposalDetail(p: ChangeProposal): string | null {
     case 'setChoiceEffects':
     case 'setChoiceConditions':
     case 'setRequirements':
+    case 'editChoiceText':
       return null;
+    case 'addChoice': {
+      const bits: string[] = [];
+      if (p.choice.conditions?.length) bits.push(`shown if ${p.choice.conditions.map((c) => describeCondition(c)).join(' and ')}`);
+      if (p.choice.effects?.length) bits.push(`does ${p.choice.effects.map((e) => describeEffect(e)).join('; ')}`);
+      if (p.choice.dialogNode) bits.push(`continues: "${String((p.choice.dialogNode as any).text ?? '').slice(0, 100)}"`);
+      return bits.join(' · ') || null;
+    }
+    case 'replaceBeat': {
+      const tree = (p.parameters as any).dialogTree;
+      const text = tree?.text ?? (p.parameters as any).text;
+      const choices = tree ? countDialogChoices(tree) : 0;
+      return [
+        typeof text === 'string' ? `opens: "${text.length > 140 ? `${text.slice(0, 137)}…` : text}"` : '',
+        choices ? `${choices} choices in the conversation` : '',
+      ].filter(Boolean).join(' · ') || null;
+    }
   }
+}
+
+function countDialogChoices(node: any): number {
+  return (node?.choices ?? []).reduce((n: number, c: any) => n + 1 + (c?.dialogNode ? countDialogChoices(c.dialogNode) : 0), 0);
 }
 
 /** New wiring in the same wording the main window uses for the current value. */
@@ -89,6 +110,8 @@ function wiringNextValue(p: ChangeProposal): string | null {
       return p.requires.length
         ? p.requires.map((r: any) => describeCondition(r.condition || {})).join(p.requiresMode === 'any' ? ' or ' : ' and ')
         : '(no gate)';
+    case 'editChoiceText':
+      return p.text;
     default:
       return null;
   }

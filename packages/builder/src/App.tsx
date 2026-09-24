@@ -5967,6 +5967,19 @@ function App() {
               const fmt = p.kind === 'setChoiceEffects' ? describeEffect : describeCondition;
               return { index, current: list.length ? list.map((x: any) => fmt(x)).join('; ') : '(none)' };
             }
+            case 'editChoiceText': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              if (!beat) return { index, current: null, error: 'beat not found' };
+              const params = typeof beat.getParameters === 'function' ? beat.getParameters() : {};
+              const site = findWiringSite(params as any, String(p.choiceId));
+              if (!site) return { index, current: null, error: `option ${p.choiceId} not found` };
+              return { index, current: site.label };
+            }
+            case 'addChoice':
+            case 'replaceBeat': {
+              const beat = state.beats.find(b => b.id === p.beatId);
+              return beat ? { index, current: null } : { index, current: null, error: 'beat not found' };
+            }
             case 'setRequirements': {
               const beat = state.beats.find(b => b.id === p.beatId);
               if (!beat) return { index, current: null, error: 'beat not found' };
@@ -6104,12 +6117,28 @@ function App() {
     // state and lose earlier edits in the same batch.
     let workingChars = characters;
     let charsChanged = false;
+    // Beats created by THIS batch are not in state.beats yet (React applies
+    // the add later), so handleBeatUpdate would not find them and silently
+    // drop their parameters. Edit those instances directly instead — their
+    // AddBeatCommand already makes the whole creation one undo step.
+    const createdInBatch = new Map<string, Beat>();
     const results = applyChangeProposals(proposals, {
       beats: state.beats as any,
-      updateBeat: (beatId, updates) => handleBeatUpdate(beatId, updates as any),
+      updateBeat: (beatId, updates) => {
+        const fresh = createdInBatch.get(beatId);
+        if (!fresh) {
+          handleBeatUpdate(beatId, updates as any);
+          return;
+        }
+        const { parameters, ...rest } = updates as Record<string, any>;
+        if (parameters) fresh.updateParameters({ ...fresh.getParameters(), ...parameters });
+        Object.assign(fresh, rest);
+        actions.updateBeat(beatId, {} as Partial<Beat>);
+      },
       addBeat: (beatType, position, name) => {
         const newBeat = actions.addBeat(beatType, position, { name });
         if (!newBeat) return null;
+        createdInBatch.set(newBeat.id, newBeat);
         const cmd = new AddBeatCommand(newBeat, stableMutations.current);
         getCommandManager().pushWithoutExecute(cmd);
         return newBeat;

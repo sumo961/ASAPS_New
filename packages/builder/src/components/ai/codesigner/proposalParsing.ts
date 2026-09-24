@@ -28,6 +28,44 @@ import {
   describeEffect,
   describeCondition,
 } from '../../../utils/wiringVocabulary';
+import { ensureDialogIds } from '../../../utils/choiceWiring';
+
+/**
+ * Validate the wiring inside a whole parameter set (a replacement beat):
+ * every choice / prop / hotspot / dialog node + choice at any depth gets its
+ * effects and conditions normalized; the first bad one refuses the lot.
+ */
+function normalizeParamsWiring(params: Record<string, any>): { ok: true; value: Record<string, any> } | { ok: false; problem: string } {
+  let problem: string | null = null;
+  const fix = (o: any, where: string): any => {
+    if (!o || typeof o !== 'object' || problem) return o;
+    const out = { ...o };
+    for (const [field, one] of [['effects', normalizeEffect], ['conditions', normalizeCondition]] as const) {
+      if (out[field] === undefined) continue;
+      const n = normalizeList(out[field], one);
+      if (!n.ok) { problem = `${where}: ${field} ${n.problem}`; return o; }
+      out[field] = n.value;
+    }
+    return out;
+  };
+  const out: Record<string, any> = { ...params };
+  for (const list of ['choices', 'props', 'hotspots']) {
+    if (Array.isArray(out[list])) out[list] = out[list].map((o: any) => (o && typeof o === 'object' ? fix(o, `${list} ${o.id ?? '?'}`) : o));
+  }
+  if (out.dialogTree && typeof out.dialogTree === 'object') {
+    const walk = (node: any): any => {
+      const n = fix(node, `node ${node.id}`);
+      n.choices = (n.choices || []).map((c: any) => {
+        const nc = fix(c, `choice ${c.id}`);
+        if (nc.dialogNode) nc.dialogNode = walk(nc.dialogNode);
+        return nc;
+      });
+      return n;
+    };
+    out.dialogTree = walk(ensureDialogIds(out.dialogTree));
+  }
+  return problem ? { ok: false, problem } : { ok: true, value: out };
+}
 
 /**
  * Validate + clamp the affect fields of an updateCharacter proposal. Numeric
@@ -135,6 +173,7 @@ const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 const VALID_KINDS = new Set([
   'editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter',
   'setChoiceEffects', 'setChoiceConditions', 'setRequirements',
+  'editChoiceText', 'addChoice', 'replaceBeat',
 ]);
 
 /** Warnings from the last normalizeProposal rejection (why an entry was dropped). */
@@ -181,6 +220,49 @@ function normalizeProposal(raw: any): ChangeProposal | null {
       return isEffects
         ? { kind: 'setChoiceEffects', beatId: raw.beatId, choiceId: String(choiceId), effects: list.value, note }
         : { kind: 'setChoiceConditions', beatId: raw.beatId, choiceId: String(choiceId), conditions: list.value, note };
+    }
+    case 'editChoiceText': {
+      const choiceId = raw.choiceId ?? raw.optionId ?? raw.nodeId;
+      if (typeof raw.beatId !== 'string' || (typeof choiceId !== 'string' && typeof choiceId !== 'number')) return reject(raw.kind, 'needs beatId and choiceId');
+      const text = typeof raw.text === 'string' ? raw.text : raw.newValue;
+      if (typeof text !== 'string' || !text.trim()) return reject(raw.kind, 'needs the new text');
+      return { kind: 'editChoiceText', beatId: raw.beatId, choiceId: String(choiceId), text: text.trim(), note: typeof raw.note === 'string' ? raw.note : undefined };
+    }
+    case 'addChoice': {
+      const c = raw.choice;
+      if (typeof raw.beatId !== 'string' || !c || typeof c !== 'object') return reject(raw.kind, 'needs beatId and choice');
+      if (typeof c.text !== 'string' || !c.text.trim()) return reject(raw.kind, 'the choice needs text');
+      const choice: Record<string, any> = { text: c.text.trim() };
+      if (typeof c.id === 'string' && c.id.trim()) choice.id = c.id.trim();
+      if (typeof c.target === 'string' && c.target.trim()) choice.target = c.target.trim();
+      for (const [field, one] of [['effects', normalizeEffect], ['conditions', normalizeCondition]] as const) {
+        if (c[field] === undefined) continue;
+        const n = normalizeList(c[field], one);
+        if (!n.ok) return reject(raw.kind, `${field} ${n.problem}`);
+        if (n.value.length) choice[field] = n.value;
+      }
+      if (c.dialogNode && typeof c.dialogNode === 'object') {
+        const n = normalizeParamsWiring({ dialogTree: c.dialogNode });
+        if (!n.ok) return reject(raw.kind, n.problem);
+        choice.dialogNode = n.value.dialogTree;
+      }
+      if (!choice.target && !choice.dialogNode) return reject(raw.kind, 'the choice needs a target beat or a dialogNode to continue with');
+      return {
+        kind: 'addChoice', beatId: raw.beatId,
+        parentId: typeof raw.parentId === 'string' && raw.parentId.trim() ? raw.parentId.trim() : undefined,
+        choice: choice as any, note: typeof raw.note === 'string' ? raw.note : undefined,
+      };
+    }
+    case 'replaceBeat': {
+      if (typeof raw.beatId !== 'string' || !raw.parameters || typeof raw.parameters !== 'object') return reject(raw.kind, 'needs beatId and the new parameters');
+      const n = normalizeParamsWiring(raw.parameters);
+      if (!n.ok) return reject(raw.kind, n.problem);
+      return {
+        kind: 'replaceBeat', beatId: raw.beatId,
+        beatType: typeof raw.beatType === 'string' && raw.beatType.trim() ? raw.beatType.trim() : undefined,
+        name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : undefined,
+        parameters: n.value, note: typeof raw.note === 'string' ? raw.note : undefined,
+      };
     }
     case 'setRequirements': {
       if (typeof raw.beatId !== 'string') return reject(raw.kind, 'needs beatId');
@@ -269,6 +351,12 @@ export function describeProposal(p: ChangeProposal): string {
       return p.conditions.length
         ? `Show ${p.beatId} › ${p.choiceId} only if ${p.conditions.map((c) => describeCondition(c)).join(' and ')}`
         : `Always show ${p.beatId} › ${p.choiceId}`;
+    case 'editChoiceText':
+      return `Reword ${p.beatId} › ${p.choiceId}: "${p.text.length > 80 ? `${p.text.slice(0, 77)}…` : p.text}"`;
+    case 'addChoice':
+      return `Add choice to ${p.beatId}${p.parentId ? ` › ${p.parentId}` : ''}: "${p.choice.text.length > 70 ? `${p.choice.text.slice(0, 67)}…` : p.choice.text}"${p.choice.target ? ` → ${p.choice.target}` : ' (conversation continues)'}`;
+    case 'replaceBeat':
+      return `New version of ${p.beatId}${p.beatType ? ` as ${p.beatType}` : ''}${p.name ? ` "${p.name}"` : ''} — links move to it; the old beat stays, marked (replaced)`;
     case 'setRequirements':
       return p.requires.length
         ? `Gate ${p.beatId}: requires ${p.requires.map((r: any) => describeCondition(r.condition) + (r.fallbackTarget ? ` (else → ${r.fallbackTarget})` : '')).join(p.requiresMode === 'any' ? ' or ' : ' and ')}`
