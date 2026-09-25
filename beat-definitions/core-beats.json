@@ -2563,7 +2563,11 @@
         "timerTarget": {
           "type": "string",
           "required": true,
-          "description": "Beat to jump to when timer expires"
+          "description": "Beat to jump to when timer expires",
+          "ui": {
+            "control": "beat-ref",
+            "label": "When the timer runs out, go to"
+          }
         },
         "connection": {
           "type": "connection",
@@ -3397,7 +3401,11 @@
           "type": "string",
           "required": false,
           "targetField": true,
-          "description": "Beat to navigate to on wrong code"
+          "description": "Beat to navigate to on wrong code",
+          "ui": {
+            "control": "beat-ref",
+            "label": "On wrong code, go to"
+          }
         },
         "maxAttempts": {
           "type": "number",
@@ -3837,7 +3845,11 @@
         "fallbackTarget": {
           "type": "string",
           "required": false,
-          "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped"
+          "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped",
+          "ui": {
+            "control": "beat-ref",
+            "label": "Fallback beat"
+          }
         },
         "speaker": {
           "type": "string",
@@ -4464,7 +4476,8 @@
           "targetField": true,
           "description": "Fallback target if AI can't decide (used when no category matches)",
           "ui": {
-            "label": "Fallback Target"
+            "label": "Fallback Target",
+            "control": "beat-ref"
           }
         },
         "timeout": {
@@ -4796,7 +4809,12 @@
         "restartTarget": {
           "type": "string",
           "required": false,
-          "description": "Beat to restart to"
+          "description": "Beat to restart to",
+          "ui": {
+            "control": "beat-ref",
+            "label": "Restart at",
+            "emptyLabel": "First beat of the story"
+          }
         },
         "connection": {
           "type": "connection",
