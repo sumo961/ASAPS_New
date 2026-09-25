@@ -107,6 +107,19 @@ export function calculateSmartButtonDimensions(
  * @param stageWidth - Stage width from project settings
  * @param stageHeight - Stage height from project settings
  */
+/**
+ * Wrapped line count for a text at a given characters-per-line: every line
+ * break starts a new line and a blank line still takes a line, which the
+ * old length / charsPerLine estimate ignored — a four-paragraph text was
+ * sized ~70px short, so buttons placed under it overlapped (2026-09-25).
+ * Markdown-lite markers don't take space when rendered.
+ */
+export function countWrappedLines(content: string, charsPerLine: number): number {
+  if (charsPerLine <= 0) return 1;
+  const plain = content.replace(/\\n/g, '\n').replace(/\*\*|__|~~|\*/g, '');
+  return plain.split('\n').reduce((acc, line) => acc + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+}
+
 export function calculateSmartTextBoxDimensions(
   content: string,
   fontSize: number,
@@ -143,7 +156,7 @@ export function calculateSmartTextBoxDimensions(
 
   // Estimate how many lines the text needs at current width
   const estimatedCharsPerLine = Math.floor(availableContentWidth / charWidth);
-  const estimatedLines = estimatedCharsPerLine > 0 ? Math.ceil(content.length / estimatedCharsPerLine) : 1;
+  const estimatedLines = countWrappedLines(content, estimatedCharsPerLine);
   const estimatedContentHeight = estimatedLines * lineHeight;
   const estimatedTotalHeight = estimatedContentHeight + contentPadding;
 
@@ -230,16 +243,18 @@ export function calculateSmartTextBoxDimensions(
     console.log(`[SmartTextBox] Expanding to preferred width: ${newWidth.toFixed(1)}`);
   }
 
-  // Height buffer for long content
-  const needsHeightBuffer = content.length > 200;
-  const heightBuffer = needsHeightBuffer ? 1.15 : 1.0;
+  // No extra height buffer: it compensated for the old length/charsPerLine
+  // count, which dropped paragraph breaks and partial last lines. With
+  // countWrappedLines both are counted, and a buffer on top left a band of
+  // empty box under the text (and pushed buttons needlessly low).
+  const heightBuffer = 1.0;
 
   // Step 2: Check if content fits at current width, grow if needed
   if (newWidth < maxWidth) {
     for (let testWidth = newWidth; testWidth <= maxWidth; testWidth += 50) {
       const testContentWidth = testWidth - contentPadding - inlineContentWidth;
       const testCharsPerLine = Math.floor(testContentWidth / charWidth);
-      const testLines = testCharsPerLine > 0 ? Math.ceil(content.length / testCharsPerLine) : 1;
+      const testLines = countWrappedLines(content, testCharsPerLine);
       const testContentHeight = testLines * lineHeight;
       const testTotalHeight = testContentHeight + contentPadding;
       const bufferedHeight = Math.ceil(testTotalHeight * heightBuffer);
