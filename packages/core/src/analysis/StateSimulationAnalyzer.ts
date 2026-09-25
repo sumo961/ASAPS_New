@@ -715,7 +715,7 @@ export class StateSimulationAnalyzer {
       return false;
     }
 
-    if (beat.type === 'movementChoice') {
+    if (beat.type === 'movementChoice' || beat.type === 'multiChoice') {
       return anyHasEffects(params.choices);
     }
 
@@ -945,6 +945,19 @@ export class StateSimulationAnalyzer {
           for (const fields of inlineAlongPath) {
             this.applyInlineChoiceFields(fields, state);
           }
+        }
+        break;
+      }
+
+      case 'multiChoice': {
+        // Links skip '__self__' choices, so match the choice by its link.
+        const mc: any[] = params.choices || [];
+        const choice = connection
+          ? mc.find((c) => c?.target === connection.targetId && (c.text || c.id) === connection.label) ?? mc.find((c) => c?.target === connection.targetId)
+          : mc[choiceIndex];
+        if (choice) {
+          this.applyEffectsList(choice.effects, state);
+          this.applyInlineChoiceFields(choice, state);
         }
         break;
       }
@@ -1258,6 +1271,16 @@ export class StateSimulationAnalyzer {
       // Every drawable branch is a possible playthrough (each can carry its
       // own effects); following only the first hid the others from analysis.
       'randomTarget',
+      // Likewise every link these beats offer: the player's choice / tap /
+      // place, or the AI's classification. They were followed first-link-
+      // only, so everything behind their other links read as unreachable.
+      'multiChoice',
+      'aiCondition',
+      'aiConversation',
+      'arBeat',
+      'gpsLocation',
+      'indoorLocation',
+      'panorama',
     ].includes(beat.type);
   }
 

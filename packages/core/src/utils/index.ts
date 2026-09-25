@@ -48,6 +48,7 @@ export {
 export { waitForTTS, waitForReadingTime } from './ttsWait';
 export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
 export { splitVoicedSegments, type VoicedSegment } from './voicedSegments';
+export { storyLinks, beatLinks, dedupeLinks, beatTargetIds, type StoryLink } from './storyLinks';
 export { buildDossier, buildDossierForRef, describeMoodAxis, type BuildDossierOptions, type DossierInteraction } from './dossier';
 export { resolveCharacterWithVariant, findCharacterVariant } from './characterVariant';
 export {

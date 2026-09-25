@@ -42,3 +42,28 @@ describe('path simulation through a random draw', () => {
     expect(got).toEqual([{ variant: 'A', clock: 240 }, { variant: 'B', clock: 180 }]);
   });
 });
+
+describe('path simulation through AI conditions and multi-choice', () => {
+  it('explores every AI-condition category and every multi-choice option (with its effects)', () => {
+    const story = new Story({ title: 'Branches', author: 'Test', firstBeatId: 'ask' });
+    story.addBeat(createTestBeat({ id: 'ask', name: 'Ask', type: 'multiChoice', parameters: { question: 'q', choices: [
+      { id: 'c1', text: 'Kind', target: 'judge', effects: [{ type: 'setVariable', target: 'tone', value: 'kind' }] },
+      { id: 'c2', text: 'Harsh', target: 'judge', effects: [{ type: 'setVariable', target: 'tone', value: 'harsh' }] },
+    ] } } as any));
+    story.addBeat(createTestBeat({ id: 'judge', name: 'Judge', type: 'aiCondition', parameters: { categories: [
+      { name: 'warm', description: 'w', targetId: 'endWarm' }, { name: 'cold', description: 'c', targetId: 'endCold' },
+    ] } } as any));
+    story.addBeat(createTestBeat({ id: 'endWarm', name: 'Warm', type: 'endScreen', parameters: { message: 'w', showRestart: false } }));
+    story.addBeat(createTestBeat({ id: 'endCold', name: 'Cold', type: 'endScreen', parameters: { message: 'c', showRestart: false } }));
+    const endings = new Set<string>(); const tones = new Set<unknown>();
+    for (const o of new StateSimulationAnalyzer(story).analyze().outcomes as any[]) {
+      for (const v of o.pathVariations ?? []) {
+        const steps = v.simulatedPath?.steps ?? [];
+        endings.add(steps[steps.length - 1]?.beatId);
+        tones.add(steps.find((s: any) => s.beatId === 'judge')?.stateAfter.variables.get('tone'));
+      }
+    }
+    expect([...endings].sort()).toEqual(['endCold', 'endWarm']);
+    expect([...tones].sort()).toEqual(['harsh', 'kind']);
+  });
+});

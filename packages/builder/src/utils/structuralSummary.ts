@@ -111,10 +111,19 @@ export function buildStructuralSummary(kg: KGGraph): string {
   const beatNodes = kg.nodes.filter(n => n.type === 'Beat' || n.protostoryElement === 'narrativeVector');
   const flowEdges = [...edges('leadsTo'), ...edges('choiceLeadsTo')];
   const hasOutgoing = new Set(flowEdges.map(e => e.source));
-  // A beat also "has outgoing flow" when it offers choices that route somewhere.
+  // A beat also "has outgoing flow" when one of its choices routes somewhere
+  // — directly, or through a nested dialog choice (continuesTo), where most
+  // dialog trees keep their exits.
+  const routes = new Set(flowEdges.map(e => e.source));
+  const continues = edges('continuesTo');
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const c of continues) {
+      if (routes.has(c.target) && !routes.has(c.source)) { routes.add(c.source); changed = true; }
+    }
+  }
   for (const oc of edges('offersChoice')) {
-    const choiceRoutes = flowEdges.some(e => e.source === oc.target);
-    if (choiceRoutes) hasOutgoing.add(oc.source);
+    if (routes.has(oc.target)) hasOutgoing.add(oc.source);
   }
   const hasIncoming = new Set(flowEdges.map(e => e.target));
 

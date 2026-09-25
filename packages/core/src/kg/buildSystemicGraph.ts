@@ -13,6 +13,7 @@ import {
   PROTOSTORY_ELEMENT,
   ProtostoryElement,
 } from './types';
+import { beatLinks } from '../utils/storyLinks';
 
 /**
  * Beat types that function as narrative vectors (Koenitz, SPP): they gate flow,
@@ -228,6 +229,23 @@ export function buildSystemicGraph(
     for (const conn of beat.connections ?? []) {
       const target = conn.targetId ?? conn.target;
       if (target) addTransition(beat.id, target, conn.label, conn.condition);
+    }
+  }
+  // Links a beat derives from its parameters — condition branches, AI
+  // condition categories, AI exits, random draws, restart / fail / fallback
+  // targets, requirement fallbacks — from the same walk the review and the
+  // layout use. Without them the overview called such beats dead ends and
+  // their targets unreachable. Dialog-tree exits are already modelled as
+  // choices (choiceLeadsTo) unless choices are left out.
+  const linkedPairs = new Set(edges.filter((e) => e.type === E.leadsTo).map((e) => `${e.source}|${e.target}`));
+  for (const beat of beats) {
+    for (const link of beatLinks(beat)) {
+      if (link.via === 'beat-connections') continue; // added above
+      if (link.via === 'dialog' && includeChoices && (beat.parameters as any)?.dialogTree) continue;
+      const pair = `${beatNodeId(beat.id)}|${beatNodeId(link.target)}`;
+      if (linkedPairs.has(pair)) continue;
+      linkedPairs.add(pair);
+      addTransition(beat.id, link.target, link.label);
     }
   }
 

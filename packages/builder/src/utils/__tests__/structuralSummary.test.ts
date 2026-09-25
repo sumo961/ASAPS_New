@@ -76,3 +76,20 @@ describe('buildStructuralSummary', () => {
     expect(summary).toMatch(/Restart leads nowhere[^\n]*b3/);
   });
 });
+
+describe('buildStructuralSummary — links from parameters (2026-09-26)', () => {
+  const beats2 = [
+    { id: 's', name: 'Start', type: 'infoText', connections: [{ targetId: 'd' }], getParameters: () => ({ text: 'x' }) },
+    { id: 'd', name: 'Nested talk', type: 'dialogTree', connections: [], getParameters: () => ({ dialogTree: { text: 'a',
+      choices: [{ id: 'c1', text: 'hi', dialogNode: { text: 'b', choices: [{ id: 'c2', text: 'go', target: 'j' }] } }] } }) },
+    { id: 'j', name: 'Judge', type: 'aiCondition', connections: [], getParameters: () => ({ categories: [{ name: 'a', description: 'a', targetId: 'e1' }, { name: 'b', description: 'b', targetId: 'e2' }] }) },
+    { id: 'e1', name: 'End A', type: 'endScreen', connections: [], getParameters: () => ({ showRestart: false }) },
+    { id: 'e2', name: 'End B', type: 'endScreen', connections: [], getParameters: () => ({ showRestart: false }) },
+  ];
+  const summary = buildStructuralSummary(buildWorkspaceKG(beats2 as any, [], [], []));
+
+  it('a dialog tree whose exits sit in nested nodes is not a dead end; AI-condition categories are links', () => {
+    expect(summary).not.toMatch(/Dead ends/);
+    expect(summary).not.toMatch(/No incoming transitions/);
+  });
+});
