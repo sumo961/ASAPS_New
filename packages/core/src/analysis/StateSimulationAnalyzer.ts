@@ -91,6 +91,12 @@ export interface SimulationAnalysisConfig {
   maxDepth?: number;           // Maximum path depth (default: 200)
   maxPaths?: number;           // Maximum paths to find (default: 1000)
   maxBeatRevisits?: number;    // Max times a beat can be revisited with same state (default: 1)
+  /** Most branches waiting to be explored (default 4000). Past it, a branch
+   *  is still queued when it leads to a beat no explored path has reached —
+   *  coverage is kept, the combinatorial rest is dropped. */
+  maxFrontier?: number;
+  /** Most beat steps explored in one run (default 300000). */
+  maxExpansions?: number;
 }
 
 // ============================================================================
@@ -161,6 +167,11 @@ export class StateSimulationAnalyzer {
   // Cached beat lookups
   private beatCache: Map<string, Beat | null> = new Map();
 
+  /** The last run hit maxFrontier / maxExpansions: some permutations were
+   *  not explored (every reachable beat still was, as far as the budget
+   *  allowed). */
+  public truncated = false;
+
   constructor(story: Story, config: SimulationAnalysisConfig = {}) {
     this.story = story;
     this.config = {
@@ -172,6 +183,8 @@ export class StateSimulationAnalyzer {
       // surface all reachable endings. See Hollow Star regression test.
       maxPaths: config.maxPaths ?? 50000,
       maxBeatRevisits: config.maxBeatRevisits ?? 1,
+      maxFrontier: config.maxFrontier ?? 4000,
+      maxExpansions: config.maxExpansions ?? 300000,
     };
   }
 
@@ -335,7 +348,24 @@ export class StateSimulationAnalyzer {
       takenChoicesPerBeat: new Map(),
     });
 
+    // Bounds (2026-09-26): with every choice-like beat branching, the BFS
+    // queue grew without limit — an 81-beat generated story ran the analyzer
+    // (and the preview's presets) out of memory. Queue beyond maxFrontier
+    // only what reaches a new beat; stop after maxExpansions steps.
+    const seenBeats = new Set<string>();
+    let expansions = 0;
+    this.truncated = false;
+    // Past the cap: one branch per beat nobody has reached yet (not every
+    // queued branch to it — many point at the same unexplored beat).
+    const admittedNew = new Set<string>();
+    const enqueue = (f: (typeof stack)[number]) => {
+      if (stack.length < (this.config.maxFrontier ?? 4000)) { stack.push(f); return; }
+      if (!seenBeats.has(f.beatId) && !admittedNew.has(f.beatId)) { admittedNew.add(f.beatId); stack.push(f); return; }
+      this.truncated = true;
+    };
+
     while (stack.length > 0 && paths.length < this.config.maxPaths) {
+      if (++expansions > (this.config.maxExpansions ?? 300000)) { this.truncated = true; break; }
       // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
       // across all branches at each level. DFS can exhaust the maxPaths
       // budget on the first few branches of a wide choice beat,
@@ -353,6 +383,7 @@ export class StateSimulationAnalyzer {
       if (!beat) {
         continue; // Invalid beat, skip this branch
       }
+      seenBeats.add(beat.id);
 
       // Check for loop: same beat + same state + same taken choices = no progress possible
       // We include takenChoicesPerBeat in the key because different choices taken
@@ -413,7 +444,7 @@ export class StateSimulationAnalyzer {
         const targetId = taken.targetId;
         const linkState = this.followLink(taken, newState, newPath);
 
-        stack.push({
+        enqueue({
           beatId: targetId,
           state: linkState,
           path: newPath,
@@ -493,7 +524,7 @@ export class StateSimulationAnalyzer {
                 .map(c => c.label || c.targetId),
             }];
 
-            stack.push({
+            enqueue({
               beatId: conn.targetId,
               state: newState,
               path: branchPath,
@@ -544,7 +575,7 @@ export class StateSimulationAnalyzer {
             stateAfter: cloneState(branchState),
           };
 
-          stack.push({
+          enqueue({
             beatId: conn.targetId,
             state: branchState,
             path: branchPath,
@@ -556,7 +587,7 @@ export class StateSimulationAnalyzer {
       } else {
         // Automatic beat - follow first/only connection (and run its link effects)
         const linkState = this.followLink(connections[0], newState, newPath);
-        stack.push({
+        enqueue({
           beatId: connections[0].targetId,
           state: linkState,
           path: newPath,
