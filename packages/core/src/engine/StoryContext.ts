@@ -1354,6 +1354,26 @@ export class StoryContext extends EventEmitter {
   }
 
   /**
+   * Is this character's persona settled, so runtime UI (HUDs) may show
+   * them? A character without variants always is. With variants: once one
+   * was chosen explicitly (setCharacterVariant), or — for
+   * variantSelectionPolicy 'random' — once the story-start draw happened:
+   * the draw IS the choice, and nothing else would ever settle it (a
+   * random-policy character's meters otherwise never appeared). An authored
+   * defaultVariantId alone still waits for the player's pick.
+   */
+  hasSettledVariant(charRef: string): boolean {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return false;
+    if (this.explicitVariantSet[key]) return true;
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    const base = characters?.find((c) => c?.id === key);
+    const variants = Array.isArray(base?.variants) ? base.variants.filter((v: any) => v?.id) : [];
+    if (variants.length === 0) return true;
+    return base.variantSelectionPolicy === 'random' && !!this.state.activeCharacterVariants[key];
+  }
+
+  /**
    * Merge the base character with whichever variant is currently active.
    * Falls back to the base record when no variant has been chosen. Used by
    * dossier rendering, trait modulation, mood seeding, etc. — anywhere a

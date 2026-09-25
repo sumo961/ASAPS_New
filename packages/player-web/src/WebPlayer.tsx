@@ -880,8 +880,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   };
 
   // Build the HUD overlay layer for screen-docked moodFrames. Mirrors the
-  // PreviewWindow overlay: gates on hasExplicitlySetVariant so the HUD
-  // stays hidden until the player picks a variant; reads merged
+  // PreviewWindow overlay: gates on hasSettledVariant so the HUD stays
+  // hidden until the variant is picked (or randomly drawn); reads merged
   // character (variant overlay applied) for name / portrait / color;
   // re-renders on every characterMoodChanged via hudTick.
   /**
@@ -911,7 +911,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     // announce someone the interactor has not met.
     const hasExplicitVariant = (c: any): boolean =>
       (c.variants && c.variants.length > 0)
-        ? !!(ctx as any).hasExplicitlySetVariant?.(c.id)
+        ? !!(ctx as any).hasSettledVariant?.(c.id)
         : true;
 
     const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {

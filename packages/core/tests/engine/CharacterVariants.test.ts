@@ -284,6 +284,18 @@ describe('variantSelectionPolicy — story-start selection', () => {
     expect(ctx.getActiveCharacterVariant('char_alex')).toBe('extrovert');
   });
 
+  it('HUD gate: a random draw settles the persona; a default alone waits for the pick', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    // Random policy: nothing else would ever settle it — its meters never showed.
+    expect(makeContext({ ...baseAlex, variantSelectionPolicy: 'random' }).hasSettledVariant('char_alex')).toBe(true);
+    const fixed = makeContext({ ...baseAlex, variantSelectionPolicy: 'fixed', defaultVariantId: 'introvert' });
+    expect(fixed.hasSettledVariant('char_alex')).toBe(false);
+    fixed.applyEffect({ type: 'setCharacterVariant', target: 'char_alex', variantId: 'extrovert' } as any);
+    expect(fixed.hasSettledVariant('char_alex')).toBe(true);
+    // No variants: always settled.
+    expect(makeContext({ ...baseAlex, variants: undefined }).hasSettledVariant('char_alex')).toBe(true);
+  });
+
   it("'random' with no variants falls back to defaultVariantId", () => {
     const ctx = makeContext({
       ...baseAlex, variants: undefined, variantSelectionPolicy: 'random', defaultVariantId: 'introvert',

@@ -513,7 +513,7 @@ export const PreviewWindow: React.FC = () => {
     // sense yet; showing their HUD would announce someone who has not appeared.
     const hasExplicitVariant = (c: any): boolean =>
       (c.variants && c.variants.length > 0)
-        ? !!(ctx as any).hasExplicitlySetVariant?.(c.id)
+        ? !!(ctx as any).hasSettledVariant?.(c.id)
         : true;
 
     const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {
@@ -1260,13 +1260,13 @@ export const PreviewWindow: React.FC = () => {
         }
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
-        // Hide HUD until the player has explicitly picked a variant —
-        // engine-applied defaults from Character.defaultVariantId don't
-        // count, so the pre-picker scenes stay uncluttered.
+        // Hide HUD until the variant is settled — picked explicitly, or
+        // drawn under the random policy; an engine-applied default from
+        // Character.defaultVariantId doesn't count, so the pre-picker scenes
+        // stay uncluttered.
         const variants = (character as any).variants;
         if (variants && variants.length > 0) {
-          const explicit = (ctx as any).hasExplicitlySetVariant?.(character.id);
-          if (!explicit) return null;
+          if (!(ctx as any).hasSettledVariant?.(character.id)) return null;
         }
         const mood = ctx.getCharacterMood(characterId);
         const merged: any = (ctx as any).getMergedCharacter?.(characterId) || character;
