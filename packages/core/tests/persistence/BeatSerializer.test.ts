@@ -181,3 +181,14 @@ describe('BeatSerializer', () => {
     });
   });
 });
+
+describe('dialog tree speaker fields (2026-09-25)', () => {
+  it('keeps the beat-level showSpeaker (the name-label switch) but not the redundant speaker', () => {
+    const saved = serializeBeatFromJSON({
+      id: 'b', type: 'dialogTree', name: 'Angry', speaker: 'Karin', showSpeaker: false,
+      parameters: { dialogTree: { id: 'n0', speaker: 'Karin', text: 'x', choices: [] } }, connections: [],
+    });
+    expect(saved.showSpeaker).toBe(false);
+    expect((saved as any).speaker).toBeUndefined();
+  });
+});

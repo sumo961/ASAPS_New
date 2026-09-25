@@ -155,7 +155,10 @@ export function serializeBeat(beat: Beat): SerializedBeat {
     ...(raw.notes ? { notes: raw.notes } : {}),
     // Skip speaker/showSpeaker for dialogTree — speaker lives in parameters.dialogTree.speaker
     ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
-    ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
+    // showSpeaker is kept for dialog trees too: their speakers live in the
+    // nodes, but the name-label switch exists only on the beat — dropping it
+    // lost "Always hide" on every reload.
+    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
     // State requirements (Level-2 authoring): persist when declared.
     ...(Array.isArray(raw.requires) && raw.requires.length > 0 ? { requires: raw.requires } : {}),
     ...(raw.requiresMode && raw.requiresMode !== 'all' ? { requiresMode: raw.requiresMode } : {}),
@@ -196,7 +199,10 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
     ...(raw.showTimer ? { showTimer: raw.showTimer } : {}),
     ...(raw.notes ? { notes: raw.notes } : {}),
     ...(raw.speaker && raw.type !== 'dialogTree' ? { speaker: raw.speaker } : {}),
-    ...(raw.showSpeaker != null && raw.type !== 'dialogTree' ? { showSpeaker: raw.showSpeaker } : {}),
+    // showSpeaker is kept for dialog trees too: their speakers live in the
+    // nodes, but the name-label switch exists only on the beat — dropping it
+    // lost "Always hide" on every reload.
+    ...(raw.showSpeaker != null ? { showSpeaker: raw.showSpeaker } : {}),
     // State requirements (Level-2 authoring): persist when declared.
     ...(Array.isArray(raw.requires) && raw.requires.length > 0 ? { requires: raw.requires } : {}),
     ...(raw.requiresMode && raw.requiresMode !== 'all' ? { requiresMode: raw.requiresMode } : {}),
