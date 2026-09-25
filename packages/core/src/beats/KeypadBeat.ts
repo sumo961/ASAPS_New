@@ -112,18 +112,19 @@ export class KeypadBeat extends Beat {
   /**
    * Override getConnections to expose failTarget to the graph and reachability analyzer
    */
-  getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
-    // Start with base connections (defaultTarget, etc.)
-    const connections = super.getConnections();
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any; derivedFrom?: string }> {
+    // Start with base connections (defaultTarget, etc.) — minus any stored
+    // copy of the fail link an older Inspector save wrote into them.
+    const connections: Array<{ targetId: string; label?: string; condition?: any; derivedFrom?: string }> =
+      super.getConnections().filter(c => !(this.failTarget && c.targetId === this.failTarget && c.label === 'fail'));
 
     // Add failTarget if set
     if (this.failTarget) {
-      if (!connections.some(c => c.targetId === this.failTarget)) {
-        connections.push({
-          targetId: this.failTarget,
-          label: 'fail'
-        });
-      }
+      connections.push({
+        targetId: this.failTarget,
+        label: 'Wrong code',
+        derivedFrom: 'failTarget',
+      });
     }
 
     return connections;

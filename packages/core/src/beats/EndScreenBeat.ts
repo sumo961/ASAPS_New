@@ -1,5 +1,5 @@
 import { Beat } from './Beat';
-import type { BeatConfig } from '../types';
+import type { BeatConfig, Connection } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import type { IRenderer } from '../types';
 import type { EndScreenParameters } from '../generated/beat-types';
@@ -58,6 +58,13 @@ export class EndScreenBeat extends Beat {
     this.resetVisitedTracking = config.resetVisitedTracking ?? config.parameters?.resetVisitedTracking ?? true;
     this.resetHistory = config.resetHistory ?? config.parameters?.resetHistory ?? true;
     // node is now handled by Beat base class
+  }
+
+  /** An end screen's exit is where its restart button leads: marked as a
+   *  restart link (drawn as such; state does not travel along it). */
+  getConnections(): Connection[] {
+    const conns = super.getConnections();
+    return this.showRestart === false ? conns : conns.map((c) => ({ ...c, role: 'restart' as const }));
   }
 
   getParameters(): Record<string, any> {

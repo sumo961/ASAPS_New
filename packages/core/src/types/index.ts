@@ -157,6 +157,18 @@ export interface Connection {
    *  "Continue"). Stored links only — links derived from
    *  choices carry their effects on the choice. */
   effects?: Effect[];
+  /**
+   * Set on links a beat DERIVES from one of its parameters in
+   * getConnections() (a keypad's failTarget, an AI summary's restartTarget)
+   * — named after that parameter. Such links are shown and analysed like any
+   * other but never stored in beat.connections: the parameter is the source
+   * of truth, and a stored copy would be followed as an ordinary exit.
+   */
+  derivedFrom?: string;
+  /** 'restart': leads back into the story with state reset (end screens,
+   *  AI summaries). Drawn as a restart link; analysis treats the beat as an
+   *  ending, not as a way on. */
+  role?: 'restart';
 }
 
 /**

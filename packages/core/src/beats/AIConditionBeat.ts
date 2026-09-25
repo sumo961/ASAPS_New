@@ -136,7 +136,8 @@ export class AIConditionBeat extends Beat {
       connections.push({
         targetId: this.aiDefaultTarget,
         label: 'Fallback',
-      });
+        derivedFrom: 'fallbackTarget',
+      } as any);
     }
 
     // Also include any base connections

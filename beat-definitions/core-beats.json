@@ -3401,7 +3401,7 @@
           "type": "string",
           "required": false,
           "targetField": true,
-          "description": "Beat to navigate to on wrong code",
+          "description": "Beat to navigate to on wrong code. Shown in the flowchart as a 'Wrong code' link.",
           "ui": {
             "control": "beat-ref",
             "label": "On wrong code, go to"
@@ -3845,7 +3845,7 @@
         "fallbackTarget": {
           "type": "string",
           "required": false,
-          "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped",
+          "description": "Target beat when the player skips, when permission is denied, or when no anchor is tapped. Shown in the flowchart as a 'Skip / no anchor' link.",
           "ui": {
             "control": "beat-ref",
             "label": "Fallback beat"
@@ -4474,7 +4474,7 @@
           "type": "string",
           "required": false,
           "targetField": true,
-          "description": "Fallback target if AI can't decide (used when no category matches)",
+          "description": "Fallback target if AI can't decide (used when no category matches). Shown in the flowchart as a 'Fallback' link.",
           "ui": {
             "label": "Fallback Target",
             "control": "beat-ref"
@@ -4809,7 +4809,7 @@
         "restartTarget": {
           "type": "string",
           "required": false,
-          "description": "Beat to restart to",
+          "description": "Beat the restart button leads to (state is reset first when resetOnRestart). Shown in the flowchart as a ↺ Restart link. Empty = the story's first beat. This — not a connection — is an ending summary's restart: connections are where a checkpoint summary continues.",
           "ui": {
             "control": "beat-ref",
             "label": "Restart at",

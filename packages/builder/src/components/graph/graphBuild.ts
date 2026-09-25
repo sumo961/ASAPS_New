@@ -824,20 +824,24 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         const guardSummary = guardConds
           ? summarizeConditions(guardConds, (id: string) => beats.find(b => b.id === id)?.name)
           : null;
+        // A restart leads back into the story with state reset — drawn as
+        // its own kind of link (dashed teal, "Restart"), not a way on.
+        const isRestart = connection.role === 'restart';
         const edge = createEdge(beat.id, connection.targetId, {
           id: `conn-${beat.id}-${connection.targetId}`,
           type: 'custom',
           animated: connection.condition !== undefined && !guardConds,
-          label: connection.label || (connection.condition && !guardConds ? '?' : ''),
+          label: isRestart ? '↺ Restart' : (connection.label || (connection.condition && !guardConds ? '?' : '')),
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 20,
             height: 20,
+            ...(isRestart ? { color: '#0d9488' } : {}),
           },
           style: {
-            stroke: guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : '#64748b',
+            stroke: isRestart ? '#0d9488' : guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : '#64748b',
             strokeWidth: 2,
-            ...(guardConds ? { strokeDasharray: '6 3' } : {}),
+            ...(isRestart ? { strokeDasharray: '8 4' } : guardConds ? { strokeDasharray: '6 3' } : {}),
           },
           data: {
             condition: guardConds ? undefined : connection.condition,

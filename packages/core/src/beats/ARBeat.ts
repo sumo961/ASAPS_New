@@ -120,7 +120,7 @@ export class ARBeat extends Beat {
       }
     }
     if (this.fallbackTarget) {
-      connections.push({ targetId: this.fallbackTarget, label: 'Skip / no anchor' });
+      connections.push({ targetId: this.fallbackTarget, label: 'Skip / no anchor', derivedFrom: 'fallbackTarget' } as any);
     }
     const base = super.getConnections();
     for (const conn of base) {

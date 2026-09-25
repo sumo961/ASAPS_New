@@ -119,7 +119,8 @@ export function buildStructuralSummary(kg: KGGraph): string {
   const hasIncoming = new Set(flowEdges.map(e => e.target));
 
   const deadEnds = beatNodes.filter(
-    n => !hasOutgoing.has(n.id) && (n.props?.beatType as string) !== 'endScreen'
+    // aiSummary is an ending too (its restart is restartTarget, not a link)
+    n => !hasOutgoing.has(n.id) && !['endScreen', 'aiSummary'].includes(n.props?.beatType as string)
   );
   const noIncoming = beatNodes.filter(n => !hasIncoming.has(n.id));
 

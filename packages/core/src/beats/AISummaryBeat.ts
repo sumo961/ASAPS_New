@@ -144,6 +144,19 @@ export class AISummaryBeat extends Beat {
     this.creditsCloseText = params.creditsCloseText || config.creditsCloseText || 'Close';
   }
 
+  /**
+   * The restart button's destination as a link — shown in the flowchart and
+   * the story digest, and reachability sees it. Derived (never stored): the
+   * beat's own exits stay what they are, so "no restart" still ends here.
+   * Without an explicit restartTarget the restart goes to the story's first
+   * beat, which a beat cannot name here.
+   */
+  getConnections(): Array<{ targetId: string; label?: string; condition?: any; derivedFrom?: string; role?: 'restart' }> {
+    const base = super.getConnections().filter(c => !(c as any).derivedFrom);
+    if (!this.showRestart || !this.restartTarget) return base;
+    return [...base, { targetId: this.restartTarget, label: 'Restart', derivedFrom: 'restartTarget', role: 'restart' }];
+  }
+
   getParameters(): Record<string, any> {
     return {
       prompt: this.prompt,

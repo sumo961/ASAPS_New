@@ -824,8 +824,8 @@ Fictional time condition example (CORRECT format):
 - Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long" — NOT a number), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
 - Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
-- When used as an ending: set showRestart: true AND add a connection back to the titleScreen (beat_0) so the restart button works and shows up as a graph edge. Example: "connections": [{ "targetId": "beat_0" }]
-- 🚨 CRITICAL: Same rule as endScreen — showRestart:true REQUIRES an explicit connection to beat_0.
+- When used as an ending: set showRestart: true and "restartTarget": the beat id the restart button leads to (e.g. "beat_0", or the beat after the title when replays should skip it). The restart shows up in the flowchart as a ↺ Restart link. Empty restartTarget = the story's first beat.
+- 🚨 Unlike endScreen, an aiSummary's restart is NOT its connection: "connections" are where the story CONTINUES when the summary is a checkpoint, and following one does not reset state. An ending aiSummary has no connections — only restartTarget.
 - 🚨 CRITICAL: ALWAYS set "resetOnRestart": true so counters, variables, and inventory don't leak between replays. Without it, counter-gated endings can become "ghost-reachable" on a second playthrough (counter adds on top of previous run, crosses threshold).
 - Advantage over endScreen: the player sees a personalized recap of what they did, not just a static message
 

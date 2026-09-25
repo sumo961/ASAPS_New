@@ -260,6 +260,19 @@ describe('buildGraphEdges', () => {
     expect(edges[0]).toMatchObject({ source: 'b1', target: 'b2', label: 'go' });
   });
 
+  it('draws a restart link as a restart (dashed teal, ↺ Restart)', () => {
+    const edges = buildGraphEdges({
+      beats: [
+        beat({ id: 'sum', type: 'aiSummary', connections: [{ targetId: 'b4', label: 'Restart', derivedFrom: 'restartTarget', role: 'restart' }] }),
+        beat({ id: 'b4' }),
+      ],
+      clusters: [],
+      expandedDialogs: new Set(),
+    });
+    expect(edges[0]).toMatchObject({ source: 'sum', target: 'b4', label: '↺ Restart' });
+    expect(edges[0].style).toMatchObject({ stroke: '#0d9488', strokeDasharray: '8 4' });
+  });
+
   it('emits real edges between beats inside one EXPANDED cluster', () => {
     const edges = buildGraphEdges({
       beats: [

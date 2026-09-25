@@ -168,7 +168,8 @@ function traceReachesSelf(
 
   const thisMutates = beatMutatesInspectedState(beat, story);
 
-  const conns = beat.getConnections();
+  // A restart resets state — it is not a way round a loop.
+  const conns = beat.getConnections().filter((c) => c.role !== 'restart');
   let cycles = false;
   let mutates = thisMutates;
   for (const conn of conns) {
@@ -304,6 +305,7 @@ function collectAncestorBeatIds(targetId: string, story: Story): Set<string> {
   const inbound = new Map<string, Set<string>>();
   for (const b of story.getAllBeats()) {
     for (const c of b.getConnections()) {
+      if (c.role === 'restart') continue; // state is reset: not an ancestor
       if (!inbound.has(c.targetId)) inbound.set(c.targetId, new Set());
       inbound.get(c.targetId)!.add(b.id);
     }

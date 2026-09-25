@@ -1058,7 +1058,11 @@ export const Inspector: React.FC<InspectorProps> = ({
         };
       }
 
-      const connections = beat.getConnections ? beat.getConnections() : [];
+      // Links derived from a parameter (a keypad's failTarget, an AI
+      // summary's restartTarget) are edited through that parameter's picker,
+      // not as stored links — keep them out of the editable list, or saving
+      // would copy them into beat.connections.
+      const connections = (beat.getConnections ? beat.getConnections() : []).filter((c: any) => !c.derivedFrom);
       const uniqueConnections = Array.from(
         new Map(connections.map(c => [`${c.targetId}-${c.label}`, c])).values()
       );
@@ -1593,7 +1597,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       const { connections: _ignored, ...beatWithoutConnections } = beat as any;
       onUpdate(beat.id, beatWithoutConnections);
     } else {
-      const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+      // Links derived from parameters (derivedFrom) are shown, not stored.
+      const updatedConnections = (beat.getConnections ? beat.getConnections() : []).filter((c: any) => !c.derivedFrom);
       onUpdate(beat.id, { ...beat, connections: updatedConnections });
     }
 
@@ -1691,7 +1696,8 @@ export const Inspector: React.FC<InspectorProps> = ({
         const { connections: _ignored, ...beatWithoutConnections } = beat as any;
         onUpdate(beat.id, beatWithoutConnections);
       } else {
-        const updatedConnections = beat.getConnections ? beat.getConnections() : [];
+        // Links derived from parameters (derivedFrom) are shown, not stored.
+        const updatedConnections = (beat.getConnections ? beat.getConnections() : []).filter((c: any) => !c.derivedFrom);
         onUpdate(beat.id, { ...beat, connections: updatedConnections });
       }
       setHasChanges(false);
