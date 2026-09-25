@@ -118,14 +118,21 @@ export function buildStructuralSummary(kg: KGGraph): string {
   }
   const hasIncoming = new Set(flowEdges.map(e => e.target));
 
-  const deadEnds = beatNodes.filter(
-    // aiSummary is an ending too (its restart is restartTarget, not a link)
-    n => !hasOutgoing.has(n.id) && !['endScreen', 'aiSummary'].includes(n.props?.beatType as string)
-  );
+  // Endings are not dead ends — but one that offers a Restart must say where
+  // replays begin (an end screen: its link; an AI summary: restartTarget).
+  const isEnding = (n: any) => ['endScreen', 'aiSummary'].includes(n.props?.beatType as string);
+  const deadEnds = beatNodes.filter(n => !hasOutgoing.has(n.id) && !isEnding(n));
+  const restartNowhere = beatNodes.filter((n: any) => {
+    if (!isEnding(n) || n.props?.showRestart === false) return false;
+    return n.props?.beatType === 'aiSummary' ? !n.props?.restartTarget : !hasOutgoing.has(n.id);
+  });
   const noIncoming = beatNodes.filter(n => !hasIncoming.has(n.id));
 
-  if (deadEnds.length > 0 || noIncoming.length > 1) {
+  if (deadEnds.length > 0 || noIncoming.length > 1 || restartNowhere.length > 0) {
     lines.push('', 'FLOW WARNINGS:');
+    if (restartNowhere.length > 0) {
+      lines.push(`- Restart leads nowhere (the ending offers Restart but names no beat — point it at the title screen, the start beat, or another beat): ${restartNowhere.map(beatRef).join(', ')}`);
+    }
     if (deadEnds.length > 0) {
       lines.push(`- Dead ends (no outgoing transition, not an ending): ${deadEnds.map(beatRef).join(', ')} — players get stuck here.`);
     }

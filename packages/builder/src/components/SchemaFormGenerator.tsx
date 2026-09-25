@@ -23,6 +23,11 @@ interface ParameterDefinition {
     control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner' | 'gps-point-curator' | 'beat-ref';
     /** For 'beat-ref' control: the label of the empty choice (what happens when no beat is picked). */
     emptyLabel?: string;
+    /** For 'beat-ref' control: a boolean parameter that makes a pick REQUIRED
+     *  while it is not false (restartTarget while showRestart). */
+    requiredWhen?: string;
+    /** For 'beat-ref' control: the warning shown while that required pick is missing. */
+    missingHint?: string;
     /** For 'affect-slider' control: end-cap labels — [low, high]. */
     axisLabels?: [string, string];
     /** For 'affect-slider' control: optional axis hint passed through to the
@@ -590,6 +595,9 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   </option>
                 ))}
               </select>
+              {!current && paramDef.ui.requiredWhen && parameters[paramDef.ui.requiredWhen] !== false && (
+                <p className="text-xs text-red-600 mt-1">{paramDef.ui.missingHint || 'Pick a beat.'}</p>
+              )}
               {paramDef.description && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
               )}

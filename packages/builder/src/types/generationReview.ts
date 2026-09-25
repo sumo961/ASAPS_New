@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -60,9 +60,20 @@ export interface UnsatisfiableThresholdFinding extends FindingBase {
   nested: boolean;
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding;
+/**
+ * An ending that offers a Restart button with nowhere to restart to: an
+ * end screen without a link, or an AI summary without a restartTarget.
+ * The author must say where replays begin (the title screen, the
+ * project's start beat, or any other beat) — no silent default.
+ */
+export interface RestartWithoutTargetFinding extends FindingBase {
+  kind: 'restart-without-target';
+  beatType: 'endScreen' | 'aiSummary';
+}
 
-export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'ai-edit';
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding;
+
+export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 
 /**
  * A local, undoable edit: set one parameter path on one beat to one value.

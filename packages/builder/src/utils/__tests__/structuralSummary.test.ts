@@ -71,7 +71,8 @@ describe('buildStructuralSummary', () => {
     expect(summary).toMatch(/No incoming transitions.*b4/);
   });
 
-  it('endScreens are not dead ends', () => {
+  it('endScreens are not dead ends — but a Restart with no target is flagged', () => {
     expect(summary).not.toMatch(/Dead ends[^\n]*b3/);
+    expect(summary).toMatch(/Restart leads nowhere[^\n]*b3/);
   });
 });

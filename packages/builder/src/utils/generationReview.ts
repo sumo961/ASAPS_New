@@ -9,6 +9,7 @@ import {
 } from './counterRangeAnalysis';
 import type {
   GenerationFinding, MissingTargetFinding, UnreachableBeatFinding, UnsatisfiableThresholdFinding,
+  RestartWithoutTargetFinding,
   FixProposal, GenerationReview,
 } from '../types/generationReview';
 import { PARAMETER_DERIVED_TYPES } from './beatConnectionModel';
@@ -64,6 +65,24 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
     };
     out.push(f);
   });
+
+  // Endings whose Restart button leads nowhere.
+  for (const beat of beats) {
+    if (beat?.type !== 'endScreen' && beat?.type !== 'aiSummary') continue;
+    const p = beat.parameters || {};
+    if (p.showRestart === false) continue; // a deliberate final end
+    const hasTarget = beat.type === 'aiSummary'
+      ? typeof p.restartTarget === 'string' && p.restartTarget.trim() !== ''
+      : (Array.isArray(beat.connections) && beat.connections.some((c: any) => c?.targetId)) || !!beat.defaultTarget
+        || !!(p.connection && (p.connection.target || p.connection.targetId || typeof p.connection === 'string'));
+    if (hasTarget) continue;
+    const f: RestartWithoutTargetFinding = {
+      id: `restart-without-target:${beat.id}`, kind: 'restart-without-target', beatId: beat.id, beatName: beat.name,
+      beatType: beat.type,
+      message: `"${beat.name || beat.id}" shows a Restart button but does not say where replays begin — pick the title screen, the project's start beat, or another beat.`,
+    };
+    out.push(f);
+  }
 
   // Counter gates that can never take one of their branches.
   const ranges = analyzeCounterRanges(beats, story?.variables);
@@ -145,6 +164,20 @@ const clampedThreshold = (f: UnsatisfiableThresholdFinding): number | null => {
   }
 };
 
+/**
+ * Where the story starts: the start beat set in Project Settings, else the
+ * story's firstBeatId, else its title screen, else its first beat.
+ */
+export function storyStartBeatId(story: any): string | null {
+  const beats: any[] = Array.isArray(story?.beats) ? story.beats : [];
+  const exists = (id: unknown): id is string => typeof id === 'string' && beats.some((b) => b?.id === id);
+  const fromSettings = story?.globalSettings?.debug?.firstbeat ?? story?.settings?.debug?.firstbeat;
+  if (exists(fromSettings)) return fromSettings;
+  if (exists(story?.firstBeatId)) return story.firstBeatId;
+  const title = beats.find((b) => b?.type === 'titleScreen');
+  return title?.id ?? beats[0]?.id ?? null;
+}
+
 /** Deterministic proposals for the findings that admit a local edit. */
 export function proposeFixes(
   findings: readonly GenerationFinding[],
@@ -174,6 +207,18 @@ export function proposeFixes(
         id: `fix:${f.id}`, findingId: f.id, kind: 'clamp-threshold', beatId: f.beatId, beatName: f.beatName,
         path: f.nested ? 'condition.value' : 'value', value: next,
         description: `Change the check on "${f.beatName || f.beatId}" to ${f.counterName} ${f.operator} ${next} (${f.counterName} reaches ${f.minValue}…${f.maxValue}) so the ${f.branch} branch can run.`,
+        confidence: 'review',
+      });
+    } else if (f.kind === 'restart-without-target') {
+      // An AI summary's restart is a parameter we can set; an end screen's
+      // is a link, which the author adds in the Inspector.
+      if (f.beatType !== 'aiSummary') continue;
+      const start = storyStartBeatId(story);
+      if (!start || start === f.beatId) continue;
+      out.push({
+        id: `fix:${f.id}`, findingId: f.id, kind: 'set-restart-target', beatId: f.beatId, beatName: f.beatName,
+        path: 'restartTarget', value: start,
+        description: `Restart "${f.beatName || f.beatId}" at "${nameOf(story, start) || start}" (${start}), where the story starts.`,
         confidence: 'review',
       });
     } else if (f.kind === 'unreachable-beat') {

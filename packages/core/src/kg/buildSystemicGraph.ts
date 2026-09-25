@@ -156,7 +156,15 @@ export function buildSystemicGraph(
       label: beat.name || beat.id,
       sourceBeatIds: [beat.id],
       protostoryElement: beatProtostoryElement(beat.type),
-      props: { beatType: beat.type, speaker: beat.speaker },
+      props: {
+        beatType: beat.type,
+        speaker: beat.speaker,
+        // Endings: whether they offer a Restart and (AI summary) where to —
+        // an ending whose Restart leads nowhere is flagged as a dead end.
+        ...(beat.type === 'endScreen' || beat.type === 'aiSummary'
+          ? { showRestart: beat.parameters?.showRestart, restartTarget: beat.parameters?.restartTarget }
+          : {}),
+      },
     });
 
     if (beat.speaker) {

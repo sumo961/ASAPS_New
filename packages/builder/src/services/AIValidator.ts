@@ -478,7 +478,7 @@ export class AIValidator {
       });
     }
     for (const f of typedFindings) {
-      if (f.kind === 'unsatisfiable-threshold') errors.push({ path: 'beats', message: f.message, severity: 'error' });
+      if (f.kind === 'unsatisfiable-threshold' || f.kind === 'restart-without-target') errors.push({ path: 'beats', message: f.message, severity: 'error' });
     }
 
     return {

@@ -4809,11 +4809,13 @@
         "restartTarget": {
           "type": "string",
           "required": false,
-          "description": "Beat the restart button leads to (state is reset first when resetOnRestart). Shown in the flowchart as a ↺ Restart link. Empty = the story's first beat. This — not a connection — is an ending summary's restart: connections are where a checkpoint summary continues.",
+          "description": "Beat the Restart button leads to (state is reset first when resetOnRestart): usually the title screen or the project's start beat, or any other beat. REQUIRED while showRestart is on. Shown in the flowchart as a ↺ Restart link. This — not a connection — is an ending summary's restart: connections are where a checkpoint summary continues.",
           "ui": {
             "control": "beat-ref",
             "label": "Restart at",
-            "emptyLabel": "First beat of the story"
+            "emptyLabel": "— choose where Restart leads —",
+            "requiredWhen": "showRestart",
+            "missingHint": "The Restart button leads nowhere yet — pick where replays begin: the title screen, the project's start beat, or another beat."
           }
         },
         "connection": {

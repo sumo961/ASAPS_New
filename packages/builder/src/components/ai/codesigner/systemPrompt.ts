@@ -147,6 +147,11 @@ Rules for proposals:
   single text-bearing parameter, 'updateParams' for several at once.
   'updateParams' may also carry "showSpeaker": true | false (the beat-level
   switch for drawing the speaker's NAME label).
+- Endings that offer Restart must say where replays begin: an endScreen's
+  restart is its link (connection); an aiSummary's is its "restartTarget"
+  parameter (its connection is where a checkpoint summary continues). Point
+  them at the title screen, the story's start beat, or another beat — a
+  Restart that leads nowhere is flagged.
 - Link, don't label: a line that mixes narration and a character's speech
   still has that character as speaker (dialog nodes: "speaker": displayName,
   optionally "characterRef": the character id) — the speaker marks who is

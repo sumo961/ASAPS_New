@@ -5115,8 +5115,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-xs text-gray-600 mb-1">
                             {beat.type === 'qrScan'
                               ? 'Default Next Beat (Required)'
-                              : `Target Beat ${beat.type === 'setTimer' ? '(Timer Expiry)' : '(Required)'}`}
+                              : beat.type === 'endScreen'
+                                ? `Restart leads to${localBeat.parameters?.showRestart !== false ? ' (Required)' : ''}`
+                                : beat.type === 'aiSummary'
+                                  ? 'Continue to (only when this summary is a checkpoint, not an ending)'
+                                  : `Target Beat ${beat.type === 'setTimer' ? '(Timer Expiry)' : '(Required)'}`}
                           </label>
+                          {beat.type === 'endScreen' && localBeat.parameters?.showRestart !== false
+                            && !(localBeat.connections?.[0]?.targetId || localBeat.defaultTarget) && (
+                            <p className="text-xs text-red-600 mb-1 leading-snug">
+                              The Restart button leads nowhere yet — pick where replays begin: the title screen, the project's start beat, or another beat.
+                            </p>
+                          )}
                           {beat.type === 'qrScan' && (
                             <p className="text-xs text-gray-500 mb-1 leading-snug">
                               Where the beat advances for unrecognized codes, a cancelled scan, or
