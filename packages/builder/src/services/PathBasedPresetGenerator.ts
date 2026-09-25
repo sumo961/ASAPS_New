@@ -101,8 +101,11 @@ export function generatePathPresets(
   const presets = pathsToTarget.map((pathInfo, index) => {
     const { path, stepIndex, outcomeGroup, pathIndexInGroup, totalInGroup } = pathInfo;
 
-    // Get the state at the target beat
-    const stateAtTarget = path.steps[stepIndex].stateAfter;
+    // The state the player ARRIVES with — the preset starts the story AT this
+    // beat, which then runs its own effects. (stateAfter of the target itself
+    // already included them, and for a dialog tree the effects of whichever
+    // choice this path went on to take.)
+    const stateAtTarget = stepIndex > 0 ? path.steps[stepIndex - 1].stateAfter : createEmptyState();
 
     // Build the path description from decisions
     const pathDescription = buildPathDescription(path, stepIndex);
@@ -229,19 +232,16 @@ function findPathsToTarget(
  * Build a human-readable path description
  */
 function buildPathDescription(path: SimulatedPath, upToIndex: number): string {
-  const relevantDecisions = path.decisions.filter((d, i) => {
-    // Find the step index for this decision
-    const stepIdx = path.steps.findIndex(s => s.beatId === d.beatId);
-    return stepIdx <= upToIndex;
-  });
+  // Decisions taken BEFORE arriving — not the one made at the target itself.
+  const relevant = path.steps.slice(0, upToIndex).filter(s => s.decisionMade);
 
-  if (relevantDecisions.length === 0) {
+  if (relevant.length === 0) {
     return 'Direct path';
   }
 
   // Take up to 3 most recent decisions
-  const recent = relevantDecisions.slice(-3);
-  return 'Via ' + recent.map(d => d.choiceMade || d.beatName).join(' → ');
+  const recent = relevant.slice(-3);
+  return 'Via ' + recent.map(s => s.decisionMade).join(' → ');
 }
 
 /**

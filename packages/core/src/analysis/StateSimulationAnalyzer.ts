@@ -409,11 +409,13 @@ export class StateSimulationAnalyzer {
           ? connections.find(c => c.label?.toLowerCase() === 'true' || c.label?.toLowerCase() === 'yes')
           : connections.find(c => c.label?.toLowerCase() === 'false' || c.label?.toLowerCase() === 'no');
 
-        const targetId = targetConnection?.targetId || connections[0].targetId;
+        const taken = targetConnection || connections[0];
+        const targetId = taken.targetId;
+        const linkState = this.followLink(taken, newState, newPath);
 
         stack.push({
           beatId: targetId,
-          state: newState,
+          state: linkState,
           path: newPath,
           decisions: frame.decisions,
           visitedStates: newVisitedStates,
@@ -507,6 +509,7 @@ export class StateSimulationAnalyzer {
         for (let idx = 0; idx < availableOptions.length; idx++) {
           const i = availableOptions[idx];
           const conn = connections[i];
+          if (this.isNeverDrawn(beat, conn)) continue;
 
           // Update takenChoicesPerBeat for this branch
           const newTakenChoicesPerBeat = new Map(frame.takenChoicesPerBeat);
@@ -533,6 +536,7 @@ export class StateSimulationAnalyzer {
 
           // Apply per-choice effects (e.g., pickProp adds inventory item per choice)
           const branchState = this.applyChoiceEffects(beat, cloneState(newState), i, conn);
+          this.applyEffectsList(conn.effects, branchState);
 
           // Update the step's stateAfter to reflect this branch's choice effects
           branchPath[branchPath.length - 1] = {
@@ -550,10 +554,11 @@ export class StateSimulationAnalyzer {
           });
         }
       } else {
-        // Automatic beat - follow first/only connection
+        // Automatic beat - follow first/only connection (and run its link effects)
+        const linkState = this.followLink(connections[0], newState, newPath);
         stack.push({
           beatId: connections[0].targetId,
-          state: newState,
+          state: linkState,
           path: newPath,
           decisions: frame.decisions,
           visitedStates: newVisitedStates,
@@ -845,6 +850,35 @@ export class StateSimulationAnalyzer {
     return newState;
   }
 
+  /** The random branch behind a connection: same position when it still matches, else the first with that target. */
+  private randomBranchFor(beat: Beat, index: number, connection?: Connection): any {
+    const raw: any[] = Array.isArray(beat.getParameters().choices) ? beat.getParameters().choices : [];
+    const target = (b: any) => (typeof b === 'string' ? b : b?.target || b?.targetId || b?.id);
+    if (!connection) return raw[index];
+    if (raw[index] !== undefined && target(raw[index]) === connection.targetId) return raw[index];
+    return raw.find((b) => target(b) === connection.targetId);
+  }
+
+  /** A random branch with weight 0 is never drawn, so no playthrough takes it. */
+  private isNeverDrawn(beat: Beat, connection: Connection): boolean {
+    if (beat.type !== 'randomTarget') return false;
+    const raw: any[] = Array.isArray(beat.getParameters().choices) ? beat.getParameters().choices : [];
+    const branches = raw.filter((b) => (typeof b === 'string' ? b : b?.target || b?.targetId || b?.id) === connection.targetId);
+    return branches.length > 0 && branches.every((b) => typeof b === 'object' && b?.weight === 0);
+  }
+
+  /**
+   * Leave a beat along `connection`: its link effects run (as at runtime),
+   * and the step records the state the next beat is entered with.
+   */
+  private followLink(connection: Connection, state: SimulationState, path: SimulatedStep[]): SimulationState {
+    if (!Array.isArray(connection.effects) || connection.effects.length === 0) return state;
+    const next = cloneState(state);
+    this.applyEffectsList(connection.effects, next);
+    path[path.length - 1] = { ...path[path.length - 1], stateAfter: cloneState(next) };
+    return next;
+  }
+
   /**
    * Apply per-choice effects when branching at a choice beat.
    * For example, pickProp adds the selected prop's name to inventory.
@@ -912,6 +946,13 @@ export class StateSimulationAnalyzer {
             this.applyInlineChoiceFields(fields, state);
           }
         }
+        break;
+      }
+
+      case 'randomTarget': {
+        // The drawn branch's effects (e.g. which case variant this run uses).
+        const branch = this.randomBranchFor(beat, choiceIndex, connection);
+        this.applyEffectsList(branch?.effects, state);
         break;
       }
 
@@ -1214,6 +1255,9 @@ export class StateSimulationAnalyzer {
       'hyperText',
       'aiDialogTree',
       'keypad',
+      // Every drawable branch is a possible playthrough (each can carry its
+      // own effects); following only the first hid the others from analysis.
+      'randomTarget',
     ].includes(beat.type);
   }
 
