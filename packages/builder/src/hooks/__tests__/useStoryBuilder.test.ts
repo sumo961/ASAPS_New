@@ -87,6 +87,19 @@ describe('beat CRUD', () => {
     expect(beat._version).toBeGreaterThanOrEqual(1);
   });
 
+  it('updateBeat leaves the caller\'s object intact (an undo command replays it)', () => {
+    const { result } = setup();
+    act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'b1' }); });
+    const values = { parameters: { text: 'Once' } } as any;
+    act(() => result.current.actions.updateBeat('b1', values));
+    act(() => result.current.actions.updateBeat('b1', { parameters: { text: 'Twice' } } as any));
+    // Redo = replaying the same stored values: they must still carry `parameters`.
+    expect(values.parameters).toEqual({ text: 'Once' });
+    act(() => result.current.actions.updateBeat('b1', values));
+    const beat: any = result.current.state.beats.find((b: any) => b.id === 'b1');
+    expect(beat.getParameters().text).toBe('Once');
+  });
+
   it('deleteBeat removes the beat and its connections', () => {
     const { result } = setup();
     act(() => { result.current.actions.addBeat('infoText', undefined, { id: 'a' }); });

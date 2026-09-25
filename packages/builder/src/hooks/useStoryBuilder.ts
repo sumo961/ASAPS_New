@@ -246,7 +246,11 @@ export function useStoryBuilder() {
   }, []);
 
   // Update a beat
-  const updateBeat = useCallback((beatId: string, updates: Partial<Beat>) => {
+  const updateBeat = useCallback((beatId: string, incoming: Partial<Beat>) => {
+    // The special cases below delete keys as they handle them; work on a
+    // copy — the caller's object is often an undo command's stored values,
+    // and a redo would find `parameters` gone.
+    const updates = { ...incoming } as Partial<Beat>;
     setState(prev => ({
       ...prev,
       beats: prev.beats.map(beat => {

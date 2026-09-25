@@ -2903,7 +2903,12 @@ function App() {
     // structuredClone preserves Map, Set, Date etc. unlike JSON.parse(JSON.stringify())
     const oldValues: Record<string, any> = {};
     for (const key of Object.keys(updates)) {
-      const val = (currentBeat as any)[key];
+      // A Beat keeps its parameters behind getParameters() — there is no
+      // `parameters` field, so reading it snapshotted `undefined` and undoing
+      // any parameter edit did nothing.
+      const val = key === 'parameters' && typeof (currentBeat as any).getParameters === 'function'
+        ? (currentBeat as any).getParameters()
+        : (currentBeat as any)[key];
       oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
     }
 
