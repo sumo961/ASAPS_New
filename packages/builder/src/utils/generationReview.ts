@@ -71,10 +71,11 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
     if (beat?.type !== 'endScreen' && beat?.type !== 'aiSummary') continue;
     const p = beat.parameters || {};
     if (p.showRestart === false) continue; // a deliberate final end
-    const hasTarget = beat.type === 'aiSummary'
-      ? typeof p.restartTarget === 'string' && p.restartTarget.trim() !== ''
-      : (Array.isArray(beat.connections) && beat.connections.some((c: any) => c?.targetId)) || !!beat.defaultTarget
-        || !!(p.connection && (p.connection.target || p.connection.targetId || typeof p.connection === 'string'));
+    // A stored link counts for both: it is an end screen's restart, and an
+    // older AI summary's (adopted as its restartTarget on load).
+    const hasLink = (Array.isArray(beat.connections) && beat.connections.some((c: any) => c?.targetId)) || !!beat.defaultTarget
+      || !!(p.connection && (p.connection.target || p.connection.targetId || typeof p.connection === 'string'));
+    const hasTarget = hasLink || (beat.type === 'aiSummary' && typeof p.restartTarget === 'string' && p.restartTarget.trim() !== '');
     if (hasTarget) continue;
     const f: RestartWithoutTargetFinding = {
       id: `restart-without-target:${beat.id}`, kind: 'restart-without-target', beatId: beat.id, beatName: beat.name,

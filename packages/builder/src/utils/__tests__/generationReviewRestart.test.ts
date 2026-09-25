@@ -17,6 +17,12 @@ describe('restart-without-target', () => {
     expect(kinds).toEqual(['sum', 'end']);
   });
 
+  it('an older AI summary that points Restart with a stored link is not flagged', () => {
+    const story = { beats: [title, mid,
+      { id: 'sum', type: 'aiSummary', name: 'Debrief', parameters: { showRestart: true }, connections: [{ targetId: 'beat_0' }] }] };
+    expect(analyzeStoryFindings(story).some((f) => f.kind === 'restart-without-target')).toBe(false);
+  });
+
   it('is satisfied by a target — or by switching Restart off (a deliberate final end)', () => {
     const story = { beats: [title, mid,
       { id: 'sum', type: 'aiSummary', name: 'Debrief', parameters: { showRestart: true, restartTarget: 'beat_0' } },

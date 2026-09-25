@@ -15,6 +15,16 @@ describe('AI summary restart link', () => {
     expect(beat.connections).toEqual([]); // the runtime's "go on" exits
   });
 
+  it('older stories: a stored link is adopted as the restart target, and not drawn twice', () => {
+    // Ember-style: Restart pointed with a stored link only.
+    const ember = new AISummaryBeat({ id: 's', type: 'aiSummary', parameters: { showRestart: true }, connections: [{ targetId: 'beat_0', label: 'To Title Screen' }] } as any);
+    expect(ember.getParameters().restartTarget).toBe('beat_0');
+    expect(ember.getConnections()).toEqual([{ targetId: 'beat_0', label: 'Restart', role: 'restart' }]);
+    // Environmental-Choices-style: both set to the same beat.
+    const both = new AISummaryBeat({ id: 's', type: 'aiSummary', parameters: { showRestart: true, restartTarget: 'title' }, connections: [{ targetId: 'title' }] } as any);
+    expect(both.getConnections()).toEqual([{ targetId: 'title', label: 'Restart', role: 'restart' }]);
+  });
+
   it('no link without a restart button or an explicit target', () => {
     expect(new AISummaryBeat({ id: 's', type: 'aiSummary', parameters: { showRestart: false, restartTarget: 'beat_4' } } as any).getConnections()).toEqual([]);
     expect(new AISummaryBeat({ id: 's', type: 'aiSummary', parameters: { showRestart: true } } as any).getConnections()).toEqual([]);

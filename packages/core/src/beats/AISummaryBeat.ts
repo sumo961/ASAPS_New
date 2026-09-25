@@ -127,6 +127,15 @@ export class AISummaryBeat extends Beat {
     this.restartText = params.restartText || config.restartText || 'Play Again';
     this.creditsText = params.creditsText || config.creditsText || 'Credits';
     this.restartTarget = params.restartTarget || config.restartTarget;
+    // Older stories — and the story generator until 2026-09 — pointed an
+    // ending summary's Restart with a stored link ("so the restart button
+    // works"). The button never read it (it used restartTarget, else the
+    // first beat), but the author's intent is plain: adopt it, so the target
+    // is explicit, shown in "Restart at", and saved that way.
+    if (!this.restartTarget && this.showRestart) {
+      const legacy = this.connections?.find((c) => c?.targetId)?.targetId;
+      if (legacy) this.restartTarget = legacy;
+    }
     this.resetOnRestart = params.resetOnRestart ?? config.resetOnRestart ?? true;
 
     // Granular reset sub-options default to true
@@ -154,6 +163,11 @@ export class AISummaryBeat extends Beat {
   getConnections(): Array<{ targetId: string; label?: string; condition?: any; derivedFrom?: string; role?: 'restart' }> {
     const base = super.getConnections().filter(c => !(c as any).derivedFrom);
     if (!this.showRestart || !this.restartTarget) return base;
+    // A stored link to the same beat is the restart (older stories drew it
+    // that way) — mark it rather than drawing the restart twice.
+    if (base.some(c => c.targetId === this.restartTarget)) {
+      return base.map(c => (c.targetId === this.restartTarget ? { ...c, label: 'Restart', role: 'restart' as const } : c));
+    }
     return [...base, { targetId: this.restartTarget, label: 'Restart', derivedFrom: 'restartTarget', role: 'restart' }];
   }
 
