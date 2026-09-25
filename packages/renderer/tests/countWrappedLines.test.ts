@@ -21,3 +21,20 @@ describe('countWrappedLines', () => {
     expect(dims.height).toBeGreaterThanOrEqual(244);
   });
 });
+
+describe('measureWrappedLines (canvas, rendered font)', () => {
+  it('word-wraps in the measured font instead of the wide heuristic', async () => {
+    const { vi } = await import('vitest');
+    // 8px per character (≈ Arial at 18px): the 184-char paragraph fits in 2 lines at 779px,
+    // where the 0.58 heuristic (10.4px at 18px) predicted 3.
+    const ctx = { font: '', measureText: (t: string) => ({ width: t.length * 8 / 1.04 }) };
+    const orig = document.createElement.bind(document);
+    const spy = vi.spyOn(document, 'createElement').mockImplementation(((tag: string) =>
+      tag === 'canvas' ? ({ getContext: () => ctx } as any) : orig(tag)) as any);
+    vi.resetModules();
+    const mod = await import('../src/components/PositionedBeatView');
+    expect(mod.measureWrappedLines(firstStep, 18, 'Arial', 779)).toBe(8);
+    expect(mod.measureWrappedLines(firstStep, 18, undefined, 779)).toBeUndefined();
+    spy.mockRestore();
+  });
+});

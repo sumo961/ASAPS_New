@@ -120,6 +120,43 @@ export function countWrappedLines(content: string, charsPerLine: number): number
   return plain.split('\n').reduce((acc, line) => acc + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
 }
 
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+/**
+ * Wrapped line count measured in the rendered font (greedy word wrap, as the
+ * browser does). Returns undefined when no canvas is available (tests, SSR)
+ * or no font is known — callers fall back to the character-width heuristic,
+ * whose 0.58 ratio is sized for the widest faces and overshoots common sans
+ * fonts by a line or more on long paragraphs (a band of empty box).
+ */
+export function measureWrappedLines(content: string, fontSize: number, fontFamily: string | undefined, contentWidth: number): number | undefined {
+  if (!fontFamily || fontFamily === 'inherit' || contentWidth <= 0 || typeof document === 'undefined') return undefined;
+  if (measureCtx === undefined) {
+    try { measureCtx = document.createElement('canvas').getContext('2d'); } catch { measureCtx = null; }
+  }
+  if (!measureCtx || typeof measureCtx.measureText !== 'function') return undefined;
+  const ctx = measureCtx;
+  // Bold (**…**) runs are wider than the regular face measured here; a 4%
+  // allowance keeps the estimate from falling short on them.
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  const width = (t: string) => ctx.measureText(t).width * 1.04;
+  const space = width(' ');
+  const plain = content.replace(/\\n/g, '\n').replace(/\*\*|__|~~|\*/g, '');
+  let lines = 0;
+  for (const paragraph of plain.split('\n')) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    if (words.length === 0) { lines += 1; continue; }
+    let used = 0;
+    lines += 1;
+    for (const word of words) {
+      const w = width(word);
+      if (used === 0) { used = w; continue; }
+      if (used + space + w <= contentWidth) used += space + w;
+      else { lines += 1; used = w; }
+    }
+  }
+  return lines;
+}
+
 export function calculateSmartTextBoxDimensions(
   content: string,
   fontSize: number,
@@ -138,7 +175,9 @@ export function calculateSmartTextBoxDimensions(
    * still "fit". The collision pass computes this per element
    * (location.smartUpperBoundY); absent ⇒ the stage-top margin as before.
    */
-  upperBoundY?: number
+  upperBoundY?: number,
+  /** The font the text renders in; lines are then measured, not estimated. */
+  fontFamily?: string
 ): { width: number; height: number; needsScroll: boolean; xOffset: number; yOffset: number } {
   // Estimate text dimensions.
   // 0.58 is the average char-width ratio that fits both proportional fonts
@@ -156,7 +195,10 @@ export function calculateSmartTextBoxDimensions(
 
   // Estimate how many lines the text needs at current width
   const estimatedCharsPerLine = Math.floor(availableContentWidth / charWidth);
-  const estimatedLines = countWrappedLines(content, estimatedCharsPerLine);
+  const linesAt = (contentWidth: number) =>
+    measureWrappedLines(content, fontSize, fontFamily, contentWidth)
+      ?? countWrappedLines(content, Math.floor(contentWidth / charWidth));
+  const estimatedLines = linesAt(availableContentWidth);
   const estimatedContentHeight = estimatedLines * lineHeight;
   const estimatedTotalHeight = estimatedContentHeight + contentPadding;
 
@@ -253,8 +295,7 @@ export function calculateSmartTextBoxDimensions(
   if (newWidth < maxWidth) {
     for (let testWidth = newWidth; testWidth <= maxWidth; testWidth += 50) {
       const testContentWidth = testWidth - contentPadding - inlineContentWidth;
-      const testCharsPerLine = Math.floor(testContentWidth / charWidth);
-      const testLines = countWrappedLines(content, testCharsPerLine);
+      const testLines = linesAt(testContentWidth);
       const testContentHeight = testLines * lineHeight;
       const testTotalHeight = testContentHeight + contentPadding;
       const bufferedHeight = Math.ceil(testTotalHeight * heightBuffer);
@@ -837,7 +878,8 @@ export function adjustElementsForCollisions(
         stageWidth,
         stageHeight,
         0,
-        prevTextBottom > -Infinity ? prevTextBottom + TEXT_STACK_GAP : undefined
+        prevTextBottom > -Infinity ? prevTextBottom + TEXT_STACK_GAP : undefined,
+        el.location.font ? getFontFamily(el.location.font) : theme.fonts?.textFont
       );
 
       // Use the smart-sized dimensions and apply offsets for collision detection
@@ -2100,7 +2142,8 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           stageWidth,
           stageHeight,
           0,
-          (el.location as any).smartUpperBoundY
+          (el.location as any).smartUpperBoundY,
+          el.location.font ? getFontFamily(el.location.font) : theme.fonts?.textFont
         );
         return {
           name: el.location.name,
@@ -3402,7 +3445,8 @@ const TextElement: React.FC<{
       stageWidth,
       stageHeight,
       portraitInlineWidth,
-      (location as any).smartUpperBoundY
+      (location as any).smartUpperBoundY,
+      computedFont
     );
 
     console.log(`[TextElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
@@ -4326,7 +4370,8 @@ const DialogElement: React.FC<{
       stageWidth,
       stageHeight,
       dialogPortraitInlineWidth,
-      (location as any).smartUpperBoundY
+      (location as any).smartUpperBoundY,
+      computedFont
     );
 
     console.log(`[DialogElement] "${location.name}" smartDims: input(x=${location.x}, y=${location.y}, w=${location.width}, h=${location.height}) -> output(w=${smartDims.width}, h=${smartDims.height}, needsScroll=${smartDims.needsScroll}, xOffset=${smartDims.xOffset}, yOffset=${smartDims.yOffset}), fontSize=${computedFontSize}, buttonHeight=${effectiveButtonHeight}`);
@@ -4335,17 +4380,17 @@ const DialogElement: React.FC<{
     const adjustedLeft = location.x - smartDims.xOffset;
     const adjustedTop = location.y - (smartDims.yOffset || 0);
 
-    // For dynamically generated content, skip minHeight — the 15% height buffer
-    // in smart sizing overshoots for AI/online content. Let height:auto fit exactly.
-    const DYNAMIC_BEATS = ['aiInfoText', 'aiDurScreen', 'aiDialogTree', 'aiSummary', 'onlineContent'];
-    const skipMinHeight = beatType ? DYNAMIC_BEATS.includes(beatType) : false;
-
+    // Height fits the content (never below the authored height). The smart
+    // estimate is for the collision pass and the width; used as a minHeight
+    // here, any overshoot showed as a band of empty box under the text
+    // (2026-09-25). The full text is always laid out (typewriter reveals by
+    // transparency), so the box doesn't grow during the reveal.
     dimensionStyle = {
       left: `${adjustedLeft}px`,
       top: `${adjustedTop}px`,
       width: `${smartDims.width}px`,
       height: 'auto',
-      minHeight: skipMinHeight ? undefined : `${smartDims.height}px`,
+      minHeight: `${location.height}px`,
       maxHeight: `${dlgMaxHeightBelow(adjustedTop)}px`,
       overflowY: 'auto',
     };

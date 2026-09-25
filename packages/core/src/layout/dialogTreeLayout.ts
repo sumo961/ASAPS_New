@@ -228,6 +228,11 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
   // Build buttons with cumulative Y based on individual heights
   const buttons: DialogTreeLayoutElement[] = [];
   let currentY = buttonStartY;
+  // A button with no stored/override position lines up with the authored
+  // buttons above it (their x and width) instead of the auto column, which
+  // is sized to the longest choice text — otherwise a choice beyond the
+  // authored slots renders narrower/offset (2026-09-25).
+  let lastAuthored: { x: number; width: number } | undefined;
 
   choices.forEach((choice, idx) => {
     // Use calculated height for this specific button
@@ -243,13 +248,17 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
       ? Math.max(storedHeight, calculatedHeight)  // Ensure stored height isn't too small
       : calculatedHeight;
 
+    const authoredX = choiceOverride?.x ?? existingButton?.x;
+    const authoredWidth = choiceOverride?.width ?? existingButton?.width;
+    if (authoredX !== undefined && authoredWidth !== undefined) lastAuthored = { x: authoredX, width: authoredWidth };
+
     buttons.push({
       id: `choice_${idx}`,
       kind: 'button',
       content: choice.text || '',
-      x: choiceOverride?.x ?? existingButton?.x ?? buttonCenterX,
+      x: authoredX ?? lastAuthored?.x ?? buttonCenterX,
       y: choiceOverride?.y ?? existingButton?.y ?? currentY,
-      width: choiceOverride?.width ?? existingButton?.width ?? uniformButtonWidth,
+      width: authoredWidth ?? lastAuthored?.width ?? uniformButtonWidth,
       height: buttonHeight,
       z: choiceOverride?.z,  // z-index from override, undefined if not set
     });
