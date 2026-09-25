@@ -180,6 +180,10 @@ interface VisualBeatEditorProps {
   themeAssets?: ThemeAssetUrls | null;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  /** Where the renderer actually draws each element (after collision
+   *  stacking + smart sizing), keyed by element id. A dialog-tree drag is
+   *  in these coordinates, so reordering must compare against them. */
+  onComputedPositions?: (positions: Map<string, { x: number; y: number; width: number; height: number }>) => void;
   /**
    * Reset this beat's positioned elements to the schema-default layout.
    * Invoked from the toolbar's "Reset layout" button (visible when set).
@@ -231,6 +235,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   themeAssets,
   onInteractionStart,
   onInteractionEnd,
+  onComputedPositions,
   onResetLayout,
   overrideCountdownMeter,
   presentationMode,
@@ -574,6 +579,10 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       return map;
     });
   }, []);
+
+  useEffect(() => {
+    onComputedPositions?.(computedPositions);
+  }, [computedPositions, onComputedPositions]);
 
   // For panorama beats, identify elements that need custom rendering instead of PositionedBeatView
   const isPanoramaBeat = beatType === 'panorama';

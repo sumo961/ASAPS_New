@@ -26,6 +26,7 @@ export {
   calculateTextDimensions,
   calculateTextBoxDimensions,
   calculateButtonDimensions,
+  calculateButtonHeightInColumn,
   calculateDialogDimensions,
   calculateSmartButtonDimensions,
   calculateSmartTextBoxDimensions,

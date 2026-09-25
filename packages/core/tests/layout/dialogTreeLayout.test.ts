@@ -123,7 +123,7 @@ describe('dialogTreeLayout', () => {
       expect(layout.dialog.height).toBe(150);
     });
 
-    it('should apply overrides to button positions', () => {
+    it('an override sets the button COLUMN (x, width); y follows the stack', () => {
       const input: DialogTreeLayoutInput = {
         ...defaultInput,
         overrides: {
@@ -132,11 +132,15 @@ describe('dialogTreeLayout', () => {
       };
 
       const layout = computeDialogTreeLayout(input);
-      expect(layout.buttons[0].x).toBe(50);
-      expect(layout.buttons[0].y).toBe(300);
-      expect(layout.buttons[0].width).toBe(200);
-      // Height might be adjusted to ensure text fits
-      expect(layout.buttons[0].height).toBeGreaterThanOrEqual(60);
+      for (const b of layout.buttons) {
+        expect(b.x).toBe(50);
+        expect(b.width).toBe(200);
+      }
+      // Stacked from below the dialog, in order — the per-button y is not used.
+      expect(layout.buttons[0].y).toBe(layout.dialog.y + layout.dialog.height + 20);
+      for (let i = 1; i < layout.buttons.length; i++) {
+        expect(layout.buttons[i].y).toBeGreaterThan(layout.buttons[i - 1].y + layout.buttons[i - 1].height);
+      }
     });
 
     it('should use storedLocations when no overrides', () => {
@@ -323,7 +327,7 @@ describe('dialogTreeLayout', () => {
       expect(layout.buttons[0].height).toBeGreaterThan(30);
     });
 
-    it('should use stored height if larger than calculated', () => {
+    it('a stored button sets the column; height is sized to the text', () => {
       const storedLocations = new Map<string, Location>();
       storedLocations.set('btn_0', {
         kind: 'button',
@@ -346,8 +350,10 @@ describe('dialogTreeLayout', () => {
       };
 
       const layout = computeDialogTreeLayout(input);
-      // Should use the larger stored height
-      expect(layout.buttons[0].height).toBe(200);
+      expect(layout.buttons[0].x).toBe(200);
+      expect(layout.buttons[0].width).toBe(300);
+      // One line of "Short" at 300px — not the stale stored 200px.
+      expect(layout.buttons[0].height).toBeLessThan(100);
     });
   });
 

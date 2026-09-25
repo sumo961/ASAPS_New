@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
+import { choiceStateOptions, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
 import { XRMapEditor } from './XRMapEditor';
 import { XRFloorPlanEditor } from './XRFloorPlanEditor';
 type PanoramaViewMode = 'layout' | 'preview';
@@ -1465,11 +1466,21 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }, []);
 
   // Creates a command from snapshot vs current state
+  const dragStartElementsRef = useRef<VisualElement[] | null>(null);
+  // A dialog-stack edit went through the beat-parameter command (which is
+  // the undo step, and from which the stack is re-derived); the element
+  // snapshot of the same gesture must not become a second step.
+  const stackCommittedRef = useRef(false);
+
   const commitSnapshot = useCallback((description: string) => {
     if (!snapshotRef.current) return;
     const oldEls = snapshotRef.current;
     const newEls = visualElementsRef.current.map(el => ({ ...el }));
     snapshotRef.current = null;
+    if (stackCommittedRef.current) {
+      stackCommittedRef.current = false;
+      return;
+    }
     // Skip if no actual change
     if (JSON.stringify(oldEls) === JSON.stringify(newEls)) return;
     const cmd = new VisualElementsSnapshotCommand(oldEls, newEls, applyElements, description);
@@ -2104,6 +2115,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const prevPhaseIdRef = useRef<string | null>(null);
   // Track previous phase choices count to detect when choices are added/removed
   const prevChoicesCountRef = useRef<number>(0);
+  // "Show as" picker for conditional dialog choices: 'all' shows every
+  // choice; any other key shows only what that player state would see.
+  const [choiceStateKey, setChoiceStateKey] = useState<string>('all');
+  const [choiceStateOpts, setChoiceStateOpts] = useState<ChoiceStateOption[] | null>(null);
+  // Choice ids of the node's displayed buttons, in element order (choice_0…),
+  // so a drag can be turned into a reorder of the real choices.
+  const displayedChoiceIdsRef = useRef<string[]>([]);
+  // Reload the node's elements when the choice order or the picked state changes.
+  const prevChoicesSigRef = useRef<string>('');
 
   // Reset selected phase and panorama view mode when beat changes
   useEffect(() => {
@@ -2805,6 +2825,96 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }, [selectedPhaseId, saveCurrentPhaseOverrides]);
 
   /**
+   * Dialog-tree buttons are a stack (fixed canvas): the author sets the
+   * column (x, width) and the ORDER of the choices; y follows the text and
+   * the order. Turns an edited button — a finished drag or a typed value —
+   * into that model: horizontal change → column x/width for every button,
+   * vertical change → the choices reordered by where the button was
+   * dropped. Persists both (phaseOverrides column + dialogTree order) and
+   * returns the re-stacked elements, or null when no dialog button changed.
+   */
+  const computedPositionsRef = useRef<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
+  const [drawnPositions, setDrawnPositions] = useState<Map<string, { x: number; y: number; width: number; height: number }>>(new Map());
+  const handleComputedPositions = useCallback((positions: Map<string, { x: number; y: number; width: number; height: number }>) => {
+    computedPositionsRef.current = positions;
+    setDrawnPositions(positions);
+  }, []);
+
+  const commitDialogButtonStack = useCallback((elements: VisualElement[], prev: VisualElement[], fromDrag = false): VisualElement[] | null => {
+    if (!beat || beat.type !== 'dialogTree' || !selectedPhaseId) return null;
+    const isBtn = (e: VisualElement) => e.type === 'button' && /^choice_\d+$/.test(e.id);
+    const before = new Map(prev.filter(isBtn).map(e => [e.id, e]));
+    const buttons = elements.filter(isBtn);
+    const moved = buttons.find(e => {
+      const o = before.get(e.id);
+      return o && (o.x !== e.x || o.y !== e.y || o.width !== e.width);
+    });
+    if (!moved) return null;
+    const was = before.get(moved.id)!;
+    const colX = moved.x !== was.x ? moved.x : was.x;
+    const colW = moved.width !== was.width ? moved.width : was.width;
+
+    const params: any = beat.getParameters ? beat.getParameters() : {};
+    const node = dialogNodeAt(params.dialogTree, dialogTreeNodePath);
+    const allChoices: any[] = Array.isArray(node?.choices) ? node.choices : [];
+    const displayed = displayedChoiceIdsRef.current;
+    let nextTree = params.dialogTree;
+    if (moved.y !== was.y && displayed.length === buttons.length) {
+      // New displayed order = buttons sorted by their centre y. The drag
+      // starts from where the button is DRAWN (the renderer stacks the
+      // buttons below the text), so the others are compared at their drawn
+      // positions too — the model y's are the unpushed layout.
+      const drawn = fromDrag ? computedPositionsRef.current : new Map();
+      const centre = (e: VisualElement) => {
+        if (e.id === moved.id) return e.y + e.height / 2;
+        const c = drawn.get(e.id);
+        return c ? c.y + c.height / 2 : e.y + e.height / 2;
+      };
+      const orderIdx = [...buttons]
+        .sort((a, b) => centre(a) - centre(b))
+        .map(e => Number(e.id.slice('choice_'.length)));
+      const newDisplayed = orderIdx.map(i => displayed[i]).filter(Boolean);
+      // Hidden (not displayed) choices keep their places; displayed ones
+      // fill the displayed ones' places in the new order.
+      const shownSet = new Set(displayed);
+      let k = 0;
+      const byId = new Map(allChoices.map((c: any) => [String(c?.id), c]));
+      const reordered = allChoices.map((c: any) => (shownSet.has(String(c?.id)) ? byId.get(newDisplayed[k++]) ?? c : c));
+      if (reordered.some((c, i) => c !== allChoices[i])) {
+        nextTree = dialogTreeWithChoicesAt(params.dialogTree, dialogTreeNodePath, reordered);
+      }
+    }
+
+    const existing = params.phaseOverrides?.[selectedPhaseId] ?? {};
+    const columnOverrides: Record<string, any> = { ...existing };
+    for (let i = 0; i < Math.max(allChoices.length, buttons.length); i++) {
+      columnOverrides[`choice_${i}`] = { ...(existing[`choice_${i}`] ?? {}), x: colX, width: colW };
+    }
+    const nextParams = { ...params, dialogTree: nextTree, phaseOverrides: { ...(params.phaseOverrides ?? {}), [selectedPhaseId]: columnOverrides } };
+    // One undoable beat-parameter edit (the Inspector's path); the canvas
+    // re-derives the stack from these params, on undo too.
+    onBeatUpdate?.(beat.id, { parameters: nextParams } as any);
+    stackCommittedRef.current = true;
+
+    // Re-stack now (the node effect also reloads on the order change).
+    const nextNode = dialogNodeAt(nextTree, dialogTreeNodePath) ?? node;
+    const pickedState = choiceStateOpts?.find(o => o.key === choiceStateKey)?.state ?? null;
+    const visibleIds = visibleChoiceIds(nextNode?.choices || [], pickedState);
+    const shownNode = visibleIds ? { ...nextNode, choices: (nextNode?.choices || []).filter((c: any) => visibleIds.has(String(c?.id))) } : nextNode;
+    displayedChoiceIdsRef.current = (shownNode?.choices || []).map((c: any) => String(c?.id));
+    const stack = generatePhaseElements(shownNode, projectSettings?.width || 1024, projectSettings?.height || 768, columnOverrides, beat.locations)
+      .filter(isBtn)
+      .map((e, i) => ({ ...e, z: buttons[i]?.z ?? e.z }));
+    return [...elements.filter(e => !isBtn(e)), ...stack];
+  }, [beat, selectedPhaseId, dialogTreeNodePath, onBeatUpdate, generatePhaseElements, projectSettings, choiceStateOpts, choiceStateKey]);
+
+  // New beat: back to "All choices", presets recomputed on demand.
+  useEffect(() => {
+    setChoiceStateKey('all');
+    setChoiceStateOpts(null);
+  }, [beat?.id]);
+
+  /**
    * Load phase-specific elements when phase changes (for DialogTree beats)
    */
   useEffect(() => {
@@ -2822,9 +2932,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Check if beat changed - always reload when switching to a different beat
     const beatChanged = prevBeatIdRef.current !== beat.id;
 
-    // Check if choices count changed - force reload when choices are added/removed
+    // Check if choices changed - force reload when choices are added,
+    // removed or reordered, or the "Show as" state changes
     const currentChoicesCount = selectedPhase.choices?.length || 0;
-    const choicesChanged = prevChoicesCountRef.current !== currentChoicesCount;
+    // …and the button column (x/width): an undo of a column edit must re-stack.
+    const phaseOv = (beat.getParameters?.() as any)?.phaseOverrides?.[selectedPhaseId] ?? {};
+    const columnSig = Object.keys(phaseOv).filter(k => /^choice_\d+$/.test(k)).sort()
+      .map(k => `${phaseOv[k]?.x},${phaseOv[k]?.width}`).join(';');
+    const choicesSig = `${(selectedPhase.choices || []).map((c: any) => c?.id).join('|')}#${choiceStateKey}#${columnSig}`;
+    const choicesChanged = prevChoicesCountRef.current !== currentChoicesCount || prevChoicesSigRef.current !== choicesSig;
 
     // Don't reload if this is the same beat AND same phase AND same choices count AND we already have elements
     if (!beatChanged && !choicesChanged && prevPhaseIdRef.current === selectedPhaseId && visualElements.length > 0) {
@@ -2840,8 +2956,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Generate dialog and choice elements for this phase
     // Uses stored positions from beat.locations (ASML import) if available,
     // otherwise falls back to auto-layout
+    // "Show as": only the choices the picked player state would see.
+    const pickedState = choiceStateOpts?.find(o => o.key === choiceStateKey)?.state ?? null;
+    const visibleIds = visibleChoiceIds(selectedPhase.choices || [], pickedState);
+    const shownPhase = visibleIds
+      ? { ...selectedPhase, choices: (selectedPhase.choices || []).filter((c: any) => visibleIds.has(String(c?.id))) }
+      : selectedPhase;
+    displayedChoiceIdsRef.current = (shownPhase.choices || []).map((c: any) => String(c?.id));
     const phaseElements = generatePhaseElements(
-      selectedPhase,
+      shownPhase,
       stageWidth,
       stageHeight,
       phaseOverrides,
@@ -2940,6 +3063,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     prevPhaseIdRef.current = selectedPhaseId;
     prevBeatIdRef.current = beat.id;
     prevChoicesCountRef.current = currentChoicesCount;
+    prevChoicesSigRef.current = choicesSig;
 
     console.log(`[VisualWorkspace] Loaded ${allElements.length} elements for phase: ${selectedPhaseId} (${persistedElements.length} persisted + ${phaseElements.length} phase, ${currentChoicesCount} choices)`);
 
@@ -2992,7 +3116,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     };
 
     updateDialogTreeImageDimensions();
-  }, [beat, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets]);
+  }, [beat, beatVersion, selectedPhaseId, selectedPhase, projectSettings, generatePhaseElements, characters, assets, choiceStateKey, choiceStateOpts]);
 
   /**
    * Load phase-specific elements when phase changes (for EndScreen credits beats)
@@ -4983,6 +5107,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           <div className="flex-1 overflow-hidden">
             {activeTab === 'elements' && (
               <VisualPropertiesPanel
+                dialogStackDrawn={beat?.type === 'dialogTree' ? drawnPositions : undefined}
                 layoutMode={
                   // Mirror the canvas gates (schemaSlot/schemaSpatial above):
                   // the panel and the canvas must agree on the mode, or the
@@ -5099,13 +5224,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     return el;
                   });
 
+                  // Dialog-tree buttons: x/width set the column, y reorders.
+                  const restacked = (updates.x !== undefined || updates.y !== undefined || updates.width !== undefined)
+                    ? commitDialogButtonStack(updatedElements, visualElements)
+                    : null;
+                  const finalElements = restacked ?? updatedElements;
+
                   // Update state and sync to beat.locations
-                  setVisualElements(updatedElements);
+                  setVisualElements(finalElements);
                   setHasChanges(true);
 
                   // CRITICAL: Sync to beat.locations immediately so effects don't overwrite with stale data
                   if (beat) {
-                    syncElementsToBeatLocations(updatedElements, beat);
+                    syncElementsToBeatLocations(finalElements, beat);
                   }
 
                   // Sync credits phase text changes back to beat parameters
@@ -5869,8 +6000,46 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 );
               })}
               {labels.length === 0 && (
-                <span className="text-slate-500 text-sm ml-2 italic">click a choice on the canvas to step in, or use the Inspector tree</span>
+                <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title="click a choice on the canvas to step in, or use the Inspector tree">click a choice on the canvas to step in, or use the Inspector tree</span>
               )}
+              {beat?.type === 'dialogTree' && (
+                <label className="ml-auto shrink-0 flex items-center gap-2 text-sm text-slate-600" title="Show the choices a player in this state would see (conditions evaluated)">
+                  <span className="font-semibold uppercase tracking-wide text-xs">Show as</span>
+                  <select
+                    value={choiceStateKey}
+                    onMouseDown={() => {
+                      if (!choiceStateOpts && beat) setChoiceStateOpts(choiceStateOptions(beats, characters as any, beat.id));
+                    }}
+                    onFocus={() => {
+                      if (!choiceStateOpts && beat) setChoiceStateOpts(choiceStateOptions(beats, characters as any, beat.id));
+                    }}
+                    onChange={(e) => setChoiceStateKey(e.target.value)}
+                    className="px-2 py-1 rounded-md border border-slate-300 bg-white text-slate-700 w-[240px] truncate"
+                  >
+                    {(choiceStateOpts ?? [{ key: 'all', label: 'All choices', state: null }]).map((o) => (
+                      <option key={o.key} value={o.key}>{o.label}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          );
+        })()}
+        {beat?.type === 'dialogTree' && choiceStateKey === 'all' && (() => {
+          const node = dialogNodeAt((beat?.getParameters?.() as any)?.dialogTree, dialogTreeNodePath);
+          const conditional = (node?.choices ?? [])
+            .map((c: any) => ({ text: c?.text || c?.id, when: choiceConditionSummary(c) }))
+            .filter((c: { when: string | null }) => c.when);
+          if (!conditional.length) return null;
+          return (
+            <div className="shrink-0 px-5 py-1.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 overflow-x-auto whitespace-nowrap">
+              <span className="font-semibold mr-2">{conditional.length} conditional choice{conditional.length === 1 ? '' : 's'}:</span>
+              {conditional.map((c: { text: string; when: string | null }, i: number) => (
+                <span key={i} className="mr-4" title={`Shown only if ${c.when}`}>
+                  “{c.text.length > 32 ? `${c.text.slice(0, 31)}…` : c.text}” <span className="text-amber-700">if {c.when}</span>
+                </span>
+              ))}
+              <span className="text-amber-700 italic">— pick a state under “Show as” to see what a player sees</span>
             </div>
           );
         })()}
@@ -6788,8 +6957,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               if (!snapshotRef.current) {
                 snapshotRef.current = visualElements.map(el => ({ ...el }));
               }
+              dragStartElementsRef.current = visualElements.map(el => ({ ...el }));
             }}
+            onComputedPositions={handleComputedPositions}
             onInteractionEnd={() => {
+              // Dialog-tree buttons: a drag reorders (vertical) and moves the
+              // column (horizontal); the stack is rebuilt on release. Only
+              // after a drag that started on the canvas — a mouse-up
+              // elsewhere (the Undo button) must not re-apply a reorder.
+              const dragStart = dragStartElementsRef.current;
+              dragStartElementsRef.current = null;
+              if (dragStart && beat) {
+                const restacked = commitDialogButtonStack(visualElementsRef.current, dragStart, true);
+                if (restacked) {
+                  setVisualElements(restacked);
+                  syncElementsToBeatLocations(restacked, beat);
+                }
+              }
               commitSnapshot('Move/resize element');
             }}
             onElementsChange={(elements) => {

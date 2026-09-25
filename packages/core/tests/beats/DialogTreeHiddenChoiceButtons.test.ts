@@ -39,8 +39,10 @@ describe('dialogTree hidden choices in fixed layout', () => {
       expect(choices.map((c: any) => c.text)).toEqual(expected);
       const buttons = locations.filter((l: any) => l.kind === 'button');
       expect(buttons.map((l: any) => l.name)).toEqual(expected);
-      // Visible choices fill the slots top-first: no holes where hidden ones were.
-      expect(buttons.map((l: any) => l.y)).toEqual([240, 330]);
+      // One column (the authored x/width), stacked without gaps in choice order.
+      expect(buttons.map((l: any) => [l.x, l.width])).toEqual([[300, 450], [300, 450]]);
+      expect(buttons[1].y).toBeGreaterThan(buttons[0].y + buttons[0].height);
+      expect(buttons[1].y - (buttons[0].y + buttons[0].height)).toBeLessThanOrEqual(20);
     });
   }
 });

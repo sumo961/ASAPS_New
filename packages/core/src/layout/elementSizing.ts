@@ -267,6 +267,40 @@ export function calculateButtonDimensions(
 }
 
 /**
+ * Height of a button whose width is fixed by its column (dialog-tree stack).
+ * calculateButtonDimensions first shrinks the width to the text and then
+ * counts lines against that narrow width with a char estimate, so a short
+ * label came out two lines tall and every stack slot was ~25px too high.
+ * Here the words wrap inside the column, measured; the 6% allowance covers
+ * the bold weight buttons render in.
+ */
+export function calculateButtonHeightInColumn(
+  text: string,
+  fontSize: number,
+  fontFamily: string,
+  columnWidth: number
+): number {
+  const horizontalPadding = 40;
+  const verticalPadding = 24;
+  const contentWidth = Math.max(1, columnWidth - horizontalPadding);
+  const width = (t: string) => measureTextWidth(t, fontSize, fontFamily) * 1.06;
+  const space = width(' ');
+  let lines = 0;
+  for (const paragraph of (text || '').split('\n')) {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    lines += 1;
+    let used = 0;
+    for (const word of words) {
+      const w = width(word);
+      if (used === 0) { used = w; continue; }
+      if (used + space + w <= contentWidth) used += space + w;
+      else { lines += 1; used = w; }
+    }
+  }
+  return Math.round(Math.max(1, lines) * fontSize * 1.4 + verticalPadding);
+}
+
+/**
  * Calculate dialog box dimensions
  * Dialog boxes have specific padding for comfortable text display
  *

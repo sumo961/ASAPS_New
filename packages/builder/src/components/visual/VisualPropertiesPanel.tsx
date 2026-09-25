@@ -40,6 +40,10 @@ type TransitionEasing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
 type BeatTransition = import('@asaps/core').Transition;
 
 interface VisualPropertiesPanelProps {
+  /** Dialog-tree choice buttons form a stack: where each is drawn (by
+   *  element id). Their Y is shown from here and is not editable — the
+   *  order decides it (drag to reorder). */
+  dialogStackDrawn?: Map<string, { x: number; y: number; width: number; height: number }>;
   /**
    * Layout mode of the current beat instance — drives Inspector mode-
    * awareness. 'absolute' (default) keeps today's Transform (Position X/Y +
@@ -159,6 +163,7 @@ const formatBeatType = (beatType: string): string => {
 };
 
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
+  dialogStackDrawn,
   layoutMode = 'absolute',
   backgroundAssetId,
   elements,
@@ -2426,6 +2431,15 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             </div>
                             <div>
                               <label className="text-xs text-gray-600">Y</label>
+                              {dialogStackDrawn && selected.type === 'button' && /^choice_\d+$/.test(selected.id) ? (
+                                <input
+                                  type="number"
+                                  readOnly
+                                  value={Math.round(dialogStackDrawn.get(selected.id)?.y ?? effectiveY)}
+                                  title="Choices stack below the text in their order — drag a button up or down to reorder"
+                                  className="w-full px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
+                                />
+                              ) : (
                               <input
                                 type="number"
                                 value={Math.round(effectiveY)}
@@ -2436,6 +2450,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                 }}
                                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                               />
+                              )}
                             </div>
                           </div>
                         </div>

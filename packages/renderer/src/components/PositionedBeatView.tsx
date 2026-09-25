@@ -1103,7 +1103,7 @@ export function adjustElementsForCollisions(
 
   // Helper to estimate button height based on text content and width
   // Uses same calculations as calculateSmartButtonDimensions for consistency
-  const estimateButtonHeight = (text: string, width: number, fontSize: number): number => {
+  const estimateButtonHeight = (text: string, width: number, fontSize: number, fontFamily?: string): number => {
     const buttonPaddingV = 12; // Vertical padding per side
     const buttonPaddingH = 20; // Horizontal padding per side
     const charWidth = fontSize * 0.6; // Same as calculateSmartButtonDimensions
@@ -1112,7 +1112,11 @@ export function adjustElementsForCollisions(
     const contentPaddingV = buttonPaddingV * 2;
     const availableContentWidth = width - contentPaddingH;
     const charsPerLine = Math.max(1, Math.floor(availableContentWidth / charWidth));
-    const linesNeeded = Math.max(1, Math.ceil(text.length / charsPerLine));
+    // Measured when the font is known (buttons render bold: 2% more
+    // allowance on top of measureWrappedLines' own); the char estimate
+    // wrapped labels that fit and padded every gap in the stack.
+    const linesNeeded = measureWrappedLines(text, fontSize, fontFamily, availableContentWidth / 1.02)
+      ?? Math.max(1, Math.ceil(text.length / charsPerLine));
     const heightNeeded = linesNeeded * lineHeight + contentPaddingV;
     return heightNeeded;
   };
@@ -1123,7 +1127,8 @@ export function adjustElementsForCollisions(
     const buttonText = el.content || el.location.name || '';
 
     // Calculate actual button height based on text wrapping
-    const estimatedHeight = estimateButtonHeight(buttonText, buttonWidth, fontSize);
+    const buttonFont = el.location.font ? getFontFamily(el.location.font) : theme.fonts?.buttonFont;
+    const estimatedHeight = estimateButtonHeight(buttonText, buttonWidth, fontSize, buttonFont);
     const buttonHeight = Math.max(el.location.height || 42, estimatedHeight);
 
     // Phase 1 — author opt-out of collision auto-shift. Designer

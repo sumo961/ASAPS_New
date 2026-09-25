@@ -9,7 +9,7 @@
  */
 
 import type { Location } from '../types';
-import { measureTextWidth, calculateButtonDimensions } from './elementSizing';
+import { measureTextWidth, calculateButtonDimensions, calculateButtonHeightInColumn } from './elementSizing';
 
 /**
  * Phase data for layout calculation
@@ -208,14 +208,14 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
     ? Math.min(Math.max(200, ...initialButtonDimensions.map(d => d.width)), maxButtonWidth)
     : 200;
 
-  // Recalculate heights using the actual uniform width (may be different from initial calc)
-  const buttonDimensions = choices.map(choice => {
-    const btnText = choice.text || '';
-    return calculateButtonDimensions(btnText, t.fontSize, t.fontFamily, uniformButtonWidth);
-  });
-  const buttonCenterX = (stageWidth - uniformButtonWidth) / 2;
-
-  // Get existing buttons from stored locations
+  // Buttons are a STACK (fixed canvas): the author controls the column —
+  // its x and width, set on any button, apply to all — and the ORDER of the
+  // choices; y always follows the text box and the order. Per-button
+  // positions are not honoured: with choices hidden by conditions, and
+  // re-entrant hubs where used-up choices disappear, per-slot positions
+  // left gaps, orphan slots and buttons that could not be moved or placed
+  // (2026-09-25). The column comes from the first button that carries an
+  // override (VE edit) or a stored location.
   const existingButtons: Array<{ x: number; y: number; width: number; height: number }> = [];
   if (storedLocations && storedLocations.size > 0) {
     storedLocations.forEach((loc) => {
@@ -224,46 +224,32 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
       }
     });
   }
+  const overrideButtons = Object.keys(overrides ?? {})
+    .map((key) => ({ key, m: /^choice_(\d+)$/.exec(key) }))
+    .filter((e) => e.m)
+    .sort((a, b) => Number(a.m![1]) - Number(b.m![1]))
+    .map((e) => overrides![e.key]);
+  const columnSource = [...overrideButtons, ...existingButtons].find(
+    (b) => b && typeof b.x === 'number' && typeof b.width === 'number',
+  );
+  const columnWidth = columnSource?.width ?? uniformButtonWidth;
+  const columnX = columnSource?.x ?? (stageWidth - columnWidth) / 2;
 
-  // Build buttons with cumulative Y based on individual heights
   const buttons: DialogTreeLayoutElement[] = [];
   let currentY = buttonStartY;
-  // A button with no stored/override position lines up with the authored
-  // buttons above it (their x and width) instead of the auto column, which
-  // is sized to the longest choice text — otherwise a choice beyond the
-  // authored slots renders narrower/offset (2026-09-25).
-  let lastAuthored: { x: number; width: number } | undefined;
 
   choices.forEach((choice, idx) => {
-    // Use calculated height for this specific button
-    const calculatedHeight = buttonDimensions[idx]?.height || 50;
-
-    const choiceOverride = overrides?.[`choice_${idx}`];
-    const existingButton = existingButtons[idx];
-
-    // Determine button height: use stored/override if available, but ensure it's at least
-    // as tall as the calculated height to prevent text clipping
-    const storedHeight = choiceOverride?.height ?? existingButton?.height;
-    const buttonHeight = storedHeight !== undefined
-      ? Math.max(storedHeight, calculatedHeight)  // Ensure stored height isn't too small
-      : calculatedHeight;
-
-    const authoredX = choiceOverride?.x ?? existingButton?.x;
-    const authoredWidth = choiceOverride?.width ?? existingButton?.width;
-    if (authoredX !== undefined && authoredWidth !== undefined) lastAuthored = { x: authoredX, width: authoredWidth };
-
+    const buttonHeight = calculateButtonHeightInColumn(choice.text || '', t.fontSize, t.fontFamily, columnWidth);
     buttons.push({
       id: `choice_${idx}`,
       kind: 'button',
       content: choice.text || '',
-      x: authoredX ?? lastAuthored?.x ?? buttonCenterX,
-      y: choiceOverride?.y ?? existingButton?.y ?? currentY,
-      width: authoredWidth ?? lastAuthored?.width ?? uniformButtonWidth,
+      x: columnX,
+      y: currentY,
+      width: columnWidth,
       height: buttonHeight,
-      z: choiceOverride?.z,  // z-index from override, undefined if not set
+      z: overrides?.[`choice_${idx}`]?.z,  // z-index from override, undefined if not set
     });
-
-    // Move Y position for next button using actual button height
     currentY += buttonHeight + t.buttonGap;
   });
 
