@@ -37,7 +37,10 @@ describe('dialogTree hidden choices in fixed layout', () => {
       await new Promise((r) => setTimeout(r, 20));
       const [choices, locations] = methods.renderChoices.mock.calls[0] as any[];
       expect(choices.map((c: any) => c.text)).toEqual(expected);
-      expect(locations.filter((l: any) => l.kind === 'button').map((l: any) => l.name)).toEqual(expected);
+      const buttons = locations.filter((l: any) => l.kind === 'button');
+      expect(buttons.map((l: any) => l.name)).toEqual(expected);
+      // Visible choices fill the slots top-first: no holes where hidden ones were.
+      expect(buttons.map((l: any) => l.y)).toEqual([240, 330]);
     });
   }
 });
