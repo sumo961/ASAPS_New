@@ -1,5 +1,6 @@
 import { uiString, isPresetSound, getPresetSound } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
+import { renderMarkdownLite } from '../utils/markdownLite';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
@@ -1953,8 +1954,22 @@ export class ReactRenderer extends BaseRenderer {
         return fallback;
       };
       const paintPositioned = (opts: { showInput: boolean; typing: boolean }) => {
-        const boxRect = rectPct(findLoc('text'), { left: 6, top: 62, width: 88, height: 14 });
+        const authoredBox = findLoc('text');
+        const boxRect = rectPct(authoredBox, { left: 6, top: 62, width: 88, height: 14 });
         const inputRect = rectPct(findLoc('input'), { left: 6, top: 84, width: 88, height: 9 });
+        // The NPC line can be many paragraphs. Keep the box clear of the
+        // input bar: with no authored position it grows UPWARD from just
+        // above the input; an authored box keeps its top and is capped at
+        // the input. Either way overflow scrolls inside the box rather than
+        // running under the input (2026-09-25, a long reply hid the input).
+        const gapPct = 2;
+        const inputBelowBox = inputRect.top > boxRect.top;
+        const anchorAboveInput = !authoredBox && inputBelowBox;
+        const boxVertical: React.CSSProperties = anchorAboveInput
+          ? { bottom: `${100 - inputRect.top + gapPct}%`, maxHeight: `${inputRect.top - gapPct * 2}%` }
+          : inputBelowBox
+            ? { top: `${boxRect.top}%`, maxHeight: `${Math.max(boxRect.height, inputRect.top - boxRect.top - gapPct)}%` }
+            : { top: `${boxRect.top}%` };
         // Match the VE's dialog-box styling (PositionedBeatView reads the same
         // theme.textBox). No drop shadow — the VE has none.
         const tb = this.theme?.textBox;
@@ -1990,17 +2005,22 @@ export class ReactRenderer extends BaseRenderer {
                 {/* NPC dialog box */}
                 <div style={{
                   position: 'absolute',
-                  left: `${boxRect.left}%`, top: `${boxRect.top}%`,
+                  left: `${boxRect.left}%`, ...boxVertical,
                   width: `${boxRect.width}%`, minHeight: `${boxRect.height}%`,
+                  overflowY: 'auto',
                   boxSizing: 'border-box',
                   background: panelBg, color: textColor,
                   border: borderW > 0 ? `${borderW}px solid ${tb?.borderColor || 'transparent'}` : undefined,
                   borderRadius, padding: pad,
-                  display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                  display: 'flex', flexDirection: 'column',
                 }}>
-                  <div style={{ fontSize: 18, lineHeight: 1.45, whiteSpace: 'pre-wrap', textAlign: 'center' }}>
-                    {opts.typing ? '…' : (options.npcText || '')}
-                  </div>
+                  {/* Markdown-lite like the chat bubbles: NPC lines use *stage directions*.
+                      margin auto centres short text but, unlike justifyContent,
+                      keeps an overflowing reply scrollable to its first line. */}
+                  <div
+                    style={{ margin: 'auto 0', fontSize: 18, lineHeight: 1.45, whiteSpace: 'pre-wrap', textAlign: 'center' }}
+                    dangerouslySetInnerHTML={{ __html: opts.typing ? '…' : renderMarkdownLite(options.npcText || '') }}
+                  />
                 </div>
                 {/* Positioned input bar (live ConversationInput — keeps mic/STT). */}
                 {opts.showInput && (

@@ -285,3 +285,22 @@ describe('markdown-lite after typewriter reveal', () => {
     }, { timeout: 4000 });
   });
 });
+
+describe('positioned AI conversation (presentation: dialog)', () => {
+  // 2026-09-25: a multi-paragraph NPC reply grew the box downward from 62%
+  // and ran under the input bar at 84%; *stage directions* showed asterisks.
+  it('keeps the NPC box above the input and renders markdown-lite', async () => {
+    void renderer.renderConversationInput({
+      positioned: true,
+      speaker: 'Karin',
+      npcText: '*A sharp breath.*\n\n"Social services? What did the school say?"',
+    });
+    await waitFor(() => expect(container.querySelector('input, textarea')).toBeTruthy());
+    const em = container.querySelector('em');
+    expect(em?.textContent).toBe('A sharp breath.');
+    const box = em!.parentElement!.parentElement as HTMLElement;
+    expect(box.style.bottom).toBe('18%'); // 100 - input top (84) + 2 gap
+    expect(box.style.top).toBe('');
+    expect(box.style.overflowY).toBe('auto');
+  });
+});
