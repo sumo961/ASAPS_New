@@ -132,7 +132,14 @@ Characters whose variants are dispositions for REPLAY VARIETY (the
 draws a variant at random at every story start, and each restart can meet
 a different disposition. Narrative variants picked by the player or by an
 authored \`setCharacterVariant\` Effect keep the default fixed behavior
-(set \`defaultVariantId\` instead).`;
+(set \`defaultVariantId\` instead).
+A character's HUD (meters, mood frame) appears when the player first MEETS
+them — the first beat or dialog line whose speaker is their displayName (or
+links them via characterRef), that places them on stage, or whose AI
+conversation partner they are — not at story start. So write their actual
+name as the speaker of their lines, never a generic label. To show it from
+the beginning instead, set \`"hudReveal": "fromStart"\` on the character
+(the player's own character does this by default).`;
 
 const EFFECTS_CONDITIONS_REFERENCE = `## Affect-Aware Effects & Conditions
 
@@ -281,7 +288,8 @@ able to say once a character trusts (or fears) them:
 Prefer this over a separate conditionBeat when the gate belongs to ONE reply;
 keep the conditionBeat for branching the whole story. Any story with a
 feeling-gated choice should give that character a visible meter (a counter
-bound to the sentiment) so the player can see the door opening.
+bound to the sentiment) so the player can see the door opening. The meter
+appears once the player meets the character (see hudReveal).
 
 ### Worked example: bookmarks are TWO-STEP
 
@@ -768,6 +776,15 @@ const injectStoryTool: Tool = {
               description:
                 'The HUD panel that draws this character\'s visible counters. A visible meter needs one or it ' +
                 'renders nowhere. Typical: { "dockMode": "screen", "screenPosition": "screen-top-left" }.',
+            },
+            hudReveal: {
+              type: 'string',
+              enum: ['onAppearance', 'fromStart'],
+              description:
+                'When this character\'s HUD appears. onAppearance (default; fromStart for the player\'s own ' +
+                'character): once the player meets them — a beat or dialog line with their displayName as ' +
+                'speaker, placing them on stage, or making them the AI conversation partner. fromStart: from ' +
+                'the first beat after the title.',
             },
           },
         },

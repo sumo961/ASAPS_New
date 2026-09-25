@@ -456,6 +456,16 @@ export const PreviewWindow: React.FC = () => {
     counters?: Record<string, number>;
     inventory?: Array<{ name: string; quantity: number }>;
     timers?: Record<string, any>;
+    /** Per character: the active variant (drawn or chosen) and whether their
+     *  HUD shows yet — the runtime's automatic character state. */
+    characters?: Array<{
+      id: string;
+      code: string;
+      variantId?: string;
+      variants: Array<{ id: string; name: string }>;
+      drawn: boolean;
+      hud: 'shown' | 'until first appearance' | 'until a variant is chosen';
+    }>;
   }>({});
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
 
@@ -509,14 +519,12 @@ export const PreviewWindow: React.FC = () => {
     const assetsList = previewDataRef.current?.assets || [];
     void debugInfo;
 
-    // A character with unchosen variants is not on stage in any meaningful
-    // sense yet; showing their HUD would announce someone who has not appeared.
-    const hasExplicitVariant = (c: any): boolean =>
-      (c.variants && c.variants.length > 0)
-        ? !!(ctx as any).hasSettledVariant?.(c.id)
-        : true;
+    // A character's HUDs wait until the player has met them (and their
+    // variant is settled) — core isCharacterHudRevealed, shared with the
+    // exported players.
+    const isHudRevealed = (c: any): boolean => !!(ctx as any).isCharacterHudRevealed?.(c.id);
 
-    const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {
+    const hudChars: ScreenHudCharacter[] = chars.filter(isHudRevealed).map((c: any) => {
       const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
       const portraitAsset = merged.portrait?.assetId
         ? assetsList.find((a: any) => a.id === merged.portrait.assetId)
@@ -1260,14 +1268,9 @@ export const PreviewWindow: React.FC = () => {
         }
         const ctx = engineRef.current?.getContext();
         if (!ctx) return null;
-        // Hide HUD until the variant is settled — picked explicitly, or
-        // drawn under the random policy; an engine-applied default from
-        // Character.defaultVariantId doesn't count, so the pre-picker scenes
-        // stay uncluttered.
-        const variants = (character as any).variants;
-        if (variants && variants.length > 0) {
-          if (!(ctx as any).hasSettledVariant?.(character.id)) return null;
-        }
+        // Hidden until the player has met the character and their variant
+        // is settled (core isCharacterHudRevealed).
+        if (!(ctx as any).isCharacterHudRevealed?.(character.id)) return null;
         const mood = ctx.getCharacterMood(characterId);
         const merged: any = (ctx as any).getMergedCharacter?.(characterId) || character;
         const portraitAsset = merged.portrait?.assetId
@@ -1811,6 +1814,22 @@ export const PreviewWindow: React.FC = () => {
           }
         }
 
+        const characters = (previewDataRef.current?.characters || []).map((c: any) => {
+          const variants = (c.variants || []).filter((v: any) => v?.id).map((v: any) => ({ id: v.id, name: v.name || v.id }));
+          const anyCtx = ctx as any;
+          const hud = anyCtx.isCharacterHudRevealed?.(c.id)
+            ? 'shown' as const
+            : (anyCtx.hasSettledVariant?.(c.id) === false ? 'until a variant is chosen' as const : 'until first appearance' as const);
+          return {
+            id: c.id,
+            code: c.name || c.id,
+            variantId: anyCtx.getActiveCharacterVariant?.(c.id),
+            variants,
+            drawn: c.variantSelectionPolicy === 'random' && !anyCtx.hasExplicitlySetVariant?.(c.id),
+            hud,
+          };
+        });
+
         setDebugInfo({
           visitedBeats,
           seededBeats: Array.from(seededBeatsRef.current),
@@ -1818,6 +1837,7 @@ export const PreviewWindow: React.FC = () => {
           counters: displayCounters,
           inventory: ctx.getInventoryEntries(),
           timers,
+          characters,
         });
 
         // Echo visited-beats + current-beat back to the builder so it can
@@ -1927,6 +1947,7 @@ export const PreviewWindow: React.FC = () => {
       context.on('characterSentimentChanged', updateDebugInfo);
       // Step 5: emotion firings + per-beat decay also re-render the panel.
       context.on('characterEmotionChanged', updateDebugInfo);
+      context.on('characterVariantChanged', updateDebugInfo);
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer
@@ -3214,6 +3235,42 @@ export const PreviewWindow: React.FC = () => {
                     </div>
                   );
                 })()}
+
+                {/* Characters — the runtime's automatic per-character state:
+                    which variant is active (random draw or chosen; switch it
+                    here to test another) and whether the HUD shows yet. */}
+                {debugInfo.characters && debugInfo.characters.some(c => c.variants.length > 0 || c.hud !== 'shown') && (
+                  <div className="bg-white p-3 rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Characters</div>
+                    <div className="space-y-2">
+                      {debugInfo.characters.map((c) => (
+                        <div key={c.id} className="text-xs space-y-1">
+                          {c.variants.length > 0 && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono text-gray-600">{c.code}.variant:</span>
+                              <select
+                                value={c.variantId ?? ''}
+                                title={c.drawn ? 'Drawn at random at story start — pick another to test it' : 'Active variant — pick another to test it'}
+                                onChange={(e) => {
+                                  const ctx = engineRef.current?.getContext() as any;
+                                  ctx?.setActiveCharacterVariant?.(c.id, e.target.value || null);
+                                }}
+                                className="min-w-0 max-w-[55%] px-1 py-0.5 border border-gray-300 rounded font-mono text-xs"
+                              >
+                                <option value="">(none)</option>
+                                {c.variants.map(v => <option key={v.id} value={v.id}>{v.id}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-2 text-gray-500">
+                            <span>{c.code} HUD{c.drawn ? ' · variant drawn at random' : ''}</span>
+                            <span className={c.hud === 'shown' ? 'text-green-700' : 'text-amber-700'}>{c.hud === 'shown' ? 'shown' : `hidden ${c.hud}`}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Variables */}
                 {debugInfo.variables && Object.keys(debugInfo.variables).length > 0 && (

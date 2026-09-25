@@ -81,6 +81,9 @@ function normalizeCharacterUpdates(rawUpdates: any): Record<string, unknown> {
   if (rawUpdates.traits && typeof rawUpdates.traits === 'object') {
     out.traits = normalizeTraits(rawUpdates.traits);
   }
+  if (rawUpdates.hudReveal === 'onAppearance' || rawUpdates.hudReveal === 'fromStart') {
+    out.hudReveal = rawUpdates.hudReveal;
+  }
   if (rawUpdates.variantSelectionPolicy === 'fixed' || rawUpdates.variantSelectionPolicy === 'random') {
     out.variantSelectionPolicy = rawUpdates.variantSelectionPolicy;
   }
@@ -395,6 +398,7 @@ export function describeProposal(p: ChangeProposal): string {
       for (const k of ['displayName', 'description', 'color'] as const) if (u[k] !== undefined) parts.push(k);
       if (u.traits) parts.push('traits');
       if (u.variantSelectionPolicy) parts.push(`selection: ${u.variantSelectionPolicy}`);
+      if (u.hudReveal) parts.push(`HUD: ${u.hudReveal === 'fromStart' ? 'from the start' : 'on first appearance'}`);
       if (Array.isArray(u.variants)) {
         parts.push(`${u.variants.length} variant${u.variants.length === 1 ? '' : 's'} (${u.variants.map((v: any) => v.name || v.id).join(', ')})`);
       }

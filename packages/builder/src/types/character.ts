@@ -137,6 +137,18 @@ export interface Character {
    */
   variantSelectionPolicy?: 'fixed' | 'random';
 
+  /**
+   * When this character's HUDs (meter frame, mood frame, inventory) appear
+   * at runtime.
+   *   - 'onAppearance': once the player meets them — a beat or dialog node
+   *     featuring them (speaker / linked character, placed on stage, AI
+   *     conversation partner) has run. Default for every role but 'player'.
+   *   - 'fromStart': from the first beat after the title. Default for the
+   *     player's own character.
+   * Either way a character with variants waits until one is settled.
+   */
+  hudReveal?: 'onAppearance' | 'fromStart';
+
   // Metadata
   description?: string;
   tags?: string[];

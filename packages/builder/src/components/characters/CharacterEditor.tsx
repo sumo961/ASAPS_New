@@ -978,6 +978,23 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           </label>
         </div>
 
+        {/* When this character's HUDs appear — meters, mood frame, inventory. */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="hud-reveal">Show HUD</label>
+          <select
+            id="hud-reveal"
+            value={editedCharacter.hudReveal ?? (editedCharacter.role === 'player' ? 'fromStart' : 'onAppearance')}
+            onChange={(e) => setEditedCharacter({ ...editedCharacter, hudReveal: e.target.value as Character['hudReveal'] })}
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
+          >
+            <option value="onAppearance">When {editedCharacter.displayName || editedCharacter.name || 'the character'} first appears</option>
+            <option value="fromStart">From the start of the story</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            "Appears" = the first beat or dialog line where they speak (speaker linked to or named as this character), are placed on stage, or are the AI conversation partner. With variants, the HUD also waits until one is chosen.
+          </p>
+        </div>
+
         {editedCharacter.meterFrame && (
           <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
             {/* Dock Mode Toggle */}

@@ -880,8 +880,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   };
 
   // Build the HUD overlay layer for screen-docked moodFrames. Mirrors the
-  // PreviewWindow overlay: gates on hasSettledVariant so the HUD stays
-  // hidden until the variant is picked (or randomly drawn); reads merged
+  // PreviewWindow overlay: gates on isCharacterHudRevealed so the HUD stays
+  // hidden until the player meets the character; reads merged
   // character (variant overlay applied) for name / portrait / color;
   // re-renders on every characterMoodChanged via hudTick.
   /**
@@ -907,14 +907,10 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const chars = (story as any).getCharacters?.() || [];
     const assetsList = (story as any).getAssets?.() || [];
 
-    // A character with unchosen variants has not appeared yet; their HUD would
-    // announce someone the interactor has not met.
-    const hasExplicitVariant = (c: any): boolean =>
-      (c.variants && c.variants.length > 0)
-        ? !!(ctx as any).hasSettledVariant?.(c.id)
-        : true;
+    // A character's HUDs wait until the interactor has met them.
+    const isHudRevealed = (c: any): boolean => !!(ctx as any).isCharacterHudRevealed?.(c.id);
 
-    const hudChars: ScreenHudCharacter[] = chars.filter(hasExplicitVariant).map((c: any) => {
+    const hudChars: ScreenHudCharacter[] = chars.filter(isHudRevealed).map((c: any) => {
       const merged: any = (ctx as any).getMergedCharacter?.(c.id) || c;
       const portraitAsset = merged.portrait?.assetId
         ? assetsList.find((a: any) => a.id === merged.portrait.assetId)

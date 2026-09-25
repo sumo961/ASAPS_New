@@ -584,6 +584,8 @@ export class DialogTreeBeat extends Beat {
         context,
       );
       const processedText = this.processText(this.currentNode.text, context);
+      // The player meets this node's speaker (HUD reveal on appearance).
+      context.markCharacterAppeared((this.currentNode as any).characterRef || processedSpeaker);
 
       // P3-3c-9 — per-node spatial detection (computed BEFORE renderDialog
       // so the absolute speaker/text render can be skipped on spatial

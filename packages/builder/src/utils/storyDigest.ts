@@ -41,6 +41,7 @@ export interface DigestCharacter {
     stance?: { warmth?: number; dominance?: number };
   }> | unknown[];
   variantSelectionPolicy?: 'fixed' | 'random';
+  hudReveal?: 'onAppearance' | 'fromStart';
   defaultVariantId?: string;
 }
 
@@ -235,6 +236,7 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
         });
         bits.push(`variants: ${named.join(', ')}`);
         if (c.variantSelectionPolicy === 'random') bits.push('selection: random each playthrough');
+        if (c.hudReveal === 'fromStart') bits.push('HUD from the start');
         else if (c.defaultVariantId) bits.push(`default variant: ${c.defaultVariantId}`);
       }
       if (c.counters && c.counters.length > 0) {

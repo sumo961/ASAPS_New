@@ -612,6 +612,7 @@ If the author's brief clearly calls for a location-based or AR experience, say s
   - RANGE CARRIES MEANING. The bar grows from ZERO, wherever zero falls in min..max. Set min: -100 when the feeling has a real opposite (trust/distrust) so the bar grows outward from the centre. Set min: 0 when it does not (fear's absence is calm, not anti-fear) — negatives then read as an empty bar.
   - Optional "bands" replace the number with a word. Give a bipolar ladder a band covering ZERO, because sentiments start at zero and a ladder without one opens the story calling someone "wary" before they have met anyone: "bands": [ { "from": -100, "label": "strong distrust" }, { "from": -20, "label": "neutral" }, { "from": 20, "label": "trusting" } ] with "numericFormat": "band".
   - A visible meter needs a frame to render in — give the character a "meterFrame": { "dockMode": "screen", "screenPosition": "screen-top-left" } (that is the whole shape you need; colours, padding and sizes default).
+  - The HUD appears when the player first MEETS the character — the first beat or dialog line whose speaker is their displayName, that places them on stage, or whose AI conversation partner they are — not at story start. So their lines must carry their real name as speaker, never a generic label like "Character" (that also leaves them unrecognised). Want it visible from the first beat instead (a companion introduced in the opening text)? Set "hudReveal": "fromStart" on the character; the player's own character does this by default.
   - 🚨 SURFACE WHAT YOU TRACK, SYMMETRICALLY. If a counter or sentiment gates an outcome (an ending threshold, a character opening up), the player deserves a visible meter for it — invisible bookkeeping makes success feel arbitrary. And meters must be symmetric across parallel characters: three suspects tracked by suspicion means three meters (or none), never a meter for one suspect only — unless the story explicitly justifies the asymmetry (e.g. an established relationship with that one character, stated in the text).
   - Phones are not a reason to skip meters: on phone-sized stages the runtime collapses every screen HUD into a slim tap-to-expand strip (initials + micro-bar per character, item counts, mood tokens) that flashes when a value changes. Authors can force or disable this with globalSettings.hudOverlays.compactMode: "auto" | "always" | "never" — leave it at auto unless the story has a reason.
 - **Fictional Time** (type: "fictionalTime"): Set or advance in-story date/time
@@ -1028,7 +1029,8 @@ submissiveness, shifted moderately from the BASE character's values — a hostil
 of a shy character stays recognizably shy. For rehearsal/training stories where the
 character should arrive in a DIFFERENT disposition every playthrough, author 3-4
 disposition variants and set \`"variantSelectionPolicy": "random"\` on the character —
-the runtime draws one at random at each story start. Player-chosen or plot-driven
+the runtime draws one at random at each story start (the draw stays hidden until the
+character appears: their HUD shows from their first scene). Player-chosen or plot-driven
 variants instead keep fixed selection: \`defaultVariantId\` on the character plus
 \`setCharacterVariant\` Effects at the transition points.
 

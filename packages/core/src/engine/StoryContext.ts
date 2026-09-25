@@ -2,7 +2,7 @@ import  { EventEmitter } from 'eventemitter3';
 import type { Condition, Effect, FictionalTime, GeoPoint } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
-import { resolveCharacterKey } from '../utils/characterRef';
+import { resolveCharacterKey, resolveCharacter } from '../utils/characterRef';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
 import {
@@ -157,6 +157,11 @@ interface StoryState {
   // CharacterVariant.id. Empty until the runtime hits a setCharacterVariant
   // effect or the seed step fills it from `Character.defaultVariantId`.
   activeCharacterVariants: Record<string, string>;
+  // Characters the player has met: a beat or dialog node featuring them
+  // (speaker, linked character, placed on stage, AI conversation partner)
+  // has run. Outer key = canonical Character.id. Gates HUDs under
+  // hudReveal 'onAppearance'.
+  appearedCharacters: Record<string, true>;
   // Initial-value capture for delta-from-initial condition baselines
   // (v0.9.45). Each map mirrors the live affect map but is populated
   // *lazily on first touch* — the first mutator call for a (character,
@@ -270,6 +275,7 @@ export interface SerializedStoryState {
   characterReflections?: Record<string, Reflection[]>;
   characterGoalStatus?: Record<string, Record<string, GoalStatus>>;
   activeCharacterVariants?: Record<string, string>;
+  appearedCharacters?: Record<string, true>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   // Baseline + bookmark state (v0.9.45). All optional so prior save files
@@ -419,6 +425,7 @@ export class StoryContext extends EventEmitter {
       characterReflections: {},
       characterGoalStatus: {},
       activeCharacterVariants: {},
+      appearedCharacters: {},
       initialMoods: {},
       initialEmotionLevels: {},
       initialSentiments: {},
@@ -1371,6 +1378,52 @@ export class StoryContext extends EventEmitter {
     const variants = Array.isArray(base?.variants) ? base.variants.filter((v: any) => v?.id) : [];
     if (variants.length === 0) return true;
     return base.variantSelectionPolicy === 'random' && !!this.state.activeCharacterVariants[key];
+  }
+
+  /** Record that the player has met this character (a beat or node featuring them ran). */
+  markCharacterAppeared(charRef: string | null | undefined): void {
+    if (!charRef) return;
+    // Only defined characters — a free-text speaker ("Narrator", a generic
+    // label) resolves to nobody and is not recorded.
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    const character = resolveCharacter(charRef, characters);
+    if (character?.id) this.state.appearedCharacters[character.id] = true;
+  }
+
+  /**
+   * Has the player met this character? Recorded as beats run; for a story
+   * started mid-way (a "Start as if…" preset, a restored save from before
+   * this was tracked) any visited beat that features them counts too.
+   */
+  hasCharacterAppeared(charRef: string): boolean {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return false;
+    if (this.state.appearedCharacters[key]) return true;
+    const story: any = this.story;
+    if (!story?.getBeat) return false;
+    for (const beatId of this.state.visitedBeats) {
+      const beat = story.getBeat(beatId);
+      const refs: string[] = beat?.constructor?.featuredCharacterRefs?.(beat) ?? [];
+      if (refs.some((r) => this.resolveCharRef(r) === key)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Should this character's HUDs (meters, mood frame, inventory) show now?
+   * Their persona must be settled (see hasSettledVariant) and, under
+   * hudReveal 'onAppearance' — the default for everyone but the player's
+   * own character — the player must have met them: a meter panel for
+   * someone not yet on stage announces them early.
+   */
+  isCharacterHudRevealed(charRef: string): boolean {
+    const key = this.resolveCharRef(charRef);
+    if (!key) return false;
+    if (!this.hasSettledVariant(key)) return false;
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    const base = characters?.find((c) => c?.id === key);
+    const reveal = base?.hudReveal ?? (base?.role === 'player' ? 'fromStart' : 'onAppearance');
+    return reveal === 'fromStart' || this.hasCharacterAppeared(key);
   }
 
   /**
@@ -2408,6 +2461,7 @@ export class StoryContext extends EventEmitter {
       characterReflections: {},
       characterGoalStatus: {},
       activeCharacterVariants: {},
+      appearedCharacters: {},
       initialMoods: {},
       initialEmotionLevels: {},
       initialSentiments: {},
@@ -2906,6 +2960,7 @@ export class StoryContext extends EventEmitter {
         Object.entries(this.state.characterGoalStatus).map(([k, v]) => [k, { ...v }])
       ),
       activeCharacterVariants: { ...this.state.activeCharacterVariants },
+      appearedCharacters: { ...this.state.appearedCharacters },
       // v0.9.45 — baseline + bookmark snapshots so save/load preserves
       // delta-vs-initial / delta-vs-bookmark comparisons across sessions.
       initialMoods: Object.fromEntries(
@@ -2995,6 +3050,7 @@ export class StoryContext extends EventEmitter {
       activeCharacterVariants: serialized.activeCharacterVariants
         ? { ...serialized.activeCharacterVariants }
         : {},
+      appearedCharacters: serialized.appearedCharacters ? { ...serialized.appearedCharacters } : {},
       // v0.9.45 — restore baseline snapshots and named bookmarks; default
       // to empty maps for older saves (forward-compat).
       initialMoods: serialized.initialMoods

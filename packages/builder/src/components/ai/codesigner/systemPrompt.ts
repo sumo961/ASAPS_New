@@ -150,7 +150,10 @@ Rules for proposals:
 - 'updateCharacter' may change: displayName, description, color; base
   personality 'traits' (Big Five, each 0..1); 'variantSelectionPolicy'
   ('fixed' | 'random' — random draws a disposition each playthrough, for
-  rehearsal/training variety); 'variants' (a FULL replacement of the
+  rehearsal/training variety); 'hudReveal' ('onAppearance' — default: the
+  HUD shows once the player meets them, i.e. a beat or dialog line has
+  their displayName as speaker, places them on stage, or makes them the AI
+  conversation partner — or 'fromStart'); 'variants' (a FULL replacement of the
   character's disposition/persona overlays); and 'counters' (also a FULL
   replacement — include the existing ones from the digest that should stay).
   Reference the character by the id or name in the digest. Prefer it only

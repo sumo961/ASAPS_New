@@ -177,6 +177,8 @@ export abstract class Beat {
       // link was made, and it went stale when the character was renamed
       // (UX-Eval B12). Free-text speakers show exactly what the author typed.
       renderer.setState('beatSpeaker', Beat.linkedSpeakerName(this.characterRef, this.speaker, context));
+      // The player meets whoever this beat features (HUD reveal on appearance).
+      for (const ref of Beat.featuredCharacterRefs(this)) context.markCharacterAppeared(this.processText(ref, context));
       renderer.setState('showSpeaker', this.showSpeaker);
 
       // Background fit for this beat's background image. Always set —
@@ -600,6 +602,25 @@ export abstract class Beat {
     text = text.replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, sub);
 
     return text;
+  }
+
+  /**
+   * Character references this beat puts in front of the player: its speaker
+   * (linked or free text), a linked characterRef, an AI conversation partner
+   * (npcName) and characters placed on stage. Dialog-tree node speakers are
+   * marked as each node shows (DialogTreeBeat). Unresolvable refs (a
+   * narrator, "You") are ignored by the caller.
+   */
+  static featuredCharacterRefs(beat: Beat): string[] {
+    const refs: string[] = [];
+    const params: any = beat.getParameters?.() ?? {};
+    for (const r of [beat.characterRef, beat.speaker, params.characterRef, params.npcName]) {
+      if (typeof r === 'string' && r.trim()) refs.push(r.trim());
+    }
+    beat.locations?.forEach((loc: any) => {
+      if (loc?.kind === 'character' && typeof loc.characterId === 'string' && loc.characterId) refs.push(loc.characterId);
+    });
+    return refs;
   }
 
   /**

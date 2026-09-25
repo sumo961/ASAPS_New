@@ -80,6 +80,16 @@ describe('updateCharacter kind', () => {
     expect(r.droppedCount).toBe(1);
   });
 
+  it('accepts hudReveal on updateCharacter and drops an unknown value', () => {
+    const parse = (hudReveal: unknown) => extractProposalsFromReply(block(JSON.stringify({
+      title: 'HUD',
+      proposals: [{ kind: 'updateCharacter', characterId: 'karin', updates: { displayName: 'Karin', hudReveal } }],
+    }))).proposalSet!.proposals[0] as any;
+    expect(parse('fromStart').updates.hudReveal).toBe('fromStart');
+    expect(parse('onAppearance').updates.hudReveal).toBe('onAppearance');
+    expect(parse('whenever').updates.hudReveal).toBeUndefined();
+  });
+
   it('accepts + clamps affect fields: traits, selection policy, and stance-bearing variants', () => {
     const r = extractProposalsFromReply(block(JSON.stringify({
       title: 'Affect',
