@@ -712,6 +712,13 @@ export class DialogTreeBeat extends Beat {
         // that `computeDialogTreeLayout` derived above for the absolute path.
         // The spatial branch composes choices via SpatialFlowView from
         // normalized hotspots — it doesn't need pixel locations.
+        // The layout places a button for EVERY choice in the node; choices
+        // hidden by their conditions must not keep theirs, or the positioned
+        // renderer draws an orphan button per hidden choice and labels it
+        // with a visible choice's text (fixed canvas, 2026-09-25). Button
+        // locations are named after their choice's text.
+        const visibleTexts = new Set(visibleChoices.map(c => c.text || ''));
+        const choiceLocations = locations.filter(loc => loc.kind !== 'button' || visibleTexts.has(loc.name));
         const choiceId = await renderer.renderChoices(
           visibleChoices.map(c => ({
             id: `${nodePath}_${c.id}`,
@@ -721,7 +728,7 @@ export class DialogTreeBeat extends Beat {
             // through SpatialFlowView when dialogNodeIsSpatial is set.
             hotspot: (c as any).hotspot,
           })),
-          nodeWillBeSpatial ? undefined : locations
+          nodeWillBeSpatial ? undefined : choiceLocations
         );
 
         // Clear the spatial flag after this node's render — the NEXT node
