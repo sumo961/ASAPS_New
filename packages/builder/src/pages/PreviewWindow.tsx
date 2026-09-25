@@ -1361,7 +1361,7 @@ export const PreviewWindow: React.FC = () => {
       // Story setting (Project Settings → Sound): speak choice questions and
       // input prompts too. Default on — exported players always did.
       getTTSService().setReadPrompts((previewData?.settings as any)?.tts?.readPrompts !== false);
-      reactRenderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
+      reactRenderer.setTTSSpeakCallback((text, speaker, isPrompt, segments) => {
         const svc = getTTSService();
         console.log(`[PreviewWindow] TTS callback fired: speaker="${speaker}", isPrompt=${isPrompt}, enabled=${svc.isEnabled()}, text="${text.substring(0, 50)}..."`);
         if (!svc.isEnabled()) return;
@@ -1372,6 +1372,9 @@ export const PreviewWindow: React.FC = () => {
         }
         if (isPrompt) {
           svc.speakPrompt(text, speaker);
+        } else if (segments && segments.length > 0) {
+          // Narration by the Narrator, quoted speech by the character.
+          svc.speakSegments(segments, text, speaker);
         } else {
           svc.speak(text, speaker);
         }
@@ -1948,6 +1951,8 @@ export const PreviewWindow: React.FC = () => {
       // Step 5: emotion firings + per-beat decay also re-render the panel.
       context.on('characterEmotionChanged', updateDebugInfo);
       context.on('characterVariantChanged', updateDebugInfo);
+      // A character's HUD appears when the player first meets them.
+      context.on('characterAppeared', updateDebugInfo);
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer

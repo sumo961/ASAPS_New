@@ -1042,6 +1042,7 @@ Visible beats (titleScreen, infoText, durScreen, multiChoice, dialogTree, moveme
 - The player character's displayName should be used as the speaker value when the player is speaking
 - **showSpeaker** controls visibility: true = always show speaker label, false = always hide, omit = use global setting
 - When a speaker is set, the speaker name appears as a label above the text box
+- 🚨 A line that MIXES narration and a character's speech ('Karin sits down. "I don't see why we're here."') still names that character as its speaker — the speaker says who is PRESENT (it reveals their HUD, routes their voice) — and the beat then sets "showSpeaker": false so no name label is drawn over prose that already says who speaks. Text in quotation marks is read in the character's voice, the rest by the narrator. Never use a generic label ("Character", "NPC") or leave the speaker empty for a line where a known character is present.
 
 ### Speaker on Beat Examples
 \`\`\`json

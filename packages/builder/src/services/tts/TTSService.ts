@@ -16,6 +16,8 @@ export class TTSService {
   private _isSpeaking: boolean = false;
   /** Generation counter — prevents old speak() finally blocks from clearing the flag */
   private _speakGeneration: number = 0;
+  /** Bumped by speak()/stop(): a running speakSegments() sequence stops. */
+  private _sequence: number = 0;
   private _language: string | null = null;
   private speakerVoices: Map<string, TTSVoiceConfig> = new Map();
   private defaultVoiceConfig: TTSVoiceConfig = {};
@@ -103,14 +105,35 @@ export class TTSService {
    * Speak text, optionally using a speaker-specific voice.
    */
   async speak(text: string, speaker?: string): Promise<void> {
+    this._sequence++; // a new line cancels a running segment sequence
+    return this.speakOne(text, speaker);
+  }
+
+  /**
+   * Speak a line as consecutive voices — narration by the Narrator, quoted
+   * speech by the character (see the renderer's voice segments). Each
+   * piece waits for the previous; a new speak()/stop() cancels the rest.
+   * Web Speech plays without telling us when it ends, so there the line
+   * is read whole in the speaker's voice instead.
+   */
+  async speakSegments(segments: Array<{ text: string; speaker?: string }>, wholeText: string, speaker?: string): Promise<void> {
+    const seq = ++this._sequence;
+    if (this.activeProvider?.name === 'Web Speech') return this.speakOne(wholeText, speaker);
+    for (const seg of segments) {
+      if (this._sequence !== seq) return;
+      await this.speakOne(seg.text, seg.speaker);
+    }
+  }
+
+  private async speakOne(text: string, speaker?: string): Promise<void> {
     if (!this._enabled || !this.activeProvider?.isReady()) {
       console.log(`[TTSService] speak() skipped: enabled=${this._enabled}, providerReady=${this.activeProvider?.isReady()}, provider=${this.activeProvider?.name || 'none'}`);
       return;
     }
     console.log(`[TTSService] speak(): "${text.substring(0, 60)}..." speaker=${speaker || 'none'}`);
 
-    // Stop any in-progress speech
-    this.stop();
+    // Stop any in-progress speech (not the sequence this line belongs to)
+    this.halt();
 
     // Build voice config: speaker-specific → default → empty
     let voiceConfig: TTSVoiceConfig = { ...this.defaultVoiceConfig };
@@ -177,6 +200,11 @@ export class TTSService {
    * Stop any in-progress speech.
    */
   stop(): void {
+    this._sequence++; // cancel a running segment sequence
+    this.halt();
+  }
+
+  private halt(): void {
     this._speakGeneration++; // Invalidate any running speak() finally block
     try {
       this.activeProvider?.stop();

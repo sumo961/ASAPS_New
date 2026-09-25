@@ -149,6 +149,44 @@ describe('TTSService', () => {
   // -------------------------------------------------------------------------
   // Speak
   // -------------------------------------------------------------------------
+  describe('speakSegments() — narration by the Narrator, quotes by the character', () => {
+    it('speaks each piece in order with its own voice', async () => {
+      const provider = createMockProvider();
+      service.registerProvider(provider);
+      service.setProvider('mock-provider');
+      service.setSpeakerVoice('Karin', { voiceId: 'karin-voice' } as any);
+      service.setSpeakerVoice('Narrator', { voiceId: 'narrator-voice' } as any);
+      await service.speakSegments([
+        { text: 'She sits down.', speaker: 'Narrator' },
+        { text: "I don't see why we're here.", speaker: 'Karin' },
+      ], 'whole', 'Karin');
+      const calls = (provider.synthesize as any).mock.calls.map((c: any[]) => [c[0], c[1].voiceId]);
+      expect(calls).toEqual([['She sits down.', 'narrator-voice'], ["I don't see why we're here.", 'karin-voice']]);
+    });
+
+    it('a new line cancels the rest of a running sequence', async () => {
+      let release: () => void = () => {};
+      const provider = createMockProvider({
+        synthesize: vi.fn(async () => { await new Promise<void>((r) => { release = r; }); return { audio: null }; }),
+      });
+      service.registerProvider(provider);
+      service.setProvider('mock-provider');
+      const running = service.speakSegments([{ text: 'one' }, { text: 'two' }], 'one two');
+      service.stop();
+      release();
+      await running;
+      expect((provider.synthesize as any).mock.calls.map((c: any[]) => c[0])).toEqual(['one']);
+    });
+
+    it('Web Speech (no end signal) reads the line whole in the speaker voice', async () => {
+      const provider = createMockProvider({ name: 'Web Speech' });
+      service.registerProvider(provider);
+      service.setProvider('Web Speech');
+      await service.speakSegments([{ text: 'a', speaker: 'Narrator' }, { text: 'b', speaker: 'Karin' }], 'a "b"', 'Karin');
+      expect((provider.synthesize as any).mock.calls.map((c: any[]) => c[0])).toEqual(['a "b"']);
+    });
+  });
+
   describe('speak()', () => {
     let provider: ITTSProvider;
 

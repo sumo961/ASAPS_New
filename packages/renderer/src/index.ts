@@ -1,5 +1,5 @@
 export { BaseRenderer } from './renderers/BaseRenderer';
-export { ReactRenderer } from './renderers/ReactRenderer';
+export { ReactRenderer, type TTSVoiceSegment } from './renderers/ReactRenderer';
 export { EditableReactRenderer, type EditCallbacks } from './renderers/EditableReactRenderer';
 export type { RenderContext, RenderOptions, RenderTheme, AssetCache } from './types';
 

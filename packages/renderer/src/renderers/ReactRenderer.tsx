@@ -1,4 +1,4 @@
-import { uiString, isPresetSound, getPresetSound } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound, splitVoicedSegments } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { renderMarkdownLite } from '../utils/markdownLite';
 import React from 'react';
@@ -7,6 +7,9 @@ import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
 import type { Location, AnimationPath, SlotIntent } from '@asaps/core';
+
+/** One piece of a line read aloud: whose voice reads it. */
+export interface TTSVoiceSegment { text: string; speaker?: string }
 import type { RenderContext, RenderOptions } from '../types';
 import { PositionedBeatView, createPositionedElementData, type PositionedElementData, type RenderThemeSettings } from '../components/PositionedBeatView';
 import type { MeterCounterData, MeterFrameConfig } from '../components/CharacterMeterFrame';
@@ -1055,7 +1058,7 @@ export class ReactRenderer extends BaseRenderer {
    *  button clears a bottom-right screen-docked HUD (inventory/meter frame).
    *  Set by the host (PreviewWindow / player) which knows the frame layout. */
   protected chatInputRightInset: number = 0;
-  private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null = null;
+  private ttsSpeakCallback: ((text: string, speaker?: string, isPrompt?: boolean, segments?: TTSVoiceSegment[]) => void) | null = null;
   private ttsStopCallback: (() => void) | null = null;
   private choiceTextMap: Map<string, string> = new Map(); // actionId → choice text for TTS
   private ttsChoiceSpeakCallback: ((text: string) => void) | null = null;
@@ -1348,8 +1351,22 @@ export class ReactRenderer extends BaseRenderer {
    * Set TTS speak callback. Called fire-and-forget when text should be spoken.
    * @param isPrompt — true for interactor-facing prompts (question, input prompt)
    */
-  setTTSSpeakCallback(callback: ((text: string, speaker?: string, isPrompt?: boolean) => void) | null): void {
+  setTTSSpeakCallback(callback: ((text: string, speaker?: string, isPrompt?: boolean, segments?: TTSVoiceSegment[]) => void) | null): void {
     this.ttsSpeakCallback = callback;
+  }
+
+  /**
+   * Hand a line to the host's TTS. A line with quotation marks and a
+   * speaker also carries voice segments: the quoted speech in the
+   * speaker's voice, the narration around it in the Narrator's
+   * ("Karin sits down. 'I don't see why we're here.'"). Without quotes the
+   * whole line is the speaker's, as before.
+   */
+  private speakAloud(text: string, speaker?: string, isPrompt?: boolean): void {
+    if (!this.ttsSpeakCallback) return;
+    const split = speaker && speaker !== 'Narrator' ? splitVoicedSegments(text) : null;
+    const segments = split?.map((seg) => ({ text: seg.text, speaker: seg.quoted ? speaker : 'Narrator' }));
+    this.ttsSpeakCallback(text, speaker, isPrompt, segments);
   }
 
   /**
@@ -2779,7 +2796,7 @@ export class ReactRenderer extends BaseRenderer {
       : mergeWithFreePositioned(generateDefaultLocations('titleScreen', content), locations);
 
     console.log(`[ReactRenderer ${this.instanceId}] ✅ Using POSITIONED rendering with ${effectiveLocations.length} locations`);
-    this.ttsSpeakCallback?.(title, this.currentSpeaker);
+    this.speakAloud(title, this.currentSpeaker);
     await this.renderPositionedBeat('titleScreen', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
@@ -2813,7 +2830,7 @@ export class ReactRenderer extends BaseRenderer {
       console.log(`[ReactRenderer.renderText] Location[${i}] "${loc.name}" (${loc.kind}): x=${loc.x}, y=${loc.y}, w=${loc.width}, h=${loc.height}, content="${(loc as any).content?.substring?.(0, 50) || 'N/A'}..."`);
     });
 
-    this.ttsSpeakCallback?.(text, this.currentSpeaker);
+    this.speakAloud(text, this.currentSpeaker);
     await this.renderPositionedBeat(beatType, content, effectiveLocations, true, undefined, authorPositioned);
   }
 
@@ -2841,7 +2858,7 @@ export class ReactRenderer extends BaseRenderer {
     this.setState('dialogContext', { speaker, text, emotion });
 
     // Fire TTS for dialog text (speaker is passed for voice differentiation)
-    this.ttsSpeakCallback?.(text, speaker);
+    this.speakAloud(text, speaker);
 
     // If in chat mode, add this message to the history
     if (this.currentPresentationMode !== 'positioned') {
@@ -3420,7 +3437,7 @@ export class ReactRenderer extends BaseRenderer {
       this.choiceTextMap.set(c.id, c.displayText || c.text);
     }
 
-    this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
+    this.speakAloud(question, this.currentSpeaker, true);
 
     // P3-3c — spatial path: ANY choice carries a normalized hotspot AND
     // there are no baked absolute locations. Compose through SpatialFlowView
@@ -3584,7 +3601,7 @@ export class ReactRenderer extends BaseRenderer {
       this.choiceTextMap.set(p.id, p.displayName || p.name);
     }
 
-    this.ttsSpeakCallback?.(question, this.currentSpeaker, true);
+    this.speakAloud(question, this.currentSpeaker, true);
 
     // P3-3c-8 — spatial path: any prop carries a normalized hotspot AND
     // there are no baked absolute locations. Compose through SpatialFlowView
@@ -3826,7 +3843,7 @@ export class ReactRenderer extends BaseRenderer {
     }
 
     // Return the user's action (e.g., 'restart', 'credits', button text)
-    this.ttsSpeakCallback?.(message, this.currentSpeaker);
+    this.speakAloud(message, this.currentSpeaker);
     return this.renderPositionedBeat('endScreen', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
@@ -3861,7 +3878,7 @@ export class ReactRenderer extends BaseRenderer {
       : mergeWithFreePositioned(generateDefaultLocations('aiSummary', content), locations);
 
     // Return the user's action (e.g., 'restart', 'credits')
-    this.ttsSpeakCallback?.(data.summary, this.currentSpeaker);
+    this.speakAloud(data.summary, this.currentSpeaker);
     return this.renderPositionedBeat('aiSummary', content, effectiveLocations, true, undefined, authorPositioned);
   }
 
@@ -3892,7 +3909,7 @@ export class ReactRenderer extends BaseRenderer {
     const authorPositioned = layoutAuthorPositioned(locations);
     const effectiveLocations = authorPositioned ? locations! : mergeWithFreePositioned(generateDefaultLocations('durScreen', content), locations);
 
-    this.ttsSpeakCallback?.(text, this.currentSpeaker);
+    this.speakAloud(text, this.currentSpeaker);
     // P3-anim-4.5 — let SlotFlowView (slot branch) self-schedule the exit
     // phase flip so the leaving animation finishes exactly as our own
     // setTimeout below advances the story. Cleared after the wait so the
@@ -3942,7 +3959,7 @@ export class ReactRenderer extends BaseRenderer {
       : mergeWithFreePositioned(generateDefaultLocations('inputText', content), locations);
 
     // Speak the prompt as regular dialog (not as a UI prompt that requires readPrompts)
-    this.ttsSpeakCallback?.(prompt, this.currentSpeaker);
+    this.speakAloud(prompt, this.currentSpeaker);
 
     // renderPositionedBeat returns a Promise<void>, but we need Promise<string>
     // So we wrap it and return the input value from resolveAction
@@ -3983,7 +4000,7 @@ export class ReactRenderer extends BaseRenderer {
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
     this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
-    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+    this.speakAloud(prompt, this.currentSpeaker, true);
 
     const content = {
       prompt,
@@ -4059,7 +4076,7 @@ export class ReactRenderer extends BaseRenderer {
       ? locations!
       : mergeWithFreePositioned(generateDefaultLocations('hyperText', data), locations);
 
-    this.ttsSpeakCallback?.(data.text, this.currentSpeaker);
+    this.speakAloud(data.text, this.currentSpeaker);
     return this.renderPositionedBeat('hyperText', data, effectiveLocations, true, undefined, authorPositioned);
   }
 
@@ -4096,7 +4113,7 @@ export class ReactRenderer extends BaseRenderer {
       ? locations!
       : mergeWithFreePositioned(generateDefaultLocations('qrScan', content), locations);
 
-    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+    this.speakAloud(prompt, this.currentSpeaker, true);
 
     return new Promise<string>(resolve => {
       const originalHandleAction = this.handleAction;
@@ -4140,7 +4157,7 @@ export class ReactRenderer extends BaseRenderer {
       ? locations!
       : mergeWithFreePositioned(generateDefaultLocations('inputImage', content), locations);
 
-    this.ttsSpeakCallback?.(prompt, this.currentSpeaker, true);
+    this.speakAloud(prompt, this.currentSpeaker, true);
 
     return new Promise<string>(resolve => {
       const originalHandleAction = this.handleAction;
@@ -4213,7 +4230,7 @@ export class ReactRenderer extends BaseRenderer {
       : mergeWithFreePositioned(generateDefaultLocations('arBeat', content), locations);
 
     if (options.prompt) {
-      this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker, true);
+      this.speakAloud(options.prompt, this.currentSpeaker, true);
     }
 
     return new Promise<string>(resolve => {
@@ -4274,7 +4291,7 @@ export class ReactRenderer extends BaseRenderer {
       : tagWebViewKind(mergeWithFreePositioned(generateDefaultLocations('webView', content), locations));
 
     if (options.prompt) {
-      this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker);
+      this.speakAloud(options.prompt, this.currentSpeaker);
     }
 
     return new Promise<string>(resolve => {
@@ -4338,7 +4355,7 @@ export class ReactRenderer extends BaseRenderer {
     console.log(`[ReactRenderer.renderPanorama] ${resolvedHotspots.length} hotspots, ${options.locations?.length || 0} overlay locations`);
 
     if (options.prompt) {
-      this.ttsSpeakCallback?.(options.prompt, this.currentSpeaker, true);
+      this.speakAloud(options.prompt, this.currentSpeaker, true);
     }
 
     return new Promise(resolve => {
@@ -4445,7 +4462,7 @@ export class ReactRenderer extends BaseRenderer {
     const sensorService = this.getState('sensorService');
     if (options.text) {
     this.applyHudSuppression(null);
-      this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
+      this.speakAloud(options.text, this.currentSpeaker, true);
     }
     return new Promise<{ path: 'arrived' | 'departed' | 'continue' | 'timeout' | 'skipped'; locationId?: string }>((resolve) => {
       this.renderComponent(
@@ -4489,7 +4506,7 @@ export class ReactRenderer extends BaseRenderer {
     const sensorService = this.getState('sensorService');
     if (options.text) {
     this.applyHudSuppression(null);
-      this.ttsSpeakCallback?.(options.text, this.currentSpeaker, true);
+      this.speakAloud(options.text, this.currentSpeaker, true);
     }
     const floorPlanUrl = options.venue?.floorPlanAssetId
       ? this.resolveAssetUrl(options.venue.floorPlanAssetId) ?? undefined

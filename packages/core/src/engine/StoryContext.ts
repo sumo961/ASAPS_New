@@ -1387,7 +1387,11 @@ export class StoryContext extends EventEmitter {
     // label) resolves to nobody and is not recorded.
     const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
     const character = resolveCharacter(charRef, characters);
-    if (character?.id) this.state.appearedCharacters[character.id] = true;
+    if (!character?.id || this.state.appearedCharacters[character.id]) return;
+    this.state.appearedCharacters[character.id] = true;
+    // Hosts repaint HUDs on this: a dialog node can introduce someone
+    // after the beat's own refresh already ran.
+    this.emit('characterAppeared', { characterRef: character.id });
   }
 
   /**

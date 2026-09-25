@@ -452,12 +452,14 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const ttsService = new WebTTSService();
         if (ttsService.isConfigured()) {
           console.log('[WebPlayer] Setting up TTS service...');
-          renderer.setTTSSpeakCallback((text, speaker, isPrompt) => {
+          renderer.setTTSSpeakCallback((text, speaker, isPrompt, segments) => {
             if (!ttsService.isEnabled()) return;
             // Questions / input prompts follow the story's "read prompts
             // aloud" setting (same rule as the Preview Window).
             if (isPrompt && !ttsService.readsPrompts()) return;
-            ttsService.speak(text, speaker);
+            // Narration by the Narrator, quoted speech by the character.
+            if (!isPrompt && segments && segments.length > 0) ttsService.speakSegments(segments);
+            else ttsService.speak(text, speaker);
           });
           renderer.setTTSStopCallback(() => ttsService.stop());
           // Set TTS language: use explicit language prop (from translation switch),
@@ -524,6 +526,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const bumpHud = () => setHudTick((t) => t + 1);
           context.on('characterMoodChanged', bumpHud);
           context.on('characterVariantChanged', bumpHud);
+          // A character's HUD appears when the player first meets them.
+          context.on('characterAppeared', bumpHud);
           // Counter HUD (screen-docked meter frames) lives in the same
           // overlay — re-render it when counters move.
           context.on('counterChanged', bumpHud);

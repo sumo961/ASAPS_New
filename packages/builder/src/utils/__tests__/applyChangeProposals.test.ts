@@ -28,6 +28,16 @@ describe('applyChangeProposals', () => {
     expect(results).toEqual([{ index: 0, ok: true, detail: 'Set text on Opening' }]);
   });
 
+  it('updateParams carries showSpeaker as the beat-level field (link, don\'t label)', () => {
+    const c = ctx([{ id: 'b1', name: 'Angry', type: 'dialogTree' }]);
+    const tree = { id: 'n0', speaker: 'Karin', text: 'She sits. "Why?"', choices: [] };
+    const results = applyChangeProposals(
+      [{ kind: 'updateParams', beatId: 'b1', params: { dialogTree: tree, showSpeaker: false } }], c);
+    expect(c.updateBeat).toHaveBeenCalledWith('b1', { parameters: { dialogTree: tree }, showSpeaker: false });
+    expect(results[0]).toMatchObject({ ok: true });
+    expect(results[0].detail).toMatch(/speaker name hidden/);
+  });
+
   it('reports missing beats without applying', () => {
     const c = ctx([]);
     const results = applyChangeProposals(

@@ -145,6 +145,15 @@ Rules for proposals:
 - Reference ONLY beat ids that appear in the story digest above.
 - Use parameter names that exist for that beat type; 'editText' is for a
   single text-bearing parameter, 'updateParams' for several at once.
+  'updateParams' may also carry "showSpeaker": true | false (the beat-level
+  switch for drawing the speaker's NAME label).
+- Link, don't label: a line that mixes narration and a character's speech
+  still has that character as speaker (dialog nodes: "speaker": displayName,
+  optionally "characterRef": the character id) — the speaker marks who is
+  PRESENT (reveals their HUD, routes their voice; quoted text is voiced as
+  them, the rest by the narrator) — and the beat sets "showSpeaker": false.
+  Replace generic speaker labels ("Character", "NPC") on lines where a
+  known character is present.
 - Prefer small, reviewable proposals over one giant rewrite. Each proposal
   should stand alone — the author can accept some and reject others.
 - 'updateCharacter' may change: displayName, description, color; base

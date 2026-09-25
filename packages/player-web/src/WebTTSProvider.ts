@@ -95,6 +95,11 @@ export class WebTTSService {
   }
 
   stop(): void {
+    this.sequence++; // cancel a running segment sequence
+    this.halt();
+  }
+
+  private halt(): void {
     this.speaking = false;
     this.abortController?.abort();
     this.abortController = undefined;
@@ -116,10 +121,31 @@ export class WebTTSService {
     return this.config.defaultVoiceId;
   }
 
+  /** Bumped by speak()/stop(): a running speakSegments() sequence stops. */
+  private sequence = 0;
+
   async speak(text: string, speaker?: string): Promise<void> {
+    this.sequence++;
+    return this.speakOne(text, speaker);
+  }
+
+  /**
+   * Speak a line as consecutive voices — narration by the Narrator, quoted
+   * speech by the character. Each piece waits for the previous; a new
+   * speak()/stop() cancels the rest.
+   */
+  async speakSegments(segments: Array<{ text: string; speaker?: string }>): Promise<void> {
+    const seq = ++this.sequence;
+    for (const seg of segments) {
+      if (this.sequence !== seq) return;
+      await this.speakOne(seg.text, seg.speaker);
+    }
+  }
+
+  private async speakOne(text: string, speaker?: string): Promise<void> {
     if (!this.isEnabled() || !text.trim()) return;
 
-    this.stop();
+    this.halt();
 
     const provider = this.config!.provider;
 

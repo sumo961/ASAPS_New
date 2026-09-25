@@ -43,8 +43,12 @@ describe('character HUD reveal', () => {
     await run(story, ctx, { id: 'b1', speaker: 'Narrator' });
     await run(story, ctx, { id: 'b2', speaker: 'Character' });        // a generic label is nobody
     expect(ctx.isCharacterHudRevealed('char_karin')).toBe(false);
+    const appeared = vi.fn();
+    ctx.on('characterAppeared', appeared);
     await run(story, ctx, { id: 'b3', speaker: 'Karin' });
+    await run(story, ctx, { id: 'b4', speaker: 'Karin' });
     expect(ctx.isCharacterHudRevealed('char_karin')).toBe(true);
+    expect(appeared).toHaveBeenCalledTimes(1); // first meeting only
   });
 
   it('an AI conversation partner, a placeholder speaker and a placed character all count', async () => {

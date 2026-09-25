@@ -172,25 +172,32 @@ export function applyChangeProposals(
             results.push({ index, ok: false, detail: `${p.beatId} not found — was it deleted or renamed?` });
             return;
           }
-          const paramProblem = beat.type ? beatParameterProblem(beat.type, p.params, false) : null;
+          // showSpeaker is a beat-level field, not a schema parameter: whether
+          // the speaker's NAME is drawn. "Link, don't label" — a line that
+          // mixes narration and speech keeps its linked character but hides
+          // the label.
+          const { showSpeaker, ...schemaParams } = p.params as Record<string, any>;
+          const paramProblem = beat.type ? beatParameterProblem(beat.type, schemaParams, false) : null;
           if (paramProblem) {
             results.push({ index, ok: false, detail: paramProblem });
             return;
           }
-          const split = splitConnection(beat.type, p.params, beatExists);
+          const split = splitConnection(beat.type, schemaParams, beatExists);
           if (split && 'problem' in split) {
             results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${split.problem}` });
             return;
           }
-          const params = split ? split.rest : p.params;
+          const params = split ? split.rest : schemaParams;
           const updates: Record<string, unknown> = {};
           if (Object.keys(params).length) updates.parameters = params;
+          if (typeof showSpeaker === 'boolean') updates.showSpeaker = showSpeaker;
           // The link REPLACES the beat's exits: a single-exit beat with two
           // links follows the first, which is how stray old links bypass
           // new ones.
           if (split) updates.connections = split.links;
           ctx.updateBeat(p.beatId, updates);
           const parts = Object.keys(params);
+          if (typeof showSpeaker === 'boolean') parts.push(showSpeaker ? 'speaker name shown' : 'speaker name hidden');
           if (split) parts.push(split.links.length ? `exit → ${split.links[0].targetId} (replaces its previous exit)` : 'exit removed');
           results.push({ index, ok: true, detail: `Updated ${parts.join(', ')} on ${beat.name || p.beatId}` });
           return;

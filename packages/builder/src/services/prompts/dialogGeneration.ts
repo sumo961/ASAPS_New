@@ -60,6 +60,7 @@ Respond with JSON in this exact structure:
 - The player character's displayName should be used when the player is speaking (not "You" or "Player" unless that is their actual displayName)
 - Each dialogNode can have a different speaker, enabling back-and-forth conversations between multiple characters
 - When story context provides character names, use those exact displayNames as speaker values
+- 🚨 A line that MIXES narration and a character's speech ('Karin sits down. "I don't see why we're here."') still names that character as its speaker — the speaker says who is PRESENT (it reveals their HUD, routes their voice) — and the beat then sets "showSpeaker": false so no name label is drawn over prose that already says who speaks. Text in quotation marks is read in the character's voice, the rest by the narrator. Never use a generic label ("Character", "NPC") or leave the speaker empty for a line where a known character is present.
 
 ## Structure Rules
 1. Every dialogNode has: id, speaker, text, and choices array
