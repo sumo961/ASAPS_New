@@ -11,6 +11,25 @@ import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { resolveCharacter } from '../utils/characterRef';
 
+/**
+ * Beat types whose defaultTarget can fire on a timer (defaultTargetDelay
+ * seconds). Elsewhere a defaultTarget only acts as the exit when the beat
+ * has no links at all. Shared by the runtime, the Inspector and the
+ * flowchart so they agree on when the "auto-advance" link exists.
+ */
+export const DEFAULT_TARGET_TIMEOUT_TYPES: ReadonlySet<string> = new Set([
+  'titleScreen', 'infoText', 'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'inputText', 'videoBeat',
+]);
+
+/** Can this beat's defaultTarget ever fire? (on its timer, or as the only exit) */
+export function defaultTargetIsLive(beat: {
+  type: string; defaultTarget?: string; defaultTargetDelay?: number; connections?: Array<{ targetId?: string }>;
+}): boolean {
+  if (!beat.defaultTarget) return false;
+  if (DEFAULT_TARGET_TIMEOUT_TYPES.has(beat.type) && (beat.defaultTargetDelay ?? 0) > 0) return true;
+  return !(beat.connections ?? []).some((c) => c?.targetId);
+}
+
 export abstract class Beat {
   public id: string;
   public name: string;
@@ -133,6 +152,16 @@ export abstract class Beat {
     // Initialize connections from config
     if (config.connections && Array.isArray(config.connections)) {
       this.connections = config.connections;
+    }
+
+    // The Inspector's link picker used to copy its choice into defaultTarget.
+    // With no delay and an unconditional link to the same beat that copy can
+    // never fire (no timer; the link wins) — drop it so the flowchart does
+    // not draw a phantom second link. A real default target (other beat, or
+    // a delay) is kept: it can be a second link.
+    if (this.defaultTarget && !(this.defaultTargetDelay && this.defaultTargetDelay > 0)
+      && this.connections.some((c) => c.targetId === this.defaultTarget && !c.condition)) {
+      this.defaultTarget = undefined;
     }
 
     if (config.locations) {
@@ -354,16 +383,7 @@ export abstract class Beat {
 
     // Start default target timer only for visible beats with user interaction
     // Excluded: durScreen (has own timer), logic beats (instant), endScreen (no timeout needed)
-    const supportsDefaultTargetTimeout = [
-      'titleScreen',
-      'infoText',
-      'dialogTree',
-      'movementChoice',
-      'pickProp',
-      'hyperText',
-      'inputText',
-      'videoBeat'
-    ].includes(this.type);
+    const supportsDefaultTargetTimeout = DEFAULT_TARGET_TIMEOUT_TYPES.has(this.type);
 
     if (supportsDefaultTargetTimeout && this.defaultTarget && this.defaultTargetDelay && this.defaultTargetDelay > 0) {
       const timerManager = context.getTimerManager();

@@ -1,4 +1,4 @@
-export { Beat } from './Beat';
+export { Beat, DEFAULT_TARGET_TIMEOUT_TYPES, defaultTargetIsLive } from './Beat';
 export { InfoTextBeat } from './InfoTextBeat';
 export { ExplanationBeat } from './ExplanationBeat';
 export { TitleScreenBeat } from './TitleScreenBeat';

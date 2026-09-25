@@ -12,7 +12,7 @@
  * the memo-buster) come in as getter callbacks.
  */
 import { Node, Edge, MarkerType, Position } from 'reactflow';
-import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
+import { Beat, Cluster, ContainerBeatPosition, DEFAULT_TARGET_TIMEOUT_TYPES, defaultTargetIsLive } from '@asaps/core';
 import { summarizeConditions } from '../../utils/conditionSummary';
 import { dialogTreeLayout } from '../../utils/dialogTreeLayout';
 import { beatTypeColors, CLUSTER_HEADER_H, MIN_CLUSTER_W, MIN_CLUSTER_H } from './graphStyle';
@@ -855,13 +855,16 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         }
       });
 
-      // Add default target
-      if (beat.defaultTarget) {
+      // Add default target — only when it can fire: on its timer (timed
+      // beat types with a delay) or as the only exit. A default target that
+      // can never act is not a link.
+      if (beat.defaultTarget && defaultTargetIsLive(beat as any)) {
+        const timed = DEFAULT_TARGET_TIMEOUT_TYPES.has(beat.type) && ((beat as any).defaultTargetDelay ?? 0) > 0;
         const edge = createEdge(beat.id, beat.defaultTarget, {
           id: `default-${beat.id}`,
           type: 'custom',
           animated: true,
-          label: 'default',
+          label: timed ? `after ${(beat as any).defaultTargetDelay} s` : 'default',
           style: {
             stroke: '#22c55e',
             strokeWidth: 2,

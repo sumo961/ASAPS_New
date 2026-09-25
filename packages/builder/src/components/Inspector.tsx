@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds } from '@asaps/core';
+import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES } from '@asaps/core';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
@@ -5136,16 +5136,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </p>
                           )}
                           <select
-                            value={localBeat.connections?.[0]?.targetId || localBeat.defaultTarget || ''}
+                            value={localBeat.connections?.[0]?.targetId || ''}
                             onChange={(e) => {
                               const targetId = e.target.value;
                               // Keep the link's other fields (its effects)
                               // when only the target changes.
                               const prior = localBeat.connections?.[0] || {};
+                              // Only the link: the default target (auto-advance
+                              // after a delay) is a separate, second link.
                               const updatedBeat = {
                                 ...localBeat,
                                 connections: targetId ? [{ ...prior, targetId, label: prior.label || '' }] : [],
-                                defaultTarget: targetId || undefined
                               };
                               setLocalBeat(updatedBeat);
                               setHasChanges(true);
@@ -5273,7 +5274,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                 )}
 
                 {/* Auto-Advance / Timer Settings - shown when advanced is toggled, only for visible beats */}
-                {showAdvanced && !['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
+                {/* Timed auto-advance runs only for DEFAULT_TARGET_TIMEOUT_TYPES; on
+                    other beats an existing default target is shown with what
+                    it actually does (the exit when the beat has no links). */}
+                {showAdvanced && (DEFAULT_TARGET_TIMEOUT_TYPES.has(getCanonicalBeatType(beat.type)) || !!localBeat.defaultTarget)
+                  && !['conditionBeat', 'setVariable', 'randomTarget', 'setTimer', 'addRemoveInventory', 'aiCondition'].includes(getCanonicalBeatType(beat.type)) && (
                   <div className="border-t pt-4 space-y-3">
                     <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                       <Timer className="w-4 h-4" />
@@ -5292,7 +5297,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </label>
                       <select
                         value={localBeat.defaultTarget || ''}
-                        onChange={(e) => handleChange('defaultTarget', e.target.value || undefined)}
+                        onChange={(e) => {
+                          handleChange('defaultTarget', e.target.value || undefined);
+                          // The delay field shows what is stored — store the 5 s it shows.
+                          if (e.target.value && !(localBeat.defaultTargetDelay > 0)) handleChange('defaultTargetDelay', 5);
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
                         <option value="">No auto-advance</option>
@@ -5304,7 +5313,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                       </select>
                     </div>
 
-                    {localBeat.defaultTarget && (
+                    {localBeat.defaultTarget && !DEFAULT_TARGET_TIMEOUT_TYPES.has(getCanonicalBeatType(beat.type)) && (
+                      <p className="text-xs text-amber-700">
+                        This beat type does not auto-advance. The default target only takes effect when the beat has no other link.
+                      </p>
+                    )}
+                    {localBeat.defaultTarget && DEFAULT_TARGET_TIMEOUT_TYPES.has(getCanonicalBeatType(beat.type)) && (
                       <>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -5315,8 +5329,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                           </label>
                           <input
                             type="number"
-                            value={localBeat.defaultTargetDelay || 5}
-                            onChange={(e) => handleChange('defaultTargetDelay', parseInt(e.target.value))}
+                            value={localBeat.defaultTargetDelay ?? ''}
+                            placeholder="not set — no auto-advance"
+                            onChange={(e) => handleChange('defaultTargetDelay', e.target.value === '' ? undefined : parseInt(e.target.value))}
                             min="1"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />

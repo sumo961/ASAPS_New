@@ -260,6 +260,18 @@ describe('buildGraphEdges', () => {
     expect(edges[0]).toMatchObject({ source: 'b1', target: 'b2', label: 'go' });
   });
 
+  it('draws a default target only when it can fire, labelled with its delay', () => {
+    const run = (b: any) => buildGraphEdges({ beats: [beat(b), beat({ id: 'b2' }), beat({ id: 'b3' })], clusters: [], expandedDialogs: new Set() })
+      .filter((e) => e.id.startsWith('default-'));
+    // inert: a link exists and no timer
+    expect(run({ id: 'b1', connections: [{ targetId: 'b2' }], defaultTarget: 'b3' })).toHaveLength(0);
+    // timed auto-advance: a second link
+    expect(run({ id: 'b1', connections: [{ targetId: 'b2' }], defaultTarget: 'b3', defaultTargetDelay: 10 })[0])
+      .toMatchObject({ target: 'b3', label: 'after 10 s' });
+    // the only exit
+    expect(run({ id: 'b1', connections: [], defaultTarget: 'b3' })[0]).toMatchObject({ target: 'b3', label: 'default' });
+  });
+
   it('draws a restart link as a restart (dashed teal, ↺ Restart)', () => {
     const edges = buildGraphEdges({
       beats: [
