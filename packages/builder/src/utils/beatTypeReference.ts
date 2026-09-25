@@ -69,6 +69,11 @@ function line(name: string, def: any, indent: string): string[] {
   return out;
 }
 
+/** The schema's connectionType for a beat type: 'single' | 'multiple' | 'conditional' (undefined if unknown). */
+export function beatConnectionType(beatType: string | undefined): string | undefined {
+  return beatType ? BEAT_TYPES[beatType]?.connectionType : undefined;
+}
+
 /** Resolve an author- or model-typed name ("conversation", "AI Conversation") to a schema id. */
 export function resolveBeatType(name: string): string | null {
   if (BEAT_TYPES[name]) return name;

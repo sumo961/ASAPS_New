@@ -69,6 +69,12 @@ STORY STATE — what exists and how to use it
   'setChoiceEffects' with "choiceId": "branch_2" sets what a branch does. To
   create or reweight branches, updateParams "choices": [ "beat_7",
   { "target": "beat_8", "weight": 2, "effects": [ … ] } ].
+- A single-exit beat's exit (infoText, durScreen, setVariable, …) is set
+  with updateParams { "connection": { "target": "beat_7", "label": "…" } }
+  (or on addBeat / replaceBeat parameters). It REPLACES the beat's existing
+  exit(s) — a stray second link is removed this way. addBeat "connectFrom"
+  a single-exit beat also replaces that beat's exit. The digest's "→" list
+  shows each beat's current exits.
 - A linear beat's link (an infoText's Continue) can carry effects too:
   'setLinkEffects' { "beatId", "effects", "targetId"? }. The digest shows them
   as "continue → …". Beats whose exits are choices use setChoiceEffects.

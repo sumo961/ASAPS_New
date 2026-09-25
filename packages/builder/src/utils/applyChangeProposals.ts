@@ -14,7 +14,38 @@ import { applyStanceToTraits } from '../services/prompts/interpersonalStance';
 import { setSiteField, labelFieldOf, addOption, listWiringSites } from './choiceWiring';
 import { redirectIncoming, retargetValue } from './redirectIncoming';
 import { beatLinks } from './storyLinks';
-import { beatParameterProblem } from './beatTypeReference';
+import { beatParameterProblem, beatConnectionType } from './beatTypeReference';
+
+type Link = { targetId: string; label?: string; effects?: unknown[] };
+
+/**
+ * A single-exit beat's link, written as the schema's "connection" parameter
+ * ({ target, label?, effects? } or a bare id). No beat reads
+ * parameters.connection — it is the generators' wire shape, turned into the
+ * beat's stored link on import — so writing it as a parameter was a silent
+ * no-op ("Updated connection" while nothing changed). Split it out so the
+ * caller can write the beat's link instead. Returns undefined when the
+ * params carry no connection.
+ */
+function splitConnection(
+  beatType: string | undefined,
+  params: Record<string, unknown> | undefined,
+  beatExists: (id: string) => boolean,
+): { rest: Record<string, unknown>; links: Link[] } | { problem: string } | undefined {
+  if (!params || !('connection' in params)) return undefined;
+  const { connection, ...rest } = params as Record<string, any>;
+  if (beatConnectionType(beatType) !== 'single') {
+    return { problem: `${beatType} has no single "connection" — its exits live in its choices, branches or targets` };
+  }
+  if (connection === null || connection === '' || connection === undefined) return { rest, links: [] };
+  const target = typeof connection === 'string' ? connection : connection.target ?? connection.targetId;
+  if (typeof target !== 'string' || !target) return { problem: 'connection needs a "target" beat id' };
+  if (!beatExists(target)) return { problem: `connection target "${target}" not found` };
+  const link: Link = { targetId: target };
+  if (typeof connection === 'object' && typeof connection.label === 'string' && connection.label) link.label = connection.label;
+  if (typeof connection === 'object' && Array.isArray(connection.effects) && connection.effects.length) link.effects = connection.effects;
+  return { rest, links: [link] };
+}
 import { describeEffect, describeCondition } from './wiringVocabulary';
 
 /** Effect types whose `target` names a character. */
@@ -146,11 +177,22 @@ export function applyChangeProposals(
             results.push({ index, ok: false, detail: paramProblem });
             return;
           }
-          ctx.updateBeat(p.beatId, { parameters: p.params });
-          results.push({
-            index, ok: true,
-            detail: `Updated ${Object.keys(p.params).join(', ')} on ${beat.name || p.beatId}`,
-          });
+          const split = splitConnection(beat.type, p.params, beatExists);
+          if (split && 'problem' in split) {
+            results.push({ index, ok: false, detail: `${beat.name || p.beatId}: ${split.problem}` });
+            return;
+          }
+          const params = split ? split.rest : p.params;
+          const updates: Record<string, unknown> = {};
+          if (Object.keys(params).length) updates.parameters = params;
+          // The link REPLACES the beat's exits: a single-exit beat with two
+          // links follows the first, which is how stray old links bypass
+          // new ones.
+          if (split) updates.connections = split.links;
+          ctx.updateBeat(p.beatId, updates);
+          const parts = Object.keys(params);
+          if (split) parts.push(split.links.length ? `exit → ${split.links[0].targetId} (replaces its previous exit)` : 'exit removed');
+          results.push({ index, ok: true, detail: `Updated ${parts.join(', ')} on ${beat.name || p.beatId}` });
           return;
         }
 
@@ -162,6 +204,11 @@ export function applyChangeProposals(
           const addProblem = beatParameterProblem(p.beatType, p.parameters ?? {}, true);
           if (addProblem) {
             results.push({ index, ok: false, detail: addProblem });
+            return;
+          }
+          const addSplit = splitConnection(p.beatType, p.parameters, beatExists);
+          if (addSplit && 'problem' in addSplit) {
+            results.push({ index, ok: false, detail: addSplit.problem });
             return;
           }
           const anchor = p.connectFrom ? findBeat(p.connectFrom) : undefined;
@@ -177,10 +224,23 @@ export function applyChangeProposals(
             results.push({ index, ok: false, detail: `Could not create ${p.beatType} beat` });
             return;
           }
-          if (p.parameters && Object.keys(p.parameters).length > 0) {
-            ctx.updateBeat(newBeat.id, { parameters: p.parameters });
+          const newParams = addSplit ? addSplit.rest : p.parameters;
+          if ((newParams && Object.keys(newParams).length > 0) || addSplit) {
+            ctx.updateBeat(newBeat.id, {
+              ...(newParams && Object.keys(newParams).length > 0 ? { parameters: newParams } : {}),
+              ...(addSplit ? { connections: addSplit.links } : {}),
+            });
           }
-          if (p.connectFrom) ctx.connectBeats(p.connectFrom, newBeat.id, p.connectLabel);
+          if (p.connectFrom) {
+            // A single-exit source gets its exit REPLACED: appending would
+            // leave the old link first, and the beat follows the first one.
+            const src = anchor as (typeof ctx.beats)[number] | undefined;
+            if (src && beatConnectionType(src.type) === 'single') {
+              ctx.updateBeat(src.id, { connections: [{ targetId: newBeat.id, ...(p.connectLabel ? { label: p.connectLabel } : {}) }] });
+            } else {
+              ctx.connectBeats(p.connectFrom, newBeat.id, p.connectLabel);
+            }
+          }
           if (p.connectTo) {
             if (findBeat(p.connectTo)) {
               ctx.connectBeats(newBeat.id, p.connectTo);
@@ -377,6 +437,11 @@ export function applyChangeProposals(
             return;
           }
           const oldName = old.name || old.id;
+          const newSplit = splitConnection(beatType, p.parameters, beatExists);
+          if (newSplit && 'problem' in newSplit) {
+            results.push({ index, ok: false, detail: newSplit.problem });
+            return;
+          }
           const created = ctx.addBeat(beatType, { x: old.x || 0, y: (old.y || 0) + 220 }, p.name || oldName);
           if (!created) {
             results.push({ index, ok: false, detail: `Could not create the new ${beatType} beat` });
@@ -384,7 +449,7 @@ export function applyChangeProposals(
           }
           const oldJson = (typeof old.toJSON === 'function' ? old.toJSON() : old) as Record<string, any>;
           const newUpdates: Record<string, unknown> = {
-            parameters: retargetValue(p.parameters, old.id, created.id),
+            parameters: retargetValue(newSplit ? newSplit.rest : p.parameters, old.id, created.id),
             notes: `[Co-Designer] New version of "${oldName}" (${old.id}). Links into the old beat now lead here; play both, then delete the one you don't keep.${p.note ? `\n\n${p.note}` : ''}`,
           };
           // The gate belongs to the beat's place in the story — carry it over.
@@ -399,6 +464,7 @@ export function applyChangeProposals(
             newUpdates.connections = retargetValue(structuredClone(oldJson.connections), old.id, created.id);
             if (oldJson.defaultTarget) newUpdates.defaultTarget = oldJson.defaultTarget === old.id ? created.id : oldJson.defaultTarget;
           }
+          if (newSplit) newUpdates.connections = retargetValue(newSplit.links, old.id, created.id);
           ctx.updateBeat(created.id, newUpdates);
 
           const serialized = ctx.beats.map((b) => {
