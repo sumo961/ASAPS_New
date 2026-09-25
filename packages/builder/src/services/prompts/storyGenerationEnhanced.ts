@@ -1335,7 +1335,7 @@ CORRECT (conditional text before hub):
 When paths rejoin at a single beat but ONE noun/clause must differ by which branch the player took, do NOT duplicate the beat per branch (combinatorial explosion, no single source of truth). Instead use a memory-token variable:
   1. Declare a story variable (top-level variables[]), e.g. contactMode.
   2. On each branch, before the convergence, add a setVariable that sets it to a branch-specific value: phone-answered path sets contactMode = "call"; ignored path sets contactMode = "voicemail".
-  3. Write the ONE convergent beat with the value interpolated using plain-brace syntax: "Her mother's {contactMode} has reduced her to something small." The runtime substitutes the current value.
+  3. Write the ONE convergent beat with the value interpolated as \${contactMode} — the same placeholder form as everywhere else: "Her mother's \${contactMode} has reduced her to something small." The runtime substitutes the current value.
 CRAFT RULE: choose values that are GRAMMATICALLY DROP-IN — every possible value must fit the surrounding sentence unchanged ("voicemail"/"call" both work after "mother's" and before "has"). If different values would need different verb agreement or articles, either rephrase the sentence to be value-neutral or split the differing clause into its own interpolated token. This is strictly better than path-A/path-B duplicate infoText beats above: one beat, one source of truth, no explosion. Use it whenever the difference is a word or short phrase; reserve duplicate beats / conditionBeat-gated text for when whole paragraphs differ.
 
 ❌ **Creating "orphan" beats that nothing connects to**

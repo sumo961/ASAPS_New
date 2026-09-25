@@ -6,7 +6,7 @@
  * presets for testing.
  */
 
-import type { Story, StatePreset } from '@asaps/core';
+import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
   type SimulationState,
@@ -88,7 +88,9 @@ export function generatePathPresets(
 
   // Run forward analysis to get all paths
   const analyzer = new StateSimulationAnalyzer(story, {
-    maxPaths: 500, // Limit for performance
+    // The simulation is bounded by its own queue/step caps now (a 76-beat
+    // story takes ~1.5 s at any budget); 500 left late beats with no preset.
+    maxPaths: 20000,
     maxDepth: 100,
   });
 
@@ -134,9 +136,10 @@ export function generatePathPresets(
     };
   });
 
-  // Deduplicate presets with identical states
+  // Deduplicate presets with identical states, then with states that only
+  // differ in what nothing from here on reads (hundreds → a handful).
   const totalPaths = presets.length;
-  const uniquePresets = deduplicatePresets(presets);
+  const uniquePresets = condenseByRelevance(deduplicatePresets(presets), relevantState(story, targetBeatId));
 
   return {
     targetBeatId,
@@ -355,6 +358,70 @@ function createEmptyState(): SimulationState {
     inventory: new Map(),
     visitedBeats: new Set(),
   };
+}
+
+/**
+ * What can make a difference from `targetBeatId` on, in any beat reachable
+ * from it (the beat included): every variable / counter / inventory
+ * condition (beat conditions, choice guards, requirements) and every text
+ * placeholder.
+ */
+export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string> } {
+  const conditions: any[] = [];
+  const placeholders = new Set<string>();
+  const seenConds = new Set<string>();
+  const seen = new Set<string>();
+  const queue = [targetBeatId];
+  const collect = (o: any): void => {
+    if (Array.isArray(o)) { o.forEach(collect); return; }
+    if (!o || typeof o !== 'object') return;
+    if (typeof o.operator === 'string' && (typeof o.variableName === 'string' || typeof o.itemName === 'string')
+      && ['variable', 'counter', 'inventory', undefined].includes(o.type)) {
+      const k = JSON.stringify(o);
+      if (!seenConds.has(k)) { seenConds.add(k); conditions.push(o); }
+    }
+    Object.values(o).forEach(collect);
+  };
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const beat: any = story.getBeat(id);
+    if (!beat) continue;
+    const data = { p: beat.getParameters?.(), r: beat.requires, c: beat.connections };
+    collect(data);
+    for (const m of JSON.stringify(data).matchAll(/\$\{([^}]+)\}|(?<!\$)\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)\$/g)) {
+      placeholders.add((m[1] ?? m[2] ?? m[3]).trim());
+    }
+    // A restart resets state: nothing past it depends on the arrival state.
+    for (const c of beat.getConnections?.() ?? []) if (c.role !== 'restart') queue.push(c.targetId);
+    for (const r of beat.requires ?? []) if (r?.fallbackTarget) queue.push(r.fallbackTarget);
+    if (beat.defaultTarget) queue.push(beat.defaultTarget);
+  }
+  return { conditions, placeholders };
+}
+
+/**
+ * Merge presets that play the same from the target beat on: every condition
+ * ahead comes out the same and every placeholder reads the same. The kept
+ * preset keeps its FULL state (play is unchanged); pathCount sums the rest.
+ */
+function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string> }): GeneratedPreset[] {
+  const seen = new Map<string, GeneratedPreset>();
+  for (const p of presets) {
+    const { variables, counters, inventory } = p.preset.state;
+    const ctx = new StoryContext();
+    Object.entries(variables).forEach(([k, v]) => ctx.setVariable(k, v));
+    Object.entries(counters).forEach(([k, v]) => ctx.setCounter(k, v as number));
+    inventory.forEach((item) => ctx.addToInventory(item));
+    const outcomes = relevant.conditions.map((c) => { try { return ctx.checkCondition(c) ? 1 : 0; } catch { return -1; } });
+    const texts = [...relevant.placeholders].map((n) => variables[n] ?? counters[n] ?? null);
+    const key = JSON.stringify([outcomes, texts]);
+    const kept = seen.get(key);
+    if (kept) kept.pathCount += p.pathCount;
+    else seen.set(key, p);
+  }
+  return Array.from(seen.values());
 }
 
 /**
