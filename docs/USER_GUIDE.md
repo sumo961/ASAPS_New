@@ -73,7 +73,10 @@ Let's get you building right away. When you launch ASAPS Modern for the very fir
 
 ```
 [Title Screen] → [Introduction] → [The End]
+      ↑_______________________________|  (Restart)
 ```
+
+The End Screen's **Play Again** button already leads back to the title screen, so the starter plays through and round again from the first minute.
 
 This is the skeleton of a simple linear experience. Your job? Transform it into something with possibilities.
 
@@ -138,14 +141,14 @@ The Projects button always reads "Projects" — your project's own name lives in
 
 The blue **+ New** button sits between **📁 Projects** and **Undo/Redo** in the top toolbar. Click it to open a compact picker titled *"Start a new project"* with four cards:
 
-- **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Static) and orientation, then drops you into a genuinely empty project ready for you to add beats from the palette.
+- **📝 Empty project** — *"Pick layout up front, then start adding beats."* Opens the New Project dialog where you choose layout mode (Responsive / Static) and orientation, then drops you into a new project holding the same three-beat starter (Title Screen → Introduction → The End, with the End Screen's Restart leading back to the title and resetting the story), ready for you to rewrite and extend from the palette.
 - **⚡ Build from a prompt** — *"Your prompt → AI drafts the rest."* Opens the Story Generator dialog. Disabled with a SOON badge when no AI provider is wired — set one up under **AI → Configure AI**.
 - **✨ Co-write with AI** — *"Develop your idea in conversation."* Opens the Ideator pop-out so you can talk through your idea before the AI drafts anything. Also gated on having an AI provider configured.
 - **🗂 Start from a template** — *"Worked examples you adapt."* Opens the template gallery. Using a template **always creates your own copy** as a new project — the template itself is never edited. See [Templates](#templates) below.
 
-The picker deliberately does *not* include an Import card — importing a zip isn't a "new project" flow conceptually; it lives on the Browser and in the toolbar's **Import** dropdown.
+The picker deliberately does *not* include an Import card — importing a zip isn't a "new project" flow conceptually; it lives on the Browser and in the toolbar's **Open** dropdown.
 
-If the current project has unsaved changes when you click **+ New** (or any create-path in the Browser, or any project-load from the dropdown), ASAPS pauses and asks: *"You have unsaved changes in the current project. Save them before continuing?"* — OK saves and continues, Cancel keeps you where you are.
+If the current project has unsaved changes when you click **+ New**, nothing is lost: a named project is simply saved before the picker opens, and an untitled one asks whether to **Save**, **Discard** or **Cancel** first.
 
 ### Starting a new project — five ways in
 
@@ -153,7 +156,7 @@ The full Project Browser opens with a **START A NEW PROJECT** row offering four 
 
 | Card | When to pick it |
 |------|-----------------|
-| 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Static) and orientation up front, then drops you into a brand-new empty project. Add beats from the palette to start building. |
+| 📝 **Empty project** | You want a clean slate. Opens the New Project dialog where you pick layout mode (Responsive / Static) and orientation up front, then drops you into a brand-new project with the three-beat starter (Title Screen → Introduction → The End, whose Restart resets the story and returns to the title). Rewrite it and add beats from the palette to start building. |
 | ⚡ **Build from a prompt** | You have a one-line idea and want the AI to draft a scaffold. Opens the Story Generator dialog. (Disabled with a SOON badge if no AI provider is configured — set one up under **AI → Configure AI**.) |
 | ✨ **Co-write with AI** | You want a thoughtful conversation about the issue you're trying to explore before generating. Opens the Ideator pop-out; the session-end handoff feeds the Story Generator and the result lands as a new project. |
 | 📥 **Open a file** | You have an existing `.asaps`, `.asapst`, or project zip. Pick it and it's added to your projects and opened — no separate "import" step to think about. Converting from other formats (ASML XML, Twine HTML) lives in the header's **Open** menu under *Import from other formats*. (Browser-only — the **+ New** toolbar button picker omits this card by design.) |
@@ -181,10 +184,13 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 **Make your own templates.** Use **Export → Template (.asapst)** (under *Share for editing*) to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
 
-**Bundled templates.** ASAPS ships with two:
+**Bundled templates.** ASAPS ships with five. Each plays through to an ending whose **Play Again** starts a clean new run from the title screen:
 
 - **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
 - **Counters that read affect** *(new in v0.9.89)* — a character called Ada carrying four meters in one HUD frame: *Gold* (an ordinary counter you set by hand) beside *Trust*, *Fear* and *Spirits*, which are wired to her actual feelings. Three choices move her sentiment, her fear and her mood — and **none of them names a counter**. The meters simply report. It needs no AI provider, and the result beat loops back to the choice so you can push Trust below zero and watch the bar grow the other way from the centre. This is the working companion to [Counters that read affect](#counter-binding) in Part 4.
+- **The Oil Lamp — a museum story** — one object seen three ways (as a made thing, a used thing, a taken thing). Shows the Clean Editorial look, a hub that dims paths you've already taken, and in-text hyperlinks. Text-first and asset-free.
+- **23:47 — a chat thriller** — a stranger's phone on a night train and a thread you can't put down. Chat-bubble beats for scripted texting hand off to a live AI conversation and back, in the Dark Cinematic look. Needs an AI provider (purple **AI** badge).
+- **Ordinary Wonders — a GPS walk** — a pocket expedition played outdoors: three targets scattered within 150 m of wherever you stand. The full GPS loop with no authored coordinates (capture your position, scatter walkable targets, a map, arrival geofences, skip exits), in the Playful look.
 
 ### Drag-drop import
 
@@ -232,7 +238,7 @@ The interactor never sees logic beats directly, but they're what make your syste
 
 Your system has memory, called **state**. This includes:
 
-- **Variables** - True/false flags (hasKey, metWizard, doorUnlocked)
+- **Variables** - Named values — true/false flags (hasKey, metWizard), numbers or text — each starting at the default value you give it
 - **Counters** - Numbers (gold, health, reputation)
 - **Inventory** - Items characters carry
 - **History** - Which beats have been visited
@@ -256,7 +262,7 @@ The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v
 
 When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
 
-**Row 2 -- Main Controls:**
+**Row 2 -- Main Controls:** (On a narrower window, around 1280 pixels wide, this row wraps: the right-hand group moves onto its own line below the left-hand one, so Debug and Preview are always reachable.)
 
 | Left Side | What it Does |
 |-----------|--------------|
@@ -321,6 +327,8 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 - **Dashed green "after N s"** — a beat's *default target*, drawn only when it can actually fire: on a timed auto-advance, or as **"default"** when it is the beat's only exit. A default target that could never act is not drawn.
 - **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
 - **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
+
+The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per pair of beats that are linked, restart links included.
 
 ![A restart link in the flowchart: the End Screen's dashed teal ↺ Restart arrow leads back to the Title Screen](images/73-restart-link-flowchart.png)
 *The End Screen's Restart button leads back to the Title Screen — drawn as a dashed teal **↺ Restart** link, next to the ordinary grey links.*
@@ -881,7 +889,7 @@ The final beat. Display an ending message with options to restart or view a dedi
 - **Message** - Your ending message (defaults to "The End")
 - **Show Restart** - Display a "Play Again" button. You can customize the button label with the **Restart Text** field.
 - **Show Credits** - Display a "Credits" button that opens a scrollable credits page. Customize the button label with the **Credits Text** field.
-- **Reset** - When enabled, clears story state when the interactor clicks "Play Again" (not when the End Screen first appears). You can choose exactly what gets reset (see below).
+- **Reset** - Off until you tick it. When enabled, clears story state when the interactor clicks "Play Again" (not when the End Screen first appears). You can choose exactly what gets reset (see below).
 - **Restart leads to** - In the **Connections** section: the beat where a replay begins — usually your title screen or the start beat set in Project Settings, but any beat works (a "try the last chapter again" ending, say).
 
 <a id="restart-target"></a>
@@ -896,7 +904,7 @@ When the **Reset** toggle is turned on, a set of sub-options appears letting you
 
 | Option | What It Clears |
 |--------|---------------|
-| **Variables** | All true/false story variables |
+| **Variables** | All story variables — each goes back to its [Project Settings](#global-settings) default |
 | **Counters** | All numeric counters (gold, health, etc.) |
 | **Inventory** | All items held by all characters |
 | **Timers** | All active timers |
@@ -907,17 +915,27 @@ When the **Reset** toggle is turned on, a set of sub-options appears letting you
 This is especially useful for "New Game+" experiences where you want interactors to keep some progress. For example, you might reset variables and history but preserve inventory so the interactor carries their collected items into a second playthrough.
 
 <a id="keep-across-restarts"></a>
-**Keeping just some things across a restart.** Usually you want a clean reset *except* for one or two things: the character the player chose, an extra they unlocked, a "you've been here before" flag. Leave **Reset** on and mark only those:
+**Keeping just some things across a restart.** Usually you want a clean reset *except* for one or two things: the character the player chose, an extra they unlocked, a "you've been here before" flag. Turn **Reset** on (an AI Summary's reset is on by default; an End Screen's starts off, so tick it) and mark only those:
 
 - **A story variable** — **Project Settings → Variables**, tick **Keep across restarts** on it. Every other variable goes back to its default value.
-- **A character's counter** — Character Editor → **Counters** tab, tick **Keep across restarts** on that counter.
-- **A character's chosen variant** — Character Editor → **Affect** tab → Variants, tick **Keep the chosen variant across restarts**. A persona the player picked stays theirs on replay, with that persona's starting feelings.
+- **A character's counter** — Character Editor → **Counters** tab, tick **Keep across restarts** on that counter (next to *Show Level Meter* — it works whether or not the counter is shown).
+- **A character's chosen variant** — Character Editor → **Affect** tab → Variants, tick **Keep the chosen variant across restarts** (it appears as soon as the character has a variant). A persona the player picked stays theirs on replay, with that persona's starting feelings.
+
+![The Variants section of a character with four variants: the "At story start" dropdown set to Pick randomly each playthrough, and below it the "Keep the chosen variant across restarts" checkbox](images/79-keep-variant-across-restarts.png)
+*The Variants section: with **Keep the chosen variant across restarts** ticked, an ending's Restart keeps the persona in play instead of drawing a new one.*
 
 These survive the Restart of any End Screen or AI Summary. The Preview's own **Restart** button and the player's **Menu → Restart** are a completely fresh start and keep nothing.
 
-**Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending. Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it.
+*Full or partial reset.* With every reset option ticked (the default once Reset is on), the characters start over too: counters back to their starting values, feelings back to where you authored them, and the variant chosen again, except for what you marked. Untick any option and the reset is partial: it clears only the ticked kinds of story state, and characters' counters, feelings and variants carry over as they are.
 
-*Why there's no effects box on an End Screen's Restart link:* effects there would run after the reset, so they could only set fixed values, never carry anything over. Links that already have effects still show them, with a note.
+**Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending (whether or not that ending resets anything). Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it.
+
+Once **Reset** is on, the End Screen's Inspector says all this under *Restart leads to*: *"What survives the reset: variables, counters and character variants marked Keep across restarts. ${playthrough} counts the runs."*
+
+![End Screen Inspector: Restart leads to the Title screen, with the note on what survives the reset below it, and no effects box](images/78-end-screen-what-survives.png)
+*An End Screen's Connections section: where the replay begins, and what survives it. At about 1280 pixels wide the header toolbar wraps onto a second line, as here.*
+
+*Why there's no effects box on an End Screen's Restart link:* effects there would run after the reset, so they could only set fixed values, never carry anything over. Links that already have effects still show them, with a note saying so.
 
 **Customizable Credits Page:**
 
@@ -1060,6 +1078,8 @@ This invisible beat (📍, Logic group, added in v0.9.83) stores geographic poin
 - **Randomly scatter points (at play time)** — generates **Number of points** points within **Scatter radius (m)** of a center. **Scatter around** picks the center: *The player's current position*, *Another point set*, or *Explicit coordinates*. The **Placement** dropdown decides where points may land:
   - *Uniform (offline, anywhere)* — pure math; works offline but points may land inside buildings or water.
   - *Walkable (streets & parks, via OpenStreetMap)* — snaps points onto real streets, footpaths, and parks using OpenStreetMap data (no API key). Needs a network connection at play time; falls back to uniform placement when coverage is thin or the lookup fails.
+
+  Either way, when a **Point radius** is set, scattered points keep at least twice that radius away from the center (at most half the scatter radius), so no target counts as reached before the player has taken a step.
 - **Place points on a map (authoring)** — preset mode. The **Points** editor in the Inspector is an embedded map (OpenStreetMap tiles): drag the blue center marker, set the radius, click **📍 Generate on streets & parks** to auto-place points on walkable ground, then curate by hand — drag a pin to nudge it, click a pin to remove it, click the map to add one. The curated points are baked into the beat and written verbatim at play time — no network or sensor needed, and you (a human) have reviewed every spot. *Walkable isn't automatically safe — that final check is yours.*
 
 ![Set GPS Location in preset mode — the embedded map curator with the dashed radius ring, center marker, generated points, and the Generate on streets & parks button](images/54-gps-point-curator.png)
@@ -1306,6 +1326,7 @@ Track numeric values for each character:
    - **Min / Max** — the range the meter spans (more on this below — it matters more than you'd think)
    - **Colour** and the **eye** toggle — how it looks, and whether it's visible at all
    - **Show Level Meter** — tick this to unfold the display controls: a horizontal/vertical **Orientation**, and **Show Value** with a format: `75`, `75/100`, `75%`, or *words* (see [Words instead of numbers](#counter-bands))
+   - **Keep across restarts** — next to *Show Value*: the counter keeps its value when the player restarts from an ending, instead of going back to *Initial* (see [Keeping just some things across a restart](#keep-across-restarts))
 
 Counters are **scoped to the character**, so two characters can each have a `trust` without colliding. To change one during play, use a **Set Variable/Counter** beat with **Owner** set to that character, or a **Change Counter** / **Set Counter** effect on a choice.
 
@@ -1694,6 +1715,8 @@ Each variant card carries:
 - **Use default variant** — the persona marked with the *default* radio (the base row or a variant) is the one in play at story start.
 - **Pick randomly each playthrough** — every story start (and every preview restart) draws one of the character's variants at random. This is the "I never know how the client will show up today" switch: the same rehearsal scenario plays differently every session. With this policy active the *default* radio is ignored — a small note in the editor reminds you.
 
+Under the dropdown sits **Keep the chosen variant across restarts** (shown once the character has any variant). Tick it when the player picks a persona and should keep it on replay: an ending's Restart then leaves the variant in play instead of choosing again. See [Keeping just some things across a restart](#keep-across-restarts).
+
 Either way, an authored **`setCharacterVariant`** effect still overrides the policy — so an instructor can pin a specific disposition for a controlled session ("today we practice hostile") while self-directed practice stays unpredictable.
 
 To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id).
@@ -1957,7 +1980,7 @@ Every project carries a **layout mode** — either *Responsive* or *Fixed canvas
 
 ### Picking the mode at project creation
 
-The **New Project** dialog (📁 Projects → *+ New Project*, or the **Empty** card on the Project Browser) has two extra rows under the description field:
+The **New Project** dialog (**+ New** → *Empty project*, or the **Empty project** card on the Project Browser) has two extra rows under the description field:
 
 - **Layout Mode** — two side-by-side cards, in plain author terms (reworded in v0.9.72):
   - **📱 Responsive** — *"Text, buttons, and images flow and adapt to any screen — phone, tablet, or desktop. You guide the layout; the player's device decides the exact placement."* Best for stories played on many devices. The default.
@@ -2070,7 +2093,7 @@ When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs acro
 
 The **Y** field is shown but read-only — the stack decides it. When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
 
-**"Show as" — see what a player sees.** Some choices only appear when they've been [earned](#conditional-choices). On the right of the Dialog path bar, the **Show as** dropdown (in both layout modes) switches the canvas between:
+**"Show as" — see what a player sees.** Some choices only appear when they've been [earned](#conditional-choices). On the right of the Dialog path bar, the **Show as** dropdown (in both layout modes; when the canvas is narrow the bar wraps and Show as moves onto a second line) switches the canvas between:
 
 - **All choices** — every choice is drawn. If some are conditional, an amber strip under the bar lists them, each with its condition in words, as a reminder that not every player sees them.
 - **Start fresh (no prior state)** — what a player who has done nothing yet would see.
@@ -2991,6 +3014,8 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 - **Bundled translations** - Include multiple language versions with a language selector
 - **TTS language** - The project's source language is automatically embedded; when translations are bundled, switching languages also switches TTS speech language
 - **Save/resume** - Interactors can save progress and resume later (via browser storage)
+
+**The player's Menu.** An exported story has a small **Menu** button in the top-right corner. It opens a bar with the play time and **Save**, **Load**, **Settings**, **Pause**, **Restart** (a fresh start that keeps nothing, after a confirmation) and **Fullscreen**, plus **Save Log** when the session log is included. Screen HUDs (the clock or timer, character meters, inventory) are laid out for the window the story is actually shown in, and stack below the Menu button rather than under it.
 - **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
 
 ### Deployment & Troubleshooting
@@ -3345,7 +3370,10 @@ Each overlay has its own *Enabled* toggle and renders on the running stage when 
 - Author name, copyright year, and license text embedded in exports and the credits page.
 
 **Settings → Variables:**
-- Define global variables for tracking story state
+- Define global variables for tracking story state: **Add Variable**, then give each a **Name**, a **Type** (text, number or true/false), a **Default Value** and an optional **Description**.
+- Every variable **starts at its Default Value** when the story begins, and goes back to it when an ending's Restart resets variables. (Before v0.9.104 the default was ignored in play and variables started empty; stories that relied on that should check their defaults.)
+- **Keep across restarts** on a variable lets it survive an ending's Restart instead — see [Keeping just some things across a restart](#keep-across-restarts).
+- Built in, no need to declare it: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
 
 **Settings → Translation:**
 - Source language and translation management
@@ -3784,7 +3812,7 @@ Quick reference for all beat types.
 | 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
 | GPS Location | Map + geofenced locations | mode (display / trigger-on-arrival / trigger-on-departure), location entries (name, lat/lng, radius, target, effects), radius (m), instructional text, button/skip text, timeout, map style, show player marker; entries also support a project-file-level `pointName` binding to a Set GPS Location point set |
 | Indoor Location | Floor plan + beacon zones | mode (display / trigger-on-arrival / trigger-on-departure), target beacon UUID (from Settings → Location & XR → Indoor venue), radius (m), instructional text, button/skip text, timeout |
-| End Screen | Story ending | message, show restart, **Restart leads to** (required while Restart is shown; drawn as a dashed teal ↺ Restart link), show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
+| End Screen | Story ending | message, show restart, **Restart leads to** (required while Restart is shown; drawn as a dashed teal ↺ Restart link), show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history; anything marked *Keep across restarts* survives), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
 ## Logic Beats
@@ -3846,6 +3874,10 @@ Quick reference for all beat types.
 
 **Restart Link** - The link from an End Screen's or AI Summary's *Play Again* button to the beat where a replay begins. Drawn in the flowchart as a dashed teal **↺ Restart** arrow; required while the Restart button is shown.
 
+**Playthrough** - The built-in count of runs: 1 on the first, +1 on every Restart from an ending. Read it as `${playthrough}` or in a condition.
+
+**Keep across restarts** - A mark on a story variable, a character counter or a character's chosen variant that lets it survive an ending's Restart while everything else is reset.
+
 **Show HUD (HUD reveal)** - A per-character setting that decides when the character's HUDs (meters, mood pad, inventory) appear: when the character first appears (default), from the start, or once a variant is chosen. See [When the HUD appears](#hud-reveal).
 
 **Counter** - A numeric quantity scoped to a character (gold, health, reputation). Either *authored* — you move it with effects — or *bound*, reading a feeling instead. See [Counters that read affect](#counter-binding).
@@ -3878,7 +3910,7 @@ Quick reference for all beat types.
 
 **System Builder** - See "Narrative System Builder."
 
-**Variable** - A true/false flag that tracks conditions (hasKey, metWizard).
+**Variable** - A named value (true/false, number or text) that tracks conditions (hasKey, metWizard). Starts at the default value set in Project Settings → Variables.
 
 **Visible Beat** - A beat that displays content to the interactor.
 

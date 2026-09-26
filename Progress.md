@@ -1,15 +1,20 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.103, 2026-09-26)
+## 2026-09-26: The replay release — restarts that keep what matters, templates that start clean (v0.9.104)
 
 ### Overview
 
-Work after the wiring release: the User Guide audit's follow-ups, a runtime
-condition bug that hid generated choices, exported HUDs that follow the box
-each screen is actually painted in, restart carry-over ("Keep across
-restarts" + a built-in playthrough count), and a pass over the five starter
-templates — audited, fixed, and played through in the Preview Window. Kept
-here as it happens; this section becomes the next release entry.
+A follow-up to the wiring release, driven by its own release checklist,
+the User Guide audit and a full play-through of the starter templates.
+Endings can now carry chosen things into the next playthrough ("Keep across
+restarts" on variables, counters and a character's variant) and count the
+runs (`${playthrough}`); story variables finally start at their Project
+Settings default. A runtime bug that hid generated choices gated on a
+counter is fixed, exported HUDs follow the box each screen is actually
+drawn in, and the five starter templates reset properly on Restart — each
+was played through to an ending and back. Plus: the header and the Visual
+Editor's path bar fit a 1280-wide screen, the base persona survives adding
+a variant, and GPS targets can no longer land on the starting point.
 
 ### Restart carry-over and variable defaults
 
@@ -47,7 +52,10 @@ and User Guide know all of it.
 
 The first variant copies the base persona instead of emptying it (base
 sections stay editable, marked "— base persona"); new projects' End Screen
-restarts at the title; the Visual Editor's dialog path bar and the header
+restarts at the title with Reset on (Play Again starts a clean run, as in
+the templates); a counter's "Keep across restarts" checkbox no longer hides
+behind "Show Level Meter"; the Inspector's "what survives the reset" note
+shows only when Reset is on; the Visual Editor's dialog path bar and the header
 toolbar wrap at 1280 wide (Debug and Preview were cut off); the flowchart's
 Connections count reads the link walk (restart links included).
 
@@ -68,7 +76,12 @@ character HUDs can appear).
 
 User Guide screenshots retaken from the running app (01, 08, 10, 21) plus
 the Visual Editor's Show-as strip (76) and a Co-Designer proposal card (77);
-restart carry-over and playthrough documented.
+restart carry-over and playthrough documented. Release audit: variables'
+default values and types, the player's Menu, five bundled templates (was
+"two"), GPS scatter spacing, the Empty-project starter, the flowchart
+count, and older errors (native unsaved-changes prompt, "Import" menu name,
+New Project path) corrected; screenshots 78 (End Screen: what survives) and
+79 (keep the chosen variant).
 
 **Files modified:** `docs/USER_GUIDE.md`, `docs/images/*`
 

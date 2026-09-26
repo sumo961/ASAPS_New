@@ -22,8 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.103** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.103 is the wiring release**: the
+Current release: **v0.9.104** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.104 is the replay release**: an
+ending's Restart can keep chosen things — a variable, a character's counter,
+the persona the player picked — while everything else resets, and the
+built-in `${playthrough}` counts the runs; story variables start at the
+default value you give them in Project Settings; generated choices gated on
+a counter now appear; exported stories place their HUDs clear of the text
+at any window size; the starter templates reset properly when replayed; and
+the toolbar fits a 13-inch laptop screen.
+
+**v0.9.103 was the wiring release**: the
 Co-Designer can change how a story works — choice effects, visibility
 conditions, entry gates, random branches, new choices, a new version of a
 beat side by side; restart and fallback targets are real links, and a
