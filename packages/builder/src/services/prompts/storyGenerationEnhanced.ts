@@ -824,7 +824,7 @@ Fictional time condition example (CORRECT format):
 - The AI generates a summary based on the player's actual choices, variables, and inventory
 - Has ALL the same ending capabilities as endScreen: showRestart, showCredits, resetOnRestart
 - Parameters: prompt, title, summaryStyle ("narrative"|"bullet-points"|"reflection"), maxLength ("short"|"medium"|"long" — NOT a number), includeVariables, includeInventory, includeCounters, includeVisitedBeats, includeChoiceHistory
-- Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory)
+- Supports showRestart, showCredits, resetOnRestart with granular reset sub-options (resetVariables, resetCounters, resetInventory, resetTimers, resetFictionalTime, resetVisitedTracking, resetHistory, resetCharacters — set resetCharacters: false for a replay where characters remember the player's last run)
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
 - When used as an ending: set showRestart: true and "restartTarget": the beat id the Restart button leads to — the titleScreen (e.g. "beat_0"), the story's start beat, or another beat (e.g. the first beat after the title when replays should skip it). 🚨 REQUIRED: an ending summary without restartTarget is flagged as an error. It shows in the flowchart as a ↺ Restart link.
 - 🚨 Unlike endScreen, an aiSummary's restart is NOT its connection: "connections" are where the story CONTINUES when the summary is a checkpoint, and following one does not reset state. An ending aiSummary has no connections — only restartTarget.

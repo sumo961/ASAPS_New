@@ -58,6 +58,7 @@ export interface AISummaryBeatParams {
   resetFictionalTime?: boolean;
   resetVisitedTracking?: boolean;
   resetHistory?: boolean;
+  resetCharacters?: boolean;
 
   /** Credits page properties */
   creditsPageTitle?: string;
@@ -99,6 +100,8 @@ export class AISummaryBeat extends Beat {
   public resetFictionalTime: boolean;
   public resetVisitedTracking: boolean;
   public resetHistory: boolean;
+  /** Characters' feelings, variants and HUD reveal (see ResetOptions.characters). */
+  public resetCharacters: boolean;
 
   // Credits page properties
   public creditsPageTitle: string;
@@ -146,6 +149,7 @@ export class AISummaryBeat extends Beat {
     this.resetFictionalTime = params.resetFictionalTime ?? config.resetFictionalTime ?? true;
     this.resetVisitedTracking = params.resetVisitedTracking ?? config.resetVisitedTracking ?? true;
     this.resetHistory = params.resetHistory ?? config.resetHistory ?? true;
+    this.resetCharacters = params.resetCharacters ?? config.resetCharacters ?? true;
 
     // Credits page properties
     this.creditsPageTitle = params.creditsPageTitle || config.creditsPageTitle || 'Credits';
@@ -195,6 +199,7 @@ export class AISummaryBeat extends Beat {
       resetFictionalTime: this.resetFictionalTime,
       resetVisitedTracking: this.resetVisitedTracking,
       resetHistory: this.resetHistory,
+      resetCharacters: this.resetCharacters,
       creditsPageTitle: this.creditsPageTitle,
       creditsPageBody: this.creditsPageBody,
       creditsCloseText: this.creditsCloseText,
@@ -226,6 +231,7 @@ export class AISummaryBeat extends Beat {
     if (params.resetFictionalTime !== undefined) this.resetFictionalTime = params.resetFictionalTime;
     if (params.resetVisitedTracking !== undefined) this.resetVisitedTracking = params.resetVisitedTracking;
     if (params.resetHistory !== undefined) this.resetHistory = params.resetHistory;
+    if (params.resetCharacters !== undefined) this.resetCharacters = params.resetCharacters;
     if (params.creditsPageTitle !== undefined) this.creditsPageTitle = params.creditsPageTitle;
     if (params.creditsPageBody !== undefined) this.creditsPageBody = params.creditsPageBody;
     if (params.creditsCloseText !== undefined) this.creditsCloseText = params.creditsCloseText;
@@ -327,7 +333,7 @@ export class AISummaryBeat extends Beat {
       r.setTimerState?.(undefined);
       // Keeps what the author marked "keep across restarts" and counts the playthrough.
       const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
-        this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+        this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory && this.resetCharacters;
       context.restartPlaythrough(!this.resetOnRestart ? null : allTrue ? 'all' : {
         variables: this.resetVariables,
         counters: this.resetCounters,
@@ -336,6 +342,7 @@ export class AISummaryBeat extends Beat {
         fictionalTime: this.resetFictionalTime,
         visitedTracking: this.resetVisitedTracking,
         history: this.resetHistory,
+        characters: this.resetCharacters,
       });
       return this.restartTarget || context.getStory().getFirstBeatId();
     };

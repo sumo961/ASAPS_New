@@ -2119,6 +2119,7 @@ export class ReactRenderer extends BaseRenderer {
             >
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <ChatDialogView
+                  onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
                   messages={[...this.chatMessages]}
                   choices={[]}
                   mode={'chat-scroll'}
@@ -2151,6 +2152,7 @@ export class ReactRenderer extends BaseRenderer {
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <ChatDialogView
+                    onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
                     messages={[...this.chatMessages]}
                     choices={[]}
                     mode={'chat-scroll'}
@@ -3082,6 +3084,7 @@ export class ReactRenderer extends BaseRenderer {
         }}
       >
         <ChatDialogView
+          onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
           messages={[...this.chatMessages]}
           choices={choices}
           mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}

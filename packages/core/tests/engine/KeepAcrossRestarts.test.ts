@@ -121,3 +121,32 @@ describe('the ending that restarted is not "visited" in the new run', () => {
     expect(ctx.getVisitedBeats()).toContain('beat_end');
   });
 });
+
+describe('partial reset reaches the characters', () => {
+  it('"counters" also resets character counters back to their starting value', () => {
+    const ctx = context();
+    ctx.setCharacterCounter('char_clare', 'sleepLost', 5);
+    ctx.selectiveReset({ counters: true });
+    expect(ctx.getCharacterCounter('char_clare', 'sleepLost')).toBe(0);
+  });
+
+  it('"characters" resets feelings and the variant; unticked, they are remembered', () => {
+    const ctx = context();
+    ctx.nudgeCharacterMood('char_clare', 0.6, 0);
+    ctx.setActiveCharacterVariant('char_clare', 'guarded', { seedAffect: false });
+    ctx.selectiveReset({ variables: true });            // characters not ticked
+    expect(ctx.getActiveCharacterVariant('char_clare')).toBe('guarded');
+    expect(ctx.getCharacterMood('char_clare').valence).toBeCloseTo(0.6);
+
+    ctx.selectiveReset({ characters: true });
+    expect(ctx.getActiveCharacterVariant('char_clare')).toBeUndefined();
+    expect(ctx.getCharacterMood('char_clare').valence).toBeCloseTo(0);
+  });
+
+  it('keepVariantOnRestart still wins over a characters reset', () => {
+    const ctx = context();
+    ctx.setActiveCharacterVariant('char_clare', 'guarded');
+    ctx.restartPlaythrough({ characters: true });
+    expect(ctx.getActiveCharacterVariant('char_clare')).toBe('guarded');
+  });
+});

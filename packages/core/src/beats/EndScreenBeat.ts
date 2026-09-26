@@ -27,6 +27,8 @@ export class EndScreenBeat extends Beat {
   public resetFictionalTime: boolean;
   public resetVisitedTracking: boolean;
   public resetHistory: boolean;
+  /** Characters' feelings, variants and HUD reveal (see ResetOptions.characters). */
+  public resetCharacters: boolean;
 
   constructor(config: BeatConfig & {
     node?: string;
@@ -57,6 +59,7 @@ export class EndScreenBeat extends Beat {
     this.resetFictionalTime = config.resetFictionalTime ?? config.parameters?.resetFictionalTime ?? true;
     this.resetVisitedTracking = config.resetVisitedTracking ?? config.parameters?.resetVisitedTracking ?? true;
     this.resetHistory = config.resetHistory ?? config.parameters?.resetHistory ?? true;
+    this.resetCharacters = config.resetCharacters ?? config.parameters?.resetCharacters ?? true;
     // node is now handled by Beat base class
   }
 
@@ -80,6 +83,7 @@ export class EndScreenBeat extends Beat {
       resetFictionalTime: this.resetFictionalTime,
       resetVisitedTracking: this.resetVisitedTracking,
       resetHistory: this.resetHistory,
+      resetCharacters: this.resetCharacters,
       restartText: this.restartText,
       creditsText: this.creditsText,
       buttonText: this.buttonText,
@@ -105,6 +109,7 @@ export class EndScreenBeat extends Beat {
     if (params.resetFictionalTime !== undefined) this.resetFictionalTime = params.resetFictionalTime;
     if (params.resetVisitedTracking !== undefined) this.resetVisitedTracking = params.resetVisitedTracking;
     if (params.resetHistory !== undefined) this.resetHistory = params.resetHistory;
+    if (params.resetCharacters !== undefined) this.resetCharacters = params.resetCharacters;
     if (params.restartText !== undefined) this.restartText = params.restartText;
     if (params.creditsText !== undefined) this.creditsText = params.creditsText;
     if (params.buttonText !== undefined) this.buttonText = params.buttonText;
@@ -226,7 +231,7 @@ export class EndScreenBeat extends Beat {
   private resetScope(): ResetOptions | 'all' | null {
     if (!this.reset) return null;
     const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
-      this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+      this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory && this.resetCharacters;
     if (allTrue) return 'all';
     return {
       variables: this.resetVariables,
@@ -236,6 +241,7 @@ export class EndScreenBeat extends Beat {
       fictionalTime: this.resetFictionalTime,
       visitedTracking: this.resetVisitedTracking,
       history: this.resetHistory,
+      characters: this.resetCharacters,
     };
   }
 

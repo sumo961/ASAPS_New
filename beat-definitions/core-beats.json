@@ -1588,7 +1588,7 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Clear all counters",
+          "description": "Clear story counters and every character's counters (back to their starting values)",
           "ui": {
             "dependsOn": {
               "field": "reset",
@@ -1652,6 +1652,20 @@
             },
             "group": "resetOptions",
             "label": "Visited Tracking"
+          }
+        },
+        "resetCharacters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Reset the characters: feelings (mood, sentiments, emotions), the active variant (drawn again or back to the default), when their HUD appears, and character variables. Untick to let characters remember the last playthrough while the rest resets. Anything marked keepOnRestart / keepVariantOnRestart survives either way",
+          "ui": {
+            "dependsOn": {
+              "field": "reset",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Characters (feelings, variants)"
           }
         },
         "resetHistory": {
@@ -4850,7 +4864,7 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Clear all counters",
+          "description": "Clear story counters and every character's counters (back to their starting values)",
           "ui": {
             "dependsOn": {
               "field": "resetOnRestart",
@@ -4914,6 +4928,20 @@
             },
             "group": "resetOptions",
             "label": "Visited Tracking"
+          }
+        },
+        "resetCharacters": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Reset the characters: feelings (mood, sentiments, emotions), the active variant (drawn again or back to the default), when their HUD appears, and character variables. Untick to let characters remember the last playthrough while the rest resets. Anything marked keepOnRestart / keepVariantOnRestart survives either way",
+          "ui": {
+            "dependsOn": {
+              "field": "resetOnRestart",
+              "value": true
+            },
+            "group": "resetOptions",
+            "label": "Characters (feelings, variants)"
           }
         },
         "resetHistory": {

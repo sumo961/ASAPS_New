@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
-import type { RenderThemeSettings } from './PositionedBeatView';
+import type { RenderThemeSettings, ReservedHudRect } from './PositionedBeatView';
+import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { renderMarkdownLite } from '../utils/markdownLite';
 
 /**
@@ -54,6 +55,9 @@ export interface ChatDialogViewProps {
    * styling for consistency with slot mode.
    */
   responsive?: boolean;
+  /** The host's packed screen-HUD rects (same channel as SlotFlowView): the
+   *  message area keeps its top clear of HUDs in the upper half. */
+  onSubscribeReservedHudRects?: (listener: (rects: ReservedHudRect[] | undefined) => void) => () => void;
 }
 
 /**
@@ -77,8 +81,52 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
   showTypingIndicator = false,
   fontScale = 1.0,
   responsive = false,
+  onSubscribeReservedHudRects,
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Top HUDs (clock, meters, strips) sit over the message area. Messages are
+  // bottom-aligned, so they only reached the HUDs once the choice panel grew —
+  // at 740×360 a two-line choice pushed the first line under the date clock.
+  const reservedHudRects = useReservedHudRects(undefined, onSubscribeReservedHudRects);
+  const [view, setView] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current?.parentElement;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const read = () => setView({ w: el.clientWidth || 0, h: el.clientHeight || 0 });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  /*
+   * Same rule as SlotFlowView: a narrow HUD in a corner is stepped around
+   * sideways when the remaining column stays readable; anything else (a
+   * wide or centred HUD, or no width to spare) pushes the messages below it.
+   * A top band alone failed at 740×360: the right-hand stack (Menu, clock,
+   * a strip) reaches ~140px down, the capped band left the messages ~20px,
+   * and the chat scrolled its first line up under the clock anyway.
+   */
+  const hudReserve = React.useMemo(() => {
+    const h = view.h || stageHeight || 0;
+    const w = view.w || stageWidth || 0;
+    let top = 0, left = 0, right = 0;
+    for (const r of reservedHudRects ?? []) {
+      if (!h || r.y + r.height / 2 >= h / 2) continue; // bottom HUDs sit under the input/choices
+      const cornered = w > 0 && (r.x + r.width <= w * 0.48 || r.x >= w * 0.52);
+      if (cornered && r.width / w < 0.4 && w - (r.width + 16) >= 360) {
+        if (r.x + r.width / 2 < w / 2) left = Math.max(left, r.x + r.width + 8);
+        else right = Math.max(right, w - r.x + 8);
+        continue;
+      }
+      top = Math.max(top, r.y + r.height + 8);
+    }
+    // Never let HUDs starve the conversation (same ceilings as SlotFlowView).
+    return {
+      top: Math.round(Math.min(top, h * 0.4)),
+      left: Math.round(Math.min(left, w * 0.35)),
+      right: Math.round(Math.min(right, w * 0.35)),
+    };
+  }, [reservedHudRects, view.w, view.h, stageHeight, stageWidth]);
   const [animatedMessages, setAnimatedMessages] = useState<Set<string>>(new Set());
   const [choicesVisible, setChoicesVisible] = useState(false);
 
@@ -405,6 +453,9 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
           padding: responsive
             ? `${Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02)))}px ${Math.round(Math.min(24, Math.max(12, (stageWidth ?? 1024) * 0.03)))}px`
             : '20px 16px',
+          ...(hudReserve.top > 0 ? { paddingTop: `${Math.max(hudReserve.top, responsive ? Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02))) : 20)}px` } : {}),
+          ...(hudReserve.left > 0 ? { paddingLeft: `${hudReserve.left}px` } : {}),
+          ...(hudReserve.right > 0 ? { paddingRight: `${hudReserve.right}px` } : {}),
           display: 'flex',
           flexDirection: 'column',
           justifyContent: mode === 'chat-bubble' ? 'center' : 'flex-end',

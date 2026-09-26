@@ -905,12 +905,13 @@ When the **Reset** toggle is turned on, a set of sub-options appears letting you
 | Option | What It Clears |
 |--------|---------------|
 | **Variables** | All story variables — each goes back to its [Project Settings](#global-settings) default |
-| **Counters** | All numeric counters (gold, health, etc.) |
+| **Counters** | All numeric counters (gold, health, etc.) — the story's and every character's, back to their starting values |
 | **Inventory** | All items held by all characters |
 | **Timers** | All active timers |
 | **Fictional Time** | The in-story date and time |
 | **Visited Tracking** | Record of which beats and choices have been seen |
 | **History** | The ordered log of beats visited during play |
+| **Characters (feelings, variants)** | Each character's mood, sentiments and emotions, the variant in play (drawn again, or back to the default), and when their HUD appears — back to how you authored them |
 
 This is especially useful for "New Game+" experiences where you want interactors to keep some progress. For example, you might reset variables and history but preserve inventory so the interactor carries their collected items into a second playthrough.
 
@@ -926,7 +927,7 @@ This is especially useful for "New Game+" experiences where you want interactors
 
 These survive the Restart of any End Screen or AI Summary. The Preview's own **Restart** button and the player's **Menu → Restart** are a completely fresh start and keep nothing.
 
-*Full or partial reset.* With every reset option ticked (the default once Reset is on), the characters start over too: counters back to their starting values, feelings back to where you authored them, and the variant chosen again, except for what you marked. Untick any option and the reset is partial: it clears only the ticked kinds of story state, and characters' counters, feelings and variants carry over as they are.
+*Full or partial reset.* Each option resets its kind of state, characters included: **Counters** resets character counters too, and **Characters (feelings, variants)** resets how the characters feel and which variant is in play. Untick **Characters** for a replay where the characters remember the player — the plot starts over, the relationships don't. Whatever you marked *Keep across restarts* survives in every case.
 
 **Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending (whether or not that ending resets anything). Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it.
 

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-09-24T19:16:05.423Z
+ * Generated: 2026-09-26T15:10:08.517Z
  */
 
 // ============================================
@@ -384,11 +384,11 @@ export interface EndScreenParameters {
   showRestart?: boolean | undefined;
   /** Show credits button */
   showCredits?: boolean | undefined;
-  /** Reset all values on restart */
+  /** Reset all values on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs */
   reset?: boolean | undefined;
   /** Clear all variables */
   resetVariables?: boolean | undefined;
-  /** Clear all counters */
+  /** Clear story counters and every character's counters (back to their starting values) */
   resetCounters?: boolean | undefined;
   /** Clear inventory */
   resetInventory?: boolean | undefined;
@@ -398,6 +398,8 @@ export interface EndScreenParameters {
   resetFictionalTime?: boolean | undefined;
   /** Clear visited beat tracking */
   resetVisitedTracking?: boolean | undefined;
+  /** Reset the characters: feelings (mood, sentiments, emotions), the active variant (drawn again or back to the default), when their HUD appears, and character variables. Untick to let characters remember the last playthrough while the rest resets. Anything marked keepOnRestart / keepVariantOnRestart survives either way */
+  resetCharacters?: boolean | undefined;
   /** Clear beat history */
   resetHistory?: boolean | undefined;
   /** Text for restart button */
@@ -794,7 +796,7 @@ export interface KeypadParameters {
   minDigits?: number | undefined;
   /** Expected code (empty = accept any input) */
   correctCode?: string | undefined;
-  /** Beat to navigate to on wrong code */
+  /** Beat to navigate to on wrong code. Shown in the flowchart as a 'Wrong code' link. */
   failTarget?: string | undefined;
   /** Maximum attempts (0 = unlimited) */
   maxAttempts?: number | undefined;
@@ -872,7 +874,7 @@ export interface ArBeatParameters {
   anchors?: Object[] | undefined;
   /** Cancel button label */
   cancelButtonText?: string | undefined;
-  /** Target beat when the player skips, when permission is denied, or when no anchor is tapped */
+  /** Target beat when the player skips, when permission is denied, or when no anchor is tapped. Shown in the flowchart as a 'Skip / no anchor' link. */
   fallbackTarget?: string | undefined;
   /** Who speaks this beat's text */
   speaker?: string | undefined;
@@ -998,7 +1000,7 @@ export interface AiConditionParameters {
   evaluateCounters?: boolean | undefined;
   /** Include rich choice history in evaluation (what choices were made) */
   evaluateChoiceHistory?: boolean | undefined;
-  /** Fallback target if AI can't decide (used when no category matches) */
+  /** Fallback target if AI can't decide (used when no category matches). Shown in the flowchart as a 'Fallback' link. */
   fallbackTarget?: string | undefined;
   /** Maximum response time in ms */
   timeout?: number | undefined;
@@ -1072,15 +1074,15 @@ export interface AiSummaryParameters {
   showRestart?: boolean | undefined;
   /** Show credits button */
   showCredits?: boolean | undefined;
-  /** Beat to restart to */
+  /** Beat the Restart button leads to (state is reset first when resetOnRestart): usually the title screen or the project's start beat, or any other beat. REQUIRED while showRestart is on. Shown in the flowchart as a ↺ Restart link. This — not a connection — is an ending summary's restart: connections are where a checkpoint summary continues. */
   restartTarget?: string | undefined;
   /** Alias of restartTarget — accepted because AI generation commonly emits this name. Both shapes resolve to the restart target. */
   connection?: Connection | undefined;
-  /** Reset state on restart */
+  /** Reset state on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs */
   resetOnRestart?: boolean | undefined;
   /** Clear all variables */
   resetVariables?: boolean | undefined;
-  /** Clear all counters */
+  /** Clear story counters and every character's counters (back to their starting values) */
   resetCounters?: boolean | undefined;
   /** Clear inventory */
   resetInventory?: boolean | undefined;
@@ -1090,6 +1092,8 @@ export interface AiSummaryParameters {
   resetFictionalTime?: boolean | undefined;
   /** Clear visited beat tracking */
   resetVisitedTracking?: boolean | undefined;
+  /** Reset the characters: feelings (mood, sentiments, emotions), the active variant (drawn again or back to the default), when their HUD appears, and character variables. Untick to let characters remember the last playthrough while the rest resets. Anything marked keepOnRestart / keepVariantOnRestart survives either way */
+  resetCharacters?: boolean | undefined;
   /** Clear beat history */
   resetHistory?: boolean | undefined;
   /** Text for restart button */

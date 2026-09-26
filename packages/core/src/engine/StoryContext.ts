@@ -109,7 +109,12 @@ export const PLAYTHROUGH_VARIABLE = 'playthrough';
 
 export interface ResetOptions {
   variables?: boolean;
+  /** Story counters AND every character's counters (back to their authored values). */
   counters?: boolean;
+  /** Characters' feelings (mood, sentiments, emotions, reflections, goals),
+   *  their active variant (re-drawn / default), HUD reveal, and character
+   *  variables & flags — back to the authored start. */
+  characters?: boolean;
   inventory?: boolean;
   timers?: boolean;
   fictionalTime?: boolean;
@@ -2596,8 +2601,30 @@ export class StoryContext extends EventEmitter {
       this.state.variables = {};
       this.seedStoryVariables();
     }
+    if (options.characters) {
+      // Before counters: variant choice decides which counter defaults seed.
+      this.state.characterVariables = {};
+      this.state.characterFlags = {};
+      this.state.characterMoods = {};
+      this.state.characterSentiments = {};
+      this.state.characterEmotionLevels = {};
+      this.state.characterReflections = {};
+      this.state.characterGoalStatus = {};
+      this.state.activeCharacterVariants = {};
+      this.state.appearedCharacters = {};
+      this.state.initialMoods = {};
+      this.state.initialEmotionLevels = {};
+      this.state.initialSentiments = {};
+      this.state.affectBookmarks = {};
+      this.explicitVariantSet = {};
+      this.seedCharacterAffectFromStory();
+    }
     if (options.counters) {
       this.state.counters = {};
+      // A partial reset used to leave character counters untouched even with
+      // "Counters" ticked — only story-wide counters were cleared.
+      this.state.characterCounters = {};
+      this.seedCharacterCountersFromStory();
     }
     if (options.inventory) {
       this.state.inventory = [];

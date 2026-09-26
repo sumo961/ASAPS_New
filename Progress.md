@@ -34,6 +34,20 @@ and User Guide know all of it.
 
 ### Runtime and export fixes
 
+- Partial reset reaches the characters. The End Screen / AI Summary reset
+  box gains **Characters (feelings, variants)** — mood, sentiments,
+  emotions, the variant in play (drawn again / back to the default), HUD
+  reveal and character variables; untick it for a replay where the
+  characters remember the player. **Counters** now resets character
+  counters too (it only cleared story-wide ones). Keep-across-restarts
+  items survive either way. Generator guidance, schema and User Guide know
+  the option.
+- Chat-layout dialog trees keep their messages clear of top HUDs: a narrow
+  corner HUD is stepped around sideways, a wide one pushes the messages
+  below it (at 740×360 a two-line choice pushed Late Light's first line
+  under the date clock — also in v0.9.103). Found by this release's
+  checklist.
+
 - Counter/variable conditions written as `{ type, variable, … }` (the shape
   the generator guidance teaches, and every analyzer reads) returned false at
   runtime — generated dialog choices gated on a counter were never shown
@@ -46,7 +60,7 @@ and User Guide know all of it.
 - GPS scatter keeps targets at least twice their arrival radius from the
   start (a target 24 m from base camp with a 25 m radius "arrived" at once).
 
-**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/core/src/utils/{geo,overpass}.ts`, `packages/core/src/beats/SetGpsLocationBeat.ts`
+**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/core/src/beats/{EndScreenBeat,AISummaryBeat}.ts`, `beat-definitions/core-beats.json`, `packages/renderer/src/components/ChatDialogView.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/core/src/utils/{geo,overpass}.ts`, `packages/core/src/beats/SetGpsLocationBeat.ts`
 
 ### Builder UI
 
