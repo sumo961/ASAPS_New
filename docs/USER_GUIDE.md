@@ -1652,10 +1652,10 @@ A variant is an alternate persona slice that shares the same character id. Use t
 - *"Play as a man / a woman / non-binary"* (gender-flexible protagonist)
 - A single NPC who comes in two flavors and the runtime picks one
 
-Click **+ Add variant** in the Variants section. The first time you add one, ASAPS migrates the base character's personality, mood, sentiments, and dossier policy onto the new variant so you don't lose work — and the parent's Personality / Initial mood / Initial sentiments / Dossier policy cards collapse into a banner reading *"This character has N variants. Personality, initial mood, and sentiments are authored per variant below…"* Subsequent variants clone from the first variant so you can copy-and-tweak.
+Click **+ Add variant** in the Variants section. The first time you add one, ASAPS copies the base character's personality, mood, sentiments and dossier policy into the new variant, so you start from a known persona and edit the differences. The base keeps its own values: it is a persona too (see *The base is a persona too* below). Its Personality / Initial mood / Initial sentiments / Dossier policy cards stay where they are, marked **— base persona**, under a banner explaining that each variant overrides only what it sets and takes everything else from the base. Later variants are copied from the first variant, so you can copy and tweak.
 
-![Affect tab with variants and a goal](images/21-affect-with-variants-goals.png)
-*Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start. (This overview screenshot predates the interpersonal stance pad and the "At story start" policy dropdown — both are shown in the next figure and described below.)*
+![Clare's Affect tab: the Base — Clare row, marked default, above the variant "Clare, door ajar" with its own Big Five sliders](images/21-affect-with-variants-goals.png)
+*Each variant card carries its own persona slice — Big Five sliders, archetype shortcut, interpersonal stance, MoodPad, sentiments, portrait and display-name overrides. The **default** radio picks what is in play at story start: here the base persona, with the variant switched in later by a setCharacterVariant effect.*
 
 **The base is a persona too.** At the top of the variants list sits a dashed **Base — {name}** row: the character as defined on the rest of the page. It has its own **default** radio, so a character with one variant visibly has *two* personas to choose from. With the base as default, the story starts as the base character, and a `setCharacterVariant` effect can switch a variant in later (a transformation mid-story, say). With a variant as default, the story starts as that variant. The note under the row always says which situation you're in.
 
@@ -2063,6 +2063,9 @@ The **Y** field is shown but read-only — the stack decides it. When conditions
 - **Start fresh (no prior state)** — what a player who has done nothing yet would see.
 - **The states a player can really arrive in** — the same [path-based states](#path-based-state-presets) the Preview's *Start as if…* menu offers, so you can check each one without playing through.
 
+![A Dialog Tree in the Visual Editor: the Dialog path bar with Root, the Show as dropdown set to All choices, and the amber strip naming the one conditional choice — "if candor (char_clare) >= 2"](images/76-dialog-choices-show-as.png)
+*"Show as" on All choices: the amber strip names the conditional choice and its condition. Pick a state from the dropdown to see the choices exactly as that player would.*
+
 Finding those states means playing every path through the story, which takes a moment on a big project. It runs in the background as soon as you open a dialog tree: a small spinner reads **Tracing paths… n/N beats** while it works, the editor stays usable, and the states appear in the dropdown when it's done. Moving to another beat cancels the run.
 
 ## Layering & Z-Order
@@ -2396,6 +2399,9 @@ When a suggestion is concrete enough, the Co-Designer turns it into a **proposal
 - **Wiring** — what a choice **does** (its effects), when a choice is **shown** (its visibility conditions), what a beat **requires** before it can be entered (its entry gate, with a fallback), the effects on a **link** a player continues along, and a Random Target branch's **effects and weight**
 - **Characters** — display name, description, colour, personality traits, variants, the *At story start* policy and [Show HUD](#hud-reveal)
 - **Story variables** — declare a new variable with its starting value
+
+![A Co-Designer proposal card: "Reword Clare's cool reply in Second greeting" with the old choice text struck through in red above the new wording in green, and Dismiss / Apply 1 selected buttons](images/77-co-designer-proposal.png)
+*A proposal card: one row per change, the current text struck through above the proposed one. Nothing changes until you press Apply.*
 
 Untick anything you don't want and click **Apply N selected**, or **Dismiss** the card. Changes are applied in the main window, **each one undoable** there, and every batch — applied or dismissed — is recorded in **AI ▸ AI changes**.
 
