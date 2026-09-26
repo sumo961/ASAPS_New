@@ -31,15 +31,18 @@ export function scatterPointsAround(
   center: { lat: number; lng: number },
   radiusMeters: number,
   count: number,
-  opts: { perPointRadius?: number; rng?: () => number } = {}
+  opts: { perPointRadius?: number; rng?: () => number; minDistanceMeters?: number } = {}
 ): GeoPoint[] {
   const rng = opts.rng ?? Math.random;
   const n = Math.max(0, Math.floor(count));
   const R = Math.max(0, radiusMeters);
+  // Keep points off the centre: a target inside its own arrival circle
+  // around the start "arrives" before the player has moved.
+  const m = Math.min(Math.max(0, opts.minDistanceMeters ?? 0), R);
   const out: GeoPoint[] = [];
   for (let i = 0; i < n; i++) {
     const bearing = rng() * 2 * Math.PI;
-    const dist = R * Math.sqrt(rng()); // sqrt → uniform over the disc's area
+    const dist = Math.sqrt(m * m + rng() * (R * R - m * m)); // uniform over the ring's area
     const north = dist * Math.cos(bearing);
     const east = dist * Math.sin(bearing);
     const { lat, lng } = offsetMeters(center.lat, center.lng, north, east);

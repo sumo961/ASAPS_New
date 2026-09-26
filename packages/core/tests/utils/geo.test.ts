@@ -62,3 +62,17 @@ describe('geo', () => {
     expect(outerHalf / pts.length).toBeGreaterThan(0.5);
   });
 });
+
+describe('scatterPointsAround keeps points off the centre', () => {
+  it('never places a point closer than minDistanceMeters', () => {
+    const center = { lat: 59.3326, lng: 18.0649 };
+    const pts = scatterPointsAround(center, 150, 2000, { perPointRadius: 25, minDistanceMeters: 50 });
+    const dist = (p: { lat: number; lng: number }) => {
+      const dLat = (p.lat - center.lat) * 111_320;
+      const dLng = (p.lng - center.lng) * 111_320 * Math.cos((center.lat * Math.PI) / 180);
+      return Math.hypot(dLat, dLng);
+    };
+    expect(Math.min(...pts.map(dist))).toBeGreaterThanOrEqual(49.5);
+    expect(Math.max(...pts.map(dist))).toBeLessThanOrEqual(150.5);
+  });
+});

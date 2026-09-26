@@ -25,6 +25,8 @@ type FetchLike = (url: string, init?: any) => Promise<{ ok: boolean; status: num
 export interface WalkableSampleOptions {
   /** Radius (metres) stamped on each returned point (its geofence size). */
   perPointRadius?: number;
+  /** Reject points closer than this to the centre. */
+  minDistanceMeters?: number;
   /** Injectable RNG in [0,1) for deterministic tests. Defaults to Math.random. */
   rng?: () => number;
   /** Injectable fetch (defaults to globalThis.fetch). */
@@ -229,7 +231,9 @@ export async function sampleWalkablePoints(
     if (!f) break;
     const pt = samplePointIn(f, rng);
     if (!pt) continue;
-    if (distMeters(center, pt) > radiusMeters) continue; // clamp to the requested radius
+    const d = distMeters(center, pt);
+    if (d > radiusMeters) continue; // clamp to the requested radius
+    if (d < (opts.minDistanceMeters ?? 0)) continue; // not on top of the start
     out.push(opts.perPointRadius != null ? { ...pt, radiusMeters: opts.perPointRadius } : pt);
   }
   return out;

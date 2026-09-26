@@ -107,3 +107,17 @@ describe('playthrough is built in, not a stored variable', () => {
     expect(other.getPlaythrough()).toBe(2);
   });
 });
+
+describe('the ending that restarted is not "visited" in the new run', () => {
+  it('skips the ending\'s own exit mark once, then records visits normally', () => {
+    const ctx = context();
+    ctx.markBeatVisited('beat_a');
+    (ctx as any).state.currentBeatId = 'beat_end';
+    ctx.restartPlaythrough('all');
+    ctx.markBeatVisited('beat_end');            // Beat.execute's exit mark
+    expect(ctx.getVisitedBeats()).not.toContain('beat_end');
+    expect(ctx.getVisitedBeats()).not.toContain('beat_a');
+    ctx.markBeatVisited('beat_end');            // reached again in the new run
+    expect(ctx.getVisitedBeats()).toContain('beat_end');
+  });
+});

@@ -189,6 +189,10 @@ export class SetGpsLocationBeat extends Beat {
         }
         center = center ?? this.fallback();
         if (center) {
+          // Twice the arrival radius from the start (capped at half the
+          // scatter radius): a target whose geofence covers the start would
+          // count as reached before the player takes a step.
+          const minDistanceMeters = Math.min((this.pointRadiusMeters ?? 0) * 2, this.scatterRadiusMeters / 2);
           if (this.placement === 'walkable') {
             // Snap onto real streets/parks via OSM. Thin coverage or a failed
             // query returns fewer than requested — top up with uniform scatter
@@ -197,6 +201,7 @@ export class SetGpsLocationBeat extends Beat {
             try {
               walk = await sampleWalkablePoints(center, this.scatterRadiusMeters, this.count, {
                 perPointRadius: this.pointRadiusMeters,
+                minDistanceMeters,
               });
             } catch (err) {
               console.warn(`[SetGpsLocationBeat ${this.id}] walkable sampling failed:`, err);
@@ -206,6 +211,7 @@ export class SetGpsLocationBeat extends Beat {
             } else {
               const fill = scatterPointsAround(center, this.scatterRadiusMeters, this.count - walk.length, {
                 perPointRadius: this.pointRadiusMeters,
+                minDistanceMeters,
               });
               points = [...walk, ...fill];
               console.warn(`[SetGpsLocationBeat ${this.id}] walkable: ${walk.length}/${this.count} on-network, ${fill.length} filled uniformly`);
@@ -213,6 +219,7 @@ export class SetGpsLocationBeat extends Beat {
           } else {
             points = scatterPointsAround(center, this.scatterRadiusMeters, this.count, {
               perPointRadius: this.pointRadiusMeters,
+                minDistanceMeters,
             });
           }
         } else {

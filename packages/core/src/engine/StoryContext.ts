@@ -2370,6 +2370,13 @@ export class StoryContext extends EventEmitter {
   }
 
   markBeatVisited(beatId: string): void {
+    // The ending whose Restart just reset the story marks itself visited on
+    // its way out (Beat.execute runs after performAction). That mark belongs
+    // to the finished run, not the new one — skip it once.
+    if (this.restartedFromBeatId === beatId) {
+      this.restartedFromBeatId = null;
+      return;
+    }
     // Step 5 — emotion decay tick on every beat-enter. Emotions decay before
     // the new beat's effects fire, so `fireCharacterEmotion` adds against a
     // freshly-decayed level and the resulting mood nudge reflects recovery.
@@ -2672,12 +2679,19 @@ export class StoryContext extends EventEmitter {
    * playthrough. A host restart (player menu, preview) calls reset() instead:
    * that one is a fresh start and keeps nothing.
    */
+  /** Set by restartPlaythrough: the ending that restarted, until it exits. */
+  private restartedFromBeatId: string | null = null;
+
   restartPlaythrough(reset: ResetOptions | 'all' | null): void {
     const run = this.getPlaythrough();
+    const from = this.state.currentBeatId;
     const kept = this.captureKeptAcrossRestarts();
     if (reset === 'all') this.reset();
     else if (reset) this.selectiveReset(reset);
     this.restoreKeptAcrossRestarts(kept);
+    // Only when the reset cleared the visit record; with visits kept the
+    // ending's own mark is harmless and expected.
+    this.restartedFromBeatId = reset === 'all' || (reset && reset.visitedTracking) ? from : null;
     this.state.playthrough = run + 1;
     this.emit('variableChanged', { name: PLAYTHROUGH_VARIABLE, value: run + 1 });
   }
