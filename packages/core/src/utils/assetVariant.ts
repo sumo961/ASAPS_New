@@ -87,12 +87,17 @@ export function resolveAssetVariant(
  *   < 1100   → tablet
  *   >= 1100  → desktop
  *
+ * With a height: a stage under 480 high is a phone too — a phone turned
+ * sideways (740×360) is wide enough to pass for a tablet, but its HUD
+ * cards covered the text. Tablets and desktop windows are ≥ 768 high.
+ *
  * Matches the boundaries already used by SLOT_PREVIEW_VIEWPORTS in
  * the Visual Editor (Phone 390, Tablet 768, Desktop 1440), so the
  * editor's preview presets map cleanly to runtime device classes.
  */
-export function detectDeviceClass(stageWidth: number): AssetDeviceClass {
+export function detectDeviceClass(stageWidth: number, stageHeight?: number): AssetDeviceClass {
   if (stageWidth < 640) return 'phone';
+  if (stageHeight !== undefined && stageHeight > 0 && stageHeight < 480) return 'phone';
   if (stageWidth < 1100) return 'tablet';
   return 'desktop';
 }

@@ -22,6 +22,11 @@ describe('resolveHudCompact', () => {
     expect(resolveHudCompact(undefined, { width: 390 })).toBe(true);
     expect(resolveHudCompact('auto', { width: 1024 })).toBe(false);
   });
+  it('auto = a phone in landscape too (short stage)', () => {
+    expect(resolveHudCompact('auto', { width: 740, height: 360 })).toBe(true);
+    expect(resolveHudCompact('auto', { width: 1024, height: 768 })).toBe(false);
+    expect(resolveHudCompact('auto', { width: 1280, height: 800 })).toBe(false);
+  });
   it('always / never override the stage', () => {
     expect(resolveHudCompact('always', { width: 1024 })).toBe(true);
     expect(resolveHudCompact('never', { width: 390 })).toBe(false);

@@ -78,8 +78,9 @@ export interface ScreenHudLayoutInput {
   stage: { width: number; height: number };
   /**
    * Phone HUD collapse. 'auto' (default) folds each corner's screen HUDs into
-   * a slim tap-to-expand strip when the STAGE is phone-class (< 640px wide —
-   * responsive stories on phones, or fixed stories authored at phone size);
+   * a slim tap-to-expand strip when the STAGE is phone-class (< 640px wide or
+   * < 480px high — responsive stories on phones in either orientation, or
+   * fixed stories authored at phone size);
    * 'always' forces the strip on every stage; 'never' keeps full cards.
    * Falls back to `hudOverlays.compactMode` when omitted.
    */
@@ -89,10 +90,10 @@ export interface ScreenHudLayoutInput {
 export type HudCompactMode = 'auto' | 'always' | 'never';
 
 /** Decide whether this stage gets the collapsed strip. Pure; exported for tests and hosts. */
-export function resolveHudCompact(mode: HudCompactMode | undefined, stage: { width: number }): boolean {
+export function resolveHudCompact(mode: HudCompactMode | undefined, stage: { width: number; height?: number }): boolean {
   if (mode === 'always') return true;
   if (mode === 'never') return false;
-  return detectDeviceClass(stage.width) === 'phone';
+  return detectDeviceClass(stage.width, stage.height) === 'phone';
 }
 
 /** One corner's collapsed HUDs. */

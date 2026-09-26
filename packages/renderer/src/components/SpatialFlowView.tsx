@@ -468,7 +468,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
     if (!imageVariants || imageVariants.length === 0) return null;
     if (containerSize.w === 0 || containerSize.h === 0) return null;
     const orientation = detectOrientation(containerSize.w, containerSize.h);
-    const deviceClass = detectDeviceClass(containerSize.w);
+    const deviceClass = detectDeviceClass(containerSize.w, containerSize.h);
     const picked = resolveAssetVariant(imageVariants, { orientation, deviceClass });
     if (!picked) return null;
     const found = imageVariants.find(v => v.assetId === picked.assetId);

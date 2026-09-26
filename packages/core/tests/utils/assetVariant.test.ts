@@ -126,6 +126,15 @@ describe('detectDeviceClass', () => {
     expect(detectDeviceClass(1099)).toBe('tablet');
   });
 
+  it('treats a stage under 480 high as a phone (phone in landscape)', () => {
+    expect(detectDeviceClass(740, 360)).toBe('phone');
+    expect(detectDeviceClass(932, 430)).toBe('phone');  // iPhone Pro Max landscape
+    expect(detectDeviceClass(1024, 768)).toBe('tablet'); // iPad landscape
+    expect(detectDeviceClass(768, 1024)).toBe('tablet');
+    expect(detectDeviceClass(1280, 800)).toBe('desktop');
+    expect(detectDeviceClass(1280, 0)).toBe('desktop');  // height not measured yet
+  });
+
   it('returns desktop for widths >= 1100', () => {
     expect(detectDeviceClass(1100)).toBe('desktop');
     expect(detectDeviceClass(1440)).toBe('desktop'); // MBP 14"
