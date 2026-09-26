@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.89*
+*Last revised against v0.9.103*
 
 ---
 
@@ -265,15 +265,15 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **Undo/Redo** | Fix mistakes (Ctrl/Cmd+Z works too!) |
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
-| **Export** | Dropdown: export as Project ZIP (ASML 2.0 — JSON, complete and native), template (.asapst), standalone HTML — or legacy ASML 1.0 XML (frozen serialization; a confirm explains what it can't carry) |
-| **Tools** | Dropdown: Change with AI, Merge DialogTrees |
+| **Export** | Dropdown, organised by what the recipient does: **Publish for players** (a playable standalone HTML story), **Share for editing** (the complete project as one `.asaps` file — ASML 2.0, JSON, native — or a template `.asapst`), and a **Legacy** group for ASML 1.0 XML (frozen serialization; newer features are not included) |
+| **Tools** | Dropdown: App Preferences… (settings for this computer), Change with AI, Merge DialogTrees |
 
 | Right Side | What it Does |
 |------------|--------------|
 | **Find & Change** | Find & replace, and AI bulk changes (slate button, Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
 | **Characters** | Create and manage your cast (blue button) |
 | **Assets** | Manage images, sounds, videos, fonts (orange button) |
-| **Settings** | Global configuration (purple button) |
+| **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (purple button, ⌘/Ctrl+,). Where this guide says **Settings → …**, it means this panel |
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
 
@@ -281,7 +281,7 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 
 | Button | What it Does |
 |--------|--------------|
-| **AI** | Dropdown: Generate Story, Create Beat from Description, Configure AI |
+| **AI** | Dropdown: Ideate with Ideator, Design with Co-Designer, Generate Story, AI changes, Create Beat from Description, Configure AI |
 | **VCS Status** | Git status (only visible for directory projects under version control) |
 | **TTS** | Text-to-Speech toggle and configuration (speaker icon, right side) |
 | **STT** | Speech-to-Text toggle and configuration (microphone icon, right side) |
@@ -313,6 +313,18 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 ![Flowchart View](images/01-main-interface.png)
 *The Flowchart view shows your system's structure*
 
+<a id="reading-the-arrows"></a>
+**Reading the arrows.** Every way a player can leave a beat is drawn, and the line tells you what kind of link it is:
+
+- **Solid grey** — an ordinary link or choice. A choice that only appears under certain conditions draws its conditions on the edge (dashed violet).
+- **Dashed teal "↺ Restart"** — where an End Screen's or AI Summary's **Play Again** button leads. Story state is reset along a restart link (if the beat's reset options say so), so it is treated as a fresh start, not a way on. The analysis tools and the "Start as if…" presets stop at these links too.
+- **Dashed green "after N s"** — a beat's *default target*, drawn only when it can actually fire: on a timed auto-advance, or as **"default"** when it is the beat's only exit. A default target that could never act is not drawn.
+- **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
+- **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
+
+![A restart link in the flowchart: the End Screen's dashed teal ↺ Restart arrow leads back to the Title Screen](images/73-restart-link-flowchart.png)
+*The End Screen's Restart button leads back to the Title Screen — drawn as a dashed teal **↺ Restart** link, next to the ordinary grey links.*
+
 ### Visual Editor (The Close-Up)
 
 Design what a specific beat looks like on screen. Position characters, add backgrounds, place text boxes. This view is for:
@@ -337,6 +349,12 @@ When you select a beat, the Inspector shows everything about it:
 - **Advanced Settings** - Sounds, conditions, special behaviors
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
+
+**Links are always picked, never typed.** Every setting that names another beat — a link's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target* — is a dropdown of your story's beats. If a stored beat has since been deleted, the picker keeps showing it as missing so you can spot and fix it.
+
+**Effects on a single link.** On a beat with one way on (an Info Text, a Title Screen…), the **Connections** section has a small **When the player continues (optional)** box under the target. Effects you add there — start a counter, record which route was taken, nudge a feeling — run as the player leaves the beat by that link. It's the same effect editor that choices use.
+
+**Default target and Auto-Advance.** Under **Show Advanced Options**, the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video) offer **Auto-Advance Settings**: pick a **Default Target Beat** and an **Auto-Advance Delay (seconds)**, and the beat moves on by itself after that time if the player hasn't. On beat types that never auto-advance the section only appears when a default target is already stored, and says what it does there: it is used only when the beat has no other link.
 
 ![Inspector Panel](images/05-inspector-panel.png)
 *The Inspector panel shows properties of the selected beat. The Speaker section uses a unified [Character combobox](#character-combobox) — pick a defined Character, type a free-text name, or leave blank for the narrator. The Dialog Tree Editor opens inline on dialog beats; click it to author choices, per-node speakers, and choice effects.*
@@ -408,6 +426,8 @@ not prose), and Hyper Text bodies stay plain so link words always match
 exactly. If you translate your story, the markers carry over — the words
 inside them get translated, the marks stay.
 
+**Showing state in text:** write `${name}` to show the current value of a story variable *or* a counter — *"You have ${gold} coins left"*, *"It is ${Clock}"*. (The older forms `$name$` and `{name}` work too; when a variable and a counter share a name, the variable wins.)
+
 **When to Use:** Scene descriptions, internal monologue, time jumps, exposition.
 
 **Example:**
@@ -477,6 +497,11 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 **Layout on responsive stages.** In a responsive project the *Visual Editor's* left panel adds a **Layout Template** for dialog beats — *Stacked (Visual Novel)*, *Conversation (side-by-side)*, *Chat - Scrollable History*, *Chat - Single Bubble*, or *Custom (drag-place)*. Conversation puts the NPC text on one side and the choices on the other; it needs genuine side-by-side room, so below roughly 640 px of usable width (a phone held upright) the same beat quietly falls back to the stacked flow — nothing to configure, and your choices and effects are untouched. Long NPC speeches scroll inside their card instead of running off the bottom of the stage, and a narrow corner HUD indents the text beside it rather than pushing everything down.
 
 **Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand.
+
+<a id="link-dont-label"></a>
+**Link the speaker, then decide about the label.** The Dialog Tree's **Show Speaker Name** setting (in the Inspector's *Speaker* group: *Default (use global setting)*, *Always show* or *Always hide*) decides whether the per-node names appear as labels over the lines, and it is kept when you save and reopen the project. It only hides the *label* — the speaker link still does its work. So a good habit is *link, don't label*: always link each line to the character who is present, and set **Show Speaker Name** to *Always hide* when your prose already says who is talking (*Karin sits down. "I don't see why we're here."*). The link is what makes the character's [HUD appear](#hud-reveal) when they first show up and what gives the line their [TTS voice](#quoted-speech-voice).
+
+**Arranging the choice buttons.** On a fixed canvas, the Visual Editor treats a dialog's choice buttons as one stack you can reorder by dragging; in either layout mode its **Show as** picker shows which choices a player in a particular state would actually see — see [Dialog-tree choices in the Visual Editor](#dialog-choices-visual-editor).
 
 **NPC Auto-Exit:** Dialog nodes can have an **NPC Auto-Exit** target set. When a node has an auto-exit target, the NPC delivers their line and then automatically advances to the target beat without showing any choices. In the Dialog Tree Editor, nodes with an auto-exit show a green badge with the target beat name, and the choices list is hidden (since they are unreachable). Use this for NPC-initiated dismissals, forced exits, or transitions where the player has no say.
 
@@ -669,7 +694,7 @@ Present a keypad interface where interactors enter a code—a phone number, safe
 **Example:**
 ```
 Prompt: "Enter the vault combination"
-Layout: Simple (1-9, 0)
+Layout: Numeric
 Correct Code: 4815162342
 Max Attempts: 3
 Fail: "Alarm Triggered" beat
@@ -818,17 +843,15 @@ The scheme is designed to ride through any string-carrying channel — including
 Create text where specific words are clickable, each leading to different paths. Like a webpage, but for stories.
 
 **Key Settings:**
-- **Text** - Full text with clickable sections marked
-- **Links** - What each clickable word connects to
+- **Text** - Type or paste the full passage into the text area
+- **Links** - In the **Preview - Select Text to Create Links** box below it, select a word or phrase and click **Create Link**, then choose the target beat. Each link can also get its own colour and underline style
+- **Allow Multiple Clicks** - Whether the interactor can follow more than one link
 
 **When to Use:** Subtle choices, exploration of details, non-linear reading.
 
-**Example:**
-```
-On the desk sat a [letter], a [photograph], and a [strange key].
-```
+**Example:** Write *"On the desk sat a letter, a photograph, and a strange key."*, then select *letter*, *photograph* and *strange key* one after another and link each to its own beat.
 
-Each bracketed word can lead to a different beat.
+**Readable in every theme.** Unless you pick a link colour yourself, links are drawn in a colour from your theme (the button colours) that stands out clearly against whatever is behind the text — the text box, or the stage when the box is transparent — and fall back to the text colour, still underlined, when no theme colour does. So a dark stage or a "text-only choices" look no longer swallows your links.
 
 ---
 
@@ -858,7 +881,14 @@ The final beat. Display an ending message with options to restart or view a dedi
 - **Message** - Your ending message (defaults to "The End")
 - **Show Restart** - Display a "Play Again" button. You can customize the button label with the **Restart Text** field.
 - **Show Credits** - Display a "Credits" button that opens a scrollable credits page. Customize the button label with the **Credits Text** field.
-- **Reset on Restart** - When enabled, clears story state when the interactor clicks "Play Again" (not when the End Screen first appears). You can choose exactly what gets reset (see below).
+- **Reset** - When enabled, clears story state when the interactor clicks "Play Again" (not when the End Screen first appears). You can choose exactly what gets reset (see below).
+- **Restart leads to** - In the **Connections** section: the beat where a replay begins — usually your title screen or the start beat set in Project Settings, but any beat works (a "try the last chapter again" ending, say).
+
+<a id="restart-target"></a>
+**Every Restart says where replays begin.** While **Show Restart** is on, *Restart leads to* is required. If it's empty, the Inspector shows a red hint (*"The Restart button leads nowhere yet — pick where replays begin…"*) and, for an AI-generated story, the [review banner](#after-generation-the-review-banner) lists the beat too. (Older stories keep working — a Restart with no target still falls back to the first beat — but it's worth picking one deliberately.) In the flowchart the link appears as a dashed teal **↺ Restart** arrow. Turn **Show Restart** off and the End Screen is simply a final ending; nothing is flagged.
+
+![End Screen Inspector: "Restart leads to (Required)" with the red hint that the Restart button leads nowhere yet](images/72-end-screen-restart-required.png)
+*An End Screen whose Restart button leads nowhere yet. Pick a beat in the dropdown and the hint disappears; a **When the player continues** effects box appears under the chosen link.*
 
 **Granular Reset Options:**
 
@@ -975,11 +1005,14 @@ The full set of checks and their per-form fields is documented in [Condition Bea
 
 Connect multiple target beats, and the story randomly chooses one. Good for variety on replay.
 
-**Key Settings:**
-- **Targets** - Possible destinations (add several)
-- **Weights** - Optional, make some outcomes more likely
+**Key Settings:** Click **Add Branch** for each possible destination. Every branch has:
+- **Target** - The beat this branch leads to
+- **Weight** - How likely it is relative to the others (2 = twice as likely as 1; 0 = never drawn). The share of playthroughs each branch gets is shown under it ("33% of playthroughs")
+- **When this branch is drawn (optional)** - Effects that run only when this branch comes up — set a variable, add to a counter, give an item, nudge a feeling. The same effect editor as a choice's effects
 
 **When to Use:** Random encounters, varied responses, games of chance.
+
+**Why branch effects matter:** they let luck *leave a mark*. A random encounter that sets `metTheStranger = true`, or a coin toss that nudges trust, is something later beats can react to — and because the branch is a real link in the flowchart, the analysis tools and "Start as if…" presets follow every branch, effects included.
 
 ---
 
@@ -1121,6 +1154,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
 - **Fallback Exit Target** - Where to go when max turns are reached
+- **Closing line when turns run out** - Optional instruction for the NPC's last line when Max Turns is reached (*"apologise that time is up and suggest meeting again next week"*), so the conversation ends gracefully instead of stopping mid-exchange
 - **Enable Voice Input** - Show a microphone button for speech-to-text input. Off by default — switch it on only after you have configured STT (header **STT** menu); AI-generated stories leave it off
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
 - **System Instructions** - Additional rules for the AI
@@ -1189,6 +1223,8 @@ AI creates a personalized summary of the player's journey—their choices, disco
 - **Narrative** - Prose summary
 - **Bullet Points** - List of key events
 - **Reflection** - Thoughtful commentary
+
+**Ending or checkpoint?** An AI Summary with **Show Restart** on is an ending, and its **Restart at** picker says where the replay begins (the title screen, the project's start beat, or any beat) — required while the button is shown, flagged in red when missing, and drawn in the flowchart as a dashed teal **↺ Restart** link, just like an [End Screen's](#restart-target). Its reset options work the same way too. The separate **Continue to** link in the Connections section is only for a summary used as a mid-story checkpoint, not an ending.
 
 **When to Use:** End-of-chapter recaps, endings that reference your journey, "Previously on..." moments.
 
@@ -1270,6 +1306,17 @@ A counter that's only in the data does nothing for your interactor. The **Meter 
 - **Show Labels**, plus **Meter Width**, **Meter Height** and **Spacing** for the bars themselves.
 
 The frame draws every counter whose eye toggle is on, in the order they're listed, and it carries a **header with the character's name and their colour dot** *(new in v0.9.89)*. That header matters as soon as you have two characters with meters: two frames docked in the same screen corner used to look like one character's counters duplicated, and since only one set responded to anything, the other looked broken. Now the HUD says whose meters it is.
+
+<a id="hud-reveal"></a>
+**When the HUD appears — "Show HUD".** Right under the Meter Frame header sits a **Show HUD** dropdown that decides when *all* of this character's HUDs (meters, mood pad, inventory) come on screen:
+
+- **When {name} first appears** *(the default for everyone but the player character)* — the HUD stays hidden until the first beat or dialog line that features the character: they speak it (speaker linked to or named as them), they are placed on stage, or they are the AI Conversation partner. A trust meter for someone the player hasn't met yet would give the game away; now it arrives with her.
+- **From the start of the story** — the HUD is there from the first beat after the title screen. The player character's own HUD defaults to this.
+- **When a variant is chosen (the player picks a persona)** — offered for characters with [variants](#variants--alternate-persona-overlays-for-one-character): the HUD waits until a variant is chosen or switched in.
+
+![The Show HUD dropdown under the Meter Frame header on the Counters tab, set to "When … first appears", with its explanation below](images/74-show-hud-setting.png)
+
+This is one reason to [link speakers](#link-dont-label) even when you hide their names: the link is how ASAPS knows who has appeared. Starting the Preview mid-story counts the beats already visited, so a character met earlier on that path shows their HUD straight away.
 
 > **Will your interactor know what it is?** A bar labelled *Trust* in the corner is still a bar they've never seen before. The [Explanation beat](#explanation) labels the HUDs that are actually on screen, and every beat carries an *Explain HUDs on entry* checkbox that does the same thing in place — worth one beat early on.
 
@@ -1559,7 +1606,7 @@ A sentiment is a (target, emotion, strength) tuple: *fear toward wolf +0.7*, *tr
 
 Sentiments can target other characters, the player, items, or any string you want to use as a key — but linking to a defined Character via id is what gives you stable references that survive renames.
 
-When the sentiment's holder and target are the same character (a self-shame, self-pride etc.), ASAPS renders it with the *self-* prefix — e.g. **mild self-shame** instead of *mild shame toward Alex*. The same convention is used in the LLM dossier, which splits affect into "Feels toward themselves:" and "Feels toward others:" so prompts don't sound recursive.
+When the sentiment's holder and target are the same character (a self-shame, self-pride etc.), ASAPS renders it with the *self-* prefix — e.g. **mild self-shame** instead of *mild shame toward Alex*. The same convention is used in the LLM dossier, which splits affect into "Feels toward themselves:" and "Feels toward others:" so prompts don't sound recursive. An emotion whose name already starts with *self-* (say, *self-respect* or *self-doubt* in your palette) keeps its name — you'll see **self-respect**, never *self-self-respect*.
 
 **Opening stance — a suggested starting point (v0.9.89).** Sentiments start at exactly zero unless you write them down, which means even a fully specified personality meets your whole cast perfectly neutral. That's rarely what you meant: a warm character and a prickly one should not open on the same blank.
 
@@ -1610,9 +1657,14 @@ Click **+ Add variant** in the Variants section. The first time you add one, ASA
 ![Affect tab with variants and a goal](images/21-affect-with-variants-goals.png)
 *Once a character has variants, each variant card carries its own complete persona slice — Big Five sliders, archetype shortcut, MoodPad, sentiments, portrait override, displayName override. The "default" radio picks which variant auto-applies at story start. (This overview screenshot predates the interpersonal stance pad and the "At story start" policy dropdown — both are shown in the next figure and described below.)*
 
+**The base is a persona too.** At the top of the variants list sits a dashed **Base — {name}** row: the character as defined on the rest of the page. It has its own **default** radio, so a character with one variant visibly has *two* personas to choose from. With the base as default, the story starts as the base character, and a `setCharacterVariant` effect can switch a variant in later (a transformation mid-story, say). With a variant as default, the story starts as that variant. The note under the row always says which situation you're in.
+
+![The Variants section with the dashed "Base — Character with affect meters" row marked default, above a variant card](images/75-variants-base-persona.png)
+*The base persona row sits above the variant cards with its own **default** radio. Here the base is the default, so the story starts as the base character and a `setCharacterVariant` effect can switch the variant in later.*
+
 Each variant card carries:
 
-- A **default** radio (one variant per character can be marked default — that one auto-applies at story start when no `setCharacterVariant` effect has fired yet).
+- A **default** radio (one persona per character is the default — the base or one variant — and that one is in play at story start until a `setCharacterVariant` effect fires).
 - A **variant id** (stable identifier used by the `setCharacterVariant` effect and `characterVariant` condition).
 - A **variant label** (e.g. *Anxious introvert*) and an optional **display name** override (the user-facing name when this variant is active).
 - An optional description, surfaced in the dossier when the variant is active.
@@ -1626,12 +1678,17 @@ Each variant card carries:
 
 **Choosing the variant at story start.** Once a character has two or more variants, an **"At story start"** dropdown appears at the top of the Variants section with two policies:
 
-- **Use default variant** — the variant marked with the *default* radio auto-applies, same as before.
+- **Use default variant** — the persona marked with the *default* radio (the base row or a variant) is the one in play at story start.
 - **Pick randomly each playthrough** — every story start (and every preview restart) draws one of the character's variants at random. This is the "I never know how the client will show up today" switch: the same rehearsal scenario plays differently every session. With this policy active the *default* radio is ignored — a small note in the editor reminds you.
 
 Either way, an authored **`setCharacterVariant`** effect still overrides the policy — so an instructor can pin a specific disposition for a controlled session ("today we practice hostile") while self-directed practice stays unpredictable.
 
-To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id). To branch on the active variant, drop a Condition Check beat and pick **Active variant** from the **Character affect** group in the Condition Type dropdown — the editor will then ask you for the character and the variant id to compare against (cascading from the character's authored variants, with a free-text fallback when none have been authored yet). The runtime evaluates this branch the same way it evaluates "player has lantern" — it just checks a different slice of state.
+To switch variants at runtime, drop a **`setCharacterVariant`** effect on a player choice (target = the character, value = the variant id).
+
+<a id="variant-switch-keeps-feelings"></a>
+**A mid-story switch keeps what the character lived through.** When a variant is switched in during play, the character doesn't forget the relationship the player has built. Instead of starting over from the variant's authored feelings, ASAPS *shifts* them: the mood moves by the difference between the new persona's initial mood and the previous one's; each sentiment the variant lists moves by its difference (and is added if it's new); sentiments the variant doesn't mention stay exactly as they were. So if Nathan trusted the player through Act I and "becomes" his grieving variant in Act II, he is grieving *and* still trusts them. (Choosing a variant at story start — or switching it in the Preview's debug panel — still starts from the variant's own values.)
+
+To branch on the active variant, drop a Condition Check beat and pick **Active variant** from the **Character affect** group in the Condition Type dropdown — the editor will then ask you for the character and the variant id to compare against (cascading from the character's authored variants, with a free-text fallback when none have been authored yet). The runtime evaluates this branch the same way it evaluates "player has lantern" — it just checks a different slice of state.
 
 In the Character Manager the grid changes shape for characters with variants: instead of a single card you get a **grouped card** with a colored border (the parent's color), a parent header showing the display name and variant count, and one inner sub-card per variant.
 
@@ -1656,7 +1713,7 @@ In the **Mood HUD** card on the Affect tab:
 - **Show axis labels** — the *sad / happy / calm / excited* corner labels.
 - **Show qualitative mood label** — a one-line plain-English description below the disc (e.g. *"sad, alert"*).
 
-If a character has variants, the HUD hides until the player picks a variant — so you don't end up showing a HUD for a character who hasn't been instantiated yet.
+Like the character's meters, the Mood HUD follows the **[Show HUD](#hud-reveal)** setting: by default it appears when the character first appears in the story. Having variants no longer hides it — the base character is a persona in play from the start. If you want the HUD to wait until the player has picked a persona, choose *When a variant is chosen* there.
 
 <a id="emotion-palette"></a>
 ### Emotion Palette — Names, Mood-Axis Weights, Decay Rates
@@ -1988,6 +2045,26 @@ Useful for "click on the suspicious painting" interactions.
 
 **Orientation-aware spatial hotspots (v0.9.59).** Spatial hotspots (on Movement Choice, Pick Prop, and similar beats in responsive mode) can carry an optional **portrait variant** — a second rect (`portrait: { x, y, width, height }`) that the runtime uses when the player is on a portrait-oriented stage. The landscape rect is the canonical position; the portrait override is *additive*. To author both variants from the Visual Editor, switch the preview viewport (top of the slot/spatial preview) between landscape and portrait presets — Phone portrait, Tablet portrait, and similar presets put the editor in portrait mode and drag-edits write into `hotspot.portrait` (creating it on first edit, with the canonical rect as its template so an accidental tap doesn't blank the override). Landscape edits write the canonical `x/y/width/height` as before. If a beat has only landscape coordinates, the runtime falls back to them in portrait orientation too — overrides are opt-in per-hotspot.
 
+<a id="dialog-choices-visual-editor"></a>
+### Dialog-Tree Choices in the Visual Editor
+
+When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into (click a choice on the canvas to step into the conversation behind it, or a crumb to step back out).
+
+**The buttons are a stack (fixed canvas).** A dialog's choice buttons always sit below the text, one after another, in the order of the choices. You decide two things:
+
+- **The column** — drag a button sideways, or type its **X** and **Width** in the properties panel, and every button of the dialog moves to that column.
+- **The order** — drag a button up or down and drop it where it should go: the choices themselves are reordered in the Dialog Tree (the Inspector follows along). It's one undo step.
+
+The **Y** field is shown but read-only — the stack decides it. When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
+
+**"Show as" — see what a player sees.** Some choices only appear when they've been [earned](#conditional-choices). On the right of the Dialog path bar, the **Show as** dropdown (in both layout modes) switches the canvas between:
+
+- **All choices** — every choice is drawn. If some are conditional, an amber strip under the bar lists them, each with its condition in words, as a reminder that not every player sees them.
+- **Start fresh (no prior state)** — what a player who has done nothing yet would see.
+- **The states a player can really arrive in** — the same [path-based states](#path-based-state-presets) the Preview's *Start as if…* menu offers, so you can check each one without playing through.
+
+Finding those states means playing every path through the story, which takes a moment on a big project. It runs in the background as soon as you open a dialog tree: a small spinner reads **Tracing paths… n/N beats** while it works, the editor stays usable, and the states appear in the dropdown when it's done. Moving to another beat cancels the run.
+
 ## Layering & Z-Order
 
 Elements stack on top of each other. A character should appear in front of the background, text in front of the character.
@@ -2025,7 +2102,7 @@ A landscape stage shown on a phone held upright gets cropped: the renderer keeps
 
 The **Reset Layout** button (grid icon, next to Reset Zoom) is the escape hatch when you've nudged elements around on a beat and want to return to the default schema-driven layout — or when a new ASAPS release ships improved default layouts and you want to opt this beat in without deleting and re-creating it.
 
-Clicking it asks you to confirm (manual position edits on this beat will be lost), then re-runs ASAPS's default layout for the beat type. The reset goes into the undo history, so **Ctrl/Cmd+Z** restores the previous layout if you change your mind.
+Clicking it re-runs ASAPS's default layout for the beat type, discarding manual position edits on this beat. There's no confirmation dialog because nothing is lost for good: a notice with an **Undo** button appears, and the reset is in the undo history, so **Ctrl/Cmd+Z** restores the previous layout too.
 
 This is especially useful for AI-content beats — `onlineContent`, `aiInfoText`, `aiSummary`, and `titleScreen` — whose default layouts were re-calibrated in v0.9.55. Existing beats keep their saved positions; Reset Layout is how you adopt the new defaults on a beat-by-beat basis.
 
@@ -2286,7 +2363,45 @@ A few things worth knowing:
 
   ![An AI fix card: the model's reasoning, the exact edit as before → after, Accept and Reject](images/71-ask-ai-fix.png)
 - **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source, your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
+- **Endings that don't say where Restart leads** are listed as well (an End Screen or AI Summary showing a Restart button with no [restart target](#restart-target)). For an AI Summary the banner proposes restarting at the story's start — the start beat from Project Settings, otherwise the title screen; for an End Screen you pick the *Restart leads to* beat in the Inspector.
 - The same banner appears for stories injected from Claude Desktop via MCP.
+
+<a id="co-designer"></a>
+## Refine Your Story with the Co-Designer
+
+The Ideator helps you shape an idea *before* there is a story. The **Co-Designer** is its counterpart for the story you already have: a design partner that has read your project and talks it through with you — deepening characters, sharpening choices, finding the places where a branch doesn't yet earn its keep — and then proposes concrete changes you can apply with a click.
+
+### Opening the Co-Designer
+
+1. Open the project you want to work on
+2. Click **AI** in the header and choose **Design with Co-Designer**
+3. The Co-Designer opens in its own window, headed *Working on "‹your title›"* with the time of its story snapshot
+
+It works from a snapshot of the story taken when you open it. After you've edited beats in the main window, click the **↻** (refresh) button in the Co-Designer's title bar so it reads the story again. The other two buttons open **past conversations** for this story and start a **new conversation** (the old one stays in the list). Like Ideator sessions, Co-Designer conversations belong to the project and travel with it.
+
+You'll need an AI provider set up (**AI → Configure AI**). A flagship model works best here, and Apple's on-device model is too small for the job — see [Which Model for Which Job?](#which-model-for-which-job).
+
+### Talking it through
+
+Type into the box at the bottom and press **Enter** (Shift+Enter for a new line). Ask the way you'd ask a colleague: *"I want the protagonist more sinister — what are my options?"*, *"The choices in the café scene all feel the same. Can you make them pull in different directions?"*, *"Does the trust counter actually matter anywhere?"* The Co-Designer knows your beats, characters, variables and counters, and how things are wired — which choices change what, which beats are gated, which characters appear where — and it looks up how each beat type works rather than asking you.
+
+### Proposals you can apply
+
+When a suggestion is concrete enough, the Co-Designer turns it into a **proposal card** that appears above the input box: a title, a short rationale, and one checkbox row per change, all ticked by default. Where a change replaces something, the row shows the current value (struck through, red) above the new one (green), so you see exactly what you'd be trading. It can propose:
+
+- **Wording** — rewrite a beat's text, or **reword a single choice** without touching what it does
+- **Settings** — change a beat's parameters, or add a design note to a beat
+- **New material** — **add a beat** (linked from and to the beats it names), **add a choice** to a menu or to a node deep inside a dialog tree
+- **A new version of a beat** — the new beat (same type or a different one) is placed **side by side** with the old one; every link that led into the old beat now leads to the new one, and any entry requirement carries over. The old beat stays in your story, renamed *"… (replaced)"*, so you can play both versions and delete the one you don't want. (The story's start beat can't be replaced this way.)
+- **Wiring** — what a choice **does** (its effects), when a choice is **shown** (its visibility conditions), what a beat **requires** before it can be entered (its entry gate, with a fallback), the effects on a **link** a player continues along, and a Random Target branch's **effects and weight**
+- **Characters** — display name, description, colour, personality traits, variants, the *At story start* policy and [Show HUD](#hud-reveal)
+- **Story variables** — declare a new variable with its starting value
+
+Untick anything you don't want and click **Apply N selected**, or **Dismiss** the card. Changes are applied in the main window, **each one undoable** there, and every batch — applied or dismissed — is recorded in **AI ▸ AI changes**.
+
+**Checked before you see it.** Wiring proposals use the same vocabulary as the story engine, and anything the engine would silently ignore — an effect on a counter that doesn't exist, a change of zero, a write to a read-only [bound counter](#counter-binding), a link to a missing beat — is left out of the card, and a note in the chat (*"Left out 1 proposed change that would not work in the player: …"*) says which and why. The Co-Designer reads that note too, so you can simply ask it to fix them. If a row still can't be applied (say, you've edited that beat since the snapshot), it shows a warning instead of silently doing something else.
+
+> **The Co-Designer never edits your story on its own.** It proposes; you decide. That's the whole point — the authorial choices stay yours, and the record in *AI changes* shows who wrote what.
 
 ## AI Beat Suggestions
 
@@ -2550,13 +2665,16 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
 
 **Using Path Presets:**
 
-1. Select a beat in the flowchart and open the Preview window
-2. Click the **Path Presets** dropdown in the toolbar
-3. Browse presets grouped by ending/outcome:
-   - Each preset shows the path taken (e.g., "Via Forest → Bridge")
-   - State summary shows variables, counters, and inventory
-   - Badge indicates if the path includes user input
-4. Select a preset to load that state
+1. Select a beat in the flowchart and open the Preview window (starting **From "‹beat›"**)
+2. Click the **Start as if… (N)** button in the toolbar — *N* is the number of distinct states found. The menu is headed *How did the player arrive here?* and tells you how many paths collapsed into how many states
+3. Pick **Start fresh (no prior state)**, or browse the presets, grouped by the ending each path goes on to:
+   - Each preset shows its key state (a couple of variable, counter or item values, or a count) and the path taken
+   - A badge indicates if the path includes typed input
+4. Select a preset to load that state; the preview restarts paused so you can look before you play
+
+**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant.
+
+**Only the states that play differently.** A long story can reach a beat by hundreds of routes. The list is condensed: two paths become one preset when nothing ahead of this beat — no condition, choice guard, entry requirement or `${…}` text placeholder — would come out differently. What's left is the handful of states worth testing. The **↻** button in the menu header re-runs the analysis after you've edited the story.
 
 **InputText Beats in Paths:**
 
@@ -2595,6 +2713,10 @@ The **Debug Info** panel (toggle with the **Debug** button on the toolbar) shows
 - List of visited beats, in order
 - Useful for debugging conditions based on beat history
 - When you start preview from a mid-story beat, path-injected beats carry an amber **seeded** badge — they satisfy visited-beat conditions but weren't actually played this run
+
+**Characters** *(when a character has variants, or a HUD that is still hidden)*:
+- **‹character›.variant** (for example `karin.variant`) — which variant is active, with a dropdown to switch to another one for testing (marked *variant drawn at random* when the story's random policy picked it)
+- Whether each character's HUD is **shown** yet, or *hidden until first appearance* / *hidden until a variant is chosen* — see [Show HUD](#hud-reveal)
 
 **Variables:**
 - All story variables and their current values
@@ -2724,6 +2846,20 @@ Each character in your story can have a distinct TTS voice:
 4. Available voices depend on your chosen TTS provider
 
 Built-in speakers like **Narrator** appear automatically. Your player character appears with "(Player)" next to their name. The player character is silent by default — assign a voice to enable speech for the player's text and clicked dialog choices.
+
+<a id="quoted-speech-voice"></a>
+### Quoted Speech and Narration
+
+Stories often mix narration and speech in one line:
+
+> Karin sits down without taking her coat off. "I don't see why we're here."
+
+When a line has a speaker and contains quotation marks, TTS reads it as two voices: the **quoted words in the speaker's voice**, everything else in the **Narrator's** voice, one after the other. Straight quotes ("…") as well as “…”, „…“, «…» and »…« are recognised; a quote that is never closed runs to the end of the line. Lines without any quotation marks are read whole in the speaker's voice, as before — so stories that write a character's lines without quote marks sound the same as ever.
+
+A few practical notes:
+- Give the **Narrator** a voice in the Character Voices list, and link the line to the character who speaks (you can hide the name label with *Show Speaker Name*; see [link, don't label](#link-dont-label)).
+- Moving on, or stopping speech, cancels the rest of the line.
+- The browser's built-in **Web Speech** voice can't report when it has finished a piece, so with that provider the line is read whole in the speaker's voice.
 
 ### TTS Language Awareness
 
@@ -3529,7 +3665,7 @@ ASAPS Modern maintains a full undo/redo history for beat operations:
 - **Ctrl/Cmd+Shift+Z** - Redo
 - The **History dropdown** (next to undo/redo buttons) shows recent operations
 
-Supported operations: edit beat properties, add beats, delete beats, move beats. The undo stack persists for the current session.
+Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer. The undo stack persists for the current session.
 
 <a id="find-and-change"></a>
 ## Find & Change
@@ -3625,11 +3761,11 @@ Quick reference for all beat types.
 | QR Scan | Real-world QR code scan | prompt, saveTo, interpretAsapsUri, facing (rear/front), matchPatterns (regex), helperText, cancelButtonText, speaker (also: built-in `asaps://` QR generator panel) |
 | Web View | Embed external URL | url, prompt, exitUrlPattern (regex), passContext (variable names to inject as URL hash), saveTo (from postMessage), doneButtonText, speaker |
 | AR Scene | AR with image-marker tracking | prompt, trackingMode (marker), markerAssetId (`.mind` file), anchors[] (id, label, assetId, offsetX/Y, scale, onTap as beat id or `asaps://` URI), cancelButtonText, fallbackTarget, speaker |
-| Hyper Text | Clickable text | text with links, link targets |
+| Hyper Text | Clickable text | text, links (select a word → Create Link → target beat; optional per-link colour/underline), allow multiple clicks; links default to a theme colour that reads against the background |
 | 360 Panorama | Panoramic view | panorama image, hotspots (pitch/yaw), starting orientation, field of view |
 | GPS Location | Map + geofenced locations | mode (display / trigger-on-arrival / trigger-on-departure), location entries (name, lat/lng, radius, target, effects), radius (m), instructional text, button/skip text, timeout, map style, show player marker; entries also support a project-file-level `pointName` binding to a Set GPS Location point set |
 | Indoor Location | Floor plan + beacon zones | mode (display / trigger-on-arrival / trigger-on-departure), target beacon UUID (from Settings → Location & XR → Indoor venue), radius (m), instructional text, button/skip text, timeout |
-| End Screen | Story ending | message, show restart, show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
+| End Screen | Story ending | message, show restart, **Restart leads to** (required while Restart is shown; drawn as a dashed teal ↺ Restart link), show credits, reset (with granular sub-options: variables, counters, inventory, timers, fictional time, visited tracking, history), restart text, credits text, credits page title, credits page body, credits close text |
 | Online Content | Live web data | mode (API/AI), query, template |
 
 ## Logic Beats
@@ -3639,7 +3775,7 @@ Quick reference for all beat types.
 | Set Variable/Counter | Change state | variable name, value (true/false, or `=`-prefixed arithmetic expression), counter operations, or fictional time |
 | Set GPS Location | Write a named GPS point set into story state | mode (capture / explicit / scatter / preset), point set name, point radius (m), lat/lng, fallback lat/lng, scatter: count + radius + center source + placement (uniform / walkable via OpenStreetMap), preset: map point curator |
 | Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant, gpsProximity, indoorProximity, permissionGranted), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
-| Random Target | Randomization | targets with optional weights |
+| Random Target | Randomization | branches, each with target, weight (0 = never; % of playthroughs shown) and optional effects that run when that branch is drawn |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character |
 | Update Affect | Mood / sentiment / emotion drift, bookmarks, reflections, goal & variant flips | `effects[]` — multi-row Effect array, same shape and editor as a choice's effects (templates, palette auto-complete, live summary, bookmark snapshots). Legacy single-row fields still load and run for older projects. |
@@ -3653,7 +3789,7 @@ Quick reference for all beat types.
 | AI Condition | AI branching | prompt, categories, fallback |
 | AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, maxChoicesPerTurn (1–4), presentationMode, prefetch support |
 | AI Conversation | Real-time AI conversation | presentation (chat / dialog — set in the Visual Editor's Conversation Settings), scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
-| AI Summary | Journey recap | style, length, include options |
+| AI Summary | Journey recap | style, length, include options, show restart + **Restart at** (beat picker; required while Restart is shown), reset options, credits; *Continue to* link only for a mid-story checkpoint |
 
 ---
 
@@ -3686,6 +3822,12 @@ Quick reference for all beat types.
 **Cluster** - A group of beats organized together, either for tidiness or to represent a location.
 
 **Connection** - A link between beats defining possible transitions in the experience.
+
+**Co-Designer** - The AI design partner for an existing story (**AI → Design with Co-Designer**). It discusses the open project with you and proposes concrete, individually selectable changes — text, choices, wiring (effects, visibility conditions, entry gates, link and random-branch effects), new beats, side-by-side new versions of a beat, characters — which you apply, each undoable. See [Refine Your Story with the Co-Designer](#co-designer).
+
+**Restart Link** - The link from an End Screen's or AI Summary's *Play Again* button to the beat where a replay begins. Drawn in the flowchart as a dashed teal **↺ Restart** arrow; required while the Restart button is shown.
+
+**Show HUD (HUD reveal)** - A per-character setting that decides when the character's HUDs (meters, mood pad, inventory) appear: when the character first appears (default), from the start, or once a variant is chosen. See [When the HUD appears](#hud-reveal).
 
 **Counter** - A numeric quantity scoped to a character (gold, health, reputation). Either *authored* — you move it with effects — or *bound*, reading a feeling instead. See [Counters that read affect](#counter-binding).
 
@@ -3765,7 +3907,7 @@ Quick reference for all beat types.
 
 **Variant** - An alternate persona overlay on a character that shares the character's stable id but carries its own personality, mood, sentiments, dossier policy, portrait, and (optional) display name. Switched at runtime via the `setCharacterVariant` effect, or drawn at random each playthrough when the character's story-start policy is *Pick randomly each playthrough*.
 
-**Variant Selection Policy** - The per-character "At story start" setting (shown when a character has 2+ variants): *Use default variant* applies the variant marked default; *Pick randomly each playthrough* draws a fresh variant on every story start and preview restart. An authored `setCharacterVariant` effect always overrides the policy.
+**Variant Selection Policy** - The per-character "At story start" setting (shown when a character has 2+ variants): *Use default variant* starts with the persona marked default (the base character or one of its variants); *Pick randomly each playthrough* draws a fresh variant on every story start and preview restart. An authored `setCharacterVariant` effect always overrides the policy.
 
 **Interpersonal Stance / Stance Pad** - A character's or variant's way of meeting other people, plotted on a 2D "Leary's Rose" pad: warmth (cold ↔ warm) × dominance (submissive ↔ dominant), with corner labels *hostile*, *leading*, *withdrawn*, *cooperative*. The pad is a lens on Big Five extraversion and agreeableness — dragging the dot updates both. Appears on the base Personality card, on each variant card, and on the AI character helper's preview cards.
 
