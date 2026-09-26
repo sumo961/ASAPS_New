@@ -216,8 +216,19 @@ export class StateSimulationAnalyzer {
    * counters). A character with variantSelectionPolicy 'random' starts once
    * per variant (combinations capped at 16) so every disposition is played.
    */
+  /** A fresh state with the story variables at their Project Settings
+   *  defaults — the runtime starts them there too. */
+  private seededInitialState(): SimulationState {
+    const state = createInitialState();
+    const defs = (this.story as any).getSettings?.()?.variables;
+    for (const def of Array.isArray(defs) ? defs : []) {
+      if (def?.name && def.defaultValue !== undefined && def.defaultValue !== '') state.variables.set(def.name, def.defaultValue);
+    }
+    return state;
+  }
+
   private initialStates(): SimulationState[] {
-    const base = createInitialState();
+    const base = this.seededInitialState();
     const ctx = this.getScratch();
     if (!ctx) return [base];
     const characters: any[] = ((this.story as any).getCharacters?.() ?? []) as any[];
@@ -231,7 +242,7 @@ export class StateSimulationAnalyzer {
     return combos.map((combo) => {
       ctx.reset();
       for (const [charId, variantId] of combo) ctx.setActiveCharacterVariant(charId, variantId, { seedAffect: true });
-      return { ...createInitialState(), runtime: ctx.getAffectSnapshot() };
+      return { ...this.seededInitialState(), runtime: ctx.getAffectSnapshot() };
     });
   }
 

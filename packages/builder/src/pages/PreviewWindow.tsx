@@ -1948,6 +1948,7 @@ export const PreviewWindow: React.FC = () => {
       context.on('inventoryChanged', updateDebugInfo);
       context.on('reset', updateDebugInfo);
       context.on('selectiveReset', updateDebugInfo);
+      if (import.meta.env.DEV) (window as any).__previewContext = context;
       // Step 4 / Phase 2: re-render the affect panel when mood / sentiment
       // changes via UpdateAffect beats or future emotion firings.
       context.on('characterMoodChanged', updateDebugInfo);

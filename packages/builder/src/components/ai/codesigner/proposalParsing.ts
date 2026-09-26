@@ -84,6 +84,9 @@ function normalizeCharacterUpdates(rawUpdates: any): Record<string, unknown> {
   if (rawUpdates.hudReveal === 'onAppearance' || rawUpdates.hudReveal === 'fromStart' || rawUpdates.hudReveal === 'onVariantChosen') {
     out.hudReveal = rawUpdates.hudReveal;
   }
+  if (typeof rawUpdates.keepVariantOnRestart === 'boolean') {
+    out.keepVariantOnRestart = rawUpdates.keepVariantOnRestart;
+  }
   if (rawUpdates.variantSelectionPolicy === 'fixed' || rawUpdates.variantSelectionPolicy === 'random') {
     out.variantSelectionPolicy = rawUpdates.variantSelectionPolicy;
   }
@@ -244,7 +247,8 @@ function normalizeProposal(raw: any): ChangeProposal | null {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return reject(raw.kind, `"${raw.name}" is not a usable name (letters, digits, _; no spaces) — placeholders are \${name}`);
       const v = raw.defaultValue ?? raw.initialValue ?? raw.value;
       const defaultValue = typeof v === 'number' || typeof v === 'boolean' ? v : typeof v === 'string' ? v : '';
-      return { kind: 'defineVariable', name, defaultValue, description: typeof raw.description === 'string' ? raw.description : undefined, note: typeof raw.note === 'string' ? raw.note : undefined };
+      if (name === 'playthrough') return reject(raw.kind, '"playthrough" is built in (the run count) — use it directly, don\'t declare it');
+      return { kind: 'defineVariable', name, defaultValue, description: typeof raw.description === 'string' ? raw.description : undefined, ...(raw.keepOnRestart === true ? { keepOnRestart: true } : {}), note: typeof raw.note === 'string' ? raw.note : undefined };
     }
     case 'editChoiceText': {
       const choiceId = raw.choiceId ?? raw.optionId ?? raw.nodeId;
@@ -381,7 +385,7 @@ export function describeProposal(p: ChangeProposal): string {
         ? `When leaving ${p.beatId}${p.targetId ? ` for ${p.targetId}` : ''}: ${p.effects.map((e) => describeEffect(e)).join('; ')}`
         : `Remove effects from ${p.beatId}'s link`;
     case 'defineVariable':
-      return `Declare story variable ${p.name} = ${JSON.stringify(p.defaultValue)}`;
+      return `Declare story variable ${p.name} = ${JSON.stringify(p.defaultValue)}${p.keepOnRestart ? ' (kept across restarts)' : ''}`;
     case 'editChoiceText':
       return `Reword ${p.beatId} › ${p.choiceId}: "${p.text.length > 80 ? `${p.text.slice(0, 77)}…` : p.text}"`;
     case 'addChoice':
@@ -398,6 +402,7 @@ export function describeProposal(p: ChangeProposal): string {
       for (const k of ['displayName', 'description', 'color'] as const) if (u[k] !== undefined) parts.push(k);
       if (u.traits) parts.push('traits');
       if (u.variantSelectionPolicy) parts.push(`selection: ${u.variantSelectionPolicy}`);
+      if (u.keepVariantOnRestart !== undefined) parts.push(u.keepVariantOnRestart ? 'keeps its variant across restarts' : 'variant resets on restart');
       if (u.hudReveal) parts.push(`HUD: ${u.hudReveal === 'fromStart' ? 'from the start' : u.hudReveal === 'onVariantChosen' ? 'once a variant is chosen' : 'on first appearance'}`);
       if (Array.isArray(u.variants)) {
         parts.push(`${u.variants.length} variant${u.variants.length === 1 ? '' : 's'} (${u.variants.map((v: any) => v.name || v.id).join(', ')})`);

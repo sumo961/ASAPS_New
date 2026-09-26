@@ -325,23 +325,18 @@ export class AISummaryBeat extends Beat {
       r.setTimerHudState?.(undefined);
       r.setTimerHudOverrideText?.(undefined);
       r.setTimerState?.(undefined);
-      if (this.resetOnRestart) {
-        const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
-          this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
-        if (allTrue) {
-          context.reset();
-        } else {
-          context.selectiveReset({
-            variables: this.resetVariables,
-            counters: this.resetCounters,
-            inventory: this.resetInventory,
-            timers: this.resetTimers,
-            fictionalTime: this.resetFictionalTime,
-            visitedTracking: this.resetVisitedTracking,
-            history: this.resetHistory,
-          });
-        }
-      }
+      // Keeps what the author marked "keep across restarts" and counts the playthrough.
+      const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
+        this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
+      context.restartPlaythrough(!this.resetOnRestart ? null : allTrue ? 'all' : {
+        variables: this.resetVariables,
+        counters: this.resetCounters,
+        inventory: this.resetInventory,
+        timers: this.resetTimers,
+        fictionalTime: this.resetFictionalTime,
+        visitedTracking: this.resetVisitedTracking,
+        history: this.resetHistory,
+      });
       return this.restartTarget || context.getStory().getFirstBeatId();
     };
 

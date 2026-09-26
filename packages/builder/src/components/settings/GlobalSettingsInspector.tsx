@@ -3440,6 +3440,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
               <p className="text-sm text-gray-600 mb-4">
                 Define global variables that can be used throughout your story. These will appear in dropdowns when selecting variables in beats.
+                Each starts at its default value, and goes back to it when an ending's Restart resets variables — unless you tick <em>Keep across restarts</em>.
+                Built in: <code className="font-mono text-xs bg-gray-100 px-1 rounded">playthrough</code> counts the runs (1, 2, …) — use <code className="font-mono text-xs bg-gray-100 px-1 rounded">{'${playthrough}'}</code> in text or test it in a condition.
               </p>
 
               {(!settings.variables || settings.variables.length === 0) ? (
@@ -3539,6 +3541,22 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                                 placeholder="What is this variable for?"
                               />
                             </div>
+                            <label
+                              className="flex items-start gap-2 text-xs text-gray-600 cursor-pointer"
+                              title="When the player presses Restart on an ending, this variable keeps its value instead of going back to the default — e.g. a character the player chose, or something they unlocked."
+                            >
+                              <input
+                                type="checkbox"
+                                className="mt-0.5"
+                                checked={!!variable.keepOnRestart}
+                                onChange={(e) => {
+                                  const updated = [...(settings.variables || [])];
+                                  updated[index] = { ...variable, keepOnRestart: e.target.checked || undefined };
+                                  handleChange('variables', undefined, updated);
+                                }}
+                              />
+                              <span>Keep across restarts <span className="text-gray-400">— survives an ending's Restart instead of going back to the default</span></span>
+                            </label>
                           </div>
                         </div>
                         <button

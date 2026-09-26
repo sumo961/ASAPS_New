@@ -138,6 +138,13 @@ export interface Character {
   variantSelectionPolicy?: 'fixed' | 'random';
 
   /**
+   * An ending's Restart (End Screen / AI Summary) keeps the variant in play
+   * instead of making the story-start choice again — a persona the player
+   * picked stays theirs across replays. A host restart still starts fresh.
+   */
+  keepVariantOnRestart?: boolean;
+
+  /**
    * When this character's HUDs (meter frame, mood frame, inventory) appear
    * at runtime.
    *   - 'onAppearance': once the player meets them — a beat or dialog node
@@ -287,6 +294,9 @@ export interface CharacterCounter {
   name: string;
   displayName: string;
   value: number;
+  /** Survives an ending's Restart (End Screen / AI Summary) instead of going
+   *  back to `value`. A host restart still starts fresh. */
+  keepOnRestart?: boolean;
   min?: number;
   max?: number;
   visible: boolean;

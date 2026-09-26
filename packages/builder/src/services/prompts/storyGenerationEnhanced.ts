@@ -508,6 +508,8 @@ Severity: "error" (default) means the gate is broken without this; "warn" means 
 - ⚠️ CRITICAL: Use "message", NOT "endMessage"!
 - ⚠️ CRITICAL: ALWAYS set "showRestart": true - player must be able to replay!
 - 🚨 CRITICAL: ALWAYS set "reset": true — otherwise counters and variables LEAK between replays, which can make counter-gated endings "ghost-reachable" on a second playthrough (player replays, counter adds on top of previous run, crosses threshold, surprise ending). reset:true wipes counters, variables, inventory, and visited tracking on restart, which is nearly always what you want.
+- Carrying something INTO the next playthrough (a persona the player chose, an unlocked extra, a "you have been here before" flag): keep reset on and mark just that item — "keepOnRestart": true on the variable (in "variables") or on a character counter, "keepVariantOnRestart": true on a character whose chosen variant should stay. Everything else still resets.
+- The built-in \${playthrough} is 1 on the first run and counts up on every Restart. Use it in text ("Back again — run \${playthrough}.") or in a condition { "type": "variable", "variable": "playthrough", "operator": ">=", "value": 2 } to acknowledge a returning player. Don't declare it yourself.
 - 🚨 CRITICAL: When showRestart is true, you MUST add a connection to where replays begin — the titleScreen (beat_0), the story's start beat, or another beat (e.g. the first beat after the title when replays should skip it). An end screen whose Restart leads nowhere is flagged as an error. Example: "connections": [{ "targetId": "beat_0" }]
 - Pattern: Multiple endScreens for different endings
 - 🚨🚨🚨 CRITICAL: endScreen must be in the main "beats" array! 🚨🚨🚨
@@ -826,6 +828,7 @@ Fictional time condition example (CORRECT format):
 - Credits page: creditsPageTitle, creditsPageBody, creditsCloseText
 - When used as an ending: set showRestart: true and "restartTarget": the beat id the Restart button leads to — the titleScreen (e.g. "beat_0"), the story's start beat, or another beat (e.g. the first beat after the title when replays should skip it). 🚨 REQUIRED: an ending summary without restartTarget is flagged as an error. It shows in the flowchart as a ↺ Restart link.
 - 🚨 Unlike endScreen, an aiSummary's restart is NOT its connection: "connections" are where the story CONTINUES when the summary is a checkpoint, and following one does not reset state. An ending aiSummary has no connections — only restartTarget.
+- Same carry-over rules as endScreen: items marked "keepOnRestart" / "keepVariantOnRestart" survive the reset, and \${playthrough} counts the runs.
 - 🚨 CRITICAL: ALWAYS set "resetOnRestart": true so counters, variables, and inventory don't leak between replays. Without it, counter-gated endings can become "ghost-reachable" on a second playthrough (counter adds on top of previous run, crosses threshold).
 - Advantage over endScreen: the player sees a personalized recap of what they did, not just a static message
 
@@ -1773,6 +1776,12 @@ Generate complete, sophisticated interactive story structures that:
       "name": "cluesFound",
       "initialValue": 0,
       "description": "Number of clues discovered"
+    },
+    {
+      "name": "sawTrueEnding",
+      "initialValue": false,
+      "keepOnRestart": true,
+      "description": "Survives Restart: unlocks an epilogue line on later runs"
     }
   ],
   "characters": [

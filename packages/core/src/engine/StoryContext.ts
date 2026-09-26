@@ -104,6 +104,9 @@ export interface ChoiceRecord {
  * Options for selective reset - each flag controls whether that category is cleared.
  * All default to true for backward compatibility with full reset.
  */
+/** Built-in story variable: which playthrough this is (1, 2, …). Readable as ${playthrough} and in conditions. */
+export const PLAYTHROUGH_VARIABLE = 'playthrough';
+
 export interface ResetOptions {
   variables?: boolean;
   counters?: boolean;
@@ -117,6 +120,8 @@ export interface ResetOptions {
 interface StoryState {
   currentBeatId: string;
   variables: Record<string, any>;
+  /** Which playthrough this is (built-in `playthrough`); absent = 1. */
+  playthrough?: number;
   counters: Record<string, number>;
   inventory: InventoryEntry[];
   characterInventories: Record<string, InventoryEntry[]>; // Character-specific inventories
@@ -262,6 +267,8 @@ export function bearingDegrees(
 export interface SerializedStoryState {
   currentBeatId: string;
   variables: Record<string, any>;
+  /** Which playthrough (in-story restarts + 1); absent in older saves = 1. */
+  playthrough?: number;
   counters: Record<string, number>;
   inventory: InventoryEntry[];  // Now stores entries with quantities
   characterInventories: Record<string, InventoryEntry[]>;
@@ -472,6 +479,7 @@ export class StoryContext extends EventEmitter {
       this.seedCharacterAffectFromStory();
       this.seedCharacterCountersFromStory();
     }
+    this.seedStoryVariables();
 
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
@@ -510,7 +518,11 @@ export class StoryContext extends EventEmitter {
   }
 
   getVariable(name: string): any {
-    return this.state.variables[name];
+    const v = this.state.variables[name];
+    // Built-in: `playthrough` reads the run count unless the story declares
+    // its own variable of that name.
+    if (v === undefined && name === PLAYTHROUGH_VARIABLE) return this.getPlaythrough();
+    return v;
   }
 
   setVariable(name: string, value: any): void {
@@ -2199,7 +2211,7 @@ export class StoryContext extends EventEmitter {
         break;
       }
       case 'variable':
-        leftValue = this.state.variables[varName];
+        leftValue = this.getVariable(varName);
         break;
       case 'timer':
         leftValue = this.state.timers[varName]?.value || 0;
@@ -2556,6 +2568,7 @@ export class StoryContext extends EventEmitter {
     // begins from the same emotional starting point each time.
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
+    this.seedStoryVariables();
     this.emit('reset');
 
     // Emit change events so UI listeners (countdown meter, debug panel) update
@@ -2574,6 +2587,7 @@ export class StoryContext extends EventEmitter {
 
     if (options.variables) {
       this.state.variables = {};
+      this.seedStoryVariables();
     }
     if (options.counters) {
       this.state.counters = {};
@@ -2622,6 +2636,89 @@ export class StoryContext extends EventEmitter {
     this.story = story;
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
+    this.seedStoryVariables();
+  }
+
+  /**
+   * Story variables start at the value the author gave them in Project
+   * Settings (`settings.variables[].defaultValue`) — the runtime used to
+   * ignore it, so every variable started undefined. Never overwrites a value
+   * that is already set.
+   */
+  seedStoryVariables(): void {
+    for (const def of this.storyVariableDefinitions()) {
+      if (!def?.name || def.defaultValue === undefined || def.defaultValue === '') continue;
+      if (this.state.variables[def.name] !== undefined) continue;
+      this.state.variables[def.name] = def.defaultValue;
+    }
+  }
+
+  private storyVariableDefinitions(): Array<{ name: string; defaultValue?: unknown; keepOnRestart?: boolean }> {
+    const defs = (this.story as any)?.getSettings?.()?.variables;
+    return Array.isArray(defs) ? defs : [];
+  }
+
+  /** Which playthrough this is: 1 on the first, +1 on every in-story restart. */
+  getPlaythrough(): number {
+    const n = Number(this.state.playthrough);
+    return Number.isFinite(n) && n >= 1 ? n : 1;
+  }
+
+  /**
+   * An in-story restart — the Restart button of an End Screen or AI Summary.
+   * Applies the ending's reset ('all', a selective set, or null for none),
+   * keeps what the author marked "keep across restarts" (story variables,
+   * character counters, a character's chosen variant) and counts the
+   * playthrough. A host restart (player menu, preview) calls reset() instead:
+   * that one is a fresh start and keeps nothing.
+   */
+  restartPlaythrough(reset: ResetOptions | 'all' | null): void {
+    const run = this.getPlaythrough();
+    const kept = this.captureKeptAcrossRestarts();
+    if (reset === 'all') this.reset();
+    else if (reset) this.selectiveReset(reset);
+    this.restoreKeptAcrossRestarts(kept);
+    this.state.playthrough = run + 1;
+    this.emit('variableChanged', { name: PLAYTHROUGH_VARIABLE, value: run + 1 });
+  }
+
+  private captureKeptAcrossRestarts(): {
+    variables: Record<string, unknown>;
+    counters: Array<{ key: string; name: string; value: number }>;
+    variants: Array<{ key: string; variantId: string }>;
+  } {
+    const variables: Record<string, unknown> = {};
+    for (const def of this.storyVariableDefinitions()) {
+      if (def?.keepOnRestart && def.name && this.state.variables[def.name] !== undefined) {
+        variables[def.name] = this.state.variables[def.name];
+      }
+    }
+    const counters: Array<{ key: string; name: string; value: number }> = [];
+    const variants: Array<{ key: string; variantId: string }> = [];
+    const characters = ((this.story as any)?.getCharacters?.() ?? []) as Array<any>;
+    for (const c of characters) {
+      const key = c?.id ? this.resolveCharRef(c.id) : undefined;
+      if (!key) continue;
+      for (const def of Array.isArray(c.counters) ? c.counters : []) {
+        const value = this.state.characterCounters[key]?.[def?.name];
+        if (def?.keepOnRestart && def.name && typeof value === 'number') counters.push({ key, name: def.name, value });
+      }
+      const variantId = this.state.activeCharacterVariants[key];
+      if (c.keepVariantOnRestart && variantId) variants.push({ key, variantId });
+    }
+    return { variables, counters, variants };
+  }
+
+  private restoreKeptAcrossRestarts(kept: ReturnType<StoryContext['captureKeptAcrossRestarts']>): void {
+    for (const [name, value] of Object.entries(kept.variables)) this.setVariable(name, value);
+    // The variant first: switching it in re-seeds that persona's affect and
+    // counters, then the kept counter values go back on top.
+    for (const { key, variantId } of kept.variants) {
+      if (this.state.activeCharacterVariants[key] !== variantId) {
+        this.setActiveCharacterVariant(key, variantId, { seedAffect: true, mode: 'reseed' });
+      }
+    }
+    for (const { key, name, value } of kept.counters) this.setCharacterCounter(key, name, value);
   }
 
   /**
@@ -3072,6 +3169,7 @@ export class StoryContext extends EventEmitter {
     return {
       currentBeatId: this.state.currentBeatId,
       variables: { ...this.state.variables },
+      ...(this.state.playthrough !== undefined ? { playthrough: this.state.playthrough } : {}),
       counters: { ...this.state.counters },
       inventory: this.state.inventory.map(entry => ({ ...entry })),
       characterInventories: Object.fromEntries(
@@ -3160,6 +3258,7 @@ export class StoryContext extends EventEmitter {
     this.state = {
       currentBeatId: serialized.currentBeatId,
       variables: { ...serialized.variables },
+      ...(serialized.playthrough !== undefined ? { playthrough: serialized.playthrough } : {}),
       counters: { ...serialized.counters },
       inventory: migrateInventory(serialized.inventory),
       characterInventories: Object.fromEntries(

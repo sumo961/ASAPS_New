@@ -43,13 +43,14 @@ export interface DigestCharacter {
   variantSelectionPolicy?: 'fixed' | 'random';
   hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
   defaultVariantId?: string;
+  keepVariantOnRestart?: boolean;
 }
 
 export interface StoryDigestInput {
   title?: string;
   beats: DigestBeat[];
   characters?: DigestCharacter[];
-  variables?: Array<{ name?: string; initialValue?: unknown }>;
+  variables?: Array<{ name?: string; initialValue?: unknown; keepOnRestart?: boolean }>;
   clusters?: Array<{ id?: string; name?: string }>;
 }
 
@@ -236,6 +237,7 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
         });
         bits.push(`variants: ${named.join(', ')}`);
         if (c.variantSelectionPolicy === 'random') bits.push('selection: random each playthrough');
+        if (c.keepVariantOnRestart) bits.push('variant kept across restarts');
         if (c.hudReveal === 'fromStart') bits.push('HUD from the start');
         else if (c.defaultVariantId) bits.push(`default variant: ${c.defaultVariantId}`);
       }
@@ -249,6 +251,7 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
           const notes: string[] = [];
           if (meta.source?.kind) notes.push(`reads ${meta.source.kind}, read-only`);
           if (typeof meta.min === 'number' && typeof meta.max === 'number') notes.push(`${meta.min}..${meta.max}`);
+          if ((k as { keepOnRestart?: boolean }).keepOnRestart) notes.push('kept across restarts');
           // Say that a ladder exists. The Co-Designer replaces a character's
           // counter list wholesale, and without this it cannot tell there is
           // authored wording to preserve — observed live: it restated a
@@ -263,7 +266,8 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
 
   const declared = (input.variables ?? []).map(v => v.name).filter(Boolean) as string[];
   if (declared.length > 0) {
-    lines.push('', `VARIABLES (declared in Project Settings): ${declared.join(', ')}`);
+    const kept = new Set((input.variables ?? []).filter(v => v.keepOnRestart).map(v => v.name));
+    lines.push('', `VARIABLES (declared in Project Settings): ${declared.map(n => (kept.has(n) ? `${n} (kept across restarts)` : n)).join(', ')}`);
   }
   const inUse = storyStateInUse(input.beats, input.characters);
   const undeclared = inUse.variables.filter(v => !declared.includes(v));

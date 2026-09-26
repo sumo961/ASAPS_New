@@ -697,6 +697,7 @@ const injectStoryTool: Tool = {
                 properties: {
                   name: { type: 'string', description: 'Internal name (e.g. "trust")' },
                   displayName: { type: 'string', description: 'Label shown on the meter (e.g. "Trust")' },
+                  keepOnRestart: { type: 'boolean', description: 'true: an ending\'s Restart keeps this counter\'s value instead of resetting it (carry-over between playthroughs).' },
                   value: { type: 'number', description: 'Starting value. Ignored when "source" is set.' },
                   min: {
                     type: 'number',
@@ -787,6 +788,12 @@ const injectStoryTool: Tool = {
                 'The HUD panel that draws this character\'s visible counters. A visible meter needs one or it ' +
                 'renders nowhere. Typical: { "dockMode": "screen", "screenPosition": "screen-top-left" }.',
             },
+            keepVariantOnRestart: {
+              type: 'boolean',
+              description:
+                'true: an ending\'s Restart keeps the variant in play (a persona the player chose stays theirs on replay) ' +
+                'instead of making the story-start choice again.',
+            },
             hudReveal: {
               type: 'string',
               enum: ['onAppearance', 'fromStart', 'onVariantChosen'],
@@ -810,6 +817,7 @@ const injectStoryTool: Tool = {
           properties: {
             name: { type: 'string' },
             initialValue: { description: 'Starting value (string, number or boolean)' },
+            keepOnRestart: { type: 'boolean', description: 'true: survives an ending\'s Restart instead of going back to initialValue. The built-in ${playthrough} (run count 1, 2, …) needs no declaration.' },
             description: { type: 'string' },
           },
           required: ['name'],

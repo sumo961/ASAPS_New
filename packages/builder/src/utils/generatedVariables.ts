@@ -28,7 +28,7 @@ export function mergeGeneratedVariables(
 
   const generated = storyVariables
     .filter(
-      (v: any): v is { name: string; initialValue?: unknown; description?: unknown } =>
+      (v: any): v is { name: string; initialValue?: unknown; description?: unknown; keepOnRestart?: unknown } =>
         v && typeof v.name === 'string' && v.name.trim().length > 0,
     )
     .map((v) => {
@@ -39,6 +39,7 @@ export function mergeGeneratedVariables(
         defaultValue:
           v.initialValue ?? (t === 'boolean' ? false : t === 'number' ? 0 : ''),
         description: typeof v.description === 'string' ? v.description : undefined,
+        ...(v.keepOnRestart === true ? { keepOnRestart: true } : {}),
       };
     });
 

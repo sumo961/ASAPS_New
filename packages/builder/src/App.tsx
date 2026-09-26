@@ -6163,7 +6163,7 @@ function App() {
       connectBeats: (sourceId, targetId, label) => actions.connectBeats(sourceId, targetId, label),
       defineVariable: (v) => {
         const base = globalSettingsRef.current ?? globalSettings;
-        const next = mergeGeneratedVariables(base, [{ name: v.name, initialValue: v.defaultValue, description: v.description }]);
+        const next = mergeGeneratedVariables(base, [{ name: v.name, initialValue: v.defaultValue, description: v.description, ...(v.keepOnRestart ? { keepOnRestart: true } : {}) }]);
         const before = (base as any).variables?.length ?? 0;
         if (!next || ((next as any).variables?.length ?? 0) === before) return false;
         globalSettingsRef.current = next;

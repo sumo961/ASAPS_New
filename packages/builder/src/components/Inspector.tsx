@@ -5164,11 +5164,27 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                         </div>
+                        {beat.type === 'endScreen' && localBeat.parameters?.showRestart !== false && (
+                          <p className="text-xs text-gray-500 leading-snug -mt-1">
+                            What survives the reset: variables, counters and character variants marked <em>Keep across restarts</em>.
+                            {' '}<span className="font-mono">{'${playthrough}'}</span> counts the runs.
+                          </p>
+                        )}
                         {/* Effects on this link: run when the player continues
-                            (e.g. start a counter, record a route). */}
-                        {!!localBeat.connections?.[0]?.targetId && (
+                            (e.g. start a counter, record a route). Not offered on
+                            an End Screen's Restart: they run after the reset, so
+                            they could only set fixed values — "Keep across
+                            restarts" is the way to carry something over. Links
+                            that already have effects keep showing them. */}
+                        {!!localBeat.connections?.[0]?.targetId
+                          && (beat.type !== 'endScreen' || (localBeat.connections[0].effects?.length ?? 0) > 0) && (
                           <div className="p-2 bg-blue-50 rounded space-y-2">
                             <div className="text-xs font-medium text-blue-700">When the player continues (optional)</div>
+                            {beat.type === 'endScreen' && (
+                              <p className="text-xs text-amber-700 leading-snug">
+                                These run after the reset, so they can only set fixed values. To carry a value into the next playthrough, tick <em>Keep across restarts</em> on the variable, counter or character instead.
+                              </p>
+                            )}
                             <ChoiceEffectsEditor
                               effects={localBeat.connections[0].effects || []}
                               onChange={(newEffects) => {

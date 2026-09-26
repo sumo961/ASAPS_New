@@ -1,6 +1,6 @@
 import { Beat } from './Beat';
 import type { BeatConfig, Connection } from '../types';
-import { StoryContext } from '../engine/StoryContext';
+import { StoryContext, type ResetOptions } from '../engine/StoryContext';
 import type { IRenderer } from '../types';
 import type { EndScreenParameters } from '../generated/beat-types';
 
@@ -150,7 +150,9 @@ export class EndScreenBeat extends Beat {
 
     // Helper: perform reset and return restart target
     const doRestart = (): string => {
-      this.applyReset(context);
+      // Keeps what the author marked "keep across restarts" and counts the
+      // playthrough; doExit below is an ending, not a restart.
+      context.restartPlaythrough(this.resetScope());
       // Always clear HUD overlay state on restart, even if reset=false, so a
       // stale real-time timer readout doesn't persist into the next playthrough.
       const r = renderer as any;
@@ -220,24 +222,27 @@ export class EndScreenBeat extends Beat {
    * Apply reset (full or selective) based on beat configuration.
    * Called just before navigating away from the EndScreen on restart.
    */
-  private applyReset(context: StoryContext): void {
-    if (!this.reset) return;
-
+  /** What this ending resets: 'all', a selective set, or null (reset off). */
+  private resetScope(): ResetOptions | 'all' | null {
+    if (!this.reset) return null;
     const allTrue = this.resetVariables && this.resetCounters && this.resetInventory &&
       this.resetTimers && this.resetFictionalTime && this.resetVisitedTracking && this.resetHistory;
-    if (allTrue) {
-      context.reset();
-    } else {
-      context.selectiveReset({
-        variables: this.resetVariables,
-        counters: this.resetCounters,
-        inventory: this.resetInventory,
-        timers: this.resetTimers,
-        fictionalTime: this.resetFictionalTime,
-        visitedTracking: this.resetVisitedTracking,
-        history: this.resetHistory,
-      });
-    }
+    if (allTrue) return 'all';
+    return {
+      variables: this.resetVariables,
+      counters: this.resetCounters,
+      inventory: this.resetInventory,
+      timers: this.resetTimers,
+      fictionalTime: this.resetFictionalTime,
+      visitedTracking: this.resetVisitedTracking,
+      history: this.resetHistory,
+    };
+  }
+
+  private applyReset(context: StoryContext): void {
+    const scope = this.resetScope();
+    if (scope === 'all') context.reset();
+    else if (scope) context.selectiveReset(scope);
   }
 
   private async showCreditsPage(context: StoryContext, renderer: IRenderer): Promise<void> {

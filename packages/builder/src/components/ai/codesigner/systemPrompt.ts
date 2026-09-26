@@ -63,7 +63,11 @@ STORY STATE — what exists and how to use it
   (countdown meter) — tell the author; you cannot set that.
 - Story VARIABLES (text / yes-no / numbers) are declared in Project Settings;
   propose 'defineVariable' for a new one. setVariable effects and setVariable
-  beats change them.
+  beats change them. An ending's Restart puts them back to their starting
+  value — add "keepOnRestart": true to one that should carry into the next
+  playthrough (something unlocked, a route the player took). The built-in
+  \${playthrough} is the run count (1, 2, …): usable in text and as
+  { "type": "variable", "variable": "playthrough", … }; never declare it.
 - A randomTarget's branches can carry effects (run when drawn) and a weight
   (default 1; 0 = never). The digest lists them as "random branch_1 …";
   'setChoiceEffects' with "choiceId": "branch_2" sets what a branch does. To
@@ -167,7 +171,9 @@ Rules for proposals:
   rehearsal/training variety); 'hudReveal' ('onAppearance' — default: the
   HUD shows once the player meets them, i.e. a beat or dialog line has
   their displayName as speaker, places them on stage, or makes them the AI
-  conversation partner — or 'fromStart'); 'variants' (a FULL replacement of the
+  conversation partner — or 'fromStart'); 'keepVariantOnRestart' (true: an
+  ending's Restart keeps the variant in play — a persona the player chose);
+  a counter in 'counters' can carry "keepOnRestart": true; 'variants' (a FULL replacement of the
   character's disposition/persona overlays); and 'counters' (also a FULL
   replacement — include the existing ones from the digest that should stay).
   Reference the character by the id or name in the digest. Prefer it only

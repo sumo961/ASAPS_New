@@ -888,7 +888,7 @@ The final beat. Display an ending message with options to restart or view a dedi
 **Every Restart says where replays begin.** While **Show Restart** is on, *Restart leads to* is required. If it's empty, the Inspector shows a red hint (*"The Restart button leads nowhere yet — pick where replays begin…"*) and, for an AI-generated story, the [review banner](#after-generation-the-review-banner) lists the beat too. (Older stories keep working — a Restart with no target still falls back to the first beat — but it's worth picking one deliberately.) In the flowchart the link appears as a dashed teal **↺ Restart** arrow. Turn **Show Restart** off and the End Screen is simply a final ending; nothing is flagged.
 
 ![End Screen Inspector: "Restart leads to (Required)" with the red hint that the Restart button leads nowhere yet](images/72-end-screen-restart-required.png)
-*An End Screen whose Restart button leads nowhere yet. Pick a beat in the dropdown and the hint disappears; a **When the player continues** effects box appears under the chosen link.*
+*An End Screen whose Restart button leads nowhere yet. Pick a beat in the dropdown and the hint disappears.*
 
 **Granular Reset Options:**
 
@@ -905,6 +905,19 @@ When the **Reset** toggle is turned on, a set of sub-options appears letting you
 | **History** | The ordered log of beats visited during play |
 
 This is especially useful for "New Game+" experiences where you want interactors to keep some progress. For example, you might reset variables and history but preserve inventory so the interactor carries their collected items into a second playthrough.
+
+<a id="keep-across-restarts"></a>
+**Keeping just some things across a restart.** Usually you want a clean reset *except* for one or two things: the character the player chose, an extra they unlocked, a "you've been here before" flag. Leave **Reset** on and mark only those:
+
+- **A story variable** — **Project Settings → Variables**, tick **Keep across restarts** on it. Every other variable goes back to its default value.
+- **A character's counter** — Character Editor → **Counters** tab, tick **Keep across restarts** on that counter.
+- **A character's chosen variant** — Character Editor → **Affect** tab → Variants, tick **Keep the chosen variant across restarts**. A persona the player picked stays theirs on replay, with that persona's starting feelings.
+
+These survive the Restart of any End Screen or AI Summary. The Preview's own **Restart** button and the player's **Menu → Restart** are a completely fresh start and keep nothing.
+
+**Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending. Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it.
+
+*Why there's no effects box on an End Screen's Restart link:* effects there would run after the reset, so they could only set fixed values, never carry anything over. Links that already have effects still show them, with a note.
 
 **Customizable Credits Page:**
 

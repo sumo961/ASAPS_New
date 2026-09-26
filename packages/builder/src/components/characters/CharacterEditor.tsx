@@ -914,6 +914,22 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     <Hash className="w-4 h-4 text-gray-500" />
                     <span className="text-gray-600">Show Value</span>
                   </label>
+                  <label
+                    className="flex items-center gap-2 text-sm ml-2"
+                    title="When the player presses Restart on an ending, this counter keeps its value instead of going back to its starting value."
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!counter.keepOnRestart}
+                      onChange={(e) => {
+                        const newCounters = [...editedCharacter.counters];
+                        newCounters[index] = { ...counter, keepOnRestart: e.target.checked || undefined };
+                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-gray-600">Keep across restarts</span>
+                  </label>
                   {/* Numeric format selector */}
                   {counter.showNumericValue && (
                     <select
@@ -2840,6 +2856,23 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                 </span>
               )}
             </div>
+          )}
+          {variants.length > 0 && (
+            <label
+              className="flex items-start gap-2 mb-3 text-[11px] text-gray-600 cursor-pointer"
+              title="When the player presses Restart on an ending, the variant in play stays in play instead of the story-start choice being made again."
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={!!editedCharacter.keepVariantOnRestart}
+                onChange={(e) => setEditedCharacter({ ...editedCharacter, keepVariantOnRestart: e.target.checked || undefined })}
+              />
+              <span>
+                Keep the chosen variant across restarts
+                <span className="text-gray-400"> — e.g. a persona the player picked stays theirs when they replay from an ending</span>
+              </span>
+            </label>
           )}
           {variants.length === 0 ? (
             <div className="text-xs text-gray-400 italic py-3">

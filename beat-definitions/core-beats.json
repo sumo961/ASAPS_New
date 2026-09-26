@@ -1568,7 +1568,7 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Reset all values on restart"
+          "description": "Reset all values on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs"
         },
         "resetVariables": {
           "type": "boolean",
@@ -4830,7 +4830,7 @@
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Reset state on restart"
+          "description": "Reset state on restart. Items marked keepOnRestart (variables, character counters) or keepVariantOnRestart (characters) survive; the built-in ${playthrough} counts the runs"
         },
         "resetVariables": {
           "type": "boolean",

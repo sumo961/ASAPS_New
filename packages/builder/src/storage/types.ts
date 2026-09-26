@@ -326,6 +326,9 @@ export interface GlobalSettings {
     type: 'string' | 'number' | 'boolean';
     defaultValue?: string | number | boolean;
     description?: string;
+    /** Survives an ending's Restart (End Screen / AI Summary) instead of
+     *  going back to defaultValue. A host restart still starts fresh. */
+    keepOnRestart?: boolean;
   }[];
 
   /**

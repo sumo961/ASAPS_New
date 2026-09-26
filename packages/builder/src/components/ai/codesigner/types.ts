@@ -79,6 +79,8 @@ export type ChangeProposal =
       name: string;
       defaultValue: string | number | boolean;
       description?: string;
+      /** Survives an ending's Restart instead of going back to defaultValue. */
+      keepOnRestart?: boolean;
       note?: string;
     }
   | {
@@ -140,6 +142,8 @@ export type ChangeProposal =
         /** Draw a disposition variant at each playthrough vs. use the default. */
         variantSelectionPolicy?: 'fixed' | 'random';
         hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
+        /** An ending's Restart keeps the variant in play (a persona the player chose). */
+        keepVariantOnRestart?: boolean;
         /** FULL replacement of the character's disposition/persona variants.
          *  A variant carrying a `stance` has its extraversion/agreeableness
          *  re-derived from the base traits + stance at apply time, keeping
