@@ -16,6 +16,8 @@ export interface ChoiceStateOption {
   key: string;
   label: string;
   state: StatePreset['state'] | null;
+  /** The story the state belongs to — feelings conditions need its cast. */
+  story?: Story;
 }
 
 /** "All choices" first, then "Start fresh", then one option per distinct arrival state. */
@@ -30,7 +32,7 @@ export function choiceStateOptions(beats: Beat[], characters: unknown[] | undefi
     for (const b of beats) story.addBeat(b);
     const result = generatePathPresets(story, beatId);
     result.presets.forEach((p, i) => {
-      options.push({ key: `path_${i}`, label: p.pathDescription || p.preset.name || `State ${i + 1}`, state: p.preset.state });
+      options.push({ key: `path_${i}`, label: p.pathDescription || p.preset.name || `State ${i + 1}`, state: p.preset.state, story });
     });
   } catch (err) {
     console.warn('[dialogChoiceVisibility] path presets failed:', err);
@@ -39,13 +41,13 @@ export function choiceStateOptions(beats: Beat[], characters: unknown[] | undefi
 }
 
 /** Ids of the choices visible in `state`; null = show all (the "All choices" option). */
-export function visibleChoiceIds(choices: Json[], state: StatePreset['state'] | null): Set<string> | null {
+export function visibleChoiceIds(choices: Json[], state: StatePreset['state'] | null, story?: Story): Set<string> | null {
   if (!state) return null;
-  const ctx = new StoryContext();
-  Object.entries(state.variables ?? {}).forEach(([k, v]) => ctx.setVariable(k, v));
-  Object.entries(state.counters ?? {}).forEach(([k, v]) => ctx.setCounter(k, v as number));
-  (state.inventory ?? []).forEach((item) => ctx.addToInventory(item));
+  let ctx: StoryContext;
+  try { ctx = story ? new StoryContext(undefined, story) : new StoryContext(); } catch { ctx = new StoryContext(); }
   (state.visitedBeats ?? []).forEach((id) => ctx.markBeatVisited(id));
+  // Feelings guards need the arrival feelings (and the story's cast).
+  ctx.loadSimulationState((state.affect ?? {}) as any, state.variables ?? {}, state.counters ?? {}, state.inventory ?? []);
   const ids = new Set<string>();
   for (const c of choices) {
     if (!c || c.visible === false) continue;

@@ -40,3 +40,24 @@ describe('preset condensation', () => {
     expect(generatePathPresets(story(withText), 'b').presets).toHaveLength(3);
   });
 });
+
+describe('presets carry feelings', () => {
+  it('a feelings gate ahead keeps both sides, and each preset carries its feelings', () => {
+    const s = new Story({ title: 't', firstBeatId: 'a' } as any);
+    s.setCharacters([{ id: 'char_n', name: 'n', displayName: 'N', role: 'npc' }] as any);
+    const reg = BeatTypeRegistry.getInstance();
+    [
+      { id: 'a', type: 'multiChoice', name: 'A', parameters: { question: 'q', choices: [
+        choice('w', 'Warm', 'b', [{ type: 'addSentiment', target: 'char_n', sentimentTarget: 'player', sentimentEmotion: 'trust', strengthDelta: 0.6 }]),
+        choice('c', 'Cold', 'b', []),
+      ] } },
+      { id: 'b', type: 'infoText', name: 'B', parameters: { text: 'x' }, connections: [{ targetId: 'g' }] },
+      { id: 'g', type: 'conditionBeat', name: 'G', parameters: { condition: { type: 'sentiment', character: 'char_n', sentimentTarget: 'player', sentimentEmotion: 'trust', operator: '>=', value: 0.3 }, trueTarget: 'e', falseTarget: 'e' } },
+      { id: 'e', type: 'endScreen', name: 'E', parameters: { message: 'x', showRestart: false } },
+    ].forEach((b: any) => s.addBeat(reg.createBeat(b.type, b)));
+    const r = generatePathPresets(s, 'b');
+    expect(r.presets).toHaveLength(2);
+    const trusts = r.presets.map((p: any) => (p.preset.state.affect?.characterSentiments?.char_n ?? []).find((x: any) => x.emotion === 'trust')?.strength ?? 0).sort();
+    expect(trusts[1]).toBeGreaterThanOrEqual(0.6);
+  });
+});

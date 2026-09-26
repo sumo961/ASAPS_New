@@ -17,6 +17,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
+import { StoryContext, type SerializedStoryState } from '../engine/StoryContext';
 import {
   ConstraintSet,
   PathStep,
@@ -38,6 +39,17 @@ export interface SimulationState {
   counters: Map<string, number>;
   inventory: Map<string, Set<string>>; // character -> items
   visitedBeats: Set<string>;
+  /**
+   * The characters' inner life — moods, sentiments, emotions, goals,
+   * variants, baselines, bookmarks — as a runtime StoryContext snapshot
+   * (2026-09-26). Feelings are computed by the runtime itself (effects,
+   * per-beat decay and goal checks, feelings conditions), not re-modelled
+   * here. Shared between branches until one changes it.
+   */
+  runtime?: Partial<SerializedStoryState>;
+  /** Feeling effects not yet applied to `runtime` — flushed at the next
+   *  runtime session (usually the next beat's tick), one session per step. */
+  pendingRuntime?: any[];
 }
 
 /**
@@ -126,6 +138,8 @@ function cloneState(state: SimulationState): SimulationState {
       Array.from(state.inventory.entries()).map(([k, v]) => [k, new Set(v)])
     ),
     visitedBeats: new Set(state.visitedBeats),
+    runtime: state.runtime,
+    pendingRuntime: state.pendingRuntime ? [...state.pendingRuntime] : undefined,
   };
 }
 
@@ -167,6 +181,94 @@ export class StateSimulationAnalyzer {
   // Cached beat lookups
   private beatCache: Map<string, Beat | null> = new Map();
 
+  /** One runtime context, reloaded from each state's snapshot as needed. */
+  private scratch: StoryContext | null | undefined;
+
+  private getScratch(): StoryContext | null {
+    if (this.scratch === undefined) {
+      try { this.scratch = new StoryContext(undefined, this.story); } catch { this.scratch = null; }
+    }
+    return this.scratch;
+  }
+
+  /**
+   * Starting states: the runtime's own story-start seeding (moods, variants,
+   * counters). A character with variantSelectionPolicy 'random' starts once
+   * per variant (combinations capped at 16) so every disposition is played.
+   */
+  private initialStates(): SimulationState[] {
+    const base = createInitialState();
+    const ctx = this.getScratch();
+    if (!ctx) return [base];
+    const characters: any[] = ((this.story as any).getCharacters?.() ?? []) as any[];
+    const random = characters.filter((c) => c?.variantSelectionPolicy === 'random' && Array.isArray(c.variants) && c.variants.some((v: any) => v?.id));
+    let combos: Array<Array<[string, string]>> = [[]];
+    for (const c of random) {
+      const next: Array<Array<[string, string]>> = [];
+      for (const combo of combos) for (const v of c.variants.filter((x: any) => x?.id)) next.push([...combo, [c.id, v.id]]);
+      combos = next.slice(0, 16);
+    }
+    return combos.map((combo) => {
+      ctx.reset();
+      for (const [charId, variantId] of combo) ctx.setActiveCharacterVariant(charId, variantId, { seedAffect: true });
+      return { ...createInitialState(), runtime: ctx.getAffectSnapshot() };
+    });
+  }
+
+  /**
+   * Run `fn` against the runtime context holding this state: its feelings
+   * snapshot plus the simulator's own variables / counters / inventory
+   * (goal checks and conditions read those). `mutate` stores the result.
+   */
+  /** A fresh serialized state: the fields the affect snapshot does not carry. */
+  private blankRuntime: SerializedStoryState | null = null;
+  /** Whether any character has authored goals (the per-beat tick re-checks them). */
+  private storyHasGoals: boolean | null = null;
+
+  /** Does the per-beat runtime tick have anything to do for this state? */
+  private tickMatters(state: SimulationState): boolean {
+    if (this.storyHasGoals === null) {
+      const characters: any[] = ((this.story as any).getCharacters?.() ?? []) as any[];
+      this.storyHasGoals = characters.some((c) => Array.isArray(c?.goals) && c.goals.length > 0);
+    }
+    if (this.storyHasGoals) return true;
+    const levels = (state.runtime as any)?.characterEmotionLevels ?? {};
+    return Object.values(levels).some((m: any) => m && Object.values(m).some((v: any) => Number(v) > 0));
+  }
+
+  private withRuntime<T>(state: SimulationState, fn: (ctx: StoryContext) => T, mutate: boolean): T | undefined {
+    const ctx = this.getScratch();
+    if (!ctx || !state.runtime) return undefined;
+    const quiet = console.log;
+    console.log = () => {};
+    try {
+      const items: string[] = [];
+      state.inventory.forEach((set) => set.forEach((name) => { if (!items.includes(name)) items.push(name); }));
+      ctx.loadSimulationState(state.runtime, Object.fromEntries(state.variables), Object.fromEntries(state.counters), items);
+      // Deferred feeling effects first, in the order they were taken.
+      const pending = state.pendingRuntime;
+      if (pending?.length) for (const e of pending) { try { ctx.applyEffect(e); } catch { /* skip */ } }
+      const result = fn(ctx);
+      // Only the affect part is kept: the runtime's own visited list and
+      // history would grow along every path and slow each step.
+      if (mutate || pending?.length) { state.runtime = ctx.detachAffectSnapshot(); state.pendingRuntime = undefined; }
+      return result;
+    } catch {
+      return undefined;
+    } finally {
+      console.log = quiet;
+    }
+  }
+
+  /** The feelings in a simulated state (pending effects applied), as a
+   *  StoryContext affect snapshot — for presets and anything that evaluates
+   *  feelings conditions outside the analyzer. */
+  affectAt(state: SimulationState): Record<string, unknown> | undefined {
+    const probe: SimulationState = { ...state, pendingRuntime: state.pendingRuntime ? [...state.pendingRuntime] : undefined };
+    this.withRuntime(probe, () => undefined, false);
+    return probe.runtime as Record<string, unknown> | undefined;
+  }
+
   /** The last run hit maxFrontier / maxExpansions: some permutations were
    *  not explored (every reachable beat still was, as far as the budget
    *  allowed). */
@@ -204,7 +306,7 @@ export class StateSimulationAnalyzer {
       return this.buildEmptyResult(startTime);
     }
 
-    const paths = this.exploreAllPaths(firstBeatId, createInitialState());
+    const paths = this.exploreAllPaths(firstBeatId, this.initialStates());
 
     return this.buildResult(paths, startTime);
   }
@@ -216,7 +318,7 @@ export class StateSimulationAnalyzer {
   public analyzeRaw(): SimulatedPath[] {
     const firstBeatId = this.story.getFirstBeatId();
     if (!firstBeatId) return [];
-    return this.exploreAllPaths(firstBeatId, createInitialState());
+    return this.exploreAllPaths(firstBeatId, this.initialStates());
   }
 
   /**
@@ -251,7 +353,7 @@ export class StateSimulationAnalyzer {
       };
     }
 
-    const allPaths = this.exploreAllPaths(firstBeatId, createInitialState());
+    const allPaths = this.exploreAllPaths(firstBeatId, this.initialStates());
 
     // Filter paths that visit the target beat
     const pathsToTarget = allPaths.filter(path =>
@@ -325,7 +427,7 @@ export class StateSimulationAnalyzer {
    *
    * For a hub with 4 choices, this gives 4! = 24 orderings per ending.
    */
-  private exploreAllPaths(startBeatId: string, initialState: SimulationState): SimulatedPath[] {
+  private exploreAllPaths(startBeatId: string, initialStates: SimulationState[]): SimulatedPath[] {
     const paths: SimulatedPath[] = [];
 
     // Stack of exploration frames - each frame is a separate branch
@@ -338,15 +440,18 @@ export class StateSimulationAnalyzer {
       takenChoicesPerBeat: Map<string, Set<number>>; // beatId -> set of choice indices taken
     }> = [];
 
-    // Initialize with start beat
-    stack.push({
-      beatId: startBeatId,
-      state: cloneState(initialState),
-      path: [],
-      decisions: [],
-      visitedStates: new Set(),
-      takenChoicesPerBeat: new Map(),
-    });
+    // Initialize with the start beat — once per starting state (one per
+    // combination of randomly drawn character variants).
+    for (const initialState of initialStates) {
+      stack.push({
+        beatId: startBeatId,
+        state: cloneState(initialState),
+        path: [],
+        decisions: [],
+        visitedStates: new Set(),
+        takenChoicesPerBeat: new Map(),
+      });
+    }
 
     // Bounds (2026-09-26): with every choice-like beat branching, the BFS
     // queue grew without limit — an 81-beat generated story ran the analyzer
@@ -762,6 +867,18 @@ export class StateSimulationAnalyzer {
 
     const params = beat.getParameters();
 
+    // The runtime's per-beat step: emotions decay, goals are re-checked
+    // (StoryContext.markBeatVisited) — feelings move between beats too.
+    if (newState.pendingRuntime?.length || this.tickMatters(newState)) this.withRuntime(newState, (ctx) => ctx.markBeatVisited(beat.id), true);
+
+    // Feelings this beat applies on its own.
+    if (beat.type === 'updateAffect') {
+      this.applyEffectsList((beat as any).affectEffects?.() ?? [], newState);
+    }
+    if (beat.type === 'dialogTree' && Array.isArray(params.dialogTree?.effects)) {
+      this.applyEffectsList(params.dialogTree.effects, newState); // the root node shows on entry
+    }
+
     switch (beat.type) {
       case 'setVariable':
       case 'variable': {
@@ -1089,6 +1206,8 @@ export class StateSimulationAnalyzer {
    */
   private applyEffectsList(effects: any[] | undefined, state: SimulationState): void {
     if (!effects || !Array.isArray(effects)) return;
+    // Effects the runtime owns are applied together, in order, in one session.
+    const runtimeEffects: any[] = [];
 
     for (const effect of effects) {
       switch (effect.type) {
@@ -1154,8 +1273,17 @@ export class StateSimulationAnalyzer {
           }
           break;
         }
+        // Feelings and everything else the runtime owns (addSentiment,
+        // nudgeMood, fireEmotion, setGoalStatus, setCharacterVariant,
+        // bookmarkAffectState, addReflection, …): the runtime applies it.
+        default:
+          runtimeEffects.push(effect);
+          break;
       }
     }
+    // Deferred to the next runtime session (the next beat's tick or a
+    // feelings condition) — applied in order before anything reads them.
+    if (runtimeEffects.length > 0) state.pendingRuntime = [...(state.pendingRuntime ?? []), ...runtimeEffects];
   }
 
   /**
@@ -1191,8 +1319,9 @@ export class StateSimulationAnalyzer {
           depth + 1
         );
         if (nestedEffects.length > 0) {
-          // Found exit in nested node - prepend this choice's effects
-          return [choice.effects || [], ...nestedEffects];
+          // Found exit in nested node - prepend this choice's effects and
+          // the nested node's own (they fire when the node is shown)
+          return [choice.effects || [], choice.dialogNode.effects || [], ...nestedEffects];
         }
       }
     }
@@ -1265,8 +1394,10 @@ export class StateSimulationAnalyzer {
         return this.compareValues(counter1Value, operator, counter2Value);
       }
 
+      // Feelings (sentiment, mood, emotion, goal, variant, …): the runtime
+      // evaluates them against the state's feelings snapshot.
       default:
-        return false;
+        return this.withRuntime(state, (ctx) => ctx.checkCondition(condition as any), false) ?? false;
     }
   }
 

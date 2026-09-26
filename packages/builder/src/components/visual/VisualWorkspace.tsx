@@ -2899,7 +2899,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Re-stack now (the node effect also reloads on the order change).
     const nextNode = dialogNodeAt(nextTree, dialogTreeNodePath) ?? node;
     const pickedState = choiceStateOpts?.find(o => o.key === choiceStateKey)?.state ?? null;
-    const visibleIds = visibleChoiceIds(nextNode?.choices || [], pickedState);
+    const visibleIds = visibleChoiceIds(nextNode?.choices || [], pickedState, choiceStateOpts?.find(o => o.key === choiceStateKey)?.story);
     const shownNode = visibleIds ? { ...nextNode, choices: (nextNode?.choices || []).filter((c: any) => visibleIds.has(String(c?.id))) } : nextNode;
     displayedChoiceIdsRef.current = (shownNode?.choices || []).map((c: any) => String(c?.id));
     const stack = generatePhaseElements(shownNode, projectSettings?.width || 1024, projectSettings?.height || 768, columnOverrides, beat.locations)
@@ -2958,7 +2958,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // otherwise falls back to auto-layout
     // "Show as": only the choices the picked player state would see.
     const pickedState = choiceStateOpts?.find(o => o.key === choiceStateKey)?.state ?? null;
-    const visibleIds = visibleChoiceIds(selectedPhase.choices || [], pickedState);
+    const visibleIds = visibleChoiceIds(selectedPhase.choices || [], pickedState, choiceStateOpts?.find(o => o.key === choiceStateKey)?.story);
     const shownPhase = visibleIds
       ? { ...selectedPhase, choices: (selectedPhase.choices || []).filter((c: any) => visibleIds.has(String(c?.id))) }
       : selectedPhase;

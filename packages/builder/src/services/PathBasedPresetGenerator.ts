@@ -121,6 +121,8 @@ export function generatePathPresets(
       outcomeGroup,
       path.steps.slice(0, stepIndex + 1).map(s => s.beatId)
     );
+    const affect = analyzer.affectAt(stateAtTarget);
+    if (affect) preset.state.affect = affect;
 
     // Extract inputText beats from the path (up to the target beat)
     const inputTextBeats = extractInputTextBeats(story, path, stepIndex, stateAtTarget);
@@ -366,7 +368,7 @@ function createEmptyState(): SimulationState {
  * condition (beat conditions, choice guards, requirements) and every text
  * placeholder.
  */
-export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string> } {
+export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string>; context: StoryContext } {
   const conditions: any[] = [];
   const placeholders = new Set<string>();
   const seenConds = new Set<string>();
@@ -375,8 +377,9 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
   const collect = (o: any): void => {
     if (Array.isArray(o)) { o.forEach(collect); return; }
     if (!o || typeof o !== 'object') return;
-    if (typeof o.operator === 'string' && (typeof o.variableName === 'string' || typeof o.itemName === 'string')
-      && ['variable', 'counter', 'inventory', undefined].includes(o.type)) {
+    // Any condition: variables, counters, items — and feelings (sentiment,
+    // mood, emotion, goal, variant), which presets now carry.
+    if (typeof o.operator === 'string' && (typeof o.type === 'string' || typeof o.variableName === 'string')) {
       const k = JSON.stringify(o);
       if (!seenConds.has(k)) { seenConds.add(k); conditions.push(o); }
     }
@@ -398,7 +401,10 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
     for (const r of beat.requires ?? []) if (r?.fallbackTarget) queue.push(r.fallbackTarget);
     if (beat.defaultTarget) queue.push(beat.defaultTarget);
   }
-  return { conditions, placeholders };
+  // A runtime context for evaluating them (feelings need the story's cast).
+  let context: StoryContext;
+  try { context = new StoryContext(undefined, story); } catch { context = new StoryContext(); }
+  return { conditions, placeholders, context };
 }
 
 /**
@@ -406,14 +412,12 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
  * ahead comes out the same and every placeholder reads the same. The kept
  * preset keeps its FULL state (play is unchanged); pathCount sums the rest.
  */
-function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string> }): GeneratedPreset[] {
+function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string>; context: StoryContext }): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
   for (const p of presets) {
-    const { variables, counters, inventory } = p.preset.state;
-    const ctx = new StoryContext();
-    Object.entries(variables).forEach(([k, v]) => ctx.setVariable(k, v));
-    Object.entries(counters).forEach(([k, v]) => ctx.setCounter(k, v as number));
-    inventory.forEach((item) => ctx.addToInventory(item));
+    const { variables, counters, inventory, affect } = p.preset.state;
+    const ctx = relevant.context;
+    ctx.loadSimulationState((affect ?? {}) as any, variables, counters, inventory);
     const outcomes = relevant.conditions.map((c) => { try { return ctx.checkCondition(c) ? 1 : 0; } catch { return -1; } });
     const texts = [...relevant.placeholders].map((n) => variables[n] ?? counters[n] ?? null);
     const key = JSON.stringify([outcomes, texts]);
@@ -438,6 +442,7 @@ function deduplicatePresets(presets: GeneratedPreset[]): GeneratedPreset[] {
       vars: preset.preset.state.variables,
       counters: preset.preset.state.counters,
       inv: preset.preset.state.inventory.sort(),
+      affect: preset.preset.state.affect ?? null, // feelings are state too
     });
 
     const existing = seen.get(stateHash);

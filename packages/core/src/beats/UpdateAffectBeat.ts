@@ -96,6 +96,19 @@ export class UpdateAffectBeat extends Beat {
     if (params.emotionDelta !== undefined) this.emotionDelta = params.emotionDelta;
   }
 
+  /** What this beat does to the characters' feelings, as effects: the
+   *  authored list, or the legacy single-row fields converted. Path analysis
+   *  replays exactly this. */
+  affectEffects(): Effect[] {
+    if (this.effects && this.effects.length > 0) return this.effects;
+    if (!this.character) return [];
+    return synthesizeEffectsFromLegacyParams({
+      character: this.character, moodValenceDelta: this.moodValenceDelta, moodArousalDelta: this.moodArousalDelta,
+      sentimentTarget: this.sentimentTarget, sentimentEmotion: this.sentimentEmotion, sentimentDelta: this.sentimentDelta,
+      emotion: this.emotion, emotionDelta: this.emotionDelta,
+    } as any);
+  }
+
   protected async performAction(
     context: StoryContext,
     _renderer: IRenderer,

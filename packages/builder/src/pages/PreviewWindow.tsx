@@ -1770,6 +1770,8 @@ export const PreviewWindow: React.FC = () => {
         Object.entries(presetToApply.state.counters).forEach(([key, value]) => context.setCounter(key, value));
         presetToApply.state.inventory.forEach(item => context.addToInventory(item));
         presetToApply.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
+        // The characters' feelings at this point of the story (path analysis).
+        if (presetToApply.state.affect) (context as any).restoreAffectSnapshot?.(presetToApply.state.affect);
         // The start beat itself IS genuinely visited in this run — only the
         // simulated path leading up to it counts as seeded.
         const runStartBeat = overrideBeatId || startBeatId;

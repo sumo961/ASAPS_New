@@ -361,6 +361,17 @@ export interface TimelineEvent {
   stateChange?: string;
 }
 
+/** Deep copy of plain data (records, arrays, primitives). */
+function clonePlain<T>(v: T): T {
+  if (Array.isArray(v)) return v.map(clonePlain) as any;
+  if (v && typeof v === 'object') {
+    const out: any = {};
+    for (const k in v as any) out[k] = clonePlain((v as any)[k]);
+    return out;
+  }
+  return v;
+}
+
 export class StoryContext extends EventEmitter {
   private state: StoryState;
   /**
@@ -2929,6 +2940,66 @@ export class StoryContext extends EventEmitter {
    * Serialize the current story state for saving
    * Converts Sets to Arrays for JSON compatibility
    */
+  /** The fields of the serialized state that make up the characters' inner
+   *  life: moods, sentiments, emotions, reflections, goals, variants, who
+   *  the player has met, and the baselines / bookmarks feelings conditions
+   *  compare against. */
+  static readonly AFFECT_KEYS = [
+    'characterMoods', 'characterSentiments', 'characterEmotionLevels', 'characterReflections',
+    'characterGoalStatus', 'activeCharacterVariants', 'appearedCharacters',
+    'initialMoods', 'initialEmotionLevels', 'initialSentiments', 'affectBookmarks',
+  ] as const;
+
+  /** Snapshot of the affect state only (see AFFECT_KEYS) — a plain deep
+   *  copy of those fields (cheap: path analysis takes one per step). */
+  getAffectSnapshot(): Partial<SerializedStoryState> {
+    const st = this.state as any;
+    const out: any = {};
+    for (const k of StoryContext.AFFECT_KEYS) if (st[k] !== undefined) out[k] = clonePlain(st[k]);
+    return out;
+  }
+
+  /** Replace the affect state with a snapshot; everything else is kept. */
+  restoreAffectSnapshot(snapshot: Partial<SerializedStoryState>): void {
+    const st = this.state as any;
+    for (const k of StoryContext.AFFECT_KEYS) {
+      const v = (snapshot as any)[k] ?? {};
+      // Baselines only gain entries (per character: new keys / list items,
+      // each written once) and bookmarks are replaced whole — copying two
+      // levels deep is enough. Everything else changes in place: deep copy.
+      if (k === 'initialMoods' || k === 'affectBookmarks') st[k] = { ...v };
+      else if (k === 'initialEmotionLevels' || k === 'initialSentiments') {
+        const out: any = {};
+        for (const c in v) out[c] = Array.isArray(v[c]) ? [...v[c]] : { ...v[c] };
+        st[k] = out;
+      } else st[k] = clonePlain(v);
+    }
+  }
+
+  /**
+   * Path analysis: hand over the live affect state WITHOUT copying and
+   * detach it (the context gets fresh empty maps), so the caller owns it
+   * and nothing here can mutate it later. Half the cost of a snapshot.
+   */
+  detachAffectSnapshot(): Partial<SerializedStoryState> {
+    const st = this.state as any;
+    const out: any = {};
+    for (const k of StoryContext.AFFECT_KEYS) { out[k] = st[k]; st[k] = {}; }
+    return out;
+  }
+
+  /**
+   * Path analysis: load a simulated state — its affect snapshot plus plain
+   * variables, counters and items — without the full deserializer.
+   */
+  loadSimulationState(affect: Partial<SerializedStoryState>, variables: Record<string, any>, counters: Record<string, number>, items: string[]): void {
+    this.restoreAffectSnapshot(affect);
+    const st = this.state as any;
+    st.variables = { ...variables };
+    st.counters = { ...counters };
+    st.inventory = items.map((name) => ({ name, quantity: 1 }));
+  }
+
   serialize(): SerializedStoryState {
     // Deep-clone the per-character maps so saved snapshots don't alias live state.
     const cloneNamespacedNumbers = (m: Record<string, Record<string, number>>) =>
