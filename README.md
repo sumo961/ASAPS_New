@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.102** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.102 is the UX-evaluation
+Current release: **v0.9.103** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.103 is the wiring release**: the
+Co-Designer can change how a story works — choice effects, visibility
+conditions, entry gates, random branches, new choices, a new version of a
+beat side by side; restart and fallback targets are real links, and a
+Restart without a target is flagged; the review, the flowchart and path
+simulation read links the same way and understand character feelings, so
+"Start as if…" presets exist for every beat; a character's HUD appears
+when the character does; quoted speech is spoken in the character's voice;
+dialog-tree buttons in the Visual Editor reorder by drag, with a "Show as"
+state picker; hypertext is readable in every theme.
+
+**v0.9.102 was the UX-evaluation
 release**: renaming a character keeps the story intact; the builder has no
 blocking dialogs left — notices, with Undo on reversible deletes; settings
 split into **Project Settings** and **App Preferences**; API keys in the

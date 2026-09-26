@@ -1,5 +1,105 @@
 # ASAPS Modern - Progress Log
 
+## 2026-09-26: The wiring release — Co-Designer wires state, links are links, the analyzers understand feelings (v0.9.103)
+
+### Overview
+
+Two threads, both driven by playing generated stories end to end. First,
+the Co-Designer can now change how a story *works*, not just what it says:
+choice effects, visibility conditions, entry gates, random branches with
+their own effects, new choices, and side-by-side new versions of a beat.
+Second, a story's links were read five different ways — the flowchart, the
+review, the story overview, the layout and the path simulation disagreed,
+and generated stories were asked to "repair" problems that did not exist.
+There is now one link walk in core, restart and fallback targets are real
+links, and the path simulation plays feelings through the actual runtime.
+Along the way: HUDs appear when their character does, quoted speech is
+voiced by the character, dialog-tree buttons in the Visual Editor are a
+reorderable stack with a "Show as" state picker, and hypertext is readable
+in every theme.
+
+### Co-Designer: wiring and structure
+
+New proposal kinds: `setChoiceEffects`, `setChoiceConditions`,
+`setRequirements` (validated against the engine's own effect/condition
+vocabulary), `editChoiceText`, `addChoice`, `replaceBeat` (a side-by-side
+new version — incoming links move to it, the old beat stays as
+"(replaced)"), `setLinkEffects` and random-branch effects/weights. The
+Co-Designer looks beat-type parameters up (`get_beat_type_schema`) instead
+of asking the author, refuses unknown parameters, knows the beat catalog
+and the story's state. Fixed: connection writes that were silent no-ops
+(`parameters.connection` is read by no beat), `addBeat` parameters dropped
+before the beat reached React state. `${name}` placeholders read counters;
+aiConversation gets a closing line on fallback exit.
+
+**Files modified:** `packages/builder/src/utils/{choiceWiring,wiringVocabulary,redirectIncoming,beatTypeReference,applyChangeProposals,storyDigest}.ts`, `packages/builder/src/components/ai/codesigner/*`, `packages/core/src/beats/{Beat,RandomTargetBeat,AIConversationBeat}.ts`, `packages/core/src/persistence/BeatSerializer.ts`
+
+### One link model
+
+`beatLinks`/`storyLinks` moved to `@asaps/core`; review, KG overview,
+layout, validators and the simulator all use it, with a parity tripwire
+test against every beat type's `getConnections()`. Restart and fallback
+targets are links (`role:'restart'`, drawn dashed "↺ Restart"); derived
+links carry `derivedFrom` and are never written into stored connections.
+AI Summary's restart is `restartTarget`; an older stored link is adopted.
+A Restart with no target is flagged (Inspector, review, overview) — replays
+begin where the author says: the Project Settings start beat, the title
+screen, or any beat. `defaultTarget` is its own link, drawn only when it can
+fire. Beat-id parameters get a beat picker.
+
+**Files modified:** `packages/core/src/utils/storyLinks.ts`, `packages/core/src/beats/{Beat,AISummaryBeat,EndScreenBeat,...}.ts`, `packages/core/src/analysis/StoryWarnings.ts`, `packages/builder/src/components/graph/graphBuild.ts`, `packages/builder/src/utils/{storyLinks,generationReview,structuralSummary}.ts`, `packages/builder/src/components/{Inspector,SchemaFormGenerator}.tsx`
+
+### Feelings-aware path analysis
+
+The path simulation carries a StoryContext affect snapshot per state, so
+feeling effects, feeling conditions and per-beat ticks run through the
+runtime rather than a re-model. Random-variant characters are explored per
+variant; random branches, AI conditions, location/AR/panorama beats branch.
+The queue is bounded (an 81-file generated story had run it out of memory)
+with admission for new beats and new beat-states. Preview "Start as if…"
+presets exist for every beat, carry feelings, and are condensed to states
+that play differently. A mid-story `setCharacterVariant` now shifts
+feelings by the difference between personas instead of resetting what the
+character lived through. The Visual Editor's "Show as" picker traces paths
+in the background with a progress label instead of freezing the editor.
+
+**Files modified:** `packages/core/src/analysis/StateSimulationAnalyzer.ts`, `packages/core/src/engine/StoryContext.ts`, `packages/builder/src/services/PathBasedPresetGenerator.ts`, `packages/builder/src/utils/dialogChoiceVisibility.ts`, `packages/builder/src/pages/PreviewWindow.tsx`
+
+### Characters, HUDs and voice
+
+`hudReveal` (on first appearance / from the start / when a variant is
+chosen): a character's HUD appears when the character does; variants never
+hide it. The Character Editor shows the base persona as a "Base — name" row
+beside its variants. "Link, don't label": the speaker is who is present,
+Show Speaker Name controls the label; quoted speech is voiced by the
+character, narration by the narrator. Self-directed feelings read
+"self-respect", not "self-self-respect". All generation paths (generator,
+dialog generation, Co-Designer, Ideator, MCP schema) learned these.
+
+**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/core/src/utils/{voicedSegments,dossier}.ts`, `packages/builder/src/components/characters/{CharacterEditor,CharacterAffectPanel}.tsx`, `packages/builder/src/types/character.ts`, `packages/builder/src/services/tts/TTSService.ts`, `packages/player-web/src/WebTTSProvider.ts`, `mcp-server-desktop/src/index.ts`
+
+### Visual Editor and renderer
+
+Dialog-tree buttons are a stack: drag reorders the choices, the column is
+editable, visible choices fill slots in order (no holes, no orphan buttons
+for hidden choices). Dialog box fits its text; text-box height counts
+paragraphs; the positioned AI-conversation box stays above its input.
+Hypertext links pick a readable colour against the theme. Parameter edits
+undo and redo. Dialog trees keep "Show Speaker Name" on save.
+
+**Files modified:** `packages/builder/src/components/visual/{VisualWorkspace,VisualBeatEditor,VisualPropertiesPanel}.tsx`, `packages/core/src/layout/{dialogTreeLayout,elementSizing}.ts`, `packages/renderer/src/components/{PositionedBeatView,SlotFlowView}.tsx`, `packages/renderer/src/utils/linkColor.ts`, `packages/builder/src/hooks/useStoryBuilder.ts`
+
+### AI prompts and import
+
+Prompt audit for Sonnet 5 / Opus 5: closing-line prefill fixed, Opus 5.5
+thinking, first-content-block reads fixed, dated and contradictory prompt
+text removed. Generated fictional-time clocks keep the generator's display
+format and show date only when time of day never moves.
+
+**Files modified:** `packages/builder/src/services/prompts/*`, `packages/builder/src/services/providers/ClaudeProvider.ts`, `packages/core/src/ai/runtimeAdapter.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/components/ai/ideator/*`
+
+---
+
 ## 2026-09-24: The UX-evaluation release — safe renames, no blocking dialogs, settings scopes, encrypted keys, one asset system, a clearer Export menu (v0.9.102)
 
 ### Overview
