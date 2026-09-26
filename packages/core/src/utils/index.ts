@@ -111,3 +111,4 @@ export {
   sampleWalkablePoints,
   type WalkableSampleOptions,
 } from './overpass';
+export { inferLayoutMode, resolveProjectLayoutMode, type LayoutMode, type LayoutModeBeat } from './layoutMode';

@@ -15,7 +15,7 @@ import { CharacterMoodToken } from './CharacterMoodToken';
 import { TimerProgressBar } from './TimerProgressBar';
 import { TimerHudDisplay } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
-import { meterEdgeOffset } from './HudOverlaysLayer';
+import { meterEdgeOffset, globalHudEdgeOffset } from './HudOverlaysLayer';
 import { KeypadElement } from './KeypadElement';
 import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
@@ -771,6 +771,11 @@ export interface ReservedHudRect {
   y: number;
   width: number;
   height: number;
+  /** Set on rects from buildScreenHudLayout: '__timer' / '__countdown' are the
+   *  renderer's own global HUDs, and edgeOffset is where the packer stacked
+   *  them (below host chrome such as the exported player's Menu button). */
+  id?: string;
+  edgeOffset?: number;
 }
 
 /**
@@ -2247,6 +2252,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
           fictionalTimeText={fictionalTimeText}
           fontScale={mobileFontScale}
           fontFamily={theme.fonts?.textFont}
+          edgeOffsetPx={globalHudEdgeOffset(reservedHudRects, '__timer')}
         />
       )}
       {/* Countdown Meter HUD overlay */}
@@ -2255,7 +2261,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
         <CountdownMeterHud
           config={countdownMeterConfig}
           visible={true}
-          edgeOffsetPx={meterEdgeOffset(timerHudConfig, countdownMeterConfig)}
+          edgeOffsetPx={Math.max(meterEdgeOffset(timerHudConfig, countdownMeterConfig), globalHudEdgeOffset(reservedHudRects, '__countdown'))}
           counterValue={countdownMeterValue.value}
           counterMin={countdownMeterValue.min}
           counterMax={countdownMeterValue.max}

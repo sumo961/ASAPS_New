@@ -23,37 +23,18 @@
  */
 
 import type { GlobalSettings } from '../storage/types';
+import { inferLayoutMode, resolveProjectLayoutMode, type LayoutMode, type LayoutModeBeat } from '@asaps/core';
 
-export type LayoutMode = 'fixed' | 'responsive';
-
-export interface BeatLike {
-  locations?: Map<string, unknown> | Record<string, unknown> | unknown[];
-}
+// The rule itself lives in core so the exported player resolves the same mode.
+export { inferLayoutMode, type LayoutMode };
+export type BeatLike = LayoutModeBeat;
 
 /** Resolve from explicit settings; falls back to inference if undefined. */
 export function resolveLayoutMode(
   settings: GlobalSettings | undefined,
   beats?: ReadonlyArray<BeatLike> | null
 ): LayoutMode {
-  const explicit = settings?.project?.layoutMode;
-  if (explicit === 'fixed' || explicit === 'responsive') return explicit;
-  return inferLayoutMode(beats);
-}
-
-/** Inference rule for legacy projects (undefined layoutMode). */
-export function inferLayoutMode(
-  beats?: ReadonlyArray<BeatLike> | null
-): LayoutMode {
-  if (!beats || beats.length === 0) return 'responsive';
-  const anyBaked = beats.some(b => {
-    const locs = b.locations;
-    if (!locs) return false;
-    if (locs instanceof Map) return locs.size > 0;
-    if (Array.isArray(locs)) return locs.length > 0;
-    if (typeof locs === 'object') return Object.keys(locs as object).length > 0;
-    return false;
-  });
-  return anyBaked ? 'fixed' : 'responsive';
+  return resolveProjectLayoutMode(settings?.project?.layoutMode, beats);
 }
 
 /** Human-readable label for UI. */

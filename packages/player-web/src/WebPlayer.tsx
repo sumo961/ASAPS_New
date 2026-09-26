@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
 import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner , harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
-import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage } from '@asaps/core';
+import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage, resolveProjectLayoutMode, type LayoutMode } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
 import { WebSTTService } from './WebSTTProvider';
@@ -78,6 +78,15 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // Size of the box the stage is fitted into — the HUD layer needs the same
   // number the renderer's ScaledStage measures, so it observes the same node.
   const [playerSize, setPlayerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  // Responsive projects reflow to the real window at 1:1, so their screen
+  // HUDs are laid out for that window too (as the Preview Window does for a
+  // device preset). Fixed projects keep the authored stage, fitted and scaled.
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>('fixed');
+  const hudStage = layoutMode === 'responsive' && playerSize.width > 0 && playerSize.height > 0
+    ? playerSize
+    : stageDims;
+  const hudScaleFor = (box: { width: number; height: number }, stage: { width: number; height: number }) =>
+    layoutMode === 'responsive' ? 1 : computeStageFitScale(box, stage, mobileMode ? 'cover' : 'fit');
   const stageBoxRef = useRef<HTMLDivElement | null>(null);
   /**
    * Boxes the surrounding page floats over the stage — in an exported story
@@ -104,19 +113,16 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const box = stageBoxRef.current;
-    if (!box || !stageDims) return;
+    if (!box || !hudStage) return;
+    const stage = hudStage;
 
     const read = () => {
       const host = box.getBoundingClientRect();
-      const scale = computeStageFitScale(
-        { width: box.clientWidth, height: box.clientHeight },
-        stageDims,
-        mobileMode ? 'cover' : 'fit',
-      );
+      const scale = hudScaleFor({ width: box.clientWidth, height: box.clientHeight }, stage);
       // The stage is centred inside the host box; convert screen px back to
       // stage px so the reservation is in the packer's own coordinates.
-      const originX = host.left + (host.width - stageDims.width * scale) / 2;
-      const originY = host.top + (host.height - stageDims.height * scale) / 2;
+      const originX = host.left + (host.width - stage.width * scale) / 2;
+      const originY = host.top + (host.height - stage.height * scale) / 2;
 
       const found: HudBox[] = [];
       document.querySelectorAll('.language-panel, [data-asaps-chrome]').forEach((node, i) => {
@@ -128,9 +134,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         const h = r.height / scale;
         // Chrome sitting entirely outside the stage (letterbox margins) is not
         // in anyone's way.
-        if (x + w <= 0 || y + h <= 0 || x >= stageDims.width || y >= stageDims.height) return;
+        if (x + w <= 0 || y + h <= 0 || x >= stage.width || y >= stage.height) return;
         const corner: HudCorner =
-          `${y + h / 2 < stageDims.height / 2 ? 'top' : 'bottom'}-${x + w / 2 < stageDims.width / 2 ? 'left' : 'right'}` as HudCorner;
+          `${y + h / 2 < stage.height / 2 ? 'top' : 'bottom'}-${x + w / 2 < stage.width / 2 ? 'left' : 'right'}` as HudCorner;
         found.push({ id: `chrome-${i}`, corner, width: Math.round(w), height: Math.round(h), kind: 'chrome' });
       });
 
@@ -150,7 +156,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const mo = new MutationObserver(read);
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     return () => { ro.disconnect(); mo.disconnect(); };
-  }, [stageDims, mobileMode, playerSize.width, playerSize.height]);
+  }, [hudStage?.width, hudStage?.height, layoutMode, mobileMode, playerSize.width, playerSize.height]);
   const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
   /* HUD explanation (overlay trigger) — mirrors the Preview Window. Beats
      carrying `explainHuds` annotate the live HUDs on entry and are held INERT
@@ -513,6 +519,15 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         console.log('[WebPlayer] Stage dimensions:', stageDimensions);
         renderer.setStageDimensions(stageDimensions.width, stageDimensions.height);
         setStageDims(stageDimensions);
+
+        // Same layout-mode answer as the Preview Window (explicit setting, else
+        // inferred from baked beat locations), so the published story renders
+        // the paths the author previewed.
+        const loadedGs: any = player.getGlobalSettings?.() || (player as any).globalSettings;
+        const loadedBeats = (player.getEngine()?.getStory() as any)?.getAllBeats?.() ?? [];
+        const mode = resolveProjectLayoutMode(loadedGs?.project?.layoutMode, loadedBeats);
+        renderer.setState('projectLayoutMode', mode);
+        setLayoutMode(mode);
 
         // Set up timer state synchronization and fictional time display
         const engine = player.getEngine();
@@ -900,7 +915,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const player = playerRef.current;
     const ctx = player?.getEngine()?.getContext();
     const story = player?.getEngine()?.getStory();
-    if (!ctx || !story || !stageDims) return null;
+    if (!ctx || !story || !hudStage) return null;
     const beatNow = (story as any).getBeat?.(ctx.getCurrentBeatId?.());
     const gsNow: any = player?.getGlobalSettings?.() || (player as any)?.globalSettings;
     // Chrome-free beats (title screens by default) show no screen HUDs at all.
@@ -945,7 +960,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
       layout: buildScreenHudLayout({
         characters: hudChars,
         hudOverlays: gsNow?.hudOverlays,
-        stage: stageDims,
+        stage: hudStage,
         extraBoxes: chromeBoxes,
       }),
       palette: (story as any).getEmotionPalette?.(),
@@ -955,7 +970,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   })();
 
   const renderMoodHudOverlay = () => {
-    if (!screenHud || !stageDims) return null;
+    if (!screenHud || !hudStage) return null;
     const { layout, palette, beatNow, theme } = screenHud;
     const showCallouts = (beatNow as any)?.type === 'explanation' || explainOverlayActive;
     /*
@@ -967,17 +982,13 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
      * which, in an exported story, is nearly every window. Same box, same
      * centring, same scale, from the same helper.
      */
-    const scale = computeStageFitScale(
-      { width: playerSize.width, height: playerSize.height },
-      stageDims,
-      mobileMode ? 'cover' : 'fit',
-    );
+    const scale = hudScaleFor({ width: playerSize.width, height: playerSize.height }, hudStage);
     return (
       <div
         style={{
           position: 'absolute',
           left: '50%', top: '50%',
-          width: stageDims.width, height: stageDims.height,
+          width: hudStage.width, height: hudStage.height,
           transform: `translate(-50%, -50%) scale(${scale})`,
           transformOrigin: 'center center',
           pointerEvents: 'none',
@@ -986,7 +997,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
       >
         <ScreenHudLayer
           layout={layout}
-          stage={stageDims}
+          stage={hudStage}
           palette={palette}
           zIndex={0}
           collapseKey={(beatNow as any)?.id}

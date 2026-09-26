@@ -113,6 +113,10 @@ export interface HudRect {
   y: number;
   width: number;
   height: number;
+  /** How far past the corner's edge margin the stack pushed this box (0 =
+   *  first in its corner). The renderer draws the global timer / countdown
+   *  at this offset so they stack below host chrome like everything else. */
+  edgeOffset: number;
 }
 
 export interface ScreenHudLayout {
@@ -250,7 +254,7 @@ export function buildScreenHudLayout(input: ScreenHudLayoutInput): ScreenHudLayo
 
   const toRects = (bs: HudBox[], pl: Map<string, HudPlacement>): HudRect[] => bs.map((b) => {
     const p = pl.get(b.id);
-    return { id: b.id, kind: b.kind, corner: b.corner, x: p?.left ?? 0, y: p?.top ?? 0, width: b.width, height: b.height };
+    return { id: b.id, kind: b.kind, corner: b.corner, x: p?.left ?? 0, y: p?.top ?? 0, width: b.width, height: b.height, edgeOffset: Math.abs(p?.offsetY ?? 0) };
   });
 
   if (!compact) {

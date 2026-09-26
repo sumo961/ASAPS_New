@@ -36,6 +36,9 @@ export interface TimerHudDisplayProps {
   config: TimerHudConfig;
   /** Font scale multiplier (default 1.0) */
   fontScale?: number;
+  /** Extra distance from the docked edge (px) — where the host's HUD packer
+   *  stacked the timer, e.g. below the exported player's Menu button. */
+  edgeOffsetPx?: number;
 }
 
 /**
@@ -56,19 +59,20 @@ function formatTime(seconds: number): string {
 /**
  * Get position CSS based on corner position
  */
-function getPositionStyle(position: TimerHudConfig['position']): React.CSSProperties {
+function getPositionStyle(position: TimerHudConfig['position'], edgeOffsetPx = 0): React.CSSProperties {
   const margin = 12;
+  const edge = margin + edgeOffsetPx;
   switch (position) {
     case 'top-left':
-      return { top: margin, left: margin };
+      return { top: edge, left: margin };
     case 'top-right':
-      return { top: margin, right: margin };
+      return { top: edge, right: margin };
     case 'bottom-left':
-      return { bottom: margin, left: margin };
+      return { bottom: edge, left: margin };
     case 'bottom-right':
-      return { bottom: margin, right: margin };
+      return { bottom: edge, right: margin };
     default:
-      return { top: margin, right: margin };
+      return { top: edge, right: margin };
   }
 }
 
@@ -87,6 +91,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
   config,
   fontFamily,
   fontScale = 1.0,
+  edgeOffsetPx = 0,
 }) => {
   // Auto-detect what to display: timer countdown takes priority when running,
   // then per-beat override text, then fictional time, then global static text, then hide
@@ -123,7 +128,7 @@ export const TimerHudDisplay: React.FC<TimerHudDisplayProps> = ({
     return null;
   }
 
-  const posStyle = getPositionStyle(config.position);
+  const posStyle = getPositionStyle(config.position, edgeOffsetPx);
 
   // Parse background color and apply opacity
   const bgColor = config.backgroundColor || '#1b1f2b';

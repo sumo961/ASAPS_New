@@ -17,6 +17,8 @@ import { TimerHudDisplay } from './TimerHudDisplay';
 import type { TimerHudConfig } from './TimerHudDisplay';
 import { CountdownMeterHud } from './CountdownMeterHud';
 import type { CountdownMeterConfig } from './CountdownMeterHud';
+import type { ReservedHudRect } from './PositionedBeatView';
+import { useReservedHudRects } from '../utils/useReservedHudRects';
 
 /**
  * When the timer HUD and the countdown meter are BOTH docked to the same
@@ -50,6 +52,11 @@ export function meterEdgeOffset(
   return Math.round((timer.fontSize ?? 24) * 1.3 + (timer.padding ?? 12) * 2 + 12);
 }
 
+/** Stack offset the host's packer gave one of the renderer's global HUDs. */
+export function globalHudEdgeOffset(rects: ReadonlyArray<ReservedHudRect> | undefined, id: '__timer' | '__countdown'): number {
+  return rects?.find((r) => r.id === id)?.edgeOffset ?? 0;
+}
+
 export interface HudOverlaysLayerProps {
   timerHudConfig?: TimerHudConfig;
   initialTimerHudState?: { remainingTime: number; totalTime: number };
@@ -66,6 +73,9 @@ export interface HudOverlaysLayerProps {
   fontScale?: number;
   /** Theme body font for HUD chrome coordination. */
   fontFamily?: string;
+  /** The host's packed HUD rects — the timer and countdown are drawn where
+   *  the packer stacked them (e.g. below the exported player's Menu). */
+  onSubscribeReservedHudRects?: (listener: (rects: ReservedHudRect[] | undefined) => void) => () => void;
 }
 
 export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
@@ -81,7 +91,9 @@ export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
   overrideCountdownMeter,
   fontScale = 1.0,
   fontFamily,
+  onSubscribeReservedHudRects,
 }) => {
+  const reservedHudRects = useReservedHudRects(undefined, onSubscribeReservedHudRects);
   const [timerHudTime, setTimerHudTime] = React.useState(initialTimerHudState);
   React.useEffect(() => {
     if (onSubscribeTimerHudState) return onSubscribeTimerHudState(setTimerHudTime);
@@ -119,13 +131,14 @@ export const HudOverlaysLayer: React.FC<HudOverlaysLayerProps> = ({
           fictionalTimeText={fictionalTimeText}
           fontScale={fontScale}
           fontFamily={fontFamily}
+          edgeOffsetPx={globalHudEdgeOffset(reservedHudRects, '__timer')}
         />
       )}
       {showMeter && (
         <CountdownMeterHud
           config={countdownMeterConfig!}
           visible={true}
-          edgeOffsetPx={meterEdgeOffset(timerHudConfig, countdownMeterConfig)}
+          edgeOffsetPx={Math.max(meterEdgeOffset(timerHudConfig, countdownMeterConfig), globalHudEdgeOffset(reservedHudRects, '__countdown'))}
           counterValue={countdownMeterValue!.value}
           counterMin={countdownMeterValue!.min}
           counterMax={countdownMeterValue!.max}

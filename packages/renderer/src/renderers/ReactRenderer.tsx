@@ -1238,6 +1238,7 @@ export class ReactRenderer extends BaseRenderer {
           overrideCountdownMeter={this.overrideCountdownMeter}
           fontScale={this.mobileFontScale}
           fontFamily={this.theme?.fonts?.textFont}
+          onSubscribeReservedHudRects={(l) => this.subscribeToReservedHudRects(l)}
         />
       </>
     );

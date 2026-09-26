@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { globalHudEdgeOffset } from '../../src/components/HudOverlaysLayer';
 import { buildScreenHudLayout, resolveHudCompact, type ScreenHudCharacter } from '../../src/components/ScreenHudLayer';
 import { COMPACT_STRIP_HEIGHT, compactStripWidthEstimate, initialsFor } from '../../src/components/CompactHudStrip';
 
@@ -97,5 +98,31 @@ describe('CompactHudStrip helpers', () => {
     const one = compactStripWidthEstimate([{ kind: 'inventory', characterId: 'x', name: 'x', count: 1 }]);
     const two = compactStripWidthEstimate([{ kind: 'inventory', characterId: 'x', name: 'x', count: 1 }, { kind: 'mood', characterId: 'y', name: 'y', valence: 0, arousal: 0 }]);
     expect(two).toBeGreaterThan(one);
+  });
+});
+
+describe('host chrome and the global timer', () => {
+  it('stacks the timer below chrome in its corner and reports how far', () => {
+    const layout = buildScreenHudLayout({
+      characters: [meterChar('clare', 'Clare', 'screen-top-right')],
+      hudOverlays: { timerHud: { enabled: true, position: 'top-right', fontSize: 18, padding: 8 } } as any,
+      stage: { width: 1100, height: 560 },
+      extraBoxes: [{ id: 'chrome-0', corner: 'top-right', width: 60, height: 37, kind: 'chrome' }],
+    });
+    const timer = layout.rects.find((r) => r.id === '__timer')!;
+    const chrome = layout.rects.find((r) => r.id === 'chrome-0')!;
+    expect(timer.y).toBeGreaterThanOrEqual(chrome.y + chrome.height);
+    expect(globalHudEdgeOffset(layout.rects, '__timer')).toBe(timer.y - 12);
+    const meter = layout.rects.find((r) => r.id === 'meter-clare')!;
+    expect(meter.y).toBeGreaterThanOrEqual(timer.y + timer.height);
+  });
+  it('no chrome: the timer keeps its corner (offset 0)', () => {
+    const layout = buildScreenHudLayout({
+      characters: [],
+      hudOverlays: { timerHud: { enabled: true, position: 'top-right' } } as any,
+      stage: { width: 1100, height: 560 },
+    });
+    expect(globalHudEdgeOffset(layout.rects, '__timer')).toBe(0);
+    expect(globalHudEdgeOffset(undefined, '__timer')).toBe(0);
   });
 });

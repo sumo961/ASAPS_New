@@ -409,7 +409,10 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   return (
     <div style={styles.container} className={className}>
       {/* Menu toggle button */}
+      {/* data-asaps-chrome: the host's HUD packer stacks screen HUDs (the
+          clock too) below this button instead of drawing them under it. */}
       <button
+        data-asaps-chrome="menu"
         style={styles.menuButton}
         onClick={() => setIsMenuOpen(!isMenuOpen)}
         onMouseEnter={() => setIsMenuOpen(true)}
