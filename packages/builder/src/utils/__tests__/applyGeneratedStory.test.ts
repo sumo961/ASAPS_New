@@ -234,3 +234,19 @@ describe('applyGeneratedStory — 2026-09-08 dragon-story regressions', () => {
     expect(beats.find((b) => b.id === 'b').connections[0]).toMatchObject({ targetId: 'c', effects: fx });
   });
 });
+
+describe('withFictionalTimeHud — display format (2026-09-26)', () => {
+  const ft = (operation: string, timeUnit?: string) => ({ id: `ft_${operation}_${timeUnit}`, type: 'setVariable', parameters: { type: 'fictionalTime', operation, timeUnit, value: 1, timeYear: 2024, timeMonth: 9, timeDay: 12 } });
+  it('a story that only moves in days shows the date only (no frozen clock time)', () => {
+    const out: any = withFictionalTimeHud({} as any, { beats: [ft('set'), ft('advance', 'days'), ft('advance', 'weeks')] });
+    expect(out.hudOverlays.fictionalTime.displayFormat).toBe('date');
+  });
+  it('advancing hours shows date and time', () => {
+    const out: any = withFictionalTimeHud({} as any, { beats: [ft('set'), ft('advance', 'hours')] });
+    expect(out.hudOverlays.fictionalTime.displayFormat).toBe('datetime-12h');
+  });
+  it("honours the generator's globalSettings.fictionalTime.displayFormat", () => {
+    const out: any = withFictionalTimeHud({} as any, { beats: [ft('set'), ft('advance', 'hours')], globalSettings: { fictionalTime: { displayFormat: 'day-number' } } });
+    expect(out.hudOverlays.fictionalTime.displayFormat).toBe('day-number');
+  });
+});

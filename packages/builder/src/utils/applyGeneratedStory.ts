@@ -144,12 +144,17 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
   if (!Array.isArray(story?.beats)) return prev;
   let usesFictionalTime = false;
   let earliestSetTime: { year: number; month: number; day: number; hour: number; minute: number } | null = null;
+  // Does the story ever move the time of day? If not, a clock time would
+  // sit frozen next to an advancing date (Late Light: "9:00 AM" for months).
+  let movesTimeOfDay = false;
 
   for (const b of story.beats) {
     const t = b?.type;
     const p = b?.parameters || {};
     if (t === 'setVariable' && p.type === 'fictionalTime') {
       usesFictionalTime = true;
+      const unit = String(p.timeUnit ?? p.unit ?? '').toLowerCase();
+      if (p.operation !== 'set' && /^(minute|hour)s?$/.test(unit)) movesTimeOfDay = true;
       if (p.operation === 'set' && earliestSetTime == null) {
         earliestSetTime = {
           year: Number(p.timeYear ?? 2024),
@@ -169,6 +174,14 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
   const hud: any = prev.hudOverlays || {};
   if (hud.fictionalTime?.enabled) return prev;
 
+  // Generators write the clock setting as globalSettings.fictionalTime (the
+  // app reads hudOverlays.fictionalTime); honour their displayFormat. Else
+  // pick one that fits how the story moves time: date only unless something
+  // advances minutes or hours.
+  const FORMATS = ['time-12h', 'time-24h', 'date', 'datetime-12h', 'datetime-24h', 'day-number', 'year'];
+  const stray = story?.globalSettings?.fictionalTime ?? (prev as any).fictionalTime;
+  const displayFormat = FORMATS.includes(stray?.displayFormat) ? stray.displayFormat : (movesTimeOfDay ? 'datetime-12h' : 'date');
+
   const initialTime = earliestSetTime || { year: 2024, month: 1, day: 1, hour: 9, minute: 0 };
   return {
     ...prev,
@@ -177,7 +190,7 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
       fictionalTime: {
         enabled: true,
         initialTime,
-        displayFormat: 'datetime-12h',
+        displayFormat,
         showInTimerHud: true,
       },
       // The Timer HUD container must be on for anything to render.
