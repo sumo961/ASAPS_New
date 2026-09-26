@@ -864,6 +864,24 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                   counter at all.
                 </span>
               )}
+              {/* Not tied to the meter: a counter the player never sees can
+                  still be one the story carries into the next playthrough. */}
+              <label
+                className="flex items-center gap-2 text-sm"
+                title="When the player presses Restart on an ending, this counter keeps its value instead of going back to its starting value."
+              >
+                <input
+                  type="checkbox"
+                  checked={!!counter.keepOnRestart}
+                  onChange={(e) => {
+                    const newCounters = [...editedCharacter.counters];
+                    newCounters[index] = { ...counter, keepOnRestart: e.target.checked || undefined };
+                    setEditedCharacter({ ...editedCharacter, counters: newCounters });
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-gray-600">Keep across restarts</span>
+              </label>
               {counter.showLevelMeter && (
                 <>
                   <div className="flex items-center gap-2">
@@ -913,22 +931,6 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
                     />
                     <Hash className="w-4 h-4 text-gray-500" />
                     <span className="text-gray-600">Show Value</span>
-                  </label>
-                  <label
-                    className="flex items-center gap-2 text-sm ml-2"
-                    title="When the player presses Restart on an ending, this counter keeps its value instead of going back to its starting value."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!counter.keepOnRestart}
-                      onChange={(e) => {
-                        const newCounters = [...editedCharacter.counters];
-                        newCounters[index] = { ...counter, keepOnRestart: e.target.checked || undefined };
-                        setEditedCharacter({ ...editedCharacter, counters: newCounters });
-                      }}
-                      className="rounded border-gray-300"
-                    />
-                    <span className="text-gray-600">Keep across restarts</span>
                   </label>
                   {/* Numeric format selector */}
                   {counter.showNumericValue && (

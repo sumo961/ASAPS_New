@@ -306,5 +306,6 @@ describe('new-project seed', () => {
     const end = beats.find((b) => b.type === 'endScreen');
     expect(end.getConnections().map((c: any) => c.targetId)).toEqual([title.id]);
     expect(end.getConnections()[0].role).toBe('restart');
+    expect(end.getParameters().reset).toBe(true);
   });
 });

@@ -5164,7 +5164,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ))}
                           </select>
                         </div>
-                        {beat.type === 'endScreen' && localBeat.parameters?.showRestart !== false && (
+                        {beat.type === 'endScreen' && localBeat.parameters?.showRestart !== false && localBeat.parameters?.reset && (
                           <p className="text-xs text-gray-500 leading-snug -mt-1">
                             What survives the reset: variables, counters and character variants marked <em>Keep across restarts</em>.
                             {' '}<span className="font-mono">{'${playthrough}'}</span> counts the runs.

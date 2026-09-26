@@ -921,7 +921,10 @@ export function useStoryBuilder() {
       parameters: {
         message: 'The End',
         showRestart: true,
-        showCredits: false
+        showCredits: false,
+        // Play Again starts a clean run (as in the templates and generated
+        // stories); items marked "Keep across restarts" still survive.
+        reset: true
       }
     });
     
