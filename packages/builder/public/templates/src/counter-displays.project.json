@@ -183,7 +183,12 @@
           "locations": [],
           "x": 1100,
           "y": 200,
-          "connections": [],
+          "connections": [
+            {
+              "targetId": "beat_title",
+              "label": "Restart"
+            }
+          ],
           "parameters": {
             "text": "The end.",
             "buttonText": "Restart"

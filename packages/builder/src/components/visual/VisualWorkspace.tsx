@@ -5979,8 +5979,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             labels.push({ idx: i, label: choice.text || choice.id });
             cur = choice.dialogNode;
           }
+          // Wraps instead of scrolling: at 1280 with both sidebars open the
+          // Show-as picker used to sit past the right edge of a
+          // sideways-scrolling bar.
           return (
-            <div className="shrink-0 flex items-center gap-2 px-5 py-3 bg-gradient-to-b from-slate-50 to-slate-100 border-b-2 border-slate-300 text-base overflow-x-auto shadow-sm">
+            <div className="shrink-0 flex flex-wrap items-center gap-x-2 gap-y-2 px-5 py-3 bg-gradient-to-b from-slate-50 to-slate-100 border-b-2 border-slate-300 text-base shadow-sm">
               <MessageSquare className="w-5 h-5 text-slate-500 shrink-0" />
               <span className="text-slate-600 text-sm font-semibold uppercase tracking-wide mr-2 shrink-0">Dialog path</span>
               <button
@@ -6003,7 +6006,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     <button
                       type="button"
                       onClick={() => setDialogTreeNodePath(prev => prev.slice(0, seg.idx + 1))}
-                      className={`px-3 py-1.5 rounded-md transition-colors font-medium truncate max-w-[260px] ${
+                      className={`px-3 py-1.5 rounded-md transition-colors font-medium truncate min-w-0 max-w-[260px] ${
                         isCurrent
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'bg-white text-slate-700 border border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
@@ -6019,7 +6022,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 <span className="text-slate-500 text-sm ml-2 italic min-w-0 truncate" title="click a choice on the canvas to step in, or use the Inspector tree">click a choice on the canvas to step in, or use the Inspector tree</span>
               )}
               {beat?.type === 'dialogTree' && (
-                <label className="ml-auto shrink-0 flex items-center gap-2 text-sm text-slate-600" title="Show the choices a player in this state would see (conditions evaluated)">
+                <label className="ml-auto max-w-full flex flex-wrap items-center gap-2 text-sm text-slate-600" title="Show the choices a player in this state would see (conditions evaluated)">
                   <span className="font-semibold uppercase tracking-wide text-xs">Show as</span>
                   <select
                     value={choiceStateKey}

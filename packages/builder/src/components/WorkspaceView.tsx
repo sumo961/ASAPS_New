@@ -1,4 +1,5 @@
 import React from 'react';
+import { flowchartLinkCount } from '../utils/storyLinks';
 import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
 import { VisualWorkspace } from './visual/VisualWorkspace';
@@ -218,7 +219,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             <span className="mx-2">•</span>
             <span>Clusters: {clusters.length}</span>
             <span className="mx-2">•</span>
-            <span>Connections: {connections.length}</span>
+            <span>Connections: {flowchartLinkCount(beats)}</span>
           </div>
         )}
       </div>

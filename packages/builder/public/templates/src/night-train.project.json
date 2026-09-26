@@ -168,7 +168,12 @@
      "locations": [],
      "x": 1520,
      "y": 200,
-     "connections": [],
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
      "parameters": {
       "message": "The platform is small and cold and hers alone. The train pulls away with the phone still on the seat, still lighting up for nobody.\n\n23:58 — jo: \"im out. station cafe is open. cab in 10. dont sleep yet ok\"",
       "showRestart": true,
@@ -182,7 +187,12 @@
      "locations": [],
      "x": 1520,
      "y": 400,
-     "connections": [],
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
      "parameters": {
       "message": "She walks the length of two carriages without hurrying, the way you told her to, and sits down across from the conductor. The phone stops lighting up somewhere before the river bridge. Nobody ever comes for it.\n\n00:31 — jo: \"home. deadbolt. tell you the rest tomorrow. thank you for staying up\"",
       "showRestart": true,

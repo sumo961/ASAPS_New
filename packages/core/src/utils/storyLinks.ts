@@ -338,7 +338,7 @@ export function dedupeLinks(links: StoryLink[]): StoryLink[] {
   const seen = new Set<string>();
   const out: StoryLink[] = [];
   for (const l of links) {
-    const key = `${l.source} ${l.target}`;
+    const key = `${l.source}\u0000${l.target}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(l);

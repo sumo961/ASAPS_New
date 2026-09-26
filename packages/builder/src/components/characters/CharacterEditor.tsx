@@ -2172,14 +2172,13 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       setEditedCharacter({ ...editedCharacter, ...updates });
     };
     /**
-     * Adding a variant migrates base personality / mood / sentiments /
-     * dossierPolicy onto the new variant so the author doesn't lose work.
+     * Adding a variant seeds it from existing personality / mood /
+     * sentiments / dossierPolicy so the author edits deltas, not a blank form.
      * Two cases:
-     *   - First variant ever: clone base values into the new variant AND
-     *     clear those fields from the base record. From this point on,
-     *     personality is authored per-variant. The base owns identity
-     *     (id, role, name, sprite sheet, states, counters, inventory,
-     *     goals, HUD config) but not personality state.
+     *   - First variant ever: clone the base values into the new variant.
+     *     From this point on, personality is authored per-variant. The base keeps its own
+     *     values too — it is the persona in play until a variant is
+     *     switched in, and a variant overrides only what it sets.
      *   - Subsequent variants: clone from the FIRST variant's values so
      *     authors start from a known persona and edit deltas, rather
      *     than facing a blank form. They can still clear individual
@@ -2221,16 +2220,10 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         variants: [...variants, newVariant],
       };
 
-      // First-variant migration: clear base personality fields so they
-      // don't shadow the variant overlay at runtime, and so the editor
-      // hides them cleanly. Only run on the first variant — subsequent
-      // adds leave the base alone (it's already cleared).
-      if (isFirst) {
-        updates.traits = undefined;
-        updates.initialMood = undefined;
-        updates.initialSentiments = undefined;
-        updates.dossierPolicy = undefined;
-      }
+      // The base keeps its personality: it is a persona in its own right (in
+      // play from the story start until a variant is switched in), and a
+      // variant only overrides the fields it sets. Moving the values onto the
+      // first variant used to leave the base persona empty.
 
       setEditedCharacter({ ...editedCharacter, ...updates });
     };
@@ -2258,18 +2251,21 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             authors don't hunt for the (now-hidden) parent sections. */}
         {hasVariants && (
           <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800">
-            This character has <span className="font-semibold">{variants.length}</span> variant{variants.length === 1 ? '' : 's'}. Personality, initial mood, and sentiments are authored per variant below — the base character only owns identity (name, sprite sheet, states, counters, inventory) and shared goals.
+            This character has <span className="font-semibold">{variants.length}</span> variant{variants.length === 1 ? '' : 's'}. The sections below are the <span className="font-semibold">base persona</span>{editedCharacter.variantSelectionPolicy === 'random'
+              ? ' — with random selection a variant is always active, so the base only fills in what a variant leaves out.'
+              : ' — in play until a variant is active.'} Each variant (further down) overrides only the personality, mood and sentiments it sets; anything it leaves out comes from the base.
           </div>
         )}
 
         {/* Personality — Big Five + author-defined traits */}
-        {!hasVariants && (
+        {(
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <Heart className="w-4 h-4" />
                 Personality
+                {hasVariants && <span className="text-xs font-normal text-gray-500">— base persona</span>}
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 Static traits in <span className="font-mono">[0, 1]</span>. Modulate emotion deltas at runtime — never gate choices on their own.
@@ -2454,13 +2450,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         )}
 
         {/* Mood — 2D affect at story start */}
-        {!hasVariants && (
+        {(
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <Heart className="w-4 h-4" />
                 Initial mood
+                {hasVariants && <span className="text-xs font-normal text-gray-500">— base persona</span>}
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 Where this character's mood starts at story open. The runtime can drift it from here via Update Affect beats.
@@ -2550,13 +2547,14 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         )}
 
         {/* Initial sentiments — directed feelings at story start */}
-        {!hasVariants && (
+        {(
         <div className="bg-white border rounded-lg p-4">
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="text-sm font-medium flex items-center gap-2">
                 <Heart className="w-4 h-4" />
                 Initial sentiments
+                {hasVariants && <span className="text-xs font-normal text-gray-500">— base persona</span>}
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 Directed feelings this character starts with. <em>Trust toward player +0.5</em>, <em>fear toward wolf +0.7</em>, etc. Each row is one (target, emotion) pair.
@@ -2668,11 +2666,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             Stays at parent level when no variants exist; hidden once variants
             take over personality (each variant overrides dossierPolicy
             individually if needed). */}
-        {!hasVariants && (
+        {(
         <div className="bg-white border rounded-lg p-4">
           <h3 className="text-sm font-medium flex items-center gap-2">
             <Heart className="w-4 h-4" />
             Dossier policy
+            {hasVariants && <span className="text-xs font-normal text-gray-500">— base persona</span>}
           </h3>
           <p className="text-xs text-gray-500 mt-1 mb-3">
             Controls how the LLM sees this character when they speak in an AI beat.

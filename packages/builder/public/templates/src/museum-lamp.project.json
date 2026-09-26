@@ -264,7 +264,12 @@
      "locations": [],
      "x": 1040,
      "y": 620,
-     "connections": [],
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
      "parameters": {
       "message": "One object, three ways of seeing.",
       "showRestart": true,

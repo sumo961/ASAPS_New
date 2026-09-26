@@ -147,7 +147,12 @@
           "name": "End",
           "type": "endScreen",
           "locations": [],
-          "connections": [],
+          "connections": [
+            {
+              "targetId": "beat_title",
+              "label": "Restart"
+            }
+          ],
           "x": 1040,
           "y": 220,
           "parameters": {

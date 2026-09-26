@@ -935,6 +935,13 @@ export function useStoryBuilder() {
       targetId: endBeat.id,
       label: 'Finish'
     });
+
+    // Restart leads back to the title screen — a new project starts complete
+    // instead of with a flagged "Restart leads nowhere" ending.
+    endBeat.addConnection({
+      targetId: titleBeat.id,
+      label: 'Restart'
+    });
     
     // Update state with actual Beat instances
     setState(prev => ({
@@ -942,7 +949,8 @@ export function useStoryBuilder() {
       beats: [titleBeat, introBeat, endBeat],
       connections: [
         { source: titleBeat.id, target: introBeat.id },
-        { source: introBeat.id, target: endBeat.id }
+        { source: introBeat.id, target: endBeat.id },
+        { source: endBeat.id, target: titleBeat.id }
       ]
     }));
     

@@ -296,3 +296,15 @@ describe('exportStory', () => {
     expect(xml).toContain('Exported Tale');
   });
 });
+
+describe('new-project seed', () => {
+  it('the seeded ending restarts at the title screen (not a flagged dead end)', () => {
+    const { result } = setup();
+    act(() => { result.current.initializeStory(); });
+    const beats = result.current.state.beats as any[];
+    const title = beats.find((b) => b.type === 'titleScreen');
+    const end = beats.find((b) => b.type === 'endScreen');
+    expect(end.getConnections().map((c: any) => c.targetId)).toEqual([title.id]);
+    expect(end.getConnections()[0].role).toBe('restart');
+  });
+});

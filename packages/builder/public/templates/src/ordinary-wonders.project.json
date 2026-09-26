@@ -267,7 +267,12 @@
      "locations": [],
      "x": 2380,
      "y": 260,
-     "connections": [],
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
      "parameters": {
       "message": "Expedition complete.\n\nSame streets, different eyes. Restart tomorrow — the scatter never lands in the same place twice.",
       "showRestart": true,
