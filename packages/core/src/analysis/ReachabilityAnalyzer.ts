@@ -1,7 +1,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
-import { StoryContext } from '../engine/StoryContext';
+import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
 
 /**
  * Analysis of a specific condition's satisfiability
@@ -299,6 +299,18 @@ export class ReachabilityAnalyzer {
   private analyzeStateModifications(): void {
     this.counterModifications.clear();
     this.variableValues.clear();
+
+    // Values a variable has without any beat setting it: its Project
+    // Settings default (the runtime starts it there), and the built-in
+    // playthrough count, which can be any run number (marked like user input).
+    const defs = (this.story as any).getSettings?.()?.variables;
+    for (const def of Array.isArray(defs) ? defs : []) {
+      if (def?.name && def.defaultValue !== undefined && def.defaultValue !== '') {
+        if (!this.variableValues.has(def.name)) this.variableValues.set(def.name, new Set());
+        this.variableValues.get(def.name)!.add(def.defaultValue);
+      }
+    }
+    this.variableValues.set(PLAYTHROUGH_VARIABLE, new Set(['__user_input__']));
 
     const allBeats = this.story.getAllBeats();
 

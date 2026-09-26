@@ -1227,8 +1227,16 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   protected renderComponent(component: React.ReactElement): void {
-    const painted = elementContainsType(component, ScaledStage) ? 'stage' : 'window';
-    if (painted !== this.paintedStage) {
+    // Only beat views decide: the fitted stage (ScaledStage) or a flow onto
+    // the window (slot / spatial / chat). Passing screens — the loading
+    // display before an AI beat, panoramas, maps — keep the last answer, or
+    // the host's HUDs would jump between layouts on every AI beat.
+    const painted = elementContainsType(component, ScaledStage)
+      ? 'stage'
+      : [SlotFlowView, SpatialFlowView, ChatDialogView].some((t) => elementContainsType(component, t))
+        ? 'window'
+        : undefined;
+    if (painted && painted !== this.paintedStage) {
       this.paintedStage = painted;
       for (const l of this.paintedStageListeners) l(painted);
     }

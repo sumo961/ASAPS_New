@@ -106,6 +106,8 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
    * a strip) reaches ~140px down, the capped band left the messages ~20px,
    * and the chat scrolled its first line up under the clock anyway.
    */
+  const padBaseY = responsive ? Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02))) : 20;
+  const padBaseX = responsive ? Math.round(Math.min(24, Math.max(12, (stageWidth ?? 1024) * 0.03))) : 16;
   const hudReserve = React.useMemo(() => {
     const h = view.h || stageHeight || 0;
     const w = view.w || stageWidth || 0;
@@ -450,12 +452,14 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
           // pixels.
           // Stage-relative (vh/vw would reference the WINDOW, which is
           // wrong inside a scaled/emulated stage box).
-          padding: responsive
-            ? `${Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02)))}px ${Math.round(Math.min(24, Math.max(12, (stageWidth ?? 1024) * 0.03)))}px`
-            : '20px 16px',
-          ...(hudReserve.top > 0 ? { paddingTop: `${Math.max(hudReserve.top, responsive ? Math.round(Math.min(24, Math.max(12, (stageHeight ?? 768) * 0.02))) : 20)}px` } : {}),
-          ...(hudReserve.left > 0 ? { paddingLeft: `${hudReserve.left}px` } : {}),
-          ...(hudReserve.right > 0 ? { paddingRight: `${hudReserve.right}px` } : {}),
+          // Longhands only: mixing the `padding` shorthand with conditional
+          // longhands let React drop the top padding when the HUD reserve
+          // went back to 0 (it clears the longhand, never re-applies the
+          // unchanged shorthand).
+          paddingTop: `${Math.max(hudReserve.top, padBaseY)}px`,
+          paddingBottom: `${padBaseY}px`,
+          paddingLeft: `${Math.max(hudReserve.left, padBaseX)}px`,
+          paddingRight: `${Math.max(hudReserve.right, padBaseX)}px`,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: mode === 'chat-bubble' ? 'center' : 'flex-end',

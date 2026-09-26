@@ -343,7 +343,7 @@ export class AISummaryBeat extends Beat {
         visitedTracking: this.resetVisitedTracking,
         history: this.resetHistory,
         characters: this.resetCharacters,
-      });
+      }, this.id);
       return this.restartTarget || context.getStory().getFirstBeatId();
     };
 

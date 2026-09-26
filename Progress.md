@@ -1,5 +1,41 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.104, 2026-09-26)
+
+### Overview
+
+Fixes from a code review of the v0.9.104 changes.
+
+### Replays and analysis
+
+- The analyzers know the built-in `playthrough`: the path simulation
+  explores a first run and a replay when a story tests it, and the
+  reachability check no longer calls it (or a variable that only has a
+  Project Settings default) "never set" — a returning-player branch written
+  as the new guidance teaches was reported unreachable. The Co-Designer's
+  story summary no longer lists `playthrough` as undeclared.
+- An ending passes its own id to the restart, so the "ending isn't visited
+  in the new run" rule holds when a host runs the ending without moving the
+  current beat (the exported player's timer path); a host reset clears it.
+- Reviewed and not a bug: a kept variant's plain counters — variants carry
+  no counter values; the misleading code comment that suggested otherwise
+  is corrected.
+
+**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/core/src/beats/{EndScreenBeat,AISummaryBeat}.ts`, `packages/core/src/analysis/{StateSimulationAnalyzer,ReachabilityAnalyzer}.ts`, `packages/builder/src/utils/storyDigest.ts`
+
+### Rendering
+
+- The chat view sets its padding as longhands, so the top padding comes
+  back when a top HUD goes away (React dropped it when shorthand and
+  longhand were mixed).
+- Loading screens, panoramas and maps no longer change the box the host
+  lays HUDs out for — in exported fixed-canvas stories the HUDs jumped on
+  every AI beat's loading screen.
+
+**Files modified:** `packages/renderer/src/components/ChatDialogView.tsx`, `packages/renderer/src/renderers/ReactRenderer.tsx`
+
+---
+
 ## 2026-09-26: The replay release — restarts that keep what matters, templates that start clean (v0.9.104)
 
 ### Overview

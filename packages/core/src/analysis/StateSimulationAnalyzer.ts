@@ -17,7 +17,7 @@
 import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
-import { StoryContext, type SerializedStoryState } from '../engine/StoryContext';
+import { StoryContext, PLAYTHROUGH_VARIABLE, type SerializedStoryState } from '../engine/StoryContext';
 import {
   ConstraintSet,
   PathStep,
@@ -227,7 +227,23 @@ export class StateSimulationAnalyzer {
     return state;
   }
 
+  /**
+   * Every starting state, once per value of the built-in playthrough the story
+   * can tell apart: a story that tests it (a returning-player branch) is
+   * explored as a first run AND a replay — otherwise that branch would read
+   * as unreachable. Stories that never mention it start at run 1.
+   */
   private initialStates(): SimulationState[] {
+    const mentionsRun = /playthrough/.test(JSON.stringify(this.story.getAllBeats().map((b: any) => b.getParameters?.() ?? b.parameters ?? {}))
+      + JSON.stringify(this.story.getAllBeats().map((b: any) => b.connections ?? [])));
+    if (!mentionsRun) return this.initialStatesForRun();
+    return [1, 2].flatMap((run) => this.initialStatesForRun().map((st) => {
+      if (!st.variables.has(PLAYTHROUGH_VARIABLE)) st.variables.set(PLAYTHROUGH_VARIABLE, run);
+      return st;
+    }));
+  }
+
+  private initialStatesForRun(): SimulationState[] {
     const base = this.seededInitialState();
     const ctx = this.getScratch();
     if (!ctx) return [base];

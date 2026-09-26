@@ -270,7 +270,8 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
     lines.push('', `VARIABLES (declared in Project Settings): ${declared.map(n => (kept.has(n) ? `${n} (kept across restarts)` : n)).join(', ')}`);
   }
   const inUse = storyStateInUse(input.beats, input.characters);
-  const undeclared = inUse.variables.filter(v => !declared.includes(v));
+  // `playthrough` is built in (the run count) — never "undeclared".
+  const undeclared = inUse.variables.filter(v => !declared.includes(v) && v !== 'playthrough');
   if (undeclared.length > 0) {
     lines.push(`VARIABLES used but not declared: ${undeclared.join(', ')}`);
   }

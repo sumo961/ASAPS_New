@@ -2572,6 +2572,7 @@ export class StoryContext extends EventEmitter {
       geoPoints: {}
     };
     this.explicitVariantSet = {};
+    this.restartedFromBeatId = null;
     this.history = [];
     this.choiceHistory = [];
     this.aiOutputHistory = [];
@@ -2709,9 +2710,11 @@ export class StoryContext extends EventEmitter {
   /** Set by restartPlaythrough: the ending that restarted, until it exits. */
   private restartedFromBeatId: string | null = null;
 
-  restartPlaythrough(reset: ResetOptions | 'all' | null): void {
+  restartPlaythrough(reset: ResetOptions | 'all' | null, fromBeatId?: string): void {
     const run = this.getPlaythrough();
-    const from = this.state.currentBeatId;
+    // The ending passes its own id: hosts don't always move currentBeatId
+    // onto the beat they run (the exported player's timer-expiry path).
+    const from = fromBeatId ?? this.state.currentBeatId;
     const kept = this.captureKeptAcrossRestarts();
     if (reset === 'all') this.reset();
     else if (reset) this.selectiveReset(reset);
@@ -2752,8 +2755,10 @@ export class StoryContext extends EventEmitter {
 
   private restoreKeptAcrossRestarts(kept: ReturnType<StoryContext['captureKeptAcrossRestarts']>): void {
     for (const [name, value] of Object.entries(kept.variables)) this.setVariable(name, value);
-    // The variant first: switching it in re-seeds that persona's affect and
-    // counters, then the kept counter values go back on top.
+    // The variant first: switching it in re-seeds that persona's affect (and
+    // so every counter bound to a feeling). Plain counters need nothing here —
+    // variants don't carry counter values, so the reset's seeding already
+    // matches any persona. Then the kept counter values go back on top.
     for (const { key, variantId } of kept.variants) {
       if (this.state.activeCharacterVariants[key] !== variantId) {
         this.setActiveCharacterVariant(key, variantId, { seedAffect: true, mode: 'reseed' });

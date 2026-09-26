@@ -150,3 +150,23 @@ describe('partial reset reaches the characters', () => {
     expect(ctx.getActiveCharacterVariant('char_clare')).toBe('guarded');
   });
 });
+
+describe('the restarting ending is named by the beat itself', () => {
+  it('skips the ending\'s exit mark even when currentBeatId points elsewhere (timer path)', () => {
+    const ctx = context();
+    (ctx as any).state.currentBeatId = 'beat_interrupted';
+    ctx.restartPlaythrough('all', 'beat_end');
+    ctx.markBeatVisited('beat_end');
+    expect(ctx.getVisitedBeats()).not.toContain('beat_end');
+    ctx.markBeatVisited('beat_interrupted');                // not swallowed
+    expect(ctx.getVisitedBeats()).toContain('beat_interrupted');
+  });
+
+  it('a host reset clears the marker', () => {
+    const ctx = context();
+    ctx.restartPlaythrough('all', 'beat_end');
+    ctx.reset();
+    ctx.markBeatVisited('beat_end');
+    expect(ctx.getVisitedBeats()).toContain('beat_end');
+  });
+});

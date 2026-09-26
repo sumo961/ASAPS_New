@@ -319,4 +319,13 @@ describe('painted stage (hosts lay their screen HUDs out for the same box)', () 
     expect(renderer.getPaintedStage()).toBe('window');
     expect(seen).toEqual(['stage', 'window']);
   });
+
+  it('a loading screen keeps the last painted stage (HUDs must not jump)', () => {
+    renderer.renderText('Placed.', 'Next', [
+      { id: 'text_1', name: 'Body', kind: 'text', x: 100, y: 100, width: 400, height: 200 } as any,
+    ]);
+    expect(renderer.getPaintedStage()).toBe('stage');
+    renderer.renderLoading('Thinking…');
+    expect(renderer.getPaintedStage()).toBe('stage');
+  });
 });

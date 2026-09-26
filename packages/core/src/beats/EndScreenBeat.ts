@@ -157,7 +157,7 @@ export class EndScreenBeat extends Beat {
     const doRestart = (): string => {
       // Keeps what the author marked "keep across restarts" and counts the
       // playthrough; doExit below is an ending, not a restart.
-      context.restartPlaythrough(this.resetScope());
+      context.restartPlaythrough(this.resetScope(), this.id);
       // Always clear HUD overlay state on restart, even if reset=false, so a
       // stale real-time timer readout doesn't persist into the next playthrough.
       const r = renderer as any;

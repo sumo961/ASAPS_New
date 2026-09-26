@@ -42,4 +42,18 @@ describe('ChatDialogView keeps its message area clear of top HUDs', () => {
     const area = container.querySelector('.overflow-y-auto') as HTMLElement;
     expect(area.style.paddingTop).toBe('144px');
   });
+
+  it('restores the base top padding when the top HUD goes away', () => {
+    const { container, rerender } = render(
+      <ChatDialogView messages={messages} mode="chat-scroll" responsive stageWidth={740} stageHeight={360}
+        onSubscribeReservedHudRects={subscribeWith([{ x: 200, y: 20, width: 340, height: 40 }])} />,
+    );
+    const area = container.querySelector('.overflow-y-auto') as HTMLElement;
+    expect(area.style.paddingTop).toBe('68px');
+    rerender(
+      <ChatDialogView messages={messages} mode="chat-scroll" responsive stageWidth={740} stageHeight={360}
+        onSubscribeReservedHudRects={subscribeWith([])} />,
+    );
+    expect(area.style.paddingTop).toBe('12px');
+  });
 });
