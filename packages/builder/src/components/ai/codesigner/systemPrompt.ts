@@ -253,6 +253,14 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
   stance and (optionally) openness/conscientiousness/neuroticism + a mood.
   The digest lists existing variants with their stances so you can see what
   is already there before proposing a replacement.
+- A variant chosen at story start (random or default) seeds the character's
+  feelings. A switch in MID-story (a setCharacterVariant effect) KEEPS what
+  the character has lived through and applies the change on top: mood
+  moves by (variant initialMood − previous persona's), each sentiment the
+  variant lists moves by its difference (added if new), sentiments it does
+  not list stay as the player built them. So give a transition variant only
+  the feelings that should shift. "suppressSeed": true on the effect
+  switches persona (name, portrait, traits) without touching feelings.
 - Use 'addNote' when a change is too big or too subjective to make directly
   (e.g. "rework this scene's tone") — the note lands on the beat for the
   author to act on.

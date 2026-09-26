@@ -158,6 +158,10 @@ markdown fences):
     //                disposition variants — cooperative, hostile,
     //                avoidant — drawn at random each playthrough") so the
     //                generator authors the variants and random selection.
+    //                A character who CHANGES mid-story (a turning point,
+    //                a disclosure) is a variant switched at that moment —
+    //                the relationship the player built carries over, the
+    //                change lands on top; say where the turn happens.
     //   "auto"     — let the downstream generator pick from the prompt.
     // Choose explicitly when the conversation gives you signal — don't
     // reflexively pick "auto" when "rich" or "sparse" would be more
