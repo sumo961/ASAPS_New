@@ -358,8 +358,9 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Row 2: All action buttons */}
-      <div className="flex items-center justify-between">
+      {/* Row 2: All action buttons. Wraps instead of overflowing: at 1280
+          wide the right-hand group (Debug, Preview) ran off the window. */}
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
         {/* Left: Project, Undo/Redo, Save, Import/Export */}
         <div className="flex items-center space-x-2">
           {/* Project Selector — "Browse all projects" routes to the
@@ -728,7 +729,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right: Feature buttons */}
-        <div className="flex items-center space-x-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2 [&_button]:whitespace-nowrap">
           {onSearch && (
             <button
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
