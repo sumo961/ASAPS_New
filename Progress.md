@@ -1,5 +1,79 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.103, 2026-09-26)
+
+### Overview
+
+Work after the wiring release: the User Guide audit's follow-ups, a runtime
+condition bug that hid generated choices, exported HUDs that follow the box
+each screen is actually painted in, restart carry-over ("Keep across
+restarts" + a built-in playthrough count), and a pass over the five starter
+templates — audited, fixed, and played through in the Preview Window. Kept
+here as it happens; this section becomes the next release entry.
+
+### Restart carry-over and variable defaults
+
+Story variables now start at their Project Settings default (the runtime
+ignored `defaultValue`; every variable started undefined). "Keep across
+restarts" on a story variable, a character counter, and a character's chosen
+variant: an End Screen / AI Summary Restart applies its reset, then restores
+the marked items (a kept variant re-seeds that persona's affect). The player
+menu / Preview Restart stays a fresh start. Built-in `playthrough` (1, 2, …),
+readable as `${playthrough}` and in conditions, saved with the game, not a
+listed variable. The End Screen's Restart link no longer offers effects
+(they ran after the reset). The ending that restarted is no longer recorded
+as visited in the new run. Generation paths, Co-Designer, digest, MCP schema
+and User Guide know all of it.
+
+**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/core/src/beats/{EndScreenBeat,AISummaryBeat}.ts`, `packages/core/src/analysis/StateSimulationAnalyzer.ts`, `packages/builder/src/components/{Inspector,settings/GlobalSettingsInspector,characters/CharacterEditor}.tsx`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/components/ai/codesigner/*`, `mcp-server-desktop/src/index.ts`, `beat-definitions/core-beats.json`
+
+### Runtime and export fixes
+
+- Counter/variable conditions written as `{ type, variable, … }` (the shape
+  the generator guidance teaches, and every analyzer reads) returned false at
+  runtime — generated dialog choices gated on a counter were never shown
+  (Late Light lost both candor rewards). The runtime reads `variable` too.
+- Exported players lay screen HUDs out for the box each screen is painted in
+  (renderer `getPaintedStage`): fixed-canvas projects still flow beats
+  without authored positions onto the window, and HUDs covered text at some
+  window sizes (identical in v0.9.102). The Menu button is host chrome; the
+  clock/timer stack below it.
+- GPS scatter keeps targets at least twice their arrival radius from the
+  start (a target 24 m from base camp with a 25 m radius "arrived" at once).
+
+**Files modified:** `packages/core/src/engine/StoryContext.ts`, `packages/renderer/src/renderers/ReactRenderer.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/core/src/utils/{geo,overpass}.ts`, `packages/core/src/beats/SetGpsLocationBeat.ts`
+
+### Builder UI
+
+The first variant copies the base persona instead of emptying it (base
+sections stay editable, marked "— base persona"); new projects' End Screen
+restarts at the title; the Visual Editor's dialog path bar and the header
+toolbar wrap at 1280 wide (Debug and Preview were cut off); the flowchart's
+Connections count reads the link walk (restart links included).
+
+**Files modified:** `packages/builder/src/components/{Header,WorkspaceView,characters/CharacterEditor,visual/VisualWorkspace}.tsx`, `packages/builder/src/hooks/useStoryBuilder.ts`, `packages/builder/src/utils/storyLinks.ts`
+
+### Starter templates
+
+All five audited against the current runtime and played through. Every
+ending now resets on Restart (none did — the rehearsal's Karin never
+changed disposition), Ada's meters show from the start, Jo's lines are
+linked, the rehearsal debrief names the session. New guards in
+`bundledTemplates.test.ts` (packed = source, endings reset with a target,
+character HUDs can appear).
+
+**Files modified:** `packages/builder/public/templates/*`, `packages/builder/src/utils/__tests__/bundledTemplates.test.ts`
+
+### Documentation
+
+User Guide screenshots retaken from the running app (01, 08, 10, 21) plus
+the Visual Editor's Show-as strip (76) and a Co-Designer proposal card (77);
+restart carry-over and playthrough documented.
+
+**Files modified:** `docs/USER_GUIDE.md`, `docs/images/*`
+
+---
+
 ## 2026-09-26: The wiring release — Co-Designer wires state, links are links, the analyzers understand feelings (v0.9.103)
 
 ### Overview
