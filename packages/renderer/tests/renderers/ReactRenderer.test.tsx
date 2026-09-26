@@ -304,3 +304,19 @@ describe('positioned AI conversation (presentation: dialog)', () => {
     expect(box.style.overflowY).toBe('auto');
   });
 });
+
+describe('painted stage (hosts lay their screen HUDs out for the same box)', () => {
+  it("an author-positioned beat is painted on the fitted stage, a flowing one on the window", () => {
+    const seen: string[] = [];
+    renderer.subscribeToPaintedStage((m) => seen.push(m));
+    renderer.setState('projectLayoutMode', 'fixed');
+    renderer.renderText('Placed.', 'Next', [
+      { id: 'text_1', name: 'Body', kind: 'text', x: 100, y: 100, width: 400, height: 200 } as any,
+    ]);
+    expect(renderer.getPaintedStage()).toBe('stage');
+    // Same fixed project, a beat without authored positions: flows to the window.
+    renderer.renderText('Flows.', 'Next');
+    expect(renderer.getPaintedStage()).toBe('window');
+    expect(seen).toEqual(['stage', 'window']);
+  });
+});

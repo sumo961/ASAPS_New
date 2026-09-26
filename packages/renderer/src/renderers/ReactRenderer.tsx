@@ -31,6 +31,15 @@ import { PanoramaView } from '../components/PanoramaView';
 import { MapBeatLeaflet } from '../components/MapBeatLeaflet';
 import { IndoorMapBeat } from '../components/IndoorMapBeat';
 
+/** Whether a React element tree (children props, a few levels deep) contains `type`. */
+function elementContainsType(node: React.ReactNode, type: unknown, depth = 8): boolean {
+  if (depth < 0 || node == null || typeof node !== 'object') return false;
+  if (Array.isArray(node)) return node.some((n) => elementContainsType(n, type, depth));
+  const el = node as React.ReactElement<{ children?: React.ReactNode }>;
+  if (el.type === type) return true;
+  return elementContainsType(el.props?.children, type, depth - 1);
+}
+
 // ============= SCALED STAGE COMPONENT =============
 // Handles viewport-responsive scaling for the story stage
 // Defined at module level to prevent recreation on each render
@@ -1050,6 +1059,17 @@ export class ReactRenderer extends BaseRenderer {
   private reservedHudRectsListeners = new Set<
     (rects: import('../components/PositionedBeatView').ReservedHudRect[] | undefined) => void
   >();
+  /**
+   * Which box the last screen was painted into: 'stage' = the authored stage
+   * fitted into the viewport (ScaledStage), 'window' = flowed straight onto
+   * the viewport at 1:1 (slot / spatial / chat flow). A fixed project still
+   * flows every beat without authored positions, so hosts that draw screen
+   * HUDs beside the renderer must lay them out for the box actually used —
+   * the exported player placed them on the fitted stage while the text
+   * filled the window, and they covered it at some window sizes.
+   */
+  private paintedStage: 'stage' | 'window' | undefined;
+  private paintedStageListeners = new Set<(mode: 'stage' | 'window') => void>();
   protected fictionalTimeText: string | undefined;  // Formatted fictional time text for Timer HUD
   private fictionalTimeTextListeners: Set<(text: string | undefined) => void> = new Set();
   protected mobileMode: boolean = false;  // Whether mobile display adaptation is active
@@ -1196,7 +1216,22 @@ export class ReactRenderer extends BaseRenderer {
     return Promise.resolve();
   }
 
+  getPaintedStage(): 'stage' | 'window' | undefined {
+    return this.paintedStage;
+  }
+
+  subscribeToPaintedStage(listener: (mode: 'stage' | 'window') => void): () => void {
+    this.paintedStageListeners.add(listener);
+    if (this.paintedStage) listener(this.paintedStage);
+    return () => this.paintedStageListeners.delete(listener);
+  }
+
   protected renderComponent(component: React.ReactElement): void {
+    const painted = elementContainsType(component, ScaledStage) ? 'stage' : 'window';
+    if (painted !== this.paintedStage) {
+      this.paintedStage = painted;
+      for (const l of this.paintedStageListeners) l(painted);
+    }
     if (!this.root) {
       console.warn(`[ReactRenderer] No root available, attempting to reinitialize`);
       try {

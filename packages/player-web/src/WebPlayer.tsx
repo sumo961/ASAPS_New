@@ -82,11 +82,16 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
   // HUDs are laid out for that window too (as the Preview Window does for a
   // device preset). Fixed projects keep the authored stage, fitted and scaled.
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('fixed');
-  const hudStage = layoutMode === 'responsive' && playerSize.width > 0 && playerSize.height > 0
+  // Which box the renderer painted the current screen into. A fixed project
+  // still flows beats without authored positions onto the window, so this is
+  // per screen, not per project; the layout mode is only the first guess.
+  const [paintedStage, setPaintedStage] = useState<'stage' | 'window' | undefined>(undefined);
+  const hudOnWindow = (paintedStage ?? (layoutMode === 'responsive' ? 'window' : 'stage')) === 'window';
+  const hudStage = hudOnWindow && playerSize.width > 0 && playerSize.height > 0
     ? playerSize
     : stageDims;
   const hudScaleFor = (box: { width: number; height: number }, stage: { width: number; height: number }) =>
-    layoutMode === 'responsive' ? 1 : computeStageFitScale(box, stage, mobileMode ? 'cover' : 'fit');
+    hudOnWindow ? 1 : computeStageFitScale(box, stage, mobileMode ? 'cover' : 'fit');
   const stageBoxRef = useRef<HTMLDivElement | null>(null);
   /**
    * Boxes the surrounding page floats over the stage — in an exported story
@@ -156,7 +161,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
     const mo = new MutationObserver(read);
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     return () => { ro.disconnect(); mo.disconnect(); };
-  }, [hudStage?.width, hudStage?.height, layoutMode, mobileMode, playerSize.width, playerSize.height]);
+  }, [hudStage?.width, hudStage?.height, hudOnWindow, mobileMode, playerSize.width, playerSize.height]);
   const [orientationPolicy, setOrientationPolicy] = useState<OrientationPolicy>('flexible');
   /* HUD explanation (overlay trigger) — mirrors the Preview Window. Beats
      carrying `explainHuds` annotate the live HUDs on entry and are held INERT
@@ -409,6 +414,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         };
         const renderer = new ReactRenderer(context);
         rendererRef.current = renderer;
+        renderer.subscribeToPaintedStage((mode) => { if (mounted) setPaintedStage(mode); });
 
         // Character-anchored inventory frames — parity with the Preview
         // Window: runtime-acquired items render with translated labels (the
