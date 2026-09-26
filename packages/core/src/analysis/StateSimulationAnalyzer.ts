@@ -460,12 +460,21 @@ export class StateSimulationAnalyzer {
     const seenBeats = new Set<string>();
     let expansions = 0;
     this.truncated = false;
-    // Past the cap: one branch per beat nobody has reached yet (not every
-    // queued branch to it — many point at the same unexplored beat).
+    // Past the cap: one branch per beat nobody has reached yet, and one per
+    // (beat, variables/counters) combination not seen before — a choice's
+    // variable can decide a gate much later (Late Light: "declined" at the
+    // visit question opens a scene two beats on), and dropping it lost the
+    // scene. That second allowance is itself bounded.
     const admittedNew = new Set<string>();
+    const seenBeatStates = new Set<string>();
+    const cap = this.config.maxFrontier ?? 4000;
     const enqueue = (f: (typeof stack)[number]) => {
-      if (stack.length < (this.config.maxFrontier ?? 4000)) { stack.push(f); return; }
+      if (stack.length < cap) { stack.push(f); return; }
       if (!seenBeats.has(f.beatId) && !admittedNew.has(f.beatId)) { admittedNew.add(f.beatId); stack.push(f); return; }
+      if (seenBeatStates.size < cap * 4) {
+        const k = `${f.beatId}|${hashState(f.state)}`;
+        if (!seenBeatStates.has(k)) { seenBeatStates.add(k); stack.push(f); return; }
+      }
       this.truncated = true;
     };
 
