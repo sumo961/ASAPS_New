@@ -789,12 +789,12 @@ const injectStoryTool: Tool = {
             },
             hudReveal: {
               type: 'string',
-              enum: ['onAppearance', 'fromStart'],
+              enum: ['onAppearance', 'fromStart', 'onVariantChosen'],
               description:
                 'When this character\'s HUD appears. onAppearance (default; fromStart for the player\'s own ' +
                 'character): once the player meets them — a beat or dialog line with their displayName as ' +
                 'speaker, placing them on stage, or making them the AI conversation partner. fromStart: from ' +
-                'the first beat after the title.',
+                'the first beat after the title. onVariantChosen: once a variant is chosen or drawn (player-picks-a-persona stories).',
             },
           },
         },

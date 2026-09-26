@@ -1826,7 +1826,7 @@ export const PreviewWindow: React.FC = () => {
           const anyCtx = ctx as any;
           const hud = anyCtx.isCharacterHudRevealed?.(c.id)
             ? 'shown' as const
-            : (anyCtx.hasSettledVariant?.(c.id) === false ? 'until a variant is chosen' as const : 'until first appearance' as const);
+            : ((c as any).hudReveal === 'onVariantChosen' ? 'until a variant is chosen' as const : 'until first appearance' as const);
           return {
             id: c.id,
             code: c.name || c.id,

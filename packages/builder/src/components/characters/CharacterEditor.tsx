@@ -989,9 +989,12 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
           >
             <option value="onAppearance">When {editedCharacter.displayName || editedCharacter.name || 'the character'} first appears</option>
             <option value="fromStart">From the start of the story</option>
+            {((editedCharacter.variants?.length ?? 0) > 0 || editedCharacter.hudReveal === 'onVariantChosen') && (
+              <option value="onVariantChosen">When a variant is chosen (the player picks a persona)</option>
+            )}
           </select>
           <p className="mt-1 text-xs text-gray-500">
-            "Appears" = the first beat or dialog line where they speak (speaker linked to or named as this character), are placed on stage, or are the AI conversation partner. With variants, the HUD also waits until one is chosen.
+            "Appears" = the first beat or dialog line where they speak (speaker linked to or named as this character), are placed on stage, or are the AI conversation partner.
           </p>
         </div>
 
@@ -2845,6 +2848,34 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
             </div>
           ) : (
             <div className="space-y-3">
+              {/* The base character is a persona too — the one in play until
+                  a variant is chosen or switched in. Without this row a
+                  character with one transition variant looked like it had
+                  only one persona. */}
+              <div className="border border-dashed rounded p-3 bg-white">
+                <div className="flex items-center gap-2">
+                  {editedCharacter.variantSelectionPolicy !== 'random' && (
+                    <label className="flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer" title="Start the story as the base character">
+                      <input
+                        type="radio"
+                        name="default-variant"
+                        checked={!defaultVariantId}
+                        onChange={() => setDefaultVariant(undefined)}
+                      />
+                      default
+                    </label>
+                  )}
+                  <span className="text-sm font-medium">Base — {editedCharacter.displayName || editedCharacter.name || 'this character'}</span>
+                  <span className="text-[11px] text-gray-500">the character as defined on this page</span>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  {editedCharacter.variantSelectionPolicy === 'random'
+                    ? 'With random selection a variant replaces the base at every story start.'
+                    : defaultVariantId
+                      ? `The story starts as "${defaultVariantId}"; the base persona is used only if a setCharacterVariant effect switches back.`
+                      : 'In play from the story start until a setCharacterVariant effect switches in a variant — which keeps the feelings the player built and applies the variant\'s change on top.'}
+                </p>
+              </div>
               {variants.map((variant, i) => (
                 <div key={i} data-variant-id={variant.id} className="border rounded p-3 bg-gray-50">
                   <div className="flex items-start gap-2">

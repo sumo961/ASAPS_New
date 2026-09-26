@@ -1426,18 +1426,23 @@ export class StoryContext extends EventEmitter {
 
   /**
    * Should this character's HUDs (meters, mood frame, inventory) show now?
-   * Their persona must be settled (see hasSettledVariant) and, under
-   * hudReveal 'onAppearance' — the default for everyone but the player's
-   * own character — the player must have met them: a meter panel for
-   * someone not yet on stage announces them early.
+   * See hudReveal below; a meter panel for someone not yet on stage would
+   * announce them early.
    */
   isCharacterHudRevealed(charRef: string): boolean {
     const key = this.resolveCharRef(charRef);
     if (!key) return false;
-    if (!this.hasSettledVariant(key)) return false;
     const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
     const base = characters?.find((c) => c?.id === key);
+    // hudReveal: 'onAppearance' (default but for the player's own character)
+    // once the player has met them; 'fromStart' (the player's default);
+    // 'onVariantChosen' once a variant is chosen or drawn — for stories
+    // where the player picks a persona. Variants alone do not hide the HUD:
+    // the base persona is in play until one is switched in (Late Light's
+    // Clare and Nathan each have one transition variant; their HUDs were
+    // hidden until it).
     const reveal = base?.hudReveal ?? (base?.role === 'player' ? 'fromStart' : 'onAppearance');
+    if (reveal === 'onVariantChosen') return this.hasSettledVariant(key);
     return reveal === 'fromStart' || this.hasCharacterAppeared(key);
   }
 

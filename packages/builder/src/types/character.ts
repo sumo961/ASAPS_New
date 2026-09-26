@@ -145,9 +145,10 @@ export interface Character {
    *     conversation partner) has run. Default for every role but 'player'.
    *   - 'fromStart': from the first beat after the title. Default for the
    *     player's own character.
-   * Either way a character with variants waits until one is settled.
+   *   - 'onVariantChosen': once a variant is chosen (setCharacterVariant)
+   *     or drawn at random — for "the player picks a persona" stories.
    */
-  hudReveal?: 'onAppearance' | 'fromStart';
+  hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
 
   // Metadata
   description?: string;

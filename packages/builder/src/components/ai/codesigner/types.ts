@@ -139,7 +139,7 @@ export type ChangeProposal =
         traits?: Record<string, number>;
         /** Draw a disposition variant at each playthrough vs. use the default. */
         variantSelectionPolicy?: 'fixed' | 'random';
-        hudReveal?: 'onAppearance' | 'fromStart';
+        hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
         /** FULL replacement of the character's disposition/persona variants.
          *  A variant carrying a `stance` has its extraversion/agreeableness
          *  re-derived from the base traits + stance at apply time, keeping

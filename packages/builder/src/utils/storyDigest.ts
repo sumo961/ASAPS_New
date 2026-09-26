@@ -41,7 +41,7 @@ export interface DigestCharacter {
     stance?: { warmth?: number; dominance?: number };
   }> | unknown[];
   variantSelectionPolicy?: 'fixed' | 'random';
-  hudReveal?: 'onAppearance' | 'fromStart';
+  hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
   defaultVariantId?: string;
 }
 

@@ -61,7 +61,7 @@ function proposalDetail(p: ChangeProposal): string | null {
         parts.push('traits: ' + Object.entries(u.traits).map(([t, val]) => `${t.slice(0, 4)} ${Number(val).toFixed(2)}`).join(' '));
       }
       if (u.variantSelectionPolicy) parts.push(`selection: ${u.variantSelectionPolicy} each playthrough`);
-      if (u.hudReveal) parts.push(`HUD shows ${u.hudReveal === 'fromStart' ? 'from the start' : 'when they first appear'}`);
+      if (u.hudReveal) parts.push(`HUD shows ${u.hudReveal === 'fromStart' ? 'from the start' : u.hudReveal === 'onVariantChosen' ? 'once a variant is chosen' : 'when they first appear'}`);
       if (Array.isArray(u.variants)) {
         parts.push('variants: ' + u.variants.map((v: any) => {
           const s = v.stance;

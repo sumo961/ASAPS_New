@@ -91,3 +91,23 @@ describe('character HUD reveal', () => {
     expect(preset.ctx.hasCharacterAppeared('char_karin')).toBe(true);
   });
 });
+
+describe('variants do not hide a HUD (2026-09-26)', () => {
+  const clare = { id: 'char_clare', name: 'clare', displayName: 'Clare', role: 'player', variants: [{ id: 'clare_unguarded', name: 'Unguarded' }] };
+  const nathan = { id: 'char_nathan', name: 'nathan', displayName: 'Nathan', role: 'npc', variants: [{ id: 'nathan_resurfaced', name: 'Resurfaced' }] };
+
+  it('a transition variant (no default, not random): the base persona is in play from the start', async () => {
+    const { story, ctx } = setup([clare, nathan]);
+    expect(ctx.isCharacterHudRevealed('char_clare')).toBe(true);    // player: from the start
+    expect(ctx.isCharacterHudRevealed('char_nathan')).toBe(false);  // npc: not met yet
+    await run(story, ctx, { id: 'n1', speaker: 'Nathan' });
+    expect(ctx.isCharacterHudRevealed('char_nathan')).toBe(true);   // met — no variant switch needed
+  });
+
+  it("'onVariantChosen' waits for the choice (player-picks-a-persona stories)", () => {
+    const { ctx } = setup([{ ...nathan, hudReveal: 'onVariantChosen' }]);
+    expect(ctx.isCharacterHudRevealed('char_nathan')).toBe(false);
+    ctx.applyEffect({ type: 'setCharacterVariant', target: 'char_nathan', variantId: 'nathan_resurfaced' } as any);
+    expect(ctx.isCharacterHudRevealed('char_nathan')).toBe(true);
+  });
+});
