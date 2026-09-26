@@ -2159,8 +2159,12 @@ export class StoryContext extends EventEmitter {
       return true;
     }
 
-    // Trim to handle ASML imports that may have leading/trailing whitespace in names
-    const varName = (condition.variableName || condition.left)?.trim();
+    // Trim to handle ASML imports that may have leading/trailing whitespace in names.
+    // `variable` is what the generator guidance teaches for condition objects;
+    // the analyzers always read it, so the runtime must too — a generated
+    // dialog choice gated on { type:'counter', variable:'candor' } was
+    // otherwise never shown in play while the review called it reachable.
+    const varName = (condition.variableName || (condition as any).variable || condition.left)?.trim();
 
     // Handle other condition types that use variableName/value pattern
     if (!varName) {

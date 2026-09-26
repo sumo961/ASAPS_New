@@ -203,7 +203,11 @@ export function describeCondition(c: Json): string {
   const val = c.value !== undefined ? ` ${JSON.stringify(c.value)}` : '';
   switch (c.type) {
     case 'variable':
-    case 'counter': return `${String(c.variableName)}${op}${val}`;
+    case 'counter': {
+      // Same name fields the engine reads (variableName / variable / left).
+      const name = String(c.variableName ?? c.variable ?? c.left ?? '?');
+      return `${name}${c.character ? ` (${String(c.character)})` : ''}${op}${val}`;
+    }
     case 'counterCompare': return `${String(c.counter1)}${op} ${String(c.counter2)}`;
     case 'inventory': return `${c.checkType === 'lacks' ? 'lacks' : 'has'} ${String(c.item)}${c.character ? ` (${String(c.character)})` : ''}`;
     case 'visitedBeat': return `${c.operator === 'not' || c.operator === '!=' ? 'not visited' : 'visited'} ${String(c.beatId)}`;

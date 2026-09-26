@@ -326,6 +326,11 @@ describe('StoryContext', () => {
       })).toBe(false);
     });
 
+    it('reads the counter name from `variable` too (the generator shape)', () => {
+      expect(context.checkCondition({ type: 'counter', operator: '>=', variable: 'score', value: 2 } as any)).toBe(true);
+      expect(context.checkCondition({ type: 'counter', operator: '>=', variable: 'score', value: 99 } as any)).toBe(false);
+    });
+
     it('should check != operator', () => {
       expect(context.checkCondition({
         type: 'counter',
