@@ -1469,10 +1469,12 @@ export class StoryContext extends EventEmitter {
    * driving mid-story personality shifts should pass false explicitly so
    * accumulated affect survives.
    */
-  setActiveCharacterVariant(charRef: string, variantId: string | null, options?: { seedAffect?: boolean }): string | undefined {
+  setActiveCharacterVariant(charRef: string, variantId: string | null, options?: { seedAffect?: boolean; mode?: 'reseed' | 'shift' }): string | undefined {
     const key = this.resolveCharRef(charRef);
     if (!key) return undefined;
     const previous = this.state.activeCharacterVariants[key];
+    // The persona being left, for a 'shift' (read before the switch).
+    const leaving = options?.mode === 'shift' ? this.getMergedCharacter(key) : undefined;
     // Mark this character's variant as explicitly chosen (not default-
     // applied at startup). Used by HUD overlays that want to gate
     // "is the persona settled?" on actual user choice rather than the
@@ -1492,7 +1494,9 @@ export class StoryContext extends EventEmitter {
     this.emit('characterVariantChanged', { characterRef: key, variantId, previous });
 
     const seed = options?.seedAffect !== false;
-    if (seed) {
+    if (seed && options?.mode === 'shift') {
+      this.shiftAffectBetweenPersonas(key, leaving, this.getMergedCharacter(key));
+    } else if (seed) {
       // Wipe per-character affect so the new variant's seed is the
       // authoritative starting point, then re-seed from authored data
       // (which now reads the merged character via getMergedCharacter).
@@ -1502,6 +1506,51 @@ export class StoryContext extends EventEmitter {
       this.seedCharacterAffectFor(key);
     }
     return previous;
+  }
+
+  /**
+   * A mid-story variant switch (2026-09-26): the character keeps what they
+   * have lived through and the authored change is applied ON TOP — each mood
+   * axis and each sentiment the new persona seeds moves by (its seed −
+   * the previous persona's seed, 0 if it had none) — added if absent;
+   * feelings the new persona does not mention stay as lived.
+   * Emotions and the "since the start" baselines are left alone. A full
+   * reseed erased every relationship built so far (Late Light: the whole
+   * Act I trust arc, so the Visit could never happen).
+   */
+  private shiftAffectBetweenPersonas(key: string, from: any, to: any): void {
+    if (!to) return;
+    const fromMood = from?.initialMood ?? { valence: 0, arousal: 0 };
+    const toMood = to.initialMood ?? fromMood;
+    const dV = (toMood.valence ?? 0) - (fromMood.valence ?? 0);
+    const dA = (toMood.arousal ?? 0) - (fromMood.arousal ?? 0);
+    if (dV !== 0 || dA !== 0) {
+      const current = this.state.characterMoods[key] ?? { valence: fromMood.valence ?? 0, arousal: fromMood.arousal ?? 0 };
+      const next = { valence: StoryContext.clampUnit(current.valence + dV), arousal: StoryContext.clampUnit(current.arousal + dA) };
+      this.state.characterMoods[key] = next;
+      this.emit('characterMoodChanged', { characterRef: key, mood: next, previous: current });
+    }
+    const seedOf = (persona: any, ref: string, emotion: string): number =>
+      (persona?.initialSentiments ?? []).find((s: any) => s?.toEntityRef === ref && s?.emotion === emotion)?.strength ?? 0;
+    // Only what the new persona names: a variant's sentiment list is a
+    // partial overlay ("at least one shifted sentiment"), so a feeling it
+    // does not mention stays as lived.
+    const pairs = new Map<string, { ref: string; emotion: string }>();
+    for (const s of to.initialSentiments ?? []) {
+      if (s?.toEntityRef && s?.emotion) pairs.set(`${s.toEntityRef}|${s.emotion}`, { ref: s.toEntityRef, emotion: s.emotion });
+    }
+    if (!this.state.characterSentiments[key]) this.state.characterSentiments[key] = [];
+    const list = this.state.characterSentiments[key];
+    let changed = false;
+    for (const { ref, emotion } of pairs.values()) {
+      const delta = seedOf(to, ref, emotion) - seedOf(from, ref, emotion);
+      if (delta === 0) continue;
+      const existing = list.find((s) => s.toEntityRef === ref && s.emotion === emotion);
+      if (existing) existing.strength = StoryContext.clampUnit(existing.strength + delta);
+      else list.push({ toEntityRef: ref, emotion, strength: StoryContext.clampUnit(delta), createdAt: Date.now() });
+      changed = true;
+    }
+    if (changed) this.emit('characterSentimentChanged', { characterRef: key });
   }
 
   // ---------------------------------------------------------------------------
@@ -2272,8 +2321,11 @@ export class StoryContext extends EventEmitter {
       case 'setCharacterVariant': {
         const variantId = (effect as any).variantId as string | undefined;
         if (variantId !== undefined) {
+          // Mid-story: keep what the character has lived through and apply
+          // the variant's change on top ('shift'); suppressSeed: no change.
           this.setActiveCharacterVariant(effect.target, variantId, {
             seedAffect: !((effect as any).suppressSeed),
+            mode: 'shift',
           });
         }
         break;

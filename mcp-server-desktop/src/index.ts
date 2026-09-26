@@ -117,6 +117,16 @@ extrovert" branches, or for character development arcs that need an
 atomic before/after switch (an awakening, a revelation, a death of
 innocence). Switch via \`setCharacterVariant\` Effect; check with
 \`characterVariant\` Condition.
+A switch in mid-story KEEPS what the character has lived through and
+applies the change on top: their mood moves by the difference between
+the variant's initialMood and the previous persona's, and each sentiment
+the variant seeds moves by its difference (added if the character had
+none); sentiments the variant does not list stay as they are. So give a
+transition variant only the feelings that should shift, at the level
+they should shift TO relative to the base (base trust 0.3, variant trust
+0.1 = "trust drops by 0.2" — whatever trust the player built). Add
+\`"suppressSeed": true\` to switch persona (name, portrait, traits)
+without touching feelings.
 A variant whose identity is interpersonal (hostile, cooperative,
 withdrawn, leading…) should also carry a \`stance\` — its position on the
 interpersonal circumplex: \`"stance": { "warmth": -1..1, "dominance": -1..1 }\`
