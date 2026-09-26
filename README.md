@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.104** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.104 is the replay release**: an
+Current release: **v0.9.105** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.105 is a small follow-up to the
+replay release**: the story checks now understand replays (a branch for a
+returning player is no longer reported unreachable) and variables that only
+have a default value; chat-style conversations keep their text clear of
+HUDs in every case; and HUDs in exported fixed-canvas stories hold still
+while an AI beat is loading.
+
+**v0.9.104 was the replay release**: an
 ending's Restart can keep chosen things — a variable, a character's counter,
 the persona the player picked — while everything else resets, and the
 built-in `${playthrough}` counts the runs; a new *Characters* reset option

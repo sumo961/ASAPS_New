@@ -1,10 +1,15 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.104, 2026-09-26)
+## 2026-09-26: Review fixes — the checks know about replays, and HUDs hold still (v0.9.105)
 
 ### Overview
 
-Fixes from a code review of the v0.9.104 changes.
+A small follow-up to the replay release, from a code review of its
+changes. The story checks now understand the built-in `playthrough` and
+variable defaults (a returning-player branch was reported unreachable),
+the "restarted ending isn't visited" rule holds on every path, the chat
+view keeps its padding when a HUD goes away, and HUDs in exported
+fixed-canvas stories no longer jump during an AI beat's loading screen.
 
 ### Replays and analysis
 

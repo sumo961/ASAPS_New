@@ -929,7 +929,7 @@ These survive the Restart of any End Screen or AI Summary. The Preview's own **R
 
 *Full or partial reset.* Each option resets its kind of state, characters included: **Counters** resets character counters too, and **Characters (feelings, variants)** resets how the characters feel and which variant is in play. Untick **Characters** for a replay where the characters remember the player — the plot starts over, the relationships don't. Whatever you marked *Keep across restarts* survives in every case.
 
-**Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending (whether or not that ending resets anything). Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it.
+**Counting playthroughs.** The built-in **playthrough** is 1 on the first run and goes up by one on every Restart from an ending (whether or not that ending resets anything). Show it in text with `${playthrough}` (*"Back again — run ${playthrough}."*), or test it in a condition (variable **playthrough** ≥ 2) to greet a returning player. You don't need to declare it. The analysis tools know it too: a story that tests **playthrough** is explored both as a first run and as a replay, so a returning-player branch isn't reported as unreachable.
 
 Once **Reset** is on, the End Screen's Inspector says all this under *Restart leads to*: *"What survives the reset: variables, counters and character variants marked Keep across restarts. ${playthrough} counts the runs."*
 
@@ -2715,7 +2715,7 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
    - A badge indicates if the path includes typed input
 4. Select a preset to load that state; the preview restarts paused so you can look before you play
 
-**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant.
+**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant. A story that tests the built-in [playthrough](#keep-across-restarts) is explored as a first run and as a replay, so a returning player's state can show up as a preset of its own.
 
 **Only the states that play differently.** A long story can reach a beat by hundreds of routes. The list is condensed: two paths become one preset when nothing ahead of this beat — no condition, choice guard, entry requirement or `${…}` text placeholder — would come out differently. What's left is the handful of states worth testing. The **↻** button in the menu header re-runs the analysis after you've edited the story.
 
@@ -2799,6 +2799,8 @@ Click the **Debug** button in the header to open the **Debug Tools** window. It 
 *The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
 
 Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Clicking a beat in the list highlights it in the main builder flowchart.
+
+A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable with a default value in Project Settings counts as set, and so does the built-in **playthrough**.
 
 ### Path Analysis
 
