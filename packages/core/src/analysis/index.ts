@@ -12,6 +12,7 @@ export type {
   SimulatedStep,
   SimulatedPath,
   SimulationAnalysisConfig,
+  SimulationProgress,
 } from './StateSimulationAnalyzer';
 export type {
   ConstraintAnalysisConfig,

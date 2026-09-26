@@ -15,7 +15,7 @@
  * supplied, character ids resolve to display names ("Alex feels …"
  * instead of "char_alex feels …"). Fall-through is the raw ref.
  */
-import type { Effect } from '@asaps/core';
+import { selfFeelingLabel, type Effect } from '@asaps/core';
 
 interface CharacterRef {
   id: string;
@@ -198,7 +198,7 @@ export function summarizeChoiceEffects(
       const polarity = s.delta < 0 ? '−' : '+';
       const value = `${polarity}${Math.abs(s.delta).toFixed(2)}`;
       if (isSelf) {
-        phrases.push(`self-${s.emotion} ${dir} (${value})`);
+        phrases.push(`${selfFeelingLabel(s.emotion)} ${dir} (${value})`);
       } else {
         const towardName = resolveName(s.toward);
         phrases.push(`${s.emotion} toward ${towardName} ${dir} (${value})`);

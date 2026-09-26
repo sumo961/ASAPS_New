@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
-import { choiceStateOptions, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
+import { choiceStateOptionsAsync, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
 import { XRMapEditor } from './XRMapEditor';
 import { XRFloorPlanEditor } from './XRFloorPlanEditor';
 type PanoramaViewMode = 'layout' | 'preview';
@@ -2119,6 +2119,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // choice; any other key shows only what that player state would see.
   const [choiceStateKey, setChoiceStateKey] = useState<string>('all');
   const [choiceStateOpts, setChoiceStateOpts] = useState<ChoiceStateOption[] | null>(null);
+  // While the player states are being traced: how many beats the path
+  // analysis has reached so far (it runs in slices, the editor stays live).
+  const [choiceStateProgress, setChoiceStateProgress] = useState<{ reached: number; total: number } | null>(null);
   // Choice ids of the node's displayed buttons, in element order (choice_0…),
   // so a drag can be turned into a reorder of the real choices.
   const displayedChoiceIdsRef = useRef<string[]>([]);
@@ -2908,10 +2911,23 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     return [...elements.filter(e => !isBtn(e)), ...stack];
   }, [beat, selectedPhaseId, dialogTreeNodePath, onBeatUpdate, generatePhaseElements, projectSettings, choiceStateOpts, choiceStateKey]);
 
-  // New beat: back to "All choices", presets recomputed on demand.
+  // New beat: back to "All choices"; a dialog tree's player states are
+  // traced in the background (cancelled when the beat changes).
   useEffect(() => {
     setChoiceStateKey('all');
     setChoiceStateOpts(null);
+    setChoiceStateProgress(null);
+    if (!beat || beat.type !== 'dialogTree') return;
+    const signal = { aborted: false };
+    const total = beats.length;
+    setChoiceStateProgress({ reached: 0, total });
+    choiceStateOptionsAsync(beats, characters as any, beat.id, (p) => setChoiceStateProgress({ reached: p.beatsReached, total }), signal)
+      .then((opts) => { if (!signal.aborted) setChoiceStateOpts(opts); })
+      .catch((err) => { if (err?.name !== 'AbortError') console.warn('[VisualWorkspace] Show-as states failed:', err); })
+      .finally(() => { if (!signal.aborted) setChoiceStateProgress(null); });
+    return () => { signal.aborted = true; };
+    // Traced once per beat, like before; edits elsewhere don't re-run it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beat?.id]);
 
   /**
@@ -6007,19 +6023,25 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   <span className="font-semibold uppercase tracking-wide text-xs">Show as</span>
                   <select
                     value={choiceStateKey}
-                    onMouseDown={() => {
-                      if (!choiceStateOpts && beat) setChoiceStateOpts(choiceStateOptions(beats, characters as any, beat.id));
-                    }}
-                    onFocus={() => {
-                      if (!choiceStateOpts && beat) setChoiceStateOpts(choiceStateOptions(beats, characters as any, beat.id));
-                    }}
                     onChange={(e) => setChoiceStateKey(e.target.value)}
                     className="px-2 py-1 rounded-md border border-slate-300 bg-white text-slate-700 w-[240px] truncate"
                   >
                     {(choiceStateOpts ?? [{ key: 'all', label: 'All choices', state: null }]).map((o) => (
                       <option key={o.key} value={o.key}>{o.label}</option>
                     ))}
+                    {choiceStateProgress && (
+                      <option disabled value="__tracing">Tracing player paths… {choiceStateProgress.reached} of {choiceStateProgress.total} beats</option>
+                    )}
                   </select>
+                  {choiceStateProgress && (
+                    <span
+                      className="flex items-center gap-1.5 text-xs text-slate-500 normal-case whitespace-nowrap"
+                      title="Playing every path through the story to find the states a player can arrive here in. The editor stays usable meanwhile."
+                    >
+                      <span className="inline-block w-3 h-3 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" />
+                      Tracing paths… {choiceStateProgress.reached}/{choiceStateProgress.total} beats
+                    </span>
+                  )}
                 </label>
               )}
             </div>

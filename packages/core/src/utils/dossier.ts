@@ -265,7 +265,7 @@ export function buildDossier(
         lines.push('Feels toward themselves:');
         for (const s of selfRows) {
           const intensity = describeSentimentIntensity(s.strength);
-          lines.push(`  - ${intensity} self-${s.emotion}`);
+          lines.push(`  - ${intensity} ${selfFeelingLabel(s.emotion)}`);
         }
       }
       if (otherRows.length > 0) {
@@ -327,6 +327,15 @@ export function buildDossier(
  * @param value Axis value, expected in [-1, 1]; rounded to nearest band.
  * @param axis  'valence' (pleasant↔unpleasant) or 'arousal' (calm↔excited).
  */
+/**
+ * Label for a feeling a character holds toward themselves: "self-shame".
+ * Emotions already named that way ("self-respect", "self-doubt") keep
+ * their name instead of becoming "self-self-respect".
+ */
+export function selfFeelingLabel(emotion: string): string {
+  return /^self[-\s]/i.test(emotion) ? emotion : `self-${emotion}`;
+}
+
 export function describeMoodAxis(value: number, axis: 'valence' | 'arousal'): string {
   if (axis === 'valence') {
     if (value >= 0.6) return 'happy';

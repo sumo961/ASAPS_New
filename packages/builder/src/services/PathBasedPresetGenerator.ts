@@ -12,6 +12,7 @@ import {
   type SimulationState,
   type SimulatedPath,
   type SimulatedStep,
+  type SimulationProgress,
 } from '@asaps/core';
 
 /**
@@ -86,15 +87,47 @@ export function generatePathPresets(
     };
   }
 
-  // Run forward analysis to get all paths
-  const analyzer = new StateSimulationAnalyzer(story, {
+  const analyzer = presetAnalyzer(story);
+  return presetsFromAnalysis(story, targetBeat, analyzer, analyzer.analyze(), startTime);
+}
+
+/**
+ * generatePathPresets without freezing the UI: the path simulation runs in
+ * frame-sized slices and reports progress between them.
+ */
+export async function generatePathPresetsAsync(
+  story: Story,
+  targetBeatId: string,
+  onProgress?: (progress: SimulationProgress) => void,
+  signal?: { aborted: boolean }
+): Promise<PresetGenerationResult> {
+  const startTime = performance.now();
+  const targetBeat = story.getBeat(targetBeatId);
+  if (!targetBeat) {
+    return { targetBeatId, targetBeatName: 'Unknown', presets: [], totalPaths: 0, analysisTime: performance.now() - startTime };
+  }
+  const analyzer = presetAnalyzer(story);
+  const analysisResult = await analyzer.analyzeAsync(onProgress, signal);
+  return presetsFromAnalysis(story, targetBeat, analyzer, analysisResult, startTime);
+}
+
+function presetAnalyzer(story: Story): StateSimulationAnalyzer {
+  return new StateSimulationAnalyzer(story, {
     // The simulation is bounded by its own queue/step caps now (a 76-beat
     // story takes ~1.5 s at any budget); 500 left late beats with no preset.
     maxPaths: 20000,
     maxDepth: 100,
   });
+}
 
-  const analysisResult = analyzer.analyze();
+function presetsFromAnalysis(
+  story: Story,
+  targetBeat: NonNullable<ReturnType<Story['getBeat']>>,
+  analyzer: StateSimulationAnalyzer,
+  analysisResult: ReturnType<StateSimulationAnalyzer['analyze']>,
+  startTime: number
+): PresetGenerationResult {
+  const targetBeatId = targetBeat.id;
 
   // Find paths that pass through the target beat
   const pathsToTarget = findPathsToTarget(analysisResult.outcomes, targetBeatId);

@@ -6,8 +6,8 @@
  * "Start as if…" presets, so the editor and the preview agree.
  */
 
-import { Story, StoryContext, type Beat, type StatePreset } from '@asaps/core';
-import { generatePathPresets } from '../services/PathBasedPresetGenerator';
+import { Story, StoryContext, type Beat, type StatePreset, type SimulationProgress } from '@asaps/core';
+import { generatePathPresets, generatePathPresetsAsync, type PresetGenerationResult } from '../services/PathBasedPresetGenerator';
 import { describeCondition } from './wiringVocabulary';
 
 type Json = Record<string, any>;
@@ -22,21 +22,49 @@ export interface ChoiceStateOption {
 
 /** "All choices" first, then "Start fresh", then one option per distinct arrival state. */
 export function choiceStateOptions(beats: Beat[], characters: unknown[] | undefined, beatId: string): ChoiceStateOption[] {
+  const story = storyFor(beats, characters);
+  let result: PresetGenerationResult | null = null;
+  try { result = generatePathPresets(story, beatId); } catch (err) { console.warn('[dialogChoiceVisibility] path presets failed:', err); }
+  return optionsFrom(result, story);
+}
+
+/**
+ * choiceStateOptions without freezing the editor: the path analysis runs in
+ * slices and reports how many beats it has reached (for a progress label).
+ */
+export async function choiceStateOptionsAsync(
+  beats: Beat[],
+  characters: unknown[] | undefined,
+  beatId: string,
+  onProgress?: (progress: SimulationProgress) => void,
+  signal?: { aborted: boolean }
+): Promise<ChoiceStateOption[]> {
+  const story = storyFor(beats, characters);
+  let result: PresetGenerationResult | null = null;
+  try {
+    result = await generatePathPresetsAsync(story, beatId, onProgress, signal);
+  } catch (err) {
+    if ((err as Error)?.name === 'AbortError') throw err;
+    console.warn('[dialogChoiceVisibility] path presets failed:', err);
+  }
+  return optionsFrom(result, story);
+}
+
+function storyFor(beats: Beat[], characters: unknown[] | undefined): Story {
+  const story = new Story({ title: 'Visual Editor', firstBeatId: beats[0]?.id });
+  if (Array.isArray(characters) && characters.length) story.setCharacters(characters as any[]);
+  for (const b of beats) story.addBeat(b);
+  return story;
+}
+
+function optionsFrom(result: PresetGenerationResult | null, story: Story): ChoiceStateOption[] {
   const options: ChoiceStateOption[] = [
     { key: 'all', label: 'All choices', state: null },
     { key: 'fresh', label: 'Start fresh (no prior state)', state: { variables: {}, counters: {}, inventory: [], visitedBeats: [] } },
   ];
-  try {
-    const story = new Story({ title: 'Visual Editor', firstBeatId: beats[0]?.id });
-    if (Array.isArray(characters) && characters.length) story.setCharacters(characters as any[]);
-    for (const b of beats) story.addBeat(b);
-    const result = generatePathPresets(story, beatId);
-    result.presets.forEach((p, i) => {
-      options.push({ key: `path_${i}`, label: p.pathDescription || p.preset.name || `State ${i + 1}`, state: p.preset.state, story });
-    });
-  } catch (err) {
-    console.warn('[dialogChoiceVisibility] path presets failed:', err);
-  }
+  result?.presets.forEach((p, i) => {
+    options.push({ key: `path_${i}`, label: p.pathDescription || p.preset.name || `State ${i + 1}`, state: p.preset.state, story });
+  });
   return options;
 }
 

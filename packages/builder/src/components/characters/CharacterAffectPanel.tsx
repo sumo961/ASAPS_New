@@ -12,7 +12,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { describeMoodAxis, type EmotionDefinition } from '@asaps/core';
+import { describeMoodAxis, selfFeelingLabel, type EmotionDefinition } from '@asaps/core';
 import type { Character } from '../../types/character';
 import { MoodPad } from './MoodPad';
 
@@ -158,7 +158,7 @@ export const CharacterAffectPanel: React.FC<CharacterAffectPanelProps> = ({
                               Alex" — clearer when the holder is also the
                               target. */}
                           {s.toEntityRef === char.id ? (
-                            <>{describeStrength(s.strength)} <strong>self-{s.emotion}</strong></>
+                            <>{describeStrength(s.strength)} <strong>{selfFeelingLabel(s.emotion)}</strong></>
                           ) : (
                             <>{describeStrength(s.strength)} <strong>{s.emotion}</strong> toward <em>{resolveName(s.toEntityRef)}</em></>
                           )}

@@ -174,6 +174,26 @@ function hashState(state: SimulationState): string {
 // StateSimulationAnalyzer
 // ============================================================================
 
+/** How far a running path analysis has got (analyzeAsync progress). */
+export interface SimulationProgress {
+  /** Simulation steps taken so far. */
+  expansions: number;
+  /** Distinct beats the simulation has reached so far. */
+  beatsReached: number;
+}
+
+/** Let the event loop run (paint, input) before the next slice of work. */
+function yieldToEventLoop(): Promise<void> {
+  if (typeof MessageChannel !== 'undefined') {
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => { channel.port1.close(); resolve(); };
+      channel.port2.postMessage(null);
+    });
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 export class StateSimulationAnalyzer {
   private story: Story;
   private config: Required<SimulationAnalysisConfig>;
@@ -312,6 +332,33 @@ export class StateSimulationAnalyzer {
   }
 
   /**
+   * analyze(), without holding the thread: runs in slices of about a frame
+   * and reports how far it got between them. Same result as analyze().
+   */
+  public async analyzeAsync(
+    onProgress?: (progress: SimulationProgress) => void,
+    signal?: { aborted: boolean },
+    sliceMs = 12
+  ): Promise<ConstraintPathResult> {
+    const startTime = performance.now();
+    const firstBeatId = this.story.getFirstBeatId();
+    if (!firstBeatId) return this.buildEmptyResult(startTime);
+    const run = this.explorePaths(firstBeatId, this.initialStates());
+    let sliceStart = performance.now();
+    let step = run.next();
+    while (!step.done) {
+      if (performance.now() - sliceStart >= sliceMs) {
+        onProgress?.(step.value);
+        await yieldToEventLoop();
+        if (signal?.aborted) throw new DOMException('Path analysis cancelled', 'AbortError');
+        sliceStart = performance.now();
+      }
+      step = run.next();
+    }
+    return this.buildResult(step.value, startTime);
+  }
+
+  /**
    * Return the raw SimulatedPath[] without grouping into outcome groups.
    * Used by PathTree builder which needs the flat path data directly.
    */
@@ -428,6 +475,18 @@ export class StateSimulationAnalyzer {
    * For a hub with 4 choices, this gives 4! = 24 orderings per ending.
    */
   private exploreAllPaths(startBeatId: string, initialStates: SimulationState[]): SimulatedPath[] {
+    const run = this.explorePaths(startBeatId, initialStates);
+    let step = run.next();
+    while (!step.done) step = run.next();
+    return step.value;
+  }
+
+  /**
+   * The exploration itself, pausable: yields its progress every few hundred
+   * steps so analyzeAsync can give the UI a frame. The sync callers drain it
+   * in one go.
+   */
+  private *explorePaths(startBeatId: string, initialStates: SimulationState[]): Generator<SimulationProgress, SimulatedPath[]> {
     const paths: SimulatedPath[] = [];
 
     // Stack of exploration frames - each frame is a separate branch
@@ -480,6 +539,7 @@ export class StateSimulationAnalyzer {
 
     while (stack.length > 0 && paths.length < this.config.maxPaths) {
       if (++expansions > (this.config.maxExpansions ?? 300000)) { this.truncated = true; break; }
+      if (expansions % 250 === 0) yield { expansions, beatsReached: seenBeats.size };
       // Use BFS (shift) instead of DFS (pop) to ensure fair coverage
       // across all branches at each level. DFS can exhaust the maxPaths
       // budget on the first few branches of a wide choice beat,
