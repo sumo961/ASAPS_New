@@ -89,6 +89,31 @@ undo and redo. Dialog trees keep "Show Speaker Name" on save.
 
 **Files modified:** `packages/builder/src/components/visual/{VisualWorkspace,VisualBeatEditor,VisualPropertiesPanel}.tsx`, `packages/core/src/layout/{dialogTreeLayout,elementSizing}.ts`, `packages/renderer/src/components/{PositionedBeatView,SlotFlowView}.tsx`, `packages/renderer/src/utils/linkColor.ts`, `packages/builder/src/hooks/useStoryBuilder.ts`
 
+### Exported player and phones (found by the release checklist)
+
+A phone held sideways (740×360) counted as a tablet, so full HUD cards
+covered the text; a stage under 480 high is now a phone and gets the
+compact strip. Exported responsive stories laid their HUDs out on the
+authored stage shrunk into the window while the text reflowed to the
+window — HUDs came out small, inset and over the text; they are now laid
+out for the real window at 1:1, like the Preview Window. The exported
+player also resolves the project's layout mode with the Preview Window's
+rule (moved to core). The player's Menu button no longer covers a
+top-right clock: it counts as chrome, and the timer and countdown are
+drawn where the HUD packer stacks them.
+
+**Files modified:** `packages/core/src/utils/{assetVariant,layoutMode}.ts`, `packages/renderer/src/components/{ScreenHudLayer,HudOverlaysLayer,TimerHudDisplay,PositionedBeatView,SpatialFlowView}.tsx`, `packages/player-web/src/WebPlayer.tsx`, `packages/player/src/PlayerUI.tsx`
+
+### User Guide
+
+Audited against the UI for this release: a Co-Designer section, the
+flowchart's arrow legend, restart targets, Random Target branches, Show
+HUD, the base persona, quoted-speech voicing, dialog-tree choices in the
+Visual Editor; wrong text corrected (hypertext syntax, keypad layouts,
+stale menus). Four new screenshots.
+
+**Files modified:** `docs/USER_GUIDE.md`, `docs/images/72–75`
+
 ### AI prompts and import
 
 Prompt audit for Sonnet 5 / Opus 5: closing-line prefill fixed, Opus 5.5

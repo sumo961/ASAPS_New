@@ -32,7 +32,9 @@ simulation read links the same way and understand character feelings, so
 "Start as if…" presets exist for every beat; a character's HUD appears
 when the character does; quoted speech is spoken in the character's voice;
 dialog-tree buttons in the Visual Editor reorder by drag, with a "Show as"
-state picker; hypertext is readable in every theme.
+state picker; hypertext is readable in every theme. Exported stories
+fit their HUDs to the real window and fold them into the compact strip on
+phones in either orientation.
 
 **v0.9.102 was the UX-evaluation
 release**: renaming a character keeps the story intact; the builder has no
