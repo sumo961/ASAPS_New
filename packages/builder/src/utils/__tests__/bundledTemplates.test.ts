@@ -36,6 +36,47 @@ describe('template registry', () => {
   });
 });
 
+describe('every bundled template, against current runtime rules', () => {
+  const loadSource = (file: string) =>
+    JSON.parse(readFileSync(join(templatesDir, 'src', file.replace(/\.asapst$/, '.project.json')), 'utf-8'));
+
+  it('the .asapst holds exactly its source JSON (repacked after every edit)', async () => {
+    const JSZip = (await import('jszip')).default;
+    for (const t of registry.templates) {
+      const zip = await JSZip.loadAsync(readFileSync(join(templatesDir, t.file)));
+      const packed = JSON.parse(await zip.file('project.json')!.async('string'));
+      expect(packed, `${t.file} is stale — repack it from src/`).toEqual(loadSource(t.file));
+    }
+  });
+
+  it('every ending with a Restart resets and says where replays begin', () => {
+    for (const t of registry.templates) {
+      for (const b of loadSource(t.file).project.story.beats) {
+        if (b.type !== 'endScreen' || b.parameters?.showRestart === false) continue;
+        // reset defaults to off: replays would carry feelings, visits and a
+        // drawn variant over ("meet a different Karin" would not happen).
+        expect(b.parameters?.reset ?? b.reset, `${t.file} ${b.id} does not reset`).toBe(true);
+        expect(b.connections?.[0]?.targetId, `${t.file} ${b.id} restart leads nowhere`).toBeTruthy();
+      }
+    }
+  });
+
+  it("a character's screen HUD can actually appear", () => {
+    for (const t of registry.templates) {
+      const story = loadSource(t.file).project.story;
+      const text = JSON.stringify(story.beats);
+      for (const c of story.characters ?? []) {
+        const hud = c.meterFrame?.dockMode === 'screen' || !!c.moodFrame || c.inventoryFrame?.dockMode === 'screen';
+        if (!hud || c.hudReveal === 'fromStart' || c.role === 'player') continue;
+        // Default reveal = first appearance: some beat must feature them.
+        const featured = [c.id, c.name, c.displayName].filter(Boolean).some((n: string) =>
+          text.includes(`"characterRef":"${n}"`) || text.includes(`"speaker":"${n}"`) || text.includes(`"characterId":"${n}"`) || text.includes(`"npcName":"${n}"`));
+        expect(featured, `${t.file}: ${c.id}'s HUD never appears (nothing features them; set hudReveal "fromStart"?)`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('rehearsal template content', () => {
   const data = JSON.parse(
     readFileSync(join(templatesDir, 'src/rehearsal-difficult-client.project.json'), 'utf-8'),

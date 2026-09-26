@@ -273,7 +273,8 @@
      "parameters": {
       "message": "One object, three ways of seeing.",
       "showRestart": true,
-      "restartText": "Look again"
+      "restartText": "Look again",
+      "reset": true
      }
     }
    ],

@@ -191,7 +191,8 @@
           ],
           "parameters": {
             "text": "The end.",
-            "buttonText": "Restart"
+            "buttonText": "Restart",
+            "reset": true
           }
         }
       ],
@@ -439,7 +440,8 @@
             "meterSpacing": 6,
             "showLabels": true,
             "meterWidth": 130
-          }
+          },
+          "hudReveal": "fromStart"
         }
       ],
       "clusters": [],

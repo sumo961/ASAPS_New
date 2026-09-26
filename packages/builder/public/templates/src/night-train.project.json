@@ -57,7 +57,8 @@
        }
       ]
      },
-     "speaker": "Jo"
+     "speaker": "Jo",
+     "characterRef": "char_jo"
     },
     {
      "id": "beat_chat2",
@@ -83,7 +84,8 @@
        }
       ]
      },
-     "speaker": "Jo"
+     "speaker": "Jo",
+     "characterRef": "char_jo"
     },
     {
      "id": "beat_chat3",
@@ -109,7 +111,8 @@
        }
       ]
      },
-     "speaker": "Jo"
+     "speaker": "Jo",
+     "characterRef": "char_jo"
     },
     {
      "id": "beat_talk",
@@ -159,7 +162,8 @@
        }
       ]
      },
-     "speaker": "Jo"
+     "speaker": "Jo",
+     "characterRef": "char_jo"
     },
     {
      "id": "beat_end_off",
@@ -177,7 +181,8 @@
      "parameters": {
       "message": "The platform is small and cold and hers alone. The train pulls away with the phone still on the seat, still lighting up for nobody.\n\n23:58 — jo: \"im out. station cafe is open. cab in 10. dont sleep yet ok\"",
       "showRestart": true,
-      "restartText": "Read the thread again"
+      "restartText": "Read the thread again",
+      "reset": true
      }
     },
     {
@@ -196,7 +201,8 @@
      "parameters": {
       "message": "She walks the length of two carriages without hurrying, the way you told her to, and sits down across from the conductor. The phone stops lighting up somewhere before the river bridge. Nobody ever comes for it.\n\n00:31 — jo: \"home. deadbolt. tell you the rest tomorrow. thank you for staying up\"",
       "showRestart": true,
-      "restartText": "Read the thread again"
+      "restartText": "Read the thread again",
+      "reset": true
      }
     }
    ],

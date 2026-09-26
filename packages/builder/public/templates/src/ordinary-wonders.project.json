@@ -276,7 +276,8 @@
      "parameters": {
       "message": "Expedition complete.\n\nSame streets, different eyes. Restart tomorrow — the scatter never lands in the same place twice.",
       "showRestart": true,
-      "showCredits": false
+      "showCredits": false,
+      "reset": true
      }
     }
    ],

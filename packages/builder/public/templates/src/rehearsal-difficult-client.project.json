@@ -138,7 +138,7 @@
           "x": 800,
           "y": 220,
           "parameters": {
-            "text": "The session is over. Before you restart, take two minutes:\n\n\u2022 Which disposition did Karin arrive in today \u2014 and when did you first notice?\n\u2022 What did you say that opened her up? What shut her down?\n\u2022 Did you leave with a concrete next step, or only with an atmosphere?\n\nRestart the story to meet a different Karin. The scenario stays the same; she doesn't.\n\nFor instructors: this project is a template. Open the character editor to see how Karin's dispositions are built (four variants on one character, drawn at random each playthrough), then adapt the scenario, the client, and the dispositions to your own case material.",
+            "text": "Session ${playthrough} is over. Before you restart, take two minutes:\n\n\u2022 Which disposition did Karin arrive in today \u2014 and when did you first notice?\n\u2022 What did you say that opened her up? What shut her down?\n\u2022 Did you leave with a concrete next step, or only with an atmosphere?\n\nRestart the story to meet a different Karin. The scenario stays the same; she doesn't.\n\nFor instructors: this project is a template. Open the character editor to see how Karin's dispositions are built (four variants on one character, drawn at random each playthrough), then adapt the scenario, the client, and the dispositions to your own case material.",
             "buttonText": "Continue"
           }
         },
@@ -156,7 +156,8 @@
           "x": 1040,
           "y": 220,
           "parameters": {
-            "text": "Session complete.\n\nRestart to rehearse with a different Karin."
+            "text": "Session complete.\n\nRestart to rehearse with a different Karin.",
+            "reset": true
           }
         }
       ],
