@@ -1013,6 +1013,8 @@ export const PreviewWindow: React.FC = () => {
         width: STAGE_WIDTH,
         height: STAGE_HEIGHT,
       });
+      // Dev-only hook so automated checks can read the live renderer (theme, state).
+      if (import.meta.env.DEV) (window as any).__previewRenderer = reactRenderer;
 
       // Disable renderer's internal scaling - PreviewWindow handles scaling via CSS transforms
       (reactRenderer as any).setDisableScaling?.(true);

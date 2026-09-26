@@ -25,6 +25,7 @@
  * See project_responsive_layout_system memory for the full rationale.
  */
 
+import { readableLinkColor } from '../utils/linkColor';
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
 import { slotIntentFor, slotAnimationsFor, uiString } from '@asaps/core';
@@ -1687,7 +1688,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       text={bodyText}
                       links={(content as any).links}
                       onLinkClick={onAction}
-                      linkColor={theme.button?.backgroundColor}
+                      linkColor={readableLinkColor(theme as any)}
                     />
                   : /* Markdown-lite body — hyperText stays plain because the
                        link splitter matches literal words in the authored
@@ -2582,7 +2583,7 @@ const HyperTextBody: React.FC<{
     }
     const isHovered = hoveredWord === link.word;
     const linkStyle: React.CSSProperties = {
-      color: isHovered && link.style?.hoverColor
+      color: isHovered && link.style?.hoverColor && link.style.hoverColor.toLowerCase() !== '#003366' // editor default hover = theme
         ? link.style.hoverColor
         : ((link.style?.color && !['#0066cc', '#3b82f6'].includes(link.style.color.toLowerCase()))
             ? link.style.color

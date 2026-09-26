@@ -8,6 +8,7 @@ import { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_BEAT_TYPES } from '../utils/legac
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { getAnimationManager } from '../animation/AnimationEngine';
 import { CharacterMeterFrame, type MeterFrameConfig, type MeterCounterData } from './CharacterMeterFrame';
+import { readableLinkColor } from '../utils/linkColor';
 import { CharacterInventoryFrame, type InventoryFrameConfig, type InventoryItemData } from './CharacterInventoryFrame';
 import { CharacterMoodFrame } from './CharacterMoodFrame';
 import { CharacterMoodToken } from './CharacterMoodToken';
@@ -4087,7 +4088,7 @@ const HyperTextContent: React.FC<{
       // The app's default link blues (#0066cc from the editor, #3b82f6
       // legacy) are treated as "use the theme accent" so links read on the
       // dark stage; an author-picked non-default color still wins.
-      color: isHovered && link.style?.hoverColor
+      color: isHovered && link.style?.hoverColor && link.style.hoverColor.toLowerCase() !== '#003366' // editor default hover = theme
         ? link.style.hoverColor
         : ((link.style?.color && !['#0066cc', '#3b82f6'].includes(link.style.color.toLowerCase()))
             ? link.style.color
@@ -4494,7 +4495,7 @@ const DialogElement: React.FC<{
                 text={displayedText}
                 hyperlinks={hyperlinks}
                 onLinkClick={onAction}
-                themeLinkColor={theme.button?.backgroundColor}
+                themeLinkColor={readableLinkColor(theme as any)}
               />
             ) : (
               (() => {
@@ -4517,7 +4518,7 @@ const DialogElement: React.FC<{
                 text={displayedText}
                 hyperlinks={hyperlinks}
                 onLinkClick={onAction}
-                themeLinkColor={theme.button?.backgroundColor}
+                themeLinkColor={readableLinkColor(theme as any)}
               />
             ) : (
               <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(displayedText) }} />
@@ -6205,7 +6206,7 @@ const FlexTextElement: React.FC<{
             text={textToDisplay}
             hyperlinks={hyperlinks}
             onLinkClick={onAction}
-            themeLinkColor={theme.button?.backgroundColor}
+            themeLinkColor={readableLinkColor(theme as any)}
           />
         ) : (
           textToDisplay
