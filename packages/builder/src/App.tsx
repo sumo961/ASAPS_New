@@ -922,7 +922,7 @@ function App() {
       palpha: 100,             // Button/choice opacity (0-100)
       ptextcolor: '#201607',   // Button text — near-black on brass
       nonpcolor: '#1b1f2b',    // NPC/narrator text box — deep ink slate
-      nonpalpha: 100,          // NPC/narrator text box opacity (0-100)
+      nonpalpha: 93,           // NPC/narrator text box opacity (0-100) — same as textbox.opacity
       nonptextcolor: '#eae7de', // NPC text — warm off-white
       bgColor: '#14161f',      // Ink stage background
       textBoxBorder: '#3d4356' // Hairline slate border

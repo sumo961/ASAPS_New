@@ -28,11 +28,13 @@ import {
   CINEMATIC_THEME,
   PLAYFUL_THEME,
   HIGH_CONTRAST_THEME,
+  INK_AND_BRASS_THEME,
 } from '../../src/themes/presets';
 
 describe('BUILT_IN_THEMES registry', () => {
-  it('has exactly seven themes (three classics + four 12b look presets)', () => {
-    expect(BUILT_IN_THEMES).toHaveLength(7);
+  it('has exactly eight themes (Ink & Brass default first, three classics, four 12b look presets)', () => {
+    expect(BUILT_IN_THEMES).toHaveLength(8);
+    expect(BUILT_IN_THEMES[0]).toBe(INK_AND_BRASS_THEME);
   });
 
   it('contains every named theme export', () => {

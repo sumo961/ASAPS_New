@@ -153,6 +153,19 @@ describe('applyGeneratedStory', () => {
     expect(deps.commitGlobalSettings).toHaveBeenCalledTimes(3);
   });
 
+  it('gives a story with no (or an unknown) suggested theme the default look, not the open project\'s', async () => {
+    const known: Record<string, string> = { 'builtin-ink-and-brass': 'Ink & Brass' };
+    const resolveTheme = vi.fn(async (id: string) => (known[id] ? { meta: { id, name: known[id] } } : null));
+    for (const suggested of [undefined, { themeId: 'builtin-gone', reason: 'x' }]) {
+      const deps = makeDeps({ resolveTheme });
+      const s: any = story();
+      if (suggested) s.suggestedTheme = suggested;
+      const r = await applyGeneratedStory(s, deps, { fallbackTitle: 'x' });
+      expect(deps.settings().themeId).toBe('builtin-ink-and-brass');
+      expect(r.themeApplied).toBe('Ink & Brass');
+    }
+  });
+
   it('looks the schema up for beat types on every run, and survives it being unavailable', async () => {
     const loadSchema = vi.fn(async () => undefined);
     const deps = makeDeps({ loadSchema });

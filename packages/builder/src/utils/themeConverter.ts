@@ -198,7 +198,7 @@ export function normalizeGlobalSettings(
     },
     colors: {
       pcolor: '#d9a441', palpha: 100, ptextcolor: '#201607',
-      nonpcolor: '#1b1f2b', nonpalpha: 100, nonptextcolor: '#eae7de',
+      nonpcolor: '#1b1f2b', nonpalpha: 93, nonptextcolor: '#eae7de',
       bgColor: '#14161f', textBoxBorder: '#3d4356',
       ...(s.colors ?? {}),
     },

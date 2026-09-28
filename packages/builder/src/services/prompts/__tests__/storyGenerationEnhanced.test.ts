@@ -110,7 +110,13 @@ describe('buildEnhancedStoryGenerationSystemPrompt', () => {
     });
 
     it('keeps the color-contrast guidance', () => {
-      expect(prompt).toMatch(/contrast ratio of at least 4\.5:1/);
+      expect(prompt).toMatch(/at least 4\.5:1\s+contrast/);
+    });
+
+    it('makes Ink & Brass the default, in the template and the worked example too', () => {
+      expect(prompt).toMatch(/The default is\s+`builtin-ink-and-brass`/);
+      expect(prompt).toContain('"themeId": "builtin-ink-and-brass"');
+      expect(prompt).not.toMatch(/"themeId": "builtin-visual-novel \|/);
     });
   });
 

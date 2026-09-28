@@ -119,7 +119,7 @@ export interface StoryGenerationRequest {
  * Suggested theme for a generated story
  */
 export interface SuggestedTheme {
-  /** Theme ID (builtin-visual-novel, builtin-twine, builtin-point-and-click) */
+  /** Built-in theme ID (default builtin-ink-and-brass; see BUILT_IN_THEMES) */
   themeId: string;
   /** Reason for the recommendation */
   reason: string;

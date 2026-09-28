@@ -834,9 +834,11 @@ const injectStoryTool: Tool = {
         properties: {
           themeId: {
             type: 'string',
-            description: 'Theme ID, one of: "builtin-visual-novel", "builtin-twine", "builtin-point-and-click", ' +
-              '"builtin-editorial" (light, print-like: documentary / museum), "builtin-cinematic" (near-black, graded), ' +
-              '"builtin-playful" (bright, rounded: walks / family), "builtin-high-contrast" (accessibility-first).',
+            description: 'Theme ID. Default "builtin-ink-and-brass" (ASAPS\'s own look: literary dark, brass buttons) — ' +
+              'keep it unless the story clearly calls for another: "builtin-editorial" (light, print-like: documentary / museum), ' +
+              '"builtin-cinematic" (near-black, graded: thriller / noir), "builtin-playful" (bright, rounded: walks / family), ' +
+              '"builtin-high-contrast" (accessibility-first), or only when that style is explicitly requested ' +
+              '"builtin-visual-novel" (Ren\'Py), "builtin-twine" (Twine hypertext), "builtin-point-and-click" (retro LucasArts).',
           },
           reason: {
             type: 'string',
@@ -967,63 +969,58 @@ async function handleGetExampleStory(): Promise<any> {
 async function handleGetThemes(): Promise<any> {
   // Theme information is static - no need to fetch from API
   const themes = {
+    defaultTheme: 'builtin-ink-and-brass',
     themes: [
+      {
+        id: 'builtin-ink-and-brass',
+        name: 'Ink & Brass',
+        description: 'The default look: literary dark — ink stage, slate text box, warm off-white text, brass pill buttons',
+        bestFor: ['almost any story — drama, literary, mystery, horror, sci-fi, fantasy'],
+      },
+      {
+        id: 'builtin-editorial',
+        name: 'Clean Editorial',
+        description: 'Light, print-inspired look',
+        bestFor: ['documentary', 'museum and heritage', 'educational'],
+      },
+      {
+        id: 'builtin-cinematic',
+        name: 'Dark Cinematic',
+        description: 'Near-black, colour-graded look with a tungsten accent',
+        bestFor: ['thriller', 'noir', 'film-like pacing'],
+      },
+      {
+        id: 'builtin-playful',
+        name: 'Playful',
+        description: 'Bright, rounded, sticker-like look',
+        bestFor: ['walks', 'family stories', 'younger players'],
+      },
+      {
+        id: 'builtin-high-contrast',
+        name: 'High Contrast',
+        description: 'WCAG-first black/white/yellow look, larger type, no motion',
+        bestFor: ['stories where accessibility is a stated requirement'],
+      },
       {
         id: 'builtin-visual-novel',
         name: 'Visual Novel',
-        description: 'Classic visual novel style inspired by Ren\'Py',
-        bestFor: ['romance', 'drama', 'character-driven stories', 'anime-style narratives'],
-        characteristics: [
-          'Semi-transparent text box at bottom of screen',
-          'Character name highlights in golden color',
-          'Typewriter text animation (characters appear one by one)',
-          'Dark overlay for backgrounds',
-          'Serif fonts for elegance',
-        ],
+        description: 'Period pastiche of Ren\'Py visual novels (name-plate dialog box)',
+        bestFor: ['only when an anime / visual-novel style is explicitly requested'],
       },
       {
         id: 'builtin-twine',
         name: 'Text Adventure',
-        description: 'Minimal text adventure style inspired by Twine/SugarCube',
-        bestFor: ['interactive fiction', 'literary narratives', 'mystery stories', 'text-heavy games'],
-        characteristics: [
-          'Minimal UI with no visible text box frame',
-          'Blue hyperlink-style choices (like web links)',
-          'Serif typography (Georgia) for literary feel',
-          'Dark background with light text',
-          'Fade text animation',
-          'Centered text layout',
-        ],
+        description: 'Period pastiche of Twine/SugarCube (frameless text, link-style choices)',
+        bestFor: ['only when a Twine-style hypertext piece is explicitly requested'],
       },
       {
         id: 'builtin-point-and-click',
         name: 'Point & Click Adventure',
-        description: 'Classic adventure game style inspired by LucasArts',
-        bestFor: ['adventure games', 'puzzle stories', 'exploration', 'mystery with locations'],
-        characteristics: [
-          'Golden text on dark blue surfaces',
-          'Prominent hotspot indicators (always visible)',
-          'Sharp corners, pixelated aesthetic',
-          'Faster typewriter animation',
-          'Dissolve scene transitions',
-          'Inventory/exploration focus',
-        ],
+        description: 'Period pastiche of LucasArts/Sierra (pixel look, visible hotspots)',
+        bestFor: ['only when a retro adventure-game style is explicitly requested'],
       },
     ],
-    recommendationGuide: {
-      'romance': 'builtin-visual-novel',
-      'drama': 'builtin-visual-novel',
-      'mystery (text-based)': 'builtin-twine',
-      'mystery (exploration)': 'builtin-point-and-click',
-      'horror': 'builtin-twine or builtin-visual-novel',
-      'fantasy (epic)': 'builtin-visual-novel',
-      'fantasy (adventure)': 'builtin-point-and-click',
-      'sci-fi': 'builtin-twine or builtin-visual-novel',
-      'comedy': 'builtin-visual-novel',
-      'adventure/exploration': 'builtin-point-and-click',
-      'literary/experimental': 'builtin-twine',
-    },
-    usage: 'Include a suggestedTheme object in your story with themeId and reason fields.',
+    usage: 'Include a suggestedTheme object with themeId and reason. Use builtin-ink-and-brass unless the story clearly calls for another theme; genre alone is not a reason to pick a period pastiche.',
     translationSupport: {
       description:
         'Write the story in one language. Authors add further languages in the ASAPS Builder after import ' +
@@ -1036,7 +1033,7 @@ async function handleGetThemes(): Promise<any> {
     success: true,
     ...themes,
     message:
-      'Theme information retrieved. Choose a theme based on your story genre and include it in the suggestedTheme field when injecting.',
+      'Theme information retrieved. Default is builtin-ink-and-brass; include your choice in the suggestedTheme field when injecting.',
   };
 }
 

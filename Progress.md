@@ -1,5 +1,24 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.105, 2026-09-28)
+
+### Overview
+Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you can pick. Since v0.9.87 it was only the look of a new project, so the generator and the theme picker didn't know it existed. The prompt steered models to the three period themes, so every recent generation came out as Visual Novel, Text Adventure or Point & Click. Late Light, for example, came out as Point & Click.
+
+### Ink & Brass is a built-in theme
+- `builtin-ink-and-brass` is first in `BUILT_IN_THEMES`, so it shows in Project Settings → Theme and can be picked again after trying another look.
+- Picking it gives exactly the new-project look; `inkAndBrassPreset.test.ts` compares the two field by field.
+- The default text-box alpha (`nonpalpha`) is now 93, the same as the box opacity. It used to be 100, so the Visual Editor drew the box more opaque than the player did.
+
+### Generation uses it by default
+- In `storyGenerationEnhanced.ts`, the theme guide now makes Ink & Brass the default. The four look presets are offered for documentary, thriller, family and accessibility stories. The three period themes are used only when their style is asked for. The guide, the JSON template, the worked example and the checklist all agree.
+- The Claude Desktop MCP server's `asaps_get_themes` tool and `suggestedTheme` description now carry the same guidance.
+- `applyGeneratedStory`: a story with no suggested theme, or one this build doesn't know, gets Ink & Brass. Before, it kept the look of whatever project was open.
+
+**Files modified:** `packages/core/src/themes/presets.ts`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, tests (`inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
+
+---
+
 ## 2026-09-26: Review fixes — the checks know about replays, and HUDs hold still (v0.9.105)
 
 ### Overview

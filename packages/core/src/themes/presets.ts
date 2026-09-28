@@ -7,7 +7,7 @@
  * 3. Point-and-Click Adventure
  */
 
-import type { ThemeDefinition } from '../types/theme';
+import { DEFAULT_THEME_VALUES, type ThemeDefinition } from '../types/theme';
 
 // ============================================================================
 // Visual Novel Theme (Ren'Py style)
@@ -636,10 +636,67 @@ export const HIGH_CONTRAST_THEME: ThemeDefinition = {
   },
 };
 
+// ============================================================================
+// Ink & Brass — the default look, as a selectable preset
+// ============================================================================
+
+/**
+ * Ink & Brass — what every new project starts with (v0.9.87): near-black ink
+ * stage, deep-slate text box with a hairline border, warm off-white Georgia
+ * titles, brass pill buttons. Built FROM DEFAULT_THEME_VALUES so the preset
+ * and the new-project default cannot drift apart; only the fields the
+ * defaults leave open are filled in, from the same palette.
+ *
+ * Until this existed the default could not be chosen: a generated story's
+ * suggestedTheme always replaced it with one of the older looks, and a
+ * project that tried another theme had no way back.
+ */
+const INK = DEFAULT_THEME_VALUES;
+export const INK_AND_BRASS_THEME: ThemeDefinition = {
+  meta: {
+    id: 'builtin-ink-and-brass',
+    name: 'Ink & Brass',
+    version: '1.0.0',
+    description: 'The default look: literary dark — ink stage, slate text box, brass pill buttons',
+    author: 'ASAPS',
+    tags: ['default', 'dark', 'literary'],
+    compatibility: { asapsVersion: '2.0.0' },
+  },
+  // Two corrections to the core defaults as the theme adapter reads them:
+  // story text takes its colour from `primary` (off-white here, brass is
+  // the accent), and fonts use the registry names new projects store
+  // ("Georgia", "System") so the font pickers recognise them.
+  colors: { ...INK.colors!, primary: { hex: '#eae7de', alpha: 1 } },
+  fonts: {
+    ...INK.fonts!,
+    title: { ...INK.fonts!.title, family: 'Georgia' },
+    body: { ...INK.fonts!.body, family: 'System' },
+    button: { ...INK.fonts!.button, family: 'System' },
+    dialog: { ...INK.fonts!.dialog, family: 'System' },
+  },
+  textBox: {
+    ...INK.textBox!,
+    background: INK.colors!.surface,
+    borderColor: INK.colors!.border,
+  },
+  button: {
+    ...INK.button!,
+    activeBackground: INK.button!.hoverBackground,
+  },
+  hotspot: INK.hotspot!,
+  effects: {
+    ...INK.effects!,
+    sceneTransition: 'fade',
+    sceneTransitionDuration: 400,
+  },
+} as ThemeDefinition;
+
 /**
  * Array of all built-in preset themes
  */
 export const BUILT_IN_THEMES: ThemeDefinition[] = [
+  // The default look first: it is what a new project already wears.
+  INK_AND_BRASS_THEME,
   VISUAL_NOVEL_THEME,
   TWINE_THEME,
   POINT_AND_CLICK_THEME,

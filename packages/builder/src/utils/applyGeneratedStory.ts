@@ -216,6 +216,9 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
   } as GlobalSettings;
 }
 
+/** The look a generated story gets when it suggests none. */
+export const DEFAULT_GENERATED_THEME_ID = 'builtin-ink-and-brass';
+
 export async function applyGeneratedStory(
   story: any,
   deps: ApplyGeneratedStoryDeps,
@@ -288,18 +291,23 @@ export async function applyGeneratedStory(
     console.log(`[applyGeneratedStory] Wired ${settings.variables?.length ?? 0} variable(s) into globalSettings.variables`);
   }
 
+  // A generated story becomes a new project, so it starts from the default
+  // look when it suggests none (or one we don't have) — never from whatever
+  // project happened to be open.
   let themeApplied: string | null = null;
-  const themeId = story.suggestedTheme?.themeId;
-  if (themeId && deps.resolveTheme) {
+  const suggestedId = story.suggestedTheme?.themeId;
+  if (deps.resolveTheme) {
     try {
-      const theme = await deps.resolveTheme(themeId);
+      let theme = suggestedId ? await deps.resolveTheme(suggestedId) : null;
+      if (!theme) {
+        if (suggestedId) console.warn('[applyGeneratedStory] Suggested theme not found:', suggestedId, '- using the default');
+        theme = await deps.resolveTheme(DEFAULT_GENERATED_THEME_ID);
+      }
       if (theme) {
         settings = themeToGlobalSettings(theme, settings);
         deps.commitGlobalSettings(settings);
-        themeApplied = theme.meta?.name ?? themeId;
-        console.log('[applyGeneratedStory] Applied suggested theme:', themeApplied, '-', story.suggestedTheme?.reason);
-      } else {
-        console.warn('[applyGeneratedStory] Suggested theme not found:', themeId);
+        themeApplied = theme.meta?.name ?? theme.meta?.id ?? null;
+        console.log('[applyGeneratedStory] Applied theme:', themeApplied, '-', story.suggestedTheme?.reason ?? 'default');
       }
     } catch (err) {
       console.warn('[applyGeneratedStory] Failed to apply suggested theme:', err);

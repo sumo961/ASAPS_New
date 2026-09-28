@@ -7,87 +7,43 @@
 import type { StoryGenerationRequest } from '../../types/ai';
 import { buildAffectPromptSection, BUILT_IN_THEMES, type AffectDepth } from '@asaps/core';
 
-/** Presets described in detail below; every other built-in preset is listed from the theme registry. */
-const DETAILED_THEME_IDS = new Set(['builtin-visual-novel', 'builtin-twine', 'builtin-point-and-click']);
-
 /**
- * Theme presets guide for AI - describes available visual themes
+ * Theme presets guide for AI. The preset list comes from the theme registry;
+ * only the choosing rules are written here.
  */
 const THEME_GUIDE = `
 ## Theme Presets
 
-ASAPS includes built-in theme presets that control the visual presentation of stories. When generating a story, you should recommend the most appropriate theme based on the genre and style.
+Built-in theme presets control how the story looks. **The default is
+\`builtin-ink-and-brass\`** — ASAPS's own look (literary dark: ink stage, slate
+text box, warm off-white text, brass pill buttons). It suits almost any story;
+keep it unless the story clearly calls for a different look.
 
 ### Available Themes
 
-**1. builtin-visual-novel** - Visual Novel Theme
-Best for: Romance, drama, character-driven stories, anime-style narratives
-Characteristics:
-- Semi-transparent text box at bottom of screen
-- Character name highlights in golden color
-- Dark overlay for backgrounds
-- Serif fonts for elegance
-- Inspired by Ren'Py and Japanese visual novels
-Use when: Story focuses on character dialog, relationships, emotional moments
+${BUILT_IN_THEMES.map((t) => `- **${t.meta.id}** — ${t.meta.name}: ${t.meta.description}`).join('\n')}
 
-**2. builtin-twine** - Text Adventure Theme
-Best for: Interactive fiction, literary narratives, choice-based games, mystery stories
-Characteristics:
-- Minimal UI with no visible text box frame
-- Blue hyperlink-style choices (like web links)
-- Serif typography (Georgia) for literary feel
-- Dark background with light text
-- Centered text, lots of reading
-- Invisible hotspots (text-based interaction)
-- Inspired by Twine/SugarCube and classic interactive fiction
-Use when: Story is text-heavy, literary, or where UI should not distract from narrative
+### When to choose something else
 
-**3. builtin-point-and-click** - Point & Click Adventure Theme
-Best for: Adventure games, puzzle stories, exploration, mystery with locations
-Characteristics:
-- Golden text on dark blue surfaces (high contrast!)
-- Prominent hotspot indicators (always visible)
-- Sharp corners, pixelated aesthetic
-- Dissolve scene transitions
-- Inventory/exploration focus
-- Inspired by LucasArts (Monkey Island) and Sierra classics
-Use when: Story involves exploration, picking up items, location-based puzzles
+| Story | Theme | Why |
+|-------|-------|-----|
+| Most stories — drama, literary, mystery, horror, sci-fi, fantasy | builtin-ink-and-brass | The default look; readable and atmospheric |
+| Documentary, museum, heritage, educational | builtin-editorial | Light, print-like, calm |
+| Thriller, noir, film-like pacing | builtin-cinematic | Near-black, colour-graded |
+| Walks, family stories, younger players | builtin-playful | Bright and rounded |
+| Accessibility is a stated requirement | builtin-high-contrast | WCAG-first, larger type, no motion |
+| Explicitly anime / Ren'Py visual-novel style | builtin-visual-novel | Name-plate dialog box |
+| Explicitly a Twine-style hypertext piece | builtin-twine | Frameless text, link-style choices |
+| Explicitly a retro LucasArts/Sierra adventure | builtin-point-and-click | Pixel look, visible hotspots |
 
-${BUILT_IN_THEMES.filter((t) => !DETAILED_THEME_IDS.has(t.meta.id)).map((t) => `**${t.meta.id}** - ${t.meta.name}: ${t.meta.description}`).join('\n')}
+The last three are period pastiches: use them only when the request asks for
+that style, not because of the genre.
 
-### ⚠️ Color Contrast Guidelines (IMPORTANT!)
+### Colour contrast
 
-When describing visual elements or suggesting styling in notes, ALWAYS ensure high color contrast:
-
-❌ BAD COLOR COMBINATIONS (hard to read):
-- Yellow text on white background
-- Light gray text on white background
-- Dark blue text on black background
-- Red text on green background (colorblind unfriendly)
-
-✓ GOOD COLOR COMBINATIONS (high contrast):
-- White/light text on dark backgrounds
-- Dark text on light backgrounds
-- Golden/yellow text on dark blue (point-and-click style)
-- Blue links on dark/light neutral backgrounds
-
-Rule: Text and background should have a contrast ratio of at least 4.5:1 for readability.
-
-### Theme Recommendation Guidelines
-
-| Genre | Recommended Theme | Reason |
-|-------|-------------------|--------|
-| Romance | builtin-visual-novel | Character focus, emotional beats |
-| Drama | builtin-visual-novel | Dialog-heavy, character-driven |
-| Mystery (text-based) | builtin-twine | Literary style, lots of reading |
-| Mystery (exploration) | builtin-point-and-click | Location investigation, item collection |
-| Horror | builtin-twine or builtin-visual-novel | Atmospheric, immersive |
-| Fantasy (epic) | builtin-visual-novel | Character interactions, world-building |
-| Fantasy (adventure) | builtin-point-and-click | Exploration, item puzzles |
-| Sci-Fi | builtin-twine or builtin-visual-novel | Depends on narrative style |
-| Comedy | builtin-visual-novel | Character expressions, timing |
-| Adventure/Exploration | builtin-point-and-click | Locations, inventory, hotspots |
-| Literary/Experimental | builtin-twine | Minimal UI, focus on text |
+When notes describe visual elements, keep text readable: at least 4.5:1
+contrast (light text on dark surfaces or dark on light; never yellow on white
+or grey on white; avoid red/green pairs).
 `;
 
 /**
@@ -1745,7 +1701,7 @@ Generate complete, sophisticated interactive story structures that:
     "genre": "mystery|fantasy|scifi|romance|horror|adventure"
   },
   "suggestedTheme": {
-    "themeId": "builtin-visual-novel | builtin-twine | builtin-point-and-click",
+    "themeId": "builtin-ink-and-brass",
     "reason": "Brief explanation of why this theme fits the story"
   },
   "beats": [
@@ -1828,7 +1784,7 @@ Generate complete, sophisticated interactive story structures that:
 ✓ Label connections clearly for choice beats
 ✓ Create reconvergent paths, not just endless branching
 ✓ **EVERY beat must be reachable** - some other beat must connect TO it (except titleScreen)
-✓ **Include suggestedTheme** with a theme ID and reason based on genre/style
+✓ **Include suggestedTheme** — builtin-ink-and-brass unless the story clearly calls for another preset (see Theme Presets)
 ✓ **ALL endings go in the "beats" array** - NEVER create a separate "endings" array!
 
 ## Translatable Labels
@@ -2371,8 +2327,8 @@ export function getEnhancedStoryExample(): { user: string; assistant: string } {
         genre: "mystery"
       },
       suggestedTheme: {
-        themeId: "builtin-point-and-click",
-        reason: "Mystery with location exploration, evidence collection, and interrogation fits the classic adventure game style"
+        themeId: "builtin-ink-and-brass",
+        reason: "A dark, literary look suits a murder mystery told through interrogation and clues"
       },
       beats: [
         {
