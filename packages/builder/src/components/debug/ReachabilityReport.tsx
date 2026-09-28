@@ -1,11 +1,23 @@
 import React, { useState, useMemo } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronRight, Search, Unlink, GitBranch } from 'lucide-react';
 import { Story, ReachabilityAnalyzer } from '@asaps/core';
-import type { ReachabilityResult } from '@asaps/core';
+import type { ReachabilityResult, UnreachableBeat } from '@asaps/core';
 
 interface ReachabilityReportProps {
   story: Story;
   onHighlightBeat?: (beatId: string) => void;
+}
+
+/** Plain-language cause for an unreachable beat (the analyzer's `reason` is a code). */
+export function unreachableReasonText(b: Pick<UnreachableBeat, 'reason' | 'details'>): string {
+  if (b.details) return b.details;
+  switch (b.reason) {
+    case 'orphaned': return 'Nothing links to this beat';
+    case 'impossibleCondition': return 'Every link to this beat has a condition that can never be met';
+    case 'unreachableParent': return 'Every beat that links here is itself unreachable';
+    case 'unreachableConditionTarget': return 'A condition beat never takes the branch to this beat';
+    default: return 'No path from the start reaches this beat';
+  }
 }
 
 export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
@@ -344,8 +356,11 @@ export const ReachabilityReport: React.FC<ReachabilityReportProps> = ({
                               {unreachable.beatId}
                             </div>
                             <div className="text-xs text-red-700 mt-2">
-                              {unreachable.reason}
+                              {unreachableReasonText(unreachable)}
                             </div>
+                            {unreachable.suggestedFixes?.map((fix, i) => (
+                              <div key={i} className="text-xs text-gray-600 mt-1">→ {fix}</div>
+                            ))}
                           </div>
                           <XCircle className="w-4 h-4 text-red-600 flex-shrink-0 ml-2" />
                         </div>

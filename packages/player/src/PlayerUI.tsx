@@ -75,6 +75,8 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   const [isPaused, setIsPaused] = useState(false);
   const [confirmOverwrite, setConfirmOverwrite] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  // Restart asks in the menu itself — a native confirm() freezes the page.
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -237,11 +239,10 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   };
 
   const handleRestart = async () => {
-    if (confirm('Are you sure you want to restart? Unsaved progress will be lost.')) {
-      await player.restart();
-      setActivePanel('none');
-      setIsMenuOpen(false);
-    }
+    setConfirmRestart(false);
+    await player.restart();
+    setActivePanel('none');
+    setIsMenuOpen(false);
   };
 
   const handleSaveLog = () => {
@@ -423,7 +424,11 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
       {/* Menu bar */}
       <div
         style={styles.menuBar}
-        onMouseLeave={() => activePanel === 'none' && setIsMenuOpen(false)}
+        onMouseLeave={() => {
+          if (activePanel !== 'none') return;
+          setIsMenuOpen(false);
+          setConfirmRestart(false);
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {showPlayTime && <span style={styles.playTime}>{playTime}</span>}
@@ -448,9 +453,21 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
           <button style={styles.button} onClick={handlePauseResume}>
             {isPaused ? 'Resume' : 'Pause'}
           </button>
-          <button style={styles.button} onClick={handleRestart}>
-            Restart
-          </button>
+          {confirmRestart ? (
+            <>
+              <span style={styles.playTime}>Restart? Unsaved progress will be lost.</span>
+              <button style={styles.button} onClick={handleRestart}>
+                Restart now
+              </button>
+              <button style={styles.button} onClick={() => setConfirmRestart(false)}>
+                Keep playing
+              </button>
+            </>
+          ) : (
+            <button style={styles.button} onClick={() => setConfirmRestart(true)}>
+              Restart
+            </button>
+          )}
           {showSessionLog && (
             <button style={styles.button} onClick={handleSaveLog}>
               Save Log

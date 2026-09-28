@@ -2798,7 +2798,7 @@ Click the **Debug** button in the header to open the **Debug Tools** window. It 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
 *The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
 
-Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Clicking a beat in the list highlights it in the main builder flowchart.
+Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, or every beat that links to it is unreachable itself), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
 
 A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable with a default value in Project Settings counts as set, and so does the built-in **playthrough**.
 
@@ -2813,6 +2813,20 @@ Enumerates the possible journeys through your story. Three modes:
 - **Backward** — given a target ending, which paths lead to it.
 
 The summary shows *Outcomes*, *Total Paths*, *Unique Endings*, *Reachable Beats*, and how long the analysis took. Each outcome can be expanded to inspect the specific beat sequence and decision points. The query box at the top lets you filter by state ("`adult > 7`", "`has axe`", "`visits beat-123`") so you can ask, "show me only the paths where the player ends up with the axe."
+
+
+#### Story Warnings
+
+In **Tree** mode, a banner above the tree lists places where a player could get stuck or skip something you meant to be earned. It counts errors (red) and warnings (amber); click it to fold the list away. Each entry names the problem and the beat, followed by a sentence saying what the analysis found. In the tree itself, a small warning triangle marks the branch that contains the beat; hover over it for the same explanation.
+
+| Entry | What it means | Usual fix |
+|---|---|---|
+| **Keypad can trap the player** (error) | A Keypad's *Fail Target* leads back to the keypad, and nothing before it makes sure the player has found the code. With unlimited attempts, a player without the code can never leave. | Limit the attempts and send the last failure somewhere else, or guard the keypad with a condition or requirement that the code has been found. |
+| **Keypad has no clue before it** (warning) | Nothing checks that the player found the code before reaching the keypad, so a lucky guess (or reading the source) skips the puzzle. | Add a [requirement](#per-beat-requirements) or a condition on the way in, if the code is meant to be earned. |
+| **Requirement can never be met** (error or warning, as you set it) | A beat's requirement tests an item, variable or counter that no earlier beat gives or changes, or the requirement isn't finished. | Add the beat that sets it, or fix or remove the requirement. |
+| **Requirement not met on some paths** (warning) | Some of the simulated routes reach the beat without meeting its requirement. Those players are redirected to its fallback. | Check that this is intended; otherwise gate the routes that arrive unprepared. |
+
+These are advice only: nothing changes at runtime. The analysis explores the same routes as the rest of Path Analysis, including a replay when your story tests the built-in [playthrough](#keep-across-restarts).
 
 ### Story Logic
 

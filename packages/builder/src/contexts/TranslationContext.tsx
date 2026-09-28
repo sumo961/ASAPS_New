@@ -10,7 +10,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
-import { buildManifestEntry, createEmptyTranslationManifest, syncTranslation, applySyncResult } from '@asaps/core';
+import { buildManifestEntry, createEmptyTranslationManifest, syncTranslation, applySyncResult, normalizeTranslationResources } from '@asaps/core';
 import {
   generateTranslationResource,
   createManualTranslationResource,
@@ -253,6 +253,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({
     newManifest?: TranslationManifest,
     projectData?: any
   ) => {
+    // Stored resources may come from other tools or older versions; fill in
+    // what's missing rather than letting one field fail the project load.
+    newTranslations = normalizeTranslationResources(newTranslations);
+
     // Pre-load Noto fonts for all translations so they're ready when switching
     for (const t of newTranslations) {
       if (t.requiredFonts.length > 0) {

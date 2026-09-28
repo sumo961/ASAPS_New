@@ -20,6 +20,7 @@ export {
   type TranslationSyncResult,
   // Factory functions
   createEmptyResource,
+  normalizeTranslationResources,
   createEmptyManifest as createEmptyTranslationManifest,
   buildManifestEntry,
 } from './types';

@@ -17,6 +17,12 @@ Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you c
 - The Claude Desktop MCP server's `asaps_get_themes` tool and `suggestedTheme` description now carry the same guidance.
 - `applyGeneratedStory`: a story with no suggested theme, or one this build doesn't know, gets Ink & Brass. Before, it kept the look of whatever project was open.
 
+### Small fixes
+- **Player Menu → Restart** asks inside the menu ("Restart? Unsaved progress will be lost." · Restart now / Keep playing) instead of a native `confirm()` that froze the page (`PlayerUI.tsx`, test `restartConfirm.test.tsx`).
+- **Reachability tab** shows each unreachable beat's cause as a sentence plus the analyzer's suggested fixes, not the reason code (`unreachableReasonText`).
+- **Story Warnings** (Path Analysis → Tree) name the problem ("Keypad can trap the player", "Requirement can never be met" …) instead of `[keypad-softlock-loop]`, in the banner and the tree tooltips (`storyWarningLabels.ts`). They are now documented in the User Guide (new *Story Warnings* subsection, with a table of what each means and the usual fix; Reachability text updated).
+- **Translation loading hardened:** a stored translation missing fields (e.g. `_sourceSnapshot`) failed the whole project load, and the next save then deleted the stored translations. Now `normalizeTranslationResources` (core) fills in missing fields on every load path. The save path only removes stored translations once this project's translations actually reached the editor.
+
 **Files modified:** `packages/core/src/themes/presets.ts` (+ `DEFAULT_THEME_ID`), `packages/builder/src/hooks/useThemes.ts`, `packages/builder/src/contexts/PersistenceContext.tsx`, `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, tests (`inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
 
 ---

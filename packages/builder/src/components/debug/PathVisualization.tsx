@@ -21,6 +21,7 @@ import type {
   StoryWarning,
 } from '@asaps/core';
 import { PathTreeView } from './PathTreeView';
+import { storyWarningLabel } from './storyWarningLabels';
 import { usePersistedState } from '../../utils/persistedState';
 
 interface PathVisualizationProps {
@@ -892,7 +893,7 @@ const StoryWarningsSummary: React.FC<{ warnings: StoryWarning[] }> = ({ warnings
           {warnings.map((w, i) => (
             <li key={i} className={`pl-2 border-l-2 ${w.severity === 'error' ? 'border-red-400' : 'border-amber-400'}`}>
               <div className={`font-medium ${w.severity === 'error' ? 'text-red-800' : 'text-amber-800'}`}>
-                [{w.code}] {w.beatName}
+                {storyWarningLabel(w.code)}: {w.beatName}
               </div>
               <div className="text-gray-700 ml-0.5">{w.message}</div>
             </li>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronRight, ChevronDown, GitBranch, RotateCw, MapPin, Flag, AlertTriangle, Layers, Activity, Check } from 'lucide-react';
 import type { PathTreeNode, PathTreeBranch, PathTreeResult, HubOption, ConditionAnnotation, StateSummary, ChoiceVariant, StoryWarning, Story, Condition, BeatRef } from '@asaps/core';
+import { storyWarningLabel } from './storyWarningLabels';
 
 interface PathTreeViewProps {
   treeResult: PathTreeResult;
@@ -676,7 +677,7 @@ const TreeNodeView: React.FC<TreeNodeViewProps> = ({
         {hasWarning && (
           <span
             className={`flex-shrink-0 ${hasError ? 'text-red-600' : 'text-amber-600'}`}
-            title={nodeWarnings.map(w => `[${w.code}] ${w.beatName}: ${w.message}`).join('\n\n')}
+            title={nodeWarnings.map(w => `${storyWarningLabel(w.code)} — ${w.beatName}: ${w.message}`).join('\n\n')}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
           </span>
@@ -1593,7 +1594,7 @@ const ChainDisplay: React.FC<{
           className={`inline-flex items-center gap-1 ml-2 px-1 py-0 rounded text-[10px] ${
             hasError ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
           }`}
-          title={chainWarnings.map(w => `[${w.code}] ${w.beatName}: ${w.message}`).join('\n\n')}
+          title={chainWarnings.map(w => `${storyWarningLabel(w.code)} — ${w.beatName}: ${w.message}`).join('\n\n')}
         >
           <AlertTriangle className="w-3 h-3" />
           {chainWarnings[0].code}

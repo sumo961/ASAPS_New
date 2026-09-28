@@ -100,7 +100,7 @@ import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal'
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
 import { applyGeneratedStory, type ApplyGeneratedStoryDeps } from './utils/applyGeneratedStory';
-import { BUILT_IN_THEMES } from '@asaps/core';
+import { BUILT_IN_THEMES, normalizeTranslationResources } from '@asaps/core';
 import { useVCSStatus } from './vcs/VCSStatusProvider';
 import { VCSPanel } from './components/vcs/VCSPanel';
 import { DiffViewer } from './components/vcs/DiffViewer';
@@ -638,6 +638,8 @@ function App() {
   const translationState = useTranslationState();
   const translationActions = useTranslationActions();
   const translationStateRef = useRef(translationState);
+  /** Project whose stored translations reached the editor (see the save path). */
+  const translationsLoadedForRef = useRef<string | null>(null);
   translationStateRef.current = translationState;
   const translationActionsRef = useRef(translationActions);
   translationActionsRef.current = translationActions;
@@ -1472,8 +1474,10 @@ function App() {
       if (currentTranslations.translations.length > 0) {
         projForTranslations.translations = currentTranslations.translations;
         projForTranslations.translationManifest = currentTranslations.manifest;
-      } else if (projForTranslations.translations) {
-        // Translations were cleared — remove from project too
+      } else if (projForTranslations.translations && translationsLoadedForRef.current === projForTranslations.id) {
+        // Translations were cleared — remove from project too. Only once this
+        // project's translations actually reached the editor: an empty state
+        // after a failed load must not delete what is stored.
         delete projForTranslations.translations;
         delete projForTranslations.translationManifest;
       }
@@ -2471,7 +2475,7 @@ function App() {
         // from IndexedDB (which may be stale after git reset — race with async updateProject).
         if (currentProject.translations?.length) {
           const isDirectoryProject = !!(currentProject as any).directoryPath || projectFormat === 'directory';
-          let translations = currentProject.translations;
+          let translations = normalizeTranslationResources(currentProject.translations);
           const manifest = currentProject.translationManifest;
 
           // Clean stale markers baked into committed translation files BEFORE sync
@@ -2511,6 +2515,7 @@ function App() {
           });
 
           translationActions.loadTranslations(translations, manifest, projectData);
+          translationsLoadedForRef.current = currentProject.id;
 
           // For directory projects: persist updated _sourceSnapshot to disk
           if (isDirectoryProject) {
@@ -2523,6 +2528,7 @@ function App() {
           console.log('[App] >>> Loaded', translations.length, 'translation(s)', 'with sync');
         } else {
           translationActions.clearTranslations();
+          translationsLoadedForRef.current = currentProject.id;
         }
 
         setIsUntitledProject(currentProject.name === 'Untitled Project');
@@ -2837,8 +2843,10 @@ function App() {
             }, 1000);
           }
           console.log('[App] >>> Loaded', translations.length, 'translation(s)', isGitResetReload ? '(no sync — git reset)' : 'with sync');
+          translationsLoadedForRef.current = currentProject.id;
         } else {
           translationActions.clearTranslations();
+          translationsLoadedForRef.current = currentProject.id;
         }
 
         // Derive untitled-ness from the loaded row, same as the
