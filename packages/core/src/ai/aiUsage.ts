@@ -14,7 +14,11 @@ export interface AIUsageTotals {
   cacheWriteTokens: number;
 }
 
-const totals = new Map<string, AIUsageTotals>();
+// Kept on globalThis, not in the module: a page can end up with two copies
+// of this module (a pre-bundled dependency and a source import), and both
+// must count into the same totals that asapsAIUsage.summary() reads.
+const totals: Map<string, AIUsageTotals> =
+  ((globalThis as any).__asapsAIUsageTotals ??= new Map<string, AIUsageTotals>());
 
 /**
  * Record one response's usage. Accepts the Anthropic shape (input_tokens,

@@ -431,3 +431,18 @@ describe('direct transports stream by default', () => {
     }
   });
 });
+
+describe('AI usage accounting', () => {
+  it('totals per route and model, from both response shapes, in one shared store', async () => {
+    const { recordAIUsage, getAIUsageSummary, resetAIUsage } = await import('../../src/ai/aiUsage');
+    resetAIUsage();
+    recordAIUsage('story', 'claude-opus-5-5', { input_tokens: 983, output_tokens: 15601, cache_read_input_tokens: 0, cache_creation_input_tokens: 64675 });
+    recordAIUsage('runtime:content', 'gpt-6-astra', { prompt_tokens: 300, completion_tokens: 40, prompt_tokens_details: { cached_tokens: 100 } });
+    recordAIUsage('story', 'claude-opus-5-5', undefined);
+    const rows = getAIUsageSummary();
+    expect(rows.find((r) => r.route === 'story')).toMatchObject({ calls: 1, inputTokens: 983, outputTokens: 15601, cacheWriteTokens: 64675 });
+    expect(rows.find((r) => r.route === 'runtime:content')).toMatchObject({ inputTokens: 200, cacheReadTokens: 100, outputTokens: 40 });
+    expect((globalThis as any).__asapsAIUsageTotals.size).toBe(2);
+    resetAIUsage();
+  });
+});
