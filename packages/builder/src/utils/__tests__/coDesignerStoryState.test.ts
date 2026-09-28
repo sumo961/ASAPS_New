@@ -53,3 +53,16 @@ describe('Co-Designer prompt', () => {
     expect(prompt).toContain('get_beat_type_schema');
   });
 });
+
+describe('Co-Designer prompt parts (prompt caching)', () => {
+  it('keeps the story digest out of the instructions, and the joined prompt ends with it', async () => {
+    const { buildCoDesignerPromptParts, buildCoDesignerSystemPrompt } = await import('../../components/ai/codesigner/systemPrompt');
+    const ctx = { digest: 'DIGEST-XYZ', capturedAt: 0 } as any;
+    const parts = buildCoDesignerPromptParts(ctx, { beatContentToolAvailable: true });
+    expect(parts.systemPrompt).not.toContain('DIGEST-XYZ');
+    expect(parts.systemContext).toContain('DIGEST-XYZ');
+    // Same instructions for any story: that is what makes them cacheable.
+    expect(buildCoDesignerPromptParts({ digest: 'OTHER', capturedAt: 5 } as any, { beatContentToolAvailable: true }).systemPrompt).toBe(parts.systemPrompt);
+    expect(buildCoDesignerSystemPrompt(ctx, { beatContentToolAvailable: true }).trimEnd().endsWith('DIGEST-XYZ')).toBe(true);
+  });
+});

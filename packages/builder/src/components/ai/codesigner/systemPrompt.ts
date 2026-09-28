@@ -14,20 +14,38 @@ import type { CoDesignerContext } from './coDesignerStore';
 import { wiringPromptReference } from '../../../utils/wiringVocabulary';
 import { beatTypeCatalog } from '../../../utils/beatTypeReference';
 
+/**
+ * The Co-Designer prompt in two parts: the instructions, which are the same
+ * for every story and session (and so can be prompt-cached), and the digest
+ * of the open story, which follows them.
+ */
+export function buildCoDesignerPromptParts(
+  context: CoDesignerContext | null,
+  opts: { beatContentToolAvailable?: boolean } = {},
+): { systemPrompt: string; systemContext: string } {
+  return { systemPrompt: coDesignerInstructions(opts), systemContext: digestBlock(context) };
+}
+
+/** The whole prompt as one string (instructions, then the story digest). */
 export function buildCoDesignerSystemPrompt(context: CoDesignerContext | null, opts: { beatContentToolAvailable?: boolean } = {}): string {
-  const digestBlock = context?.digest
+  const { systemPrompt, systemContext } = buildCoDesignerPromptParts(context, opts);
+  return `${systemPrompt}\n\n${systemContext}`;
+}
+
+function digestBlock(context: CoDesignerContext | null): string {
+  return context?.digest
     ? `THE OPEN STORY (digest captured ${new Date(context.capturedAt).toLocaleString()}):
 
 ${context.digest}`
     : `NO STORY CONTEXT WAS PROVIDED. Tell the author to reopen the Co-Designer
 from the main builder window so the story snapshot can be captured.`;
+}
 
+function coDesignerInstructions(opts: { beatContentToolAvailable?: boolean }): string {
   return `You are the Co-Designer, a design-phase collaborator built into ASAPS — an
 Interactive Digital Narrative (IDN) authoring tool. Unlike the Ideator (which
 helps authors shape a brand-new idea), you work WITH the author on the story
-they currently have open. You can see its structure below.
-
-${digestBlock}
+they currently have open. Its digest follows these instructions, at the end.
 
 ${IDN_COMPLEXITY_PRINCIPLES}
 ${opts.beatContentToolAvailable ? `

@@ -363,3 +363,66 @@ export function extractResponsesOutputText(json: any): string {
   }
   return parts.join('');
 }
+
+// ---------------------------------------------------------------------------
+// Claude request features, keyed on the model id. A `claude-*` id means the
+// official API (or the relay/proxy in front of it); Claude-compatible third
+// parties use their own model ids and get none of these.
+// ---------------------------------------------------------------------------
+
+function claudeVersion(model: string | undefined): { family: string; major: number; minor?: number } | null {
+  const m = String(model ?? '').toLowerCase().match(/^claude-(opus|sonnet|haiku|fable|mythos)-(\d+)(?:-(\d+))?/);
+  if (!m) return null;
+  // A trailing segment longer than 2 digits is a YYYYMMDD snapshot, not a minor version.
+  const minor = m[3] && m[3].length <= 2 ? parseInt(m[3], 10) : undefined;
+  return { family: m[1], major: parseInt(m[2], 10), minor };
+}
+
+/**
+ * Takes `thinking: {type: 'adaptive'}` + `output_config.effort`: Opus/Sonnet
+ * 4.6+, the whole 5 family, Fable/Mythos. Haiku only from 5.
+ */
+export function claudeSupportsAdaptiveThinking(model: string | undefined): boolean {
+  const v = claudeVersion(model);
+  if (!v) return false;
+  if (v.family === 'fable' || v.family === 'mythos') return true;
+  if (v.family === 'haiku') return v.major >= 5;
+  return v.major >= 5 || (v.major === 4 && v.minor !== undefined && v.minor >= 6);
+}
+
+/**
+ * Thinks when the request omits `thinking` (the 5 family, Fable, Mythos).
+ * Older adaptive-capable models (Opus/Sonnet 4.6-4.8) run without thinking
+ * unless asked.
+ */
+export function claudeThinksByDefault(model: string | undefined): boolean {
+  const v = claudeVersion(model);
+  if (!v) return false;
+  return v.family === 'fable' || v.family === 'mythos' || v.major >= 5;
+}
+
+/**
+ * Takes `output_config.format` (structured JSON outputs). Limited to the
+ * models that also take `output_config.effort`; older ones used a beta shape.
+ */
+export function claudeSupportsStructuredOutputs(model: string | undefined): boolean {
+  return claudeSupportsAdaptiveThinking(model);
+}
+
+/**
+ * Models whose safety classifiers can decline benign requests and that take
+ * server-side refusal fallbacks (`fallbacks: "default"`).
+ */
+export function claudeSupportsServerFallbacks(model: string | undefined): boolean {
+  const v = claudeVersion(model);
+  if (!v) return false;
+  return v.family === 'fable' || v.family === 'mythos' || (v.family === 'opus' && v.major >= 5);
+}
+
+/** Beta header for the `fallbacks: "default"` scalar form (the array form uses a different one). */
+export const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+/** Official OpenAI model ids (structured outputs via response_format); local/compatible servers use other names. */
+export function isOfficialOpenAIModel(model: string | undefined): boolean {
+  return /^(gpt-|o\d)/i.test(String(model ?? ''));
+}

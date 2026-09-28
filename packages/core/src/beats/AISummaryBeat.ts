@@ -481,8 +481,9 @@ export class AISummaryBeat extends Beat {
       reflection: 'Write as if the player is reflecting on their journey, using "you" form.',
     }[this.summaryStyle];
 
-    // Thinking/reasoning leakage is handled by config (thinking off on the
-    // runtime route) and stripThinkingBlocks + the post-filters below.
+    // Reasoning leakage is handled by config (thinking runs in its own
+    // blocks at low effort on the runtime route) and stripThinkingBlocks +
+    // the post-filters below.
     const prompt = `Write the end-of-story summary for this player, shown on the final screen.
 
 PLAYER JOURNEY DATA:

@@ -219,11 +219,44 @@ function formatActionDescription(action: ConversationAction): string {
 }
 
 /**
+ * Reply shape for direction evaluation, enforced on providers that support
+ * structured outputs. The parser also accepts the bare array the prompt asks
+ * other providers for.
+ */
+export const DIRECTION_EVALUATION_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: { triggered: { type: 'array', items: { type: 'integer' } } },
+  required: ['triggered'],
+  additionalProperties: false,
+};
+
+/**
+ * Reply shape for variable extraction: one field per variable, null when the
+ * conversation does not say.
+ */
+export function extractionSchema(names: string[]): Record<string, unknown> {
+  const value = { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { type: 'null' }] };
+  return {
+    type: 'object',
+    properties: Object.fromEntries(names.map((n) => [n, value])),
+    required: names,
+    additionalProperties: false,
+  };
+}
+
+/**
  * Parse direction evaluation response from AI
  */
 export function parseDirectionEvaluationResponse(response: string): number[] {
   try {
-    // Extract JSON array from response
+    // Structured reply: {"triggered": [...]}; prompt-only providers: a bare array.
+    const trimmed = response.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed?.triggered)) return parsed.triggered.filter((i: any) => typeof i === 'number');
+      } catch { /* fall through to the array scan */ }
+    }
     const match = response.match(/\[[\s\S]*?\]/);
     if (!match) return [];
     const indices = JSON.parse(match[0]);
@@ -315,6 +348,7 @@ EXTRACT:
 ${extractionDescs}
 
 Return a JSON object mapping variable names to extracted values. Be concise but complete.
+Use null for a value the conversation does not give.
 Example: {"order_content": "2 dozen fried boneless chicken wings with hot sauce"}
 Only return the JSON object, nothing else.`;
 }

@@ -315,3 +315,15 @@ describe('ConversationPromptBuilder', () => {
     });
   });
 });
+
+describe('structured replies', () => {
+  it('parses the structured {"triggered": [...]} evaluation reply as well as a bare array', async () => {
+    const { parseDirectionEvaluationResponse, extractionSchema } = await import('../../src/utils/ConversationPromptBuilder');
+    expect(parseDirectionEvaluationResponse('{"triggered":[1,3]}')).toEqual([1, 3]);
+    expect(parseDirectionEvaluationResponse('{"triggered":[]}')).toEqual([]);
+    expect(parseDirectionEvaluationResponse('[2]')).toEqual([2]);
+    const schema = extractionSchema(['order', 'count']) as any;
+    expect(schema.required).toEqual(['order', 'count']);
+    expect(schema.additionalProperties).toBe(false);
+  });
+});

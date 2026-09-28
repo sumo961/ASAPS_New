@@ -610,6 +610,13 @@ export interface IAIService {
   generateContent(prompt: string, options?: {
     maxTokens?: number;
     enableWebSearch?: boolean;
+    /**
+     * JSON Schema the reply must match. Providers that can enforce it
+     * (Claude, OpenAI) return exactly that JSON; others rely on the prompt,
+     * so the prompt must still describe the shape. Every object in it needs
+     * `additionalProperties: false`; no numeric/string-length limits.
+     */
+    schema?: Record<string, unknown>;
   }): Promise<string>;
 
   /** Generate a dialog tree structure */
@@ -626,6 +633,8 @@ export interface IAIService {
   generateConversationTurn?(request: {
     systemPrompt: string;
     messages: Array<{ role: string; content: string }>;
+    /** As for generateContent: enforce this JSON shape where the provider can. */
+    schema?: Record<string, unknown>;
   }): Promise<{ text: string }>;
 
   /** Analyze an image with a vision-capable model (for InputImageBeat).

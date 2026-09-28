@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAI } from '../../../hooks/useAI';
 import { useCoDesignerStore, type CoDesignerContext } from './coDesignerStore';
-import { buildCoDesignerSystemPrompt } from './systemPrompt';
+import { buildCoDesignerPromptParts } from './systemPrompt';
 import {
   loadSession,
   newSessionId,
@@ -263,13 +263,15 @@ export function useCoDesigner() {
       // the plain conversation turn — the prompt then steers the model to
       // ask the author instead of editing blind.
       const useTools = currentProvider === 'claude' || currentProvider === 'openai';
-      const systemPrompt = buildCoDesignerSystemPrompt(state.context, { beatContentToolAvailable: useTools });
+      // Instructions first (prompt-cached), the story digest after them.
+      const { systemPrompt, systemContext } = buildCoDesignerPromptParts(state.context, { beatContentToolAvailable: useTools });
 
       let result: { text: string } | null = null;
       if (useTools) {
         try {
           result = await generateChatWithTools({
             systemPrompt,
+            systemContext,
             messages: transcript,
             tools: [getBeatContentToolSpec, getBeatTypeSchemaToolSpec],
             executeTool: async (name: string, input: any) => {
@@ -302,7 +304,8 @@ export function useCoDesigner() {
       if (result?.text == null) {
         result = await generateConversationTurn({
           // No tools on this path — build the prompt without the tool section.
-          systemPrompt: useTools ? buildCoDesignerSystemPrompt(state.context, { beatContentToolAvailable: false }) : systemPrompt,
+          systemPrompt: useTools ? buildCoDesignerPromptParts(state.context, { beatContentToolAvailable: false }).systemPrompt : systemPrompt,
+          systemContext,
           messages: transcript,
           // Proposal blocks can carry whole dialog trees; reasoning models
           // also need headroom on top (same budget as the tool path).

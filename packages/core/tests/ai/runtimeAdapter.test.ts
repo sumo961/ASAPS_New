@@ -39,26 +39,65 @@ const anthropicReply = (text: string, withThinking = false) => ({
 });
 
 describe('generateContent', () => {
-  it('pins thinking OFF for Claude 5 models (adaptive-by-default trap) and leaves others alone', async () => {
+  it('runs thinking Claude models at LOW effort with reply headroom, and leaves older models alone', async () => {
     const bodies: any[] = [];
     const transport = async (body: any) => {
       bodies.push(body);
       return { content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' };
     };
-    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-4-8', 'claude-haiku-4-5']) {
+    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-fable-5-1', 'claude-opus-4-8', 'claude-haiku-4-5']) {
       const svc = createRuntimeAIService({ family: 'anthropic', model, transport });
-      await svc.generateContent('hi');
+      await svc.generateContent('hi', { maxTokens: 250 });
     }
-    expect(bodies[0].thinking).toEqual({ type: 'disabled' }); // opus-5
-    expect(bodies[1].thinking).toEqual({ type: 'disabled' }); // sonnet-5
-    expect(bodies[2].thinking).toBeUndefined(); // opus-4-8: omitted = off already
-    expect(bodies[3].thinking).toBeUndefined(); // haiku-4-5
+    for (const b of bodies.slice(0, 4)) {
+      // `disabled` is a 400 on Opus 5.5 / Fable and leaks reasoning on Opus 5.
+      expect(b.thinking).toEqual({ type: 'adaptive' });
+      expect(b.output_config).toEqual({ effort: 'low' });
+      // Thinking counts against max_tokens: 250 would leave no room for the reply.
+      expect(b.max_tokens).toBeGreaterThanOrEqual(8192);
+    }
+    expect(bodies[4].thinking).toBeUndefined(); // opus-4-8: omitted = off already
+    expect(bodies[4].output_config).toBeUndefined();
+    expect(bodies[5].thinking).toBeUndefined(); // haiku-4-5 rejects effort
+    expect(bodies[5].output_config).toBeUndefined();
+    expect(bodies[5].max_tokens).toBe(250);
   });
 
-  it('never sends thinking:disabled to claude-opus-5-5 (always thinks; disabled is a 400)', async () => {
-    const { transport, calls } = stub(anthropicReply('ok'));
-    await createRuntimeAIService({ family: 'anthropic', model: 'claude-opus-5-5', transport }).generateContent('hi');
-    expect(calls[0].thinking).toBeUndefined();
+  it('enforces a JSON schema where the provider can, and leaves other endpoints to the prompt', async () => {
+    const schema = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'], additionalProperties: false };
+    const a = stub(anthropicReply('{"text":"x"}'));
+    await createRuntimeAIService({ family: 'anthropic', model: 'claude-sonnet-5', transport: a.transport }).generateContent('hi', { schema });
+    expect((a.calls[0].output_config as any).format).toEqual({ type: 'json_schema', schema });
+
+    const o = stub(openaiReply('{"text":"x"}'));
+    await createRuntimeAIService({ family: 'openai', model: 'gpt-6-astra', transport: o.transport }).generateContent('hi', { schema });
+    expect(o.calls[0].response_format).toEqual({ type: 'json_schema', json_schema: { name: 'reply', strict: true, schema } });
+
+    const local = stub(openaiReply('{"text":"x"}'));
+    await createRuntimeAIService({ family: 'openai', model: 'llama3.2', transport: local.transport }).generateContent('hi', { schema });
+    expect(local.calls[0].response_format).toBeUndefined();
+
+    const compat = stub(anthropicReply('{"text":"x"}'));
+    await createRuntimeAIService({ family: 'anthropic', model: 'kimi-k2', transport: compat.transport }).generateContent('hi', { schema });
+    expect(compat.calls[0].output_config).toBeUndefined();
+  });
+
+  it('classifies through a category enum and reads the structured reply', async () => {
+    const { transport, calls } = stub(anthropicReply('{"category":"angry"}'));
+    const svc = createRuntimeAIService({ family: 'anthropic', model: 'claude-sonnet-5', transport });
+    expect(await svc.classifyContent('grr', ['calm', 'angry'])).toBe('angry');
+    expect((calls[0].output_config as any).format.schema.properties.category.enum).toEqual(['calm', 'angry']);
+  });
+
+  it('caches a multi-turn NPC conversation, not a one-shot call', async () => {
+    const { transport, calls } = stub(anthropicReply('Hm.'));
+    const svc = createRuntimeAIService({ family: 'anthropic', model: 'claude-sonnet-5', transport });
+    await svc.generateConversationTurn({ systemPrompt: 'npc', messages: [{ role: 'user', content: 'Hi' }] });
+    await svc.generateConversationTurn({ systemPrompt: 'npc', messages: [
+      { role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello.' }, { role: 'user', content: 'How are you?' },
+    ] });
+    expect(calls[0].cache_control).toBeUndefined();
+    expect(calls[1].cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('conversation turns always end on a user turn (a trailing assistant turn is a prefill)', async () => {
@@ -327,6 +366,19 @@ describe('transports (fetch wire contracts)', () => {
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     expect(init.headers['x-api-key']).toBe('sk');
     expect(init.headers['anthropic-dangerous-direct-browser-access']).toBe('true');
+  });
+
+  it('direct anthropic transport opts Opus 5 / Fable into server-side refusal fallbacks, official API only', async () => {
+    const spy = fetchSpy();
+    await createDirectAnthropicTransport({ apiKey: 'sk' })({ model: 'claude-opus-5' });
+    await createDirectAnthropicTransport({ apiKey: 'sk' })({ model: 'claude-sonnet-5' });
+    await createDirectAnthropicTransport({ apiKey: 'sk', baseUrl: 'http://localhost:8080/v1' })({ model: 'claude-opus-5' });
+    const sent = spy.mock.calls.map(([, init]: any) => ({ body: JSON.parse(init.body), beta: init.headers['anthropic-beta'] }));
+    expect(sent[0].body.fallbacks).toBe('default');
+    expect(sent[0].beta).toBe('server-side-fallback-2026-07-01');
+    expect(sent[1].body.fallbacks).toBeUndefined(); // Sonnet 5: not a fallback model
+    expect(sent[1].beta).toBeUndefined();
+    expect(sent[2].body.fallbacks).toBeUndefined(); // custom endpoint: header not ours to send
   });
 
   it('direct openai transport appends /chat/completions to a custom baseUrl', async () => {

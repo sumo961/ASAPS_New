@@ -29,6 +29,8 @@ import {
   parseDirectionEvaluationResponse,
   collectActions,
   buildExtractionPrompt,
+  DIRECTION_EVALUATION_SCHEMA,
+  extractionSchema,
   type ConversationTurn,
 } from '../utils/ConversationPromptBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
@@ -603,7 +605,7 @@ export class AIConversationBeat extends Beat {
                 conversationHistory,
                 turnNumber,
               );
-              const evalResponse = await this.callAI(aiService, evalPrompt, 'Evaluate which directions triggered');
+              const evalResponse = await this.callAI(aiService, evalPrompt, 'Evaluate which directions triggered', DIRECTION_EVALUATION_SCHEMA);
               for (const fi of parseDirectionEvaluationResponse(evalResponse)) {
                 const activeIdx = fuzzyToActiveIdx[fi];
                 if (activeIdx !== undefined) triggeredIndices.push(activeIdx);
@@ -621,12 +623,12 @@ export class AIConversationBeat extends Beat {
               if (actions.extractions.length > 0) {
                 try {
                   const extractPrompt = buildExtractionPrompt(actions.extractions, conversationHistory);
-                  const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values');
+                  const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values', extractionSchema(actions.extractions.map(e => e.name)));
                   const match = extractResponse.match(/\{[\s\S]*\}/);
                   if (match) {
                     const extracted = JSON.parse(match[0]);
                     for (const ext of actions.extractions) {
-                      if (extracted[ext.name] !== undefined) {
+                      if (extracted[ext.name] != null) {
                         variableSets.push({ name: ext.name, value: extracted[ext.name] });
                         console.log(`[AIConversationBeat ${this.id}] Extracted ${ext.name} = "${extracted[ext.name]}"`);
                       }
@@ -680,7 +682,7 @@ export class AIConversationBeat extends Beat {
               const reEvalPrompt = buildDirectionEvaluationPrompt(
                 playerInput, newlyActive, conversationHistory, turnNumber,
               );
-              const reEvalResponse = await this.callAI(aiService, reEvalPrompt, 'Re-evaluate directions');
+              const reEvalResponse = await this.callAI(aiService, reEvalPrompt, 'Re-evaluate directions', DIRECTION_EVALUATION_SCHEMA);
               const reTriggered = parseDirectionEvaluationResponse(reEvalResponse);
 
               if (reTriggered.length > 0) {
@@ -695,12 +697,12 @@ export class AIConversationBeat extends Beat {
                 if (reActions.extractions.length > 0) {
                   try {
                     const extractPrompt = buildExtractionPrompt(reActions.extractions, conversationHistory);
-                    const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values');
+                    const extractResponse = await this.callAI(aiService, extractPrompt, 'Extract variable values', extractionSchema(reActions.extractions.map(e => e.name)));
                     const match = extractResponse.match(/\{[\s\S]*\}/);
                     if (match) {
                       const extracted = JSON.parse(match[0]);
                       for (const ext of reActions.extractions) {
-                        if (extracted[ext.name] !== undefined) {
+                        if (extracted[ext.name] != null) {
                           context.setVariable(ext.name, extracted[ext.name]);
                           console.log(`[AIConversationBeat ${this.id}] Extracted ${ext.name} = "${extracted[ext.name]}"`);
                         }
@@ -923,11 +925,12 @@ export class AIConversationBeat extends Beat {
   /**
    * Generic AI call for direction evaluation etc.
    */
-  private async callAI(aiService: any, prompt: string, _purpose: string): Promise<string> {
+  private async callAI(aiService: any, prompt: string, _purpose: string, schema?: Record<string, unknown>): Promise<string> {
     if (typeof aiService.generateConversationTurn === 'function') {
       const response = await aiService.generateConversationTurn({
         systemPrompt: 'You are a conversation analyzer. Follow the instructions exactly.',
         messages: [{ role: 'user', content: prompt }],
+        ...(schema ? { schema } : {}),
       });
       return typeof response === 'string' ? response : response.text || response.content || '';
     }

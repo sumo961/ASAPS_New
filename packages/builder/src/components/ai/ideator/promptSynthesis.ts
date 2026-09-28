@@ -71,6 +71,21 @@ function validate(parsed: any): StoryGenerationRequest {
   return req;
 }
 
+/** The synthesis reply, enforced on providers with structured outputs (validate() still checks it). */
+const SYNTHESIS_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    prompt: { type: 'string' },
+    genre: { type: 'string' },
+    length: { type: 'string', enum: ['short', 'medium', 'long'] },
+    complexity: { type: 'string', enum: ['linear', 'moderate', 'complex'] },
+    affectDepth: { type: 'string', enum: ['auto', 'sparse', 'standard', 'rich'] },
+    includeAIBeats: { type: 'boolean' },
+  },
+  required: ['prompt'],
+  additionalProperties: false,
+};
+
 export async function synthesizeStoryRequest(
   transcript: IdeatorMessage[]
 ): Promise<SynthesisResult> {
@@ -111,6 +126,7 @@ export async function synthesizeStoryRequest(
     systemPrompt: system,
     messages: wrapped,
     maxTokens: 8000,
+    schema: SYNTHESIS_SCHEMA,
   });
 
   const json = extractJson(text);

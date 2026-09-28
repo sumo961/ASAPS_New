@@ -1,4 +1,5 @@
 import { Beat } from './Beat';
+import { TEXT_WITH_SUGGESTIONS_SCHEMA } from '../utils/aiReplySchemas';
 import type { BeatConfig } from '../types';
 import type { IRenderer } from '../types';
 import { StoryContext } from '../engine/StoryContext';
@@ -389,6 +390,7 @@ The "suggestions" array should contain ideas for story variables that would impr
 
     const response = await aiService.generateContent(prompt, {
       maxTokens: 250, // Increased for JSON response
+      schema: TEXT_WITH_SUGGESTIONS_SCHEMA,
     });
 
     // Parse the response (could be JSON or plain text)

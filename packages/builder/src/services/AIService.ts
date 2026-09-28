@@ -50,6 +50,17 @@ import {
  *
  * Singleton service for AI operations
  */
+/**
+ * Only the Claude provider sends `systemContext` as its own (uncached)
+ * system block; every other provider gets it appended to the system prompt
+ * so it is never silently dropped.
+ */
+function withSystemContextFor<T extends { systemPrompt: string; systemContext?: string }>(providerName: string, request: T): T {
+  if (!request.systemContext || providerName === 'claude') return request;
+  const { systemContext, ...rest } = request;
+  return { ...rest, systemPrompt: `${request.systemPrompt}\n\n${systemContext}` } as T;
+}
+
 export class AIService {
   private providers: Map<string, IAIProvider> = new Map();
   private currentProvider: IAIProvider | null = null;
@@ -1689,7 +1700,7 @@ export class AIService {
       );
     }
 
-    return provider.generateConversationTurn(request);
+    return provider.generateConversationTurn(withSystemContextFor(provider.name, request));
   }
 
   /**
@@ -1721,7 +1732,7 @@ export class AIService {
       );
     }
 
-    return provider.generateChatWithTools(request);
+    return provider.generateChatWithTools(withSystemContextFor(provider.name, request));
   }
 
   // ============================================================================

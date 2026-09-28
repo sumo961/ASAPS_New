@@ -30,6 +30,19 @@ import {
   repairJsonAggressive,
   parseJSONWithRepair,
 } from './openai-utils';
+import {
+  claudeSupportsServerFallbacks,
+  claudeSupportsStructuredOutputs,
+  recordAIUsage,
+  SERVER_FALLBACK_BETA,
+} from '@asaps/core';
+
+/**
+ * Output cap floor for authoring calls on thinking models: thinking counts
+ * against max_tokens, and the author's effort setting (now applied to every
+ * route) can make it long. A ceiling, not a target.
+ */
+const THINKING_ROUTE_MIN_TOKENS = 16000;
 
 /**
  * Claude Provider Implementation
@@ -94,6 +107,20 @@ export function maxOutputTokensFor(model?: string): number {
     if (major >= 5 || (major === 4 && minor !== undefined && minor >= 6)) return 128000;
   }
   return 64000;
+}
+
+/**
+ * The assistant content to act on and echo back. After a server-side
+ * fallback mid-output, the declined model's thinking and tool calls before
+ * the last `fallback` block must not be echoed (or run); its text may stay.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function echoableContent(blocks: any[]): any[] {
+  let boundary = -1;
+  blocks.forEach((b, i) => { if (b?.type === 'fallback') boundary = i; });
+  if (boundary < 0) return blocks;
+  const dropBefore = new Set(['thinking', 'redacted_thinking', 'tool_use', 'server_tool_use']);
+  return blocks.filter((b, i) => i > boundary || (i < boundary && !dropBefore.has(b?.type)));
 }
 
 export class ClaudeProvider extends BaseAIProvider {
@@ -240,7 +267,7 @@ export class ClaudeProvider extends BaseAIProvider {
       const effort = this.getAdaptiveEffort();
       if (effort) {
         requestBody.thinking = { type: 'adaptive' };
-        requestBody.output_config = { effort };
+        requestBody.output_config = { ...(requestBody.output_config ?? {}), effort };
         console.log(`[ClaudeProvider] Adaptive thinking enabled, effort=${effort}`);
       }
     } else {
@@ -250,6 +277,52 @@ export class ClaudeProvider extends BaseAIProvider {
         console.log(`[ClaudeProvider] Extended thinking enabled, budget=${thinkingBudget}`);
       }
     }
+  }
+
+  /**
+   * Everything a direct-API request gets besides the prompt: the author's
+   * effort, an output cap with room for thinking, optional structured JSON,
+   * and prompt-caching markers. Proxied (custom baseUrl) requests get only
+   * the effort handling they had before — third-party endpoints vary.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private prepareRequest(requestBody: any, opts: { schema?: Record<string, unknown>; cacheConversation?: boolean; systemContext?: string } = {}): void {
+    this.applyThinkingConfig(requestBody);
+    if (this.requiresAdaptiveThinking()) {
+      requestBody.max_tokens = Math.min(
+        maxOutputTokensFor(this.model),
+        Math.max(requestBody.max_tokens ?? 0, THINKING_ROUTE_MIN_TOKENS),
+      );
+    }
+    if (this.useProxy) {
+      if (opts.systemContext) requestBody.system = `${requestBody.system ?? ''}\n\n${opts.systemContext}`;
+      return;
+    }
+    if (opts.schema && claudeSupportsStructuredOutputs(this.model)) {
+      requestBody.output_config = { ...(requestBody.output_config ?? {}), format: { type: 'json_schema', schema: opts.schema } };
+    }
+    // The system prompt is the stable prefix (tools come before it and are
+    // cached with it). Context that changes between sessions (the
+    // Co-Designer's story digest) follows in a second, uncached block.
+    if (typeof requestBody.system === 'string' && requestBody.system) {
+      requestBody.system = [
+        { type: 'text', text: requestBody.system, cache_control: { type: 'ephemeral' } },
+        ...(opts.systemContext ? [{ type: 'text', text: opts.systemContext }] : []),
+      ];
+    }
+    // A conversation is resent with every turn and tool call: let the
+    // automatic breakpoint follow the growing history.
+    if (opts.cacheConversation) requestBody.cache_control = { type: 'ephemeral' };
+    if (claudeSupportsServerFallbacks(this.model)) requestBody.fallbacks = 'default';
+  }
+
+  /** SDK request options: the beta header server-side fallbacks need. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private requestOptions(requestBody: any, signal?: AbortSignal): { signal?: AbortSignal; headers?: Record<string, string> } {
+    return {
+      ...(signal ? { signal } : {}),
+      ...(requestBody.fallbacks !== undefined ? { headers: { 'anthropic-beta': SERVER_FALLBACK_BETA } } : {}),
+    };
   }
 
   /**
@@ -336,18 +409,22 @@ export class ClaudeProvider extends BaseAIProvider {
    * by the SSE reassembly.
    */
   private async callAnthropic(
+    route: string,
     requestBody: any,
     signal?: AbortSignal,
     onProgress?: (chars: number) => void,
   ): Promise<any> {
     if (this.useProxy) {
-      return this.makeProxyRequest(requestBody, signal);
+      const proxied = await this.makeProxyRequest(requestBody, signal);
+      recordAIUsage(route, this.model, proxied?.usage);
+      return proxied;
     }
-    const stream = this.client!.messages.stream(requestBody as any, { signal });
+    const stream = this.client!.messages.stream(requestBody as any, this.requestOptions(requestBody, signal));
     if (onProgress) {
       stream.on('text', (_delta: string, snapshot: string) => onProgress(snapshot.length));
     }
     const apiResponse = await stream.finalMessage();
+    recordAIUsage(route, this.model, apiResponse.usage);
     return { content: apiResponse.content, stop_reason: apiResponse.stop_reason };
   }
 
@@ -443,13 +520,18 @@ export class ClaudeProvider extends BaseAIProvider {
         ],
       };
 
-      this.applyThinkingConfig(requestBody);
+      // The story max_tokens budget is already sized above; prepareRequest
+      // only raises it, and adds the cache marker on the (large, stable)
+      // system prompt so a repair pass or an escalated retry reads it back.
+      this.prepareRequest(requestBody);
+      maxTokens = requestBody.max_tokens;
 
       let response;
 
       if (this.useProxy) {
         // Use proxy for custom providers; thread signal for cancel support.
         response = await this.makeProxyRequest(requestBody, request.signal);
+        recordAIUsage('story', this.model, response?.usage);
       } else {
         // Direct API call for official Anthropic — STREAM the response.
         //
@@ -473,9 +555,7 @@ export class ClaudeProvider extends BaseAIProvider {
         let apiResponse;
         for (;;) {
           requestBody.max_tokens = maxTokens;
-          const stream = this.client!.messages.stream(requestBody as any, {
-            signal: request.signal,
-          });
+          const stream = this.client!.messages.stream(requestBody as any, this.requestOptions(requestBody, request.signal));
           // Drive the UI progress indicator with the real cumulative char count.
           if (request.onProgress) {
             stream.on('text', (_delta: string, snapshot: string) => {
@@ -483,6 +563,7 @@ export class ClaudeProvider extends BaseAIProvider {
             });
           }
           apiResponse = await stream.finalMessage();
+          recordAIUsage('story', this.model, apiResponse.usage);
           console.log(
             `[ClaudeProvider] generateStory response: stop=${apiResponse.stop_reason}, ` +
               `output_tokens=${apiResponse.usage?.output_tokens ?? '?'}`,
@@ -587,11 +668,10 @@ export class ClaudeProvider extends BaseAIProvider {
         ],
       };
 
-      let response;
+      this.prepareRequest(requestBody);
+      const response = await this.callAnthropic('dialog', requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
-      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
-
-      const contentText = this.extractTextBlock(response, maxTokens);
+      const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
       // Extract + parse JSON via the shared tolerant extractor with repair
       const dialogData = parseJSONWithRepair(stripThinkingBlocks(contentText));
@@ -619,7 +699,7 @@ export class ClaudeProvider extends BaseAIProvider {
 
     return this.withRetry(async () => {
       // `temperature` omitted — newer Anthropic models reject it as deprecated.
-      const requestBody = {
+      const requestBody: any = {
         model: this.model,
         // 8000: suggestion JSON for 3-5 beats plus thinking headroom on
         // adaptive-thinking models (max_tokens is a cap, not a floor)
@@ -633,9 +713,8 @@ export class ClaudeProvider extends BaseAIProvider {
         ],
       };
 
-      let response;
-
-      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
+      this.prepareRequest(requestBody);
+      const response = await this.callAnthropic('suggestions', requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
@@ -684,7 +763,7 @@ Respond with JSON in this format:
 
     return this.withRetry(async () => {
       // `temperature` omitted — newer Anthropic models reject it as deprecated.
-      const requestBody = {
+      const requestBody: any = {
         model: this.model,
         max_tokens: 2000,
         system: systemPrompt,
@@ -696,9 +775,8 @@ Respond with JSON in this format:
         ],
       };
 
-      let response;
-
-      response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
+      this.prepareRequest(requestBody);
+      const response = await this.callAnthropic('nl-beat', requestBody, (request as any)?.signal, (request as any)?.onProgress);
 
       const contentText = this.extractTextBlock(response, requestBody.max_tokens);
 
@@ -716,8 +794,13 @@ Respond with JSON in this format:
    */
   async generateConversationTurn(request: {
     systemPrompt: string;
+    /** Changes between sessions (e.g. a story digest): sent after the cached system prompt. */
+    systemContext?: string;
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     maxTokens?: number;
+    /** Reply must be JSON of this shape (structured outputs, direct API). */
+    schema?: Record<string, unknown>;
+    route?: string;
   }): Promise<{ text: string }> {
     this.ensureReady();
 
@@ -732,15 +815,22 @@ Respond with JSON in this format:
     // `temperature` omitted — newer Anthropic models reject it as deprecated.
     // Adaptive-thinking models spend thinking tokens against max_tokens; a
     // cap sized for a thinking-off reply truncates or empties the turn.
-    const requestBody = {
+    const requestBody: any = {
       model: this.model,
-      max_tokens: Math.max(request.maxTokens ?? 1000, this.requiresAdaptiveThinking() ? 8192 : 0),
+      max_tokens: request.maxTokens ?? 1000,
       system: request.systemPrompt,
       messages: claudeMessages,
     };
+    this.prepareRequest(requestBody, {
+      schema: request.schema,
+      systemContext: request.systemContext,
+      cacheConversation: claudeMessages.length > 1,
+    });
 
-    let response;
-    response = await this.callAnthropic(requestBody, (request as any)?.signal, (request as any)?.onProgress);
+    const response = await this.callAnthropic(
+      request.route ?? (request.schema ? 'structured-turn' : 'conversation'),
+      requestBody, (request as any)?.signal, (request as any)?.onProgress,
+    );
 
     return { text: this.extractTextBlock(response, requestBody.max_tokens).trim() };
   }
@@ -758,6 +848,8 @@ Respond with JSON in this format:
    */
   async generateChatWithTools(request: {
     systemPrompt: string;
+    /** Changes between sessions (e.g. a story digest): sent after the cached system prompt. */
+    systemContext?: string;
     messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     tools: Array<{ name: string; description: string; input_schema: unknown }>;
     executeTool: (name: string, input: Record<string, unknown>) => Promise<string>;
@@ -789,16 +881,17 @@ Respond with JSON in this format:
     // buildChatRequest elsewhere in this file). 1500 was too tight for
     // tool loops where the model wants to think before calling — bumped
     // default to 8192.
-    const toolLoopMaxTokens = this.config?.maxTokens || 8192;
+    const toolLoopMaxTokens = Math.min(maxOutputTokensFor(this.model), Math.max(this.config?.maxTokens || 0, THINKING_ROUTE_MIN_TOKENS));
 
     for (let iter = 0; iter < maxIter; iter++) {
-      const requestBody = {
+      const requestBody: any = {
         model: this.model,
         max_tokens: toolLoopMaxTokens,
         system: request.systemPrompt,
         tools: request.tools,
         messages,
       };
+      this.prepareRequest(requestBody, { systemContext: request.systemContext, cacheConversation: true });
       console.log(
         `[ClaudeProvider] tool-loop iter ${iter}/${maxIter}, ` +
           `${messages.length} messages, requesting up to ${requestBody.max_tokens} tokens`,
@@ -810,12 +903,13 @@ Respond with JSON in this format:
         response = await this.makeProxyRequest(requestBody);
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const apiResp = await this.client!.messages.create(requestBody as any);
-        response = { content: apiResp.content, stop_reason: apiResp.stop_reason };
+        const apiResp = await this.client!.messages.create(requestBody as any, this.requestOptions(requestBody));
+        response = { content: apiResp.content, stop_reason: apiResp.stop_reason, usage: apiResp.usage };
       }
+      recordAIUsage('tool-loop', this.model, response?.usage);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blocks = (response.content ?? []) as any[];
+      const blocks = echoableContent((response.content ?? []) as any[]);
       const toolUses = blocks.filter(b => b?.type === 'tool_use');
       const textLen = blocks
         .filter(b => b?.type === 'text')
@@ -832,6 +926,21 @@ Respond with JSON in this format:
           .map(b => String(b.text ?? ''))
           .join('\n')
           .trim();
+        if (response.stop_reason === 'refusal') {
+          const err = new Error('Claude declined this request (stop_reason: refusal). Rephrase it — retrying the same message will not help.');
+          (err as Error & { nonRetryable?: boolean }).nonRetryable = true;
+          throw err;
+        }
+        if (response.stop_reason === 'max_tokens') {
+          if (!text) {
+            throw new Error(
+              `Claude used the whole output budget (${toolLoopMaxTokens} tokens) before replying. ` +
+                'Raise Max Tokens in AI settings or lower the reasoning effort.',
+            );
+          }
+          console.warn(`[ClaudeProvider] tool-loop reply hit max_tokens=${toolLoopMaxTokens}; returning it marked as cut off`);
+          return { text: `${text}\n\n(This reply was cut off at the output limit — ask me to continue.)`, toolCalls };
+        }
         console.log(`[ClaudeProvider] tool-loop done at iter ${iter}, returning ${text.length} chars`);
         return { text, toolCalls };
       }

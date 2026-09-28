@@ -452,6 +452,16 @@ export interface ConversationTurnRequest {
    * payload) should pass a higher cap to avoid truncation.
    */
   maxTokens?: number;
+
+  /**
+   * Context that changes between sessions (e.g. the Co-Designer's story
+   * digest). Claude sends it after the cached system prompt; other providers
+   * get it appended to the system prompt.
+   */
+  systemContext?: string;
+
+  /** Reply must be JSON of this shape where the provider can enforce it. */
+  schema?: Record<string, unknown>;
 }
 
 /**
@@ -483,6 +493,8 @@ export interface ChatToolCall {
 /** Request to run a chat turn that may invoke tools. */
 export interface ChatWithToolsRequest {
   systemPrompt: string;
+  /** As in ConversationTurnRequest: per-session context after the cached system prompt. */
+  systemContext?: string;
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   tools: ChatToolSpec[];
   /** Executes a tool by name and returns the string result Claude sees. */

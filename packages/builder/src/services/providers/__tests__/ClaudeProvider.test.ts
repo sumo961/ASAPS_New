@@ -426,3 +426,88 @@ describe('generateStory escalates once when the output hits max_tokens', () => {
     expect(maxOutputTokensFor('claude-opus-4-5')).toBe(64000);
   });
 });
+
+describe('request features on the direct API (prompt-audit follow-ups)', () => {
+  function streamingClient(reply: any = { content: [{ type: 'text', text: '{"prompt":"x"}' }], stop_reason: 'end_turn', usage: { input_tokens: 5, output_tokens: 2 } }) {
+    const calls: Array<{ body: any; opts: any }> = [];
+    const stream = vi.fn((body: any, opts: any) => {
+      calls.push({ body: JSON.parse(JSON.stringify(body)), opts });
+      return { on: vi.fn(), finalMessage: vi.fn().mockResolvedValue(reply) };
+    });
+    (p as any).client = { messages: { stream, create: vi.fn() } };
+    return calls;
+  }
+
+  it('conversation turns: cached system prompt, per-session context after it, structured JSON, thinking headroom', async () => {
+    p.configure(cfg({ model: 'claude-sonnet-5', reasoningEffort: 'medium' }));
+    const calls = streamingClient();
+    const schema = { type: 'object', properties: { prompt: { type: 'string' } }, required: ['prompt'], additionalProperties: false };
+    await p.generateConversationTurn({
+      systemPrompt: 'INSTRUCTIONS', systemContext: 'DIGEST', schema,
+      messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'c' }],
+    });
+    const body = calls[0].body;
+    expect(body.system).toEqual([
+      { type: 'text', text: 'INSTRUCTIONS', cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: 'DIGEST' },
+    ]);
+    expect(body.cache_control).toEqual({ type: 'ephemeral' }); // multi-turn: history cached too
+    expect(body.output_config).toEqual({ effort: 'medium', format: { type: 'json_schema', schema } });
+    expect(body.thinking).toEqual({ type: 'adaptive' });
+    expect(body.max_tokens).toBeGreaterThanOrEqual(16000);
+    expect(body.fallbacks).toBeUndefined(); // Sonnet 5 is not a fallback model
+    expect(calls[0].opts.headers).toBeUndefined();
+  });
+
+  it('opts Opus 5 into server-side fallbacks with the beta header', async () => {
+    p.configure(cfg({ model: 'claude-opus-5' }));
+    const calls = streamingClient();
+    await p.generateConversationTurn({ systemPrompt: 's', messages: [{ role: 'user', content: 'hi' }] });
+    expect(calls[0].body.fallbacks).toBe('default');
+    expect(calls[0].opts.headers).toEqual({ 'anthropic-beta': 'server-side-fallback-2026-07-01' });
+    expect(calls[0].body.cache_control).toBeUndefined(); // one-shot: no automatic breakpoint
+  });
+
+  it('proxied requests keep a plain string system prompt with the context appended, and no new fields', async () => {
+    p.configure(cfg({ model: 'claude-opus-5', baseUrl: 'https://gw' }));
+    const body: any = { model: 'claude-opus-5', max_tokens: 1000, system: 'S', messages: [] };
+    (p as any).prepareRequest(body, { systemContext: 'D', cacheConversation: true, schema: { type: 'object' } });
+    expect(body.system).toBe('S\n\nD');
+    expect(body.cache_control).toBeUndefined();
+    expect(body.fallbacks).toBeUndefined();
+    expect(body.output_config).toBeUndefined();
+  });
+
+  it('tool loop: a refusal is reported, not returned as an empty reply', async () => {
+    p.configure(cfg({ model: 'claude-sonnet-5' }));
+    const create = vi.fn().mockResolvedValue({ content: [], stop_reason: 'refusal' });
+    (p as any).client = { messages: { create, stream: vi.fn() } };
+    await expect(p.generateChatWithTools({ systemPrompt: 's', messages: [{ role: 'user', content: 'hi' }], tools: [], executeTool: async () => '' }))
+      .rejects.toThrow(/declined/);
+    expect(create.mock.calls[0][0].max_tokens).toBeGreaterThanOrEqual(16000);
+    expect(create.mock.calls[0][0].cache_control).toEqual({ type: 'ephemeral' });
+  });
+
+  it('tool loop: a reply cut off at max_tokens says so', async () => {
+    p.configure(cfg({ model: 'claude-sonnet-5' }));
+    const create = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'Half a thought' }], stop_reason: 'max_tokens' });
+    (p as any).client = { messages: { create, stream: vi.fn() } };
+    const r = await p.generateChatWithTools({ systemPrompt: 's', messages: [{ role: 'user', content: 'hi' }], tools: [], executeTool: async () => '' });
+    expect(r.text).toMatch(/^Half a thought/);
+    expect(r.text).toMatch(/cut off/);
+  });
+});
+
+describe('echoableContent', () => {
+  it('drops the declined model\'s thinking and tool calls before a fallback boundary, keeps its text', async () => {
+    const { echoableContent } = await import('../ClaudeProvider');
+    const blocks = [
+      { type: 'thinking', thinking: 'x' }, { type: 'text', text: 'partial' }, { type: 'tool_use', id: 't1' },
+      { type: 'fallback', from: {}, to: {} },
+      { type: 'thinking', thinking: 'y' }, { type: 'tool_use', id: 't2' },
+    ];
+    expect(echoableContent(blocks).map((b: any) => b.type + (b.id ?? ''))).toEqual(['text', 'thinking', 'tool_uset2']);
+    const plain = [{ type: 'text', text: 'a' }];
+    expect(echoableContent(plain)).toBe(plain);
+  });
+});

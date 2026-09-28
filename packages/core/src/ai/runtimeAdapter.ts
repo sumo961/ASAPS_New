@@ -36,8 +36,22 @@ import {
   buildChatRequestBody,
   effectiveMaxTokens,
   stripThinkingBlocks,
+  claudeThinksByDefault,
+  claudeSupportsStructuredOutputs,
+  claudeSupportsServerFallbacks,
+  isOfficialOpenAIModel,
+  SERVER_FALLBACK_BETA,
 } from './providerQuirks';
 import { extractJSON, parseJSONWithRepair } from './jsonExtraction';
+import { recordAIUsage } from './aiUsage';
+
+/**
+ * Output cap for runtime calls on thinking Claude models. Thinking counts
+ * against max_tokens, so a cap sized for the reply alone (250 for an info
+ * text, 100 for a classification) would leave nothing for the answer. It is
+ * a ceiling, not a target — reply length comes from the prompt.
+ */
+const RUNTIME_THINKING_MAX_TOKENS = 8192;
 
 export type RuntimeProviderFamily = 'anthropic' | 'openai';
 
@@ -71,15 +85,25 @@ export function createDirectAnthropicTransport(options: {
     // holds a silent connection open (browser/webview/gateway limits), and
     // TTFB proves the request is alive. Opt out per-request with stream:false.
     const wantStream = (body as any).stream !== false;
-    const sendBody = wantStream ? { ...body, stream: true } : body;
+    const sendBody: Record<string, unknown> = wantStream ? { ...body, stream: true } : { ...body };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': options.apiKey || '',
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    };
+    // Opus 5 / Fable classifiers can decline a benign story scene; on the
+    // official API let the server re-run a declined request on the model
+    // Anthropic recommends for that case, instead of failing the beat. This
+    // transport is the only one that controls the beta header, so it opts in
+    // here rather than in the request body builder.
+    if (!options.baseUrl && sendBody.fallbacks === undefined && claudeSupportsServerFallbacks(String(sendBody.model))) {
+      sendBody.fallbacks = 'default';
+      headers['anthropic-beta'] = SERVER_FALLBACK_BETA;
+    }
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': options.apiKey || '',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
+      headers,
       body: JSON.stringify(sendBody),
     });
 
@@ -398,6 +422,28 @@ function openaiText(response: any): string {
   return response?.choices?.[0]?.message?.content || '';
 }
 
+/** Structured-output schema for a one-of-N classification. */
+function categorySchema(categories: string[]): Record<string, unknown> {
+  return {
+    type: 'object',
+    properties: { category: { type: 'string', enum: categories } },
+    required: ['category'],
+    additionalProperties: false,
+  };
+}
+
+/** The category from a structured `{"category": …}` reply, or the plain-text reply. */
+function categoryFromReply(reply: string): string {
+  const trimmed = reply.trim();
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed?.category === 'string') return parsed.category.trim();
+    } catch { /* not JSON after all — treat as plain text */ }
+  }
+  return trimmed;
+}
+
 /**
  * Create an IAIService for runtime AI beats (OnlineContentBeat,
  * AIDialogTreeBeat, AIConversationBeat, AIConditionBeat, InputImageBeat, …).
@@ -418,9 +464,15 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
 
   /** One chat round-trip returning the raw assistant text (thinking stripped). */
   async function complete(args: {
+    /** Names the kind of call in the usage log (content, dialog, conversation, …). */
+    route: string;
     systemPrompt?: string;
     messages: Array<{ role: string; content: unknown }>;
     maxTokens: number;
+    /** Reply must be JSON of this shape (enforced where the provider can). */
+    schema?: Record<string, unknown>;
+    /** A conversation that will be resent with more turns: cache its prefix. */
+    cachePrefix?: boolean;
   }): Promise<string> {
     // Elapsed-time visibility for every runtime AI round-trip — field
     // debugging of "it took forever" needs numbers, not vibes.
@@ -430,26 +482,36 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       console.log(`${logPrefix} AI round-trip: ${secs >= 90 ? (secs / 60).toFixed(1) + 'min' : secs.toFixed(1) + 's'} (${family}/${model})`);
     };
     if (family === 'anthropic') {
+      // Models that think anyway get LOW effort; older ones stay thinking-off.
+      const adaptive = claudeThinksByDefault(model);
       const body: Record<string, unknown> = {
         model,
-        max_tokens: effectiveMaxTokens(model, args.maxTokens),
+        max_tokens: adaptive
+          ? Math.max(args.maxTokens, RUNTIME_THINKING_MAX_TOKENS)
+          : effectiveMaxTokens(model, args.maxTokens),
         messages: args.messages,
       };
       if (args.systemPrompt) body.system = args.systemPrompt;
-      // Claude 5-family models run ADAPTIVE THINKING when the request omits
-      // `thinking` — measured on the Environmental Choices dialog tree:
-      // 10,425 thinking tokens, max_tokens exhausted, tree truncated, 149s.
-      // Runtime beats are latency-sensitive JSON producers; pin thinking
-      // off where the model supports it (Fable always thinks and rejects
-      // 'disabled', so it is deliberately NOT matched; pre-5 models treat
-      // an omitted param as off already and need nothing).
-      // Exactly Sonnet 5 / Opus 5: Opus 5.5 (claude-opus-5-5) always thinks
-      // and rejects 'disabled' too.
-      if (/claude-(sonnet-5|opus-5)(?!-\d)/.test(String(model))) {
-        body.thinking = { type: 'disabled' };
+      // Claude 5-family models think adaptively when `thinking` is omitted,
+      // at the default (high) effort — measured on the Environmental Choices
+      // dialog tree: 10,425 thinking tokens, max_tokens exhausted, 149s.
+      // Runtime beats are latency-sensitive, so they think at LOW effort
+      // (Anthropic's recommendation over `thinking: disabled`, which Opus 5.5
+      // and Fable reject outright and which makes Opus 5 leak reasoning).
+      const outputConfig: Record<string, unknown> = {};
+      if (adaptive) {
+        body.thinking = { type: 'adaptive' };
+        outputConfig.effort = 'low';
       }
+      if (args.schema && claudeSupportsStructuredOutputs(model)) {
+        outputConfig.format = { type: 'json_schema', schema: args.schema };
+      }
+      if (Object.keys(outputConfig).length > 0) body.output_config = outputConfig;
+      // Automatic prompt caching: the breakpoint follows the growing history.
+      if (args.cachePrefix && /^claude-/.test(String(model))) body.cache_control = { type: 'ephemeral' };
       const response = await transport(body);
       logElapsed();
+      recordAIUsage(`runtime:${args.route}`, String(model), response?.usage);
       return stripThinkingBlocks(anthropicText(response));
     }
 
@@ -458,21 +520,30 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
     const messages = args.systemPrompt
       ? [{ role: 'system', content: args.systemPrompt }, ...args.messages]
       : args.messages;
-    const body = buildChatRequestBody(
+    const body: Record<string, unknown> = buildChatRequestBody(
       model,
       messages as Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
       effectiveMaxTokens(model, args.maxTokens)
     );
+    // Strict JSON on OpenAI's own models; local and compatible servers
+    // (Ollama, llama.cpp, Kimi) vary in what they accept, so they keep the
+    // prompt-described shape plus the tolerant parser.
+    if (args.schema && isOfficialOpenAIModel(model)) {
+      body.response_format = { type: 'json_schema', json_schema: { name: 'reply', strict: true, schema: args.schema } };
+    }
     const response = await transport(body);
     logElapsed();
+    recordAIUsage(`runtime:${args.route}`, String(model), response?.usage);
     return stripThinkingBlocks(openaiText(response));
   }
 
   return {
-    async generateContent(prompt: string, options?: { maxTokens?: number }): Promise<string> {
+    async generateContent(prompt: string, options?: { maxTokens?: number; schema?: Record<string, unknown> }): Promise<string> {
       return complete({
+        route: 'content',
         messages: [{ role: 'user', content: prompt }],
         maxTokens: options?.maxTokens ?? 4096,
+        schema: options?.schema,
       });
     },
 
@@ -483,6 +554,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         : `You are helping create interactive dialog for a story game. Generate a dialog tree in JSON format.`;
 
       const text = await complete({
+        route: isTextFormat ? 'dialog-text' : 'dialog-tree',
         systemPrompt,
         messages: [{ role: 'user', content: request.prompt }],
         maxTokens: isTextFormat ? 1024 : 16000,
@@ -510,6 +582,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
     async generateConversationTurn(request: {
       systemPrompt: string;
       messages: Array<{ role: string; content: string }>;
+      schema?: Record<string, unknown>;
     }): Promise<{ text: string }> {
       if (family === 'anthropic') {
         // Claude takes the system prompt as a top-level field and only
@@ -524,11 +597,15 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
           claudeMessages.push({ role: 'user', content: '(The scene continues.)' });
         }
         const text = await complete({
+          route: request.schema ? 'analysis' : 'conversation',
           systemPrompt: request.systemPrompt,
           messages: claudeMessages.length > 0
             ? claudeMessages
             : [{ role: 'user', content: 'Begin.' }],
           maxTokens: 1000,
+          schema: request.schema,
+          // An NPC conversation resends its whole history every turn.
+          cachePrefix: claudeMessages.length > 1,
         });
         return { text };
       }
@@ -544,9 +621,11 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         messages.push({ role: 'user', content: '(The scene continues.)' });
       }
       const text = await complete({
+        route: request.schema ? 'analysis' : 'conversation',
         systemPrompt: request.systemPrompt,
         messages,
         maxTokens: 1000,
+        schema: request.schema,
       });
       return { text: text.trim() };
     },
@@ -556,9 +635,11 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       let result: string;
       try {
         result = await complete({
+          route: 'classify',
           systemPrompt,
           messages: [{ role: 'user', content: prompt }],
           maxTokens: 100,
+          schema: categorySchema(categories),
         });
       } catch (e) {
         if (e instanceof Error && e.message.startsWith('Unexpected response type from Claude')) {
@@ -568,8 +649,9 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
         }
         throw e;
       }
-      const trimmed = result.trim();
+      const trimmed = categoryFromReply(result);
       const match = categories.find(c => c.toLowerCase() === trimmed.toLowerCase());
+      if (!match) console.warn(`${logPrefix} Classifier answered "${trimmed}", not one of [${categories.join(', ')}] — using "${categories[0]}"`);
       return match || categories[0];
     },
 
@@ -582,6 +664,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
 
       if (family === 'anthropic') {
         const text = await complete({
+          route: 'image',
           messages: [{
             role: 'user',
             content: [
@@ -598,6 +681,7 @@ export function createRuntimeAIService(options: RuntimeAIServiceOptions): IAISer
       // without vision support return an API error here, which the beat
       // turns into its fallbackValue.
       const text = await complete({
+        route: 'image',
         messages: [{
           role: 'user',
           content: [

@@ -126,7 +126,9 @@ export function getDefaultModel(provider: AIProvider): string {
     case 'openai':
       return 'gpt-5.2';
     case 'anthropic':
-      return 'claude-sonnet-4-6';
+      // Sonnet 5 thinks by default; the shared runtime adapter runs it at low
+      // effort with room for the reply (see @asaps/core runtimeAdapter).
+      return 'claude-sonnet-5';
     case 'local':
       return 'gemma-3-4b';
     case 'custom':
