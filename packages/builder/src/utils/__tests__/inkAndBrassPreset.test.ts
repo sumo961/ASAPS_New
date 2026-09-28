@@ -24,3 +24,18 @@ describe('Ink & Brass preset', () => {
     expect(look(back)).toEqual(look(fresh));
   });
 });
+
+describe('theme picker order', () => {
+  it('lists built-ins in registry order (Ink & Brass first), then the author\'s themes', async () => {
+    const { toThemeInfos } = await import('../../hooks/useThemes');
+    const stored = (id: string, name: string, source: string) => ({ id, source, definition: { meta: { id, name } } });
+    // The store hands them back sorted by name.
+    const infos = toThemeInfos([
+      stored('custom-a', 'A Mine', 'custom'),
+      stored('builtin-cinematic', 'Dark Cinematic', 'built-in'),
+      stored('builtin-ink-and-brass', 'Ink & Brass', 'built-in'),
+      stored('builtin-visual-novel', 'Visual Novel', 'built-in'),
+    ] as any);
+    expect(infos.map((t) => t.id)).toEqual(['builtin-ink-and-brass', 'builtin-visual-novel', 'builtin-cinematic', 'custom-a']);
+  });
+});

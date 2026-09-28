@@ -54,7 +54,8 @@ export interface PersistenceContextValue {
 
   // Project management
   loadProject: (projectId: string) => Promise<boolean>;
-  createProject: (name: string, description?: string) => Promise<string>;
+  /** `themeId` records the base theme the new project's settings come from, so the theme picker names it. */
+  createProject: (name: string, description?: string, options?: { themeId?: string }) => Promise<string>;
   deleteProject: (projectId: string) => Promise<boolean>;
   updateProjectMetadata: (updates: Partial<Pick<Project, 'name' | 'description' | 'themeId' | 'assetsPath'>>) => Promise<void>;
   updateProjectStory: (storyData: Partial<any>) => void;
@@ -673,7 +674,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    */
   const createProject = useCallback(async (
     name: string,
-    description?: string
+    description?: string,
+    options?: { themeId?: string }
   ): Promise<string> => {
     try {
       const { v4: uuidv4 } = await import('uuid');
@@ -722,6 +724,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           fonts: ['Arial', 'Helvetica', 'sans-serif'],
         },
         assetIds: [],
+        ...(options?.themeId ? { themeId: options.themeId } : {}),
         createdAt: new Date(),
         modifiedAt: new Date(),
         version: '1.0.0',

@@ -652,9 +652,12 @@ export const HIGH_CONTRAST_THEME: ThemeDefinition = {
  * project that tried another theme had no way back.
  */
 const INK = DEFAULT_THEME_VALUES;
+/** The theme new and generated projects start from. */
+export const DEFAULT_THEME_ID = 'builtin-ink-and-brass';
+
 export const INK_AND_BRASS_THEME: ThemeDefinition = {
   meta: {
-    id: 'builtin-ink-and-brass',
+    id: DEFAULT_THEME_ID,
     name: 'Ink & Brass',
     version: '1.0.0',
     description: 'The default look: literary dark — ink stage, slate text box, brass pill buttons',

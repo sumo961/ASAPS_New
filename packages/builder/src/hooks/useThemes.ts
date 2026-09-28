@@ -87,6 +87,29 @@ export interface UseThemesResult {
 // Hook Implementation
 // ============================================================================
 
+/**
+ * Built-ins in registry order (Ink & Brass, the default look, first), then
+ * the author's own themes as the store lists them. The store sorts by name,
+ * which put the default in the middle of the list.
+ */
+export function toThemeInfos(storedThemes: Array<StoredTheme & { id: string }>): ThemeInfo[] {
+  const rank = (id: string) => {
+    const i = BUILT_IN_THEMES.findIndex((t) => t.meta.id === id);
+    return i === -1 ? BUILT_IN_THEMES.length : i;
+  };
+  return storedThemes
+    .map((stored, index) => ({ stored, index }))
+    .sort((a, b) => rank(a.stored.id) - rank(b.stored.id) || a.index - b.index)
+    .map(({ stored }) => ({
+      id: stored.id,
+      name: stored.definition.meta.name,
+      description: stored.definition.meta.description,
+      source: stored.source,
+      tags: stored.definition.meta.tags,
+      previewImage: stored.previewImage,
+    }));
+}
+
 export function useThemes(initialThemeId?: string): UseThemesResult {
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(initialThemeId || null);
@@ -111,14 +134,7 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
         // Load all themes
         const storedThemes = await service.listThemes();
 
-        const themeInfos: ThemeInfo[] = storedThemes.map(stored => ({
-          id: stored.id,
-          name: stored.definition.meta.name,
-          description: stored.definition.meta.description,
-          source: stored.source,
-          tags: stored.definition.meta.tags,
-          previewImage: stored.previewImage,
-        }));
+        const themeInfos = toThemeInfos(storedThemes);
 
         setThemes(themeInfos);
         setInitialized(true);
@@ -155,14 +171,7 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
       const service = getThemeService();
       const storedThemes = await service.listThemes();
 
-      const themeInfos: ThemeInfo[] = storedThemes.map(stored => ({
-        id: stored.id,
-        name: stored.definition.meta.name,
-        description: stored.definition.meta.description,
-        source: stored.source,
-        tags: stored.definition.meta.tags,
-        previewImage: stored.previewImage,
-      }));
+      const themeInfos = toThemeInfos(storedThemes);
 
       setThemes(themeInfos);
     } catch (err) {

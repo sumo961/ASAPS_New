@@ -8,6 +8,8 @@ Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you c
 ### Ink & Brass is a built-in theme
 - `builtin-ink-and-brass` is first in `BUILT_IN_THEMES`, so it shows in Project Settings → Theme and can be picked again after trying another look.
 - Picking it gives exactly the new-project look; `inkAndBrassPreset.test.ts` compares the two field by field.
+- The picker lists built-ins in registry order, with Ink & Brass at the top, then the author's own themes. The theme store sorts by name, which had put the default in the middle (`toThemeInfos` in `useThemes.ts`).
+- The new-project dialog and generated stories record their base theme (`createProject(…, { themeId })`, `applyGeneratedStory` → `themeIdApplied`), so the picker names Ink & Brass instead of "Custom (No Theme)". Before, a generated project could also inherit the previously open project's theme label. Verified live: a new project's picker shows Ink & Brass, and its `theme.json` records `builtin-ink-and-brass`.
 - The default text-box alpha (`nonpalpha`) is now 93, the same as the box opacity. It used to be 100, so the Visual Editor drew the box more opaque than the player did.
 
 ### Generation uses it by default
@@ -15,7 +17,7 @@ Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you c
 - The Claude Desktop MCP server's `asaps_get_themes` tool and `suggestedTheme` description now carry the same guidance.
 - `applyGeneratedStory`: a story with no suggested theme, or one this build doesn't know, gets Ink & Brass. Before, it kept the look of whatever project was open.
 
-**Files modified:** `packages/core/src/themes/presets.ts`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, tests (`inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
+**Files modified:** `packages/core/src/themes/presets.ts` (+ `DEFAULT_THEME_ID`), `packages/builder/src/hooks/useThemes.ts`, `packages/builder/src/contexts/PersistenceContext.tsx`, `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, tests (`inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
 
 ---
 

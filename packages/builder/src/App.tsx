@@ -1667,7 +1667,8 @@ function App() {
 
           // CRITICAL: Use createProject first to switch to a new IndexedDB project,
           // THEN sync beats. This prevents writing AI beats to the current directory project.
-          const newProjectId = await createProject(storyTitle, description);
+          const newProjectId = await createProject(storyTitle, description, { themeId: applied.themeIdApplied ?? undefined });
+          setCurrentThemeId(applied.themeIdApplied ?? undefined);
           console.log('[App] Injected story saved successfully, new project ID:', newProjectId);
 
           // Phase 3 — AI-generated projects default to responsive layout.
@@ -5789,7 +5790,8 @@ function App() {
 
         console.log('[App] Creating new project for generated story:', storyTitle);
         // pendingNewProjectIdRef is already 'pending' (set by the applier before the state load)
-        const newProjectId = await createProject(storyTitle, description);
+        const newProjectId = await createProject(storyTitle, description, { themeId: applied.themeIdApplied ?? undefined });
+        setCurrentThemeId(applied.themeIdApplied ?? undefined);
         pendingNewProjectIdRef.current = newProjectId;
         loadedProjectIdRef.current = newProjectId;
         console.log('[App] AI story generation - Created new project:', newProjectId);

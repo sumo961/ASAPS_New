@@ -13,6 +13,7 @@
 import React, { useState } from 'react';
 import { X, Folder, ChevronRight, ChevronDown } from 'lucide-react';
 import { useProject } from '../contexts/PersistenceContext';
+import { DEFAULT_THEME_ID } from '@asaps/core';
 import { normalizeGlobalSettings } from '../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../utils/languageCatalog';
 import { CultureSettingFields, cultureIsSet, type CultureValue } from './settings/CultureSettingFields';
@@ -65,7 +66,9 @@ export const NewProjectDialog: React.FC<NewProjectDialogProps> = ({
     setError(null);
 
     try {
-      const projectId = await create(name.trim(), description.trim() || undefined);
+      // Its settings are the Ink & Brass defaults (below); record that so
+      // the theme picker names the theme instead of "Custom (No Theme)".
+      const projectId = await create(name.trim(), description.trim() || undefined, { themeId: DEFAULT_THEME_ID });
 
       // Phase 2.5 — apply the wizard's layout choices to the freshly
       // created project. updateGlobalSettings reads the current project

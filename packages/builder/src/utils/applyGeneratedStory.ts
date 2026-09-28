@@ -18,7 +18,7 @@
  * WebSocket de-dup (injection), and the deferred create-project + save.
  */
 import type { Beat } from '@asaps/core';
-import { normalizeStory, buildClustersFromBeats } from '@asaps/core';
+import { normalizeStory, buildClustersFromBeats, DEFAULT_THEME_ID } from '@asaps/core';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import { applyTreeLayoutToBeats } from './TreeLayoutAlgorithm';
@@ -85,6 +85,8 @@ export interface ApplyGeneratedStoryResult {
   clusterCount: number;
   characterCount: number;
   themeApplied: string | null;
+  /** Id of that theme — the new project records it so the theme picker names it. */
+  themeIdApplied: string | null;
   fictionalTimeHudEnabled: boolean;
   unknownBeatTypes: string[];
   logicIssueCount: number;
@@ -216,9 +218,6 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
   } as GlobalSettings;
 }
 
-/** The look a generated story gets when it suggests none. */
-export const DEFAULT_GENERATED_THEME_ID = 'builtin-ink-and-brass';
-
 export async function applyGeneratedStory(
   story: any,
   deps: ApplyGeneratedStoryDeps,
@@ -295,18 +294,20 @@ export async function applyGeneratedStory(
   // look when it suggests none (or one we don't have) — never from whatever
   // project happened to be open.
   let themeApplied: string | null = null;
+  let themeIdApplied: string | null = null;
   const suggestedId = story.suggestedTheme?.themeId;
   if (deps.resolveTheme) {
     try {
       let theme = suggestedId ? await deps.resolveTheme(suggestedId) : null;
       if (!theme) {
         if (suggestedId) console.warn('[applyGeneratedStory] Suggested theme not found:', suggestedId, '- using the default');
-        theme = await deps.resolveTheme(DEFAULT_GENERATED_THEME_ID);
+        theme = await deps.resolveTheme(DEFAULT_THEME_ID);
       }
       if (theme) {
         settings = themeToGlobalSettings(theme, settings);
         deps.commitGlobalSettings(settings);
         themeApplied = theme.meta?.name ?? theme.meta?.id ?? null;
+        themeIdApplied = theme.meta?.id ?? null;
         console.log('[applyGeneratedStory] Applied theme:', themeApplied, '-', story.suggestedTheme?.reason ?? 'default');
       }
     } catch (err) {
@@ -452,6 +453,7 @@ export async function applyGeneratedStory(
     clusterCount: clusters.length,
     characterCount: storyCharacters.length,
     themeApplied,
+    themeIdApplied,
     fictionalTimeHudEnabled,
     unknownBeatTypes,
     logicIssueCount,
