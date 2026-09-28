@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.105** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.105 is a small follow-up to the
+Current release: **v0.9.106** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.106 brings the Ink & Brass look
+to generated stories**: AI-generated stories now open in ASAPS's own look
+instead of a retro theme, and Ink & Brass is a theme you can pick in Project
+Settings, listed first. AI features got leaner and sturdier: AI beats in a
+running story answer faster on the newest Claude models, replies that must
+be data are guaranteed to be valid, repeated requests reuse cached prompts,
+and the stand-alone players use Claude Sonnet 5. Also: the player's Restart
+asks inside its menu instead of freezing the page, the story checks explain
+problems in plain sentences, and a damaged translation file no longer stops
+a project from opening.
+
+**v0.9.105 was a small follow-up to the
 replay release**: the story checks now understand replays (a branch for a
 returning player is no longer reported unreachable) and variables that only
 have a default value; chat-style conversations keep their text clear of

@@ -2200,7 +2200,7 @@ job?** fold-out carries the short version of this table:
 | What you're doing | What matters | Good fit |
 |---|---|---|
 | **Story generation, Ideator, Co-Designer** | One-shot draft quality — you wait once, then work with the result | Flagship: `claude-opus-5` / `gpt-6-astra` (or `gpt-5.6-sol` at half the price). Reasoning **Auto** or higher; **Pro** mode (GPT-5.6 only) for hard material. See *What we measured* below before reaching for Fable |
-| **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto**. Put it in **Model for in-story AI** so your authoring model stays the flagship |
+| **Runtime AI beats** (AI Conversation, AI Dialog Tree, AI Condition, AI Info Text) | Latency — a player is sitting in your story waiting for every turn | Fast tier: `claude-sonnet-5` / `gpt-5.6-terra` or `-luna`. Reasoning **None** or **Auto** (Claude 5 models think at low effort in AI beats whatever you pick, to keep turns quick). Put it in **Model for in-story AI** so your authoring model stays the flagship |
 | **Translation** | Instruction-following (markers, variables, JSON) plus literary register, across big batches | Flagship for the pass you ship; the balanced tier is fine for drafts |
 | **Character helper, beat suggestions, transformations** | A structured proposal you review before accepting | The default tier is fine |
 
@@ -2257,6 +2257,8 @@ The **Reasoning effort** dropdown (labelled *Extended thinking (Claude)* on Anth
 | **Minimal** / **Low** / **Medium** / **High** | Progressively more thinking budget |
 | **X-High** | Most thinking the GPT-5.x tiers expose; they cap here internally |
 | **Max (Claude 4.5+, GPT-6 Astra)** | Top tier on Claude 4.5+ models and on GPT-6 Astra. Selecting it on other OpenAI models silently falls back to X-High. On Fable models **None** is not available — Fable always thinks, and Auto is the safe choice; GPT-6 Astra likewise rejects **None** and **Minimal**, which ASAPS sends as **Low** |
+
+The setting applies to every AI helper in the builder — story generation, the Ideator, the Co-Designer, translation, the character helper and the rest — not only to story generation. In-story AI beats are the exception: on Claude 5 models they always think at low effort, so the player isn't kept waiting.
 
 Claude extended thinking forces temperature to 1.0 when enabled and only works on the direct Anthropic endpoint — most Claude-compatible proxies do not support it. OpenAI reasoning uses `max_completion_tokens` and ignores temperature; the none–xhigh tiers apply to gpt-5.5 and the whole gpt-5.6 family (Sol/Terra/Luna), `gpt-6-astra` takes low–max, and `gpt-5.5` defaults to `none` when no tier is selected.
 
@@ -2798,7 +2800,7 @@ Click the **Debug** button in the header to open the **Debug Tools** window. It 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
 *The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
 
-Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, or every beat that links to it is unreachable itself), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
+Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
 
 A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable with a default value in Project Settings counts as set, and so does the built-in **playthrough**.
 
@@ -3032,7 +3034,7 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 - **TTS language** - The project's source language is automatically embedded; when translations are bundled, switching languages also switches TTS speech language
 - **Save/resume** - Interactors can save progress and resume later (via browser storage)
 
-**The player's Menu.** An exported story has a small **Menu** button in the top-right corner. It opens a bar with the play time and **Save**, **Load**, **Settings**, **Pause**, **Restart** (a fresh start that keeps nothing, after a confirmation) and **Fullscreen**, plus **Save Log** when the session log is included. Screen HUDs (the clock or timer, character meters, inventory) are laid out for the window the story is actually shown in, and stack below the Menu button rather than under it.
+**The player's Menu.** An exported story has a small **Menu** button in the top-right corner. It opens a bar with the play time and **Save**, **Load**, **Settings**, **Pause**, **Restart** (a fresh start that keeps nothing; the bar first asks *"Restart? Unsaved progress will be lost."* — **Restart now** or **Keep playing**) and **Fullscreen**, plus **Save Log** when the session log is included. Screen HUDs (the clock or timer, character meters, inventory) are laid out for the window the story is actually shown in, and stack below the Menu button rather than under it.
 - **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
 
 ### Deployment & Troubleshooting
@@ -3408,18 +3410,29 @@ Adjust speed in Settings.
 
 ### Theme Presets
 
-Load complete visual styles:
-- **Visual Novel** - Traditional VN aesthetic
-- **Twine** - Hypertext fiction style
-- **Point-and-Click** - Adventure game look
+The **Theme:** picker at the top of the Settings panel loads a complete visual style — colours, fonts, text box, buttons and effects — in one click. Your own saved themes follow the built-in ones in the list. The built-in themes, in the order the picker lists them:
+
+- **Ink & Brass** - The default look: literary dark, with an ink stage, a slate text box and brass pill buttons
+- **Visual Novel** - Classic visual novel style inspired by Ren'Py
+- **Text Adventure** - Minimal text adventure style inspired by Twine/SugarCube
+- **Point & Click Adventure** - Classic point-and-click adventure style inspired by LucasArts/Sierra
+- **Clean Editorial** - Light, print-inspired look for documentary and museum stories
+- **Dark Cinematic** - Near-black, colour-graded look with a tungsten accent
+- **Playful** - Bright, rounded, sticker-like look for walks and family stories
+- **High Contrast** - Black, white and yellow, larger type, no motion; built for accessibility
+
+**A new empty project starts in Ink & Brass**, and the picker names it (a project made from a template keeps the template's look). Stories generated by AI get Ink & Brass too, unless the story clearly calls for a different look; the three period themes (Visual Novel, Text Adventure, Point & Click Adventure) are only picked when you ask for that style. You can switch at any time.
+
+If you change settings after picking a built-in theme, the picker notes *Modified from …* next to it. **Custom (No Theme)** at the top of the list keeps your current settings without tying them to a theme.
 
 ### Custom Themes
 
-Create and save your own themes, including:
+Click **Save as Theme** next to the picker to save your current settings as a reusable theme, including:
 - All color settings
 - Typography choices
 - UI element styling
-- Bundled fonts
+
+**Import Ren'Py** turns a Ren'Py visual novel theme into an ASAPS theme, bringing its fonts and graphics along.
 
 ## Timers, Countdowns & Fictional Time
 

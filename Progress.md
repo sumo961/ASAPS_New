@@ -1,11 +1,25 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.105, 2026-09-28)
+## 2026-09-29: Ink & Brass for generated stories, and leaner, sturdier AI requests (v0.9.106)
 
 ### Overview
-Also: the leftover small fixes, and all seven request-level follow-ups from the September prompt audit (see below).
+Generated stories now get ASAPS's own Ink & Brass look, and Ink & Brass is a theme you can pick, listed first. Until now it was only the look of a new project: the generator and the theme picker didn't know it existed. The prompt steered models to the three period themes, so recent generations (Late Light among them) came out as Visual Novel, Text Adventure or Point & Click.
 
-Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you can pick. Since v0.9.87 it was only the look of a new project, so the generator and the theme picker didn't know it existed. The prompt steered models to the three period themes, so every recent generation came out as Visual Novel, Text Adventure or Point & Click. Late Light, for example, came out as Point & Click.
+Under the hood, all seven request-level follow-ups from the September prompt audit landed:
+- runtime AI beats think at low effort on the Claude 5 models (thinking can't be switched off on Opus 5.5 and Fable);
+- fixed-shape replies are enforced as JSON;
+- prompt caching, including a Co-Designer prompt split so its instructions are reused across stories;
+- server-side refusal fallbacks for Opus 5 / 5.5 / Fable;
+- clearer tool-loop errors;
+- the player apps moved onto the shared runtime adapter with Sonnet 5;
+- per-route token accounting.
+
+A generation after these changes was imported and played through all three endings.
+
+Small fixes:
+- the player's Restart confirms inside its menu;
+- Reachability and Story Warnings read as sentences, and Story Warnings are now in the User Guide;
+- a malformed stored translation no longer breaks project loading or deletes translations on the next save.
 
 ### Ink & Brass is a built-in theme
 - `builtin-ink-and-brass` is first in `BUILT_IN_THEMES`, so it shows in Project Settings → Theme and can be picked again after trying another look.
@@ -33,9 +47,18 @@ Generated stories now get the Ink & Brass look, and Ink & Brass is a theme you c
 - **F5 — server-side refusal fallbacks:** `fallbacks: "default"` with beta `server-side-fallback-2026-07-01` for Opus 5 / 5.5 / Fable / Mythos, on the builder's direct SDK calls and the runtime's direct Anthropic transport (official endpoint only). Tool-loop echo follows the fallback rules (`echoableContent`). Not on the relay or dev proxy, which don't control the header.
 - **F6 — player apps:** the desktop and mobile players now delegate to the shared runtime adapter instead of their own fetch copies, so they get all of the above plus conversation turns and image analysis. The default model moves from `claude-sonnet-4-6` to `claude-sonnet-5`.
 - **F7 — token accounting:** `recordAIUsage` (core) totals input, output, cache-read and cache-write tokens per route and model for the builder and runtime paths; `asapsAIUsage.summary()` in devtools.
-- **Live generation after F1–F7** (Opus 5.5, short / moderate drama brief): 2 min 24 s, `end_turn` at 15,601 output tokens with no escalation. The cached system block and the fallback header were accepted: 64,675 tokens written to cache, 983 uncached input. It suggested `builtin-ink-and-brass`; 15 beats, 3 characters, 3 endings restarting to the title with `reset`. The generation review found nothing. The cache write costs about 25% extra on the story prompt's input and pays back on any reuse within 5 minutes (an escalated retry, a repair pass, regenerating after editing the brief). A second generation went through the real **Story Generator dialog and import** ("Lights Out at St. Brannock's": 2 min 11 s, 12,474 output tokens, `end_turn`). The import found no logic issues and wired its 2 variables; Ink & Brass was applied and the theme picker names it (`theme.json` = `builtin-ink-and-brass`); 14 beats in 4 clusters; no review findings. All three endings were played to the end in the Preview Window (the third, "What It Cost", by Hartmut); the path simulator agrees: all three are reachable over 108 routes, with no dead ends. Fixed along the way: usage totals now live on `globalThis`, so two copies of the core module in one page count into the same summary. The "ONLY valid JSON" prose stays in prompts because non-schema providers still rely on it. A story generated after the audit (Late Light) has already been played end to end.
 
-**Files modified:** `packages/core/src/ai/{providerQuirks,runtimeAdapter,aiUsage}.ts`, `packages/core/src/utils/{ConversationPromptBuilder,aiReplySchemas}.ts`, `packages/core/src/beats/{AIConversation,AIInfoText,AIDurScreen,AISummary}Beat.ts`, `packages/builder/src/services/providers/ClaudeProvider.ts`, `packages/builder/src/services/AIService.ts`, `packages/builder/src/components/ai/codesigner/{systemPrompt,useCoDesigner}.ts`, `packages/builder/src/components/ai/ideator/promptSynthesis.ts`, `apps/player-{desktop,mobile}/src/services/{AIService,AIConfig}.ts`, `packages/core/src/themes/presets.ts` (+ `DEFAULT_THEME_ID`), `packages/builder/src/hooks/useThemes.ts`, `packages/builder/src/contexts/PersistenceContext.tsx`, `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, tests (`inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
+### User Guide
+- Theme Presets rewritten: all 8 built-ins in picker order (Ink & Brass first) with their current names; new and generated projects start in Ink & Brass. Custom Themes names *Save as Theme* and no longer claims bundled fonts (*Import Ren'Py* brings those).
+- Player Menu → Restart describes the in-menu confirmation. Reachability lists the fourth cause. The reasoning-effort section says the setting now applies to every builder AI helper, while in-story AI beats think at low effort on Claude 5.
+
+### Verification after F1–F7
+- **Direct generation** (Opus 5.5, short / moderate drama brief): 2 min 24 s, `end_turn` at 15,601 output tokens with no escalation. The cached system block and the fallback header were accepted: 64,675 tokens written to cache, 983 uncached input. It suggested `builtin-ink-and-brass`; 15 beats, 3 characters, 3 endings restarting to the title with `reset`. The generation review found nothing. The cache write costs about 25% extra on the story prompt's input and pays back on any reuse within 5 minutes (an escalated retry, a repair pass, regenerating after editing the brief).
+- **Story Generator dialog and import:** a second generation ("Lights Out at St. Brannock's": 2 min 11 s, 12,474 output tokens, `end_turn`). The import found no logic issues and wired its 2 variables; Ink & Brass was applied and the theme picker names it (`theme.json` = `builtin-ink-and-brass`); 14 beats in 4 clusters; no review findings. All three endings were played to the end in the Preview Window (the third, "What It Cost", by Hartmut); the path simulator agrees: all three are reachable over 108 routes, with no dead ends.
+- Fixed along the way: usage totals now live on `globalThis`, so two copies of the core module in one page count into the same summary.
+- The "ONLY valid JSON" prose stays in prompts because non-schema providers still rely on it. A story generated after the audit (Late Light) had already been played end to end.
+
+**Files modified:** `packages/core/src/ai/{providerQuirks,runtimeAdapter,aiUsage}.ts`, `packages/core/src/utils/{ConversationPromptBuilder,aiReplySchemas}.ts`, `packages/core/src/beats/{AIConversation,AIInfoText,AIDurScreen,AISummary}Beat.ts`, `packages/builder/src/services/providers/ClaudeProvider.ts`, `packages/builder/src/services/AIService.ts`, `packages/builder/src/components/ai/codesigner/{systemPrompt,useCoDesigner}.ts`, `packages/builder/src/components/ai/ideator/promptSynthesis.ts`, `apps/player-{desktop,mobile}/src/services/{AIService,AIConfig}.ts`, `packages/core/src/themes/presets.ts` (+ `DEFAULT_THEME_ID`), `packages/builder/src/hooks/useThemes.ts`, `packages/builder/src/contexts/PersistenceContext.tsx`, `packages/builder/src/components/NewProjectDialog.tsx`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/utils/applyGeneratedStory.ts`, `packages/builder/src/utils/themeConverter.ts`, `packages/builder/src/App.tsx`, `packages/builder/src/types/ai.ts`, `mcp-server-desktop/src/index.ts`, `packages/player/src/PlayerUI.tsx`, `packages/builder/src/components/debug/{ReachabilityReport,PathVisualization,PathTreeView}.tsx` + `storyWarningLabels.ts`, `packages/builder/src/contexts/TranslationContext.tsx`, `packages/core/src/translation/{types,index}.ts`, `docs/USER_GUIDE.md`, tests (`restartConfirm.test.tsx`, `reachabilityReasonText.test.ts`, `normalizeTranslationResources.test.ts`, `runtimeAdapter.test.ts`, `ClaudeProvider.test.ts`, `coDesignerStoryState.test.ts`, `inkAndBrassPreset.test.ts`, `applyGeneratedStory.test.ts`, `storyGenerationEnhanced.test.ts`, core `presets.test.ts`)
 
 ---
 
