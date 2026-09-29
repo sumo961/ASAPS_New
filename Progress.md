@@ -3,14 +3,17 @@
 ## Unreleased (since v0.9.106, 2026-09-29)
 
 ### Overview
-The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls.
+The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. The Field App's iOS project builds on Xcode 27.
 
 ### Relay refusal fallbacks
 - The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
 - The relay is a stand-alone file, so it carries its own model pattern. A tripwire test checks it against `claudeSupportsServerFallbacks` in core over a list of model ids.
 - `README-RELAY.md` says a relay deployed before v0.9.107 must be redeployed from a new export to get this.
 
-**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`
+### Field App: first iOS build
+- With Xcode 27 and CocoaPods 1.17 now installed on the dev Mac, `cap sync ios` ran `pod install` cleanly for all 7 plugins (closing the "iOS pods unverified" item from the Capacitor 8 upgrade). The app compiles for device (`xcodebuild … -sdk iphoneos`, unsigned) after raising the Xcode project's `IPHONEOS_DEPLOYMENT_TARGET` from 13.0 to 15.0, the Capacitor 8 minimum; the Podfile already said 15.0. `cap sync` rewrote the Podfile's plugin paths to where each plugin is actually installed.
+
+**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`, `apps/player-mobile/ios/App/{App.xcodeproj/project.pbxproj,Podfile,Podfile.lock,App.xcworkspace/contents.xcworkspacedata}`
 
 ---
 
