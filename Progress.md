@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.106, 2026-09-29)
+
+### Overview
+The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls.
+
+### Relay refusal fallbacks
+- The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
+- The relay is a stand-alone file, so it carries its own model pattern. A tripwire test checks it against `claudeSupportsServerFallbacks` in core over a list of model ids.
+- `README-RELAY.md` says a relay deployed before v0.9.107 must be redeployed from a new export to get this.
+
+**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`
+
+---
+
 ## 2026-09-29: Ink & Brass for generated stories, and leaner, sturdier AI requests (v0.9.106)
 
 ### Overview

@@ -138,3 +138,36 @@ describe('relay function — request validation', () => {
     expect((await r.json()).error).toContain('ANTHROPIC_API_KEY is not set');
   });
 });
+
+describe('relay function — server-side refusal fallbacks', () => {
+  const sent = () => {
+    const [, init] = (fetch as any).mock.calls.at(-1);
+    return { body: JSON.parse(init.body), beta: init.headers['anthropic-beta'] };
+  };
+
+  it('opts Opus 5 / 5.5 and Fable into fallbacks with the beta header', async () => {
+    for (const model of ['claude-opus-5', 'claude-opus-5-5', 'claude-fable-5-1']) {
+      await handler(req('POST', null, { provider: 'anthropic', body: { model, messages: [] } }));
+      expect(sent()).toEqual({ body: { model, messages: [], fallbacks: 'default' }, beta: 'server-side-fallback-2026-07-01' });
+    }
+  });
+
+  it('leaves other models, OpenAI and an explicit fallbacks setting alone', async () => {
+    await handler(req('POST', null, { provider: 'anthropic', body: { model: 'claude-sonnet-5' } }));
+    expect(sent()).toEqual({ body: { model: 'claude-sonnet-5' }, beta: undefined });
+    await handler(req('POST', null, { provider: 'openai', body: { model: 'gpt-6-astra' } }));
+    expect(sent().body.fallbacks).toBeUndefined();
+    await handler(req('POST', null, { provider: 'anthropic', body: { model: 'claude-opus-5', fallbacks: [{ model: 'claude-opus-4-8' }] } }));
+    expect(sent().beta).toBeUndefined();
+  });
+
+  it('tripwire: the relay\'s model list matches @asaps/core claudeSupportsServerFallbacks', async () => {
+    const { claudeSupportsServerFallbacks } = await import('@asaps/core');
+    const m = RELAY_FUNCTION_SOURCE.match(/const FALLBACK_MODELS = \/(.*)\/;/);
+    const relayRx = new RegExp(m![1]);
+    for (const model of ['claude-opus-5', 'claude-opus-5-5', 'claude-opus-6', 'claude-opus-4-8', 'claude-sonnet-5',
+      'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-fable-5', 'claude-fable-5-1', 'claude-mythos-5-1', 'gpt-6-astra', 'kimi-k2']) {
+      expect(relayRx.test(model), model).toBe(claudeSupportsServerFallbacks(model));
+    }
+  });
+});

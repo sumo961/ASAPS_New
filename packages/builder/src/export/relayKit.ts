@@ -36,6 +36,13 @@ const UPSTREAMS = {
   openai: 'https://api.openai.com/v1/chat/completions',
 };
 
+// Claude Opus 5 / 5.5, Fable and Mythos run safety classifiers that can
+// decline a harmless story scene. For those models the relay asks Anthropic
+// to re-run a declined request on the model it recommends, instead of the
+// AI beat failing. (Mirrors claudeSupportsServerFallbacks in @asaps/core.)
+const FALLBACK_MODELS = /^claude-(fable-|mythos-|opus-([5-9]|\\d{2,}))/;
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
 // Cross-origin access is opt-in via ALLOWED_ORIGINS (comma-separated).
 // Entries are exact origins ("https://my-story.netlify.app") or
 // suffix wildcards ("*.netlify.app" — any https site on that suffix).
@@ -112,6 +119,10 @@ export default async (req) => {
         'content-type': 'application/json',
         authorization: 'Bearer ' + key,
       };
+  if (provider === 'anthropic' && body.fallbacks === undefined && FALLBACK_MODELS.test(String(body.model || ''))) {
+    body.fallbacks = 'default';
+    headers['anthropic-beta'] = FALLBACK_BETA;
+  }
 
   const upstream = await fetch(UPSTREAMS[provider], {
     method: 'POST',
@@ -244,6 +255,10 @@ function on the NEXT deploy (**Deploys → Trigger deploy**).
 - Works on any host that supports Netlify-style functions. For other
   hosts (Cloudflare, Vercel), port \`netlify/functions/asaps-ai.mjs\` —
   it is ~100 lines of standard fetch code with no dependencies.
+- For Claude Opus 5 / 5.5 and Fable, the relay asks Anthropic to retry a
+  request that a safety check declines on another model, so an AI beat
+  doesn't fail over a harmless scene. A relay deployed before ASAPS
+  Builder v0.9.107 doesn't do this — redeploy it from a new export to get it.
 `;
 
 export const RELAY_NETLIFY_TOML = `[build]
