@@ -27,7 +27,8 @@ and new features arrive frequently. **v0.9.106 brings the Ink & Brass look
 to generated stories**: AI-generated stories now open in ASAPS's own look
 instead of a retro theme, and Ink & Brass is a theme you can pick in Project
 Settings, listed first. AI features got leaner and sturdier: AI beats in a
-running story answer faster on the newest Claude models, replies that must
+running story think briefly on the newest Claude models (much quicker on
+Opus 5.5 and Fable), replies that must
 be data are guaranteed to be valid, repeated requests reuse cached prompts,
 and the stand-alone players use Claude Sonnet 5. Also: the player's Restart
 asks inside its menu instead of freezing the page, the story checks explain
