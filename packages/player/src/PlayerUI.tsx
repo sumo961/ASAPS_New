@@ -302,7 +302,9 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '8px 16px',
+      // Right padding keeps the bar's buttons clear of the Menu/Close
+      // toggle, which sits in the same corner on top of the bar.
+      padding: '8px 84px 8px 16px',
       background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))',
       pointerEvents: isMenuOpen ? 'auto' as const : 'none' as const,
       opacity: isMenuOpen ? 1 : 0,
@@ -434,28 +436,12 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
           {showPlayTime && <span style={styles.playTime}>{playTime}</span>}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          {showSaveLoad && (
-            <>
-              <button style={styles.button} onClick={() => setActivePanel('save')}>
-                Save
-              </button>
-              <button style={styles.button} onClick={() => setActivePanel('load')}>
-                Load
-              </button>
-            </>
-          )}
-          {showSettings && (
-            <button style={styles.button} onClick={() => setActivePanel('settings')}>
-              Settings
-            </button>
-          )}
-          <button style={styles.button} onClick={handlePauseResume}>
-            {isPaused ? 'Resume' : 'Pause'}
-          </button>
+        {/* Wraps onto more rows on a narrow screen instead of running off
+            it. While Restart asks, only the question and its answers show. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', rowGap: '8px', flex: '1 1 0', minWidth: 0 }}>
           {confirmRestart ? (
             <>
-              <span style={styles.playTime}>Restart? Unsaved progress will be lost.</span>
+              <span style={{ ...styles.playTime, marginLeft: '8px' }}>Restart? Unsaved progress will be lost.</span>
               <button style={styles.button} onClick={handleRestart}>
                 Restart now
               </button>
@@ -464,19 +450,39 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
               </button>
             </>
           ) : (
-            <button style={styles.button} onClick={() => setConfirmRestart(true)}>
-              Restart
-            </button>
-          )}
-          {showSessionLog && (
-            <button style={styles.button} onClick={handleSaveLog}>
-              Save Log
-            </button>
-          )}
-          {showFullscreen && (
-            <button style={styles.button} onClick={toggleFullscreen}>
-              {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            </button>
+            <>
+              {showSaveLoad && (
+                <>
+                  <button style={styles.button} onClick={() => setActivePanel('save')}>
+                    Save
+                  </button>
+                  <button style={styles.button} onClick={() => setActivePanel('load')}>
+                    Load
+                  </button>
+                </>
+              )}
+              {showSettings && (
+                <button style={styles.button} onClick={() => setActivePanel('settings')}>
+                  Settings
+                </button>
+              )}
+              <button style={styles.button} onClick={handlePauseResume}>
+                {isPaused ? 'Resume' : 'Pause'}
+              </button>
+              <button style={styles.button} onClick={() => setConfirmRestart(true)}>
+                Restart
+              </button>
+              {showSessionLog && (
+                <button style={styles.button} onClick={handleSaveLog}>
+                  Save Log
+                </button>
+              )}
+              {showFullscreen && (
+                <button style={styles.button} onClick={toggleFullscreen}>
+                  {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
