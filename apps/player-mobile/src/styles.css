@@ -18,12 +18,13 @@ body {
 }
 
 .app-container {
+  position: relative;
   display: flex;
   flex-direction: column;
+  /* Fills the page body, which already stops at the safe areas (index.html
+     pads it by env(safe-area-inset-*)); 100vh here overflowed the padded
+     body and cut off the bottom of the stage. */
   height: 100%;
-  /* Account for safe areas */
-  height: 100vh;
-  height: calc(var(--vh, 1vh) * 100);
 }
 
 /* Library View */
@@ -32,7 +33,6 @@ body {
   flex-direction: column;
   height: 100%;
   padding: 16px;
-  padding-top: max(16px, env(safe-area-inset-top));
 }
 
 .library-header {
@@ -55,6 +55,8 @@ body {
   overflow-y: auto;
   flex: 1;
   -webkit-overflow-scrolling: touch;
+  /* Rows keep their card height; the grid only fills the rest with space. */
+  align-content: start;
 }
 
 .story-card {
@@ -175,7 +177,7 @@ body {
 /* Mobile Menu */
 .mobile-menu {
   position: absolute;
-  top: max(8px, env(safe-area-inset-top));
+  top: 8px;
   left: 8px;
   right: 8px;
   display: flex;
@@ -221,7 +223,6 @@ body {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  padding-top: max(20px, env(safe-area-inset-top));
   animation: fadeIn 0.2s ease;
 }
 

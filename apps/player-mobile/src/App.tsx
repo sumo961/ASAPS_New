@@ -196,9 +196,16 @@ const App: React.FC = () => {
         }
       });
 
-      // Load and start
+      // Load and start. start() runs the whole story and resolves only when
+      // it ends, so it must not be awaited here — awaiting it kept the
+      // loading screen over the title screen forever. Errors from the
+      // running story still reach the error screen.
       await player.loadStory(data);
-      await player.start();
+      player.start().catch(err => {
+        console.error('Story stopped with an error:', err);
+        setError(err instanceof Error ? err.message : 'The story stopped with an error');
+        setAppState('error');
+      });
 
       setAppState('playing');
       await haptic(ImpactStyle.Heavy);
@@ -425,9 +432,17 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Player View */}
-      {appState === 'playing' && (
-        <div className="player-view">
+      {/* Player View — always mounted, hidden until a story plays. The
+          renderer attaches to containerRef while the story is still
+          loading; if this view (and so the container) only mounted on
+          'playing', the story would keep drawing into the discarded
+          placeholder element and the stage would stay empty. */}
+      <div
+        className="player-view"
+        // Hidden but laid out (not display:none) while a story loads, so the
+        // renderer measures the stage at its real size.
+        style={appState === 'playing' ? undefined : { visibility: 'hidden', position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      >
           {/* Mobile Menu Bar */}
           <div className="mobile-menu">
             <button className="menu-button" onClick={handleBack}>
@@ -745,13 +760,7 @@ const App: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Hidden container when not playing */}
-      {appState !== 'playing' && (
-        <div ref={containerRef} style={{ display: 'none' }} />
-      )}
+      </div>
     </div>
   );
 };

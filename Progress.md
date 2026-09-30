@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.106, 2026-09-29)
 
 ### Overview
-The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. The Field App's iOS project builds on Xcode 27.
+The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. The Field App's iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
 
 ### Relay refusal fallbacks
 - The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
@@ -12,8 +12,14 @@ The exported-story relay now gets the same server-side refusal fallbacks as the 
 
 ### Field App: first iOS build
 - With Xcode 27 and CocoaPods 1.17 now installed on the dev Mac, `cap sync ios` ran `pod install` cleanly for all 7 plugins (closing the "iOS pods unverified" item from the Capacitor 8 upgrade). The app compiles for device (`xcodebuild … -sdk iphoneos`, unsigned) after raising the Xcode project's `IPHONEOS_DEPLOYMENT_TARGET` from 13.0 to 15.0, the Capacitor 8 minimum; the Podfile already said 15.0. `cap sync` rewrote the Podfile's plugin paths to where each plugin is actually installed.
+- **First simulator run (iPhone 17, iOS 27)** found and fixed four problems that had never shown up without a device:
+  - *No launch at all:* apps built with the iOS 27 SDK must use the UIScene life cycle. Added `SceneDelegate.swift`, the scene configuration in `AppDelegate`, and `UIApplicationSceneManifest` in Info.plist, following Capacitor 8.5's own template.
+  - *Stuck on "Loading story…" forever:* the app awaited `player.start()`, which runs the whole story and resolves only at the end. It now starts the story without waiting, like the desktop player, and errors still reach the error screen.
+  - *Empty stage once that was fixed:* the renderer attached to a hidden placeholder `<div>` that React replaced when the app switched to playing, so the story drew into a discarded element. The player view is now mounted all the time and only hidden (laid out, invisible) while a story loads, so the stage is also measured at its real size.
+  - *Layout:* the safe areas were counted twice (an inset web view plus the page's own `env(safe-area-inset-*)` padding) and the app used `100vh`, so the stage's bottom (the start button) was cut off, with grey or white bands around it. Now the web view covers the screen (`contentInset: 'never'`), the page padding is the only inset, the native background matches the app (`#1a1a2e`), and the recent-stories grid no longer stretches its cards.
+  - Verified: Ordinary Wonders handed over as a file URL (as the Files app does) → location prompt with our explanation → title screen fitting the screen. Playing on needs taps and GPS, so that is for the device test.
 
-**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`, `apps/player-mobile/ios/App/{App.xcodeproj/project.pbxproj,Podfile,Podfile.lock,App.xcworkspace/contents.xcworkspacedata}`
+**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`, `apps/player-mobile/ios/App/{App.xcodeproj/project.pbxproj,Podfile,Podfile.lock,App.xcworkspace/contents.xcworkspacedata}`, `apps/player-mobile/ios/App/App/{AppDelegate,SceneDelegate}.swift` + `Info.plist`, `apps/player-mobile/src/{App.tsx,styles.css}`, `apps/player-mobile/capacitor.config.ts`
 
 ---
 
