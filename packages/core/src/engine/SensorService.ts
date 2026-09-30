@@ -261,6 +261,9 @@ export interface SensorService {
  * for tests. The internal marker is a soft contract; the class is
  * exported so test code can spy on it.
  */
+/** How old a cached reading may be to stand in for a failed getCurrentLocation. */
+const RECENT_LOCATION_MS = 60_000;
+
 export class WebSensorService extends EventEmitter implements SensorService {
   private locationWatchId: number | null = null;
   private locationSubscribers = new Set<(r: GpsReading) => void>();
@@ -276,13 +279,37 @@ export class WebSensorService extends EventEmitter implements SensorService {
   // populate it when scanBeacons gains a real implementation.
   private lastBeacons: BeaconReading[] = [];
 
+  /** When lastLocation was received (not the fix's own timestamp). */
+  private lastLocationAt = 0;
+
   async getCurrentLocation(): Promise<GpsReading | null> {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return null;
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve(this.normalizePosition(pos)),
-        () => resolve(null),  // permission denied / unavailable
-        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
+        (pos) => {
+          const reading = this.normalizePosition(pos);
+          this.lastLocation = reading;
+          this.lastLocationAt = Date.now();
+          resolve(reading);
+        },
+        (err) => {
+          // A fresh high-accuracy fix can take longer than the timeout
+          // (indoors, or a phone/simulator that only reports on change). Two
+          // reads a moment apart — a story capturing base camp, then
+          // scattering points around "here" — must not lose the second
+          // one, so a reading from the last minute stands in. A denial
+          // never does.
+          const code = (err as GeolocationPositionError | undefined)?.code;
+          const recent = this.lastLocation && Date.now() - this.lastLocationAt <= RECENT_LOCATION_MS;
+          console.warn(
+            `[SensorService] getCurrentLocation failed (code ${code ?? '?'}: ${(err as { message?: string } | undefined)?.message ?? 'unknown'})` +
+              (recent && code !== 1 ? ' — using the reading from moments ago' : ''),
+          );
+          resolve(recent && code !== 1 ? this.lastLocation : null);
+        },
+        // maximumAge: a fix up to 5 s old is as good as a new one for a
+        // story beat, and answers at once.
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 5_000 },
       );
     });
   }
@@ -298,6 +325,7 @@ export class WebSensorService extends EventEmitter implements SensorService {
         (pos) => {
           const reading = this.normalizePosition(pos);
           this.lastLocation = reading;  // S3 — keep the cache fresh
+          this.lastLocationAt = Date.now();
           // Snapshot the subscriber list — defensive against unsubscribe-during-iterate.
           for (const sub of Array.from(this.locationSubscribers)) sub(reading);
         },

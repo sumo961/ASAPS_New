@@ -95,6 +95,29 @@ describe('WebSensorService', () => {
       expect(reading).toBeNull();
     });
 
+    it('falls back to the reading from moments ago when a new fix times out, but never after a denial', async () => {
+      await service.getCurrentLocation(); // succeeds, cached
+      geo.getCurrentPosition.mockImplementationOnce((_success, error) => { error({ code: 3, message: 'timeout' }); });
+      expect(await service.getCurrentLocation()).toMatchObject({ lat: 37.7749, lng: -122.4194 });
+      geo.getCurrentPosition.mockImplementationOnce((_success, error) => { error({ code: 1, message: 'denied' }); });
+      expect(await service.getCurrentLocation()).toBeNull();
+    });
+
+    it('does not use a cached reading older than a minute', async () => {
+      const now = vi.spyOn(Date, 'now');
+      now.mockReturnValue(1_000_000);
+      await service.getCurrentLocation();
+      now.mockReturnValue(1_000_000 + 61_000);
+      geo.getCurrentPosition.mockImplementationOnce((_success, error) => { error({ code: 3, message: 'timeout' }); });
+      expect(await service.getCurrentLocation()).toBeNull();
+      now.mockRestore();
+    });
+
+    it('asks for a fix no older than 5 s', async () => {
+      await service.getCurrentLocation();
+      expect(geo.getCurrentPosition.mock.calls.at(-1)[2]).toMatchObject({ maximumAge: 5_000, enableHighAccuracy: true });
+    });
+
     it('resolves null when navigator.geolocation is absent', async () => {
       vi.stubGlobal('navigator', {});
       service = new WebSensorService();
