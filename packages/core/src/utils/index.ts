@@ -109,6 +109,8 @@ export {
   buildWalkableQuery,
   fetchWalkableWays,
   sampleWalkablePoints,
+  setOverpassFetch,
+  type OverpassFetch,
   type WalkableSampleOptions,
 } from './overpass';
 export { inferLayoutMode, resolveProjectLayoutMode, type LayoutMode, type LayoutModeBeat } from './layoutMode';

@@ -20,7 +20,21 @@ const DEFAULT_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const M_PER_DEG_LAT = 111_320;
 
 /** Minimal fetch typing so core doesn't need the DOM lib. */
-type FetchLike = (url: string, init?: any) => Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
+export type OverpassFetch = (url: string, init?: any) => Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
+type FetchLike = OverpassFetch;
+
+
+/**
+ * Let the host app supply how Overpass requests are sent. The public
+ * instance answers 406 to requests carrying a browser user agent, and a web
+ * page cannot choose its own; a native app (the Field App) can send the
+ * request natively with an identifying user agent instead.
+ */
+export function setOverpassFetch(fetchImpl: OverpassFetch | null): void {
+  // On globalThis, not in this module: @asaps/player bundles its own copy
+  // of core, and the story runs on that copy.
+  (globalThis as any).__asapsOverpassFetch = fetchImpl;
+}
 
 export interface WalkableSampleOptions {
   /** Radius (metres) stamped on each returned point (its geofence size). */
@@ -170,7 +184,7 @@ export async function fetchWalkableWays(
   radiusMeters: number,
   opts: WalkableSampleOptions = {}
 ): Promise<OverpassWay[]> {
-  const fetchImpl: FetchLike | undefined = opts.fetchImpl ?? (globalThis as any).fetch?.bind(globalThis);
+  const fetchImpl: FetchLike | undefined = opts.fetchImpl ?? (globalThis as any).__asapsOverpassFetch ?? (globalThis as any).fetch?.bind(globalThis);
   if (!fetchImpl) return [];
   const endpoint = opts.endpoint ?? DEFAULT_ENDPOINT;
   const query = buildWalkableQuery(center.lat, center.lng, radiusMeters);
@@ -190,11 +204,16 @@ export async function fetchWalkableWays(
       body: `data=${encodeURIComponent(query)}`,
       signal: controller?.signal,
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      // 406: the public instance refuses browser user agents (see setOverpassFetch).
+      console.warn(`[overpass] walkable query failed: HTTP ${res.status}`);
+      return [];
+    }
     const json = await res.json();
     const els = Array.isArray(json?.elements) ? json.elements : [];
     return els.filter((e: any) => e?.type === 'way' && Array.isArray(e.geometry)) as OverpassWay[];
-  } catch {
+  } catch (err) {
+    console.warn('[overpass] walkable query failed:', err instanceof Error ? err.message : err);
     return [];
   } finally {
     if (timer) clearTimeout(timer);

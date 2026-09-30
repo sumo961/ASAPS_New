@@ -41,18 +41,29 @@ export function installNativeGeolocation(): void {
       .catch((err) => fail?.(toError(err)));
   };
 
+  // Live tracking. The plugin reads `timeout` as the longest gap between
+  // updates, so a player standing still got a timeout after 30 s and the
+  // watch went quiet for good — arriving at a pin then never registered.
+  // No timeout here, and a native watch that errors is restarted.
   geo.watchPosition = (ok: Success, fail?: Failure, opts?: PositionOptions) => {
     const id = nextId++;
-    watches.set(
-      id,
+    const start = (): Promise<string> =>
       Geolocation.watchPosition(
-        { enableHighAccuracy: opts?.enableHighAccuracy ?? false, timeout: opts?.timeout, maximumAge: opts?.maximumAge },
+        { enableHighAccuracy: opts?.enableHighAccuracy ?? false, maximumAge: opts?.maximumAge },
         (p, err) => {
-          if (p) ok(toPosition(p));
-          else if (err) fail?.(toError(err));
+          if (p) {
+            ok(toPosition(p));
+            return;
+          }
+          if (!err) return;
+          const error = toError(err);
+          fail?.(error);
+          if (error.code === 1 || !watches.has(id)) return; // denied, or cleared meanwhile
+          const old = watches.get(id)!;
+          watches.set(id, old.then((cb) => Geolocation.clearWatch({ id: cb }).catch(() => {})).then(start));
         },
-      ),
-    );
+      );
+    watches.set(id, start());
     return id;
   };
 

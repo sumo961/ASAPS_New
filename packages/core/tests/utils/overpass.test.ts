@@ -78,3 +78,17 @@ describe('overpass walkable sampler', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('setOverpassFetch (host-supplied transport)', () => {
+  it('routes walkable queries through the host fetch, and logs a refused request', async () => {
+    const { setOverpassFetch, fetchWalkableWays } = await import('../../src/utils/overpass');
+    const calls: string[] = [];
+    setOverpassFetch(async (url) => { calls.push(url); return { ok: false, status: 406, json: async () => ({}) }; });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await fetchWalkableWays({ lat: 59.33, lng: 18.07 }, 150)).toEqual([]);
+    expect(calls).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('HTTP 406'));
+    warn.mockRestore();
+    setOverpassFetch(null);
+  });
+});
