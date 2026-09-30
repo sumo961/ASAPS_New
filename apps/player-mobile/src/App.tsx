@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
-import { Filesystem } from '@capacitor/filesystem';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Geolocation } from '@capacitor/geolocation';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { PlayerEngine } from '@asaps/player';
@@ -18,6 +18,39 @@ interface RecentStory {
   name: string;
   lastPlayed: Date;
   thumbnail?: string;
+  /** The app's own copy (Directory.Data), so Recent can reopen the story. */
+  path?: string;
+}
+
+/** Where the app keeps a copy of every story it has opened. */
+const LIBRARY_DIR = 'library';
+
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): ArrayBuffer {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+/**
+ * Keep a copy of an opened story in the app's data folder. A story handed
+ * over by the Files app or picked once is otherwise gone the next time, and
+ * Recent could only offer the file picker again.
+ */
+async function keepInLibrary(buf: ArrayBuffer, title: string): Promise<string | undefined> {
+  if (!Capacitor.isNativePlatform()) return undefined;
+  const path = `${LIBRARY_DIR}/${title.replace(/[^\w\- ]+/g, '_') || 'Story'}.asaps`;
+  await Filesystem.writeFile({ path, data: toBase64(buf), directory: Directory.Data, recursive: true });
+  return path;
 }
 
 interface Settings {
@@ -130,7 +163,7 @@ const App: React.FC = () => {
     }
   }, [settings.haptics]);
 
-  const openStory = useCallback(async (data: File | ArrayBuffer, title: string = 'Story') => {
+  const openStory = useCallback(async (data: File | ArrayBuffer, title: string = 'Story', libraryPath?: string) => {
     if (!containerRef.current) return;
 
     try {
@@ -200,7 +233,8 @@ const App: React.FC = () => {
       // it ends, so it must not be awaited here — awaiting it kept the
       // loading screen over the title screen forever. Errors from the
       // running story still reach the error screen.
-      await player.loadStory(data);
+      const bytes = data instanceof ArrayBuffer ? data : await data.arrayBuffer();
+      await player.loadStory(bytes);
       player.start().catch(err => {
         console.error('Story stopped with an error:', err);
         setError(err instanceof Error ? err.message : 'The story stopped with an error');
@@ -210,10 +244,19 @@ const App: React.FC = () => {
       setAppState('playing');
       await haptic(ImpactStyle.Heavy);
 
-      // Update recent stories
+      // Update recent stories (with the app's own copy, so Recent reopens it)
+      let path = libraryPath;
+      if (!path) {
+        try {
+          path = await keepInLibrary(bytes, title);
+        } catch (err) {
+          console.warn('[FieldPlayer] Could not keep a copy for Recent:', err);
+        }
+      }
       const newRecent: RecentStory = {
         name: title,
         lastPlayed: new Date(),
+        path,
       };
       setRecentStories(prev => {
         const filtered = prev.filter(s => s.name !== title);
@@ -290,6 +333,21 @@ const App: React.FC = () => {
     };
     input.click();
   }, [openStory, haptic]);
+
+  const openRecent = useCallback(async (story: RecentStory) => {
+    if (!story.path) {
+      // Opened before the app kept copies: all we can do is pick it again.
+      await handleImport();
+      return;
+    }
+    try {
+      const res = await Filesystem.readFile({ path: story.path, directory: Directory.Data });
+      await openStory(fromBase64(res.data as string), story.name, story.path);
+    } catch (err) {
+      console.warn('[FieldPlayer] Recent story copy is missing:', story.path, err);
+      await handleImport();
+    }
+  }, [openStory, handleImport]);
 
   const handleBack = useCallback(async () => {
     await haptic();
@@ -394,7 +452,7 @@ const App: React.FC = () => {
                   <div
                     key={index}
                     className="story-card"
-                    onClick={handleImport}
+                    onClick={() => void openRecent(story)}
                   >
                     {story.thumbnail ? (
                       <img src={story.thumbnail} alt="" className="story-card-thumbnail" />
