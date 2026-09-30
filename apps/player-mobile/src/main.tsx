@@ -6,6 +6,10 @@ import './styles.css';
 // Initialize Capacitor plugins
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
+import { installNativeGeolocation } from './nativeGeolocation';
+
+// Story positions come from the native location service, not WebKit's.
+installNativeGeolocation();
 
 // Configure status bar for native platforms
 if (Capacitor.isNativePlatform()) {

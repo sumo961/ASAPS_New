@@ -167,24 +167,30 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
+/* The story stage gets everything below the app's button bar. */
 .player-container {
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  position: relative;
 }
 
-/* Mobile Menu */
+/* Mobile Menu — its own bar above the stage, so the app's buttons never
+   sit on top of the story's text (a map beat's instruction banner, a
+   title). The story's own type size stays as the author set it. */
 .mobile-menu {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
+  flex: 0 0 auto;
+  height: 52px;
+  padding: 4px 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: #1a1a2e;
   z-index: 1000;
-  pointer-events: none;
 }
 
 .mobile-menu > * {

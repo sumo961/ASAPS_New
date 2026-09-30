@@ -228,7 +228,12 @@ export class SetGpsLocationBeat extends Beat {
       }
 
       context.setGeoPoints(this.pointName, points);
-      console.log(`[SetGpsLocationBeat ${this.id}] ${this.gpsMode} → '${this.pointName}' = ${points.length} point(s)`);
+      console.log(
+        `[SetGpsLocationBeat ${this.id}] ${this.gpsMode} → '${this.pointName}' = ${points.length} point(s)` +
+          // Coordinates in the log: a field test (or a simulator) can then
+          // walk or set its position to a placed point.
+          (points.length ? `: ${points.map(p => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`).join(' ')}` : ''),
+      );
     } catch (err) {
       console.error(`[SetGpsLocationBeat ${this.id}] error:`, err);
     }
