@@ -263,6 +263,8 @@ export interface SensorService {
  */
 /** How old a cached reading may be to stand in for a failed getCurrentLocation. */
 const RECENT_LOCATION_MS = 60_000;
+/** A reading this recent is returned without asking the sensor again. */
+const FRESH_LOCATION_MS = 5_000;
 
 export class WebSensorService extends EventEmitter implements SensorService {
   private locationWatchId: number | null = null;
@@ -284,6 +286,12 @@ export class WebSensorService extends EventEmitter implements SensorService {
 
   async getCurrentLocation(): Promise<GpsReading | null> {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return null;
+    // A reading from the last few seconds answers at once. WebKit and
+    // Chrome do not reliably honour maximumAge for getCurrentPosition, and a
+    // second request right after the first can wait out the full timeout.
+    if (this.lastLocation && Date.now() - this.lastLocationAt <= FRESH_LOCATION_MS) {
+      return this.lastLocation;
+    }
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -319,6 +327,15 @@ export class WebSensorService extends EventEmitter implements SensorService {
     opts?: { accuracy?: 'high' | 'low'; intervalMs?: number },
   ): () => void {
     this.locationSubscribers.add(callback);
+    // A watch reports only when the position changes. A subscriber that
+    // joins an already-running watch (the next map screen mounts before the
+    // previous one unsubscribes) would otherwise wait — for a player standing
+    // still, forever — so hand it the last known position straight away.
+    // Asynchronously, like a real fix, so callers never run it mid-subscribe.
+    if (this.lastLocation && this.locationWatchId !== null) {
+      const known = this.lastLocation;
+      queueMicrotask(() => { if (this.locationSubscribers.has(callback)) callback(known); });
+    }
     // Lazy: only start the underlying watcher when the first subscriber arrives.
     if (this.locationWatchId === null && typeof navigator !== 'undefined' && navigator.geolocation) {
       this.locationWatchId = navigator.geolocation.watchPosition(

@@ -96,11 +96,26 @@ describe('WebSensorService', () => {
     });
 
     it('falls back to the reading from moments ago when a new fix times out, but never after a denial', async () => {
+      const now = vi.spyOn(Date, 'now');
+      now.mockReturnValue(3_000_000);
       await service.getCurrentLocation(); // succeeds, cached
+      now.mockReturnValue(3_000_000 + 20_000); // too old to answer at once, recent enough to stand in
       geo.getCurrentPosition.mockImplementationOnce((_success, error) => { error({ code: 3, message: 'timeout' }); });
       expect(await service.getCurrentLocation()).toMatchObject({ lat: 37.7749, lng: -122.4194 });
       geo.getCurrentPosition.mockImplementationOnce((_success, error) => { error({ code: 1, message: 'denied' }); });
       expect(await service.getCurrentLocation()).toBeNull();
+      now.mockRestore();
+    });
+
+    it('answers a second request within 5 s from the reading it just got', async () => {
+      const now = vi.spyOn(Date, 'now');
+      now.mockReturnValue(2_000_000);
+      await service.getCurrentLocation();
+      const calls = geo.getCurrentPosition.mock.calls.length;
+      now.mockReturnValue(2_000_000 + 3_000);
+      expect(await service.getCurrentLocation()).toMatchObject({ lat: 37.7749 });
+      expect(geo.getCurrentPosition.mock.calls.length).toBe(calls);
+      now.mockRestore();
     });
 
     it('does not use a cached reading older than a minute', async () => {
@@ -127,6 +142,20 @@ describe('WebSensorService', () => {
   });
 
   describe('watchLocation — shared underlying watcher', () => {
+    it('hands a subscriber joining a running watch the last known position at once', async () => {
+      const first = vi.fn();
+      service.watchLocation(first);
+      const onFix = geo.watchPosition.mock.calls[0][0];
+      onFix({ coords: { latitude: 59.33, longitude: 18.07, accuracy: 5 }, timestamp: 1 });
+      const second = vi.fn();
+      const unsub = service.watchLocation(second);
+      expect(second).not.toHaveBeenCalled(); // not during subscribe
+      await Promise.resolve();
+      expect(second).toHaveBeenCalledWith(expect.objectContaining({ lat: 59.33, lng: 18.07 }));
+      expect(geo.watchPosition).toHaveBeenCalledTimes(1);
+      unsub();
+    });
+
     it('starts ONE underlying watchPosition for many subscribers', () => {
       const cb1 = vi.fn();
       const cb2 = vi.fn();
