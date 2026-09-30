@@ -1091,6 +1091,8 @@ This invisible beat (📍, Logic group, added in v0.9.83) stores geographic poin
 
 **Flow:** Executes instantly (capture and walkable-scatter may take a moment for the sensor/network), stores the points, then moves to the target beat. Point sets live in story state and ride through save/resume; any GPS Location beat later in the flow can geofence them by name.
 
+**Waiting for a first position.** Capture, and scatter around the player's current position, need a GPS fix. Outdoors on a phone that was just unlocked, that can take a while. If none has come in after about 10 seconds and you set no fallback coordinates, the player sees **Waiting for GPS…** ("Step outside or near a window…") until a position arrives; the story then carries on by itself. A **Continue without location** button lets them skip the wait; the point set is then left empty and any GPS Location entry bound to it has nothing to show. With fallback coordinates set, the fallback is used straight away, as before. If location permission is denied, the beat doesn't wait.
+
 **When to Use:** Geocaching-style hunts ("three clues are hidden on streets near you — find one"), stories anchored to wherever the player happens to be standing, museum or campus routes you curate on a map in advance, dynamic meeting points.
 
 **Testing without leaving your desk:** the Preview window's [Mock Sensors panel](#mock-sensors) lets you type or nudge a simulated player position and watch the geofences fire.

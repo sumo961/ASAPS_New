@@ -18,6 +18,7 @@
  */
 
 import { Beat } from './Beat';
+import { uiString } from '../i18n/uiStrings';
 import type { BeatConfig, IRenderer, GeoPoint } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { scatterPointsAround } from '../utils/geo';
@@ -138,6 +139,51 @@ export class SetGpsLocationBeat extends Beat {
     return null;
   }
 
+  /**
+   * The player's position for capture / scatter-around-here. The quick read
+   * covers the usual case. When it finds nothing and the author set no
+   * fallback, the player sees "Waiting for GPS…" until a position arrives
+   * or they choose to continue without one — instead of the story silently
+   * storing no points (its map scenes then skip themselves). A first fix
+   * outdoors, on a phone just unlocked, can take well over 10 s.
+   */
+  private async waitForPosition(context: StoryContext, renderer: IRenderer): Promise<{ lat: number; lng: number } | null> {
+    const quick = await this.readCurrentPosition(context);
+    if (quick) return quick;
+    const authored = this.fallback();
+    if (authored) return authored;
+    const svc = context.getSensorService?.();
+    if (!svc || !renderer.renderLoading) return null;
+    try {
+      const permission = await svc.getPermissionState('gps');
+      if (permission === 'denied' || permission === 'unavailable') return null;
+    } catch { /* unknown — wait anyway, the player can continue */ }
+
+    console.warn(`[SetGpsLocationBeat ${this.id}] no position yet — waiting for GPS`);
+    return new Promise((resolve) => {
+      let done = false;
+      let unsubscribe: () => void = () => {};
+      const finish = (pos: { lat: number; lng: number } | null) => {
+        if (done) return;
+        done = true;
+        unsubscribe();
+        if (!pos) console.warn(`[SetGpsLocationBeat ${this.id}] player continued without a position`);
+        resolve(pos);
+      };
+      renderer.renderLoading!(uiString('gpsWaiting'), {
+        subMessage: uiString('gpsWaitingHint'),
+        spinnerType: 'pulse',
+        cancelLabel: uiString('gpsContinueWithout'),
+        onCancel: () => finish(null),
+      });
+      unsubscribe = svc.watchLocation((reading) => {
+        if (typeof reading?.lat === 'number' && typeof reading?.lng === 'number') {
+          finish({ lat: reading.lat, lng: reading.lng });
+        }
+      });
+    });
+  }
+
   /** Fallback coords from authored fallbackLat/Lng, or null. */
   private fallback(): { lat: number; lng: number } | null {
     return typeof this.fallbackLat === 'number' && typeof this.fallbackLng === 'number'
@@ -147,7 +193,7 @@ export class SetGpsLocationBeat extends Beat {
 
   protected async performAction(
     context: StoryContext,
-    _renderer: IRenderer
+    renderer: IRenderer
   ): Promise<string | null> {
     if (!this.pointName) {
       console.error(`[SetGpsLocationBeat ${this.id}] no pointName specified — skipping`);
@@ -170,7 +216,7 @@ export class SetGpsLocationBeat extends Beat {
           console.warn(`[SetGpsLocationBeat ${this.id}] explicit mode without lat/lng — storing empty`);
         }
       } else if (this.gpsMode === 'capture') {
-        const pos = (await this.readCurrentPosition(context)) ?? this.fallback();
+        const pos = await this.waitForPosition(context, renderer);
         if (pos) {
           points = [{ lat: pos.lat, lng: pos.lng, ...(this.pointRadiusMeters != null ? { radiusMeters: this.pointRadiusMeters } : {}) }];
         } else {
@@ -185,7 +231,7 @@ export class SetGpsLocationBeat extends Beat {
           const stored = this.centerPointName ? context.getGeoPoints(this.centerPointName) : [];
           center = stored.length > 0 ? { lat: stored[0].lat, lng: stored[0].lng } : null;
         } else {
-          center = (await this.readCurrentPosition(context)) ?? this.fallback();
+          center = await this.waitForPosition(context, renderer);
         }
         center = center ?? this.fallback();
         if (center) {

@@ -178,3 +178,61 @@ describe('StoryContext geoPoints state', () => {
     expect(ctx.getGeoPoints('a')[0].lat).toBe(1);
   });
 });
+
+describe('SetGpsLocationBeat — waiting for a first fix', () => {
+  function sensorWithWatch(permission: string) {
+    let push: ((r: any) => void) | null = null;
+    const svc = {
+      getCurrentLocation: async () => null,
+      getPermissionState: async () => permission,
+      watchLocation: (cb: (r: any) => void) => { push = cb; return () => { push = null; }; },
+    };
+    return { svc, deliver: (r: any) => push?.(r), watching: () => push !== null };
+  }
+  function loadingRenderer() {
+    const shown: any[] = [];
+    const r = { setState: () => {}, getState: () => null, renderLoading: (m: string, o: any) => shown.push({ m, o }) } as unknown as IRenderer;
+    return { r, shown };
+  }
+  const tick = () => new Promise((res) => setTimeout(res, 0));
+
+  it('shows "Waiting for GPS…" and captures the position when it arrives', async () => {
+    const ctx = new StoryContext();
+    const s = sensorWithWatch('granted');
+    (ctx as any).getSensorService = () => s.svc;
+    const { r, shown } = loadingRenderer();
+    const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'capture', pointName: 'base' } as any });
+    const running = beat.execute(ctx, r);
+    for (let i = 0; i < 5 && !s.watching(); i++) await tick();
+    expect(shown[0].m).toBe('Waiting for GPS…');
+    expect(shown[0].o.cancelLabel).toBe('Continue without location');
+    s.deliver({ lat: 59.33, lng: 18.07, accuracy: 5, timestamp: 1 });
+    await running;
+    expect(ctx.getGeoPoints('base')).toEqual([{ lat: 59.33, lng: 18.07 }]);
+    expect(s.watching()).toBe(false);
+  });
+
+  it('continues without a position when the player chooses to', async () => {
+    const ctx = new StoryContext();
+    const s = sensorWithWatch('granted');
+    (ctx as any).getSensorService = () => s.svc;
+    const { r, shown } = loadingRenderer();
+    const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'scatter', pointName: 'w', count: 3 } as any });
+    const running = beat.execute(ctx, r);
+    for (let i = 0; i < 5 && !shown.length; i++) await tick();
+    shown[0].o.onCancel();
+    await running;
+    expect(ctx.getGeoPoints('w')).toEqual([]);
+  });
+
+  it('does not wait when location is denied', async () => {
+    const ctx = new StoryContext();
+    const s = sensorWithWatch('denied');
+    (ctx as any).getSensorService = () => s.svc;
+    const { r, shown } = loadingRenderer();
+    const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'capture', pointName: 'base' } as any });
+    await beat.execute(ctx, r);
+    expect(shown).toHaveLength(0);
+    expect(ctx.getGeoPoints('base')).toEqual([]);
+  });
+});

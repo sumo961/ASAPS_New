@@ -63,6 +63,11 @@ export const UI_STRING_DEFAULTS = {
   loadingRetrieving: 'Please wait while I retrieve the information',
   loadingMoment: 'This may take a moment',
   loadingJustAMoment: 'This will just take a moment',
+
+  // Location beats waiting for a first GPS fix (Set GPS Location)
+  gpsWaiting: 'Waiting for GPS…',
+  gpsWaitingHint: 'Step outside or near a window. The story continues as soon as your position comes in.',
+  gpsContinueWithout: 'Continue without location',
 } as const;
 
 export type UIStringKey = keyof typeof UI_STRING_DEFAULTS;

@@ -963,6 +963,9 @@ export interface IRenderer {
   renderLoading?(message: string, options?: {
     subMessage?: string;
     spinnerType?: 'spinner' | 'dots' | 'pulse';
+    /** Shows a button that ends the wait (renderers without one ignore it). */
+    cancelLabel?: string;
+    onCancel?: () => void;
   }): void;
   hideLoading?(): void;
 

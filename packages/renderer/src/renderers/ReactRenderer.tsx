@@ -692,7 +692,10 @@ const LoadingDisplay: React.FC<{
   spinnerType?: 'spinner' | 'dots' | 'pulse';
   backgroundUrl?: string | null;
   theme?: RenderThemeSettings;
-}> = ({ message, subMessage, spinnerType = 'spinner', backgroundUrl, theme }) => {
+  /** Optional way out of the wait (e.g. "Continue without location"). */
+  cancelLabel?: string;
+  onCancel?: () => void;
+}> = ({ message, subMessage, spinnerType = 'spinner', backgroundUrl, theme, cancelLabel, onCancel }) => {
   // Animation states for dots
   const [dotCount, setDotCount] = React.useState(1);
 
@@ -738,12 +741,12 @@ const LoadingDisplay: React.FC<{
     switch (spinnerType) {
       case 'dots':
         return (
-          <div className="flex items-center justify-center space-x-3 mb-4">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
             {[0, 1, 2].map(i => (
               <div
                 key={i}
-                className="w-3 h-3 rounded-full transition-all duration-300"
                 style={{
+                  width: '12px', height: '12px', borderRadius: '50%', transition: 'all 300ms',
                   backgroundColor: i < dotCount ? textColor : `${textColor}33`,
                   transform: i < dotCount ? 'scale(1.3)' : 'scale(1)',
                   opacity: i < dotCount ? textAlpha : textAlpha * 0.3,
@@ -754,10 +757,10 @@ const LoadingDisplay: React.FC<{
         );
       case 'pulse':
         return (
-          <div className="mb-4 flex justify-center">
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
             <div
-              className="w-12 h-12 rounded-full animate-pulse"
               style={{
+                width: '48px', height: '48px', borderRadius: '50%', animation: 'asaps-loading-pulse 2s ease-in-out infinite',
                 backgroundColor: theme?.button?.backgroundColor || textBox.borderColor || '#4a90d9',
                 boxShadow: `0 0 15px ${theme?.button?.backgroundColor || textBox.borderColor || '#4a90d9'}`,
               }}
@@ -767,10 +770,10 @@ const LoadingDisplay: React.FC<{
       case 'spinner':
       default:
         return (
-          <div className="mb-4 flex justify-center">
+          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
             <div
-              className="w-10 h-10 border-3 rounded-full animate-spin"
               style={{
+                width: '40px', height: '40px', borderRadius: '50%', borderStyle: 'solid', animation: 'asaps-loading-spin 1s linear infinite',
                 borderWidth: '3px',
                 borderColor: `${textColor}33`,
                 borderTopColor: textColor,
@@ -789,8 +792,12 @@ const LoadingDisplay: React.FC<{
 
   return (
     <div
-      className="flex flex-col items-center justify-center h-screen"
       style={{
+        // Inline styles, not Tailwind classes: the mobile app and other
+        // hosts don't ship Tailwind, and there the box sat at the top with
+        // no spinner.
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100%', minHeight: '100%', position: 'relative', padding: '16px', boxSizing: 'border-box',
         backgroundImage: backgroundUrl ? `url(${backgroundUrl})` : undefined,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -798,11 +805,12 @@ const LoadingDisplay: React.FC<{
         background: !backgroundUrl ? pageBackground : undefined,
       }}
     >
+      <style>{'@keyframes asaps-loading-spin{to{transform:rotate(360deg)}}@keyframes asaps-loading-pulse{0%,100%{opacity:1}50%{opacity:.5}}'}</style>
       {/* Semi-transparent overlay for readability when there's a background image */}
       {backgroundUrl && (
         <div
-          className="absolute inset-0"
           style={{
+            position: 'absolute', inset: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.3)',
           }}
         />
@@ -810,14 +818,15 @@ const LoadingDisplay: React.FC<{
 
       {/* Content box using theme textbox styling */}
       <div
-        className="relative z-10 flex flex-col items-center text-center"
         style={{
+          position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
           backgroundColor: textBoxBg,
           border: `${textBox.borderWidth || 2}px solid ${textBox.borderColor || '#4a90d9'}`,
           borderRadius: `${textBox.borderRadius || 8}px`,
           padding: `${(textBox.padding || 24) + 8}px ${(textBox.padding || 24) + 16}px`,
-          minWidth: '300px',
-          maxWidth: '500px',
+          minWidth: 'min(300px, 100%)',
+          maxWidth: 'min(500px, 100%)',
+          boxSizing: 'border-box',
           boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         }}
       >
@@ -847,6 +856,25 @@ const LoadingDisplay: React.FC<{
           >
             {subMessage}
           </p>
+        )}
+        {cancelLabel && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.15)',
+              color: theme?.button?.textColor || textColor,
+              border: 'none',
+              borderRadius: `${theme?.button?.borderRadius ?? 8}px`,
+              fontFamily: fonts.textFont || 'sans-serif',
+              fontSize: `${(fonts.textFontSize || 18) - 2}px`,
+              cursor: 'pointer',
+            }}
+          >
+            {cancelLabel}
+          </button>
         )}
       </div>
     </div>
@@ -4649,6 +4677,8 @@ export class ReactRenderer extends BaseRenderer {
   renderLoading(message: string, options?: {
     subMessage?: string;
     spinnerType?: 'spinner' | 'dots' | 'pulse';
+    cancelLabel?: string;
+    onCancel?: () => void;
   }): void {
     // Get background
     const backgroundAssetId = this.getState('backgroundAssetId');
@@ -4662,6 +4692,8 @@ export class ReactRenderer extends BaseRenderer {
         spinnerType={options?.spinnerType}
         backgroundUrl={this.backgroundImageUrl}
         theme={this.theme}
+        cancelLabel={options?.cancelLabel}
+        onCancel={options?.onCancel}
       />
     );
   }
