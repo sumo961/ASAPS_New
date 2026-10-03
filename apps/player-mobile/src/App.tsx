@@ -365,6 +365,26 @@ const App: React.FC = () => {
     setError(null);
   }, [haptic]);
 
+  // Android's system Back (button or gesture). Without a handler the
+  // WebView's default closes the app mid-story. Step back one level instead:
+  // sub-panel → menu → story → library; only the library lets Back exit.
+  const backStateRef = useRef({ appState, menuPanel, handleBack });
+  backStateRef.current = { appState, menuPanel, handleBack };
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+    const sub = CapApp.addListener('backButton', () => {
+      const { appState: state, menuPanel: panel, handleBack: back } = backStateRef.current;
+      if (panel !== 'none') {
+        setMenuPanel(panel === 'main' ? 'none' : 'main');
+      } else if (state !== 'library') {
+        void back();
+      } else {
+        void CapApp.exitApp();
+      }
+    });
+    return () => { void sub.then((h) => h.remove()); };
+  }, []);
+
   const openMenu = useCallback(async (panel: MenuPanel) => {
     await haptic();
     setMenuPanel(panel);

@@ -30,6 +30,12 @@ The exported-story relay now gets the same server-side refusal fallbacks as the 
   - *Loading screens unstyled in the app:* `LoadingDisplay` was laid out with Tailwind classes, which the mobile app doesn't ship, so every loading screen (AI beats' "Thinking…" too) sat at the top without a spinner. Now inline styles, with its own keyframes, and the box never wider than the screen.
   - Verified: Ordinary Wonders handed over as a file URL (as the Files app does) → location prompt with our explanation → title screen fitting the screen. Playing on needs taps and GPS, so that is for the device test.
 
+### Field App: Android brought up to Capacitor 8
+- The Android project still had Capacitor 6-era settings (min SDK 22, compile/target 34, AGP and Gradle 8.2.1). It now matches Capacitor 8.5's own template: min SDK 24 (Android 7), compile/target 36, AGP 8.13.0, Gradle 8.14.3, current AndroidX versions, the template's `navigation|density` config changes, Groovy `=` assignments.
+- Targeting SDK 36 means edge-to-edge on Android 15+: the page padding now prefers the `--safe-area-inset-*` variables Capacitor 8 injects on Android and falls back to `env()` (iOS unchanged).
+- Android's system Back no longer closes the app mid-story: sub-panel → menu → story → library, and only the library lets Back exit.
+- Not built or run yet: waiting for Android Studio's SDK setup.
+
 ### CI green again
 - The **CI** workflow (build, type-check, lint, tests on every push) had failed on every push since at least 2026-09-26, including the v0.9.105 and v0.9.106 release commits: `promisesFixture.test.ts` reads `public/examples/someone-made-her-promises.asaps.zip`, which the repo-wide `examples/` ignore rule had kept out of git. It passed locally, where the file exists. The file is now committed (`git add -f`); the rule stays because it also keeps large example media out. The release checks only looked at "Build Desktop Apps"; `/releaseGH` now checks CI too.
 
