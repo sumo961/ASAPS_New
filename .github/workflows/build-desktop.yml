@@ -10,12 +10,18 @@ on:
         description: 'Version to build (without v prefix)'
         required: false
         default: ''
+      linux_only:
+        description: 'Only build and smoke-test Linux (no build-number bump, no other platforms, no release)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
 
 jobs:
   increment-build-number:
+    if: ${{ !inputs.linux_only }}
     runs-on: ubuntu-latest
     outputs:
       build_number: ${{ steps.bump.outputs.build_number }}
@@ -49,6 +55,7 @@ jobs:
 
   build-macos:
     needs: increment-build-number
+    if: ${{ !inputs.linux_only }}
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -174,6 +181,7 @@ jobs:
 
   build-windows:
     needs: increment-build-number
+    if: ${{ !inputs.linux_only }}
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -236,6 +244,9 @@ jobs:
   # macOS / Windows release (see the release job's `if`).
   build-linux:
     needs: increment-build-number
+    # Runs after the build-number bump on releases; on its own (bump
+    # skipped) for a manual linux_only run.
+    if: ${{ always() && (inputs.linux_only || needs.increment-build-number.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -319,6 +330,7 @@ jobs:
   # image leaves preview.
   validate-macos-27:
     needs: increment-build-number
+    if: ${{ !inputs.linux_only }}
     runs-on: xcode-27
     continue-on-error: true
     steps:
@@ -375,7 +387,7 @@ jobs:
   release:
     needs: [increment-build-number, build-macos, build-windows, build-linux]
     # Linux is beta: release once macOS and Windows built, with or without it.
-    if: ${{ always() && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' }}
+    if: ${{ always() && !inputs.linux_only && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
