@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.106, 2026-09-29)
 
 ### Overview
-The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. The Field App's iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
+The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App's iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
 
 ### Relay refusal fallbacks
 - The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
@@ -30,7 +30,14 @@ The exported-story relay now gets the same server-side refusal fallbacks as the 
   - *Loading screens unstyled in the app:* `LoadingDisplay` was laid out with Tailwind classes, which the mobile app doesn't ship, so every loading screen (AI beats' "Thinking…" too) sat at the top without a spinner. Now inline styles, with its own keyframes, and the box never wider than the screen.
   - Verified: Ordinary Wonders handed over as a file URL (as the Files app does) → location prompt with our explanation → title screen fitting the screen. Playing on needs taps and GPS, so that is for the device test.
 
-**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`, `apps/player-mobile/ios/App/{App.xcodeproj/project.pbxproj,Podfile,Podfile.lock,App.xcworkspace/contents.xcworkspacedata}`, `apps/player-mobile/ios/App/App/{AppDelegate,SceneDelegate}.swift` + `Info.plist`, `apps/player-mobile/src/{App.tsx,styles.css}`, `apps/player-mobile/capacitor.config.ts`
+### Linux desktop build (beta)
+- electron-builder `linux` config: **AppImage** and **.deb** for x64 (`ASAPS-Builder-<version>-x86_64.AppImage`, `…-amd64.deb`), applications-menu entry with `desktopName`/`syncDesktopName` so the running window matches it, `.asaps`/`.asapst` registered as file types (shared-mime-info), the app icon. The .deb's dependencies add `libasound2t64 | libasound2` and `libgbm1`: without ALSA the app did not start on a minimal Ubuntu 24.04 (electron-builder's defaults omit it).
+- CI: a `build-linux` job on ubuntu-latest builds both packages, starts the AppImage and the apt-installed .deb on a virtual display for 20 s, and uploads them with `latest-linux.yml` (the AppImage auto-updates). While Linux is in beta, the release job publishes macOS/Windows even if the Linux job fails.
+- Updater: a failed background update *check* (offline, or a release without this platform's update file) is only logged; the "Failed to download update" dialog is kept for downloads the interactor started. A Linux build against v0.9.106 (no Linux files yet) showed that dialog with a stack trace at start-up.
+- "Show Project in Explorer" reads "Show Project in File Manager" on Linux.
+- Verified locally: built on macOS (`electron-builder --linux`), installed the .deb with apt in an Ubuntu 24.04 container (x64 under emulation) and started it on Xvfb: start window, templates and menu bar render; the unpacked app likewise. The AppImage itself can't run under that emulation, so the CI job is its first real start. README: Linux downloads and install notes (the .deb via apt; the AppImage and Ubuntu 24.04's sandbox restriction: `--no-sandbox` or use the .deb).
+
+**Files modified:** `packages/builder/src/export/relayKit.ts`, `packages/builder/src/export/__tests__/relayFunction.test.ts`, `apps/player-mobile/ios/App/{App.xcodeproj/project.pbxproj,Podfile,Podfile.lock,App.xcworkspace/contents.xcworkspacedata}`, `apps/player-mobile/ios/App/App/{AppDelegate,SceneDelegate}.swift` + `Info.plist`, `apps/player-mobile/src/{App.tsx,styles.css}`, `apps/player-mobile/capacitor.config.ts`, `apps/builder-desktop/package.json` (linux/deb config), `apps/builder-desktop/src/main/index.ts` (updater dialog, menu label), `.github/workflows/build-desktop.yml` (build-linux job), `README.md`
 
 ---
 

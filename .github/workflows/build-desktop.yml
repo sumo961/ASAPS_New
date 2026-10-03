@@ -230,6 +230,87 @@ jobs:
             apps/builder-desktop/release/latest.yml
           if-no-files-found: error
 
+  # Linux (beta): AppImage + .deb for x64. Both are started on a virtual
+  # display for 20 s before upload, since there is no Linux machine in the
+  # loop yet. While Linux is in beta, a failure here does not hold up the
+  # macOS / Windows release (see the release job's `if`).
+  build-linux:
+    needs: increment-build-number
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Pull latest (includes build number)
+        run: git pull origin ${{ github.ref_name }} --ff-only || true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # npm install, not npm ci — see the Windows job.
+        run: npm install --no-audit --no-fund
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Build Electron app
+        working-directory: apps/builder-desktop
+        run: |
+          npm run build:electron
+          rm -rf builder
+          cp -r ../../packages/builder/dist builder
+
+      - name: Package Linux
+        working-directory: apps/builder-desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --no-install electron-builder --linux --publish never
+
+      - name: Smoke test (AppImage and .deb on a virtual display)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libfuse2t64 > /dev/null || sudo apt-get install -y -qq xvfb libfuse2 > /dev/null
+          ls -la apps/builder-desktop/release
+          run_for_20s() {
+            local label="$1"; shift
+            xvfb-run -a "$@" > "$RUNNER_TEMP/$label.log" 2>&1 &
+            local pid=$!
+            sleep 20
+            if kill -0 "$pid" 2>/dev/null; then
+              echo "$label: still running after 20 s — no crash on start"
+              pkill -f asaps-builder || true; kill "$pid" 2>/dev/null || true
+              return 0
+            fi
+            wait "$pid"; local rc=$?
+            echo "$label: exited early with code $rc"; tail -40 "$RUNNER_TEMP/$label.log"
+            return 1
+          }
+          APPIMAGE=$(ls apps/builder-desktop/release/*.AppImage | head -1)
+          chmod +x "$APPIMAGE"
+          # --no-sandbox: Ubuntu 24.04 blocks the Chromium sandbox for
+          # AppImages (AppArmor userns restriction) — the README's Linux
+          # notes tell users the same.
+          run_for_20s appimage "$APPIMAGE" --no-sandbox
+          sudo apt-get install -y -qq "./$(ls apps/builder-desktop/release/*.deb | head -1)" > /dev/null
+          run_for_20s deb asaps-builder
+          echo "--- AppImage log (tail)"; tail -20 "$RUNNER_TEMP/appimage.log" || true
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-x64
+          path: |
+            apps/builder-desktop/release/*.AppImage
+            apps/builder-desktop/release/*.deb
+            apps/builder-desktop/release/latest-linux.yml
+          if-no-files-found: error
+
   # macOS 27 readiness check — packages an unsigned arm64 app on GitHub's
   # xcode-27 image (macOS 27 since 2026-09-10, arm64 only, "preview") and
   # launches it for 20 s to catch a crash-on-start. Non-blocking: the
@@ -292,7 +373,9 @@ jobs:
           exit $STATUS
 
   release:
-    needs: [increment-build-number, build-macos, build-windows]
+    needs: [increment-build-number, build-macos, build-windows, build-linux]
+    # Linux is beta: release once macOS and Windows built, with or without it.
+    if: ${{ always() && needs.build-macos.result == 'success' && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -307,6 +390,13 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: windows-x64
+          path: release
+
+      - name: Download Linux artifact (beta)
+        if: ${{ needs.build-linux.result == 'success' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-x64
           path: release
 
       - name: Get version from tag
@@ -328,8 +418,11 @@ jobs:
             release/*.dmg
             release/*.zip
             release/*.exe
+            release/*.AppImage
+            release/*.deb
             release/latest-mac.yml
             release/latest.yml
+            release/latest-linux.yml
           fail_on_unmatched_files: false
           body: |
             ## ASAPS Builder v${{ steps.version.outputs.version }}
@@ -337,6 +430,7 @@ jobs:
             ### Downloads
             - **macOS** (Universal - Intel & Apple Silicon): `ASAPS Builder-${{ steps.version.outputs.version }}-universal.dmg`
             - **Windows** (64-bit): `ASAPS Builder Setup ${{ steps.version.outputs.version }}.exe`
+            - **Linux** (64-bit, beta): `ASAPS-Builder-${{ steps.version.outputs.version }}-x86_64.AppImage` or `.deb`
 
             ### Installation
             **macOS**: Open the DMG and drag `ASAPS Builder.app` to Applications.

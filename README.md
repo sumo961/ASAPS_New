@@ -202,7 +202,7 @@ For what shipped when, see:
 - **[Progress.md](Progress.md)** — detailed, narrative release notes with the
   *why* behind each change
 - **[GitHub Releases](https://github.com/sumo961/ASAPS_New/releases)** — pre-built
-  desktop installers for macOS and Windows with auto-update support
+  desktop installers for macOS, Windows and (beta) Linux with auto-update support
 
 <!-- Feature matrix and per-version deep-dives live in VERSION_HISTORY.md — please add new entries there. -->
 
@@ -279,17 +279,20 @@ This is a high-level overview, grouped by theme. For per-version details see [VE
 ### Collaboration & Distribution
 - **Git VCS Integration**: Full Git inside the app — commit, push, pull, branch, merge, clone, history. Force-push option for rejection recovery; advisory beat-level editing locks for collaboration
 - **HTML Export**: Standalone playable HTML with splash screen, counter HUD, inventory icons, scrollable credits page, embedded TTS, language switcher. HUDs stay anchored to the stage at any window size and flow around the page's own language panel *(fixed in v0.9.90)*
-- **Desktop Apps**: Pre-built macOS Universal (Intel + Apple Silicon) and Windows installers via GitHub Releases, with auto-update support
+- **Desktop Apps**: Pre-built macOS Universal (Intel + Apple Silicon), Windows and (beta) Linux builds via GitHub Releases, with auto-update support
 - **ASML XML Format**: Standard format for interchange and version control — see [ASML File Format](#-asml-file-format) below
 - **Session Logging**: Exportable play-session traces (beat path, choices, AI outputs, branch decisions) from both the Preview Window and HTML exports
 
 ## 📥 Releases
 
-Pre-built desktop applications are available for macOS and Windows on the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
+Pre-built desktop applications are available for macOS, Windows and (in beta) Linux on the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases).
 
 Each release includes:
 - **macOS**: Universal binary (.dmg) supporting both Intel and Apple Silicon
 - **Windows**: Installer (.exe) and portable version
+- **Linux (beta, 64-bit x86)**: an AppImage and a .deb package
+
+**Installing on Linux.** On Ubuntu, Debian and similar, the .deb is the simplest: `sudo apt install ./ASAPS-Builder-<version>-amd64.deb` installs it with everything it needs and adds it to the applications menu (start it from there or with `asaps-builder`). The AppImage runs on most other distributions without installing: make it executable (`chmod +x ASAPS-Builder-<version>-x86_64.AppImage`) and start it. It is also the only Linux build that updates itself. On Ubuntu 24.04 and later the AppImage may refuse to start because the system restricts the sandbox it uses; start it with `--no-sandbox` or use the .deb instead. Your API keys are stored encrypted when the desktop provides a keyring (GNOME Keyring, KWallet); without one they are stored unencrypted and the log says so.
 
 Download the latest release to get started without building from source.
 
@@ -513,7 +516,7 @@ Modular monorepo (npm workspaces) with the runtime engine, builder UI, and rende
 
 ### Desktop App (`apps/builder-desktop`)
 - **Electron 40**: Chromium 144, Node 24, supported until June 2026
-- **electron-builder**: Universal macOS DMG (Intel + Apple Silicon) and Windows installer with auto-update via GitHub Releases
+- **electron-builder**: Universal macOS DMG (Intel + Apple Silicon), Windows installer and (beta) Linux AppImage/.deb with auto-update via GitHub Releases
 
 ## 🤖 AI Integration
 

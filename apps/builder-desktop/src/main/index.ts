@@ -223,6 +223,15 @@ function trackBounds(win: Electron.BrowserWindow, kind: string): void {
   });
 }
 
+/**
+ * True while an update the interactor agreed to is downloading. Only then is
+ * an updater error worth a dialog: a failed background *check* (offline, or
+ * a release without this platform's update file, e.g. Linux while it is in
+ * beta) is logged, not thrown at the interactor at start-up. The manual
+ * "Check for Updates…" reports its own failures.
+ */
+let updateDownloadInProgress = false;
+
 // Auto-updater setup
 function setupAutoUpdater(): void {
   // Don't check for updates in dev mode
@@ -259,6 +268,7 @@ function setupAutoUpdater(): void {
       cancelId: 1,
     }).then((result) => {
       if (result.response === 0) {
+        updateDownloadInProgress = true;
         autoUpdater.downloadUpdate();
       }
     });
@@ -282,6 +292,7 @@ function setupAutoUpdater(): void {
    */
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
     console.log('[AutoUpdater] Update downloaded:', info.version);
+    updateDownloadInProgress = false;
 
     dialog.showMessageBox(mainWindow!, {
       type: 'info',
@@ -309,6 +320,12 @@ function setupAutoUpdater(): void {
       console.log('[AutoUpdater] Ignoring file-not-found error (expected for unpacked builds)');
       return;
     }
+
+    if (!updateDownloadInProgress) {
+      console.warn('[AutoUpdater] Background update check failed — not shown to the interactor');
+      return;
+    }
+    updateDownloadInProgress = false;
 
     // Show error to user with option to manually download
     dialog.showMessageBox(mainWindow!, {
@@ -637,7 +654,7 @@ function createMenu(): void {
           // The hallmark affordance of folder projects: the files are RIGHT
           // THERE. Renderer answers with the active project's folder (or
           // explains that this project still lives in app storage).
-          label: process.platform === 'darwin' ? 'Reveal Project in Finder' : 'Show Project in Explorer',
+          label: process.platform === 'darwin' ? 'Reveal Project in Finder' : process.platform === 'win32' ? 'Show Project in Explorer' : 'Show Project in File Manager',
           click: () => mainWindow?.webContents.send('menu:reveal-project'),
         },
         { type: 'separator' },
