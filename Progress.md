@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.106, 2026-09-29)
 
 ### Overview
-The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App's iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
+The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App runs the full Ordinary Wonders walk on an Android 17 emulator too, and its iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
 
 ### Relay refusal fallbacks
 - The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
@@ -34,7 +34,9 @@ The exported-story relay now gets the same server-side refusal fallbacks as the 
 - The Android project still had Capacitor 6-era settings (min SDK 22, compile/target 34, AGP and Gradle 8.2.1). It now matches Capacitor 8.5's own template: min SDK 24 (Android 7), compile/target 36, AGP 8.13.0, Gradle 8.14.3, current AndroidX versions, the template's `navigation|density` config changes, Groovy `=` assignments.
 - Targeting SDK 36 means edge-to-edge on Android 15+: the page padding now prefers the `--safe-area-inset-*` variables Capacitor 8 injects on Android and falls back to `env()` (iOS unchanged).
 - Android's system Back no longer closes the app mid-story: sub-panel → menu → story → library, and only the library lets Back exit.
-- Not built or run yet: waiting for Android Studio's SDK setup.
+- **Built and run** (Android 17 emulator, API 37 Play Store image), with every step driven from the Mac: taps and DevTools through `adb` (debug builds expose the web view), the position through `adb emu geo fix`. Ordinary Wonders handed over as a `content://` link (as Android's Files app does) → location granted → title screen between status and navigation bars → base camp → 3 pins on streets (native Overpass request, HTTP 200) → walk screen with the player's dot and "103 m to A wonder" → position moved onto a pin → "Sighting confirmed" → system Back → library. On a clean install, Recent shows the right name and reopens the story.
+- Build tooling: Android Studio now bundles Java 25, which Gradle 8.14.3 (Capacitor 8.5's pinned version) can't run on ("class file major version 69"). Builds use Java 21 (`brew install openjdk@21`); in Android Studio set Settings → Build Tools → Gradle → Gradle JDK to 21. Gradle 9 would run on Java 25 but pairs with Android Gradle plugin 9, which Capacitor's template and plugins aren't on yet.
+- Fixed: the story name taken from a `content://` link kept the document id ("primary:Download/Ordinary Wonders" in Recent); the name is now decoded first, then cut to the file name.
 
 ### CI green again
 - The **CI** workflow (build, type-check, lint, tests on every push) had failed on every push since at least 2026-09-26, including the v0.9.105 and v0.9.106 release commits: `promisesFixture.test.ts` reads `public/examples/someone-made-her-promises.asaps.zip`, which the repo-wide `examples/` ignore rule had kept out of git. It passed locally, where the file exists. The file is now committed (`git add -f`); the rule stays because it also keeps large example media out. The release checks only looked at "Build Desktop Apps"; `/releaseGH` now checks CI too.

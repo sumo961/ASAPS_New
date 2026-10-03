@@ -290,7 +290,9 @@ const App: React.FC = () => {
       const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const name = decodeURIComponent(uri.split('/').pop() || 'Story')
+      // Decode first, then take the file name: an Android content:// link
+      // ends in an encoded document id like "primary%3ADownload%2FName.asapst".
+      const name = (decodeURIComponent(uri).split(/[/:]/).pop() || 'Story')
         .replace(/\.(asaps|asapst)$/i, '');
       await openStory(bytes.buffer, name);
     } catch (err) {
