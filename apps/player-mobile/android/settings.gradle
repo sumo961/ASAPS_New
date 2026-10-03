@@ -1,3 +1,11 @@
+// Java 21 for Gradle and the plugins' toolchains, downloaded when a machine
+// doesn't have it (gradle/gradle-daemon-jvm.properties pins the version).
+// Android Studio now ships Java 25, which Gradle 8.14 — the version
+// Capacitor 8.5's template uses — cannot run on.
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.10.0'
+}
+
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
