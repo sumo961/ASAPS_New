@@ -68,6 +68,9 @@ export const UI_STRING_DEFAULTS = {
   gpsWaiting: 'Waiting for GPS…',
   gpsWaitingHint: 'Step outside or near a window. The story continues as soon as your position comes in.',
   gpsContinueWithout: 'Continue without location',
+
+  // Map beats when the map images can't load (no internet)
+  mapOffline: 'Map unavailable offline — the pins and your position still work.',
 } as const;
 
 export type UIStringKey = keyof typeof UI_STRING_DEFAULTS;

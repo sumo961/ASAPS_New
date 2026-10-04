@@ -20,6 +20,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { uiString } from '@asaps/core';
 // Import as inline CSS string so the rules ship inside the JS bundle and
 // get injected at component-mount time. Plain `import 'leaflet/dist/leaflet.css'`
 // only emits a sibling stylesheet (`packages/renderer/dist/style.css`) that
@@ -203,6 +204,10 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
   const hasZoomedInRef = useRef(false);
   const initialPlayerPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const [resolved, setResolved] = useState(false);
+  // True while the map images fail to load (no internet, or the tile server
+  // refuses): the grey map then says why instead of looking broken. Pins,
+  // the player's dot and geofences don't need the images.
+  const [tilesOffline, setTilesOffline] = useState(false);
   const resolvedRef = useRef(false);
   const onResolveRef = useRef(onResolve);
   onResolveRef.current = onResolve;
@@ -224,10 +229,21 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
       zoomControl: true,
       attributionControl: true,
     });
+    let tileErrors = 0;
+    let tileLoaded = false;
     L.tileLayer(tile.url, {
       attribution: tile.attribution,
       maxZoom: tile.maxZoom,
-    }).addTo(map);
+    })
+      .on('tileerror', () => {
+        tileErrors += 1;
+        if (!tileLoaded && tileErrors >= 2) setTilesOffline(true);
+      })
+      .on('tileload', () => {
+        tileLoaded = true;
+        setTilesOffline(false);
+      })
+      .addTo(map);
 
     // One marker + radius ring per location. Author-supplied name appears
     // as the marker tooltip (so authors can hover to verify which is which).
@@ -491,7 +507,22 @@ export const MapBeatLeaflet: React.FC<MapBeatLeafletProps> = ({
           {text}
         </div>
       )}
-      <div ref={mapContainerRef} style={{ flex: 1, minHeight: 0 }} />
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        <div ref={mapContainerRef} style={{ position: 'absolute', inset: 0 }} />
+        {tilesOffline && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute', left: 12, right: 12, bottom: 28, zIndex: 1000,
+              background: 'rgba(15, 23, 42, 0.88)', color: 'white', borderRadius: 8,
+              padding: '8px 12px', fontSize: 13, lineHeight: 1.35, textAlign: 'center',
+              pointerEvents: 'none',
+            }}
+          >
+            {uiString('mapOffline')}
+          </div>
+        )}
+      </div>
       <div style={{
         background: 'white', padding: '12px 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

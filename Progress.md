@@ -30,6 +30,9 @@ The exported-story relay now gets the same server-side refusal fallbacks as the 
   - *Loading screens unstyled in the app:* `LoadingDisplay` was laid out with Tailwind classes, which the mobile app doesn't ship, so every loading screen (AI beats' "Thinking…" too) sat at the top without a spinner. Now inline styles, with its own keyframes, and the box never wider than the screen.
   - Verified: Ordinary Wonders handed over as a file URL (as the Files app does) → location prompt with our explanation → title screen fitting the screen. Playing on needs taps and GPS, so that is for the device test.
 
+### Map: offline note
+- When the map images can't load (no internet, or the tile server refuses), the map beat used to show plain grey with no explanation. It now overlays "Map unavailable offline — the pins and your position still work." (runtime UI string `mapOffline`, translated with the rest), driven by Leaflet's tile error/load events, and removes it once images load again. Applies to the builder preview, exported stories and the apps. Checked in headless Chrome with the tile server blocked (note shown) and unblocked (no note). Found on the Android emulator, whose DNS had broken after the Mac's network changed. Fix for the emulator: switch its Wi-Fi off and on.
+
 ### Field App: Android brought up to Capacitor 8
 - The Android project still had Capacitor 6-era settings (min SDK 22, compile/target 34, AGP and Gradle 8.2.1). It now matches Capacitor 8.5's own template: min SDK 24 (Android 7), compile/target 36, AGP 8.13.0, Gradle 8.14.3, current AndroidX versions, the template's `navigation|density` config changes, Groovy `=` assignments.
 - Targeting SDK 36 means edge-to-edge on Android 15+: the page padding now prefers the `--safe-area-inset-*` variables Capacitor 8 injects on Android and falls back to `env()` (iOS unchanged).
