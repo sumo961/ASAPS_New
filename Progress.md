@@ -5,6 +5,13 @@
 ### Overview
 The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App runs the full Ordinary Wonders walk on an Android 17 emulator too, and its iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
 
+### Field App (Android): stories couldn't be opened
+- An Android tester found `.asapst` greyed out in the app's "Tap to open a story" picker. Android's picker filters by MIME type, knows none for `.asaps`/`.asapst`, and so left only `.zip` selectable. On Android the app now accepts any file and checks the name after the pick ("… is not an ASAPS story"); iOS keeps its filter.
+- "Open with" from Files, Downloads, Drive or mail didn't offer the app for `.asapst` either: those apps send a typed intent (octet-stream or zip), often with a link that doesn't contain the file name (`msf:123`), and the manifest only matched untyped links by file name. The manifest now offers the app for octet-stream, zip and the two ASAPS types; a file that isn't a story ends on the app's error screen. Untitled links are named in Recent by the story's own title.
+- Checked on the Android 17 emulator: the picker lists `Ordinary Wonders.asapst` as selectable and opens it; a `content://media/external/downloads/19` link with type octet-stream opens the story and Recent says "Ordinary Wonders".
+
+**Files modified:** `apps/player-mobile/src/App.tsx`, `apps/player-mobile/android/app/src/main/AndroidManifest.xml`
+
 ### Design: character parts (recastable roles)
 - `docs/Character-Parts-Design.md`: a story can refer to a *part* ("@confidant") that a character fills at runtime: an AI conversation partner that depends on earlier decisions, or "choose who you play". Covers the data model, resolution, text placeholders and pronouns, state ownership, analyzers, authoring UI and generation guidance. It also turns the AI conversation's NPC Personality field into scene notes, because the Inspector currently copies the character's description into it and the AI receives it twice. Nine decisions are pending for Hartmut.
 

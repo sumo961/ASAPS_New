@@ -43,11 +43,21 @@
                 <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\.asapst" />
                 <data android:scheme="content" android:host="*" android:pathPattern=".*\\..*\\..*\\.asapst" />
             </intent-filter>
+            <!-- Files, Downloads, Drive and mail hand over a content URI WITH a
+                 MIME type, and a typed intent never matches the untyped filter
+                 above. Android knows no type for .asaps/.asapst, so they arrive
+                 as octet-stream (or zip), often under a URI without the file
+                 name (msf:123), so a pathPattern can't tell them apart. Offer
+                 the app for those types; a file that isn't a story ends on the
+                 app's error screen. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="content" android:mimeType="application/x-asaps-project" />
-                <data android:scheme="content" android:mimeType="application/octet-stream" android:host="*" android:pathPattern=".*\\.asaps" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/x-asaps-project" />
+                <data android:mimeType="application/x-asaps-template" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/zip" />
             </intent-filter>
 
         </activity>

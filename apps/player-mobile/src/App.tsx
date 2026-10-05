@@ -235,6 +235,9 @@ const App: React.FC = () => {
       // running story still reach the error screen.
       const bytes = data instanceof ArrayBuffer ? data : await data.arrayBuffer();
       await player.loadStory(bytes);
+      // A file handed over without its name (Drive/Downloads: content://…/msf:123)
+      // arrives untitled; the story's own title names it in Recent.
+      if (!title) title = player.getStoryTitle();
       player.start().catch(err => {
         console.error('Story stopped with an error:', err);
         setError(err instanceof Error ? err.message : 'The story stopped with an error');
@@ -292,8 +295,10 @@ const App: React.FC = () => {
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       // Decode first, then take the file name: an Android content:// link
       // ends in an encoded document id like "primary%3ADownload%2FName.asapst".
-      const name = (decodeURIComponent(uri).split(/[/:]/).pop() || 'Story')
-        .replace(/\.(asaps|asapst)$/i, '');
+      // Opaque links (msf:123) carry no file name: leave the title empty
+      // so openStory takes the story's own.
+      const last = decodeURIComponent(uri).split('?')[0].split(/[/:]/).pop() || '';
+      const name = /\.(asaps|asapst|zip)$/i.test(last) ? last.replace(/\.(asaps|asapst|zip)$/i, '') : '';
       await openStory(bytes.buffer, name);
     } catch (err) {
       console.error('[FieldPlayer] Could not open handed file:', uri, err);
@@ -307,11 +312,16 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let removed = false;
+    // A file link either names a story file, or is an Android content://
+    // link, which often doesn't carry the name (the manifest only lets
+    // story-like types through; a non-story ends on the error screen).
+    const isStoryLink = (url: string) =>
+      /\.(asaps|asapst)$/i.test(url.split('?')[0]) || url.startsWith('content://');
     const sub = CapApp.addListener('appUrlOpen', ({ url }) => {
-      if (/\.(asaps|asapst)$/i.test(url.split('?')[0])) void openFromUriRef.current(url);
+      if (isStoryLink(url)) void openFromUriRef.current(url);
     });
     CapApp.getLaunchUrl().then(launch => {
-      if (launch?.url && /\.(asaps|asapst)$/i.test(launch.url.split('?')[0])) {
+      if (launch?.url && isStoryLink(launch.url)) {
         void openFromUriRef.current(launch.url);
       }
     }).catch(() => {});
@@ -326,9 +336,20 @@ const App: React.FC = () => {
     // Use file input for importing
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.zip,.asaps,.asapst,.asaps.zip';
+    // Android's picker only filters by MIME type and knows no type for
+    // .asaps/.asapst, so the filter left .zip as the only selectable file
+    // and greyed out every story. There we accept any file and check the
+    // name after the pick.
+    if (Capacitor.getPlatform() !== 'android') {
+      input.accept = '.zip,.asaps,.asapst,.asaps.zip';
+    }
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
+      if (file && !/\.(asaps|asapst|zip)$/i.test(file.name)) {
+        setError(`"${file.name}" is not an ASAPS story. Choose a file ending in .asaps or .asapst.`);
+        setAppState('error');
+        return;
+      }
       if (file) {
         await openStory(file, file.name.replace(/\.(asaps|asapst|zip|asaps\.zip)$/i, ''));
       }
