@@ -5,6 +5,9 @@
 ### Overview
 The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App runs the full Ordinary Wonders walk on an Android 17 emulator too, and its iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
 
+### Design: character parts (recastable roles)
+- `docs/Character-Parts-Design.md`: a story can refer to a *part* ("@confidant") that a character fills at runtime: an AI conversation partner that depends on earlier decisions, or "choose who you play". Covers the data model, resolution, text placeholders and pronouns, state ownership, analyzers, authoring UI and generation guidance. It also turns the AI conversation's NPC Personality field into scene notes, because the Inspector currently copies the character's description into it and the AI receives it twice. Nine decisions are pending for Hartmut.
+
 ### Relay refusal fallbacks
 - The generated Netlify relay function (`relayKit.ts`) adds `fallbacks: "default"` and the `server-side-fallback-2026-07-01` beta header for Claude Opus 5 / 5.5, Fable and Mythos when the request doesn't set `fallbacks` itself. An AI beat in a relay-deployed story no longer fails when a safety check declines a harmless scene. Other models, OpenAI and an explicit `fallbacks` are untouched.
 - The relay is a stand-alone file, so it carries its own model pattern. A tripwire test checks it against `claudeSupportsServerFallbacks` in core over a list of model ids.
