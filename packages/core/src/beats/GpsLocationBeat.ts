@@ -24,6 +24,7 @@
  */
 
 import { Beat } from './Beat';
+import { uiString } from '../i18n/uiStrings';
 import type { BeatConfig, IRenderer, Effect, XRLocationEntry } from '../types';
 import { StoryContext } from '../engine/StoryContext';
 import { ensureXRPermission } from '../utils/xrPermissions';
@@ -223,6 +224,9 @@ export class GpsLocationBeat extends Beat {
       | undefined;
 
     if (this.mode !== 'display') {
+      // The permission check can read a position first (see
+      // SensorService.requestPermission) — say so instead of a still screen.
+      renderer.renderLoading?.(uiString('gpsLocating'), { spinnerType: 'pulse' });
       const verdict = await ensureXRPermission(context, ['gps'], {
         onDenied: locationSettings?.onPermissionDenied,
       });

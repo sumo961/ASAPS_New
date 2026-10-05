@@ -128,6 +128,14 @@ describe('WebSensorService', () => {
       now.mockRestore();
     });
 
+    it('requestPermission: a slow or failed fix is not a denial; a real refusal is', async () => {
+      (navigator as any).permissions = undefined; // force the read path, as in iOS/Android web views
+      geo.getCurrentPosition.mockImplementationOnce((_s, error) => { error({ code: 3, message: 'timeout' }); });
+      expect(await service.requestPermission('gps')).toBe('granted');
+      geo.getCurrentPosition.mockImplementationOnce((_s, error) => { error({ code: 1, message: 'denied' }); });
+      expect(await service.requestPermission('gps')).toBe('denied');
+    });
+
     it('asks for a fix no older than 5 s', async () => {
       await service.getCurrentLocation();
       expect(geo.getCurrentPosition.mock.calls.at(-1)[2]).toMatchObject({ maximumAge: 5_000, enableHighAccuracy: true });

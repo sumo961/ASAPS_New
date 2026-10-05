@@ -148,6 +148,9 @@ export class SetGpsLocationBeat extends Beat {
    * outdoors, on a phone just unlocked, can take well over 10 s.
    */
   private async waitForPosition(context: StoryContext, renderer: IRenderer): Promise<{ lat: number; lng: number } | null> {
+    // Say what is happening from the first moment: even a successful read
+    // can take several seconds, and a still screen reads as a hang.
+    renderer.renderLoading?.(uiString('gpsLocating'), { spinnerType: 'pulse' });
     const quick = await this.readCurrentPosition(context);
     if (quick) return quick;
     const authored = this.fallback();
@@ -240,6 +243,7 @@ export class SetGpsLocationBeat extends Beat {
           // count as reached before the player takes a step.
           const minDistanceMeters = Math.min((this.pointRadiusMeters ?? 0) * 2, this.scatterRadiusMeters / 2);
           if (this.placement === 'walkable') {
+            renderer.renderLoading?.(uiString('gpsPlacingPoints'), { spinnerType: 'pulse' });
             // Snap onto real streets/parks via OSM. Thin coverage or a failed
             // query returns fewer than requested — top up with uniform scatter
             // so the count is always met and the story never stalls.

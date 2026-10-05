@@ -74,5 +74,29 @@ export function installNativeGeolocation(): void {
     void pending.then((callbackId) => Geolocation.clearWatch({ id: callbackId })).catch(() => {});
   };
 
+  // The web view's Permissions API answers 'prompt' for geolocation even
+  // when the app may use location, so the story asked for a fresh position
+  // before every walk screen just to learn that. Answer from the platform.
+  let perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+  if (!perms?.query) {
+    // No Permissions API in this web view: supply one that knows geolocation.
+    const unsupported = (async () => { throw new TypeError('Unsupported permission'); }) as unknown as Permissions['query'];
+    perms = { query: unsupported } as Permissions;
+    try { Object.defineProperty(navigator, 'permissions', { value: perms, configurable: true }); } catch { /* read-only: leave as is */ }
+  }
+  if (perms?.query) {
+    const query = perms.query.bind(perms);
+    perms.query = (async (desc: PermissionDescriptor) => {
+      if (desc?.name !== 'geolocation') return query(desc);
+      try {
+        const status = await Geolocation.checkPermissions();
+        const state: PermissionState = status.location === 'granted' ? 'granted' : status.location === 'denied' ? 'denied' : 'prompt';
+        return { name: 'geolocation', state, onchange: null, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false } as unknown as PermissionStatus;
+      } catch {
+        return query(desc);
+      }
+    }) as Permissions['query'];
+  }
+
   console.log('[FieldPlayer] navigator.geolocation routed through the native Geolocation plugin');
 }

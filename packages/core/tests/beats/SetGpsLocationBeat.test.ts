@@ -204,8 +204,10 @@ describe('SetGpsLocationBeat — waiting for a first fix', () => {
     const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'capture', pointName: 'base' } as any });
     const running = beat.execute(ctx, r);
     for (let i = 0; i < 5 && !s.watching(); i++) await tick();
-    expect(shown[0].m).toBe('Waiting for GPS…');
-    expect(shown[0].o.cancelLabel).toBe('Continue without location');
+    expect(shown[0].m).toBe('Finding your location…'); // at once, before any wait
+    const waiting = shown.find((x) => x.o?.cancelLabel);
+    expect(waiting.m).toBe('Waiting for GPS…');
+    expect(waiting.o.cancelLabel).toBe('Continue without location');
     s.deliver({ lat: 59.33, lng: 18.07, accuracy: 5, timestamp: 1 });
     await running;
     expect(ctx.getGeoPoints('base')).toEqual([{ lat: 59.33, lng: 18.07 }]);
@@ -219,8 +221,8 @@ describe('SetGpsLocationBeat — waiting for a first fix', () => {
     const { r, shown } = loadingRenderer();
     const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'scatter', pointName: 'w', count: 3 } as any });
     const running = beat.execute(ctx, r);
-    for (let i = 0; i < 5 && !shown.length; i++) await tick();
-    shown[0].o.onCancel();
+    for (let i = 0; i < 5 && !shown.some((x) => x.o?.cancelLabel); i++) await tick();
+    shown.find((x) => x.o?.cancelLabel).o.onCancel();
     await running;
     expect(ctx.getGeoPoints('w')).toEqual([]);
   });
@@ -232,7 +234,7 @@ describe('SetGpsLocationBeat — waiting for a first fix', () => {
     const { r, shown } = loadingRenderer();
     const beat = new SetGpsLocationBeat({ id: 'g', type: 'setGpsLocation', parameters: { mode: 'capture', pointName: 'base' } as any });
     await beat.execute(ctx, r);
-    expect(shown).toHaveLength(0);
+    expect(shown.map((x) => x.m)).toEqual(['Finding your location…']); // no waiting screen
     expect(ctx.getGeoPoints('base')).toEqual([]);
   });
 });

@@ -283,6 +283,8 @@ export class WebSensorService extends EventEmitter implements SensorService {
 
   /** When lastLocation was received (not the fix's own timestamp). */
   private lastLocationAt = 0;
+  /** Error code of the last failed getCurrentLocation (1 = permission denied). */
+  private lastLocationErrorCode: number | null = null;
 
   async getCurrentLocation(): Promise<GpsReading | null> {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return null;
@@ -298,6 +300,7 @@ export class WebSensorService extends EventEmitter implements SensorService {
           const reading = this.normalizePosition(pos);
           this.lastLocation = reading;
           this.lastLocationAt = Date.now();
+          this.lastLocationErrorCode = null;
           resolve(reading);
         },
         (err) => {
@@ -308,6 +311,7 @@ export class WebSensorService extends EventEmitter implements SensorService {
           // one, so a reading from the last minute stands in. A denial
           // never does.
           const code = (err as GeolocationPositionError | undefined)?.code;
+          this.lastLocationErrorCode = typeof code === 'number' ? code : null;
           const recent = this.lastLocation && Date.now() - this.lastLocationAt <= RECENT_LOCATION_MS;
           console.warn(
             `[SensorService] getCurrentLocation failed (code ${code ?? '?'}: ${(err as { message?: string } | undefined)?.message ?? 'unknown'})` +
@@ -482,10 +486,15 @@ export class WebSensorService extends EventEmitter implements SensorService {
     }
     // Trigger the prompt via the appropriate underlying API.
     if (name === 'gps') {
-      // getCurrentLocation surfaces the GPS prompt. Resolves with reading
-      // (granted) or null (denied / dismissed).
+      // getCurrentLocation surfaces the GPS prompt. A reading means granted.
+      // No reading is only a denial when the platform said so (code 1): a
+      // slow first fix (indoors, just unlocked) or no signal is not a
+      // refusal, and treating it as one made map beats skip themselves.
+      // iOS/Android web views also answer 'prompt' to the Permissions API
+      // even when the app may use location, so this path runs there often.
       const reading = await this.getCurrentLocation();
-      return reading ? 'granted' : 'denied';
+      if (reading) return 'granted';
+      return this.lastLocationErrorCode === 1 ? 'denied' : 'granted';
     }
     if (name === 'camera') {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {

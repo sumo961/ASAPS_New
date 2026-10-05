@@ -64,7 +64,9 @@ export const UI_STRING_DEFAULTS = {
   loadingMoment: 'This may take a moment',
   loadingJustAMoment: 'This will just take a moment',
 
-  // Location beats waiting for a first GPS fix (Set GPS Location)
+  // Location beats: finding the player, placing points, waiting for a fix
+  gpsLocating: 'Finding your location…',
+  gpsPlacingPoints: 'Placing the points on the map…',
   gpsWaiting: 'Waiting for GPS…',
   gpsWaitingHint: 'Step outside or near a window. The story continues as soon as your position comes in.',
   gpsContinueWithout: 'Continue without location',
