@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.107** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.107 makes location stories say
+Current release: **v0.9.108** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.108 fixes two Windows problems**:
+when Windows won't open your browser, the Help menu's Documentation and
+Report a Bug… entries now show the link to copy instead of doing nothing,
+and the GitHub setup finds the GitHub CLI wherever its installer put it —
+click Re-check after installing, no restart needed.
+
+**v0.9.107 made location stories say
 what they are doing**: instead of a still screen, players see "Finding your
 location…", "Placing the points on the map…", and — when no position comes
 in — "Waiting for GPS…" with a button to continue without it. A slow GPS

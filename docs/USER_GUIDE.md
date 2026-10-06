@@ -3604,7 +3604,7 @@ If `git` or `gh` is missing, you'll see a panel listing the status of each (✓ 
 | **Windows** | `winget install --id Git.Git -e ; winget install --id GitHub.cli -e` |
 | **Linux** | `sudo apt install git gh` |
 
-Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. After installing, click **Re-check** in ASAPS to refresh the detection.
+Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. After installing, click **Re-check** in ASAPS to refresh the detection — no need to restart the app. On Windows, ASAPS also looks in the places these tools usually land (the Program Files and per-user install folders, plus winget, Scoop and Chocolatey) and re-reads the system PATH when a tool isn't found, so something you installed while ASAPS was open shows up on the next Re-check.
 
 ### Step 2: Sign in to GitHub
 
@@ -3829,6 +3829,7 @@ The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a 
 - **Local file access** - Direct read/write without browser limitations
 - **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, and the Claude Desktop (MCP) integration.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
+- **When a link won't open** - Help → Documentation, Report a Bug…, Known Issues, the **Open Releases Page** button (offered when an update can't download), and other web links you click in ASAPS all open in your web browser. If your computer declines to open one (usually because no default browser is set), ASAPS shows **Couldn't open your browser** with the address and a **Copy Link** button, so you can paste it into any browser yourself. If it keeps happening on Windows, set a default browser under **Settings › Apps › Default apps**, and make sure you're not running ASAPS as administrator.
 
 ---
 

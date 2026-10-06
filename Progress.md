@@ -1,9 +1,14 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.107, 2026-10-06)
+## 2026-10-06: Windows fixes — Help links and the GitHub CLI (v0.9.108)
 
 ### Overview
-Links the desktop app opens no longer fail silently, and the GitHub setup finds the GitHub CLI on Windows.
+A small release for two problems a Windows user reported. Help ▸ Documentation and Report a Bug… did nothing at all when Windows wouldn't open the browser; now the app shows the address with a Copy Link button. And the GitHub setup kept showing the GitHub CLI as missing although it was installed; the app now looks in the CLI's usual install folders and re-reads the PATH when a tool isn't found, so Re-check works after an install without restarting ASAPS.
+
+### Release checklist (v0.9.108)
+- Only the desktop main process changed (no player, renderer or exporter code), so the story play-through, device sweep and export items don't apply; desktop tests (24) and CI green.
+- The update-error dialog's "Open Releases Page" now goes through the same link function, so its fallback reaches users from the next update on (updating into v0.9.108 runs v0.9.107's updater).
+- Neither fix has run on a Windows machine yet; v0.9.108 is the build for the reporting user to try.
 
 ### Help menu links that did nothing on Windows
 - A Windows user saw Help ▸ Documentation and Report a Bug… do nothing at all, while the app ran fine. Every link goes to the browser through `shell.openExternal`; when the system refuses (no default browser registered for web links, a locked-down company image), the call rejects, and the app discarded that. Now all links (the three Help entries, the updater's "Open Releases Page", links from stories and web views) go through `openExternalIfSafe`, and a refusal shows "Couldn't open your browser" with the address, a **Copy Link** button and, on Windows, where to set a default browser and a hint not to run ASAPS as administrator.
