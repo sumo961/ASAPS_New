@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.107, 2026-10-06)
 
 ### Overview
-Links the desktop app opens no longer fail silently.
+Links the desktop app opens no longer fail silently, and the GitHub setup finds the GitHub CLI on Windows.
 
 ### Help menu links that did nothing on Windows
 - A Windows user saw Help ▸ Documentation and Report a Bug… do nothing at all, while the app ran fine. Every link goes to the browser through `shell.openExternal`; when the system refuses (no default browser registered for web links, a locked-down company image), the call rejects, and the app discarded that. Now all links (the three Help entries, the updater's "Open Releases Page", links from stories and web views) go through `openExternalIfSafe`, and a refusal shows "Couldn't open your browser" with the address, a **Copy Link** button and, on Windows, where to set a default browser and a hint not to run ASAPS as administrator.
@@ -11,6 +11,13 @@ Links the desktop app opens no longer fail silently.
 - The failure path wasn't triggered on a real machine (this Mac always has a browser); the main bundle builds and the desktop tests pass.
 
 **Files modified:** `apps/builder-desktop/src/main/index.ts`
+
+### GitHub setup didn't see the GitHub CLI on Windows
+- A Windows user had both tools installed, but the GitHub setup kept showing the GitHub CLI (gh) as missing. On Windows the app only looked for **git** in its usual install folders; everything else depended on the PATH ASAPS was started with. A tool installed while ASAPS is open (the setup panel says "install, then Re-check") only reaches the registry PATH, and some installers (winget portable links, scoop shims) add no PATH entry the app would see.
+- New `toolPaths.ts`: the usual locations of git and gh (Program Files\GitHub CLI, the per-user install, winget Links, scoop shims, Chocolatey) are tried first and added to the child process PATH. When a command is still not found, the main process re-reads the user and system PATH from the registry and runs it once more, so Re-check works without restarting. The streaming runner (`gh auth login`) uses the same lookup. The "not found" message names the right tool (it used to send gh users to Git for Windows).
+- Unit tests for the candidate list, registry parsing, `%VAR%` expansion and PATH merging (`__tests__/toolPaths.test.ts`, 10 tests). Not run on a Windows machine yet.
+
+**Files modified:** `apps/builder-desktop/src/main/index.ts`, `apps/builder-desktop/src/main/toolPaths.ts` (new), `apps/builder-desktop/src/main/__tests__/toolPaths.test.ts` (new)
 
 ---
 

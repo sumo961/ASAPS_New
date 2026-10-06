@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage, clipboard } from 'electron';
 import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
-import { join } from 'path';
+import { join, win32 as winPath } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
@@ -9,6 +9,7 @@ import { execFile, spawn } from 'child_process';
 import { release as osRelease } from 'os';
 import { buildBugReportUrl, ISSUES_REPO_URL } from './bugReport';
 import { MachineStore } from './machineStore';
+import { windowsToolCandidates, windowsToolDirs, parseRegPath, mergePathEntries, toolNotFoundMessage } from './toolPaths';
 
 /** Injected by vite.config.ts from build-number.json (0 when absent). */
 declare const __BUILD_NUMBER__: number;
@@ -1052,50 +1053,57 @@ ipcMain.handle('fs:unwatch-dir', async () => {
   stopWatching();
 });
 
-// Find the actual executable path for a command on Windows
-// Searches common install locations when the command isn't on PATH
+// Find the actual executable path for a command on Windows: git and the
+// GitHub CLI in their usual install locations (see toolPaths.ts), so they're
+// found even when the PATH this app started with doesn't list them.
 function findExecutable(command: string): string {
-  if (process.platform !== 'win32' || command !== 'git') return command;
-
-  const localAppData = process.env.LOCALAPPDATA || '';
-  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-
-  const candidates = [
-    join(programFiles, 'Git', 'cmd', 'git.exe'),
-    join(programFilesX86, 'Git', 'cmd', 'git.exe'),
-    join(localAppData, 'Programs', 'Git', 'cmd', 'git.exe'),
-    join(programFiles, 'Git', 'bin', 'git.exe'),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      console.log('[IPC:fs] Found git at:', candidate);
-      return candidate;
-    }
-  }
-
-  // Not found in known locations, return original and let PATH handle it
-  console.warn('[IPC:fs] git not found in common locations, trying PATH. Searched:', candidates);
+  if (process.platform !== 'win32') return command;
+  const candidates = windowsToolCandidates(command, process.env, winPath.join);
+  const found = candidates.find(c => existsSync(c));
+  if (found) return found;
+  if (candidates.length) console.warn(`[IPC:fs] ${command} not found in common locations, trying PATH. Searched:`, candidates);
   return command;
+}
+
+/**
+ * Re-read the user and system PATH from the registry into process.env.PATH.
+ * A tool installed while ASAPS is open is only on the registry PATH; called
+ * when a command isn't found, so "Re-check" after an install finds it
+ * without restarting the app. Resolves false when nothing changed.
+ */
+function refreshWindowsPath(): Promise<boolean> {
+  if (process.platform !== 'win32') return Promise.resolve(false);
+  const query = (key: string) => new Promise<string>((resolve) => {
+    execFile('reg', ['query', key, '/v', 'Path'], { timeout: 5000, windowsHide: true }, (err, stdout) => {
+      resolve(err ? '' : parseRegPath(stdout || '', process.env));
+    });
+  });
+  return Promise.all([
+    query('HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment'),
+    query('HKCU\\Environment'),
+  ]).then(([machine, user]) => {
+    const before = process.env.PATH || '';
+    const merged = mergePathEntries([before.split(';'), machine.split(';'), user.split(';')], true).join(';');
+    if (merged === before) return false;
+    process.env.PATH = merged;
+    console.log('[IPC:fs] PATH refreshed from the registry');
+    return true;
+  });
+}
+
+/** PATH for a child process: ours plus the tools' usual folders. */
+function toolPathEnv(): string {
+  const isWin = process.platform === 'win32';
+  const extra = isWin
+    ? windowsToolDirs(process.env, winPath.join)
+    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+  const sep = isWin ? ';' : ':';
+  return mergePathEntries([(process.env.PATH || '').split(sep), extra], isWin).join(sep);
 }
 
 ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?: string, timeout?: number) => {
   console.log('[IPC:fs] run-command:', command, args.join(' '), cwd ? `(cwd: ${cwd})` : '');
-
-  // Augment PATH so tools are found when Electron is launched from GUI
-  // macOS: Homebrew paths (Finder has minimal PATH)
-  // Windows: Git for Windows paths (common install locations)
   const isWin = process.platform === 'win32';
-  const pathSep = isWin ? ';' : ':';
-  const extraPaths = isWin
-    ? ['C:\\Program Files\\Git\\cmd', 'C:\\Program Files\\Git\\bin', 'C:\\Program Files (x86)\\Git\\cmd']
-    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
-  const currentPath = process.env.PATH || '';
-  const augmentedPath = [...new Set([...currentPath.split(pathSep), ...extraPaths])].join(pathSep);
-
-  // On Windows, try to find the actual executable path if it's git
-  const resolvedCommand = isWin ? findExecutable(command) : command;
 
   // If git-lfs is configured globally but not installed, git operations fail.
   // Disable LFS filters entirely (empty string = no filter, no process spawned).
@@ -1113,23 +1121,24 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
     lfsEnv.GIT_CONFIG_VALUE_3 = '';
   }
 
-  return new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve) => {
+  type Result = { stdout: string; stderr: string; exitCode: number; notFound: boolean };
+  // Augment PATH so tools are found when Electron is launched from the GUI
+  // (Finder's minimal PATH on macOS; usual install folders on Windows).
+  const run = () => new Promise<Result>((resolve) => {
+    const resolvedCommand = isWin ? findExecutable(command) : command;
     execFile(resolvedCommand, args, {
       cwd: cwd || undefined,
       timeout: timeout || 30000,
-      env: { ...process.env, PATH: augmentedPath, ...lfsEnv },
+      env: { ...process.env, PATH: toolPathEnv(), ...lfsEnv },
+      windowsHide: true,
     }, (error, stdout, stderr) => {
       const exitCode = error?.code !== undefined ? (typeof error.code === 'number' ? error.code : 1) : 0;
+      const notFound = !!error && (error.code === 'ENOENT' || error.message.includes('ENOENT'));
       // When execFile fails (e.g. ENOENT = command not found), stderr is empty
       // but error.message has the real error - surface it so callers can display it
       let stderrResult = stderr || '';
       if (exitCode !== 0 && !stderrResult.trim() && error?.message) {
-        // Provide a user-friendly message for common errors
-        if (error.code === 'ENOENT' || error.message.includes('ENOENT')) {
-          stderrResult = `${command} is not installed or not found on PATH.\n\nPlease install Git for Windows from https://git-scm.com/download/win and restart the app.`;
-        } else {
-          stderrResult = error.message;
-        }
+        stderrResult = notFound ? toolNotFoundMessage(command) : error.message;
       }
       if (exitCode !== 0) {
         console.warn('[IPC:fs] run-command FAILED:', resolvedCommand, args.join(' '), `exit=${exitCode}`, stderrResult.substring(0, 200));
@@ -1137,13 +1146,15 @@ ipcMain.handle('fs:run-command', async (_, command: string, args: string[], cwd?
       } else {
         console.log('[IPC:fs] run-command OK:', resolvedCommand, args.join(' '));
       }
-      resolve({
-        stdout: stdout || '',
-        stderr: stderrResult,
-        exitCode,
-      });
+      resolve({ stdout: stdout || '', stderr: stderrResult, exitCode, notFound });
     });
   });
+
+  let result = await run();
+  // Installed while ASAPS was open? Its folder is only on the registry PATH.
+  if (result.notFound && isWin && await refreshWindowsPath()) result = await run();
+  const { stdout, stderr, exitCode } = result;
+  return { stdout, stderr, exitCode };
 });
 
 // Streaming command runner — used by `gh auth login` flow so the renderer can
@@ -1156,17 +1167,16 @@ const streamProcs = new Map<string, ReturnType<typeof spawn>>();
 ipcMain.handle('vcs:run-streaming', async (event, streamId: string, command: string, args: string[], cwd?: string) => {
   console.log('[IPC:vcs] run-streaming:', streamId, command, args.join(' '), cwd ? `(cwd: ${cwd})` : '');
   const isWin = process.platform === 'win32';
-  const pathSep = isWin ? ';' : ':';
-  const extraPaths = isWin
-    ? ['C:\\Program Files\\Git\\cmd', 'C:\\Program Files\\Git\\bin', 'C:\\Program Files (x86)\\Git\\cmd']
-    : ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
-  const augmentedPath = [...new Set([...(process.env.PATH || '').split(pathSep), ...extraPaths])].join(pathSep);
-  const resolvedCommand = isWin && command === 'git' ? findExecutable(command) : command;
+  // The tool check ran first and may have refreshed PATH already; refresh
+  // again in case this runner is the first to need a fresh install.
+  if (isWin) await refreshWindowsPath();
+  const resolvedCommand = isWin ? findExecutable(command) : command;
 
   try {
     const proc = spawn(resolvedCommand, args, {
       cwd: cwd || undefined,
-      env: { ...process.env, PATH: augmentedPath },
+      env: { ...process.env, PATH: toolPathEnv() },
+      windowsHide: true,
     });
     streamProcs.set(streamId, proc);
 
