@@ -22,8 +22,12 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.108** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.108 fixes two Windows problems**:
+Current release: **v0.9.109** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.109 fixes Random Target beats**:
+since v0.9.103, **Add Branch** did nothing — new branches now appear and
+keep the target you pick.
+
+**v0.9.108 fixed two Windows problems**:
 when Windows won't open your browser, the Help menu's Documentation and
 Report a Bug… entries now show the link to copy instead of doing nothing,
 and the GitHub setup finds the GitHub CLI wherever its installer put it —

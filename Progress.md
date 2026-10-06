@@ -1,9 +1,14 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.108, 2026-10-06)
+## 2026-10-06: Random Target branches can be added again (v0.9.109)
 
 ### Overview
-Random Target beats can get new branches again (GitHub #4).
+A one-fix release for GitHub #4: **Add Branch** on a Random Target beat did nothing since v0.9.103; new branches now appear and keep their target once picked.
+
+### Release checklist (v0.9.109)
+- The change is in core (`RandomTargetBeat`): a branch without a target is kept for the editor and skipped at runtime. Stories whose branches all have targets behave exactly as before (same links, same draw); the bundled player (`player-web.js`) was rebuilt with it.
+- Core suite green (2820) and CI green; checked in the web builder (Add Branch ×3, pick a target).
+- User Guide: the Random Target section already describes **Add Branch** as it works now; no change needed.
 
 ### "Add Branch" did nothing on Random Target beats (GitHub #4)
 - Reported by a Windows user on 0.9.106 and reproduced here: clicking **Add Branch** in a Random Target beat's Inspector left the list unchanged. A new branch has no target until the author picks one, and since v0.9.103 (`d59e0212`, weights and effects on branches) `RandomTargetBeat` dropped untargeted branches when its parameters were set, so the new row vanished on the round trip through the beat. Beats that already had branches kept working; only adding was broken.
