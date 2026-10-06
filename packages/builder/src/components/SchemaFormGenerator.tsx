@@ -46,6 +46,8 @@ interface ParameterDefinition {
     itemLabel?: string;
     // Help text shown below the field
     help?: string;
+    // Placeholder for text inputs / textareas (defaults to the description)
+    placeholder?: string;
     // Hint text shown below select fields (e.g. recommendations)
     hint?: string;
     // Conditional visibility - only show when another field has the specified value
@@ -100,8 +102,6 @@ interface SchemaFormGeneratorProps {
    * are hidden unless this is 'advanced'. Defaults to showing everything
    * (callers that don't know about tiers keep their old behavior). */
   uiTier?: 'basic' | 'advanced';
-  // Callback to sync NPC name/personality back to character definitions
-  onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   // Top-level beat properties (speaker, showSpeaker) — values read from here, not parameters
   beatProperties?: Record<string, any>;
   // Callback for top-level beat property changes (scope: 'beat' fields)
@@ -258,7 +258,6 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   translationSourceHints,
   characterObjects = [],
   uiTier,
-  onCharacterSync,
   beatProperties = {},
   onBeatPropertyChange,
   usedNames = [],
@@ -418,27 +417,20 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 ref={showFormatBar ? (el) => { proseTextareaRefs.current[paramName] = el; } : undefined}
                 value={value || paramDef.default || ''}
                 onChange={(e) => onParameterChange(paramName, e.target.value)}
-                onBlur={paramName === 'npcPersonality' && onCharacterSync && parameters.npcName
-                  ? () => {
-                      const npcName = parameters.npcName;
-                      if (npcName && value) {
-                        onCharacterSync(npcName, { description: value });
-                      }
-                    }
-                  : undefined}
                 rows={rows}
                 className={`w-full px-3 py-2 border rounded-lg text-sm ${
                   translationSourceHints ? 'border-blue-300 bg-blue-50/30' : 'border-gray-300'
                 }`}
-                placeholder={translationSourceHints ? 'Enter translation...' : (paramDef.description || `Enter ${paramName}`)}
+                placeholder={translationSourceHints ? 'Enter translation...' : (paramDef.ui?.placeholder || paramDef.description || `Enter ${paramName}`)}
               />
               {showSourceHint && (
                 <p className="text-xs text-gray-400 mt-1 italic truncate" title={sourceHint}>
                   Source: {sourceHint}
                 </p>
               )}
-              {!showSourceHint && paramDef.description && (
-                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              {/* ui.help speaks to the author; the description also teaches the AI generators. */}
+              {!showSourceHint && (paramDef.ui?.help || paramDef.description) && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
               )}
             </div>
           );
@@ -708,11 +700,12 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
 
         // NPC Character control — combobox for AIDialogTree / AIConversation's
         // npcName field. Filters defined characters to non-player roles (the
-        // NPC is whom the player talks *to*). When a defined Character is
-        // linked, the linked character's description is auto-loaded into
-        // npcPersonality (preserves the prior behaviour and is the small win
-        // that drove this Step). Free-text names work unchanged — typing a
-        // new NPC name and clicking "Define as Character" opens the Manager.
+        // NPC is whom the player talks *to*). A linked character's description
+        // reaches the AI through the dossier on every turn, so it is NOT copied
+        // into npcPersonality ("In this scene" notes): a copy was sent twice,
+        // went stale when the character was edited, and would describe the
+        // wrong person once roles can recast the NPC. Free-text names work
+        // unchanged — "Define as Character" opens the Manager.
         if (paramDef.ui?.control === 'npc-character') {
           // Non-player Characters only — the player is never the NPC.
           const npcCharacters = characterObjects
@@ -742,19 +735,6 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           const setNpc = (next: { characterRef?: string; freeText?: string }) => {
             const newValue = next.characterRef || next.freeText || '';
             handleChange(newValue);
-
-            // When the user links to a defined Character (newValue is the
-            // canonical id), auto-fill npcPersonality from that Character's
-            // description IF the personality slot is currently empty. This
-            // is the dossier-prefill that justifies promoting NPCs to real
-            // Characters in the first place — the LLM context now reuses
-            // the same description across every beat that links to this NPC.
-            if (next.characterRef) {
-              const linked = npcCharacters.find((c: any) => c.id === next.characterRef);
-              if (linked?.description && !parameters.npcPersonality) {
-                onParameterChange('npcPersonality', linked.description);
-              }
-            }
           };
 
           return (
@@ -792,17 +772,15 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                       // "Refine with questions first" stays available inside.
                       askFirst: false,
                       onAccepted: (character) => {
-                        // Link the beat to the accepted character and load the
-                        // generated personality into the beat's context field.
+                        // Link the beat to the accepted character; its profile
+                        // reaches the AI through the dossier. The scene notes
+                        // stay as the author wrote them.
                         handleChange(character.id);
-                        if (character.description) {
-                          onParameterChange('npcPersonality', character.description);
-                        }
                       },
                     })
                   }
                   className="mt-1 text-xs text-purple-600 hover:bg-purple-50 px-1.5 py-1 rounded flex items-center gap-1"
-                  title="AI drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and personality text"
+                  title="AI drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and scene notes"
                 >
                   ✨ Develop character with AI…
                 </button>

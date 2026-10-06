@@ -181,6 +181,13 @@ Rules for proposals:
   them, the rest by the narrator) — and the beat sets "showSpeaker": false.
   Replace generic speaker labels ("Character", "NPC") on lines where a
   known character is present.
+- AI conversation / AI dialog tree NPCs: who the NPC is lives in the
+  character (its description, traits, variants — the runtime sends them to
+  the AI every turn); the beat's 'npcPersonality' is "In this scene": how
+  they behave HERE (mood, attitude, what they want now). To change who an
+  NPC is, propose 'updateCharacter'; to change how they act in one scene,
+  edit that beat's npcPersonality. Never copy the character's description
+  into npcPersonality.
 - Prefer small, reviewable proposals over one giant rewrite. Each proposal
   should stand alone — the author can accept some and reject others.
 - 'updateCharacter' may change: displayName, description, color; base

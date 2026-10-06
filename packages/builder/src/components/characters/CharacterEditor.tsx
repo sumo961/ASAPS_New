@@ -248,7 +248,7 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Role</label>
+        <label className="block text-sm font-medium mb-1" title="What kind of character this is: the player, a non-player character, or a companion">Kind</label>
         <select
           value={editedCharacter.role}
           onChange={(e) => setEditedCharacter({ ...editedCharacter, role: e.target.value as Character['role'] })}

@@ -742,8 +742,8 @@ Fictional time condition example (CORRECT format):
 - Creates personalized NPC responses based on player state
 - Parameters:
   - scenario: Scene description for context
-  - npcName: NPC the player talks to
-  - npcPersonality: Character traits (optional)
+  - npcName: the NPC's character id (e.g. "char_wolf") — define the NPC in "characters" with a description of who they are; the runtime sends that description to the AI every turn
+  - npcPersonality: how the NPC behaves in THIS scene — mood, attitude, what they want right now (e.g. "impatient, hiding that the shop is closing"). NOT who they are: don't repeat the character's description here
   - maxTurns: Maximum conversation depth (default: 3)
   - exitTargets: Array of exit destinations, each with:
     - id: Target beat ID
@@ -760,8 +760,8 @@ Fictional time condition example (CORRECT format):
 - Unlike aiDialogTree (pre-generated tree), each NPC turn is generated fresh
 - Parameters:
   - scenario: Scene description
-  - npcName: NPC the player talks to
-  - npcPersonality: Character traits (optional)
+  - npcName: the NPC's character id (e.g. "char_wolf") — define the NPC in "characters" with a description of who they are; the runtime sends that description to the AI every turn
+  - npcPersonality: how the NPC behaves in THIS scene — mood, attitude, what they want right now. NOT who they are: don't repeat the character's description here (the same character can behave differently in two scenes)
   - maxTurns: Maximum conversation turns before fallback exit
   - directions: Array of steering rules that guide the AI, each with:
     - trigger: When this direction activates (topic-mention, sentiment, turn-count, variable, custom)
@@ -2272,7 +2272,7 @@ You may use these advanced beat types that leverage AI at runtime:
 - **aiDurScreen**: Generate contextual text with automatic duration based on reading speed (like durScreen but dynamic)
   Parameters: prompt, fallbackText, includeVariables, includeInventory, includeHistory, maxSentences, wordsPerMinute, minDuration, maxDuration
 - **aiConversation**: Real-time AI conversation with author-defined steering rules
-  Parameters: scenario, npcName, npcPersonality, maxTurns, directions (steering rules with triggers and actions), fallbackExitTarget, fallbackExitMessage, openingLine, systemInstructions
+  Parameters: scenario, npcName (a character id — who the NPC is comes from that character's description), npcPersonality (how they behave in this scene only), maxTurns, directions (steering rules with triggers and actions), fallbackExitTarget, fallbackExitMessage, openingLine, systemInstructions
 
 Use these sparingly for dynamic, personalized experiences. They require an AI API key and internet at runtime.`);
   } else {

@@ -5,7 +5,8 @@ import { StoryContext } from '../engine/StoryContext';
 import { PlayerContextBuilder } from '../utils/PlayerContextBuilder';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 import { uiString } from '../i18n/uiStrings';
-import { buildDossierForRef, resolveCharacterDisplayName } from '../utils/dossier';
+import { buildDossierForRef, resolveCharacterDisplayName, sceneNotesFor } from '../utils/dossier';
+import { npcIdentityBlock } from '../utils/ConversationPromptBuilder';
 import type { DialogNode, DialogChoice } from '../generated/beat-types';
 import {
   type DialogTreeLayoutTemplate,
@@ -91,6 +92,8 @@ export class AIDialogTreeBeat extends Beat {
    *  by generateDialogTree / validateDialogTree / exit handling, which run in
    *  separate methods where the performAction local is out of scope. */
   private _npcDisplay = '';
+  /** Who the NPC is for this run (dossier + scene notes), reused by exit lines. */
+  private _npcIdentity = '';
   public includeVariables: boolean;
   public includeInventory: boolean;
   public includeVisitedBeats: boolean;
@@ -477,14 +480,16 @@ export class AIDialogTreeBeat extends Beat {
     // re-imagining the NPC from scratch each beat.
     const characters = (story as any)?.getCharacters?.() || [];
     const characterDossier = buildDossierForRef(this.npcName, characters, context);
+    // Dossier = identity; the NPC Personality field = "In this scene" notes
+    // (a copy of the character's description is dropped).
+    this._npcIdentity = npcIdentityBlock(characterDossier, sceneNotesFor(this.npcPersonality, this.npcName, characters));
 
     // Build the generation prompt
     const prompt = `Generate a dialog tree for the following scenario:
-${characterDossier ? `\n${characterDossier}\n` : ''}
 SCENARIO: ${this.scenario}
 
 NPC: ${this._npcDisplay}
-${this.npcPersonality ? `PERSONALITY: ${this.npcPersonality}` : ''}
+${this._npcIdentity}
 
 PLAYER CONTEXT:
 ${playerContext}
@@ -869,7 +874,7 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
         const exitConfig = this.exitTargets.find(t => t.id === chosen.target);
         if (exitConfig?.npcExitMessage && aiService) {
           try {
-            const exitPrompt = `You are ${this._npcDisplay}. ${this.npcPersonality || ''}\n\n` +
+            const exitPrompt = `You are ${this._npcDisplay}.\n\n${this._npcIdentity}\n\n` +
               `SCENARIO: ${this.scenario}\n\n` +
               `The NPC just said: "${processedText}"\n` +
               `The player responded: "${chosen.text}"\n\n` +

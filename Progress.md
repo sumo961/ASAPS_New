@@ -1,5 +1,26 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.109, 2026-10-06)
+
+### Overview
+Character roles (recastable cast) are decided and phase 0 is built: an AI conversation's NPC field "NPC Personality" becomes **"In this scene"** — who the NPC is comes from the linked character, the beat says how they behave here — and the copy of the character's description that the Inspector used to put there is gone.
+
+### Character roles: decisions (design doc renamed)
+- `docs/Character-Parts-Design.md` → `docs/Character-Roles-Design.md`. Hartmut's decisions (2026-10-06): the concept is called **Role** (theatre/games/IDN term; "part" collides with story structure); the existing `Character.role` (player/npc/companion) is relabelled **Kind** in the UI only — stored name unchanged, nothing to migrate; recasting is opt-in per role; a dedicated "Choose your character" beat for phase 2; phase 0 ships first. Open until phase 1: `@` syntax, uncast roles, pronouns, protagonist inventory, analyzer budget.
+
+### Phase 0: "In this scene" instead of NPC Personality
+- **Why:** picking a character in an AI Conversation / AI Dialog Tree copied its description into NPC Personality, so the AI read the same identity twice (dossier + PERSONALITY); the copy went stale when the character was edited, editing the field silently rewrote (or created) the character, and with roles it would describe the wrong person.
+- **Runtime (core):** `npcIdentityBlock` — the dossier carries identity; the field goes in as `IN THIS SCENE:` beside a dossier, and keeps `PERSONALITY:` for a free-text NPC (its only description). `sceneNotesFor` / `isCopiedCharacterDescription` drop text that only repeats the linked character's (or a variant's) description, matched by id, name or display name like the runtime lookup — so older projects and exported stories stop sending it twice. The farewell / closing lines (direction exits, max-turn closing, dialog-tree exits) now carry the dossier too instead of only "You are X. <personality>".
+- **Builder:** label "In this scene", placeholder and author help (new generic `ui.placeholder` / `ui.help` support on schema textareas; the description still teaches the generators). Picking a character no longer fills the field; blurring it no longer writes to the character (`onCharacterSync` removed from App → Inspector → SchemaFormGenerator); "Develop character with AI…" links the accepted character without overwriting the notes. Projects opened with a field that is exactly a copy get it cleared (`migrateCopiedNpcDescriptions` in the deserializer); edited text stays.
+- **AI generation (same change):** schema descriptions (MCP serves them live), `storyGenerationEnhanced.ts` (npcName = character id with the identity in characters[]; npcPersonality = behaviour in this scene) and the Co-Designer prompt (identity → `updateCharacter`, scene behaviour → the beat's field, never copy).
+- **Character Editor:** "Role" → **Kind**; Character Manager filter "All kinds".
+- User Guide: AI Dialog Tree / AI Conversation settings, the conversation example, "what linking means", an "Opening an older project?" note, the Develop-character helper, runtime dialog generation, and Kind; "NPC Name" corrected to the actual label "NPC Character". Open: screenshot `55-aiconversation-presentation.png` still shows the old "NPC Personality" label with a copied description — retake.
+- Tests: `sceneNotes.test.ts` (9), two AI-conversation prompt tests (a copy reaches the AI once; real notes arrive as IN THIS SCENE), `migrateCopiedNpcDescriptions.test.ts` (2). Core 2829+, builder 2832+ green. Checked in the web builder: the rehearsal template's conversation beat shows "In this scene" with the new placeholder and help; templates hold no copies (Night Train's texting-style notes are scene notes as intended).
+
+**Files modified:** `beat-definitions/core-beats.json`, `packages/core/src/utils/{dossier,ConversationPromptBuilder,index}.ts`, `packages/core/src/beats/{AIConversationBeat,AIDialogTreeBeat}.ts`, `packages/core/src/generated/beat-types.ts`, `packages/builder/src/components/{SchemaFormGenerator,Inspector}.tsx`, `packages/builder/src/App.tsx`, `packages/builder/src/utils/projectDeserializer.ts`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/src/components/ai/codesigner/systemPrompt.ts`, `packages/builder/src/components/characters/{CharacterEditor,CharacterManager}.tsx`, `docs/Character-Roles-Design.md`; tests as listed
+
+---
+
 ## 2026-10-06: Random Target branches can be added again (v0.9.109)
 
 ### Overview

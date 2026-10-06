@@ -1164,8 +1164,8 @@ Instead of scripting every possible response, let AI generate a contextually app
 
 **Key Settings:**
 - **Scenario** - Scene description providing context
-- **NPC Name** - Who the player is talking to. Uses the [Character combobox](#character-combobox) — pick a defined Character to link this beat to that character's identity. When you link a Character that has a description set, the description is auto-filled into **NPC Personality** below (only if that field is empty), so you don't have to rewrite the persona on every AI beat that uses the same NPC. Free-text names still work.
-- **NPC Personality** - How the AI should "act"
+- **NPC Character** - Who the player is talking to. Uses the [Character combobox](#character-combobox) — pick a defined Character to link this beat to that character's identity. A linked character brings everything that makes them *them* — description, personality traits, mood, the active variant — to the AI on every turn (that's the character's [dossier](#character-affect)), so you write who they are once, in the Character Editor, and every AI beat with that NPC uses it. Free-text names still work.
+- **In this scene** - How the NPC behaves *here*: their mood, attitude, what they want right now (*"in a hurry, suspicious of you"*). Who they are comes from the linked character, so this field only needs the scene-specific part — and it can stay empty. For a free-text NPC (no defined character), describe the whole person here, since this field is all the AI knows about them.
 - **Exit Targets** - Named exits with descriptions telling the AI when to use each one
 - **Max Turns** - Limit conversation length
 - **Max choices per turn** - Cap on how many replies the player is offered per exchange (1–4), applied after the opening turn. Leave it empty and the model chooses (usually 2–3). This one number decides how long the player waits: a tree grows *exponentially* with branching, so five turns at three choices is a 40-plus-node tree (about two minutes to generate on any model), while two choices halves it. Five turns with a cap of two is the sweet spot for a personal conversation — set **2** on any AI Dialog Tree with four or more turns.
@@ -1193,8 +1193,8 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 
 **Key Settings:**
 - **Scenario** - Scene description
-- **NPC Name** - The NPC the player is conversing with. Same [Character combobox](#character-combobox) as AI Dialog Tree — link to a defined Character to keep the identity stable, or type a free-text name. Linking a Character with a description auto-fills **NPC Personality** when that field is empty. Right under the field sits **✨ Develop character with AI…** — a shortcut that drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and personality text, then links the accepted character back to the beat. See [AI Character Development](#ai-character-development).
-- **NPC Personality** - Character traits and behaviour the AI should embody
+- **NPC Character** - The NPC the player is conversing with. Same [Character combobox](#character-combobox) as AI Dialog Tree — link to a defined Character to keep the identity stable (their description, traits and variants reach the AI every turn), or type a free-text name. Right under the field sits **✨ Develop character with AI…** — a shortcut that drafts a full character profile (personality, mood, speaking style, optional disposition variants) from this beat's scenario and **In this scene** notes, then links the accepted character to the beat. See [AI Character Development](#ai-character-development).
+- **In this scene** - How the NPC behaves in this conversation: mood, attitude, what they want right now. Leave identity to the linked character; for a free-text NPC, describe them here too.
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
 - **Fallback Exit Target** - Where to go when max turns are reached
@@ -1245,7 +1245,8 @@ Directions are the heart of AI Conversation. Each direction has a **trigger** an
 **Example Setup:**
 ```
 Scenario: "The player meets a merchant in a bazaar"
-NPC: "Fatima", personality: "shrewd but fair, loves haggling"
+NPC: "Fatima" (a defined character: shrewd but fair, loves haggling)
+In this scene: "slow day at the stall, eager to make a sale"
 
 Directions:
   1. Topic "price, cost, expensive" → Steer: "offer a 10% discount"
@@ -1305,7 +1306,7 @@ You can ignore all of this and ship a perfectly good story with just names and p
    - **Portrait** - Click the square to pick or upload the picture shown beside this character's lines
    - **Display Name** - What interactors see (e.g., "Elena Blackwood")
    - **Name** - How you and the AI refer to the character while writing — in the speaker picker, AI prompts and exports (e.g., "elena")
-   - **Role** - Player, NPC, or Companion
+   - **Kind** - Player, NPC, or Companion (the Character Manager's filter lets you show *All kinds* or just one)
    - **Description** - Notes for yourself
 
    The character's fixed **ID** is shown in small print at the bottom of the Basic tab; conditions and saved games refer to it, so it never changes.
@@ -1550,8 +1551,8 @@ Anywhere in the Inspector that asks for a character — a beat's speaker, an inv
 1. The **Speaker** field on every beat type (used for TTS voice routing and speaker labels).
 2. The **NPC Speaker** field on each individual node inside a **Dialog Tree** — so a single Dialog Tree can naturally flow Granny → Wolf → Granny by giving each node a different linked speaker.
 3. The **Character**, **From character**, and **To character** fields on **AddRemoveInventory** beats. *Player* is pinned at the top of these dropdowns and preserves the global single-inventory routing some authors rely on.
-4. The **NPC Name** field on **AI Dialog Tree** beats.
-5. The **NPC Name** field on **AI Conversation** beats.
+4. The **NPC Character** field on **AI Dialog Tree** beats.
+5. The **NPC Character** field on **AI Conversation** beats.
 
 In the two AI cases the dropdown is filtered to non-player Characters — the player is never the NPC.
 
@@ -1559,7 +1560,9 @@ In the two AI cases the dropdown is filtered to non-player Characters — the pl
 
 - Renaming the Character in the Character Manager updates **every** linked field across your project automatically.
 - TTS voice routing, speaker portraits, and other character-aware features look up the linked record once and stay in sync.
-- For AI Dialog Tree and AI Conversation, linking the NPC field to a Character that has a **description** auto-fills the **NPC Personality** slot from that description (only if the slot is currently empty). This means you can write the persona once on the Character record and have it reused on every AI beat that uses the same NPC.
+- For AI Dialog Tree and AI Conversation, linking the NPC field to a Character means the character's **description**, traits, mood and active variant reach the AI on every turn. Write the persona once on the Character record and every AI beat with that NPC uses it — and when you later refine the character, every scene picks up the change. The beat's **In this scene** field is then just for how the NPC behaves in that particular scene; nothing is copied into it, and nothing you type there is written back to the character.
+
+> **Opening an older project?** Earlier versions copied the character's description into the beat's field (then called *NPC Personality*). When a project opens, a field that still holds an exact, untouched copy of the linked character's description — or of one of its variants' — is cleared, because the character already supplies it. Anything you edited or wrote yourself stays exactly as it is.
 - If you ever delete a Character that's still linked somewhere, those fields show a small *(deleted)* indicator so you can see what needs cleanup.
 
 To go back to plain text, click the **✕** on the chip and type whatever you like.
@@ -1576,7 +1579,7 @@ To go back to plain text, click the **✕** on the chip and type whatever you li
 
 ### The Player Character as Speaker
 
-Your player character (the character with the "Player" role) automatically appears as a built-in option in beat speaker dropdowns. You'll see it listed by its display name with "(Player)" appended — for example, **Red (Player)**.
+Your player character (the character whose **Kind** is Player) automatically appears as a built-in option in beat speaker dropdowns. You'll see it listed by its display name with "(Player)" appended — for example, **Red (Player)**.
 
 When you assign the player character as a beat's speaker, the character's actual display name is stored (not the generic "Interactor"). This means speaker labels and portraits work naturally for the player character, just like any other character.
 
@@ -2483,7 +2486,7 @@ Building a rich character by hand means trait sliders, mood pads, and sentiment 
 **Two doors into the same dialog:**
 
 - **From the Character Manager** — click **Add Character**, then the **✨ Generate with AI** card in the template picker. You start from a blank brief, and the helper offers its follow-up questions by default.
-- **From an AI Conversation beat** — click **✨ Develop character with AI…** right under the NPC field in the Inspector. The helper is pre-seeded from the beat's scenario and personality text, so it generates immediately (the questions stage stays one click away). When you accept, the character is linked back to the beat and its description fills the beat's **NPC Personality** field.
+- **From an AI Conversation beat** — click **✨ Develop character with AI…** right under the NPC field in the Inspector. The helper is pre-seeded from the beat's scenario and **In this scene** notes, so it generates immediately (the questions stage stays one click away). When you accept, the character is linked to the beat; your scene notes stay as you wrote them, and the new character's profile reaches the AI through its dossier.
 
 **The flow:**
 
@@ -2516,7 +2519,7 @@ The AI Dialog Tree beat generates conversations on the fly during play:
 - The tree streams in as the model writes it, and the beat's **Max choices per turn** setting is your main lever on how long that takes (see [AI Dialog Tree](#ai-dialog-tree))
 - If you've set a **Model for in-story AI** in AI settings, that model answers here — in the Preview Window and in exported players alike — while your authoring model stays untouched
 
-Configure with personality prompts:
+Describe the NPC on the linked character (or, for a free-text NPC, in the beat's **In this scene** field):
 ```
 You are Marcus, a gruff bartender who knows everyone's secrets
 but rarely shares them. Speak in short sentences. You're

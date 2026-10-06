@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-09-26T15:10:08.517Z
+ * Generated: 2026-10-06T13:35:19.920Z
  */
 
 // ============================================
@@ -1016,7 +1016,7 @@ export interface AiDialogTreeParameters {
   scenario: string;
   /** NPC name the player is talking to */
   npcName: string;
-  /** NPC personality traits */
+  /** How the NPC behaves in THIS scene — mood, attitude, what they want right now (e.g. "in a hurry, suspicious of the player, hiding that the shop is closing"). Who the NPC is (identity, background, personality) belongs in the character's description: set npcName to a defined character's id and the runtime sends that description to the AI on every turn. Do NOT repeat the character's description here. Only for a free-text npcName (no defined character) describe the NPC here as well. */
   npcPersonality?: string | undefined;
   /** Include player variables in context */
   includeVariables?: boolean | undefined;
@@ -1200,7 +1200,7 @@ export interface AiConversationParameters {
   scenario: string;
   /** Name of the NPC the player is talking to */
   npcName: string;
-  /** NPC personality traits and behavior guidelines */
+  /** How the NPC behaves in THIS scene — mood, attitude, what they want right now (e.g. "in a hurry, suspicious of the player, hiding that the shop is closing"). Who the NPC is (identity, background, personality) belongs in the character's description: set npcName to a defined character's id and the runtime sends that description to the AI on every turn. Do NOT repeat the character's description here. Only for a free-text npcName (no defined character) describe the NPC here as well. */
   npcPersonality?: string | undefined;
   /** NPC's opening line (if empty, AI generates one) If this beat is the interactor's first meeting with the NPC, introduce them HERE (name, what they are, one vivid detail) — scenario and npcPersonality are never shown to the interactor. */
   openingLine?: string | undefined;

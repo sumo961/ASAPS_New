@@ -626,6 +626,44 @@ describe('AIConversationBeat', () => {
   // -------------------------------------------------------------------------
   // Error handling
   // -------------------------------------------------------------------------
+  describe('NPC identity and scene notes', () => {
+    const description = 'A retired ferry captain who distrusts officials.';
+    const runWith = async (npcPersonality: string) => {
+      story.setCharacters([{ id: 'char_mara', name: 'Mara', displayName: 'Mara', description }]);
+      const aiService = createMockAIService(['Opening line'], ['[0]']);
+      const beat = new AIConversationBeat({
+        id: 'conv1',
+        type: 'aiConversation',
+        parameters: {
+          scenario: 'At the pier',
+          npcName: 'char_mara',
+          npcPersonality,
+          maxTurns: 1,
+          directions: [{ id: 'd1', trigger: { type: 'topic-mention', keywords: ['x'] }, action: { type: 'exit', exitTarget: 'exit_beat' } }],
+        },
+      });
+      await beat.execute(context, createMockRenderer(aiService));
+      const npcPrompts = aiService.generateConversationTurn.mock.calls
+        .map((c: any[]) => c[0].systemPrompt as string)
+        .filter((p: string) => !p.includes('conversation analyzer'));
+      expect(npcPrompts.length).toBeGreaterThan(0);
+      return npcPrompts[0];
+    };
+
+    it('sends the character description once when the field is only a copy of it', async () => {
+      const prompt = await runWith(description);
+      expect(prompt.split(description).length - 1).toBe(1);
+      expect(prompt).not.toContain('PERSONALITY:');
+      expect(prompt).not.toContain('IN THIS SCENE:');
+    });
+
+    it('sends real scene notes labelled as such next to the dossier', async () => {
+      const prompt = await runWith('In a hurry; the last ferry leaves in five minutes.');
+      expect(prompt).toContain(description);
+      expect(prompt).toContain('IN THIS SCENE: In a hurry; the last ferry leaves in five minutes.');
+    });
+  });
+
   describe('Error handling', () => {
     it('should render error message on AI failure', async () => {
       const aiService = {

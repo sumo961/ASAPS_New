@@ -4543,11 +4543,13 @@
         "npcPersonality": {
           "type": "string",
           "required": false,
-          "description": "NPC personality traits",
+          "description": "How the NPC behaves in THIS scene — mood, attitude, what they want right now (e.g. \"in a hurry, suspicious of the player, hiding that the shop is closing\"). Who the NPC is (identity, background, personality) belongs in the character's description: set npcName to a defined character's id and the runtime sends that description to the AI on every turn. Do NOT repeat the character's description here. Only for a free-text npcName (no defined character) describe the NPC here as well.",
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "NPC Personality"
+            "label": "In this scene",
+            "placeholder": "How they behave here — e.g. in a hurry, suspicious of you",
+            "help": "How the NPC behaves in this scene: mood, attitude, what they want right now. Who they are comes from the linked character — edit that in the Character Editor. For an NPC that isn't a defined character, describe them here too."
           }
         },
         "includeVariables": {
@@ -5471,11 +5473,13 @@
         "npcPersonality": {
           "type": "string",
           "required": false,
-          "description": "NPC personality traits and behavior guidelines",
+          "description": "How the NPC behaves in THIS scene — mood, attitude, what they want right now (e.g. \"in a hurry, suspicious of the player, hiding that the shop is closing\"). Who the NPC is (identity, background, personality) belongs in the character's description: set npcName to a defined character's id and the runtime sends that description to the AI on every turn. Do NOT repeat the character's description here. Only for a free-text npcName (no defined character) describe the NPC here as well.",
           "ui": {
             "control": "textarea",
             "rows": 2,
-            "label": "NPC Personality"
+            "label": "In this scene",
+            "placeholder": "How they behave here — e.g. in a hurry, suspicious of you",
+            "help": "How the NPC behaves in this scene: mood, attitude, what they want right now. Who they are comes from the linked character — edit that in the Character Editor. For an NPC that isn't a defined character, describe them here too."
           }
         },
         "openingLine": {

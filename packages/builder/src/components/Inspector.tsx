@@ -144,10 +144,8 @@ interface InspectorProps {
   onOpenAssetManager?: () => void;
   onAssetSelect?: (type: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   onOpenCharacterManager?: (callback?: (character: any) => void) => void;
-  /** Sync NPC name/personality back to character definitions. Creates new NPC if not found. */
-  onCharacterSync?: (npcName: string, updates: { description?: string }) => void;
   /** Opens the AI "Develop character" dialog (host renders it). Seeded from
-   *  the beat's scenario + npcPersonality by the npc-character control. */
+   *  the beat's scenario + "In this scene" notes by the npc-character control. */
   onDevelopCharacter?: (session: import('./characters/CharacterDevelopmentDialog').CharacterDevelopmentSession) => void;
   // For counter/variable dropdowns
   characters?: Character[];
@@ -201,7 +199,6 @@ export const Inspector: React.FC<InspectorProps> = ({
   onOpenAssetManager,
   onAssetSelect,
   onOpenCharacterManager,
-  onCharacterSync,
   onDevelopCharacter,
   characters = [],
   emotionPalette,
@@ -1993,7 +1990,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                     availableCounters={availableCounters}
                     availableVariables={availableVariables}
                     characterObjects={characters}
-                    onCharacterSync={onCharacterSync}
                     onDevelopCharacter={onDevelopCharacter}
                     translationSourceHints={
                       translationState.activeLanguage ? sourceParametersRef.current : undefined

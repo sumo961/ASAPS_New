@@ -428,7 +428,7 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
             onChange={(e) => setFilterRole(e.target.value as any)}
             className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="all">All Roles</option>
+            <option value="all">All kinds</option>
             <option value="player">Player</option>
             <option value="npc">NPC</option>
             <option value="companion">Companion</option>

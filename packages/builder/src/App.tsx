@@ -6878,40 +6878,6 @@ function App() {
               onAssetRemove={handleAssetRemove}
               onAssetUpdate={handleAssetUpdate}
               onOpenCharacterManager={handleOpenCharacterManager}
-              onCharacterSync={(npcName, updates) => {
-                const existing = characters.find(c =>
-                  (c.displayName || c.name) === npcName
-                );
-                if (existing) {
-                  // Update existing character's description if provided
-                  if (updates.description) {
-                    const updated = characters.map(c =>
-                      c.id === existing.id
-                        ? { ...c, description: updates.description || c.description }
-                        : c
-                    );
-                    handleCharactersChange(updated);
-                  }
-                } else {
-                  // Create new NPC character
-                  const now = new Date().toISOString();
-                  const newChar: Character = {
-                    id: `char_${Date.now()}`,
-                    name: npcName.toLowerCase().replace(/\s+/g, '_'),
-                    displayName: npcName,
-                    role: 'npc',
-                    description: updates.description || '',
-                    visual: { type: 'static' },
-                    states: [],
-                    defaultState: '',
-                    counters: [],
-                    inventory: [],
-                    createdAt: now,
-                    updatedAt: now,
-                  };
-                  handleCharactersChange([...characters, newChar]);
-                }
-              }}
               onDevelopCharacter={setDevelopCharSession}
               characters={characters}
               emotionPalette={emotionPalette}

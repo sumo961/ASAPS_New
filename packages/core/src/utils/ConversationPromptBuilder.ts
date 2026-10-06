@@ -17,7 +17,11 @@ export interface ConversationTurn {
 export interface ConversationPromptContext {
   /** NPC name */
   npcName: string;
-  /** NPC personality description */
+  /**
+   * The beat's NPC Personality field: scene notes when a dossier is given
+   * ("In this scene"), the NPC's description otherwise. Pass it through
+   * sceneNotesFor() so a copy of the character's description is dropped.
+   */
   npcPersonality?: string;
   /**
    * Pre-built character dossier (Step 2 of the rich-character roadmap).
@@ -47,6 +51,22 @@ export interface ConversationPromptContext {
 }
 
 /**
+ * Who the NPC is, for any AI prompt that speaks as them. A linked character
+ * brings its dossier (identity); the beat's NPC Personality field then holds
+ * how they behave in this scene ("In this scene"). Without a linked
+ * character there is no dossier, and the field is the NPC's whole
+ * description, so it keeps its PERSONALITY label.
+ */
+export function npcIdentityBlock(characterDossier: string | undefined, sceneNotes: string | undefined): string {
+  const dossier = characterDossier?.trim() || '';
+  const notes = sceneNotes?.trim() || '';
+  const lines: string[] = [];
+  if (dossier) lines.push(dossier);
+  if (notes) lines.push(dossier ? `IN THIS SCENE: ${notes}` : `PERSONALITY: ${notes}`);
+  return lines.join('\n\n');
+}
+
+/**
  * Build the system prompt for an AI conversation turn
  */
 export function buildConversationSystemPrompt(ctx: ConversationPromptContext): string {
@@ -59,12 +79,8 @@ export function buildConversationSystemPrompt(ctx: ConversationPromptContext): s
   // state and prepended here. The LLM always sees the canonical identity,
   // so it can't drift away from who the character is — directly addresses
   // the personality-drift problem flagged in the rich-character design.
-  if (ctx.characterDossier && ctx.characterDossier.trim()) {
-    parts.push(`\n${ctx.characterDossier}`);
-  }
-  if (ctx.npcPersonality) {
-    parts.push(`\nPERSONALITY: ${ctx.npcPersonality}`);
-  }
+  const identity = npcIdentityBlock(ctx.characterDossier, ctx.npcPersonality);
+  if (identity) parts.push(`\n${identity}`);
 
   parts.push(`\nSCENARIO: ${ctx.scenario}`);
 

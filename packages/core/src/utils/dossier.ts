@@ -1,3 +1,4 @@
+import { resolveCharacter } from './characterRef';
 import { interactionsForCharacter } from './narrativeMemory';
 
 /**
@@ -454,6 +455,45 @@ export function resolveCharacterDisplayName(
   if (!ref) return ref || '';
   const match = characters?.find((c) => c.id === ref);
   return match ? (match.displayName || match.name || ref) : ref;
+}
+
+/**
+ * True when an AI beat's NPC Personality text is just a copy of the linked
+ * character's description (or of one of its variants'). The builder used to
+ * copy the description into that field when the author picked the
+ * character, so the AI read the same identity twice: once in the dossier,
+ * once as PERSONALITY. That field now means "In this scene" (how the NPC
+ * behaves here); a copy adds nothing and, once roles can recast the NPC,
+ * would describe the wrong person. Only a defined character counts — a
+ * free-text NPC has no dossier, so its text is its identity.
+ */
+export function isCopiedCharacterDescription(
+  text: string | null | undefined,
+  ref: string | null | undefined,
+  characters: ReadonlyArray<CharacterLike & { variants?: ReadonlyArray<{ description?: string; characterDescription?: string }> }> | null | undefined,
+): boolean {
+  const norm = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().toLowerCase() : '');
+  const t = norm(text);
+  if (!t || !ref) return false;
+  // Same matching as the runtime's character lookup (id, then name, then
+  // display name), so a generated story's name reference counts too.
+  const match = resolveCharacter(ref, characters);
+  if (!match) return false;
+  const candidates = [match.description, ...(match.variants ?? []).flatMap((v) => [v.description, v.characterDescription])];
+  return candidates.some((c) => norm(c) === t);
+}
+
+/**
+ * The scene notes an AI beat should send: the author's NPC Personality text,
+ * unless it merely repeats the linked character's description.
+ */
+export function sceneNotesFor(
+  text: string | null | undefined,
+  ref: string | null | undefined,
+  characters: Parameters<typeof isCopiedCharacterDescription>[2],
+): string {
+  if (!text || !text.trim()) return '';
+  return isCopiedCharacterDescription(text, ref, characters) ? '' : text.trim();
 }
 
 export function buildDossierForRef(

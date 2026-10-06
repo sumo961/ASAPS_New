@@ -5,7 +5,7 @@
  * This utility reconstructs proper Beat instances from the stored data.
  */
 
-import { BeatTypeRegistry, Story, normalizeCharacter } from '@asaps/core';
+import { BeatTypeRegistry, Story, normalizeCharacter, isCopiedCharacterDescription } from '@asaps/core';
 import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
 import { salvageBeatLocations } from './projectRepair';
@@ -286,6 +286,27 @@ const BEAT_TYPE_ALIASES: Record<string, string> = {
 /**
  * Normalize beat type to canonical name
  */
+/**
+ * AI conversation / AI dialog tree: the NPC Personality field became "In this
+ * scene" (how the NPC behaves here). Older builds copied the linked
+ * character's description into it, so the AI got the description twice; a
+ * field that still holds exactly that copy is cleared. Edited text is kept as
+ * scene notes; free-text NPCs (no linked character) are untouched.
+ */
+export function migrateCopiedNpcDescriptions(beats: Beat[], characters: any[]): number {
+  let cleared = 0;
+  for (const beat of beats) {
+    if (beat.type !== 'aiConversation' && beat.type !== 'aiDialogTree') continue;
+    const params = beat.getParameters?.() ?? {};
+    if (isCopiedCharacterDescription(params.npcPersonality, params.npcName, characters)) {
+      beat.updateParameters({ npcPersonality: '' });
+      cleared++;
+    }
+  }
+  if (cleared) console.log(`[loadProjectData] Cleared ${cleared} NPC scene-notes field(s) that only repeated the character's description`);
+  return cleared;
+}
+
 function normalizeBeatType(type: string): string {
   return BEAT_TYPE_ALIASES[type] || type;
 }
@@ -672,6 +693,7 @@ export function loadProjectData(project: Project): {
     rawCharacters = story.characters;
   }
   const characters: any[] = rawCharacters.map((c: any) => normalizeCharacter(c).character);
+  migrateCopiedNpcDescriptions(beats, characters);
 
   // Extract clusters
   let clusters: any[] = [];

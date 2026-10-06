@@ -1,12 +1,12 @@
-# Character Parts (Recastable Roles) — Design
+# Character Roles (recastable cast) — Design
 
-**Status: PROPOSAL, decisions pending (Hartmut)**
+**Status: APPROVED in part (Hartmut, 2026-10-06): D1, D3, D7, D9 decided; phase 0 in progress. D2, D4, D5, D6, D8 open until phase 1.**
 **Date: 2026-10-05 · Author: session work after the Field App location fixes**
 
 ## The question
 
-Can a story refer to *a part* instead of a specific character, so that who
-fills the part is decided at runtime? Two motivating cases:
+Can a story refer to *a role* instead of a specific character, so that who
+fills the role is decided at runtime? Two motivating cases:
 
 1. **The NPC depends on earlier decisions.** The AI conversation partner in
    scene 7 is whoever the interactor sided with in scene 2: Mara or Jonas,
@@ -15,12 +15,12 @@ fills the part is decided at runtime? Two motivating cases:
    start, and the whole story follows that person.
 
 Both can be built today with duplicated branches. That copies every beat
-that differs only in *who* is present, and the copies drift apart. Parts
+that differs only in *who* is present, and the copies drift apart. Roles
 would let the story stay one story while the person changes.
 
-## Parts vs. variants
+## Roles vs. variants
 
-| | Variant | Part |
+| | Variant | Role |
 |---|---|---|
 | What changes | the disposition of **one person** | **which person** |
 | Identity (id, name, history) | the same | different |
@@ -30,15 +30,19 @@ would let the story stay one story while the person changes.
 Using variants to fake different people (the `CharacterVariant` doc comment
 even suggests "Player-man vs Player-woman") breaks as soon as state
 matters: trust built with "Mara" would carry over to "Jonas", because both
-are one character record. Parts and variants combine: a part's holder still
+are one character record. Roles and variants combine: a role's holder still
 has their own active variant.
 
 ## Naming
 
-`Character.role` already exists (`'player' | 'npc' | 'companion'`,
-`builder/src/types/character.ts:16`) and means *kind of character*. To
-avoid two meanings of "role", this doc calls the new concept a **Part**
-(as in "who plays the part of…"). See decision D1.
+**Role** (decided, D1): it is the established word in theatre, games and
+interactive narrative ("cast a role", "choose your role"), and "part" would
+collide with story structure ("Part 2"). The existing `Character.role`
+(`'player' | 'npc' | 'companion'`, `builder/src/types/character.ts:16`)
+means *kind of character*; its Character Editor label and card tag become
+**Kind**. Only the label changes: the stored field keeps its name, so no
+project needs migrating. Cast roles live at story level (`roles[]`), so
+the two never share an object.
 
 ## What exists today (verified in code, 2026-10-05)
 
@@ -83,25 +87,25 @@ avoid two meanings of "role", this doc calls the new concept a **Part**
 Story-level, next to `characters`:
 
 ```ts
-interface CharacterPart {
+interface CastRole {
   id: string;                 // 'confidant' — referenced as '@confidant'
   name: string;               // 'The confidant' (author-facing, translatable)
-  description?: string;       // what the part does in the story (author + AI)
+  description?: string;       // what the role does in the story (author + AI)
   candidates: string[];       // character ids that may fill it (≥ 1)
   defaultCharacterId?: string;// holder when nothing has cast it yet
   selection: 'cast' | 'random' | 'fixed';
-  //   cast   — the story casts it with a castPart effect (choices, beats)
+  //   cast   — the story casts it with a castRole effect (choices, beats)
   //   random — drawn from candidates at story start (like variant policy)
-  //   fixed  — always the default (lets an author stage a part before
+  //   fixed  — always the default (lets an author stage a role before
   //            writing the alternatives)
   recastable?: boolean;       // default false — see "State" below
   keepOnRestart?: boolean;    // mirrors keepVariantOnRestart
 }
 ```
 
-Runtime state: `StoryContext.state.partHolders: Record<partId, characterId>`.
+Runtime state: `StoryContext.state.roleHolders: Record<partId, characterId>`.
 
-New effect: `{ type: 'castPart', part: 'confidant', character: 'char_mara' }`,
+New effect: `{ type: 'castRole', role: 'confidant', character: 'char_mara' }`,
 usable everywhere effects are (choices, links, beats, random branches).
 
 ### References
@@ -112,15 +116,15 @@ inventory `character`. Resolution happens in **one** new step in front of
 the existing path:
 
 ```
-'@confidant' → state.partHolders.confidant
-             ?? part.defaultCharacterId
-             ?? part.candidates[0]          (+ review finding: used before cast)
+'@confidant' → state.roleHolders.confidant
+             ?? role.defaultCharacterId
+             ?? role.candidates[0]          (+ review finding: used before cast)
            → resolveCharacter / resolveCharRef as today
 ```
 
 `StoryContext.resolveCharRef` gains this step, so every state store follows
 automatically. The context-free `resolveCharacter` stays as it is; its
-callers that have a context (≈7 files) call `context.resolvePartRef` first.
+callers that have a context (≈7 files) call `context.resolveRoleRef` first.
 
 **The speaker-string lookups must move into core.** Portraits and TTS voices
 are found by the speaker string *after* core hands it to the renderer, so
@@ -144,30 +148,30 @@ Pronouns need a new optional field on Character, `pronouns`, with presets
 helpers (D5).
 
 The honest limit: prose written with one person in mind often doesn't fit
-another. Parts suit stories where the part-dependent lines are short (names,
+another. Roles suit stories where the role-dependent lines are short (names,
 a pronoun) or AI-written (conversations, AI text beats). For a few lines
 that truly differ, authors keep using conditions on `@confidant` (below).
 Translations are harder still: gendered adjectives and case endings in
 other languages don't follow from a pronoun set. A translated story with
-parts will need per-language attention; the translation extractors
+roles will need per-language attention; the translation extractors
 (StoryTranslator.ts and its copy in HtmlExporter.ts) must leave the
 placeholders intact.
 
 ### Conditions
 
-New condition `{ type: 'partHolder', part: 'confidant', character: 'char_mara' }`
+New condition `{ type: 'roleHolder', role: 'confidant', character: 'char_mara' }`
 ("the confidant is Mara"), for the places where a story needs a different
 line, image, or branch per holder.
 
 ### State belongs to characters
 
 Counters, feelings, inventory, variants and goals stay on the **character**.
-An effect written against `@confidant` lands on whoever holds the part *at
-that moment*. If Mara holds it, trust goes to Mara; if the part later moves
+An effect written against `@confidant` lands on whoever holds the role *at
+that moment*. If Mara holds it, trust goes to Mara; if the role later moves
 to Jonas, Jonas starts from his own values and Mara keeps hers.
 
-Recasting is therefore deliberate: a `castPart` on an already-cast part
-replaces the holder only when the part is `recastable`; otherwise the review
+Recasting is therefore deliberate: a `castRole` on an already-cast role
+replaces the holder only when the role is `recastable`; otherwise the review
 flags it as an error at authoring time (D3). The runtime does not silently
 ignore it: per "respect authorial intent", the author is told while
 authoring, and the runtime applies what was authored.
@@ -176,7 +180,7 @@ authoring, and the runtime applies what was authored.
 
 Changed meaning, with a migration:
 
-- **Who the NPC is** comes only from `npcName`: a character id, `@part`, or a
+- **Who the NPC is** comes only from `npcName`: a character id, `@role`, or a
   free-text name (unchanged behaviour for free text).
 - **`npcPersonality` becomes "In this scene"** (label and schema description;
   the wire name stays for compatibility): how the NPC behaves *here*, e.g.
@@ -192,25 +196,25 @@ Changed meaning, with a migration:
   - edited text → kept as scene notes;
   - free-text NPCs → untouched.
 
-  This fixes a duplication that exists today regardless of parts.
-- With `@part` in `npcName`, the "Develop character" helper asks which
+  This fixes a duplication that exists today regardless of roles.
+- With `@role` in `npcName`, the "Develop character" helper asks which
   candidate to work on.
-- Review finding: a part used as an AI NPC whose candidate has no
+- Review finding: a role used as an AI NPC whose candidate has no
   description and the beat has no scene notes — the conversation would
   run on a bare name.
 
-### Player part (phase 2)
+### Player role (phase 2)
 
-When a story defines a part with id `player`, the implicit `'player'` key
+When a story defines a role with id `player`, the implicit `'player'` key
 becomes an alias for it: inventory, conditions, affect and HUDs follow the
 chosen protagonist. Candidates are characters with `role: 'player'`.
 
-- Inventory: the protagonist's bag follows the **part** (today's global
+- Inventory: the protagonist's bag follows the **role** (today's global
   `'player'` inventory), not the character, so picking up the key doesn't
   depend on who you play (D6).
 - HUD reveal: the holder counts as present from the start.
 - A **"Choose your character"** beat (D7): candidates' portraits, display
-  names and descriptions, one tap casts the part. Schema-driven, so the
+  names and descriptions, one tap casts the role. Schema-driven, so the
   phone layout and translations come for free.
 
 This touches every place that hard-codes `'player'` (≈10 runtime sites and
@@ -218,41 +222,41 @@ the analyzers), which is why it comes second.
 
 ### Authoring UI
 
-- **Character Manager → Parts** tab: name, description, candidates
+- **Character Manager → Roles** tab: name, description, candidates
   (multi-select of characters), selection, default, recastable.
-- **Pickers** (speaker, NPC, owner, condition character) list parts above
+- **Pickers** (speaker, NPC, owner, condition character) list roles above
   characters, shown as "@ The confidant".
 - **Preview as**: a casting selector in the Inspector header, the VE and the
   Preview Window's debug panel ("The confidant: Mara ▾"), so authors see each
-  version. The Inspector shows "currently: Mara" next to a part reference.
-- Flowchart: beats that cast a part get a small badge.
+  version. The Inspector shows "currently: Mara" next to a role reference.
+- Flowchart: beats that cast a role get a small badge.
 
 ### Analysis
 
 - `StateSimulationAnalyzer` explores castings the way it explores random
-  variants: each `random` part's candidates at story start, and each
-  `castPart` effect as a state change. The product of parts × variants
+  variants: each `random` role's candidates at story start, and each
+  `castRole` effect as a state change. The product of roles × variants
   needs a higher cap or sampling; the current 16-combo cap would be hit
   quickly (D8).
-- `ReachabilityAnalyzer` treats `partHolder` conditions as satisfiable by
+- `ReachabilityAnalyzer` treats `roleHolder` conditions as satisfiable by
   any candidate (it has no variant handling either).
-- New review findings: part used before it can be cast (no default);
-  `castPart` naming a non-candidate; recast of a non-recastable part;
-  part placeholder in text of a beat whose language has no pronoun forms;
-  AI NPC part with no description (above).
-- The link-walk parity tripwire needs no change (parts don't add targets).
+- New review findings: role used before it can be cast (no default);
+  `castRole` naming a non-candidate; recast of a non-recastable role;
+  role placeholder in text of a beat whose language has no pronoun forms;
+  AI NPC role with no description (above).
+- The link-walk parity tripwire needs no change (roles don't add targets).
 
 ### AI generation (same change, per CLAUDE.md)
 
-- `core-beats.json`: descriptions for `@part` references, `castPart`,
-  `partHolder`, the "In this scene" meaning of `npcPersonality`, and
-  `parts[]` in the story shape.
+- `core-beats.json`: descriptions for `@role` references, `castRole`,
+  `roleHolder`, the "In this scene" meaning of `npcPersonality`, and
+  `roles[]` in the story shape.
 - Prose guidance: `storyGenerationEnhanced.ts` (Character & Speaker
   System section ~934–990, npc fields ~745–772), `dialogGeneration.ts`,
-  Co-Designer `systemPrompt.ts` (+ tools `definePart`, `setPartCandidates`,
-  and `castPart` as an effect in the existing wiring vocabulary),
+  Co-Designer `systemPrompt.ts` (+ tools `defineRole`, `setRoleCandidates`,
+  and `castRole` as an effect in the existing wiring vocabulary),
   `ideator/systemPrompt.ts`; the MCP desktop server's prompt copy.
-- `applyGeneratedStory` imports `parts[]`; the generation review validates
+- `applyGeneratedStory` imports `roles[]`; the generation review validates
   them.
 - Generator rule: identity goes into the cast, scene behaviour into
   `npcPersonality`. Today generated stories put identity into
@@ -260,8 +264,8 @@ the analyzers), which is why it comes second.
 
 ### Storage and exports
 
-`parts` serialize with the story in `project.json`; `normalizeStory` gets a
-`normalizeParts`; old projects have none. Exports (HTML, Field App, player)
+`roles` serialize with the story in `project.json`; `normalizeStory` gets a
+`normalizeRoles`; old projects have none. Exports (HTML, Field App, player)
 carry the story as is; the player's portrait and TTS paths get the
 id-based lookup from above. ASML 1.0 import is unaffected.
 
@@ -270,39 +274,45 @@ id-based lookup from above. ASML 1.0 import is unaffected.
 | Phase | Contents | Rough size |
 |---|---|---|
 | 0 | `npcPersonality` → "In this scene" + migration + no copy (useful alone) | small |
-| 1 | NPC parts: data model, `castPart`, `@part` resolution, speaker/portrait/TTS move to core, placeholders + pronouns, `partHolder`, Parts tab, pickers, Preview-as, analyzers, findings, generation guidance, UG | large (several sessions) |
-| 2 | Player part + "Choose your character" beat | medium |
+| 1 | NPC roles: data model, `castRole`, `@role` resolution, speaker/portrait/TTS move to core, placeholders + pronouns, `roleHolder`, Roles tab, pickers, Preview-as, analyzers, findings, generation guidance, UG | large (several sessions) |
+| 2 | Player role + "Choose your character" beat | medium |
 
 Phase 0 can ship on its own; it removes a duplication in every AI
 conversation with a linked character.
 
-## Decisions for Hartmut
+## Decisions
 
-- **D1 Name.** "Part" (proposed), or rename the existing `Character.role`
-  to "kind" and call the new concept "Role"?
+Decided 2026-10-06:
+
+- **D1 Name: Role.** The old `Character.role` is relabelled **Kind** in the
+  UI (stored name unchanged).
+- **D3 Recasting: opt-in per role.** Off by default; the author ticks
+  "can be recast". Recasting a role that doesn't allow it is flagged while
+  authoring.
+- **D7 Choose-your-character: a dedicated beat** showing the candidates'
+  portraits, names and descriptions.
+- **D9 Phase 0 first:** `npcPersonality` becomes "In this scene" notes, no
+  more copying, migration — shipped before roles.
+
+Open until phase 1:
+
 - **D2 Reference syntax.** `@confidant` in character fields and
   `${@confidant.name}` in text?
-- **D3 Recasting.** Off by default, opt-in per part (proposed), or always
-  allowed?
-- **D4 Uncast part.** Default holder, else first candidate + review finding
+- **D4 Uncast role.** Default holder, else first candidate + review finding
   (proposed), or should the story stop with an error?
 - **D5 Pronouns.** Pronoun sets only, or also `.is`/`.has`/`.was` agreement
   helpers for English?
-- **D6 Protagonist's inventory.** Follows the part (proposed) or the
+- **D6 Protagonist's inventory.** Follows the role (proposed) or the
   character?
-- **D7 Choose-your-character.** A dedicated beat (proposed), or only choices
-  with `castPart` effects like variants today?
 - **D8 Analyzer budget.** Raise the combination cap or sample castings?
-- **D9 Phase 0 first?** Ship the `npcPersonality` change on its own before
-  parts?
 
 ## Risks
 
 - **Prose that only fits one person.** The main authoring cost; the UI
   (Preview-as) makes it visible but can't fix it.
-- **Translations** of part-dependent text in gendered languages.
-- **Combinatorial analysis** once several parts and variants combine.
+- **Translations** of role-dependent text in gendered languages.
+- **Combinatorial analysis** once several roles and variants combine.
 - **String-keyed lookups elsewhere.** Anything still matching characters by
-  speaker string (beyond the three found) will silently show the part id.
-  A tripwire test should render one beat per type with a `@part` speaker
+  speaker string (beyond the three found) will silently show the role id.
+  A tripwire test should render one beat per type with a `@role` speaker
   and assert no `@` reaches the screen.
