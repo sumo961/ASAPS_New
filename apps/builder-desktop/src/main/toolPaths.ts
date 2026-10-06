@@ -92,7 +92,7 @@ export function mergePathEntries(lists: string[][], caseInsensitive: boolean): s
 export function toolNotFoundMessage(command: string): string {
   if (command === 'gh') {
     return 'The GitHub CLI (gh) was not found.\n\nInstall it from https://cli.github.com, then click Re-check. ' +
-      'If it is already installed, restarting ASAPS lets it see the new install.';
+      'If it is already installed, check that "gh --version" works in a new Command Prompt or terminal.';
   }
   if (command === 'git') {
     return 'Git was not found.\n\nPlease install Git for Windows from https://git-scm.com/download/win, then click Re-check.';
