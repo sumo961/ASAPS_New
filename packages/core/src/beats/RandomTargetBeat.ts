@@ -20,12 +20,17 @@ export interface RandomBranch {
  * Every shape a random branch has been stored in: a bare beat id (the
  * original and still the common form), { target } / { id, target } (legacy
  * import), { targetId } (Connection form), and the full RandomBranch.
+ *
+ * A branch without a target is kept: it is one the author just added in the
+ * Inspector and hasn't pointed anywhere yet. Dropping it here made "Add
+ * Branch" do nothing (GitHub #4) — the new row vanished on the round trip
+ * through the beat. Untargeted branches get no graph link and are never drawn.
  */
 function toBranch(raw: any): RandomBranch | null {
-  if (typeof raw === 'string') return raw ? { target: raw } : null;
+  if (typeof raw === 'string') return { target: raw };
   if (!raw || typeof raw !== 'object') return null;
-  const target = raw.target || raw.targetId || raw.id;
-  if (typeof target !== 'string' || !target) return null;
+  const target = raw.target || raw.targetId || raw.id || '';
+  if (typeof target !== 'string') return null;
   const b: RandomBranch = { target };
   if (typeof raw.weight === 'number' && Number.isFinite(raw.weight) && raw.weight >= 0) b.weight = raw.weight;
   if (Array.isArray(raw.effects) && raw.effects.length > 0) b.effects = raw.effects;
@@ -55,6 +60,7 @@ export class RandomTargetBeat extends Beat {
     // performAction), NOT on these links — so they can't fire twice.
     this.connections = [];
     this.branches.forEach((b, index) => {
+      if (!b.target) return;
       const weight = b.weight !== undefined && b.weight !== 1 ? ` (×${b.weight})` : '';
       this.addConnection({ targetId: b.target, label: b.label || `Random ${index + 1}${weight}` });
     });
@@ -79,18 +85,20 @@ export class RandomTargetBeat extends Beat {
 
   /** Weighted draw; weights default to 1, and all-zero falls back to an even draw. */
   private draw(): RandomBranch | null {
-    if (this.branches.length === 0) return null;
-    const weights = this.branches.map((b) => (b.weight === undefined ? 1 : b.weight));
+    // Branches the author hasn't pointed anywhere yet are not drawn.
+    const branches = this.branches.filter((b) => b.target);
+    if (branches.length === 0) return null;
+    const weights = branches.map((b) => (b.weight === undefined ? 1 : b.weight));
     const total = weights.reduce((a, w) => a + w, 0);
-    if (total <= 0) return this.branches[Math.floor(Math.random() * this.branches.length)];
+    if (total <= 0) return branches[Math.floor(Math.random() * branches.length)];
     let r = Math.random() * total;
-    for (let i = 0; i < this.branches.length; i++) {
+    for (let i = 0; i < branches.length; i++) {
       r -= weights[i];
-      if (r < 0 && weights[i] > 0) return this.branches[i];
+      if (r < 0 && weights[i] > 0) return branches[i];
     }
     // Float edge: the last branch that can be drawn.
-    for (let i = this.branches.length - 1; i >= 0; i--) if (weights[i] > 0) return this.branches[i];
-    return this.branches[this.branches.length - 1];
+    for (let i = branches.length - 1; i >= 0; i--) if (weights[i] > 0) return branches[i];
+    return branches[branches.length - 1];
   }
 
   protected async performAction(

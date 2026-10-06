@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.108, 2026-10-06)
+
+### Overview
+Random Target beats can get new branches again (GitHub #4).
+
+### "Add Branch" did nothing on Random Target beats (GitHub #4)
+- Reported by a Windows user on 0.9.106 and reproduced here: clicking **Add Branch** in a Random Target beat's Inspector left the list unchanged. A new branch has no target until the author picks one, and since v0.9.103 (`d59e0212`, weights and effects on branches) `RandomTargetBeat` dropped untargeted branches when its parameters were set, so the new row vanished on the round trip through the beat. Beats that already had branches kept working; only adding was broken.
+- Untargeted branches are now kept in the beat's parameters (so the Inspector shows them), get no graph link, and are never drawn at runtime. The link walk already skipped empty targets.
+- Regression test in `RandomTargetBeat.test.ts`; core suite green (2820). Checked in the web builder (separate headless profile): a new Random Target beat, Add Branch three times gives three empty branch rows, picking a target for the first keeps it and the other two rows.
+
+**Files modified:** `packages/core/src/beats/RandomTargetBeat.ts`, `packages/core/tests/beats/RandomTargetBeat.test.ts`
+
+---
+
 ## 2026-10-06: Windows fixes — Help links and the GitHub CLI (v0.9.108)
 
 ### Overview

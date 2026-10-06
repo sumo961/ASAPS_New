@@ -176,6 +176,24 @@ describe('RandomTargetBeat', () => {
       expect(connections[1].targetId).toBe('updated2');
     });
 
+    it('keeps a branch the author just added without a target (GitHub #4)', () => {
+      const beat = new RandomTargetBeat({
+        id: 'random1',
+        name: 'Random',
+        type: 'randomTarget',
+        choices: ['a', 'b'],
+      });
+      // The Inspector's "Add Branch" saves an empty target until one is picked.
+      beat.updateParameters({ choices: ['a', 'b', ''] });
+      expect(beat.getParameters().choices).toEqual(['a', 'b', '']);
+      // ...but it is no graph link.
+      expect(beat.getConnections().map((c) => c.targetId)).toEqual(['a', 'b']);
+
+      beat.updateParameters({ choices: ['a', 'b', { target: '', weight: 2 }] });
+      expect(beat.getParameters().choices).toEqual([{ target: 'a' }, { target: 'b' }, { target: '', weight: 2 }]);
+      expect(beat.getConnections()).toHaveLength(2);
+    });
+
     it('should handle object format in updateParameters', () => {
       const beat = new RandomTargetBeat({
         id: 'random1',
