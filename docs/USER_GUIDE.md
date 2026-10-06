@@ -1091,7 +1091,15 @@ This invisible beat (📍, Logic group, added in v0.9.83) stores geographic poin
 
 **Flow:** Executes instantly (capture and walkable-scatter may take a moment for the sensor/network), stores the points, then moves to the target beat. Point sets live in story state and ride through save/resume; any GPS Location beat later in the flow can geofence them by name.
 
-**Waiting for a first position.** Capture, and scatter around the player's current position, need a GPS fix. Outdoors on a phone that was just unlocked, that can take a while. If none has come in after about 10 seconds and you set no fallback coordinates, the player sees **Waiting for GPS…** ("Step outside or near a window…") until a position arrives; the story then carries on by itself. A **Continue without location** button lets them skip the wait; the point set is then left empty and any GPS Location entry bound to it has nothing to show. With fallback coordinates set, the fallback is used straight away, as before. If location permission is denied, the beat doesn't wait.
+**What the player sees while their position comes in.** Capture, and scatter around the player's current position, need a GPS fix, and even a good fix can take a few seconds. So the player is never left looking at a still screen:
+
+1. **Finding your location…** appears the moment the beat starts reading the position.
+2. **Placing the points on the map…** follows while *Walkable* placement looks up streets and parks.
+3. If no position has come in after about 10 seconds and you set no fallback coordinates, the message becomes **Waiting for GPS…** ("Step outside or near a window. The story continues as soon as your position comes in."). Outdoors on a phone that was just unlocked, a first fix can take a while. The story carries on by itself once a position arrives. A **Continue without location** button lets the player skip the wait; the point set is then left empty and any GPS Location entry bound to it has nothing to show.
+
+With fallback coordinates set, the fallback is used as soon as that first read comes back empty, with no waiting screen. If location permission is denied, the beat doesn't wait either. Like all player-facing messages, these follow the story's language (see [Multi-Language Translation](#multi-language-translation)).
+
+**On the GPS Location map, too.** A GPS Location beat that triggers on arrival or departure shows **Finding your location…** while it checks that it may use the player's position. A slow first fix no longer counts as a refusal: the beat treats location as refused only when the player (or their device settings) actually turned it down. And if the map images can't load (no internet, or the map server refuses), the map says **Map unavailable offline — the pins and your position still work.** instead of staying plain grey; the note goes away once the map images load.
 
 **When to Use:** Geocaching-style hunts ("three clues are hidden on streets near you — find one"), stories anchored to wherever the player happens to be standing, museum or campus routes you curate on a map in advance, dynamic meeting points.
 
@@ -2165,7 +2173,7 @@ ASAPS Modern includes AI assistance to help you build narrative systems. Think o
    - **Claude** - Anthropic's AI (recommended; default model: **claude-sonnet-5**). The whole Claude 5 family works — type `claude-opus-5` or `claude-fable-5` into the Model field if you prefer; older Claude 4.x models keep working when named explicitly.
    - **OpenAI** - GPT models (default model: **gpt-6-astra**)
    - **Ollama / Apple Intelligence** - Local models (free, no API key needed). On macOS 27 the built-in Apple model works here too: run `fm serve` in Terminal, enter the URL it prints plus `/v1` as the Base URL and `system` as the Model. Its 8K-token window suits the in-story AI beats (AI Conversation, AI Dialog Tree, AI Condition); story generation, the Ideator and the Co-Designer need a cloud model.
-4. Enter your API key (for cloud providers). In the desktop app, API keys for AI, voices, speech input and web search are kept on this computer, encrypted by the operating system — the Keychain on macOS, Windows Data Protection on Windows (tied to your Windows user account), the desktop keyring on Linux. Only your user account on that computer can read them, and they are never stored in the project, so sharing or committing a project never shares your keys. Moving to another computer or Windows account means entering them again. The browser version keeps them in that browser's storage.
+4. Enter your API key (for cloud providers). In the desktop app, API keys for AI, voices, speech input and web search are kept on this computer, encrypted by the operating system — the Keychain on macOS, Windows Data Protection on Windows (tied to your Windows user account), the desktop keyring on Linux (GNOME Keyring or KWallet; on a Linux desktop without a keyring the keys are stored unencrypted). Only your user account on that computer can read them, and they are never stored in the project, so sharing or committing a project never shares your keys. Moving to another computer or Windows account means entering them again. The browser version keeps them in that browser's storage.
 5. Adjust settings (model, temperature, etc.)
 
 Two fields in that dialog deserve a second look once you start playing your stories, not just generating them:
@@ -3039,6 +3047,13 @@ The resulting HTML file includes the full renderer, all story data, and embedded
 **The player's Menu.** An exported story has a small **Menu** button in the top-right corner. It opens a bar with the play time and **Save**, **Load**, **Settings**, **Pause**, **Restart** (a fresh start that keeps nothing; the bar first asks *"Restart? Unsaved progress will be lost."* — **Restart now** or **Keep playing**) and **Fullscreen**, plus **Save Log** when the session log is included. Screen HUDs (the clock or timer, character meters, inventory) are laid out for the window the story is actually shown in, and stack below the Menu button rather than under it.
 - **AI translation on-the-fly** - Optionally embed an API key for runtime AI translation to any language
 
+**Stories with AI beats: embed a key or use a relay.** When you tick **Enable AI Features** and pick OpenAI or Anthropic, the dialog asks how the exported story reaches the AI:
+
+- **Embed my API key** puts your key inside the HTML. Fine for private sharing with people you trust, but anyone who opens the page source can read it.
+- **Use a relay (recommended for public hosting)** keeps the key out of the page. The export becomes one deploy-ready zip: your story as `index.html`, a small relay function that holds the key on the server, and `README-RELAY.md`, which walks you through deploying it on Netlify (in the browser via GitHub, with the Netlify CLI, or as one shared relay for many stories).
+
+Since v0.9.107 the relay asks Claude's server-side fallbacks to step in when a safety check declines a harmless scene (for Claude Opus 5 and newer, Fable and Mythos), so an AI beat keeps going instead of failing. A relay you deployed from an earlier version doesn't have this yet: export the story again and redeploy the relay to get it.
+
 ### Deployment & Troubleshooting
 
 When you host an HTML export online (rather than just double-clicking a single-file export), a few infrastructure quirks occasionally show up:
@@ -3806,7 +3821,7 @@ The **Auto-Arrange** button is available directly on the flowchart canvas (botto
 
 ## Desktop App Features
 
-The ASAPS Desktop app (built with Electron) provides additional capabilities:
+The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a beta on 64-bit Linux (AppImage or .deb). It provides additional capabilities:
 
 - **Directory projects** - Stories saved as folders of JSON files (better for version control)
 - **Native file dialogs** - Save/open using OS file picker
@@ -4092,7 +4107,7 @@ The fastest path: one author uses **File → New Project on GitHub…** to creat
 Yes! Use the language selector (top right) to add target languages. You can translate manually or use AI-assisted translation. Translations are saved with the project.
 
 ### What browsers are supported?
-Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects.
+Modern versions of Chrome, Firefox, Safari, and Edge all work. Chrome is recommended for best performance. The Desktop app (Electron) provides additional features like Git integration and directory projects. The desktop app is available for macOS and Windows, and, as a beta, for 64-bit Linux (an AppImage and a .deb package); downloads and Linux install notes are on the [GitHub Releases page](https://github.com/sumo961/ASAPS_New/releases) and in the project README.
 
 ### Should my trust bar be a counter I set, or one that reads the character's feelings?
 Both are first-class; it depends on what you want to be in charge of. Choose an **authored counter** when the number is the mechanic and you want exact control — a reputation score, a quest tally, anything where "+10 here, −15 there" *is* the design. Choose a **bound counter** when the number is a *readout* of a relationship, and you'd rather describe how the character reacts than tabulate every increment — then their personality does the scaling for you, and the meter reports the result. You can mix both on the same character in the same frame. See [Counters that read affect](#counter-binding).

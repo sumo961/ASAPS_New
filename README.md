@@ -22,8 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.106** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.106 brings the Ink & Brass look
+Current release: **v0.9.107** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.107 makes location stories say
+what they are doing**: instead of a still screen, players see "Finding your
+location…", "Placing the points on the map…", and — when no position comes
+in — "Waiting for GPS…" with a button to continue without it. A slow GPS
+fix no longer makes a story skip its map scene, and a map without internet
+says so instead of staying grey. **ASAPS Builder now also runs on Linux** (beta: AppImage and
+.deb for 64-bit PCs). Stories exported with the Netlify relay get the same
+protection against over-cautious AI refusals as the builder (redeploy the
+relay from a new export). Work toward native mobile apps continues.
+
+**v0.9.106 brought the Ink & Brass look
 to generated stories**: AI-generated stories now open in ASAPS's own look
 instead of a retro theme, and Ink & Brass is a theme you can pick in Project
 Settings, listed first. AI features got leaner and sturdier: AI beats in a

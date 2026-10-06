@@ -1,9 +1,20 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.106, 2026-09-29)
+## 2026-10-06: Location stories that say what they are doing, and a Linux beta (v0.9.107)
 
 ### Overview
-The exported-story relay now gets the same server-side refusal fallbacks as the builder and direct runtime calls. A Linux desktop build (beta) joins macOS and Windows. The Field App runs the full Ordinary Wonders walk on an Android 17 emulator too, and its iOS project builds on Xcode 27 and runs a story in the simulator after four fixes found on the first run (scene life cycle, endless loading screen, empty stage, safe-area layout).
+Location stories now tell the player what is happening instead of waiting silently: "Finding your location…" appears at once, "Placing the points on the map…" while pins go down, "Waiting for GPS…" with a way to continue when no position comes in, and "Map unavailable offline" when map tiles can't load. Position reads answer at once from a fresh reading, fall back to a recent one, and a slow fix no longer counts as a refused permission (which could skip a map scene). In the mobile apps, the pins of a "walkable" scatter land on streets again (exported stories in a browser still fall back to an even scatter; the public street service refuses browser requests). A Linux desktop build (beta, AppImage + .deb) joins macOS and Windows. The exported-story relay gets the same server-side refusal fallbacks as the builder. Behind these: the Field App ran Ordinary Wonders end to end on an iPhone 15 Pro (indoors at an airport), the iOS 27 simulator and an Android 17 emulator, which is where the location bugs were found; the mobile apps themselves are not released yet. Also: CI is green again, and a design proposal for recastable character parts.
+
+### Security: new advisories cleared before the release
+- CI's security audit turned red overnight on new advisories: Capacitor Android/iOS 8.5.0 (critical, GHSA-rvm3-566m-v7fv: remote content could load at the app origin through the internal proxy path) and `proxy-addr` (critical, IP spoofing via IPv4-mapped IPv6). `npm audit fix` (no breaking changes): Capacitor Android/iOS 8.5.2 (minimum recorded in the player-mobile package.json; native projects re-synced, pods 8.5.2), `proxy-addr` 2.0.8, and patch updates elsewhere. Electron moved to 43.7.7 in the lock, so `build.electronVersion` follows (43.3.0 → 43.7.7; the packaged app and the dev app stay on the same Electron).
+- Both mobile projects still build (Android debug APK; iOS for the simulator). Remaining: 5 high (braces/chokidar needs a breaking chokidar 5) and moderate advisories, below the CI gate.
+
+**Files modified:** `package-lock.json`, `apps/player-mobile/package.json`, `apps/player-mobile/ios/App/Podfile(.lock)`, `apps/player-mobile/android/capacitor.settings.gradle`, `apps/builder-desktop/package.json`
+
+### Release checklist (v0.9.107)
+- New screens measured in the mobile web player with Ordinary Wonders at 1440×900, 1024×768, 768×1024, 402×874 and 874×402: the "Waiting for GPS…" card and its "Continue without location" button and the "Map unavailable offline" note lie fully inside the window, no sideways scrolling. At phone landscape the story's long text gates its button until it is scrolled to the end, by design.
+- Played end to end: Ordinary Wonders on an iPhone 15 Pro, the iOS 27 simulator and the Android 17 emulator (this release's location changes). Non-location stories: the only renderer change is the loading screen's styling, checked in the Preview Window earlier in this cycle.
+- The desktop updater changed (a dialog only while a download is in progress), so that fix takes effect one release late: updating *into* v0.9.107 still runs the old updater.
 
 ### Field App (Android): stories couldn't be opened
 - An Android tester found `.asapst` greyed out in the app's "Tap to open a story" picker. Android's picker filters by MIME type, knows none for `.asaps`/`.asapst`, and so left only `.zip` selectable. On Android the app now accepts any file and checks the name after the pick ("… is not an ASAPS story"); iOS keeps its filter.
