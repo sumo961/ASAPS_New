@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, safeStorage, clipboard } from 'electron';
 import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
 import { join } from 'path';
 import * as fs from 'fs/promises';
@@ -70,7 +70,37 @@ function openExternalIfSafe(url: string): void {
     console.warn('[main] Refused to open external URL (unsupported scheme):', url);
     return;
   }
-  void shell.openExternal(url);
+  // The OS can refuse: no default browser registered for web links (a
+  // browser uninstalled, a locked-down company image) makes Windows reject
+  // the request. Swallowing that left Help ▸ Documentation / Report a Bug
+  // doing nothing at all on a user's machine; offer the address instead.
+  shell.openExternal(url).catch((err: unknown) => {
+    console.warn('[main] The system could not open a link:', url, err);
+    void showLinkFallback(url, err);
+  });
+}
+
+/** "Couldn't open your browser" with the address to copy. */
+async function showLinkFallback(url: string, err: unknown): Promise<void> {
+  const reason = err instanceof Error && err.message ? err.message : String(err ?? '');
+  const options: Electron.MessageBoxOptions = {
+    type: 'warning',
+    title: 'Couldn\u2019t open your browser',
+    message: 'Your computer didn\u2019t open this link in a browser.',
+    detail: `${url}\n\nCopy the link and paste it into your browser\u2019s address bar. ` +
+      `If this keeps happening, check that a default web browser is set in your system settings` +
+      (process.platform === 'win32' ? ' (Settings \u203a Apps \u203a Default apps), and that ASAPS isn\u2019t running as administrator.' : '.') +
+      (reason ? `\n\n(${reason})` : ''),
+    buttons: ['Copy Link', 'Close'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  };
+  const parent = BrowserWindow.getFocusedWindow() ?? mainWindow;
+  const { response } = parent && !parent.isDestroyed()
+    ? await dialog.showMessageBox(parent, options)
+    : await dialog.showMessageBox(options);
+  if (response === 0) clipboard.writeText(url);
 }
 
 // Suppress EPIPE errors from console.log when stdout/stderr pipes are closed
@@ -338,7 +368,7 @@ function setupAutoUpdater(): void {
       cancelId: 1,
     }).then((result) => {
       if (result.response === 0) {
-        shell.openExternal('https://github.com/sumo961/ASAPS_New/releases/latest');
+        openExternalIfSafe('https://github.com/sumo961/ASAPS_New/releases/latest');
       }
     });
   });
@@ -814,7 +844,7 @@ function createMenu(): void {
         { type: 'separator' },
         {
           label: 'Documentation',
-          click: () => shell.openExternal(`${ISSUES_REPO_URL}/blob/main/docs/USER_GUIDE.md`),
+          click: () => openExternalIfSafe(`${ISSUES_REPO_URL}/blob/main/docs/USER_GUIDE.md`),
         },
         { type: 'separator' },
         {
@@ -825,7 +855,7 @@ function createMenu(): void {
         },
         {
           label: 'Known Issues',
-          click: () => shell.openExternal(`${ISSUES_REPO_URL}/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug`),
+          click: () => openExternalIfSafe(`${ISSUES_REPO_URL}/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug`),
         },
       ],
     },

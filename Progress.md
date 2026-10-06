@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.107, 2026-10-06)
+
+### Overview
+Links the desktop app opens no longer fail silently.
+
+### Help menu links that did nothing on Windows
+- A Windows user saw Help ▸ Documentation and Report a Bug… do nothing at all, while the app ran fine. Every link goes to the browser through `shell.openExternal`; when the system refuses (no default browser registered for web links, a locked-down company image), the call rejects, and the app discarded that. Now all links (the three Help entries, the updater's "Open Releases Page", links from stories and web views) go through `openExternalIfSafe`, and a refusal shows "Couldn't open your browser" with the address, a **Copy Link** button and, on Windows, where to set a default browser and a hint not to run ASAPS as administrator.
+- Not covered: a browser that starts and then quits on its own (e.g. Edge refusing to run under an elevated app) looks like success to the system, so no notice appears.
+- The failure path wasn't triggered on a real machine (this Mac always has a browser); the main bundle builds and the desktop tests pass.
+
+**Files modified:** `apps/builder-desktop/src/main/index.ts`
+
+---
+
 ## 2026-10-06: Location stories that say what they are doing, and a Linux beta (v0.9.107)
 
 ### Overview
