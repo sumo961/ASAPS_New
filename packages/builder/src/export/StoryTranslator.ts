@@ -174,7 +174,7 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
   for (let i = 0; i < beats.length; i++) {
     const beat = beats[i];
     const prefix = `${P}.beats.${i}`;
-    extractBeatStrings(beat, prefix, strings);
+    extractBeatStrings(beat, prefix, strings, characters);
   }
 
   return strings;
@@ -185,17 +185,34 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
  * Returns a flat map like { "beat:abc123.parameters.text": "Hello" }.
  * Used for incremental staleness detection after editing a beat.
  */
-export function extractBeatSourceStrings(beat: any, beatId: string): Record<string, string> {
+export function extractBeatSourceStrings(beat: any, beatId: string, characters?: any[]): Record<string, string> {
   const strings: Record<string, string> = {};
   const prefix = `beat:${beatId}`;
-  extractBeatStrings(beat, prefix, strings);
+  extractBeatStrings(beat, prefix, strings, characters);
   return strings;
+}
+
+/**
+ * True when an NPC reference names a defined character (its id, name or
+ * display name). Such a reference is a KEY, not text: translating it
+ * replaced the link with a plain foreign name in that language (the
+ * Malay "Perunding Alam Sekitar", which then spawned a duplicate
+ * character). The character's display name is translated on its own.
+ * Without the character list, only a canonical id ("char_…") is recognised.
+ */
+export function refersToDefinedCharacter(ref: string, characters?: any[]): boolean {
+  if (/^char_/.test(ref)) return true;
+  if (!Array.isArray(characters)) return false;
+  const lower = ref.toLowerCase();
+  return characters.some((c: any) => c?.id === ref
+    || (c?.name || '').toLowerCase() === lower
+    || (c?.displayName || '').toLowerCase() === lower);
 }
 
 /**
  * Extract translatable strings from a single beat based on its type.
  */
-function extractBeatStrings(beat: any, prefix: string, strings: Record<string, string>): void {
+function extractBeatStrings(beat: any, prefix: string, strings: Record<string, string>, characters?: any[]): void {
   const params = beat.parameters || beat;
   const type = beat.type || '';
 
@@ -379,7 +396,10 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       break;
 
     case 'aiDialogTree':
-      if (params.npcName) strings[`${prefix}.parameters.npcName`] = params.npcName;
+      // Only a free-text NPC name is text; a defined character is a key.
+      if (params.npcName && !refersToDefinedCharacter(params.npcName, characters)) {
+        strings[`${prefix}.parameters.npcName`] = params.npcName;
+      }
       break;
   }
 }

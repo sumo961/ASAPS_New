@@ -471,6 +471,17 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
         var story = project.project && project.project.story;
         if (!story) return strings;
         var P = 'project.story';
+        // An NPC reference that names a defined character (id, name or display name).
+        var isCharacterRef = function (ref) {
+          if (/^char_/.test(ref)) return true;
+          var lower = String(ref).toLowerCase();
+          var cs = story.characters || [];
+          for (var k = 0; k < cs.length; k++) {
+            var c = cs[k] || {};
+            if (c.id === ref || String(c.name || '').toLowerCase() === lower || String(c.displayName || '').toLowerCase() === lower) return true;
+          }
+          return false;
+        };
 
         if (story.metadata && story.metadata.title) strings[P + '.metadata.title'] = story.metadata.title;
 
@@ -535,6 +546,9 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
                           'openingLine', 'helperText', 'cancelButtonText', 'doneButtonText'];
             for (var f = 0; f < fields.length; f++) {
               if (params[fields[f]] && typeof params[fields[f]] === 'string') {
+                // An NPC naming a defined character is a key, not text
+                // (mirror of refersToDefinedCharacter in StoryTranslator.ts).
+                if (fields[f] === 'npcName' && isCharacterRef(params.npcName)) continue;
                 strings[prefix + '.parameters.' + fields[f]] = params[fields[f]];
               }
             }

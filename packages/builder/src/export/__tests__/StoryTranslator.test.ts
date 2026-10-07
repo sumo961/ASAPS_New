@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractTranslatableStrings, applyVideoTranslations } from '../StoryTranslator';
+import { extractTranslatableStrings, applyVideoTranslations, refersToDefinedCharacter } from '../StoryTranslator';
 
 // Helper to create minimal project data
 function createProjectData(overrides: any = {}): any {
@@ -718,5 +718,36 @@ describe('translation prompt protects runtime syntax', () => {
     expect(prompt).toContain('**bold**');
     expect(prompt).toContain('*italic*');
     expect(prompt).toContain('~~strikethrough~~');
+  });
+});
+
+describe('AI dialog tree NPC references', () => {
+  const project = (npcName: string) => ({
+    project: {
+      story: {
+        characters: [{ id: 'char_1', name: 'consultant', displayName: 'Environmental Consultant' }],
+        beats: [{ id: 'b1', type: 'aiDialogTree', parameters: { npcName } }],
+      },
+    },
+  });
+
+  it('does not translate an NPC that names a defined character (it is a key)', () => {
+    for (const ref of ['char_1', 'Environmental Consultant', 'consultant']) {
+      const strings = extractTranslatableStrings(project(ref));
+      expect(Object.keys(strings).some(k => k.endsWith('.parameters.npcName'))).toBe(false);
+    }
+    // ...while the character's display name is still translated on its own
+    expect(extractTranslatableStrings(project('char_1'))['project.story.characters.0.displayName']).toBe('Environmental Consultant');
+  });
+
+  it('still translates a free-text NPC name', () => {
+    const strings = extractTranslatableStrings(project('Old Sailor'));
+    expect(strings['project.story.beats.0.parameters.npcName']).toBe('Old Sailor');
+  });
+
+  it('recognises references with and without the character list', () => {
+    expect(refersToDefinedCharacter('char_99')).toBe(true);
+    expect(refersToDefinedCharacter('Old Sailor')).toBe(false);
+    expect(refersToDefinedCharacter('consultant', [{ id: 'char_1', name: 'consultant' }])).toBe(true);
   });
 });
