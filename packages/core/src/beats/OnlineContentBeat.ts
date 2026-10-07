@@ -117,8 +117,13 @@ export class OnlineContentBeat extends Beat {
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
   }
 
-  // Cache for prefetched AI content
+  // Cache for prefetched AI content, and the query (variables filled in) it
+  // answers. A prefetch runs while the player is still on the previous beat;
+  // if a variable in the query changes before this beat runs (an answer, a
+  // Preview debug edit, a restart with other values), the cached answer is
+  // about something else and is thrown away.
   private prefetchedContent: string | null = null;
+  private prefetchedFor: string | null = null;
 
   /**
    * Prefetch AI content in the background so it's cached when the beat executes.
@@ -131,10 +136,12 @@ export class OnlineContentBeat extends Beat {
     try {
       const aiService = renderer.getState('aiService');
       if (!aiService || typeof aiService.generateContent !== 'function') return;
-      if (this.prefetchedContent) return; // already cached
+      const query = this.processText(this.query || '', context);
+      if (this.prefetchedContent && this.prefetchedFor === query) return; // already cached
 
       console.log(`[OnlineContentBeat ${this.id}] Prefetching AI content...`);
       this.prefetchedContent = await this.fetchAIContent(context, renderer);
+      this.prefetchedFor = query;
       console.log(`[OnlineContentBeat ${this.id}] Prefetch complete`);
     } catch (err) {
       // Prefetch failure is non-fatal - will retry on execute
@@ -176,11 +183,18 @@ export class OnlineContentBeat extends Beat {
         }
       }
 
-      if (this.prefetchedContent) {
+      const prefetchMatches = this.prefetchedContent !== null
+        && this.prefetchedFor === this.processText(this.query || '', context);
+      if (this.prefetchedContent !== null && !prefetchMatches) {
+        console.log(`[OnlineContentBeat ${this.id}] Prefetched content is for an older query — fetching again`);
+      }
+      const prefetched = prefetchMatches ? this.prefetchedContent : null;
+      this.prefetchedContent = null; // Clear after use (or when stale)
+      this.prefetchedFor = null;
+      if (prefetched !== null) {
         // Use prefetched content from background generation
         console.log(`[OnlineContentBeat ${this.id}] Using prefetched content`);
-        content = this.prefetchedContent;
-        this.prefetchedContent = null; // Clear after use
+        content = prefetched;
       } else if (this.sourceType === 'api') {
         content = await this.fetchApiContent(context, renderer);
       } else {

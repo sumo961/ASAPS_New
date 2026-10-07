@@ -438,6 +438,17 @@ export const PreviewWindow: React.FC = () => {
   const [showInputTextModal, setShowInputTextModal] = useState(false);
   const [pendingInputTextBeats, setPendingInputTextBeats] = useState<InputTextBeatInfo[]>([]);
   const [pendingPreset, setPendingPreset] = useState<StatePreset | null>(null);
+  // The start state chosen automatically (the only path to the start beat)
+  // still needs the player's typed answers. Starting it used to skip the
+  // values dialog and run on placeholders ("PlayerLocation"), so AI beats
+  // branched and searched on nonsense. True once the author answered (or
+  // chose placeholders) for the current automatic state.
+  const typedValuesSettledRef = useRef(false);
+  // Last answers typed per variable, to pre-fill the dialog next time.
+  const lastTypedValuesRef = useRef<Record<string, string | number>>({});
+  // Whether the dialog was opened by a Start click (start running after it)
+  // rather than by picking a path in the menu (start paused, as before).
+  const valuesDialogFromStartRef = useRef(false);
   // Debug rail: OFF by default (the eval's flagship legibility finding —
   // ~40% of the window went to a variable dump before anything ran) and
   // persisted, so authors who live in it keep it with one click ever.
@@ -893,6 +904,7 @@ export const PreviewWindow: React.FC = () => {
             return prev;
           }
           if (result.presets.length === 1) {
+            typedValuesSettledRef.current = false;
             return {
               ...result.presets[0].preset,
               id: 'auto_0',
@@ -2236,6 +2248,29 @@ export const PreviewWindow: React.FC = () => {
     }
   }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);
 
+  /**
+   * Start from the "ready to preview" state. When the start state was chosen
+   * automatically and its path asks the player for input, ask for those
+   * answers first (pre-filled with the last ones typed); the dialog then
+   * starts the run.
+   */
+  const startFromWaiting = () => {
+    const generated = selectedPreset?.id === 'auto_0' ? generatedPresets[0] : undefined;
+    if (generated?.inputTextBeats?.length && !typedValuesSettledRef.current) {
+      setPendingPreset(selectedPreset);
+      setPendingInputTextBeats(generated.inputTextBeats.map(b => (
+        lastTypedValuesRef.current[b.variableName] !== undefined
+          ? { ...b, simulatedValue: lastTypedValuesRef.current[b.variableName] }
+          : b
+      )));
+      valuesDialogFromStartRef.current = true;
+      setShowInputTextModal(true);
+      return;
+    }
+    setIsWaitingToStart(false);
+    startPreview(startBeatId || undefined, false);
+  };
+
   // Auto-start preview when story is loaded
   // Note: Auto-start is disabled. User must click to start preview.
   // This provides clearer UX - user sees which beat they'll preview before it runs.
@@ -2536,8 +2571,7 @@ export const PreviewWindow: React.FC = () => {
       if (e.key === ' ' && story && !isInputFocused) {
         e.preventDefault();
         if (isWaitingToStart) {
-          setIsWaitingToStart(false);
-          startPreview(startBeatId || undefined, false);
+          startFromWaiting();
         } else if (isPaused) {
           resumePreview();
         } else if (isRunning) {
@@ -2917,10 +2951,7 @@ export const PreviewWindow: React.FC = () => {
           {isWaitingToStart ? (
             <>
               <button
-                onClick={() => {
-                  setIsWaitingToStart(false);
-                  startPreview(startBeatId || undefined, false);
-                }}
+                onClick={startFromWaiting}
                 className="px-4 py-1.5 bg-amber-500 text-white text-sm rounded hover:bg-amber-600 flex items-center gap-2"
               >
                 <Play className="w-4 h-4" />
@@ -3120,8 +3151,7 @@ export const PreviewWindow: React.FC = () => {
                   className="absolute inset-0 z-50 bg-gray-900/30 cursor-pointer flex items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsWaitingToStart(false);
-                    startPreview(startBeatId || undefined, false); // Start without auto-pause
+                    startFromWaiting(); // Start without auto-pause (asks for typed answers first if needed)
                   }}
                   title="Click to start preview"
                 >
@@ -3612,6 +3642,7 @@ export const PreviewWindow: React.FC = () => {
               // Apply user-entered values
               for (const beat of pendingInputTextBeats) {
                 const value = userValues[beat.variableName];
+                lastTypedValuesRef.current[beat.variableName] = value;
                 if (beat.saveToType === 'counter') {
                   updatedCounters[beat.variableName] = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
                 } else {
@@ -3629,29 +3660,37 @@ export const PreviewWindow: React.FC = () => {
               };
 
               setSelectedPreset(updatedPreset);
+              typedValuesSettledRef.current = true;
               setShowInputTextModal(false);
               setPendingInputTextBeats([]);
               setPendingPreset(null);
               setIsWaitingToStart(false); // Clear the "click to preview" overlay
 
-              // Start preview with updated preset
-              setTimeout(() => handleRestart(startBeatId || undefined, updatedPreset, true), 50);
+              // Start preview with updated preset — running when the author
+              // already clicked Start, paused when they picked a path.
+              const pause = !valuesDialogFromStartRef.current;
+              valuesDialogFromStartRef.current = false;
+              setTimeout(() => handleRestart(startBeatId || undefined, updatedPreset, pause), 50);
             }
           }}
           onUsePlaceholders={() => {
             // Use the preset as-is with placeholder values
             if (pendingPreset) {
               setSelectedPreset(pendingPreset);
+              typedValuesSettledRef.current = true;
               setShowInputTextModal(false);
               setPendingInputTextBeats([]);
               setPendingPreset(null);
               setIsWaitingToStart(false); // Clear the "click to preview" overlay
 
               // Start preview with placeholder values
-              setTimeout(() => handleRestart(startBeatId || undefined, pendingPreset, true), 50);
+              const pause = !valuesDialogFromStartRef.current;
+              valuesDialogFromStartRef.current = false;
+              setTimeout(() => handleRestart(startBeatId || undefined, pendingPreset, pause), 50);
             }
           }}
           onCancel={() => {
+            valuesDialogFromStartRef.current = false;
             setShowInputTextModal(false);
             setPendingInputTextBeats([]);
             setPendingPreset(null);

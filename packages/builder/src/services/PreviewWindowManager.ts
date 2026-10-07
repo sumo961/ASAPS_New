@@ -95,6 +95,12 @@ class PreviewWindowManager {
   private lastVisitedBeats: string[] = [];
   private lastCurrentBeatId: string | null = null;
   private pendingData: PreviewMessage['payload'] | null = null;
+  /**
+   * The newest story data sent to the preview. A preview page that says it is
+   * ready (first load, or a reload) gets this, so it never waits for a story
+   * that went out before it was listening.
+   */
+  private lastSentData: PreviewMessage['payload'] | null = null;
   private isElectron: boolean = false;
 
   constructor() {
@@ -111,6 +117,22 @@ class PreviewWindowManager {
     if (this.isElectron) {
       (window as any).electronAPI?.onPreviewClosed?.(() => {
         this.cleanup();
+      });
+      // The preview page pings when it is ready to receive. Answer EVERY
+      // ping with the newest story: a page that loads slowly (the first
+      // launch after a restart compiles its code), or is reloaded, would
+      // otherwise wait for a story that was sent before it listened. This
+      // replaces a 3-second fallback that sent the data blind — on a slow
+      // first load it went out too early and the window stayed on
+      // "Connecting to builder…".
+      (window as any).electronAPI?.onPreviewReady?.(() => {
+        const data = this.pendingData ?? this.lastSentData;
+        this.pendingData = null;
+        if (data) {
+          console.log('[PreviewWindowManager] Preview window ready (PING), sending story data');
+          this.sendUpdateElectron(data);
+          this.notifyListeners();
+        }
       });
       // Forward messages the preview window sends back via IPC through the
       // same `handleMessage` path as the web build. Without this, the live
@@ -243,36 +265,8 @@ class PreviewWindowManager {
         return false;
       }
 
-      // Set up the ready listener BEFORE opening the window to avoid race condition
-      // (preview window may load and send PING before we register the listener)
-      if (initialData) {
-        this.pendingData = initialData;
-        let unsubscribe: (() => void) | null = null;
-
-        if (electronAPI.onPreviewReady) {
-          unsubscribe = electronAPI.onPreviewReady(() => {
-            console.log('[PreviewWindowManager] Preview window ready (PING received), sending initial data');
-            unsubscribe?.();
-            unsubscribe = null;
-            if (this.pendingData) {
-              this.sendUpdateElectron(this.pendingData);
-              this.pendingData = null;
-              this.notifyListeners();
-            }
-          });
-        }
-
-        // Fallback timeout in case PING is missed
-        setTimeout(() => {
-          if (this.pendingData) {
-            console.log('[PreviewWindowManager] Fallback: sending initial data after timeout');
-            unsubscribe?.();
-            this.sendUpdateElectron(this.pendingData);
-            this.pendingData = null;
-            this.notifyListeners();
-          }
-        }, 3000);
-      }
+      // Sent when the page pings that it is ready (listener in the constructor).
+      if (initialData) this.pendingData = initialData;
 
       await electronAPI.preview.open();
       this._electronWindowOpen = true;
@@ -318,6 +312,7 @@ class PreviewWindowManager {
    * Send update via postMessage (web)
    */
   private sendUpdateWeb(data: PreviewMessage['payload']): void {
+    this.lastSentData = data;
     if (!this.previewWindow || this.previewWindow.closed) return;
 
     const message: PreviewMessage = {
@@ -336,6 +331,7 @@ class PreviewWindowManager {
    * Send update via IPC (Electron)
    */
   private async sendUpdateElectron(data: PreviewMessage['payload']): Promise<void> {
+    this.lastSentData = data;
     try {
       const electronAPI = (window as any).electronAPI;
       if (electronAPI?.preview?.sendMessage) {
@@ -396,18 +392,21 @@ class PreviewWindowManager {
     if (!message || typeof message.type !== 'string') return;
 
     switch (message.type) {
-      case 'PING':
-        // Preview window is ready, send pending data
-        if (this.pendingData && this.previewWindow) {
+      case 'PING': {
+        // Preview window is ready (first load or reload): send the newest story
+        const data = this.pendingData ?? this.lastSentData;
+        if (data && this.previewWindow) {
           const initMessage: PreviewMessage = {
             type: 'STORY_UPDATE',
-            payload: this.pendingData,
+            payload: data,
           };
           this.previewWindow.postMessage(initMessage, window.location.origin);
+          this.lastSentData = data;
           this.pendingData = null;
           this.notifyListeners();
         }
         break;
+      }
       case 'VISITED_BEATS_UPDATE': {
         const visited = message.payload?.visitedBeats ?? [];
         const current = message.payload?.currentBeatId ?? null;
@@ -447,6 +446,7 @@ class PreviewWindowManager {
     }
     this.previewWindow = null;
     this.pendingData = null;
+    this.lastSentData = null;
     this._electronWindowOpen = false;
     // Clear the visited-beats trace so the flowchart stops showing stale red highlights
     this.lastVisitedBeats = [];

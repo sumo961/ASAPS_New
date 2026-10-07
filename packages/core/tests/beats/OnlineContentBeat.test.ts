@@ -101,6 +101,37 @@ describe('OnlineContentBeat', () => {
     });
   });
 
+  describe('prefetch', () => {
+    const makeBeat = () => new OnlineContentBeat({
+      id: 'oc_p',
+      name: 'Transport',
+      type: 'onlineContent',
+      parameters: { sourceType: 'ai-query', query: 'Transport in ${city}?', displayTemplate: 'In ${city}: {{data}}', maxWords: 50 },
+    });
+
+    it('uses the prefetched answer when the query is unchanged', async () => {
+      const { renderer, stateStore } = createMockRenderer('Title\n\nBuses everywhere.');
+      context.setVariable('city', 'Barranquilla');
+      const beat = makeBeat();
+      await beat.prefetch(context, renderer);
+      await beat.execute(context, renderer);
+      expect(stateStore['aiService'].generateContent).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetches again when a variable in the query changed after the prefetch', async () => {
+      const { renderer, stateStore } = createMockRenderer('Title\n\nSome answer.');
+      context.setVariable('city', 'PlayerLocation');
+      const beat = makeBeat();
+      await beat.prefetch(context, renderer);
+      context.setVariable('city', 'Barranquilla');
+      await beat.execute(context, renderer);
+      const calls = stateStore['aiService'].generateContent.mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[1][0]).toContain('Transport in Barranquilla?');
+      expect(calls[1][0]).not.toContain('PlayerLocation');
+    });
+  });
+
   describe('word limit enforcement', () => {
     it('should truncate AI response exceeding maxWords at sentence boundary', async () => {
       // Generate text that's ~30 words (exceeds limit of 20)
