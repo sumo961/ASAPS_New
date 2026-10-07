@@ -132,6 +132,43 @@ describe('OnlineContentBeat', () => {
     });
   });
 
+  describe('text boxes (locations)', () => {
+    const stale = 'Info about the commuter transport options in Santa Cruz, CA, USA. (an old saved answer)';
+    const makeBeat = () => new OnlineContentBeat({
+      id: 'oc_l',
+      name: 'Transport',
+      type: 'onlineContent',
+      parameters: { sourceType: 'ai-query', query: 'Transport in ${city}?', errorMessage: 'Sorry, no data.', maxWords: 50 },
+      locations: [
+        { id: 'l1', name: 'Title', x: 0, y: 0, width: 100, height: 20, content: 'Car Ownership in Santa' },
+        { id: 'l2', name: 'Text', x: 0, y: 30, width: 100, height: 50, content: stale },
+        { id: 'l3', name: 'Continue Button', x: 0, y: 90, width: 50, height: 20, content: 'Learn More' },
+      ],
+    } as any);
+
+    it('shows the error message, not text saved in the boxes, when the AI call fails', async () => {
+      const { renderer, stateStore } = createMockRenderer('x');
+      stateStore['aiService'].generateContent = vi.fn().mockRejectedValue(new Error('OpenAI API error: 401'));
+      context.setVariable('city', 'Lima, Peru');
+      await makeBeat().execute(context, renderer);
+      const locs = (renderer.renderText as any).mock.calls[0][2] as any[];
+      const text = locs.find(l => l.name === 'Text').content;
+      expect(text).toBe('Sorry, no data.');
+      expect(JSON.stringify(locs)).not.toContain('Santa Cruz');
+    });
+
+    it('does not write the AI answer into the beat itself', async () => {
+      const { renderer } = createMockRenderer('Getting Around Lima\n\nBuses and the Metropolitano.');
+      context.setVariable('city', 'Lima, Peru');
+      const beat = makeBeat();
+      await beat.execute(context, renderer);
+      const rendered = (renderer.renderText as any).mock.calls[0][2] as any[];
+      expect(rendered.find(l => l.name === 'Text').content).toContain('Metropolitano');
+      const own = Array.from((beat as any).locations.values()) as any[];
+      expect(own.find(l => l.name === 'Text').content).toBe(stale);
+    });
+  });
+
   describe('word limit enforcement', () => {
     it('should truncate AI response exceeding maxWords at sentence boundary', async () => {
       // Generate text that's ~30 words (exceeds limit of 20)

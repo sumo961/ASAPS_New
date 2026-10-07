@@ -224,28 +224,14 @@ export class OnlineContentBeat extends Beat {
       const processedButtonText = this.processText(this.buttonText || 'Continue', context);
       const processedTitle = title ? this.processText(title, context) : '';
 
-      // Update location content - title and text should be separate
-      // NOTE: Map keys are element IDs, use loc.name for display name matching
-      console.log(`[OnlineContentBeat ${this.id}] Updating locations, count=${this.locations.size}`);
-      for (const [, loc] of this.locations) {
-        const nameLower = (loc.name || '').toLowerCase();
-        if (nameLower === 'title' || nameLower.includes('title')) {
-          (loc as any).content = processedTitle;
-          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> TITLE`);
-        } else if (nameLower === 'text' || nameLower.includes('text')) {
-          (loc as any).content = processedText;
-          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> TEXT (${processedText.length} chars)`);
-        } else if (nameLower.includes('button') || nameLower.includes('continue')) {
-          (loc as any).content = processedButtonText;
-          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> BUTTON`);
-        } else {
-          console.log(`[OnlineContentBeat ${this.id}] Location "${loc.name}" -> UNMATCHED`);
-        }
-      }
-
+      // Fill the beat's text boxes for THIS run — on copies. Writing into the
+      // beat's own locations stored the AI answer in the beat: once saved, an
+      // old answer (a Santa Cruz playtest) travelled with the project and was
+      // shown whenever a later call failed.
+      const filledLocations = this.locationsWithContent(processedTitle, processedText, processedButtonText);
       // Render as text display
       // Pass title separately in the locations so PositionedBeatView can distinguish title from text
-      const locations = Array.from(this.locations.values());
+      const locations = filledLocations;
       console.log(`[OnlineContentBeat ${this.id}] Calling renderText with ${locations.length} locations, title="${processedTitle}"`);
 
       // Verify location content was set correctly
@@ -267,11 +253,24 @@ export class OnlineContentBeat extends Beat {
       // Otherwise show error message and continue
       const processedError = this.processText(this.errorMessage || 'Content unavailable.', context);
       const processedButtonText = this.processText(this.buttonText || 'Continue', context);
-      const locations = Array.from(this.locations.values());
+      // The boxes get the error message, not whatever text they were saved
+      // with — otherwise a stored old answer looks like a fresh one.
+      const locations = this.locationsWithContent(this.title ? this.processText(this.title, context) : '', processedError, processedButtonText);
       await renderer.renderText(processedError, processedButtonText, locations);
 
       return this.getNextBeat(context);
     }
+  }
+
+  /** The beat's text boxes with this run's title / text / button, as copies. */
+  private locationsWithContent(title: string, text: string, button: string): any[] {
+    return Array.from(this.locations.values()).map((loc) => {
+      const nameLower = (loc.name || '').toLowerCase();
+      if (nameLower.includes('title')) return { ...loc, content: title };
+      if (nameLower.includes('text')) return { ...loc, content: text };
+      if (nameLower.includes('button') || nameLower.includes('continue')) return { ...loc, content: button };
+      return { ...loc };
+    });
   }
 
   /**
