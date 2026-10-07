@@ -99,6 +99,43 @@ const OPENAI_PROXY_ENDPOINT = isViteDev
  *   - remote custom baseUrl → the builder CORS proxy (contract unchanged)
  *   - localhost / official endpoints → direct fetch
  */
+/** Fired when the AI provider rejects the configured key; the Preview shows it. */
+const AI_AUTH_ERROR_EVENT = 'asaps:ai-auth-error';
+
+/** A failed AI call that means "this key/account can't be used", not "try again". */
+export function isAIAuthError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error ?? '');
+  return /\b(401|403)\b|invalid_api_key|incorrect api key|authentication_error|permission_error|invalid x-api-key/i.test(text);
+}
+
+/**
+ * Report rejected keys instead of leaving them in the console. Every AI beat
+ * has its own fallback (an error message, a fallback exit, a default branch),
+ * so a story with a dead key keeps playing and looks merely odd — the author
+ * needs to be told the key is the problem.
+ */
+function reportAuthErrors(service: IAIService, provider: string): IAIService {
+  return new Proxy(service, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        const result = value.apply(target, args);
+        if (result && typeof (result as Promise<unknown>).catch === 'function') {
+          (result as Promise<unknown>).catch((error: unknown) => {
+            if (isAIAuthError(error)) {
+              window.dispatchEvent(new CustomEvent(AI_AUTH_ERROR_EVENT, {
+                detail: { provider, message: error instanceof Error ? error.message : String(error) },
+              }));
+            }
+          });
+        }
+        return result;
+      };
+    },
+  });
+}
+
 function createAIServiceAdapter(): IAIService | null {
   const savedConfig = getSavedAIConfig();
   console.log('[PreviewWindow] Loaded AI config:', savedConfig ? {
@@ -136,14 +173,14 @@ function createAIServiceAdapter(): IAIService | null {
           apiKey: savedConfig.apiKey,
           baseUrl: isLocalUrl ? savedConfig.baseUrl : undefined,
         });
-    return createRuntimeAIService({
+    return reportAuthErrors(createRuntimeAIService({
       family: 'anthropic',
       // Runtime override first — the authoring flagship is measurably the
       // wrong model for a player waiting mid-story (see AI settings).
       model: savedConfig.runtimeModel || savedConfig.model,
       transport,
       logPrefix: '[PreviewWindow]',
-    });
+    }), 'Claude');
   }
 
   // OpenAI-compatible provider (also used for local/Ollama)
@@ -157,12 +194,12 @@ function createAIServiceAdapter(): IAIService | null {
         apiKey: savedConfig.apiKey || 'ollama', // Ollama doesn't need a real key
         baseUrl: isLocalUrl ? savedConfig.baseUrl : undefined,
       });
-  return createRuntimeAIService({
+  return reportAuthErrors(createRuntimeAIService({
     family: 'openai',
     model: savedConfig.runtimeModel || savedConfig.model,
     transport,
     logPrefix: '[PreviewWindow]',
-  });
+  }), savedConfig.baseUrl ? 'the AI provider' : 'OpenAI');
 }
 
 interface PreviewData {
@@ -436,6 +473,14 @@ export const PreviewWindow: React.FC = () => {
   const [isGeneratingPresets, setIsGeneratingPresets] = useState(false);
   // Input text values modal state
   const [showInputTextModal, setShowInputTextModal] = useState(false);
+  // The AI provider rejected the key (401/403) — shown over the stage until
+  // dismissed, instead of only in the console.
+  const [aiAuthError, setAiAuthError] = useState<{ provider: string; message: string } | null>(null);
+  useEffect(() => {
+    const onAuthError = (e: Event) => setAiAuthError((e as CustomEvent).detail);
+    window.addEventListener(AI_AUTH_ERROR_EVENT, onAuthError);
+    return () => window.removeEventListener(AI_AUTH_ERROR_EVENT, onAuthError);
+  }, []);
   const [pendingInputTextBeats, setPendingInputTextBeats] = useState<InputTextBeatInfo[]>([]);
   const [pendingPreset, setPendingPreset] = useState<StatePreset | null>(null);
   // The start state chosen automatically (the only path to the start beat)
@@ -3629,6 +3674,23 @@ export const PreviewWindow: React.FC = () => {
         </div>
       </div>
 
+      {/* Rejected API key — window-fixed, outside the scaled stage */}
+              {aiAuthError && (
+                <div
+                  role="alert"
+                  className="fixed top-24 left-4 z-[60] w-[min(36rem,calc(100vw-2rem))] bg-red-50 border border-red-300 text-red-800 text-sm rounded-lg shadow px-3 py-2 flex items-start gap-3"
+                >
+                  <div className="flex-1">
+                    <div className="font-semibold">{aiAuthError.provider} rejected the API key — AI beats can't run.</div>
+                    <div className="text-xs mt-0.5">
+                      Each AI beat falls back (an error message, a default branch), so the story keeps going but won't
+                      be what you wrote. Check the key in AI settings, then restart the preview.
+                    </div>
+                    <div className="text-[11px] text-red-600 mt-1 font-mono truncate" title={aiAuthError.message}>{aiAuthError.message}</div>
+                  </div>
+                  <button className="text-red-700 hover:text-red-900 text-xs underline" onClick={() => setAiAuthError(null)}>Dismiss</button>
+                </div>
+              )}
       {/* InputText Values Modal */}
       {showInputTextModal && pendingInputTextBeats.length > 0 && (
         <InputTextValuesModal
