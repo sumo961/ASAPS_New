@@ -14,6 +14,14 @@ The Preview no longer hangs on "Connecting to builder…" after a restart, and s
 
 **Files modified:** `packages/builder/src/services/PreviewWindowManager.ts`, `packages/builder/src/pages/PreviewWindow.tsx`, `packages/core/src/beats/OnlineContentBeat.ts`, `packages/core/tests/beats/OnlineContentBeat.test.ts`, `packages/builder/public/player-web.js`
 
+### Audit of "Environmental Choices 4" against the current beats
+- Checked every beat against `core-beats.json`, plus the generation review, the link walk and reachability (read-only; the project wasn't changed): 31 links, none dangling, nothing unreachable, no dead ends; no unknown beat types or custom shapes. The `connection` parameter "missing" on every single-exit beat is the generator's wire shape only (links live in `connections`).
+- **Schema gap, ours:** `aiDialogTree` reads `systemInstructions` and `showAvatars` at runtime, but neither was in its schema, so the Inspector couldn't show or edit them (this story's dialog tree has instructions nobody could see). Both added (same shapes as AI Conversation / Dialog Tree); types regenerated.
+- **In the story, author's call:** the AI dialog tree's NPC is the free text "Environmental Consultant", not linked to the defined character, so the character's description never reaches the AI; a second character "Perunding Alam Sekitar" (April, Malay) duplicates the consultant — most likely made by the old NPC write-back removed in phase 0; the AI condition has no fallback branch, so a failed call always takes the first category; `project.json` still carries `firstBeatId: "0"` (no such beat; harmless — the start beat comes from Project Settings). Legacy `presentationMode` next to `layoutTemplate` is migrated on load.
+- No other project in the library has Online Content beats with stored answer text.
+
+**Files modified:** `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`
+
 ### Character roles: decisions (design doc renamed)
 - `docs/Character-Parts-Design.md` → `docs/Character-Roles-Design.md`. Hartmut's decisions (2026-10-06): the concept is called **Role** (theatre/games/IDN term; "part" collides with story structure); the existing `Character.role` (player/npc/companion) is relabelled **Kind** in the UI only — stored name unchanged, nothing to migrate; recasting is opt-in per role; a dedicated "Choose your character" beat for phase 2; phase 0 ships first. Open until phase 1: `@` syntax, uncast roles, pronouns, protagonist inventory, analyzer budget.
 

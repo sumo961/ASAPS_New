@@ -4611,6 +4611,12 @@
             "scope": "ve-left"
           }
         },
+        "showAvatars": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Show character avatars beside the lines in the chat layouts (chat-scroll, chat-bubble)"
+        },
         "exitTargets": {
           "type": "array<object>",
           "required": true,
@@ -4651,6 +4657,16 @@
                 "label": "NPC Exit Message Prompt"
               }
             }
+          }
+        },
+        "systemInstructions": {
+          "type": "string",
+          "required": false,
+          "description": "Extra instructions for the AI that writes the dialog tree — what to reference, what to avoid, the tone (e.g. \"Reference the player's earlier choices; inform without preaching\"). Never shown to the player.",
+          "ui": {
+            "control": "textarea",
+            "rows": 3,
+            "label": "System Instructions"
           }
         },
         "choiceDelay": {

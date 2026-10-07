@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-06T13:35:19.920Z
+ * Generated: 2026-10-07T14:55:07.318Z
  */
 
 // ============================================
@@ -1032,8 +1032,12 @@ export interface AiDialogTreeParameters {
   maxChoicesPerTurn?: number | undefined;
   /** How the dialog renders. 'stacked' keeps the NPC text on top with choices below (visual-novel). 'conversation' lays text on one side and choices on the other. 'chat-scroll' is a scrollable chat history. 'chat-bubble' shows one bubble at a time. 'custom' reads slotIntent anchors. Lives in the LEFT-side VE settings panel. */
   layoutTemplate?: string | undefined;
+  /** Show character avatars beside the lines in the chat layouts (chat-scroll, chat-bubble) */
+  showAvatars?: boolean | undefined;
   /** Exit targets for conversation outcomes */
   exitTargets: Object[];
+  /** Extra instructions for the AI that writes the dialog tree — what to reference, what to avoid, the tone (e.g. "Reference the player's earlier choices; inform without preaching"). Never shown to the player. */
+  systemInstructions?: string | undefined;
   /** Delay before showing choices */
   choiceDelay?: number | undefined;
   /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
