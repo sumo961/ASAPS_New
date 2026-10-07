@@ -1,9 +1,15 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.109, 2026-10-06)
+## 2026-10-07: AI failures you can see, and NPCs that come from their character (v0.9.110)
 
 ### Overview
-The Preview no longer hangs on "Connecting to builder…" after a restart, and starting it from a beat asks for the player's typed answers instead of running on placeholders. Character roles (recastable cast) are decided and phase 0 is built: an AI conversation's NPC field "NPC Personality" becomes **"In this scene"** — who the NPC is comes from the linked character, the beat says how they behave here — and the copy of the character's description that the Inspector used to put there is gone.
+A release about AI beats that went wrong quietly. When the AI provider rejects the API key, the Preview now says so instead of letting every AI beat fall back in silence; an Online Content beat whose call fails shows its error message instead of an old answer stored in its text boxes (the "Santa Cruz" text in Environmental Choices 4); an AI dialog tree's System Instructions and Show avatars are finally editable; and a translation no longer turns an NPC that is a defined character into a plain name. The Preview no longer hangs on "Connecting to builder…" on its first launch after a restart, and starting it from a beat asks for the answers the player would have typed instead of running on placeholders. First step of character roles: an AI conversation's "NPC Personality" becomes "In this scene" — who the NPC is comes from the linked character, the beat says how they behave here — and the Character Editor's "Role" is now "Kind".
+
+### Release checklist (v0.9.110)
+- Played end to end in the dev Preview: Environmental Choices 4 from the beginning (Maria / Woman / Teacher / Barranquilla → global-south branch → "Getting Around Barranquilla") and from "Transport Dialog" with the new values dialog (→ Barranquilla; Hartmut's own run → Bogotá).
+- Changed surfaces are Preview chrome (values dialog, key notice — measured inside the window after moving the notice out of the scaled stage) and core beat logic (Online Content boxes, AI identity block); no renderer layout change, so no device sweep. The exporter change is limited to the embedded translation extractor.
+- Suites: core 2835, builder 2835; CI must be green before tagging. The updater did not change.
+- GitHub returned "Internal Server Error" on every push for this release (also for an empty test commit to a new branch; status page green) — retried until it went through.
 
 ### Preview: stuck on first launch, and mid-story starts that ran on placeholders
 - **"Connecting to builder…" forever on the first Preview after a restart** (Hartmut, 2026-10-07): the builder waited for the Preview's "ready" ping but also sent the story blind after a 3-second timer. On the first launch after a restart the page compiles slowly, so the timer fired before it listened; the late ping then found no listener. A reload of the Preview hung the same way. `PreviewWindowManager` now answers **every** ready ping (Electron IPC and web PING) with the newest story it has sent (`lastSentData`); the timer is gone (signal, not time). Checked in the dev app after a cold dev-server restart: first open and a page reload both reach the start screen.

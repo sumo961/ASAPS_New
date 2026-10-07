@@ -962,6 +962,9 @@ Fetch real-time data from APIs or AI web searches, then display it. Make stories
 - **Mode** - Direct API call or AI-powered search
 - **Query/URL** - What to fetch
 - **Display Template** - How to show the results
+- **Error Message** - What the player sees if the fetch or AI search fails (default: *"Unable to fetch content."*)
+
+**Fresh every time.** The answer is fetched while the story plays and shown to the player, but it's never saved back into your beat — so the text boxes you laid out in the Visual Editor stay exactly as you authored them. If the call fails (no connection, a rejected API key), the beat shows your **Error Message** in its text box rather than leftover text from an earlier run.
 
 **When to Use:** Current events integration, dynamic content, web-aware narratives.
 
@@ -1170,7 +1173,9 @@ Instead of scripting every possible response, let AI generate a contextually app
 - **Max Turns** - Limit conversation length
 - **Max choices per turn** - Cap on how many replies the player is offered per exchange (1–4), applied after the opening turn. Leave it empty and the model chooses (usually 2–3). This one number decides how long the player waits: a tree grows *exponentially* with branching, so five turns at three choices is a 40-plus-node tree (about two minutes to generate on any model), while two choices halves it. Five turns with a cap of two is the sweet spot for a personal conversation — set **2** on any AI Dialog Tree with four or more turns.
 - **Presentation Mode** - Positioned, chat scroll, or chat bubble
+- **Show Avatars** - Show character portraits beside the lines in the chat layouts (chat scroll and chat bubble). On by default
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
+- **System Instructions** - Extra guidance for the AI that writes the tree: what to reference, what to avoid, the tone (*"Reference the player's earlier choices; inform without preaching"*). The player never sees it. (Generated stories could set this before v0.9.110, but the Inspector didn't show it — open such a beat now and you can read and edit what's there.)
 
 **Which model answers?** In-story AI beats use the **Model for in-story AI** from AI settings when you've set one, and your main model otherwise — see [Which Model for Which Job?](#which-model-for-which-job). The generated tree streams in as it is written, and every call logs its round-trip time to the browser console (`[PreviewWindow]` while previewing) so you can see what a change to the cap or the model actually buys.
 
@@ -2748,7 +2753,13 @@ When a path includes **inputText** beats (where the interactor types input), ASA
 
 This ensures variables like `playerName` or `playerGender` have realistic values when testing later parts of your story.
 
+**Only one way in? You'll still be asked (v0.9.110).** When exactly one path leads to the beat you're starting from, there's nothing to choose, so ASAPS picks that start state for you. If that path includes typed input, pressing Start — the amber **Start Preview** button, a click on the stage, or **Space** — first opens the **Enter Input Values** dialog. Your answers from last time are already filled in, so most runs are just a press of **Continue**, and the story starts right away. Prefer the placeholders? **Use Placeholders** keeps them. (Earlier versions skipped the dialog here and quietly ran on placeholders such as *PlayerLocation*, which could send AI beats down the wrong branch.)
+
 **Seeded beats in the debug panel.** A path preset injects the simulated path into the story's visited-beat history — that's what makes "has the player been to the crypt?" conditions behave as if the run really started at the beginning. To keep the record honest, the debug panel's **Visited Beats** list marks those injected beats with an amber **seeded** badge (and a *"seeded by start state"* count in the heading): they count as visited for conditions, but the player never actually saw them in this run. Beats you walk through after the mid-story start appear without the badge.
+
+### When the AI Provider Rejects Your Key
+
+If your AI provider turns the API key down (expired, revoked, or simply mistyped), every AI beat quietly falls back: an error message, a default branch, a fallback exit. The story keeps going, but it isn't the story you wrote. So the Preview Window tells you: a red notice appears in its top-left corner, for example *"OpenAI rejected the API key — AI beats can't run."*, with the provider's own message underneath. Fix the key in AI settings (see [Setting Up AI](#setting-up-ai)), then restart the preview. **Dismiss** hides the notice.
 
 ### Session Timeline
 
@@ -3811,6 +3822,8 @@ Create localized versions of your story with AI-assisted translation:
 
 **Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, and an AI Conversation's scripted opening line. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
 
+**Linked characters stay linked (v0.9.110).** When an AI Dialog Tree's **NPC Character** is a defined character, it isn't offered for translation: it's a link, not text, and translating it would turn it into a plain name (and cut the character's description off from the AI). The character's name is translated once, through its [display-name translations](#character-name-translations). A free-text NPC name is still translated like any other text.
+
 **VCS-Aware:** Translations persist through git operations (push, pull, merge) and are saved in the directory project format.
 
 ## The Tools Menu
@@ -3885,7 +3898,7 @@ Quick reference for all beat types.
 | AI Info Text | Dynamic narrative text | prompt, fallbackText, buttonText, includeVariables, includeInventory, includeHistory, maxSentences |
 | AI Duration Screen | Dynamic timed text | prompt, fallbackText, wordsPerMinute, minDuration, maxDuration, context options |
 | AI Condition | AI branching | prompt, categories, fallback |
-| AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, maxChoicesPerTurn (1–4), presentationMode, prefetch support |
+| AI Dialog Tree | AI pre-generated conversation | scenario, npcName, npcPersonality, exitTargets (with npcExitMessage), maxTurns, maxChoicesPerTurn (1–4), presentationMode, showAvatars, systemInstructions, prefetch support |
 | AI Conversation | Real-time AI conversation | presentation (chat / dialog — set in the Visual Editor's Conversation Settings), scenario, npcName, npcPersonality, directions (trigger + action), maxTurns, fallbackExitTarget, enableVoiceInput, openingLine |
 | AI Summary | Journey recap | style, length, include options, show restart + **Restart at** (beat picker; required while Restart is shown), reset options, credits; *Continue to* link only for a mid-story checkpoint |
 
