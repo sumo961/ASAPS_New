@@ -91,6 +91,7 @@ const ToolsMissingCard: React.FC = () => {
           <a style={linkStyle} onClick={() => open(hints.gitDownloadUrl)}>Git</a>
           {' · '}
           <a style={linkStyle} onClick={() => open(hints.ghDownloadUrl)}>GitHub CLI</a>
+          {hints.downloadNote && <div style={{ marginTop: 6 }}>{hints.downloadNote}</div>}
         </div>
       </div>
       <div style={{ marginTop: 16 }}>

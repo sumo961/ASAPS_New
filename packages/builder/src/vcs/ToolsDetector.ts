@@ -98,6 +98,8 @@ export function getInstallHints(): {
   bothCommand: string;
   gitDownloadUrl: string;
   ghDownloadUrl: string;
+  /** Shown next to the download links (e.g. which file to take). */
+  downloadNote?: string;
 } {
   const platform = (window as unknown as { electronAPI?: { platform?: string } }).electronAPI?.platform;
   if (platform === 'darwin') {
@@ -117,7 +119,12 @@ export function getInstallHints(): {
       ghCommand: 'winget install --id GitHub.cli -e',
       bothCommand: 'winget install --id Git.Git -e ; winget install --id GitHub.cli -e',
       gitDownloadUrl: 'https://git-scm.com/download/win',
-      ghDownloadUrl: 'https://github.com/cli/cli/releases/latest',
+      // The GitHub CLI home page, whose Windows download is the .msi
+      // installer. The releases page listed ~30 files and users took the
+      // .zip: a loose gh.exe in Downloads that neither Windows nor ASAPS
+      // can find. The installer puts it in Program Files and on PATH.
+      ghDownloadUrl: 'https://cli.github.com/',
+      downloadNote: 'For the GitHub CLI, take the Windows installer (.msi), not the .zip — ASAPS cannot find a gh.exe unpacked from a zip.',
     };
   }
   // Linux fallback — Debian/Ubuntu instructions cover the common case

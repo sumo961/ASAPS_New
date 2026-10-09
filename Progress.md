@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.110, 2026-10-07)
+
+### Overview
+The GitHub setup on Windows points to the GitHub CLI installer instead of a page of thirty downloads.
+
+### GitHub CLI still "not found" on Windows (user feedback)
+- Users reported that ASAPS still didn't find the GitHub CLI after installing it, and that installing it with the Windows installer fixed it. The setup panel's "GitHub CLI" link opened GitHub's releases page (~30 files); taking the `.zip` leaves a loose `gh.exe` in whatever folder it was unpacked to, which no install-location search or PATH re-read can find. On Windows the link now opens cli.github.com, whose Windows download is the `.msi` installer, and the panel says to take the installer, not the zip (`downloadNote` in `ToolsDetector.ts`). User Guide's GitHub setup paragraph says the same.
+
+**Files modified:** `packages/builder/src/vcs/ToolsDetector.ts`, `packages/builder/src/components/vcs/VCSOnboardingPanel.tsx`, `docs/USER_GUIDE.md`
+
+---
+
 ## 2026-10-07: AI failures you can see, and NPCs that come from their character (v0.9.110)
 
 ### Overview

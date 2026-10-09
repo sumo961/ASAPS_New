@@ -3618,7 +3618,7 @@ If `git` or `gh` is missing, you'll see a panel listing the status of each (✓ 
 | **Windows** | `winget install --id Git.Git -e ; winget install --id GitHub.cli -e` |
 | **Linux** | `sudo apt install git gh` |
 
-Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. After installing, click **Re-check** in ASAPS to refresh the detection — no need to restart the app. On Windows, ASAPS also looks in the places these tools usually land (the Program Files and per-user install folders, plus winget, Scoop and Chocolatey) and re-reads the system PATH when a tool isn't found, so something you installed while ASAPS was open shows up on the next Re-check.
+Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. **On Windows, take the GitHub CLI's installer (the `.msi` file)**, not the `.zip`: a `gh.exe` unpacked from a zip sits in whatever folder you put it, where neither Windows nor ASAPS can find it. After installing, click **Re-check** in ASAPS to refresh the detection — no need to restart the app. On Windows, ASAPS also looks in the places these tools usually land (the Program Files and per-user install folders, plus winget, Scoop and Chocolatey) and re-reads the system PATH when a tool isn't found, so something you installed while ASAPS was open shows up on the next Re-check.
 
 ### Step 2: Sign in to GitHub
 
