@@ -22,16 +22,24 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.110** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.110 makes AI failures visible**:
-when your AI provider rejects the API key, the Preview tells you instead of
-letting every AI beat quietly fall back; an Online Content beat whose search
-fails shows its error message instead of stale text; and an AI dialog
-tree's System Instructions can finally be edited. Starting the Preview from
-a beat now asks for the answers the player would have typed, and the
-Preview no longer hangs on its first launch. For AI conversations, the old
-"NPC Personality" field is now **In this scene**: who the NPC is comes from
-the character you link, the beat says how they behave in this scene.
+Current release: **v0.9.111** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.111 lets one choice stand
+apart**: in a responsive project, any choice of a Multi Choice beat can be
+pinned to a corner of the screen on its own (a "Leave" option top-right
+while the answers stay under the question), and pinned buttons now make
+room for the text instead of covering it on phones. On Windows, the GitHub
+setup's link for the GitHub CLI now leads to its installer, which fixes
+"GitHub CLI not found" for people who had downloaded the zip.
+
+**v0.9.110 made AI failures visible**: when your AI provider rejects the
+API key, the Preview tells you instead of letting every AI beat quietly
+fall back; an Online Content beat whose search fails shows its error
+message instead of stale text; and an AI dialog tree's System Instructions
+can finally be edited. Starting the Preview from a beat now asks for the
+answers the player would have typed, and the Preview no longer hangs on
+its first launch. For AI conversations, the old "NPC Personality" field is
+now **In this scene**: who the NPC is comes from the character you link,
+the beat says how they behave in this scene.
 
 **v0.9.109 fixed Random Target beats**:
 since v0.9.103, **Add Branch** did nothing — new branches now appear and

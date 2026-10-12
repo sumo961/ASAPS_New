@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.110, 2026-10-07)
+## 2026-10-12: One choice can stand apart, and the GitHub CLI installer on Windows (v0.9.111)
 
 ### Overview
-The GitHub setup on Windows points to the GitHub CLI installer instead of a page of thirty downloads. In responsive projects a Multi Choice choice can be pinned on its own, apart from the other choices, and pinned buttons no longer cover the question.
+A small release. In responsive projects any choice of a Multi Choice beat can be pinned to a corner on its own, apart from the other choices, and pinned buttons (choices, Continue, Restart, Credits) now make room for the question instead of covering it on narrow screens. On Windows the GitHub setup points to the GitHub CLI installer instead of GitHub's page of thirty downloads, which was why some users kept seeing "GitHub CLI not found".
 
 ### GitHub CLI still "not found" on Windows (user feedback)
 - Users reported that ASAPS still didn't find the GitHub CLI after installing it, and that installing it with the Windows installer fixed it. The setup panel's "GitHub CLI" link opened GitHub's releases page (~30 files); taking the `.zip` leaves a loose `gh.exe` in whatever folder it was unpacked to, which no install-location search or PATH re-read can find. On Windows the link now opens cli.github.com, whose Windows download is the `.msi` installer, and the panel says to take the installer, not the zip (`downloadNote` in `ToolsDetector.ts`). User Guide's GitHub setup paragraph says the same.

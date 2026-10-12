@@ -547,7 +547,7 @@ Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's que
 - **Choice Delay (seconds)** - Hold the buttons back for a moment so the question gets read first
 - **Revisit behaviour** - the same *Block and dim visited choices* / *Effects fire only on first pick* pair as Dialog Tree — see [What happens on a second visit?](#revisit-policy)
 
-In a responsive project the Visual Editor's left panel offers a **Layout Template** — *Stacked (prompt + buttons)*, *Conversation (side-by-side)*, *Chat - Single Bubble*, or *Custom (drag-place)*. Like Dialog Tree, a Conversation layout falls back to stacked on phone-width stages.
+In a responsive project the Visual Editor's left panel offers a **Layout Template** — *Stacked (prompt + buttons)*, *Conversation (side-by-side)*, *Chat - Single Bubble*, or *Custom (drag-place)*. Like Dialog Tree, a Conversation layout falls back to stacked on phone-width stages. To set one choice apart (say, a *Leave* button in a corner), pin it from the Elements tab; see [Per-button pins](#per-button-pins-action-slot).
 
 **When to Use:** Quick decisions, quiz questions, "which way?" moments that don't need a conversation.
 
@@ -2028,7 +2028,7 @@ The slot system covers most of the visible beat catalogue: Title Screen, Info Te
 The Visual Editor adapts to the active mode:
 
 - **Mode-consistent options panel (v0.9.72).** The Visual Editor's properties panel now shows only the controls that belong to your project's mode. In a **Static (fixed canvas)** project you get the baked elements list — every element with pixel positions, z-order, lock, and visibility controls — and the slot-intent rows ("On stage (from slots)" with per-slot anchors/pins) are gone, since they only affect the responsive renderer. In a **Responsive** project you get the slot controls and viewport preview. After switching modes via the migrator, the editor immediately reflects the new mode.
-- **Add Character / Add Prop / Add Text** buttons (in the Elements panel on the right) are **only available in Fixed canvas mode**. In Responsive mode these would create dead pixel positions the responsive renderer ignores, so they're hidden. **Add Hotspot** stays available everywhere because hotspots are normalized 0–1 overlays on the spatial image rect — fundamentally responsive.
+- **Character / Prop / Text** buttons sit at the top of the **Elements** tab (left of the stage) in both Fixed canvas and Responsive projects. **Hotspot** joins them on Movement Choice, Pick Prop, and 360 Panorama beats, and **Meter** appears once one of your characters has a counter with a level meter turned on.
 - **Background fit** (Visual Editor left sidebar, just under the background-image picker) lets you toggle *Contain* (show the whole image) vs *Cover* (fill the stage, crop edges) per beat in spatial mode. Defaults to *Contain*. This moved out of the Inspector in v0.9.59 to sit closer to where authors are looking.
 - **Path-keyframe animations** (the absolute-mode animation editor) keep working on beats with baked pixel positions even in responsive projects, but the Animations panel shows a small amber **"Legacy path animation"** banner reminding you that slot-anchored elements use a different animation editor.
 - **Speaker label preview** — when a slot-mode dialog beat has a speaker assigned, the VE preview now shows the speaker label exactly where the runtime would render it, matching `resolveSpeakerForSlot`.
@@ -2052,9 +2052,13 @@ In responsive mode you can lift a single button out of the shared button row and
 
 This works for the fixed buttons (*Continue*, *Restart*, *Credits*) and for each choice of a **Multi Choice** beat, so one choice can sit apart from the others: a *Leave* option in the top-right corner while the real answers stay under the question. Clicking a button on the stage selects its row too.
 
-Once a button is pinned, a **Gap** slider sets its distance from the stage edge. Several buttons pinned to the same spot stack in one column instead of covering each other. The question and the remaining buttons make room for pinned ones on every device: beside them on a wide screen, below or above them on a phone. Switch the device presets above the stage to check. Like the button row, pinned choices appear only once the player has read the question.
+![The Elements tab's Action slot group for a Multi Choice beat: one row per choice, the expanded row pinned bottom-right with its Gap slider, and the stage showing the pinned choices around the question](images/80-action-slot-pinned-choice.png)
+
+Once a button is pinned, a **Gap** slider sets its distance from the stage edge. Several buttons pinned to the same spot (with the same gap) stack in one column instead of covering each other. The question and the remaining buttons make room for pinned ones on every device: beside them on a wide screen, below or above them on a phone. Switch the device presets above the stage to check. Like the button row, pinned choices appear only once the player has read the question.
 
 Pin sparingly: a choice that is different in kind (an exit, a map, a "not now") reads well apart; answers to the question belong together in the row.
+
+Below the button rows, the group's **Action layout** box places the shared row itself: **Where** (*Stage bottom* or *Below body*), **Align**, **Gap**, and the buttons' font, size and rotation. It leaves pinned buttons where you put them.
 
 ## Setting the Scene
 
@@ -3622,7 +3626,7 @@ If `git` or `gh` is missing, you'll see a panel listing the status of each (✓ 
 | **Windows** | `winget install --id Git.Git -e ; winget install --id GitHub.cli -e` |
 | **Linux** | `sudo apt install git gh` |
 
-Each command has a **Copy** button so you can paste straight into a terminal. There are also direct links to the official installers if you'd rather download them by hand. **On Windows, take the GitHub CLI's installer (the `.msi` file)**, not the `.zip`: a `gh.exe` unpacked from a zip sits in whatever folder you put it, where neither Windows nor ASAPS can find it. After installing, click **Re-check** in ASAPS to refresh the detection — no need to restart the app. On Windows, ASAPS also looks in the places these tools usually land (the Program Files and per-user install folders, plus winget, Scoop and Chocolatey) and re-reads the system PATH when a tool isn't found, so something you installed while ASAPS was open shows up on the next Re-check.
+Each command has a **Copy** button so you can paste straight into a terminal. Below them, **Git** and **GitHub CLI** links open the official download pages if you'd rather install by hand. **On Windows, take the GitHub CLI's installer (the `.msi` file)**, not the `.zip` (the panel reminds you of this under the links): a `gh.exe` unpacked from a zip sits in whatever folder you put it, where neither Windows nor ASAPS can find it. After installing, click **Re-check** in ASAPS to refresh the detection — no need to restart the app. On Windows, ASAPS also looks in the places these tools usually land (the Program Files and per-user install folders, plus winget, Scoop and Chocolatey) and re-reads the system PATH when a tool isn't found, so something you installed while ASAPS was open shows up on the next Re-check.
 
 ### Step 2: Sign in to GitHub
 
@@ -3865,7 +3869,7 @@ Quick reference for all beat types.
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
 | Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
-| Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
+| Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template and per-choice pins (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
