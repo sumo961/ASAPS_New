@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-07T14:55:07.318Z
+ * Generated: 2026-10-12T18:48:28.741Z
  */
 
 // ============================================
@@ -264,6 +264,8 @@ export interface MultiChoiceParameters {
   markVisited?: boolean | undefined;
   /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
   effectsOncePerChoice?: boolean | undefined;
+  /** Soft responsive layout intent (responsive projects only). Optional per-choice pinning: slotIntent.actions.buttonAnchors maps a choice id to a stage anchor ({h:'left'|'center'|'right', v:'top'|'bottom', relativeTo:'stage', gap}) and lifts that ONE choice out of the shared button row — e.g. a 'Leave' choice in the top-right corner while the real answers stay under the question. Choices pinned to the same spot stack in one column; the question and row step around pinned choices on every device. Unpinned choices stay in the row. Visual-Editor managed (Elements → Action slot → choice → Pin); NEVER serialized as baked locations[]. */
+  slotIntent?: Object | undefined;
   /** How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel. */
   layoutTemplate?: string | undefined;
   /** Who speaks the prompt (for TTS voice routing and optional display) */

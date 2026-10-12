@@ -3,12 +3,21 @@
 ## Unreleased (since v0.9.110, 2026-10-07)
 
 ### Overview
-The GitHub setup on Windows points to the GitHub CLI installer instead of a page of thirty downloads.
+The GitHub setup on Windows points to the GitHub CLI installer instead of a page of thirty downloads. In responsive projects a Multi Choice choice can be pinned on its own, apart from the other choices, and pinned buttons no longer cover the question.
 
 ### GitHub CLI still "not found" on Windows (user feedback)
 - Users reported that ASAPS still didn't find the GitHub CLI after installing it, and that installing it with the Windows installer fixed it. The setup panel's "GitHub CLI" link opened GitHub's releases page (~30 files); taking the `.zip` leaves a loose `gh.exe` in whatever folder it was unpacked to, which no install-location search or PATH re-read can find. On Windows the link now opens cli.github.com, whose Windows download is the `.msi` installer, and the panel says to take the installer, not the zip (`downloadNote` in `ToolsDetector.ts`). User Guide's GitHub setup paragraph says the same.
 
 **Files modified:** `packages/builder/src/vcs/ToolsDetector.ts`, `packages/builder/src/components/vcs/VCSOnboardingPanel.tsx`, `docs/USER_GUIDE.md`
+
+### Pin a single choice (responsive Multi Choice)
+- Hartmut asked whether one choice could go somewhere other than the rest (button 1 in one place, button 2 in another). The runtime already honoured per-button pins (`slotIntent.actions.buttonAnchors`) for choice buttons by choice id; only the editor never listed choices. The Elements panel's **Action slot** group now has a row per choice (keyed by choice id, so stage clicks select it) with the same **Pin** presets as Continue/Restart/Credits.
+- **Pinned buttons covered the question on narrow stages** (true for pinned Restart/Credits before this too): a pin is absolutely placed while the flow ignored it. Pinned groups are now measured and join the HUD reserve, so the column steps beside them on a wide stage and below/above them on a phone, by the same rules as corner HUDs. Buttons pinned to the same spot share one column instead of stacking on top of each other; a pin with an explicit offset keeps its own box. Pinned groups are laid out (hidden) before the read-gate fires, so the flow makes room from the first paint and they appear with the row. Pinned choices now dim and block when visited, like row choices.
+- Schema: `multiChoice` declares `slotIntent` with the per-choice pin (generators and the Co-Designer's schema reference learn it); the generation prompt's per-button anchor paragraph covers choice ids, with "sparingly — for a choice different in kind". User Guide's "Per-button pins" section rewritten (it still described the old toolbar).
+- Checked in the dev app on a scratch responsive project ("QA — pinned choices"): two choices pinned top-right + one bottom-left, short and long (scrolling) question, Stacked and Conversation templates — geometry sweep at Phone 390 / Tablet 768 / Authored 1024 / Desktop 1440 in portrait and landscape: no overlap between pins and the question or row, nothing outside the stage. Preview Window: pins hidden while the long question is read, shown at the end, "Leave quietly" (pinned) goes to its target. Five renderer tests (`SlotFlowViewPinnedChoices.test.tsx`). Suites: core 2835, renderer 663, builder 2835, desktop 24, player 7.
+- Not covered yet: dialogTree choices (the runtime keys them `node path + choice id`, the editor by the bare id — needs one key both agree on), movementChoice/pickProp without hotspots (the editor previews them on the spatial path while the runtime uses the slot path), anchoring a choice next to another element (`relativeTo: 'element'`). In Conversation layout with every choice pinned, the empty choices column still keeps its width. A pin and a corner HUD in the same corner can still overlap.
+
+**Files modified:** `packages/renderer/src/components/SlotFlowView.tsx`, `packages/renderer/tests/components/SlotFlowViewPinnedChoices.test.tsx`, `packages/builder/src/components/visual/VisualPropertiesPanel.tsx`, `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`, `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `packages/builder/public/player-web.js`, `docs/USER_GUIDE.md`
 
 ---
 

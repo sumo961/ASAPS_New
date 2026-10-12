@@ -1971,7 +1971,13 @@ position for the action slot). NEVER serialize this as
 aiSummary, \`slotIntent.actions.buttonAnchors\` lifts a single named
 button out of the shared row to its own stage corner — useful for
 designs like "Credits in the corner, Restart centered". Keys:
-\`continueButton\`, \`restartButton\`, \`creditsButton\`.
+\`continueButton\`, \`restartButton\`, \`creditsButton\`. On multiChoice the
+keys are CHOICE IDS: pin one choice apart from the others, e.g. a "Leave"
+option in the top-right corner while the real answers stay under the
+question —
+\`"slotIntent": { "actions": { "buttonAnchors": { "choice_leave": { "h": "right", "v": "top", "relativeTo": "stage", "gap": 16 } } } }\`.
+Use it sparingly, for a choice that is different in kind (an exit, a
+map, a "not now"); answers to the question belong in the row.
 
 **Hotspot portrait override (optional)**. A hotspot can carry
 \`portrait: { x, y, width, height }\` when the scene's portrait crop

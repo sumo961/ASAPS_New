@@ -882,8 +882,36 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     return h <= 480 && w / h >= 1.4;
   }, [measuredH, measuredW, previewHeight, previewWidth]);
 
+  /**
+   * Pinned buttons (slotIntent[action].buttonAnchors) sit on the stage like a
+   * corner HUD does, so the flow steps around them by the same rules —
+   * beside them where the stage is wide enough, below/above them where it is
+   * not. Without this a choice pinned top-right covered the question on a
+   * phone. Measured in stage pixels (unscaled, so the editor's fit-to-pane
+   * preview reads the same numbers as the player). The groups' geometry does
+   * not depend on the reserve (they are placed against the root's padding
+   * box), so measuring after each render cannot oscillate.
+   */
+  const [pinnedRects, setPinnedRects] = React.useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
+  React.useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const rootRect = root.getBoundingClientRect();
+    const scale = root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1;
+    const next = [...root.querySelectorAll<HTMLElement>('[data-slotflow-pinned]')].map(el => {
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round((r.left - rootRect.left) / (scale || 1)),
+        y: Math.round((r.top - rootRect.top) / (scale || 1)),
+        width: Math.round(r.width / (scale || 1)),
+        height: Math.round(r.height / (scale || 1)),
+      };
+    });
+    setPinnedRects(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
+  });
+
   const hudReserve = React.useMemo(() => {
-    const rects = reservedHudRects || [];
+    const rects = [...(reservedHudRects || []), ...pinnedRects];
     if (rects.length === 0) return { top: 0, bottom: 0, left: 0, right: 0 };
     // Measure the stage we are actually inside. `previewHeight` is only
     // supplied at some of the renderer's SlotFlowView call sites, and falling
@@ -954,7 +982,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
       left: Math.round(Math.min(left, sideCeiling)),
       right: Math.round(Math.min(right, sideCeiling)),
     };
-  }, [reservedHudRects, previewHeight, previewWidth, measuredH, measuredW]);
+  }, [reservedHudRects, pinnedRects, previewHeight, previewWidth, measuredH, measuredW]);
 
   /**
    * Conversation needs genuine side-by-side room. Below ~640px of usable
@@ -2132,6 +2160,79 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const anchoredButtons = buttonCatalog.filter(
           b => b.show && buttonAnchors?.[b.id]
         );
+        // Pinned buttons. Buttons pinned to the same spot share one
+        // absolutely-placed column (authored order, top to bottom) instead
+        // of being drawn on top of each other — with choice beats several
+        // choices pinned to one corner is the common case. A button with an
+        // explicit offset keeps its own box. Laid out (hidden) before the
+        // read-gate fires too, so the flow can make room for them from the
+        // first paint instead of jumping when they arrive.
+        const renderPinned = (hidden: boolean) => {
+          const groups: Array<{ key: string; anchor: SlotAnchor; buttons: typeof anchoredButtons }> = [];
+          for (const b of anchoredButtons) {
+            const anchor = buttonAnchors![b.id];
+            const solo = !!(anchor.offset?.x || anchor.offset?.y);
+            const key = solo
+              ? `solo:${b.id}`
+              : `${anchor.v ?? 'bottom'}|${anchor.h ?? 'center'}|${anchor.gap ?? 16}`;
+            const g = groups.find(x => x.key === key);
+            if (g) g.buttons.push(b);
+            else groups.push({ key, anchor, buttons: [b] });
+          }
+          const actionSlotName = actionSlot?.name;
+          return groups.map(g => {
+            const inset = typeof g.anchor.gap === 'number' ? g.anchor.gap : 16;
+            return (
+              <div
+                key={`anchored-${g.key}`}
+                data-slotflow-pinned={g.key}
+                aria-hidden={hidden || undefined}
+                style={{
+                  ...(hidden ? { visibility: 'hidden' as const, pointerEvents: 'none' as const } : null),
+                  position: 'absolute',
+                  ...anchoredButtonPlacement(g.anchor),
+                  zIndex: 4,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  alignItems: g.anchor.h === 'left' ? 'flex-start' : g.anchor.h === 'right' ? 'flex-end' : 'center',
+                  // Long labels wrap inside the stage instead of
+                  // running off its edge on narrow viewports.
+                  maxWidth: `calc(100% - ${inset * 2}px)`,
+                }}
+              >
+                {g.buttons.map(b => {
+                  const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
+                  const isVisited = !editorMode && markVisited && hasDynamicChoices
+                    && visitedChoiceIds.includes(b.id);
+                  const handleClick = editorMode && onSlotSelect && actionSlotName
+                    ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
+                    : (isVisited ? undefined : b.onClick);
+                  return (
+                    <button
+                      key={`anchored-${b.id}`}
+                      className={`slotflow-btn ${a.className ?? ''}`}
+                      data-slotflow-button={b.id}
+                      disabled={isVisited}
+                      aria-disabled={isVisited || undefined}
+                      onClick={handleClick}
+                      style={{
+                        ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
+                        maxWidth: '100%',
+                        ...a.style,
+                        ...(isVisited ? { opacity: 0.4, cursor: 'default' } : {}),
+                        ...(editorMode ? { cursor: 'pointer' } : null),
+                        ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
+                      }}
+                    >
+                      {b.text}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          });
+        };
         // The action row is hidden in phase 1 (single AND multi-action):
         // the body card occupies the full stage and the player reads
         // first. Once the gate fires (content scrolled to its end, or
@@ -2139,7 +2240,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         // and slides up from the bottom. No "dimmed but visible" state —
         // per the design diagram, choices/Continue simply aren't there
         // until they're earned.
-        if (!gateEarned) return null;
+        if (!gateEarned) return <>{renderPinned(true)}</>;
         return (
           <>
             <div
@@ -2304,32 +2405,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 );
               })}
             </div>
-            {anchoredButtons.map(b => {
-              const anchor = buttonAnchors![b.id];
-              const actionSlotName = actionSlot?.name;
-              const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
-              const handleClick = editorMode && onSlotSelect && actionSlotName
-                ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
-                : b.onClick;
-              return (
-                <button
-                  key={`anchored-${b.id}`}
-                  className={`slotflow-btn ${a.className ?? ''}`}
-                  onClick={handleClick}
-                  style={{
-                    ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
-                    position: 'absolute',
-                    ...anchoredButtonPlacement(anchor),
-                    zIndex: 4,
-                    ...a.style,
-                    ...(editorMode ? { cursor: 'pointer' } : null),
-                    ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
-                  }}
-                >
-                  {b.text}
-                </button>
-              );
-            })}
+            {renderPinned(false)}
           </>
         );
       })()}

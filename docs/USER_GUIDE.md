@@ -2039,7 +2039,7 @@ In Responsive mode the bar above the stage previews the beat at each device widt
 
 ### Per-button pins (action slot)
 
-In responsive mode, the slot-intent toolbar (top of the Visual Editor preview area) has a **Pin** row that lets you lift individual stage buttons out of the shared action row and pin them to any stage corner. One control per visible button — *Continue*, *Restart*, *Credits*. The six preset glyphs are:
+In responsive mode you can lift a single button out of the shared button row and pin it to a corner of the stage. In the Visual Editor's **Elements** panel, open the **Action slot** group and click the button you want; its **Pin** row offers six spots:
 
 | Glyph | Position |
 |-------|----------|
@@ -2050,7 +2050,11 @@ In responsive mode, the slot-intent toolbar (top of the Visual Editor preview ar
 | `⎵` | Bottom-center |
 | `⌟` | Bottom-right |
 
-Once a button is pinned (anything other than *In row*), a per-button **gap** slider appears next to its preset row so you can tune the offset from the stage edge.
+This works for the fixed buttons (*Continue*, *Restart*, *Credits*) and for each choice of a **Multi Choice** beat, so one choice can sit apart from the others: a *Leave* option in the top-right corner while the real answers stay under the question. Clicking a button on the stage selects its row too.
+
+Once a button is pinned, a **Gap** slider sets its distance from the stage edge. Several buttons pinned to the same spot stack in one column instead of covering each other. The question and the remaining buttons make room for pinned ones on every device: beside them on a wide screen, below or above them on a phone. Switch the device presets above the stage to check. Like the button row, pinned choices appear only once the player has read the question.
+
+Pin sparingly: a choice that is different in kind (an exit, a map, a "not now") reads well apart; answers to the question belong together in the row.
 
 ## Setting the Scene
 
@@ -4048,7 +4052,7 @@ Quick reference for all beat types.
 
 **Hotspot Portrait Override** - Optional second rect on a spatial hotspot (v0.9.59+) that the runtime uses when the stage is portrait-oriented. Authored by switching the Visual Editor preview to a portrait viewport preset and dragging the hotspot — drags in portrait mode write to `hotspot.portrait`, drags in landscape write the canonical rect. Falls back to landscape values when no portrait override exists.
 
-**Action Slot Button Pin** - Per-button override (v0.9.59+) that lifts one of the action-slot buttons (*Continue*, *Restart*, *Credits*) out of the shared flex row and pins it to one of five stage corners (or back into the row). Authored from the **Pin** row in the slot-intent toolbar; each pinned button gets its own gap slider.
+**Action Slot Button Pin** - Per-button override that lifts one action-slot button (*Continue*, *Restart*, *Credits*, or a Multi Choice choice) out of the shared row and pins it to one of five stage spots (or back into the row). Authored from the **Pin** row of the button in the Elements panel's **Action slot** group; each pinned button gets its own gap slider.
 
 **asaps:// URI** - The URI scheme ASAPS uses to encode story-level intent in any string-carrying channel — QR codes, AR anchor targets, deep links, postMessage payloads. Grammar: `asaps://beat/<id>`, `asaps://variable/<name>/<value>`, `asaps://inventory/add/<item>`, `asaps://inventory/remove/<item>`, `asaps://event/<name>`. See [The asaps:// URI Scheme](#asaps-uri-scheme).
 

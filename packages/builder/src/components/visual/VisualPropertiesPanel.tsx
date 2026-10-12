@@ -383,6 +383,26 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           slotName: s.name,
         });
       } else if (s.role === 'action') {
+        // Choice beats (multiChoice): one row per authored choice, keyed by
+        // the choice id the runtime routes by, so each button can be pinned
+        // on its own (slotIntent[action].buttonAnchors[choiceId]).
+        const dynamicSource = (s as any).dynamicSource as string | undefined;
+        if (dynamicSource) {
+          for (const c of (Array.isArray(p[dynamicSource]) ? p[dynamicSource] : []) as any[]) {
+            if (!c?.id) continue;
+            const label = (c.text && String(c.text).trim()) || c.id;
+            rows.push({
+              key: `slot:${s.name}:${c.id}`,
+              icon: <Square className="w-4 h-4 text-blue-600" />,
+              label: ellipsize(label, 40),
+              preview: 'Choice button',
+              tooltip: `Choice "${label}" — edit its text in the right inspector under Choices; pin it here to place it apart from the other choices.`,
+              role: 'action',
+              slotName: s.name,
+              buttonId: c.id,
+            });
+          }
+        }
         for (const bid of (s as any).buttons ?? []) {
           // Skip restart/credits if the author chose to hide them on endScreen.
           if (bid === 'restartButton' && p.showRestart === false) continue;
