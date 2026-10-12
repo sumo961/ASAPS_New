@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, waitFor, fireEvent } from '@testing-library/react';
-import { SlotFlowView } from '../../src/components/SlotFlowView';
+import { SlotFlowView, stackPinnedGroups, computeFlowReserve } from '../../src/components/SlotFlowView';
 import { getSlotSpec } from '../../src/utils/slotLayout';
 import { installRendererDomStubs } from '../helpers/installRendererDomStubs';
 
@@ -105,5 +105,58 @@ describe('SlotFlowView — pinned choices', () => {
     } else {
       expect(group.style.visibility).not.toBe('hidden');
     }
+  });
+
+  it('stacks a pin below host chrome in its corner (the exported player\'s Menu button)', async () => {
+    const { container } = mount({
+      previewWidth: 1300,
+      previewHeight: 613,
+      // Menu button, top-right, as WebPlayer reserves it.
+      reservedHudRects: [{ x: 1232, y: 8, width: 60, height: 37 }],
+    });
+    await waitFor(() => expect(pinnedGroups(container)).toHaveLength(1));
+    const top = pinnedGroups(container)[0].style.top;
+    // 8 + 37 + 8 = 53px clear of the stage top, instead of the 16px gap.
+    expect(top).toContain('53px');
+  });
+
+  it('leaves a pin alone when the host chrome is in another corner', async () => {
+    const { container } = mount({
+      previewWidth: 1300,
+      previewHeight: 613,
+      reservedHudRects: [{ x: 8, y: 8, width: 60, height: 37 }],
+    });
+    await waitFor(() => expect(pinnedGroups(container)).toHaveLength(1));
+    expect(pinnedGroups(container)[0].style.top).toContain('16px');
+  });
+
+  it('stacks groups in different corners of one edge when they meet sideways (narrow phone)', () => {
+    // 390px stage: bottom-left 16..208, bottom-right 51..374 — same row.
+    expect(stackPinnedGroups([
+      { key: 'bottom|left|16', edge: 'bottom', base: 16, x: 16, width: 192, height: 44 },
+      { key: 'bottom|right|16', edge: 'bottom', base: 16, x: 51, width: 323, height: 44 },
+      { key: 'top|right|16', edge: 'top', base: 53, x: 232, width: 142, height: 44 },
+    ])).toEqual({ 'bottom|right|16': 52 }); // 16 + 44 + 8 = 68 from the edge
+  });
+
+  it('leaves corners alone when there is room between them', () => {
+    expect(stackPinnedGroups([
+      { key: 'bottom|left|16', edge: 'bottom', base: 16, x: 16, width: 240, height: 44 },
+      { key: 'bottom|right|16', edge: 'bottom', base: 16, x: 896, width: 388, height: 44 },
+    ])).toEqual({});
+  });
+
+  it('steps around one narrow corner box sideways on a wide stage', () => {
+    expect(computeFlowReserve([{ x: 16, y: 708, width: 229, height: 44 }], 1024, 768))
+      .toEqual({ top: 0, bottom: 0, left: 253, right: 0 });
+  });
+
+  it('falls back to bands when left and right indents together would starve the column', () => {
+    // Each box alone could be stepped around (1024 - 245 >= 520); both
+    // together leave 1024 - 253 - 399 < 520, so both become a bottom band.
+    expect(computeFlowReserve([
+      { x: 16, y: 708, width: 229, height: 44 },
+      { x: 633, y: 708, width: 375, height: 44 },
+    ], 1024, 768)).toEqual({ top: 0, bottom: 68, left: 0, right: 0 });
   });
 });

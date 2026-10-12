@@ -893,21 +893,38 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
    * box), so measuring after each render cannot oscillate.
    */
   const [pinnedRects, setPinnedRects] = React.useState<Array<{ x: number; y: number; width: number; height: number }>>([]);
+  /**
+   * Pins in DIFFERENT corners of the same edge can still meet: on a phone a
+   * bottom-left and a bottom-right group are each wider than half the stage.
+   * Groups on one edge whose horizontal spans overlap are stacked away from
+   * the edge in authored order. Computed from widths/heights only (stacking
+   * moves groups vertically, which changes neither), so this settles in one
+   * extra pass.
+   */
+  const [pinStackOffsets, setPinStackOffsets] = React.useState<Record<string, number>>({});
   React.useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const rootRect = root.getBoundingClientRect();
-    const scale = root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1;
-    const next = [...root.querySelectorAll<HTMLElement>('[data-slotflow-pinned]')].map(el => {
+    const scale = (root.offsetWidth > 0 ? rootRect.width / root.offsetWidth : 1) || 1;
+    const els = [...root.querySelectorAll<HTMLElement>('[data-slotflow-pinned]')];
+    const measured = els.map(el => {
       const r = el.getBoundingClientRect();
       return {
-        x: Math.round((r.left - rootRect.left) / (scale || 1)),
-        y: Math.round((r.top - rootRect.top) / (scale || 1)),
-        width: Math.round(r.width / (scale || 1)),
-        height: Math.round(r.height / (scale || 1)),
+        key: el.getAttribute('data-slotflow-pinned') || '',
+        edge: el.getAttribute('data-slotflow-pin-edge') || 'bottom',
+        base: Number(el.getAttribute('data-slotflow-pin-base')) || 0,
+        x: Math.round((r.left - rootRect.left) / scale),
+        y: Math.round((r.top - rootRect.top) / scale),
+        width: Math.round(r.width / scale),
+        height: Math.round(r.height / scale),
       };
     });
+    const next = measured.map(({ x, y, width, height }) => ({ x, y, width, height }));
     setPinnedRects(prev => JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
+
+    const offsets = stackPinnedGroups(measured);
+    setPinStackOffsets(prev => JSON.stringify(prev) === JSON.stringify(offsets) ? prev : offsets);
   });
 
   const hudReserve = React.useMemo(() => {
@@ -919,69 +936,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     // was missing — the device preset is smaller than the window it sits in.
     const viewportH = measuredH || previewHeight
       || (typeof window !== 'undefined' ? window.innerHeight : 768);
-    const mid = viewportH / 2;
     const viewportW = measuredW || previewWidth || 0;
-    let top = 0, bottom = 0, left = 0, right = 0;
-    for (const r of rects) {
-      /*
-       * The reserve is a full-width band, which is right when the content
-       * column spans the stage — it cannot avoid a corner HUD sideways, so it
-       * has to start below it.
-       *
-       * On a short, wide stage that is too blunt. At 740×360 the frame is
-       * 146px of the width and sits in a corner, while the column is centred
-       * with empty margins either side: nothing would have collided, yet the
-       * band pushed every beat down by the frame's full height and cost more
-       * than it saved. A narrow corner HUD on a landscape stage is beside the
-       * content, not above it.
-       */
-      /*
-       * A narrow corner HUD is stepped AROUND rather than under — on ANY
-       * stage that can spare the indent, not just short-wide ones. The
-       * full-width band pushed content below the HUD's whole height while
-       * most of the width sat empty beside it: at 740×360 it shoved a
-       * four-choice beat's question off the top, and on a 1024-wide desktop
-       * stage a 3-meter corner stack pushed the body card ~190px down for
-       * no reason (bake-off Story M, 2026-09-03).
-       *
-       * Three guards keep the band where it is genuinely needed: the HUD
-       * must be narrow relative to the stage, actually cornered (a
-       * top-CENTER timer cannot be dodged sideways), and the remaining
-       * column must stay readable — phone portrait fails that last test
-       * and correctly keeps content below the HUD.
-       */
-      const cornered = viewportW > 0
-        && (r.x + r.width <= viewportW * 0.48 || r.x >= viewportW * 0.52);
-      if (cornered
-        && r.width / viewportW < 0.4
-        && viewportW - (r.width + 16) >= 520) {
-        if (r.x + r.width / 2 < viewportW / 2) left = Math.max(left, r.x + r.width + 8);
-        else right = Math.max(right, (viewportW - r.x) + 8);
-        continue;
-      }
-      if (r.y + r.height <= mid) top = Math.max(top, r.y + r.height + 8);
-      else bottom = Math.max(bottom, (viewportH - r.y) + 8);
-    }
-    /*
-     * Never let the HUDs starve the beat. HUD boxes are a fixed pixel size, so
-     * on a short viewport a stack of them can claim most of the height: two
-     * frames in one corner take 277px, and at 740×360 that left the body with
-     * nothing — measured zero visible text, a screen with no story on it.
-     *
-     * Past this ceiling the content wins and is allowed to run under the
-     * lowest HUD. Text partly behind a meter is readable and scrollable; an
-     * empty screen is not, and the author cannot discover why from looking at
-     * it. The cap is per-edge so a top and a bottom HUD cannot combine to the
-     * same effect.
-     */
-    const ceiling = viewportH * 0.4;
-    const sideCeiling = viewportW * 0.35;
-    return {
-      top: Math.round(Math.min(top, ceiling)),
-      bottom: Math.round(Math.min(bottom, ceiling)),
-      left: Math.round(Math.min(left, sideCeiling)),
-      right: Math.round(Math.min(right, sideCeiling)),
-    };
+    return computeFlowReserve(rects, viewportW, viewportH);
   }, [reservedHudRects, pinnedRects, previewHeight, previewWidth, measuredH, measuredW]);
 
   /**
@@ -2180,17 +2136,59 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             else groups.push({ key, anchor, buttons: [b] });
           }
           const actionSlotName = actionSlot?.name;
+          // Host HUDs and page chrome (the exported player's Menu button, the
+          // language panel) own their corners: a pin in the same corner
+          // stacks below them (top) or above them (bottom), the way HUD
+          // frames stack below the Menu. Only the host's rects — the pins'
+          // own rects feed the flow reserve, not each other.
+          const stageW = measuredW || previewWidth || 0;
+          const stageH = measuredH || previewHeight || 0;
+          const cornerClearance = (anchor: SlotAnchor): number => {
+            if (!stageW || !stageH) return 0;
+            const top = anchor.v === 'top';
+            const h = anchor.h ?? 'center';
+            let need = 0;
+            for (const r of reservedHudRects || []) {
+              const inTopHalf = r.y + r.height / 2 < stageH / 2;
+              if (inTopHalf !== top) continue;
+              const cx = r.x + r.width / 2;
+              const sameSide = h === 'left' ? cx < stageW / 2
+                : h === 'right' ? cx >= stageW / 2
+                : r.x < stageW / 2 && r.x + r.width > stageW / 2;
+              if (!sameSide) continue;
+              need = Math.max(need, top ? r.y + r.height + 8 : (stageH - r.y) + 8);
+            }
+            return need;
+          };
           return groups.map(g => {
             const inset = typeof g.anchor.gap === 'number' ? g.anchor.gap : 16;
+            const clearance = cornerClearance(g.anchor);
+            const edge = g.anchor.v === 'top' ? 'top' : 'bottom';
+            // Distance from the edge before stacking: the gap, or the host
+            // chrome's clearance when that is larger.
+            const base = Math.max(inset, clearance);
+            const shift = base - inset + (pinStackOffsets[g.key] ?? 0);
             return (
               <div
                 key={`anchored-${g.key}`}
                 data-slotflow-pinned={g.key}
+                data-slotflow-pin-edge={edge}
+                data-slotflow-pin-base={base}
                 aria-hidden={hidden || undefined}
                 style={{
                   ...(hidden ? { visibility: 'hidden' as const, pointerEvents: 'none' as const } : null),
                   position: 'absolute',
-                  ...anchoredButtonPlacement(g.anchor),
+                  ...anchoredButtonPlacement(
+                    shift > 0
+                      ? {
+                          ...g.anchor,
+                          offset: {
+                            ...g.anchor.offset,
+                            y: (g.anchor.offset?.y ?? 0) + (edge === 'top' ? shift : -shift),
+                          },
+                        }
+                      : g.anchor,
+                  ),
                   zIndex: 4,
                   display: 'flex',
                   flexDirection: 'column',
@@ -2429,6 +2427,123 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     </div>
   );
 };
+
+/**
+ * The space the flow column keeps clear of reserved boxes (host HUDs, page
+ * chrome, pinned buttons), in stage pixels. Pure, so the rules below can be
+ * tested without a layout engine.
+ */
+export function computeFlowReserve(
+  rects: Array<{ x: number; y: number; width: number; height: number }>,
+  viewportW: number,
+  viewportH: number,
+): { top: number; bottom: number; left: number; right: number } {
+  const mid = viewportH / 2;
+  const reserveFor = (allowSide: boolean) => {
+    let top = 0, bottom = 0, left = 0, right = 0;
+    for (const r of rects) {
+      /*
+       * The reserve is a full-width band, which is right when the content
+       * column spans the stage — it cannot avoid a corner HUD sideways, so it
+       * has to start below it.
+       *
+       * On a short, wide stage that is too blunt. At 740×360 the frame is
+       * 146px of the width and sits in a corner, while the column is centred
+       * with empty margins either side: nothing would have collided, yet the
+       * band pushed every beat down by the frame's full height and cost more
+       * than it saved. A narrow corner HUD on a landscape stage is beside the
+       * content, not above it.
+       */
+      /*
+       * A narrow corner HUD is stepped AROUND rather than under — on ANY
+       * stage that can spare the indent, not just short-wide ones. The
+       * full-width band pushed content below the HUD's whole height while
+       * most of the width sat empty beside it: at 740×360 it shoved a
+       * four-choice beat's question off the top, and on a 1024-wide desktop
+       * stage a 3-meter corner stack pushed the body card ~190px down for
+       * no reason (bake-off Story M, 2026-09-03).
+       *
+       * Three guards keep the band where it is genuinely needed: the HUD
+       * must be narrow relative to the stage, actually cornered (a
+       * top-CENTER timer cannot be dodged sideways), and the remaining
+       * column must stay readable — phone portrait fails that last test
+       * and correctly keeps content below the HUD.
+       */
+      const cornered = viewportW > 0
+        && (r.x + r.width <= viewportW * 0.48 || r.x >= viewportW * 0.52);
+      if (allowSide && cornered
+        && r.width / viewportW < 0.4
+        && viewportW - (r.width + 16) >= 520) {
+        if (r.x + r.width / 2 < viewportW / 2) left = Math.max(left, r.x + r.width + 8);
+        else right = Math.max(right, (viewportW - r.x) + 8);
+        continue;
+      }
+      if (r.y + r.height <= mid) top = Math.max(top, r.y + r.height + 8);
+      else bottom = Math.max(bottom, (viewportH - r.y) + 8);
+    }
+    return { top, bottom, left, right };
+  };
+  /*
+   * Each corner is side-stepped only when the column left beside IT stays
+   * readable, but a left and a right indent together can still starve the
+   * column: pins in a bottom-left and a bottom-right corner at 1024 wide
+   * left 413px, the body card (which does not shrink that far) ran under
+   * the top-right pin. When both indents together leave less than the
+   * readable width, every corner goes back to a band above/below.
+   */
+  let { top, bottom, left, right } = reserveFor(true);
+  if ((left > 0 || right > 0) && viewportW - left - right < 520) {
+    ({ top, bottom, left, right } = reserveFor(false));
+  }
+  /*
+   * Never let the HUDs starve the beat. HUD boxes are a fixed pixel size, so
+   * on a short viewport a stack of them can claim most of the height: two
+   * frames in one corner take 277px, and at 740×360 that left the body with
+   * nothing — measured zero visible text, a screen with no story on it.
+   *
+   * Past this ceiling the content wins and is allowed to run under the
+   * lowest HUD. Text partly behind a meter is readable and scrollable; an
+   * empty screen is not, and the author cannot discover why from looking at
+   * it. The cap is per-edge so a top and a bottom HUD cannot combine to the
+   * same effect.
+   */
+  const ceiling = viewportH * 0.4;
+  const sideCeiling = viewportW * 0.35;
+  return {
+    top: Math.round(Math.min(top, ceiling)),
+    bottom: Math.round(Math.min(bottom, ceiling)),
+    left: Math.round(Math.min(left, sideCeiling)),
+    right: Math.round(Math.min(right, sideCeiling)),
+  };
+}
+
+/**
+ * Stack pinned button groups that share an edge and overlap sideways, in the
+ * given (authored) order. `base` is each group's distance from its edge
+ * before stacking; the result is the extra distance per group key (absent =
+ * stays put). Pure, so the rule is testable without a layout engine.
+ */
+export function stackPinnedGroups(
+  groups: Array<{ key: string; edge: string; base: number; x: number; width: number; height: number }>,
+): Record<string, number> {
+  const offsets: Record<string, number> = {};
+  for (const edge of ['top', 'bottom']) {
+    const placed: Array<{ x0: number; x1: number; d0: number; d1: number }> = [];
+    for (const m of groups.filter(g => g.edge === edge)) {
+      let d = m.base;
+      for (let moved = true; moved;) {
+        moved = false;
+        for (const q of placed) {
+          const sideways = m.x < q.x1 && q.x0 < m.x + m.width;
+          if (sideways && d < q.d1 && q.d0 < d + m.height) { d = q.d1 + 8; moved = true; }
+        }
+      }
+      placed.push({ x0: m.x, x1: m.x + m.width, d0: d, d1: d + m.height });
+      if (d > m.base) offsets[m.key] = d - m.base;
+    }
+  }
+  return offsets;
+}
 
 /**
  * Resolve a SlotAnchor into the `position: absolute` placement for a
