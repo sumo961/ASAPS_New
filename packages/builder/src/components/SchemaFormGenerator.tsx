@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle } from 'lucide-react';
+import { VariableValueInput } from '../editors/VariableValueInput';
 import type { Beat } from '@asaps/core';
 import { describeMoodAxis } from '@asaps/core';
 import type { AvailableCounter, AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
@@ -1345,18 +1346,16 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               </React.Fragment>
             );
           } else {
-            // Show text input for variables
-            // Handle boolean false properly - don't treat it as empty
-            const displayValue = value !== undefined && value !== null ? String(value) : '';
+            // Text for variables; true/false for one declared boolean.
             return (
               <div key={paramName}>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Value
                 </label>
-                <input
-                  type="text"
-                  value={displayValue}
-                  onChange={(e) => onParameterChange(paramName, e.target.value)}
+                <VariableValueInput
+                  variableType={availableVariables.find(v => v.name === parameters.name)?.type}
+                  value={value}
+                  onChange={(v) => onParameterChange(paramName, v)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   placeholder="Variable value"
                 />

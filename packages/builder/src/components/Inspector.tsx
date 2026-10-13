@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES } from '@asaps/core';
+import { VariableValueInput } from '../editors/VariableValueInput';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
@@ -2281,10 +2282,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Value
                             </label>
-                            <input
-                              type="text"
+                            <VariableValueInput
+                              variableType={availableVariables.find(v => v.name === (localBeat.parameters?.variableName || localBeat.parameters?.variable || localBeat.parameters?.left))?.type}
                               value={localBeat.parameters?.value ?? localBeat.parameters?.val ?? ''}
-                              onChange={(e) => handleParameterChange('value', e.target.value)}
+                              onChange={(v) => handleParameterChange('value', v)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                               placeholder="Variable value to check"
                             />
@@ -5526,6 +5527,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             ...availableVariables.map(v => ({
                               name: v.name,
                               displayName: v.description ? `${v.name} (${v.description})` : v.name,
+                              type: v.type,
                             })),
                             ...fromStory,
                           ];

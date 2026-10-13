@@ -21,6 +21,8 @@ interface AvailableOption {
   displayName?: string;
   description?: string;
   characterName?: string;
+  /** Declared type (Project Settings variables) — picks the value control. */
+  type?: 'string' | 'number' | 'boolean';
 }
 
 /** SmartNameDropdown wants a required displayName — derive one. */
@@ -163,7 +165,14 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
                 <div className="flex-1 min-w-0">
                   <SmartNameDropdown
                     value={cond.variableName ?? ''}
-                    onChange={v => update(i, { variableName: v ?? '' })}
+                    onChange={v => {
+                      const picked = gate === 'variable' ? availableVariables.find(o => o.name === v)?.type : undefined;
+                      // The True/False control shows "false" for an empty
+                      // value; store it, so what is shown is what is checked.
+                      update(i, picked === 'boolean' && typeof cond.value !== 'boolean'
+                        ? { variableName: v ?? '', value: String(cond.value) === 'true' }
+                        : { variableName: v ?? '' });
+                    }}
                     options={toDropdownOptions(gate === 'variable' ? availableVariables : availableCounters)}
                     placeholder={gate === 'variable' ? 'variable…' : 'counter…'}
                     newItemLabel={gate === 'variable' ? '+ New variable…' : '+ New counter…'}
@@ -178,15 +187,38 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
                     <option key={op} value={op}>{op}</option>
                   ))}
                 </select>
-                <input
-                  type={gate === 'counter' ? 'number' : 'text'}
-                  value={String(cond.value ?? '')}
-                  onChange={e => update(i, {
-                    value: gate === 'counter' ? Number(e.target.value) : e.target.value,
-                  })}
-                  placeholder="value"
-                  className="w-16 px-1.5 py-1 border border-gray-300 rounded text-xs"
-                />
+                {(() => {
+                  // A variable declared boolean gets True/False and stores a
+                  // real boolean; typed text "false" never equalled the
+                  // variable's boolean default.
+                  const varType = gate === 'variable'
+                    ? availableVariables.find(v => v.name === cond.variableName)?.type
+                    : undefined;
+                  if (varType === 'boolean') {
+                    return (
+                      <select
+                        value={String(cond.value) === 'true' ? 'true' : 'false'}
+                        onChange={e => update(i, { value: e.target.value === 'true' })}
+                        className="px-1 py-1 border border-gray-300 rounded text-xs bg-white"
+                      >
+                        <option value="true">true</option>
+                        <option value="false">false</option>
+                      </select>
+                    );
+                  }
+                  const numeric = gate === 'counter' || varType === 'number';
+                  return (
+                    <input
+                      type={numeric ? 'number' : 'text'}
+                      value={String(cond.value ?? '')}
+                      onChange={e => update(i, {
+                        value: numeric ? Number(e.target.value) : e.target.value,
+                      })}
+                      placeholder="value"
+                      className="w-16 px-1.5 py-1 border border-gray-300 rounded text-xs"
+                    />
+                  );
+                })()}
               </>
             )}
 

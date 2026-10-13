@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.111, 2026-10-13)
 
 ### Overview
-Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended.
+Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended. Boolean and number variables had the same problem with text values. In the flowchart, selecting several beats now carries through to copy, paste and delete.
 
 ### Counter effects add numbers again
 - Cause: the Choice Effects editor kept the old value when an effect's type was switched. A value typed while the effect was **Set variable** (a text field) stayed a string after switching to **Increment counter**, and the engine computed `0 + "2"`. Found in a user's "Birka" story, which had mixed `2` / `"2"` effect values across its five dialog trees.
@@ -15,6 +15,42 @@ Counter effects whose amount was stored as text added like text: two "+2" choice
 - `packages/core/src/engine/StoryContext.ts`
 - `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
 - `packages/core/tests/engine/StoryContextEffects.test.ts`
+
+### True/false variables stay true/false
+- Project Settings stores a boolean variable's default as a real `false`, but the choice-condition value field, the choice effect **Set variable** and the Set Variable beat all wrote what you typed as text. The engine compared strictly, so a boolean variable starting `false` never matched a condition written as "false". After an effect wrote "true", the variable held the text "true".
+- The engine now converts a written value to the variable's declared type: "true"/"false" for boolean variables, "5" for number variables. Text that doesn't fit the type is kept as written. Defaults saved as text are converted when the story starts.
+- Variable conditions compare "false" with false and "5" with 5, for undeclared variables too. The story simulator behind the logic report uses the same rule (it compared with JavaScript's `==`, where `false == "false"` is false).
+- A **true / false** picker for a variable declared boolean, storing a real boolean, appears in:
+  - choice conditions and the **Set variable** effect (number variables also get a number field in conditions);
+  - the **Set Variable** beat;
+  - the **Condition Check** beat;
+  - beat preconditions (**Requirements**).
+- An empty value on a boolean variable reads as false, matching what the picker shows.
+- Preconditions run through the same engine check, so a requirement like "wokeHim = false" now passes at the start of a story. Covered by tests that run a gated beat.
+- The precondition editor no longer turns "5" typed for a text variable into the number 5.
+- The Condition Check beat's **Exists**, **Does Not Exist** and **Contains** operators for variables now work. The engine had no case for the first two, so they were always false. Contains handled only lists, not text.
+
+**Files modified:**
+- `packages/core/src/engine/variableValues.ts` (new), `StoryContext.ts`, `analysis/StateSimulationAnalyzer.ts`
+- `packages/core/tests/engine/VariableValueTypes.test.ts` (new)
+- `packages/core/src/types/index.ts` (operators), `tests/beats/BeatRequiresGate.test.ts`
+- `packages/builder/src/editors/VariableValueInput.tsx` (new), `ChoiceConditionsEditor.tsx`, `ChoiceEffectsEditor.tsx`, `RequirementsEditor.tsx`
+- `packages/builder/src/components/Inspector.tsx` (Condition Check value, requirements variable types), `SchemaFormGenerator.tsx` (Set Variable value)
+- `packages/builder/src/editors/__tests__/booleanVariableControls.test.tsx` (new)
+
+### Flowchart: selecting, copying and deleting several beats
+- **Copy and paste take the whole selection.** ⌘C and the right-click **Copy** used to put only one beat on the clipboard, rebuilt from its type and parameters, so its plain links were lost. Now every selected beat is copied as a snapshot. Paste brings the group back in its arrangement, with the links between the copied beats pointing to the copies, as one Undo step.
+- **Delete, ⌘C and ⌘D work after a selection box.** The flowchart's key handler only heard keys pressed while focus was inside the flowchart. The pane never takes focus, so after Shift-drag the keys went to the page, or to the Inspector field that still had focus. The flowchart now takes focus when you press on it.
+- **Shift-drag works reliably.** React Flow tracked Shift through its own set of pressed keys. A key whose release it never saw (released in a text field or dialog) stayed in that set, and the selection box stopped appearing until the window lost focus. Shift now comes from the mouse and keyboard events themselves.
+- **⌘-click no longer moves the view.** Every click on a beat re-centred and zoomed the flowchart to it, so the next beat you meant to ⌘-click had moved. Clicks in the flowchart no longer re-centre (picking a beat in the Story Beats list still does). ⌘-click now only adds or removes a beat, and the Inspector switches when one beat is left.
+- **Selection and Inspector agree.** Picking a beat elsewhere (Story Beats list, paste, duplicate) replaces an old flowchart selection, so Delete can't remove a group that's still highlighted from before.
+
+**Files modified:**
+- `packages/builder/src/components/graph/GraphEditor.tsx`
+- `packages/builder/src/App.tsx` (copy/paste handlers)
+- `packages/builder/src/utils/duplicateBeats.ts` (`cloneBeatsForPaste`) + tests
+- `packages/builder/src/components/Canvas.tsx`, `WorkspaceView.tsx` (prop type)
+- `docs/USER_GUIDE.md` (keyboard shortcuts)
 
 ---
 

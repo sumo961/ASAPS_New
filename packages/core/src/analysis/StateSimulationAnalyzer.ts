@@ -15,6 +15,7 @@
  */
 
 import type { Story } from '../engine/Story';
+import { alignForComparison } from '../engine/variableValues';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
 import { StoryContext, PLAYTHROUGH_VARIABLE, type SerializedStoryState } from '../engine/StoryContext';
@@ -1509,8 +1510,9 @@ export class StateSimulationAnalyzer {
       case '<=': return numLeft <= numRight;
       case '>':  return numLeft > numRight;
       case '<':  return numLeft < numRight;
-      case '==': return left == right;  
-      case '!=': return left != right;  
+      // Same alignment as the runtime: "false" equals false, "5" equals 5.
+      case '==': { const [l, r] = alignForComparison(left, right); return l == r; }
+      case '!=': { const [l, r] = alignForComparison(left, right); return l != r; }
       default:   return false;
     }
   }

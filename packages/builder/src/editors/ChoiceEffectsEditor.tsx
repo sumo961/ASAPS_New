@@ -99,6 +99,9 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
     characterName: c.characterName,
   }));
 
+  const variableTypeOf = (name: string | undefined) =>
+    availableVariables.find(v => v.name === name)?.type;
+
   const variableOptions: DropdownOption[] = availableVariables.map(v => ({
     name: v.name,
     displayName: v.description ? `${v.name} (${v.description})` : v.name,
@@ -339,7 +342,14 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           ) : (
             <SmartNameDropdown
               value={effect.target || ''}
-              onChange={(val) => updateEffect(index, { target: val || '' })}
+              onChange={(val) => {
+                // Picking a boolean variable stores a real true/false, which
+                // its True/False control then shows.
+                const isBool = effect.type === 'setVariable' && variableTypeOf(val || '') === 'boolean';
+                updateEffect(index, isBool && typeof effect.value !== 'boolean'
+                  ? { target: val || '', value: String(effect.value).trim().toLowerCase() === 'true' }
+                  : { target: val || '' });
+              }}
               options={getTargetOptions(effect.type)}
               placeholder="Name..."
               newItemLabel="+ New..."
@@ -541,6 +551,15 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
                 className="w-14 px-1.5 py-1 text-xs border rounded flex-shrink-0"
                 placeholder="0"
               />
+            ) : effect.type === 'setVariable' && variableTypeOf(effect.target) === 'boolean' ? (
+              <select
+                value={String(effect.value) === 'true' ? 'true' : 'false'}
+                onChange={(e) => updateEffect(index, { value: e.target.value === 'true' })}
+                className="px-1 py-1 text-xs border rounded flex-shrink-0 bg-white"
+              >
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
             ) : (
               <input
                 type="text"

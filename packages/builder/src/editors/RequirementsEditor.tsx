@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import { VariableValueInput, valueForPickedVariable } from './VariableValueInput';
 import { Plus, Trash2, ShieldCheck } from 'lucide-react';
 import type { Beat } from '@asaps/core';
 import type { StateRequirement, Condition } from '@asaps/core';
@@ -21,6 +22,8 @@ interface AvailableOption {
   name: string;
   displayName: string;
   characterName?: string;
+  /** Declared type (Project Settings variables) — picks the value control. */
+  type?: 'string' | 'number' | 'boolean';
 }
 
 interface RequirementsEditorProps {
@@ -393,7 +396,10 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
               <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
                 <SmartNameDropdown
                   value={(cond as any).variableName || ''}
-                  onChange={v => updateCondition(idx, { variableName: v || '' } as any)}
+                  onChange={v => {
+                    const picked = availableVariables.find(o => o.name === v)?.type;
+                    updateCondition(idx, { variableName: v || '', value: valueForPickedVariable(picked, (cond as any).value) } as any);
+                  }}
                   options={availableVariables}
                   placeholder="variable"
                   newItemLabel="+ New variable…"
@@ -408,21 +414,41 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                   <option value="==">=</option>
                   <option value="!=">≠</option>
                 </select>
-                <input
-                  type="text"
-                  value={String((cond as any).value ?? '')}
-                  onChange={e => {
-                    const raw = e.target.value;
-                    // Best-effort type coercion: true/false → boolean, number-ish → number
-                    let coerced: any = raw;
-                    if (raw === 'true') coerced = true;
-                    else if (raw === 'false') coerced = false;
-                    else if (raw !== '' && !isNaN(Number(raw))) coerced = Number(raw);
-                    updateCondition(idx, { value: coerced } as any);
-                  }}
-                  placeholder="value (true/false/number/text)"
-                  className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-                />
+                {(() => {
+                  const varType = availableVariables.find(v => v.name === (cond as any).variableName)?.type;
+                  if (varType === 'boolean') {
+                    return (
+                      <VariableValueInput
+                        variableType="boolean"
+                        value={(cond as any).value}
+                        onChange={v => updateCondition(idx, { value: v } as any)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                    );
+                  }
+                  return (
+                    <input
+                      type="text"
+                      value={String((cond as any).value ?? '')}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        // A text variable keeps what was typed ("5" stays
+                        // "5"); otherwise best-effort: true/false → boolean,
+                        // number-ish → number. The runtime compares "5" and 5
+                        // alike either way.
+                        let coerced: any = raw;
+                        if (varType !== 'string') {
+                          if (raw === 'true') coerced = true;
+                          else if (raw === 'false') coerced = false;
+                          else if (raw !== '' && !isNaN(Number(raw))) coerced = Number(raw);
+                        }
+                        updateCondition(idx, { value: coerced } as any);
+                      }}
+                      placeholder="value (true/false/number/text)"
+                      className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                    />
+                  );
+                })()}
               </div>
             )}
 

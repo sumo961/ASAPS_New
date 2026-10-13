@@ -5,6 +5,7 @@ import { TimerManager } from './TimerManager';
 import { resolveCharacterKey, resolveCharacter } from '../utils/characterRef';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
+import { coerceToDeclaredType, alignForComparison, type DeclaredVariableType } from './variableValues';
 import {
   createSensorService,
   MockSensorService,
@@ -531,6 +532,9 @@ export class StoryContext extends EventEmitter {
   }
 
   setVariable(name: string, value: any): void {
+    // A variable declared boolean/number in Project Settings keeps that type
+    // when an effect or Set Variable beat writes "true" / "5" as text.
+    value = coerceToDeclaredType(value, this.declaredVariableType(name));
     this.state.variables[name] = value;
     this.emit('variableChanged', { name, value });
   }
@@ -2217,6 +2221,9 @@ export class StoryContext extends EventEmitter {
       }
       case 'variable':
         leftValue = this.getVariable(varName);
+        // Condition values are typed as text; compare "false" with a
+        // boolean false (and "5" with 5) as the same value.
+        [leftValue, rightValue] = alignForComparison(leftValue, rightValue);
         break;
       case 'timer':
         leftValue = this.state.timers[varName]?.value || 0;
@@ -2241,7 +2248,15 @@ export class StoryContext extends EventEmitter {
       case '>=': return leftValue >= rightValue;
       case '<=': return leftValue <= rightValue;
       case 'contains':
-        return Array.isArray(leftValue) ? leftValue.includes(rightValue) : false;
+        if (Array.isArray(leftValue)) return leftValue.includes(rightValue);
+        // Text variables (the Condition beat offers Contains for them)
+        return typeof leftValue === 'string' && rightValue !== undefined && rightValue !== null
+          ? leftValue.toLowerCase().includes(String(rightValue).toLowerCase())
+          : false;
+      // Offered by the Condition beat for variables; had no case, so both
+      // always came out false.
+      case 'exists': return leftValue !== undefined && leftValue !== null && leftValue !== '';
+      case 'notExists': return leftValue === undefined || leftValue === null || leftValue === '';
       default: return false;
     }
   }
@@ -2691,13 +2706,17 @@ export class StoryContext extends EventEmitter {
     for (const def of this.storyVariableDefinitions()) {
       if (!def?.name || def.defaultValue === undefined || def.defaultValue === '') continue;
       if (this.state.variables[def.name] !== undefined) continue;
-      this.state.variables[def.name] = def.defaultValue;
+      this.state.variables[def.name] = coerceToDeclaredType(def.defaultValue, def.type);
     }
   }
 
-  private storyVariableDefinitions(): Array<{ name: string; defaultValue?: unknown; keepOnRestart?: boolean }> {
+  private storyVariableDefinitions(): Array<{ name: string; type?: DeclaredVariableType; defaultValue?: unknown; keepOnRestart?: boolean }> {
     const defs = (this.story as any)?.getSettings?.()?.variables;
     return Array.isArray(defs) ? defs : [];
+  }
+
+  private declaredVariableType(name: string): DeclaredVariableType | undefined {
+    return this.storyVariableDefinitions().find(d => d?.name === name)?.type;
   }
 
   /** Which playthrough this is: 1 on the first, +1 on every in-story restart. */

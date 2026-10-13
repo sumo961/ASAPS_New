@@ -193,7 +193,7 @@ export interface Condition {
     //   permissionGranted — branch on whether the player has granted the
     //                       listed sensor permissions
     | 'gpsProximity' | 'indoorProximity' | 'permissionGranted';
-  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not';
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not' | 'exists' | 'notExists';
   // New canonical field names
   variableName?: string;
   value?: any;

@@ -207,4 +207,35 @@ describe('Beat requires-gate', () => {
     // First unmet requirement (Sword) takes precedence over the satisfied 2nd one
     expect(nextBeat).toBe('armory');
   });
+
+  describe('variable requirements compare text and typed values alike', () => {
+    const gatedOn = (value: unknown, operator = '==') => new InfoTextBeat({
+      id: 'bedside',
+      name: 'Bedside',
+      type: 'infoText',
+      text: 'Eymund is still asleep.',
+      connections: [{ targetId: 'proceed' }],
+      requires: [{
+        condition: { type: 'variable', operator, variableName: 'wokeHim', value } as any,
+        explanation: 'Only before he is woken.',
+        fallbackTarget: 'kitchen',
+      }],
+    } as any);
+
+    beforeEach(() => {
+      story.setSettings({ variables: [{ name: 'wokeHim', type: 'boolean', defaultValue: false }] });
+      context = new StoryContext({}, story);
+    });
+
+    it('a boolean default false passes a requirement written as "false"', async () => {
+      expect(await gatedOn('false').execute(context, renderer)).not.toBe('kitchen');
+      expect(renderer.renderText).toHaveBeenCalled();
+    });
+
+    it('after an effect writes "true" the same requirement redirects', async () => {
+      context.applyEffect({ type: 'setVariable', target: 'wokeHim', value: 'true' });
+      expect(await gatedOn('false').execute(context, renderer)).toBe('kitchen');
+      expect(await gatedOn(true).execute(context, renderer)).not.toBe('kitchen');
+    });
+  });
 });
