@@ -260,8 +260,10 @@ function normalizeProposal(raw: any): ChangeProposal | null {
     case 'addChoice': {
       const c = raw.choice;
       if (typeof raw.beatId !== 'string' || !c || typeof c !== 'object') return reject(raw.kind, 'needs beatId and choice');
-      if (typeof c.text !== 'string' || !c.text.trim()) return reject(raw.kind, 'the choice needs text');
-      const choice: Record<string, any> = { text: c.text.trim() };
+      // A continue step is not a player line: it has no text.
+      const isContinue = c.continue === true;
+      if (!isContinue && (typeof c.text !== 'string' || !c.text.trim())) return reject(raw.kind, 'the choice needs text');
+      const choice: Record<string, any> = isContinue ? { text: '', continue: true } : { text: c.text.trim() };
       if (typeof c.id === 'string' && c.id.trim()) choice.id = c.id.trim();
       if (typeof c.target === 'string' && c.target.trim()) choice.target = c.target.trim();
       for (const [field, one] of [['effects', normalizeEffect], ['conditions', normalizeCondition]] as const) {

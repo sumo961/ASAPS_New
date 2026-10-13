@@ -3,7 +3,26 @@
 ## Unreleased (since v0.9.111, 2026-10-13)
 
 ### Overview
-Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended. Boolean and number variables had the same problem with text values. In the flowchart, selecting several beats now carries through to copy, paste and delete.
+Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended. Boolean and number variables had the same problem with text values. In the flowchart, selecting several beats now carries through to copy, paste and delete. A Dialog Tree can now let several characters speak in a row before the player answers.
+
+### Dialog Tree: several characters can speak before the player answers
+- A student asked for "NPC 1 says, NPC 2 says, then the player acts" in one Dialog Tree. Every node already had its own speaker. But the only way from one line to the next was a player choice, so a second character could only answer after a made-up player reply such as "[Continue]".
+- New **continue step**: a dialog choice marked `continue: true` is not a player reply but the next line of the scene. The player sees no choices. After the reading time (plus any speech), or a click on **Continue**, the conversation moves on to that choice's node, usually another character. It works exactly like the NPC auto-exit, but stays inside the tree. Its effects apply. It is not recorded as something the player said. If several continue steps carry conditions, the first one that matches is taken, so the next line can depend on the story state.
+- It is a choice with a nested node, the shape every dialog-tree walker already follows. Link analysis, reachability, both translation extractors, search, character rename, the Co-Designer and the knowledge graph needed no changes.
+- **Editor:** a line without player responses gets **Then another character speaks**, next to **Add Player Response**. The new line is drawn directly below, marked "then, after the reading time", and set to a different character. Only the last line of a chain takes player responses. ✕ removes a line and what follows it. In the Visual Editor, a continue step is not a reply button.
+- **Chat layouts:** neither a continue step nor the Continue button of an NPC auto-exit adds a "Continue" player bubble any more. The button is not spoken by interactor speech either. A new `isContinue` flag on `renderChoices` carries this.
+- **Old `[Continue]` choices:** a lone `[Continue]` choice is read as a continue step. These come from ASML 1.0 imports, old `next` links, and AI repair of node-level targets. The player no longer sees brackets as a reply. A `[Continue]` next to real replies is left alone. ASML 1.0 export writes continue steps back as `[Continue]`.
+- **AI generation learns it:** schema (`dialogChoice.continue` plus the notes on dialogChoice and dialogNode), story generation, dialog generation and the Co-Designer prompt (its `addChoice` accepts a continue step without text). The dialog validator no longer requires text on a continue step, and the Co-Designer digest labels it.
+- Verified in the Preview Window of a responsive project, in the conversation and chat-scroll layouts. Mara speaks, then Jonas follows by himself (or on Continue), then the player's two replies. In chat, both lines appear as bubbles with no player bubble in between.
+
+**Files modified:**
+- `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`
+- `packages/core/src/beats/DialogTreeBeat.ts` (continue step, legacy `[Continue]`, migration whitelist), `AIDialogTreeBeat.ts`, `packages/core/src/types/index.ts` (`isContinue`), `packages/core/src/xml/ASMLGenerator.ts`
+- `packages/renderer/src/renderers/ReactRenderer.tsx` (no chat bubble, no interactor speech for Continue), `packages/builder/public/player-web.js` (rebuilt)
+- `packages/builder/src/editors/DialogTreeEditor.tsx`, `components/visual/VisualWorkspace.tsx`
+- `packages/builder/src/services/prompts/storyGenerationEnhanced.ts`, `dialogGeneration.ts`, `components/ai/codesigner/systemPrompt.ts`, `proposalParsing.ts`, `utils/choiceWiring.ts`, `services/AIValidator.ts`
+- `docs/USER_GUIDE.md` (Dialog Tree: "Several characters before the player answers")
+- Tests: `core/tests/beats/DialogTreeContinueStep.test.ts` (6), `builder/src/editors/__tests__/DialogTreeContinueStep.test.tsx` (2), `utils/__tests__/choiceStructureProposals.test.ts` (+1)
 
 ### Counter effects add numbers again
 - Cause: the Choice Effects editor kept the old value when an effect's type was switched. A value typed while the effect was **Set variable** (a text field) stayed a string after switching to **Increment counter**, and the engine computed `0 + "2"`. Found in a user's "Birka" story, which had mixed `2` / `"2"` effect values across its five dialog trees.

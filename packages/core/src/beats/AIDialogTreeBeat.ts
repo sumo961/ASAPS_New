@@ -900,7 +900,7 @@ Return a JSON object with this structure. The example below is a 3-turn tree —
               // A renderer that rejects or throws on this auxiliary button must
                 // not break the exit — degrade to the pure timer.
                 const continueClick: Promise<string> = Promise.resolve()
-                  .then(() => renderer.renderChoices([{ id: '__ai_npc_exit', text: uiString('continue'), isExit: true }], locations))
+                  .then(() => renderer.renderChoices([{ id: '__ai_npc_exit', text: uiString('continue'), isExit: true, isContinue: true }], locations))
                   .catch(() => new Promise<string>(() => { /* never */ }));
               await Promise.race([advanceTimer, continueClick]);
             }

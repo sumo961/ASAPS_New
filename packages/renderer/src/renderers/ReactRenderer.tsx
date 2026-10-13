@@ -3031,7 +3031,7 @@ export class ReactRenderer extends BaseRenderer {
    * Render the chat dialog view with current messages and optional choices
    * Choices can include an isExit flag to indicate the choice exits to another beat
    */
-  private renderChatDialog(choices: Array<{ id: string; text: string; isExit?: boolean }>): Promise<string> {
+  private renderChatDialog(choices: Array<{ id: string; text: string; isExit?: boolean; isContinue?: boolean }>): Promise<string> {
     return new Promise(resolve => {
       // Get response delay from renderer state (set by DialogTreeBeat)
       const responseDelay = (this.getState('responseDelay') as number) || 0;
@@ -3039,7 +3039,8 @@ export class ReactRenderer extends BaseRenderer {
       this.resolveAction = async (id: string) => {
         // When a choice is selected, add it as a player message
         const selectedChoice = choices.find(c => c.id === id);
-        if (selectedChoice) {
+        // A Continue button moves the scene on; the player said nothing.
+        if (selectedChoice && !selectedChoice.isContinue) {
           // Get player name from state (set by beat from context), default to "You"
           const playerName = (this.getState('playerName') as string) || 'You';
           // Use first name or initial if full name is too long
@@ -3140,17 +3141,18 @@ export class ReactRenderer extends BaseRenderer {
     );
   }
 
-  async renderChoices(choices: { id: string; text: string; isExit?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+  async renderChoices(choices: { id: string; text: string; isExit?: boolean; isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
     this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
     this.backgroundImageUrl = this.getState('backgroundAssetUrl') || this.resolveAssetUrl(backgroundAssetId);
     this.backgroundImageVariants = this.resolveAssetVariants(backgroundAssetId);
 
-    // Store choice text for interactor TTS on click
+    // Store choice text for interactor TTS on click. A Continue button is
+    // not something the player says, so it is not spoken.
     this.choiceTextMap.clear();
     for (const c of choices) {
-      this.choiceTextMap.set(c.id, c.text);
+      if (!c.isContinue) this.choiceTextMap.set(c.id, c.text);
     }
 
     // Get dialog context from prior renderDialog call

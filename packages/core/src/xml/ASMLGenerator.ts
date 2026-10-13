@@ -954,6 +954,13 @@ export class ASMLGenerator {
     if (!choices || choices.length === 0) return choices;
 
     return choices.map(choice => {
+      // ASML 1.0 writes a continue step as the "[Continue]" choice it
+      // imports back as one.
+      if (choice.continue === true) {
+        const { continue: _continue, ...rest } = choice;
+        choice = { ...rest, text: '[Continue]' };
+      }
+
       // First, recursively optimize any nested dialogNode's choices
       if (choice.dialogNode) {
         choice = {

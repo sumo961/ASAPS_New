@@ -54,6 +54,9 @@ interface DialogChoice {
   effects?: Effect[];
   visible?: boolean;
   soundEffect?: string;  // Sound to play when choice is selected
+  /** Not a player reply: the scene moves on to dialogNode (usually another
+   *  character) after the reading time. */
+  continue?: boolean;
 }
 
 // The engine's Condition (the runtime evaluates choice.conditions with
@@ -344,6 +347,31 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     }
   };
 
+  // "Then another character speaks": a continue step to a new node. The new
+  // line goes to a different character than this one when there is one.
+  const addContinueAtPath = (path: string[]) => {
+    const node = getNodeAtPath(dialogTree, path);
+    if (!node) return;
+    const nextSpeaker = characters.find(c => c && c !== node.speaker) ?? '';
+    const updated = updateNodeAtPath(dialogTree, path, {
+      choices: [
+        ...(node.choices || []),
+        {
+          id: `continue_${Date.now()}`,
+          text: '',
+          continue: true,
+          dialogNode: {
+            id: `node_${Date.now()}`,
+            speaker: nextSpeaker,
+            text: '',
+            choices: [],
+          },
+        },
+      ],
+    });
+    onChange(updated);
+  };
+
   // Update choice at path
   const updateChoiceAtPath = (path: string[], choiceIndex: number, updates: Partial<DialogChoice>) => {
     const node = getNodeAtPath(dialogTree, path);
@@ -506,11 +534,18 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
      * pencil. Used by nested NPC responses to delete themselves from the
      * parent player choice without losing their edit affordance. */
     onRemoveSelf?: () => void,
+    /** The next line of a scene (reached through a continue step): drawn
+     *  under the previous line at the same indent, not as a nested reply. */
+    chained: boolean = false,
   ): JSX.Element => {
     const nodeId = path.join('.');
     const isExpanded = expandedNodes.has(nodeId);
     const isNPC = depth % 2 === 0; // Even depths are NPC, odd are player
-    const hasChoices = node.choices && node.choices.length > 0;
+    // A continue step is not a player reply; it is drawn as the next line.
+    const replyChoices = (node.choices || []).filter(c => !c.continue);
+    const continueIndex = (node.choices || []).findIndex(c => c.continue);
+    const continueStep = continueIndex >= 0 ? node.choices[continueIndex] : undefined;
+    const hasChoices = replyChoices.length > 0;
     // For root node or nodes without choices, always show as expanded to display "Add Player Response"
     // For nested nodes (depth > 0), always show content since parent choice was already expanded to get here
     const shouldShowContent = isExpanded || depth > 0 || (!hasChoices && isNPC);
@@ -520,7 +555,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
     const isCanvasFocused = nodeId === canvasFocusedNodeId;
     return (
-      <div key={nodeId} className={`${depth > 0 ? (expanded ? 'ml-8' : 'ml-4') : ''}`}>
+      <div key={nodeId} className={`${depth > 0 && !chained ? (expanded ? 'ml-8' : 'ml-4') : ''}`}>
         {/* Node Header */}
         <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
@@ -592,7 +627,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               {/* Only show choice count for root node where collapse/expand is available */}
               {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">
-                  ({node.choices?.length} choice{node.choices?.length !== 1 ? 's' : ''})
+                  ({replyChoices.length} choice{replyChoices.length !== 1 ? 's' : ''})
                 </span>
               )}
               {/* NPC exit badge */}
@@ -661,7 +696,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             <button
               onClick={onRemoveSelf}
               className="p-1 text-red-500 hover:bg-red-50 rounded"
-              title="Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown."
+              title={chained
+                ? 'Remove this line and everything that follows it. The line above then waits for player responses again.'
+                : 'Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown.'}
             >
               <X className="w-3 h-3" />
             </button>
@@ -670,9 +707,10 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         
         {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
         {/* Hide choices when NPC auto-exit is set (they are unreachable) */}
-        {(shouldShowContent) && !node.target && (
+        {(shouldShowContent) && !node.target && !(continueStep && !hasChoices) && (
           <div className={`${expanded ? 'ml-10 pl-3' : 'ml-6 pl-2'} border-l-2 border-gray-200`}>
             {node.choices && node.choices.map((choice, index) => {
+              if (choice.continue) return null; // drawn below as the next line
               const choiceId = `${nodeId}.choice_${index}`;
               const isChoiceExpanded = expandedChoices.has(choiceId);
               // Use dialogNode for nested dialog (new format)
@@ -976,15 +1014,45 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               );
             })}
             
-            {/* Add choice button for NPC nodes */}
-            {isNPC && (
-              <button
-                onClick={() => addChoiceAtPath(path)}
-                className="mt-2 px-3 py-1 bg-orange-100 text-orange-700 rounded text-sm hover:bg-orange-200 flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" />
-                Add Player Response
-              </button>
+            {/* Add choice button for NPC nodes. A line followed by another
+                character's line takes no player replies. */}
+            {isNPC && !continueStep && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => addChoiceAtPath(path)}
+                  className="px-3 py-1 bg-orange-100 text-orange-700 rounded text-sm hover:bg-orange-200 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add Player Response
+                </button>
+                {!hasChoices && (
+                  <button
+                    onClick={() => addContinueAtPath(path)}
+                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 flex items-center gap-1"
+                    title="Another character speaks next, before the player answers. The story moves on to that line after the reading time."
+                  >
+                    <Users className="w-3 h-3" />
+                    Then another character speaks
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* The next line of the scene, reached without a player reply. */}
+        {isNPC && !node.target && continueStep?.dialogNode && (
+          <div>
+            <div className="flex items-center gap-1.5 ml-3 my-1 text-xs text-gray-500">
+              <ChevronDown className="w-3 h-3" />
+              <span>then, after the reading time</span>
+            </div>
+            {renderDialogNode(
+              continueStep.dialogNode,
+              [...path, `choice_${continueIndex}`],
+              depth + 2,
+              () => removeChoiceAtPath(path, continueIndex),
+              true,
             )}
           </div>
         )}

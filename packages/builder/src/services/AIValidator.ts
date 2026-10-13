@@ -552,7 +552,8 @@ export class AIValidator {
                 severity: 'error'
               });
             }
-            if (!choice.text) {
+            // A continue step is not a player line and has no text.
+            if (!choice.text && choice.continue !== true) {
               errors.push({
                 path: `${path}.choices[${i}].text`,
                 message: 'Choice must have text',

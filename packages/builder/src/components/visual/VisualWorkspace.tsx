@@ -174,7 +174,7 @@ function buildPhaseTree(dialogTree: DialogNode | undefined): PhaseTreeNode | nul
       choiceText: choiceText ? (choiceText.length > 20 ? choiceText.substring(0, 20) + '...' : choiceText) : undefined,
       children: (node.choices || [])
         .filter(c => c.dialogNode)
-        .map((c, idx) => traverse(c.dialogNode!, depth + 1, `${pathId}_choice${idx}`, c.text)),
+        .map((c, idx) => traverse(c.dialogNode!, depth + 1, `${pathId}_choice${idx}`, (c as any).continue ? '(next line)' : c.text)),
     };
   }
 
@@ -2215,7 +2215,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         id: phase.id || 'root',
         speaker: phase.speaker || '',
         text: phase.text || '',
-        choices: (phase.choices || []).map((c, idx) => ({
+        // A continue step is not a reply button (the player shows Continue).
+        choices: (phase.choices || []).filter(c => !(c as any).continue).map((c, idx) => ({
           id: c.id || `choice_${idx}`,
           text: c.text || '',
         })),

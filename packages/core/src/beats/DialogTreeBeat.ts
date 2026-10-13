@@ -54,6 +54,20 @@ export function isChatLayoutTemplate(template: DialogTreeLayoutTemplate): boolea
   return template === 'chat-scroll' || template === 'chat-bubble';
 }
 
+/** The placeholder older imports wrote for "the scene goes on". */
+function isLegacyContinueChoice(choice: DialogChoice): boolean {
+  return !choice.continue && (choice.id === 'auto_continue' || choice.text?.trim() === '[Continue]');
+}
+
+/**
+ * The continue step a node moves on through, if it has one: the first
+ * visible choice marked `continue`. Such a node shows the next speaker's
+ * line instead of player replies.
+ */
+export function continueStepOf(visibleChoices: DialogChoice[]): DialogChoice | undefined {
+  return visibleChoices.find(c => c.continue === true);
+}
+
 export class DialogTreeBeat extends Beat {
   public dialogTree: DialogNode;
   public speaker: string;
@@ -196,6 +210,9 @@ export class DialogTreeBeat extends Beat {
         // edits silently revert.
         if (choice.hotspot) (migratedChoice as any).hotspot = choice.hotspot;
 
+        // The next line of the scene, not a player reply (see isContinueStep).
+        if (choice.continue === true) migratedChoice.continue = true;
+
         // Old format: target was either string (beat ID) or object (nested DialogNode)
         // New format: target is string only, dialogNode is nested node
         if (typeof choice.target === 'string') {
@@ -231,6 +248,13 @@ export class DialogTreeBeat extends Beat {
           dialogNode: this.migrateDialogTree(node.next)
         });
       }
+    }
+
+    // A lone "[Continue]" choice (ASML 1.0 imports, old `next` above) was a
+    // stand-in for "the scene goes on": the player saw the brackets as a
+    // reply. It is a continue step.
+    if (migrated.choices.length === 1 && isLegacyContinueChoice(migrated.choices[0])) {
+      migrated.choices[0] = { ...migrated.choices[0], text: '', continue: true };
     }
 
     // Migrate flat counter fields → canonical effects on all choices
@@ -545,7 +569,8 @@ export class DialogTreeBeat extends Beat {
           id: phaseId,
           speaker: this.currentNode.speaker || '',
           text: this.currentNode.text || '',
-          choices: (this.currentNode.choices || []).map((c, idx) => ({
+          // A continue step is not a reply button.
+          choices: (this.currentNode.choices || []).filter(c => !c.continue).map((c, idx) => ({
             id: c.id || `choice_${idx}`,
             text: c.text || '',
           })),
@@ -611,10 +636,13 @@ export class DialogTreeBeat extends Beat {
       // Chat-style templates (chat-bubble / chat-scroll) own their
       // render path via ChatDialogView, so they never become spatial.
       // Everything else (conversation / stacked / custom) is eligible.
+      // A node that moves on through a continue step renders like an NPC
+      // exit node (line + Continue button), so it is not spatial either.
       const nodeWillBeSpatial =
         !isChatLayoutTemplate(this.layoutTemplate)
         && this.locations.size === 0
-        && earlyVisibleChoices.length > 0;
+        && earlyVisibleChoices.length > 0
+        && !continueStepOf(earlyVisibleChoices);
       renderer.setState('dialogNodeIsSpatial', nodeWillBeSpatial);
 
       // Render the NPC/system dialog
@@ -643,7 +671,7 @@ export class DialogTreeBeat extends Beat {
         // A renderer that rejects or throws on this auxiliary button must
           // not break the exit — degrade to the pure timer.
           const continueClick: Promise<string> = Promise.resolve()
-            .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit`, text: uiString('continue'), isExit: true }], locations))
+            .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
             .catch(() => new Promise<string>(() => { /* never */ }));
         await Promise.race([advanceTimer, continueClick]);
 
@@ -655,6 +683,43 @@ export class DialogTreeBeat extends Beat {
         console.log(`[DialogTreeBeat] NPC exit node → ${this.currentNode.target}`);
         exitTargetBeatId = this.currentNode.target;
         this.currentNode = null;
+        continue;
+      }
+
+      // Continue step: the scene goes on to the next line (usually another
+      // character) without a player reply. Same skippable wait as an NPC
+      // exit; the player is not recorded as having said anything.
+      const continueStep = continueStepOf(earlyVisibleChoices);
+      if (continueStep) {
+        const advanceTimer3 = (async () => {
+          await waitForTTS(renderer);
+          await waitForReadingTime(renderer, processedText);
+          return '__timer__';
+        })();
+        const continueClick3: Promise<string> = Promise.resolve()
+          .then(() => renderer.renderChoices([{ id: `${nodePath}___continue`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
+          .catch(() => new Promise<string>(() => { /* never */ }));
+        await Promise.race([advanceTimer3, continueClick3]);
+
+        const alreadyTaken = this.effectsOncePerChoice
+          && context.getVisitedChoicesForBeat(this.id).includes(`${nodePath}_${continueStep.id}`);
+        if (continueStep.effects && !alreadyTaken) {
+          continueStep.effects.forEach(effect => context.applyEffect(effect));
+        }
+        context.markChoiceVisited(this.id, `${nodePath}_${continueStep.id}`);
+
+        if (continueStep.target === '__self__') {
+          this.currentNode = this.dialogTree;
+          nodePath = 'root';
+        } else if (continueStep.target) {
+          exitTargetBeatId = continueStep.target;
+          this.currentNode = null;
+        } else if (continueStep.dialogNode) {
+          nodePath = `${nodePath}.${continueStep.id}`;
+          this.currentNode = continueStep.dialogNode;
+        } else {
+          break;
+        }
         continue;
       }
 
@@ -678,7 +743,7 @@ export class DialogTreeBeat extends Beat {
             // A renderer that rejects or throws on this auxiliary button must
               // not break the exit — degrade to the pure timer.
               const continueClick2: Promise<string> = Promise.resolve()
-                .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit_f`, text: uiString('continue'), isExit: true }], locations))
+                .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit_f`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
                 .catch(() => new Promise<string>(() => { /* never */ }));
             await Promise.race([advanceTimer2, continueClick2]);
             if (this.currentNode.target === '__self__') {

@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-12T18:48:28.741Z
+ * Generated: 2026-10-13T16:05:33.422Z
  */
 
 // ============================================
@@ -42,6 +42,7 @@ export interface DialogChoice {
   counterValue?: number;
   soundEffect?: string;
   hotspot?: SpatialHotspot;
+  continue?: boolean;
 }
 
 /**
@@ -1214,7 +1215,7 @@ export interface AiConversationParameters {
   directions?: Object[] | undefined;
   /** Maximum conversation turns before fallback exit */
   maxTurns?: number | undefined;
-  /** Beat to go to when max turns are reached — the bare beat id as a string (e.g. "beat_12"), not a { target } object */
+  /** Beat to go to when max turns are reached — the bare beat id as a string (e.g. "beat_12"), not a { target } object. Also used if the AI is not set up or fails, so a story can always leave the conversation. */
   fallbackExitTarget?: Connection | undefined;
   /** Instruction for the NPC's closing line when Max Turns is reached (e.g. "apologise that time is up and suggest meeting again next week"). The NPC says it before the story moves to the fallback exit, so the conversation ends instead of stopping mid-exchange. Empty = no closing line. Direction exits have their own actionExitMessage. */
   fallbackExitMessage?: string | undefined;

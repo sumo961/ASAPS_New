@@ -67,7 +67,10 @@ function walkDialog(node: Json | undefined, depth: number, out: WiringSite[]): v
   out.push(site('dialogNode', node, depth));
   for (const c of Array.isArray(node.choices) ? node.choices : []) {
     if (!c || typeof c !== 'object' || c.id === undefined) continue;
-    out.push(site('dialogChoice', c, depth));
+    const s = site('dialogChoice', c, depth);
+    // A continue step has no text: say what it is.
+    if (c.continue === true) s.label = '(continue: next line, no player reply)';
+    out.push(s);
     walkDialog(c.dialogNode, depth + 1, out);
   }
 }

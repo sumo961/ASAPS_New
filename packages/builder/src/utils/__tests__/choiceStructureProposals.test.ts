@@ -71,6 +71,16 @@ describe('addChoice', () => {
   });
 });
 
+describe('addChoice continue step', () => {
+  it('accepts a continue step without text and keeps the flag', () => {
+    const out = extractProposalsFromReply(reply([
+      { kind: 'addChoice', beatId: 'b1', parentId: 'n1', choice: { continue: true, dialogNode: { id: 'n2', speaker: 'Jonas', text: 'Me too.', choices: [{ id: 'z', text: 'Go', target: 'b9' }] } } },
+    ]));
+    expect(out.problems ?? []).toEqual([]);
+    expect((out.proposalSet!.proposals[0] as any).choice).toMatchObject({ continue: true, text: '' });
+  });
+});
+
 describe('replaceBeat', () => {
   it('parses a whole tree, fills missing ids and validates its wiring', () => {
     const ok = extractProposalsFromReply(reply([{ kind: 'replaceBeat', beatId: 'b1', parameters: { dialogTree: { text: 'Hi', choices: [{ text: 'A', target: 'b8' }] } } }]));

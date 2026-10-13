@@ -1,0 +1,131 @@
+/**
+ * Continue steps: several characters speak in a row before the player
+ * answers (NPC 1 → NPC 2 → player choices), without a fake player reply.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { DialogTreeBeat } from '../../src/beats/DialogTreeBeat';
+import { StoryContext } from '../../src/engine/StoryContext';
+import type { IRenderer } from '../../src/types';
+
+function mockRenderer(clicks: string[]) {
+  const dialogs: string[] = [];
+  const choiceCalls: any[][] = [];
+  const renderer = {
+    initialize: vi.fn(), clear: vi.fn(), playSound: vi.fn(), stopSound: vi.fn(),
+    setState: vi.fn(), getState: vi.fn().mockReturnValue(null),
+    renderDialog: vi.fn().mockImplementation(async (speaker: string, text: string) => { dialogs.push(`${speaker}: ${text}`); }),
+    renderChoices: vi.fn().mockImplementation(async (choices: any[]) => {
+      choiceCalls.push(choices);
+      const id = clicks.shift();
+      if (!id) return new Promise<string>(() => { /* nobody clicks */ });
+      return id;
+    }),
+  } as unknown as IRenderer;
+  return { renderer, dialogs, choiceCalls };
+}
+
+const scene = (extra: Record<string, unknown> = {}) => new DialogTreeBeat({
+  id: 'scene', name: 'Scene', type: 'dialogTree',
+  dialogTree: {
+    id: 'n0', speaker: 'Mara', text: "We can't stay here.",
+    choices: [{
+      id: 'c_next', text: '', continue: true,
+      effects: [{ type: 'setVariable', target: 'heardJonas', value: true }],
+      dialogNode: {
+        id: 'n1', speaker: 'Jonas', text: 'And go where?',
+        choices: [
+          { id: 'c1', text: 'We take the ferry.', target: 'beat_ferry' },
+          { id: 'c2', text: 'We wait.', target: 'beat_wait' },
+        ],
+      },
+    }],
+  },
+  ...extra,
+} as any);
+
+describe('DialogTree continue step', () => {
+  it('plays the next speaker without a player reply, then offers the choices', async () => {
+    const context = new StoryContext();
+    // Nobody clicks Continue: the reading time moves the scene on.
+    const { renderer, dialogs, choiceCalls } = mockRenderer([]);
+    (renderer.renderChoices as any).mockImplementationOnce(async (choices: any[]) => {
+      choiceCalls.push(choices);
+      return new Promise<string>(() => {});
+    }).mockImplementationOnce(async (choices: any[]) => {
+      choiceCalls.push(choices);
+      return 'root.c_next_c1';
+    });
+
+    const result = await scene().execute(context, renderer);
+
+    expect(dialogs).toEqual(["Mara: We can't stay here.", 'Jonas: And go where?']);
+    // First: a Continue button that is not a player line; then the replies.
+    expect(choiceCalls[0]).toHaveLength(1);
+    expect(choiceCalls[0][0]).toMatchObject({ text: 'Continue', isContinue: true });
+    expect(choiceCalls[1].map((c: any) => c.text)).toEqual(['We take the ferry.', 'We wait.']);
+    expect(result).toBe('beat_ferry');
+    expect(context.getVariable('heardJonas')).toBe(true);
+    // The player said nothing at the continue step: only the reply is recorded.
+    expect(context.getChoiceHistory().map(c => c.choiceText)).toEqual(['We take the ferry.']);
+  });
+
+  it('a click on Continue moves on at once', async () => {
+    const context = new StoryContext();
+    const { renderer, dialogs } = mockRenderer(['root___continue', 'root.c_next_c2']);
+    const result = await scene().execute(context, renderer);
+    expect(dialogs).toHaveLength(2);
+    expect(result).toBe('beat_wait');
+  });
+
+  it('takes the first continue step whose conditions match', async () => {
+    const beat = new DialogTreeBeat({
+      id: 'cond', name: 'Cond', type: 'dialogTree',
+      dialogTree: {
+        id: 'n0', speaker: 'Mara', text: 'Well?',
+        choices: [
+          { id: 'k1', text: '', continue: true, conditions: [{ type: 'variable', variable: 'angry', operator: '==', value: true }],
+            dialogNode: { id: 'a', speaker: 'Jonas', text: 'Leave me alone.', choices: [], target: 'beat_a' } },
+          { id: 'k2', text: '', continue: true,
+            dialogNode: { id: 'b', speaker: 'Jonas', text: 'Fine by me.', choices: [], target: 'beat_b' } },
+        ],
+      },
+    } as any);
+    const { renderer, dialogs } = mockRenderer([]);
+    expect(await beat.execute(new StoryContext(), renderer)).toBe('beat_b');
+    expect(dialogs[1]).toBe('Jonas: Fine by me.');
+  });
+
+  it('keeps the continue flag through a parameter update', () => {
+    const beat = scene();
+    beat.updateParameters({ ...beat.getParameters() });
+    const choice = (beat.getParameters() as any).dialogTree.choices[0];
+    expect(choice.continue).toBe(true);
+  });
+
+  it('reads a lone legacy "[Continue]" choice as a continue step', () => {
+    const beat = new DialogTreeBeat({
+      id: 'legacy', name: 'Legacy', type: 'dialogTree',
+      dialogTree: {
+        id: 'n0', speaker: 'Mara', text: 'Listen.',
+        choices: [{ id: 'auto_continue', text: '[Continue]', dialogNode: { id: 'n1', speaker: 'Jonas', text: 'I am.', choices: [] } }],
+      },
+    } as any);
+    const choice = (beat.getParameters() as any).dialogTree.choices[0];
+    expect(choice).toMatchObject({ continue: true, text: '' });
+  });
+
+  it('leaves a "[Continue]" choice next to real replies alone', () => {
+    const beat = new DialogTreeBeat({
+      id: 'mixed', name: 'Mixed', type: 'dialogTree',
+      dialogTree: {
+        id: 'n0', speaker: 'Mara', text: 'Listen.',
+        choices: [
+          { id: 'a', text: '[Continue]', target: 'beat_x' },
+          { id: 'b', text: 'No.', target: 'beat_y' },
+        ],
+      },
+    } as any);
+    const choices = (beat.getParameters() as any).dialogTree.choices;
+    expect(choices[0].continue).toBeUndefined();
+  });
+});
