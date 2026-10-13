@@ -1198,8 +1198,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 </option>
               ))}
             </select>
-            {paramDef.description && (
-              <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+            {(paramDef.ui?.help || paramDef.description) && (
+              <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
             )}
           </div>
         );

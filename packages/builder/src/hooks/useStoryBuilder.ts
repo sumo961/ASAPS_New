@@ -17,6 +17,7 @@ import {
 import type { DialogNode } from '@asaps/core';
 import { applyTreeLayoutToBeats } from '../utils/TreeLayoutAlgorithm';
 import { grownClusterBounds } from '../utils/clusterAutosize';
+import { soleLinkParameter } from '../utils/beatTypeReference';
 import {
   importAsmlAssets,
   linkAssetsToBeats,
@@ -337,6 +338,20 @@ export function useStoryBuilder() {
       const targetBeat = prev.beats.find(b => b.id === targetBeatId);
 
       if (!sourceBeat || !targetBeat) return prev;
+
+      // A beat whose schema keeps its exit in a parameter (aiConversation's
+      // fallbackExitTarget) gets the target there: a plain link would be
+      // invisible in the Inspector and only used when that field is empty.
+      const linkParam = soleLinkParameter(sourceBeat.type);
+      if (linkParam) {
+        const params = sourceBeat.getParameters() as Record<string, unknown>;
+        if (params[linkParam]) {
+          console.warn(`[connectBeats] ${sourceBeatId} already exits to ${String(params[linkParam])} via ${linkParam}; not adding a hidden link to ${targetBeatId}`);
+          return prev;
+        }
+        sourceBeat.updateParameters({ ...params, [linkParam]: targetBeatId });
+        return { ...prev, beats: [...prev.beats] };
+      }
 
       // Check if connection already exists (same target and label)
       const existingConnection = sourceBeat.getConnections().find(

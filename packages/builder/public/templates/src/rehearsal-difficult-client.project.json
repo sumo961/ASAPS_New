@@ -109,19 +109,31 @@
           "name": "The Session",
           "type": "aiConversation",
           "locations": [],
-          "connections": [
-            {
-              "targetId": "beat_debrief",
-              "label": "Session over"
-            }
-          ],
+          "connections": [],
           "x": 560,
           "y": 220,
           "parameters": {
             "scenario": "A scheduled appointment at a municipal social services office. The caseworker (the player) must address two missed payments on Karin's rent support plan, understand what happened, keep the working relationship intact, and agree on one concrete next step. Karin needs the support to keep her flat but finds the situation humiliating.",
             "npcName": "karin",
             "npcPersonality": "",
-            "maxTurns": 12
+            "maxTurns": 12,
+            "directions": [
+              {
+                "id": "dir_session_closed",
+                "trigger": {
+                  "type": "custom",
+                  "description": "The caseworker clearly brings the appointment to a close: says goodbye, ends the session, or confirms the agreed next step and wraps up."
+                },
+                "action": {
+                  "type": "exit",
+                  "exitTarget": "beat_debrief",
+                  "exitMessage": "Answer the caseworker's closing words in one or two sentences, in character and in the frame of mind you arrived in today."
+                },
+                "once": true
+              }
+            ],
+            "fallbackExitTarget": "beat_debrief",
+            "fallbackExitMessage": "Time is up: the next client is waiting. Close the appointment in one or two sentences, in character and in your current frame of mind, and say whether or when you will come back."
           }
         },
         {

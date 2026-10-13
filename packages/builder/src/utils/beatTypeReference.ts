@@ -74,6 +74,19 @@ export function beatConnectionType(beatType: string | undefined): string | undef
   return beatType ? BEAT_TYPES[beatType]?.connectionType : undefined;
 }
 
+/**
+ * The parameter that holds a beat type's link when the schema gives it no
+ * `connection` parameter but exactly one connection-typed one (today:
+ * aiConversation → fallbackExitTarget). A plain link added to such a beat is
+ * shown nowhere in the Inspector, so links meant for it go here instead.
+ */
+export function soleLinkParameter(beatType: string | undefined): string | undefined {
+  const params = beatType ? BEAT_TYPES[beatType]?.parameters : undefined;
+  if (!params || params.connection) return undefined;
+  const names = Object.entries(params).filter(([, v]: [string, any]) => v?.type === 'connection').map(([k]) => k);
+  return names.length === 1 ? names[0] : undefined;
+}
+
 /** Resolve an author- or model-typed name ("conversation", "AI Conversation") to a schema id. */
 export function resolveBeatType(name: string): string | null {
   if (BEAT_TYPES[name]) return name;

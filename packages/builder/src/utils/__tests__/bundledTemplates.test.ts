@@ -105,6 +105,18 @@ describe('rehearsal template content', () => {
     expect(charIds.has(conv.parameters.npcName)).toBe(true);
   });
 
+  it('the AI conversation has a visible way out: an exit direction and a max-turns fallback', () => {
+    // A plain link alone left the Inspector showing no exit and no fallback.
+    const conv = story.beats.find((b: any) => b.type === 'aiConversation');
+    const exits = (conv.parameters.directions ?? []).filter((d: any) => d.action?.type === 'exit');
+    expect(exits.length).toBeGreaterThan(0);
+    for (const d of exits) expect(d.action.exitTarget).toBe('beat_debrief');
+    expect(conv.parameters.fallbackExitTarget).toBe('beat_debrief');
+    expect(conv.parameters.fallbackExitMessage).toBeTruthy();
+    // No hidden plain link next to them: the Inspector cannot show one.
+    expect(conv.connections ?? []).toHaveLength(0);
+  });
+
   it('the client has 4 disposition variants on random policy, each complete', () => {
     const karin = story.characters[0];
     expect(karin.variantSelectionPolicy).toBe('random');

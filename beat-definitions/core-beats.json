@@ -5807,7 +5807,10 @@
         "fallbackExitTarget": {
           "type": "connection",
           "required": false,
-          "description": "Beat to go to when max turns are reached — the bare beat id as a string (e.g. \"beat_12\"), not a { target } object"
+          "description": "Beat to go to when max turns are reached — the bare beat id as a string (e.g. \"beat_12\"), not a { target } object. Also used if the AI is not set up or fails, so a story can always leave the conversation.",
+          "ui": {
+            "help": "Where the story goes when Max Turns runs out, or when no AI is available. Directions with an Exit action can leave earlier."
+          }
         },
         "fallbackExitMessage": {
           "type": "string",

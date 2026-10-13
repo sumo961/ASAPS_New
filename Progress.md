@@ -38,6 +38,24 @@ Counter effects whose amount was stored as text added like text: two "+2" choice
 - `packages/builder/src/components/Inspector.tsx` (Condition Check value, requirements variable types), `SchemaFormGenerator.tsx` (Set Variable value)
 - `packages/builder/src/editors/__tests__/booleanVariableControls.test.tsx` (new)
 
+### Rehearsal template: the conversation has a visible way out
+- "Rehearsal: The Difficult Client" reached its Debrief only through a plain link the Inspector does not show. The AI Conversation's **Fallback Exit Target** read "None" and there was no exit direction, so authors adapting the template saw no defined way out. The session could also only end by running out of its 12 turns.
+- The conversation now has:
+  - an exit direction: when the caseworker clearly closes the appointment, Karin answers in character and the story goes to the Debrief;
+  - a fallback to the Debrief after 12 turns, with a closing line ("the next client is waiting").
+- The hidden plain link is gone. It had been written into the template by hand, and the runtime used it only because the Fallback Exit Target was empty.
+- A new template test guards all three.
+- **No new hidden links.** Linking from an AI Conversation, through the Co-Designer's "add beat after" or the Inspector's beat suggestions, used to add a plain link that the Inspector cannot show. It now fills the Fallback Exit Target when that is empty. An exit that is already set is kept. The rule comes from the schema: a beat type with no `connection` parameter and exactly one link parameter keeps its link there. It is the same rule AI generation already followed.
+- **Fallback Exit Target explains itself to authors.** Its help text used to be the note written for the AI ("the bare beat id as a string…"). It now reads: "Where the story goes when Max Turns runs out, or when no AI is available. Directions with an Exit action can leave earlier." The schema gained `ui.help` for this. The description stays for AI generation, which now also learns that the fallback applies when the AI is missing or fails.
+
+**Files modified:**
+- `packages/builder/public/templates/src/rehearsal-difficult-client.project.json`, `rehearsal-difficult-client.asapst` (repacked)
+- `packages/builder/src/utils/__tests__/bundledTemplates.test.ts`
+- `beat-definitions/core-beats.json` (`fallbackExitTarget` `ui.help` and description)
+- `packages/builder/src/components/SchemaFormGenerator.tsx` (link pickers show `ui.help`)
+- `packages/builder/src/utils/beatTypeReference.ts` (`soleLinkParameter`), `packages/builder/src/hooks/useStoryBuilder.ts` (`connectBeats`)
+- Tests: `hooks/__tests__/useStoryBuilder.test.ts`, `utils/__tests__/soleLinkParameter.test.ts`
+
 ### Flowchart: selecting, copying and deleting several beats
 - **Copy and paste take the whole selection.** ⌘C and the right-click **Copy** used to put only one beat on the clipboard, rebuilt from its type and parameters, so its plain links were lost. Now every selected beat is copied as a snapshot. Paste brings the group back in its arrangement, with the links between the copied beats pointing to the copies, as one Undo step.
 - **Delete, ⌘C and ⌘D work after a selection box.** The flowchart's key handler only heard keys pressed while focus was inside the flowchart. The pane never takes focus, so after Shift-drag the keys went to the page, or to the Inspector field that still had focus. The flowchart now takes focus when you press on it.

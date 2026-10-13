@@ -152,6 +152,20 @@ describe('connections', () => {
     expect(result.current.state.connections).toEqual([]);
   });
 
+  it('an AI conversation gets the link as its Fallback Exit Target, not a hidden plain link', () => {
+    const { result } = withTwoBeats();
+    act(() => { result.current.actions.addBeat('aiConversation', undefined, { id: 'talk' }); });
+    act(() => result.current.actions.connectBeats('talk', 'a'));
+    const talk: any = result.current.state.beats.find((x: any) => x.id === 'talk');
+    expect(talk.getParameters().fallbackExitTarget).toBe('a');
+    expect(talk.connections ?? []).toHaveLength(0);
+
+    // An exit that is already set is kept; no second, unused link appears.
+    act(() => result.current.actions.connectBeats('talk', 'b'));
+    expect(talk.getParameters().fallbackExitTarget).toBe('a');
+    expect(talk.connections ?? []).toHaveLength(0);
+  });
+
   it('disconnectBeats removes the connection', () => {
     const { result } = withTwoBeats();
     act(() => result.current.actions.connectBeats('a', 'b'));
