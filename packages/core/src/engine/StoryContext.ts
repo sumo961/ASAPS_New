@@ -611,7 +611,7 @@ export class StoryContext extends EventEmitter {
       this.incrementCharacterCounter(owner, name, value);
       return;
     }
-    this.state.counters[name] = (this.state.counters[name] || 0) + value;
+    this.state.counters[name] = (Number(this.state.counters[name]) || 0) + Number(value);
     this.emit('counterChanged', { name, value: this.state.counters[name] });
   }
 
@@ -823,7 +823,7 @@ export class StoryContext extends EventEmitter {
   incrementCharacterCounter(charRef: string, name: string, delta: number = 1): number {
     const key = this.resolveCharRef(charRef);
     if (!key) return 0;
-    const next = (this.state.characterCounters[key]?.[name] ?? 0) + delta;
+    const next = (Number(this.state.characterCounters[key]?.[name]) || 0) + Number(delta);
     this.setCharacterCounter(charRef, name, next);
     return next;
   }
@@ -2268,20 +2268,27 @@ export class StoryContext extends EventEmitter {
       // When `effect.character` is set the counter is scoped to that
       // character's per-character store (mirrors setVariable.character);
       // omitted ⇒ the story-global counter, unchanged.
-      case 'incrementCounter':
+      // Effect values can arrive as strings ("2" — e.g. typed while the effect
+      // was a setVariable, then switched to a counter type), and `0 + "2"`
+      // concatenates. Coerce here so every caller gets arithmetic.
+      case 'incrementCounter': {
+        const delta = Number(effect.value) || 1;
         if (effect.character) {
-          this.incrementCharacterCounter(effect.character, effect.target, effect.value || 1);
+          this.incrementCharacterCounter(effect.character, effect.target, delta);
         } else {
-          this.incrementCounter(effect.target, effect.value || 1);
+          this.incrementCounter(effect.target, delta);
         }
         break;
-      case 'setCounter':
+      }
+      case 'setCounter': {
+        const value = Number(effect.value ?? 0) || 0;
         if (effect.character) {
-          this.setCharacterCounter(effect.character, effect.target, effect.value ?? 0);
+          this.setCharacterCounter(effect.character, effect.target, value);
         } else {
-          this.setCounter(effect.target, effect.value ?? 0);
+          this.setCounter(effect.target, value);
         }
         break;
+      }
       // Step 4 / Phase A: character affect effects. The deltas live on the
       // effect record itself (`valenceDelta` / `arousalDelta` / `strengthDelta`)
       // so the existing effect-editor UI can treat them as any other field.

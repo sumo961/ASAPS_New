@@ -1,5 +1,23 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.111, 2026-10-13)
+
+### Overview
+Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended.
+
+### Counter effects add numbers again
+- Cause: the Choice Effects editor kept the old value when an effect's type was switched. A value typed while the effect was **Set variable** (a text field) stayed a string after switching to **Increment counter**, and the engine computed `0 + "2"`. Found in a user's "Birka" story, which had mixed `2` / `"2"` effect values across its five dialog trees.
+- The engine now converts Increment/Set counter effect values to numbers (global and character counters), and the increment helpers treat an already-stored text value as a number, so stories that already carry string values play correctly without re-editing.
+- The editor converts the value to a number when switching to a counter type.
+- Analyzers already converted values, so the logic report and counter ranges were right and only the played story was wrong.
+
+**Files modified:**
+- `packages/core/src/engine/StoryContext.ts`
+- `packages/builder/src/editors/ChoiceEffectsEditor.tsx`
+- `packages/core/tests/engine/StoryContextEffects.test.ts`
+
+---
+
 ## 2026-10-12: One choice can stand apart, and the GitHub CLI installer on Windows (v0.9.111)
 
 ### Overview

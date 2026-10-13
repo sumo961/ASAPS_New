@@ -225,4 +225,26 @@ describe('StoryContext - Extended', () => {
       expect(context.getCounter('balance')).toBe(-10);
     });
   });
+  describe('applyEffect - counter values stored as strings', () => {
+    // A project can carry `value: "2"` (typed while the effect was a
+    // setVariable, then switched to a counter type); 0 + "2" + "2" was "022".
+    it('adds a string increment as a number', () => {
+      context.setCounter('warriorScore', 0);
+      context.applyEffect({ type: 'incrementCounter', target: 'warriorScore', value: '2' });
+      context.applyEffect({ type: 'incrementCounter', target: 'warriorScore', value: '2' });
+      expect(context.getCounter('warriorScore')).toBe(4);
+    });
+
+    it('adds a string increment to a character-scoped counter as a number', () => {
+      context.applyEffect({ type: 'incrementCounter', target: 'score', value: '2', character: 'c1' });
+      context.applyEffect({ type: 'incrementCounter', target: 'score', value: '3', character: 'c1' });
+      expect(context.getCharacterCounter('c1', 'score')).toBe(5);
+    });
+
+    it('sets a string value as a number', () => {
+      context.applyEffect({ type: 'setCounter', target: 'health', value: '7' });
+      context.incrementCounter('health', 1);
+      expect(context.getCounter('health')).toBe(8);
+    });
+  });
 });

@@ -242,7 +242,9 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               if (newType === 'addInventory' || newType === 'removeInventory') {
                 updates.value = undefined;
               } else if (newType === 'incrementCounter' || newType === 'setCounter') {
-                updates.value = effect.value ?? 1;
+                // Counter values are numbers; a value typed while this was a
+                // setVariable is a string and would concatenate at runtime.
+                updates.value = Number(effect.value ?? 1) || (newType === 'setCounter' ? 0 : 1);
               } else if (newType === 'setVariable') {
                 updates.value = effect.value ?? '';
               } else if (newType === 'nudgeMood') {
