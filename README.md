@@ -22,10 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.111** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.111 lets one choice stand
-apart**: in a responsive project, any choice of a Multi Choice beat can be
-pinned to a corner of the screen on its own (a "Leave" option top-right
+Current release: **v0.9.112** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.112 lets several characters
+talk before the player answers**: in a Dialog Tree, click **Then another
+character speaks** under a line, and the next character's line follows by
+itself after the reading time, with no made-up player reply in between.
+Story state is more trustworthy too: counter effects add numbers again
+(two "+2" choices used to make "22"), variables declared true/false or
+number keep their type and get a true/false picker where they are set or
+checked, and text variables still hold any text exactly. In the flowchart,
+copy, paste and delete now take every selected beat, and an AI
+Conversation always shows its way out in the Inspector.
+
+**v0.9.111 let one choice stand apart**: in a responsive project, any
+choice of a Multi Choice beat can be pinned to a corner of the screen on its own (a "Leave" option top-right
 while the answers stay under the question), and pinned buttons now make
 room for the text instead of covering it on phones. On Windows, the GitHub
 setup's link for the GitHub CLI now leads to its installer, which fixes

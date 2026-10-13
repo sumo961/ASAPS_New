@@ -1,9 +1,27 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.111, 2026-10-13)
+## 2026-10-13: Several characters in one conversation, and story state you can trust (v0.9.112)
 
 ### Overview
-Counter effects whose amount was stored as text added like text: two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended. Boolean and number variables had the same problem with text values. In the flowchart, selecting several beats now carries through to copy, paste and delete. A Dialog Tree can now let several characters speak in a row before the player answers.
+- **New in Dialog Trees:** several characters can speak in a row before the player answers. Mara speaks, Jonas answers, then the player chooses, with no made-up player reply in between. A student asked for this.
+- **Counters:** counter effects whose amount was stored as text added like text. Two "+2" choices took a counter from 0 to "022" instead of 4, so a later `warriorScore >= 6` check never matched as intended.
+- **True/false and number variables:** they had the same problem with text values. They now keep their type, get a true/false picker where they are set or checked, and compare correctly in conditions and preconditions. Text variables still hold any string exactly as written.
+- **Flowchart:** selecting several beats now carries through to copy, paste and delete.
+- **AI Conversation:** it always shows its way out. The rehearsal template gained an exit direction and a max-turns fallback, and links from an AI Conversation now land in its Fallback Exit Target instead of a hidden link.
+
+### Release checklist (v0.9.112)
+- **Generated story played end to end** in the dev Electron app (the user's AI provider):
+  - "The Last Crossing": a new Short/Moderate generation with a prompt asking for several characters to speak in a row. 72 s, 14 beats in 3 clusters. The import check found 0 errors and 0 warnings.
+  - The generator used the new continue step on its own. "The Argument" chains Ingrid → Tomas → Old Sven → Ingrid before the doctor answers, and "The Engine Report" chains three speakers.
+  - Played to an ending twice, picking the first option everywhere and then the last option everywhere. The second run also crossed a continue chain inside a nested node (Ingrid's confession → Tomas → replies). No dead ends.
+- **A real story played end to end:** a copy of the user-reported "Birka" story (38 beats), played from the start in the dev Preview. It went through the title, five question dialogs and the score check to "YOU ARE A SLAVE" and The End.
+  - The Debug panel showed `warriorScore` = 10 (number) after five mixed `"2"`/`2` effects, and `wokeHim` = true.
+- **Device-preset sweep of the changed surface:** a scene where Mara speaks → continue step → Jonas → two replies, plus the same scene in chat-scroll. Measured at Desktop, Tablet landscape/portrait and Phone landscape/portrait, in a responsive and a fixed project. Checked: line, Continue button and replies inside the stage, no overlaps.
+  - Clean everywhere except fixed layout at phone landscape. There the 1024×768 canvas is cropped to fill the 740×360 stage and the top of the canvas falls off, so the dialog text is cut off.
+  - This was not changed by this release: Jonas's ordinary choice node is cut the same way, and continue steps use the NPC-exit path. Recorded as an open item.
+  - Watched at 20 ms resolution: Mara + Continue → Jonas + replies at about 3.8 s, with no in-between frame.
+- **Export at non-1:1:** the HTML export of the fixed test project, opened at 1100×620 (scaled down) and 1500×950 (scaled up). Clean at both sizes, for the Continue step, Jonas's replies and the chat scene. In chat, Continue added no player bubble.
+- **Suites:** core 2857, renderer 669, builder 2849, desktop 24, player 7. CI green on f47123c4. The updater did not change.
 
 ### Dialog Tree: several characters can speak before the player answers
 - A student asked for "NPC 1 says, NPC 2 says, then the player acts" in one Dialog Tree. Every node already had its own speaker. But the only way from one line to the next was a player choice, so a second character could only answer after a made-up player reply such as "[Continue]".
@@ -48,6 +66,7 @@ Counter effects whose amount was stored as text added like text: two "+2" choice
 - Preconditions run through the same engine check, so a requirement like "wokeHim = false" now passes at the start of a story. Covered by tests that run a gated beat.
 - The precondition editor no longer turns "5" typed for a text variable into the number 5.
 - The Condition Check beat's **Exists**, **Does Not Exist** and **Contains** operators for variables now work. The engine had no case for the first two, so they were always false. Contains handled only lists, not text.
+- **Text variables are untouched.** Only variables declared true/false or number are converted. A variable declared text, or not declared at all, stores any string exactly as written: "true", "5", "007", "", quotes. `==` / `!=` compare the exact text. Guarded by tests over a set of such strings, including a text default that looks like a number or boolean.
 
 **Files modified:**
 - `packages/core/src/engine/variableValues.ts` (new), `StoryContext.ts`, `analysis/StateSimulationAnalyzer.ts`

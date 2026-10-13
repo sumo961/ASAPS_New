@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.103*
+*Last revised against v0.9.112*
 
 ---
 
@@ -186,7 +186,7 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 **Bundled templates.** ASAPS ships with five. Each plays through to an ending whose **Play Again** starts a clean new run from the title screen:
 
-- **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
+- **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. The session ends when you, as the caseworker, close the appointment (an **Exit** direction: Karin answers in character and the story moves on to the Debrief), or after 12 turns with a closing line because the next client is waiting (the **Fallback Exit Target**) — both visible in the Inspector, so you can see how the way out is built when you adapt it. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
 - **Counters that read affect** *(new in v0.9.89)* — a character called Ada carrying four meters in one HUD frame: *Gold* (an ordinary counter you set by hand) beside *Trust*, *Fear* and *Spirits*, which are wired to her actual feelings. Three choices move her sentiment, her fear and her mood — and **none of them names a counter**. The meters simply report. It needs no AI provider, and the result beat loops back to the choice so you can push Trust below zero and watch the bar grow the other way from the centre. This is the working companion to [Counters that read affect](#counter-binding) in Part 4.
 - **The Oil Lamp — a museum story** — one object seen three ways (as a made thing, a used thing, a taken thing). Shows the Clean Editorial look, a hub that dims paths you've already taken, and in-text hyperlinks. Text-first and asset-free.
 - **23:47 — a chat thriller** — a stranger's phone on a night train and a thread you can't put down. Chat-bubble beats for scripted texting hand off to a live AI conversation and back, in the Dark Cinematic look. Needs an AI provider (purple **AI** badge).
@@ -332,6 +332,15 @@ The small count strip above the canvas (**Beats · Clusters · Connections**) co
 
 ![A restart link in the flowchart: the End Screen's dashed teal ↺ Restart arrow leads back to the Title Screen](images/73-restart-link-flowchart.png)
 *The End Screen's Restart button leads back to the Title Screen — drawn as a dashed teal **↺ Restart** link, next to the ordinary grey links.*
+
+<a id="flowchart-multi-select"></a>
+**Working with several beats at once.** Hold **Shift** and drag across empty canvas to draw a selection box, or **Ctrl/Cmd-click** beats to add them to the selection (click one again to take it out). Whatever you do next applies to the whole group:
+
+- **Copy and paste** — **Ctrl/Cmd + C** (or right-click a selected beat → **Copy**) copies every selected beat. **Ctrl/Cmd + V** pastes the group in the middle of the flowchart, or right-click empty canvas → **Paste Beat** to drop it right there. The copies keep their arrangement, and links between the copied beats point to the copies, so a little scene you copy arrives already wired.
+- **Duplicate** — **Ctrl/Cmd + D**, or right-click → **Duplicate N beats**.
+- **Delete** — **Delete** (or right-click → **Delete N beats**) removes them all. If that would break links from other beats, ASAPS asks first; otherwise it just happens, and **Undo** brings everything back.
+
+A paste is a single Undo step, however many beats it brought in. Clicking beats in the flowchart doesn't move the view, so the next beat you meant to Ctrl/Cmd-click is still where you saw it.
 
 ### Visual Editor (The Close-Up)
 
@@ -507,7 +516,7 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 **Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand.
 
 <a id="then-another-character-speaks"></a>
-**Several characters before the player answers.** Characters can also talk to each other: Granny speaks, the Wolf answers, and only then does the player choose. Under a line that has no player responses yet, click **Then another character speaks**. A new line appears directly below, marked *then, after the reading time*, already set to a different character, and you can chain as many lines as the scene needs. Add the player responses to the last line. While playing, each line gets its reading time (plus any speech) and then the next speaker follows by itself; a **Continue** button lets fast readers skip ahead. In chat layouts the lines appear as bubbles one after another, with no reply from the player in between. To take a line out of the chain, use its ✕: everything after it goes with it, and the line above waits for player responses again.
+**Several characters before the player answers.** Characters can also talk to each other: Granny speaks, the Wolf answers, and only then does the player choose. Under a line that has no player responses yet, click **Then another character speaks**. A new line appears directly below, marked *then, after the reading time*, already set to a different character (when your project has more than one), and you can chain as many lines as the scene needs. Only the last line of the chain takes player responses — add them there. While playing, each line gets its reading time (plus any speech) and then the next speaker follows by itself; a **Continue** button lets fast readers skip ahead. In chat layouts the lines appear as bubbles one after another, with no reply from the player in between. To take a line out of the chain, use its ✕: everything after it goes with it, and the line above waits for player responses again.
 
 <a id="link-dont-label"></a>
 **Link the speaker, then decide about the label.** The Dialog Tree's **Show Speaker Name** setting (in the Inspector's *Speaker* group: *Default (use global setting)*, *Always show* or *Always hide*) decides whether the per-node names appear as labels over the lines, and it is kept when you save and reopen the project. It only hides the *label* — the speaker link still does its work. So a good habit is *link, don't label*: always link each line to the character who is present, and set **Show Speaker Name** to *Always hide* when your prose already says who is talking (*Karin sits down. "I don't see why we're here."*). The link is what makes the character's [HUD appear](#hud-reveal) when they first show up and what gives the line their [TTS voice](#quoted-speech-voice).
@@ -519,7 +528,7 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 - Set auto-exit to a beat to advance there after the NPC speaks
 - Set auto-exit to **Return to initial choices** (`__self__`) to loop back to the root of the dialog tree
 
-The farewell line is never a frozen screen: a **Continue** button appears right away, and whichever comes first — the player's tap or the reading time (plus any speech) — moves the story on. Fast readers skip ahead; slow readers are never cut off.
+The farewell line is never a frozen screen: a **Continue** button appears right away, and whichever comes first — the player's tap or the reading time (plus any speech) — moves the story on. Fast readers skip ahead; slow readers are never cut off. In chat layouts that Continue tap doesn't add a reply bubble from the player.
 
 **Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking**, choices the interactor has already picked can be visually dimmed or blocked.
 
@@ -988,6 +997,9 @@ Set a variable to true/false or modify a counter value. This is how your story r
 - Add 10 to `gold` when they find treasure
 - Set `reputation` to 50 at story start
 
+<a id="typed-variables"></a>
+**True/false and numbers stay what they are.** Give a variable its **Type** in [Project Settings → Variables](#global-settings) and ASAPS keeps to it. A variable declared *true/false* gets a **true / false** picker instead of a text field, here and everywhere else you write or test it: choice conditions, the **Set Variable** choice effect, the [Condition Beat](#condition-beat), and beat [Requirements](#per-beat-requirements). A *number* variable gets a number field in choice conditions. Even a value typed as text — say `5` for a number variable, or `false` for a true/false one — is stored as the declared type, so `hasKey = false` matches a variable that starts out false. *Text* variables hold whatever you type, exactly as written. Counters always count: a **Change Counter** effect of +2 adds two, even in older stories where the amount was saved as text.
+
 **Calculations (v0.9.71+).** Start the value with `=` (spreadsheet convention) and it's evaluated as an arithmetic expression at runtime:
 
 ```
@@ -1205,7 +1217,7 @@ Unlike AI Dialog Tree (which pre-generates a branching tree), AI Conversation ge
 - **In this scene** - How the NPC behaves in this conversation: mood, attitude, what they want right now. Leave identity to the linked character; for a free-text NPC, describe them here too.
 - **Opening Line** - Fixed first line (if empty, the AI generates one)
 - **Max Turns** - Conversation length before fallback exit
-- **Fallback Exit Target** - Where to go when max turns are reached
+- **Fallback Exit Target** - Where the story goes when Max Turns runs out, or when no AI is available (no provider set up, or the request fails), so the player can always leave the conversation. Directions with an **Exit** action can leave earlier. When you link onward from an AI Conversation with the Co-Designer or the Inspector's beat suggestions, ASAPS fills this field for you if it is empty; an exit you have already set is kept
 - **Closing line when turns run out** - Optional instruction for the NPC's last line when Max Turns is reached (*"apologise that time is up and suggest meeting again next week"*), so the conversation ends gracefully instead of stopping mid-exchange
 - **Enable Voice Input** - Show a microphone button for speech-to-text input. Off by default — switch it on only after you have configured STT (header **STT** menu); AI-generated stories leave it off
 - **Context Toggles** - Include variables, inventory, visited beats, choice history
@@ -3175,7 +3187,7 @@ The Condition Beat provides branching logic — checking variables, counters, ti
 The Condition Type dropdown groups the available checks into two families:
 
 **Classic checks** (the original ASAPS condition vocabulary):
-- **Variable** — true/false flags (`hasKey`, `metWizard`)
+- **Variable** — true/false flags (`hasKey`, `metWizard`), numbers or text. Operators: **Equals**, **Not Equal**, **Contains** (text contains a word or phrase, ignoring upper/lower case — `playerName` contains `ann`), **Exists** (the variable has any value) and **Does Not Exist** (it is unset or empty). A variable declared true/false gets a **true / false** picker for the value — see [True/false and numbers stay what they are](#typed-variables)
 - **Counter** / **Counter Compare** — numeric comparisons (`gold > 50`, `reputation == respect`)
 - **Inventory** — whether a character holds a named item, or how many copies
 - **Timer** — whether a named timer has expired or has time left
@@ -3432,6 +3444,7 @@ Each overlay has its own *Enabled* toggle and renders on the running stage when 
 
 **Settings → Variables:**
 - Define global variables for tracking story state: **Add Variable**, then give each a **Name**, a **Type** (text, number or true/false), a **Default Value** and an optional **Description**.
+- The **Type** matters: a true/false variable gets a **true / false** picker wherever you set or test it, and true/false and number variables keep their type when the story writes to them — see [True/false and numbers stay what they are](#typed-variables).
 - Every variable **starts at its Default Value** when the story begins, and goes back to it when an ending's Restart resets variables. (Before v0.9.104 the default was ignored in play and variables started empty; stories that relied on that should check their defaults.)
 - **Keep across restarts** on a variable lets it survive an ending's Restart instead — see [Keeping just some things across a restart](#keep-across-restarts).
 - Built in, no need to declare it: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
@@ -3871,7 +3884,7 @@ Quick reference for all beat types.
 | Title Screen | Story opening | title, subtitle, author, button text |
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
-| Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
+| Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), per-line speakers, *Then another character speaks* (several characters before the player answers), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
 | Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template and per-choice pins (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
