@@ -3924,8 +3924,12 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Shift + P | Open Preview window |
 | Space | Pause / resume (in preview) |
 | Ctrl/Cmd + I | Toggle inventory (in preview) |
-| Delete | Delete selected beat |
+| Delete | Delete selected beat (or all selected beats in the flowchart) |
 | Escape | Deselect / Close panel |
+| Shift + drag | Draw a selection box around beats (flowchart) |
+| Ctrl/Cmd + Click | Add a beat to the selection, or take it out (flowchart) |
+| Ctrl/Cmd + C / V | Copy the selected beats / paste them in the middle of the flowchart; links between the copied beats come along |
+| Ctrl/Cmd + D | Duplicate the selected beats (flowchart) |
 | Shift + Click | Multi-select elements (Visual Editor) |
 
 ---

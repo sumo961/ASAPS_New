@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { BeatTypeRegistry } from '@asaps/core';
-import { cloneBeatsForDuplicate } from '../duplicateBeats';
+import { cloneBeatsForDuplicate, cloneBeatsForPaste } from '../duplicateBeats';
 import { deserializeBeats } from '../projectDeserializer';
 
 const registry = BeatTypeRegistry.getInstance();
@@ -84,5 +84,27 @@ describe('cloneBeatsForDuplicate', () => {
     (a as any).cluster = 'cluster_x';
     const { clones } = cloneBeatsForDuplicate([a], ['a']);
     expect(clones[0].cluster).toBe('cluster_x');
+  });
+});
+
+describe('cloneBeatsForPaste', () => {
+  it('pastes the whole group at the position, keeping its arrangement and inner links', () => {
+    const a = makeBeat('a', { target: 'b', x: 100, y: 200 });
+    const b = makeBeat('b', { target: 'outside', x: 300, y: 260 });
+    const snapshot = [a.toJSON(), b.toJSON()];
+    const { clones, idMap } = cloneBeatsForPaste(snapshot, ['a', 'b', 'outside'], { x: 1000, y: 50 });
+    expect(clones.map(c => [c.name, c.x, c.y])).toEqual([
+      ['Beat a (Paste)', 1000, 50],
+      ['Beat b (Paste)', 1200, 110],
+    ]);
+    expect(clones[0].connections[0].targetId).toBe(idMap.get('b'));
+    expect(clones[1].connections[0].targetId).toBe('outside');
+    expect(deserializeBeats(clones)).toHaveLength(2);
+  });
+
+  it('lands a beat copied from a cluster on the canvas', () => {
+    const a = { ...makeBeat('a').toJSON(), cluster: 'c1' };
+    const { clones } = cloneBeatsForPaste([a], ['a'], { x: 0, y: 0 });
+    expect(clones[0].cluster).toBeUndefined();
   });
 });

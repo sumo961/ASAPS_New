@@ -84,7 +84,7 @@ interface GraphEditorProps {
   /** One sentence naming what a delete would break ("3 links in 2 other
    *  beats point here and will break.") — appended to the delete confirm. */
   describeDeleteImpact?: (beatIds: string[]) => string | null;
-  onBeatCopy?: (beatId: string) => void;
+  onBeatCopy?: (beatIds: string[]) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
   // VCS context menu actions
@@ -163,6 +163,37 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // Ids of all currently multi-selected beat nodes (ReactFlow selection:
   // shift+drag marquee on the pane, or cmd/ctrl/shift+click on nodes).
   const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+  const selectedBeatIdRef = useRef<string | null>(null);
+  selectedBeatIdRef.current = selectedBeat?.id ?? null;
+  const beatsRef = useRef(beats);
+  beatsRef.current = beats;
+  // Set when a selection comes from a click in the graph itself: the beat is
+  // already in view, and re-centring (and re-zooming) under the pointer
+  // moved the next beat the author was about to ⌘-click.
+  const selectedFromGraphRef = useRef(false);
+  // True from a pointer press in the graph until the next selection made
+  // from outside it (Story Beats list, paste, …).
+  const graphGestureRef = useRef(false);
+
+  // Shift, read from the pointer and keyboard events themselves. React Flow's
+  // own Shift tracking (selectionKeyCode) keeps a set of pressed keys, and a
+  // key whose keyup it never sees (released in a text field, a dialog, …)
+  // left the set non-matching: the selection box stopped appearing until the
+  // window lost focus.
+  const [shiftHeld, setShiftHeld] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => setShiftHeld(e.shiftKey);
+    const onBlur = () => setShiftHeld(false);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keyup', onKey, true);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('keyup', onKey, true);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
+  const graphRootRef = useRef<HTMLDivElement>(null);
 
   // B1b — dialogTree disclosure expansion (session-scoped). Expanded beats
   // render their internal tree inside the node; their outgoing edges leave
@@ -178,9 +209,25 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   }, []);
   const onSelectionChange = useCallback(
     ({ nodes: selNodes }: { nodes: Node[] }) => {
-      setMultiSelectedIds(selNodes.filter(n => n.type === 'beat').map(n => n.id));
+      const ids = selNodes.filter(n => n.type === 'beat').map(n => n.id);
+      setMultiSelectedIds(ids);
+      // ⌘-click leaves the Inspector alone (see onNodeClick); when the graph
+      // selection narrows to one beat — a marquee around one, or ⌘-clicking
+      // the others away — the Inspector follows it, so Delete/⌘C and the
+      // Inspector never name different beats.
+      // Only for a change the author made here (pointer in the graph):
+      // selection changes this component makes itself (the sync below) must
+      // not select a beat in turn, or the two fight — the Inspector flipped
+      // between two beats several times a second.
+      if (graphGestureRef.current && ids.length === 1 && ids[0] !== selectedBeatIdRef.current) {
+        const beat = beatsRef.current.find(b => b.id === ids[0]);
+        if (beat) {
+          selectedFromGraphRef.current = true;
+          onBeatSelect(beat);
+        }
+      }
     },
-    []
+    [onBeatSelect]
   );
 
   // Use ref for assets to avoid triggering unnecessary useMemo recalculations
@@ -343,6 +390,22 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     prevBeatsLengthRef.current = beats.length;
   }, [nodes, setNodes, beats.length, clusters.length]);
 
+  // A beat selected from outside the graph (Story Beats list, paste,
+  // duplicate, Find) replaces the graph selection unless it is part of it —
+  // otherwise ⌫ would delete the group still highlighted from before, not
+  // the beat the Inspector shows. Declared after the node sync so a
+  // just-pasted beat is already among the nodes when this runs.
+  useEffect(() => {
+    const id = selectedBeat?.id;
+    if (!id) return;
+    if (!selectedFromGraphRef.current) graphGestureRef.current = false;
+    setNodes(prev => {
+      if (prev.some(n => n.id === id && n.selected)) return prev;
+      if (!prev.some(n => n.id === id)) return prev;
+      return prev.map(n => (n.selected || n.id === id) ? { ...n, selected: n.id === id } : n);
+    });
+  }, [selectedBeat?.id, setNodes]);
+
   // Update edges when beats change
   useEffect(() => {
     setEdges(edges);
@@ -434,6 +497,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   // hidden inside a COLLAPSED cluster has no useful own position; center on
   // its cluster frame instead.
   useEffect(() => {
+    if (selectedFromGraphRef.current) {
+      selectedFromGraphRef.current = false;
+      return;
+    }
     if (!reactFlowInstance || !selectedBeat) return;
 
     const node = reactFlowInstance.getNode(selectedBeat.id);
@@ -481,13 +548,17 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       } else {
         // Handle beat node clicks (incl. the dialogContainer, which keeps
         // the beat's id)
+        // ⌘/Ctrl-click only adds or removes the beat from the group;
+        // onSelectionChange updates the Inspector when one beat is left.
+        if (event.metaKey || event.ctrlKey) return;
         const beat = beats.find((b) => b.id === node.id);
         if (beat) {
+          selectedFromGraphRef.current = beat.id !== selectedBeat?.id;
           onBeatSelect(beat);
         }
       }
     },
-    [beats, clusters, onBeatSelect, onClusterSelect, onClusterExpandCollapse]
+    [beats, clusters, selectedBeat, onBeatSelect, onClusterSelect, onClusterExpandCollapse]
   );
 
   // Handle node context menu (right-click)
@@ -564,8 +635,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           }
           break;
         case 'copy':
-          if (contextMenu.beatId && onBeatCopy) {
-            onBeatCopy(contextMenu.beatId);
+          if (multiTarget && onBeatCopy) {
+            onBeatCopy(multiTarget);
+          } else if (contextMenu.beatId && onBeatCopy) {
+            onBeatCopy([contextMenu.beatId]);
           }
           break;
         case 'paste':
@@ -794,7 +867,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     } else if (mod && key === 'c') {
       // Real text selections keep native copy
       if (window.getSelection()?.toString()) return;
-      if (singleId && onBeatCopy) { event.preventDefault(); onBeatCopy(singleId); }
+      if (multi && onBeatCopy) { event.preventDefault(); onBeatCopy(multi); }
+      else if (singleId && onBeatCopy) { event.preventDefault(); onBeatCopy([singleId]); }
     } else if (mod && key === 'v') {
       if (hasBeatClipboard && onBeatPaste && reactFlowInstance) {
         event.preventDefault();
@@ -828,7 +902,29 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   }, [multiSelectedIds, selectedBeat, beats, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, hasBeatClipboard, onBeatDelete, onBeatsDelete, describeDeleteImpact, reactFlowInstance]);
 
   return (
-    <div className="w-full h-full" style={{ position: 'relative' }} onKeyDown={handleGraphKeyDown}>
+    <div
+      ref={graphRootRef}
+      className="w-full h-full"
+      style={{ position: 'relative', outline: 'none' }}
+      // Focusable so ⌫ / ⌘C / ⌘D reach handleGraphKeyDown after a selection
+      // box: the pane itself never takes focus, so the keys went to <body>
+      // (or to the Inspector field still focused) and did nothing.
+      tabIndex={-1}
+      onKeyDown={handleGraphKeyDown}
+      onPointerMove={(e) => { if (e.shiftKey !== shiftHeld) setShiftHeld(e.shiftKey); }}
+      onPointerDownCapture={(e) => {
+        setShiftHeld(e.shiftKey);
+        graphGestureRef.current = true;
+        const target = e.target as HTMLElement;
+        if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+        const root = graphRootRef.current;
+        const active = document.activeElement as HTMLElement | null;
+        if (root && active && !root.contains(active)) {
+          active.blur();
+          root.focus({ preventScroll: true });
+        }
+      }}
+    >
       {/* Clean minimal viewport - prepare for final render test */}
       <ReactFlow
         nodes={nodesState}
@@ -838,10 +934,13 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
         onSelectionChange={onSelectionChange}
-        // Shift belongs to the MARQUEE (drag a selection box on the pane);
-        // while it also sat in multiSelectionKeyCode, the click-add binding
-        // won and the box never appeared. ⌘/Ctrl-click adds to a selection.
-        selectionKeyCode="Shift"
+        // Shift-drag on the pane draws a selection box; Shift comes from
+        // shiftHeld (see above), not React Flow's key tracking. Shift must not
+        // sit in multiSelectionKeyCode too, or the click-add binding wins and
+        // the box never appears. ⌘/Ctrl-click adds to a selection.
+        selectionKeyCode={null}
+        selectionOnDrag={shiftHeld}
+        panOnDrag={!shiftHeld}
         multiSelectionKeyCode={['Meta', 'Control']}
         // Selection elevation (+1000) would lift an opaque expanded dialog
         // above its own internal-edge layers; explicit zIndex tiers on the

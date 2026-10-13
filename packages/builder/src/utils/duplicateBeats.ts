@@ -56,3 +56,31 @@ export function cloneBeatsForDuplicate(
 
   return { clones, idMap };
 }
+
+/**
+ * Paste a copied group of beats (serialized snapshots taken at copy time).
+ * Same id-rewriting as duplicate, so links BETWEEN the copied beats point at
+ * the pasted copies; the group keeps its arrangement with its top-left
+ * corner at `position`. Pasted beats land on the canvas, outside any cluster
+ * (the snapshot's x/y must already be canvas positions).
+ */
+export function cloneBeatsForPaste(
+  snapshot: ReadonlyArray<any>,
+  allBeatIds: Iterable<string>,
+  position: { x: number; y: number }
+): DuplicateResult {
+  const { clones, idMap } = cloneBeatsForDuplicate(snapshot, allBeatIds);
+  const minX = Math.min(...snapshot.map(b => (typeof b.x === 'number' ? b.x : 0)));
+  const minY = Math.min(...snapshot.map(b => (typeof b.y === 'number' ? b.y : 0)));
+  const pasted = clones.map((clone, i) => {
+    const src = snapshot[i];
+    const { cluster: _cluster, ...rest } = clone;
+    return {
+      ...rest,
+      name: `${src.name || src.id} (Paste)`,
+      x: position.x + ((typeof src.x === 'number' ? src.x : 0) - minX),
+      y: position.y + ((typeof src.y === 'number' ? src.y : 0) - minY),
+    };
+  });
+  return { clones: pasted, idMap };
+}

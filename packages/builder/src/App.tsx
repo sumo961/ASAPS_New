@@ -41,7 +41,7 @@ import { ImportTwineDialog } from './components/ImportTwineDialog';
 import { MergeStoryDialog } from './components/MergeStoryDialog';
 import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
 import { deserializeBeats } from './utils/projectDeserializer';
-import { cloneBeatsForDuplicate } from './utils/duplicateBeats';
+import { cloneBeatsForDuplicate, cloneBeatsForPaste } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
 import { v4 as uuidv4 } from 'uuid';
 import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
@@ -80,6 +80,7 @@ import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
 import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
 import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
+import { CLUSTER_HEADER_H } from './components/graph/graphStyle';
 import { reconcileLegacyMaxTokens } from './utils/aiConfigBudget';
 import { analyzeStoryFindings, proposeFixes, planBeatEdit, createGenerationReview, openFindings } from './utils/generationReview';
 import type { GenerationFinding, FixProposal, GenerationReview } from './types/generationReview';
@@ -3319,11 +3320,9 @@ function App() {
   }, [state.beats]);
 
   // Beat clipboard for copy/paste
-  const [beatClipboard, setBeatClipboard] = useState<{
-    type: string;
-    name: string;
-    parameters: Record<string, any>;
-  } | null>(null);
+  // Serialized snapshots taken at copy time (canvas positions), so later
+  // edits or deletes of the originals do not change what gets pasted.
+  const [beatClipboard, setBeatClipboard] = useState<any[] | null>(null);
 
   const handleBeatDuplicate = useCallback((beatId: string) => {
     const beat = state.beats.find(b => b.id === beatId);
@@ -3391,32 +3390,43 @@ function App() {
     reportBrokenLinksAfterDelete(state.beats.filter(b => !idSet.has(b.id)));
   }, [state.beats, markChanged, reportBrokenLinksAfterDelete]);
 
-  const handleBeatCopy = useCallback((beatId: string) => {
-    const beat = state.beats.find(b => b.id === beatId);
-    if (!beat) return;
+  /** Copy one or more beats. Every selected beat goes on the clipboard, so
+   *  a paste brings back the group with the links between its beats. */
+  const handleBeatCopy = useCallback((beatIds: string[]) => {
+    const idSet = new Set(beatIds);
+    const selected = state.beats.filter(b => idSet.has(b.id));
+    if (selected.length === 0) return;
+    setBeatClipboard(selected.map(beat => {
+      const data = typeof beat.toJSON === 'function' ? beat.toJSON() : JSON.parse(JSON.stringify(beat));
+      if (!beat.cluster) return data;
+      // A clustered beat's x/y is not where it is drawn: use its slot in the
+      // frame, offset by the frame, so the pasted group keeps its shape.
+      const cluster = state.clusters.find(c => c.id === beat.cluster);
+      const slot = containerSlotFor(beat.id, beat.cluster, state.beats, state.containerBeatPositions ?? []);
+      return {
+        ...data,
+        x: (cluster?.containerPosition.x ?? 0) + slot.x,
+        y: (cluster?.containerPosition.y ?? 0) + CLUSTER_HEADER_H + slot.y,
+      };
+    }));
+  }, [state.beats, state.clusters, state.containerBeatPositions]);
 
-    setBeatClipboard({
-      type: beat.type,
-      name: beat.name,
-      parameters: typeof beat.getParameters === 'function' ? beat.getParameters() : {},
-    });
-  }, [state.beats]);
-
+  /** Paste the clipboard at a canvas position — one undoable step. The old
+   *  path rebuilt a single beat from type + parameters, dropping its plain
+   *  connections, and only ever held one beat. */
   const handleBeatPaste = useCallback((position: { x: number; y: number }) => {
-    if (!beatClipboard) return;
-
-    const newBeat = actions.addBeat(beatClipboard.type, position, {
-      name: `${beatClipboard.name} (Paste)`,
-    });
-
-    // Apply copied parameters
-    if (newBeat && beatClipboard.parameters) {
-      actions.updateBeat(newBeat.id, { parameters: beatClipboard.parameters } as Partial<Beat>);
-    }
-
-    setSelectedBeat(newBeat);
+    if (!beatClipboard || beatClipboard.length === 0) return;
+    const { clones } = cloneBeatsForPaste(beatClipboard, state.beats.map(b => b.id), position);
+    const newBeats = deserializeBeats(clones);
+    if (newBeats.length === 0) return;
+    actions.mergeBeats(newBeats);
+    const addCommands = newBeats.map(b => new AddBeatCommand(b, stableMutations.current));
+    getCommandManager().pushWithoutExecute(
+      addCommands.length === 1 ? addCommands[0] : new BatchCommand(addCommands, `Paste ${newBeats.length} beats`)
+    );
+    setSelectedBeat(newBeats[0]);
     markChanged();
-  }, [actions, beatClipboard, markChanged]);
+  }, [actions, beatClipboard, state.beats, markChanged]);
 
   // VCS context menu handlers
   const vcsCtx = useVCSStatus();

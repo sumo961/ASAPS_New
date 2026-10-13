@@ -74,7 +74,7 @@ interface WorkspaceViewProps {
   onBeatDelete?: (beatId: string) => void;
   describeDeleteImpact?: (beatIds: string[]) => string | null;
   onBeatsDelete?: (beatIds: string[]) => void;
-  onBeatCopy?: (beatId: string) => void;
+  onBeatCopy?: (beatIds: string[]) => void;
   onBeatPaste?: (position: { x: number; y: number }) => void;
   hasBeatClipboard?: boolean;
   // VCS context menu actions
