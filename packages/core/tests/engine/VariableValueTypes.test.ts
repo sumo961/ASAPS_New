@@ -112,3 +112,39 @@ describe('preconditions (beat requirements) use the same comparison', () => {
     expect(ctx.checkCondition(req.condition as any)).toBe(true);
   });
 });
+
+describe('text variables hold and match arbitrary strings', () => {
+  const samples = ['the old mill', 'true', 'false', 'TRUE', '5', '007', '1.0', '', '  spaced  ', 'Ümlaut & "quotes"', 'null', 'undefined', '[1,2]'];
+
+  for (const declared of [[{ name: 'note', type: 'string', defaultValue: 'start' }], []]) {
+    const kind = declared.length ? 'declared text' : 'undeclared';
+
+    it(`${kind}: every string is stored exactly as written`, () => {
+      const ctx = context(declared);
+      for (const s of samples) {
+        ctx.applyEffect({ type: 'setVariable', target: 'note', value: s });
+        expect(ctx.getVariable('note')).toBe(s);
+        ctx.setVariable('note', s);
+        expect(ctx.getVariable('note')).toBe(s);
+      }
+    });
+
+    it(`${kind}: == / != compare the exact text`, () => {
+      const ctx = context(declared);
+      for (const s of samples) {
+        ctx.setVariable('note', s);
+        expect(is(ctx, 'note', s)).toBe(true);
+        for (const other of samples) {
+          if (other === s) continue;
+          expect(is(ctx, 'note', other)).toBe(false);
+          expect(is(ctx, 'note', other, '!=')).toBe(true);
+        }
+      }
+    });
+  }
+
+  it('a declared text default is seeded as text, even when it looks like a number or boolean', () => {
+    expect(context([{ name: 'code', type: 'string', defaultValue: '007' }]).getVariable('code')).toBe('007');
+    expect(context([{ name: 'flag', type: 'string', defaultValue: 'true' }]).getVariable('flag')).toBe('true');
+  });
+});
