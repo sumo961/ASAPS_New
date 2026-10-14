@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.114, 2026-10-14)
+
+### Overview
+- **Preview Window fits fixed-layout projects into device presets.** At a phone or tablet preset, a fixed canvas used to be drawn at full size and cropped; it now letterboxes into the preset like the exported player.
+
+### Preview Window
+- **Cause:** since February the Preview Window turned off the renderer's own fit scaling (`setDisableScaling(true)`) and scaled the whole stage box itself. With a preset, the box is the preset size, so the 1024×768 canvas inside it was never shrunk.
+- **Fix:** the renderer keeps its fit scaling. `ScaledStage` only wraps the fixed-layout paths, and without a preset the box is the canvas size, so the fit is 1 and nothing changes there.
+- **Verified** (The Last Ferry in fixed layout, every preset): canvas, text and button stay inside the preset box, at scale 0.38 on phone portrait and 0.47 on phone landscape. The same project in responsive layout still reflows to fill each preset.
+
+**Files modified:** `builder/src/pages/PreviewWindow.tsx`.
+
+---
+
 ## 2026-10-14: Show an asterisk, highlight a word, and roles everywhere you need them (v0.9.114)
 
 ### Overview

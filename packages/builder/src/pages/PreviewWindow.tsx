@@ -1098,8 +1098,11 @@ export const PreviewWindow: React.FC = () => {
       // Dev-only hook so automated checks can read the live renderer (theme, state).
       if (import.meta.env.DEV) (window as any).__previewRenderer = reactRenderer;
 
-      // Disable renderer's internal scaling - PreviewWindow handles scaling via CSS transforms
-      (reactRenderer as any).setDisableScaling?.(true);
+      // Keep the renderer's own fit scaling on. PreviewWindow scales the
+      // whole stage box (zoom); the renderer fits a fixed canvas into that
+      // box. Without a device preset the box is the canvas size (scale 1);
+      // with one, a fixed project letterboxes into the preset like the
+      // exported player, instead of being drawn at full size and cropped.
 
       // Set up asset resolver - uses ref so it always accesses latest assets
       reactRenderer.setAssetResolver((assetId: string) => {
