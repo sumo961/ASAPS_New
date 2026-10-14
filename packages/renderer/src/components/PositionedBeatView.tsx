@@ -19,7 +19,7 @@ import { meterEdgeOffset, globalHudEdgeOffset } from './HudOverlaysLayer';
 import { KeypadElement } from './KeypadElement';
 import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
-import { renderMarkdownLite } from '../utils/markdownLite';
+import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import { revealBoundary } from '../utils/typewriterGranularity';
 
 // Default stage dimensions (can be overridden by project settings)
@@ -117,7 +117,7 @@ export function calculateSmartButtonDimensions(
  */
 export function countWrappedLines(content: string, charsPerLine: number): number {
   if (charsPerLine <= 0) return 1;
-  const plain = content.replace(/\\n/g, '\n').replace(/\*\*|__|~~|\*/g, '');
+  const plain = markdownLiteToPlain(content);
   return plain.split('\n').reduce((acc, line) => acc + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
 }
 
@@ -141,7 +141,7 @@ export function measureWrappedLines(content: string, fontSize: number, fontFamil
   ctx.font = `${fontSize}px ${fontFamily}`;
   const width = (t: string) => ctx.measureText(t).width * 1.04;
   const space = width(' ');
-  const plain = content.replace(/\\n/g, '\n').replace(/\*\*|__|~~|\*/g, '');
+  const plain = markdownLiteToPlain(content);
   let lines = 0;
   for (const paragraph of plain.split('\n')) {
     const words = paragraph.split(/\s+/).filter(Boolean);
@@ -3858,7 +3858,7 @@ const ButtonElement: React.FC<{
   };
 
   // Build tooltip text: description takes priority, label as fallback for hotspot tooltips
-  const tooltipText = description || content;
+  const tooltipText = markdownLiteToPlain(description || content);
   const tooltipHasDescription = !!description;
 
   // Tooltip styles using theme colors
@@ -3894,7 +3894,7 @@ const ButtonElement: React.FC<{
         onMouseMove={handleMouseMove}
         disabled={!interactive}
       >
-        {shouldShowText ? content : ''}
+        {shouldShowText ? <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(content) }} /> : ''}
       </button>
       {showTooltip && ReactDOM.createPortal(
         <div style={tooltipStyle}>{tooltipText}</div>,

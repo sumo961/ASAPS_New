@@ -172,6 +172,7 @@ interface InspectorProps {
 // movementChoice was in it). Single source for both save paths.
 import { PARAMETER_DERIVED_TYPES } from '../utils/beatConnectionModel';
 import { RolePreviewBar } from './characters/RolePreviewBar';
+import { RoleHolderConditionFields } from '../editors/RoleHolderConditionFields';
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
@@ -2141,6 +2142,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <option value="sentiment">Sentiment toward target ≷ value</option>
                           <option value="goal">Goal status</option>
                           <option value="characterVariant">Active variant</option>
+                          <option value="roleHolder">Who plays a role</option>
                         </optgroup>
                         <optgroup label="XR / sensors">
                           <option value="gpsProximity">GPS proximity (within / outside radius)</option>
@@ -3084,6 +3086,18 @@ export const Inspector: React.FC<InspectorProps> = ({
                     })()}
 
                     {/* CharacterVariant condition — which variant is currently active on character */}
+                    {localBeat.parameters?.conditionType === 'roleHolder' && (
+                      <div className="flex flex-wrap gap-1 items-center" data-testid="condition-role-holder">
+                        <RoleHolderConditionFields
+                          role={localBeat.parameters?.role}
+                          character={localBeat.parameters?.character}
+                          operator={localBeat.parameters?.operator}
+                          characters={characters}
+                          onChange={(patch) => handleParametersChange(patch as Record<string, any>)}
+                        />
+                      </div>
+                    )}
+
                     {localBeat.parameters?.conditionType === 'characterVariant' && (() => {
                       const charId = localBeat.parameters?.character;
                       const selectedChar = (characters || []).find((c) => c.id === charId);

@@ -66,6 +66,7 @@ const BUTTONS: Array<{ marker: string; title: string; label: React.ReactNode }> 
   { marker: '**', title: 'Bold — **text**', label: <strong>B</strong> },
   { marker: '*', title: 'Italic — *text*', label: <em>I</em> },
   { marker: '~~', title: 'Strikethrough — ~~text~~', label: <del>S</del> },
+  { marker: '==', title: 'Highlight — ==text==', label: <mark style={{ background: 'rgba(250,204,21,0.5)', padding: '0 2px' }}>H</mark> },
 ];
 
 export const FormattingToolbar: React.FC<{
@@ -103,6 +104,12 @@ export const FormattingToolbar: React.FC<{
           {b.label}
         </button>
       ))}
+      <span
+        className="ml-1 text-[10px] text-gray-400 cursor-help select-none"
+        title={'To show a character the formatting uses, put a backslash before it: \\* shows *, \\_ shows _, \\~ shows ~, \\= shows =, \\\\ shows \\.'}
+      >
+        \* = *
+      </span>
     </div>
   );
 };

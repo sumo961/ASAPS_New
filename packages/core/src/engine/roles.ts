@@ -34,6 +34,12 @@ export interface CastRole {
   recastable?: boolean;
   /** Keep the holder across an in-story restart. */
   keepOnRestart?: boolean;
+  /**
+   * Editor-only, while Project Settings is open: the id this role had when
+   * the dialog opened. On Save the builder rewrites references from it to
+   * the new id, then drops the field. Never saved with the story.
+   */
+  renamedFrom?: string;
 }
 
 /** The role id that makes the implicit 'player' key follow the chosen protagonist. */
@@ -147,4 +153,56 @@ export function rolePlaceholderText(
   if (text === undefined) return undefined;
   const capitalise = raw[0] !== raw[0].toLowerCase();
   return capitalise ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+// ---------------------------------------------------------------------------
+// Renaming a role
+// ---------------------------------------------------------------------------
+
+/**
+ * A copy of `value` with every reference to role `from` pointing at `to`:
+ * '@from' strings (speakers, AI partners, effect/condition characters),
+ * ${@from…} placeholders, castRole effects (`target`), roleHolder
+ * conditions (`role`) and a Choose Your Character / Condition Check `role`.
+ * Returns the same object when nothing referred to the role.
+ */
+export function renameRoleReferences<T>(value: T, from: string, to: string): T {
+  const f = stripRolePrefix(from);
+  const t = stripRolePrefix(to);
+  if (!f || !t || f === t) return value;
+  const esc = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const placeholder = new RegExp(`\\$\\{(\\s*)@${esc}(?=[.}\\s])`, 'g');
+  const isRef = (v: unknown) => v === f || v === '@' + f;
+  let changed = false;
+  const visit = (v: any, roleKeyOwner = false): any => {
+    if (typeof v === 'string') {
+      if (v === '@' + f) { changed = true; return '@' + t; }
+      if (v.includes('${') && placeholder.test(v)) {
+        placeholder.lastIndex = 0;
+        changed = true;
+        return v.replace(placeholder, `\${$1@${t}`);
+      }
+      return v;
+    }
+    if (Array.isArray(v)) {
+      const out = v.map((x) => visit(x));
+      return out.some((x, i) => x !== v[i]) ? out : v;
+    }
+    if (v && typeof v === 'object') {
+      let out: any = v;
+      const set = (k: string, nv: any) => { if (out === v) out = { ...v }; out[k] = nv; changed = true; };
+      for (const k of Object.keys(v)) {
+        const cur = v[k];
+        if (k === 'target' && v.type === 'castRole' && isRef(cur)) { set(k, t); continue; }
+        if (k === 'role' && (v.type === 'roleHolder' || roleKeyOwner) && isRef(cur)) { set(k, t); continue; }
+        // A beat's own `role` parameter (Choose Your Character, Condition Check).
+        const nv = visit(cur, k === 'parameters' || k === 'condition');
+        if (nv !== cur) { if (out === v) out = { ...v }; out[k] = nv; }
+      }
+      return out;
+    }
+    return v;
+  };
+  const result = visit(value);
+  return changed ? result : value;
 }

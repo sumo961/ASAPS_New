@@ -24,6 +24,7 @@ import {
 import type { Beat, Effect } from '@asaps/core';
 import { useAI } from '../hooks/useAI';
 import { CharacterRefField } from '../components/characters/CharacterRefField';
+import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 import type { DialogGenerationRequest } from '../types/ai';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
 import { ChoiceConditionsEditor } from './ChoiceConditionsEditor';
@@ -147,6 +148,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   emotionPalette,
   beatHasAuthorLocations = false,
 }) => {
+  const projectRoles = useProjectRoles();
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
   // AI hook
@@ -616,6 +618,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         }))
                     ) as any}
                     onDefineAsCharacter={onDefineAsCharacter}
+                    // Cast roles: this line is spoken by whoever plays the role.
+                    pinnedOptions={projectRoles.map((r) => ({ value: `@${r.id}`, label: roleOptionLabel(r) }))}
                     placeholder="NPC speaker…"
                   />
                 </div>

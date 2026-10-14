@@ -239,3 +239,32 @@ describe('Condition Check beat with character conditions', () => {
     expect(await run({ type: 'goal', character: 'char_mara', goalId: 'g1', goalStatus: 'met', operator: '==' }, ctx)).toBe('yes');
   });
 });
+
+describe('renaming a role', () => {
+  it('rewrites every kind of reference and nothing else', async () => {
+    const { renameRoleReferences } = await import('../../src/engine/roles');
+    const beat = {
+      speaker: '@confidant',
+      parameters: {
+        role: 'confidant',
+        text: '${@confidant} and ${@confidant.They}; ${@confidante} stays; @confidant inline stays',
+        npcName: '@confidant',
+        choices: [{ id: 'a', effects: [{ type: 'castRole', target: 'confidant', character: 'x' }], conditions: [{ type: 'roleHolder', role: '@confidant', character: 'x', operator: '==' }] }],
+        condition: { type: 'roleHolder', role: 'confidant' },
+      },
+      connections: [{ targetId: 'b', effects: [{ type: 'castRole', target: '@confidant', character: 'y' }] }],
+    };
+    const out: any = renameRoleReferences(beat, 'confidant', 'friend');
+    expect(out.speaker).toBe('@friend');
+    expect(out.parameters.role).toBe('friend');
+    expect(out.parameters.text).toBe('${@friend} and ${@friend.They}; ${@confidante} stays; @confidant inline stays');
+    expect(out.parameters.npcName).toBe('@friend');
+    expect(out.parameters.choices[0].effects[0].target).toBe('friend');
+    expect(out.parameters.choices[0].conditions[0].role).toBe('friend');
+    expect(out.parameters.condition.role).toBe('friend');
+    expect(out.connections[0].effects[0].target).toBe('friend');
+    expect(beat.speaker).toBe('@confidant'); // input untouched
+    const plain = { speaker: 'Mara', parameters: { text: 'hi' } };
+    expect(renameRoleReferences(plain, 'confidant', 'friend')).toBe(plain);
+  });
+});

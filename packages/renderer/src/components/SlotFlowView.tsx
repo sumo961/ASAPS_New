@@ -310,16 +310,17 @@ let uidCounter = 0;
 
 /** A choice button's label, with an optional smaller description line under it. */
 const ChoiceLabel: React.FC<{ text: string; description?: string }> = ({ text, description }) => {
-  if (!description) return <>{text}</>;
+  // Labels take the same markdown-lite as body text (**bold**, \* escapes).
+  const md = (t: string) => ({ __html: renderMarkdownLite(t) });
+  if (!description) return <span dangerouslySetInnerHTML={md(text)} />;
   return (
     <>
-      <span style={{ display: 'block' }}>{text}</span>
+      <span style={{ display: 'block' }} dangerouslySetInnerHTML={md(text)} />
       <span
         data-slotflow-choice-description
         style={{ display: 'block', fontSize: '0.72em', fontWeight: 'normal', opacity: 0.85, marginTop: '0.25em', lineHeight: 1.3 }}
-      >
-        {description}
-      </span>
+        dangerouslySetInnerHTML={md(description)}
+      />
     </>
   );
 };

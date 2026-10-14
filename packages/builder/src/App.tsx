@@ -44,7 +44,7 @@ import { deserializeBeats } from './utils/projectDeserializer';
 import { cloneBeatsForDuplicate, cloneBeatsForPaste } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
 import { v4 as uuidv4 } from 'uuid';
-import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
+import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, renameRoleReferences, type AssetManifest, type ImportResult, type EmotionDefinition, type TraitEmotionWeight } from '@asaps/core';
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
@@ -7026,16 +7026,50 @@ function App() {
       {showSettings && (
         <GlobalSettingsInspector
           settings={globalSettings}
-          onUpdate={(newSettings) => {
+          onUpdate={(edited) => {
             const oldSettings = globalSettings;
-            applyGlobalSettingsChange(newSettings);
-            const cmd = new UpdateGlobalSettingsCommand(
-              oldSettings,
-              newSettings,
-              globalSettingsMutationsRef.current,
-              'Update global settings'
-            );
-            getCommandManager().pushWithoutExecute(cmd);
+            // A role whose id changed takes every reference along (speakers,
+            // AI partners, ${@role…} text, Cast Role effects, conditions,
+            // Choose Your Character) — one undo step with the settings.
+            const renames = ((edited as any).roles ?? [])
+              .filter((r: any) => r?.renamedFrom && r.id && r.renamedFrom !== r.id)
+              .map((r: any) => ({ from: r.renamedFrom as string, to: r.id as string }));
+            const newSettings = (edited as any).roles
+              ? { ...edited, roles: (edited as any).roles.map(({ renamedFrom: _from, ...role }: any) => role) } as GlobalSettings
+              : edited;
+            if (renames.length === 0) {
+              applyGlobalSettingsChange(newSettings);
+              getCommandManager().pushWithoutExecute(new UpdateGlobalSettingsCommand(
+                oldSettings,
+                newSettings,
+                globalSettingsMutationsRef.current,
+                'Update global settings'
+              ));
+              return;
+            }
+            const commands: any[] = [new UpdateGlobalSettingsCommand(oldSettings, newSettings, globalSettingsMutationsRef.current, 'Update global settings')];
+            for (const beat of (beatsRef.current || state.beats) as any[]) {
+              const before: Record<string, any> = {
+                speaker: beat.speaker,
+                characterRef: beat.characterRef,
+                parameters: beat.getParameters ? beat.getParameters() : beat.parameters,
+                connections: beat.connections,
+              };
+              let after: Record<string, any> = before;
+              for (const r of renames) after = renameRoleReferences(after, r.from, r.to);
+              if (after === before) continue;
+              const oldValues: Record<string, any> = {};
+              const newValues: Record<string, any> = {};
+              for (const k of Object.keys(after)) {
+                if (after[k] === before[k]) continue;
+                oldValues[k] = before[k] && typeof before[k] === 'object' ? structuredClone(before[k]) : before[k];
+                newValues[k] = after[k];
+              }
+              commands.push(new UpdateBeatCommand(beat.id, oldValues, newValues as any, stableMutations.current));
+            }
+            const label = renames.length === 1 ? `Rename role @${renames[0].from} to @${renames[0].to}` : `Rename ${renames.length} roles`;
+            void getCommandManager().execute(new BatchCommand(commands, label));
+            notify.success(`${label}: ${commands.length - 1} beat${commands.length === 2 ? '' : 's'} updated`);
           }}
           onClose={handleCloseSettings}
           assets={assets}

@@ -434,18 +434,23 @@ This is your workhorse for narration. Write descriptive text, the interactor rea
 
 **Formatting your text:** Narrative text fields support a small set of
 formatting marks — write them inline or select text and use the **B** / *I* /
-~~S~~ buttons above the field:
+~~S~~ / **H** buttons above the field:
 
 | You type | The player sees |
 |----------|-----------------|
 | `**text**` | **bold** |
 | `*text*` | *italic* |
 | `~~text~~` | ~~strikethrough~~ |
+| `==text==` | highlighted |
+| `\*` | a plain asterisk: `5 \* 3` shows *5 \* 3* |
 
-This works in body text, end-screen messages, input prompts, and chat
-bubbles — everywhere prose renders. Button labels stay plain (they're UI,
-not prose), and Hyper Text bodies stay plain so link words always match
-exactly. If you translate your story, the markers carry over — the words
+**Showing a marker character itself:** put a backslash in front of it —
+`\*`, `\_`, `\~`, `\=` — and it shows as typed instead of starting
+formatting; `\\` shows one backslash. (`\n` still means a line break.)
+
+This works in body text, end-screen messages, input prompts, chat
+bubbles and choice buttons. Hyper Text bodies stay plain so link words
+always match exactly. If you translate your story, the markers carry over — the words
 inside them get translated, the marks stay.
 
 **Showing state in text:** write `${name}` to show the current value of a story variable *or* a counter — *"You have ${gold} coins left"*, *"It is ${Clock}"*. (The older forms `$name$` and `{name}` work too; when a variable and a counter share a name, the variable wins.)
@@ -1649,11 +1654,11 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 - **Drawn at random at the start** — each playthrough draws one of the characters (rehearsal stories with different people).
 - **Always the default** — handy while the other characters are still unwritten.
 
-**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise the review flags it), and **Keep across restarts** lets an ending's Restart keep who plays it. Renaming the *Referenced as* id does not update places that already use it, so settle on it early.
+**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise the review flags it), and **Keep across restarts** lets an ending's Restart keep who plays it. Changing the *Referenced as* id updates every beat that uses it when you click **Save Settings** — speakers, AI partners, `${@…}` text, Cast Role effects, conditions and Choose Your Character — as one step you can undo.
 
 ![Project Settings → Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story](images/82-project-settings-roles.png)
 
-**Using a role.** Roles appear as *@ The confidant* in the character pickers: a beat's **Speaker** (below *Narrator* and the player), an AI Conversation's or AI Dialog Tree's **NPC** (every role except `player`), and the character an affect effect such as **Add Sentiment** or **Fire Emotion** is aimed at (listed first). In a Dialog Tree, the per-line speaker picker doesn't list roles yet; type `@confidant` into it. In text, write:
+**Using a role.** Roles appear as *@ The confidant* in the character pickers: a beat's **Speaker** (below *Narrator* and the player), an AI Conversation's or AI Dialog Tree's **NPC** (every role except `player`), and the character an affect effect such as **Add Sentiment** or **Fire Emotion** is aimed at (listed first). Each Dialog Tree line's speaker picker lists them too. In text, write:
 
 | You write | The interactor sees |
 |---|---|
@@ -1664,7 +1669,7 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 
 So *"${@confidant.They} ${@confidant.is} waiting."* reads *"She is waiting."* or *"They are waiting."* Set each character's **Pronouns** in the Character Editor (she/her, he/him, they/them, or your own); without a setting, they/them is used.
 
-**Deciding who plays it.** Besides the Choose Your Character beat, any choice can cast a role with the **Cast Role** effect (*@ The confidant is played by Tomas*). For the few lines that really must differ per person, use a role condition (*@ The confidant is played by Tomas*, or *is not played by*): pick **role** in a choice's [Show only if…](#conditional-choices) editor to show a choice to one person only, or **Who plays a role** in a beat's [Requirements](#per-beat-requirements) to guard a whole beat. (The Condition Check beat's own *Condition Type* list doesn't offer it.)
+**Deciding who plays it.** Besides the Choose Your Character beat, any choice can cast a role with the **Cast Role** effect (*@ The confidant is played by Tomas*). For the few lines that really must differ per person, use a role condition (*@ The confidant is played by Tomas*, or *is not played by*): pick **role** in a choice's [Show only if…](#conditional-choices) editor to show a choice to one person only, **Who plays a role** in a beat's [Requirements](#per-beat-requirements) to guard a whole beat, or **Who plays a role** as a Condition Check beat's *Condition Type* to branch.
 
 **The player role.** A role called `player` makes the interactor's own counters, feelings and sentiment targets follow the character they chose. The inventory stays the player's whoever plays, so picking up the key doesn't depend on who you are. Until the pick, none of the candidates' HUDs show; afterwards only the chosen one's.
 
@@ -1676,7 +1681,7 @@ While the story plays, the Preview's **Debug Info → Roles** card shows who pla
 
 **In the Flowchart**, a beat that decides who plays a role carries a **🎭 @role** badge, so you can see where the story chooses.
 
-**What the review banner checks.** When a story arrives from the [Story Generator](#after-generation-the-review-banner) or from Claude Desktop, the review banner also lists role problems:
+**What gets checked.** Role problems appear in the review banner when a story arrives from the [Story Generator](#after-generation-the-review-banner) or Claude Desktop, and for any story — hand-written ones too — under **Debug → Story Warnings**:
 - a reference to a role that doesn't exist;
 - casting someone who isn't on the role's list;
 - a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one);
@@ -2735,7 +2740,7 @@ Text boxes in ASAPS Modern support a lightweight markdown syntax for basic forma
 
 You don't have to remember the syntax: prose fields in the Inspector carry a small **B** / *I* / ~~S~~ bar — select text and click to wrap or unwrap it.
 
-Two places deliberately stay plain: **button labels** (they're UI, not prose) and **Hyper Text bodies** (link words must match the text exactly, and markers would break the match). If you translate your story, the markers carry over — the words inside get translated, the marks stay.
+One place deliberately stays plain: **Hyper Text bodies** (link words must match the text exactly, and markers would break the match). Choice buttons show formatting like body text. If you translate your story, the markers carry over — the words inside get translated, the marks stay.
 
 **Supported Syntax:**
 
@@ -2744,6 +2749,8 @@ Two places deliberately stay plain: **button labels** (they're UI, not prose) an
 | `**bold**` or `__bold__` | **bold** text |
 | `*italic*` or `_italic_` | *italic* text |
 | `~~strikethrough~~` | ~~strikethrough~~ text |
+| `==highlight==` | highlighted text (a soft yellow marker) |
+| `\*` `\_` `\~` `\=` `\\` | the character itself, not formatting: `5 \* 3` shows 5 * 3 |
 | Line breaks (Enter key) | New paragraphs |
 | `\n` (literal) | Line break |
 
@@ -2755,7 +2762,7 @@ Two places deliberately stay plain: **button labels** (they're UI, not prose) an
 She paused, then added: "~~Especially~~ **especially** those who forget."
 ```
 
-This renders with proper bold, italic, and strikethrough formatting in the preview and exported stories. HTML entities are safely escaped, so you cannot inject raw HTML.
+This renders with proper bold, italic, and strikethrough formatting in the preview and exported stories. Speech reads the words, not the markers. HTML entities are safely escaped, so you cannot inject raw HTML.
 
 ---
 
@@ -2965,6 +2972,7 @@ In **Tree** mode, a banner above the tree lists places where a player could get 
 | **Keypad has no clue before it** (warning) | Nothing checks that the player found the code before reaching the keypad, so a lucky guess (or reading the source) skips the puzzle. | Add a [requirement](#per-beat-requirements) or a condition on the way in, if the code is meant to be earned. |
 | **Requirement can never be met** (error or warning, as you set it) | A beat's requirement tests an item, variable or counter that no earlier beat gives or changes, or the requirement isn't finished. | Add the beat that sets it, or fix or remove the requirement. |
 | **Requirement not met on some paths** (warning) | Some of the simulated routes reach the beat without meeting its requirement. Those players are redirected to its fallback. | Check that this is intended; otherwise gate the routes that arrive unprepared. |
+| **Role** (error or warning) | A [role](#roles) problem: a role that doesn't exist or a character who isn't on a role's list (errors); a role cast in two beats without *Can be recast later*, a role used before anything chooses who plays it, or an AI partner role with nothing to go on (warnings). | Add the role, tick the character, set a default, or tick *Can be recast later* — the message says which. |
 
 These are advice only: nothing changes at runtime. The analysis explores the same routes as the rest of Path Analysis, including a replay when your story tests the built-in [playthrough](#keep-across-restarts).
 
@@ -3291,6 +3299,7 @@ The Condition Type dropdown groups the available checks into two families:
 - **Sentiment toward target ≷ value** — branch on how one character feels about another (optionally summed across all emotions, or scoped to a single emotion like *trust*)
 - **Goal status** — branch on whether a character's named goal is `open`, `met`, `failed`, or `abandoned`
 - **Active variant** — branch on which authored variant of a character is currently in play (e.g. anxious-introvert vs. free-spirit)
+- **Who plays a role** — branch on who currently plays a [role](#roles) (*@ The confidant is played by Tomas*)
 
 **XR / sensors** (for location-aware stories, exposed under the *XR / sensors* optgroup):
 - **GPS proximity (within / outside radius)** — is the player within (or outside) a radius of a target coordinate? (For geofencing a whole *named point set* from [Set GPS Location](#set-gps-location-beat), bind a GPS Location beat entry to the set instead — that's where dynamic points live.)
@@ -4165,7 +4174,7 @@ Quick reference for all beat types.
 
 **Session Timeline** - An automatic log of significant events during story playback, including beat transitions, player choices, AI outputs, and branching decisions.
 
-**Markdown-Lite** - Lightweight text formatting supported in text boxes: `**bold**`, `*italic*`, `~~strikethrough~~`, and line breaks.
+**Markdown-Lite** - Lightweight text formatting supported in text boxes and choice buttons: `**bold**`, `*italic*`, `~~strikethrough~~`, `==highlight==`, line breaks, and backslash escapes (`\*` shows an asterisk).
 
 **Layout Mode** - Project-level setting (v0.9.59+) that decides whether the project uses *Responsive layout* (slot/spatial flow, reflows to any viewport, default for new projects) or *Fixed canvas* (pixel positions on a 1024×768-ish stage, the historical ASAPS behaviour). Set in the New Project wizard or **Settings → Project → Layout Mode**; the colored pill in the header reflects the active mode. Switching modes on an existing project runs a one-shot migrator with a preview.
 

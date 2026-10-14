@@ -21,8 +21,10 @@ export function revealBoundary(
   index: number,
   granularity: TypewriterGranularity = 'letter',
 ): number {
-  if (granularity === 'letter') return index;
   if (index >= text.length) return text.length;
+  // Never stop between a backslash and the character it escapes (\*):
+  // the reveal would show a stray backslash for a tick.
+  if (granularity === 'letter') return index > 0 && text[index - 1] === '\\' ? index - 1 : index;
 
   const sep = granularity === 'line' ? '\n' : /\s/;
   // Walk back from `index` to the most recent separator; everything up to

@@ -8,7 +8,7 @@
  * the User Guide, and the renderer stay in agreement about what formats.
  */
 import { describe, it, expect } from 'vitest';
-import { renderMarkdownLite } from '../src/utils/markdownLite';
+import { renderMarkdownLite, markdownLiteToPlain } from '../src/utils/markdownLite';
 
 describe('renderMarkdownLite', () => {
   it('formats the documented subset', () => {
@@ -52,5 +52,29 @@ describe('renderMarkdownLite', () => {
   it('handles empty and missing input', () => {
     expect(renderMarkdownLite('')).toBe('');
     expect(renderMarkdownLite(undefined as unknown as string)).toBe('');
+  });
+});
+
+describe('markdown-lite escapes and highlight', () => {
+  it('a backslash shows the marker itself', () => {
+    expect(renderMarkdownLite('5 \\* 3 = 15')).toBe('5 * 3 = 15');
+    expect(renderMarkdownLite('\\*not italic\\*')).toBe('*not italic*');
+    expect(renderMarkdownLite('a \\_b\\_ \\~\\~c\\~\\~')).toBe('a _b_ ~~c~~');
+    expect(renderMarkdownLite('**bold with a \\* inside**')).toBe('<strong>bold with a * inside</strong>');
+    expect(renderMarkdownLite('C:\\\\path')).toBe('C:\\path');
+  });
+
+  it('keeps \\n as a line break', () => {
+    expect(renderMarkdownLite('one\\ntwo')).toBe('one<br/>two');
+  });
+
+  it('==highlight==', () => {
+    expect(renderMarkdownLite('a ==key== word')).toMatch(/^a <mark [^>]*>key<\/mark> word$/);
+    expect(renderMarkdownLite('a \\=\\=no\\=\\= mark')).toBe('a ==no== mark');
+  });
+
+  it('plain text for speech and measuring', () => {
+    expect(markdownLiteToPlain('**Run!** said *she*, 5 \\* 3, ==now==.')).toBe('Run! said she, 5 * 3, now.');
+    expect(markdownLiteToPlain('one\\ntwo')).toBe('one\ntwo');
   });
 });

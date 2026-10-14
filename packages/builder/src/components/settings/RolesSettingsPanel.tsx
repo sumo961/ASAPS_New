@@ -112,9 +112,13 @@ export const RolesSettingsPanel: React.FC<Props> = ({ roles = [], characters, on
                       <input
                         type="text"
                         value={role.id}
-                        onChange={e => update(index, { id: e.target.value.replace(/[^A-Za-z0-9_-]/g, '') })}
+                        onChange={e => update(index, {
+                          id: e.target.value.replace(/[^A-Za-z0-9_-]/g, ''),
+                          // Remember the saved id so Save can move every reference along.
+                          renamedFrom: role.renamedFrom ?? role.id,
+                        })}
                         className="w-full px-2 py-1 text-sm border rounded font-mono"
-                        title="Used in fields and text: @id, ${@id.name}. Renaming it does not update references."
+                        title="Used in fields and text: @id, ${@id.name}. Renaming it updates every beat that uses it when you save."
                       />
                     </div>
                   </div>

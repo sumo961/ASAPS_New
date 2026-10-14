@@ -1,6 +1,6 @@
 import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
-import { renderMarkdownLite } from '../utils/markdownLite';
+import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
@@ -1436,6 +1436,8 @@ export class ReactRenderer extends BaseRenderer {
    */
   private speakAloud(text: string, speaker?: string, isPrompt?: boolean): void {
     if (!this.ttsSpeakCallback) return;
+    // Speak what the reader sees: no **markers**, escaped \* as a plain *.
+    text = markdownLiteToPlain(text);
     const split = speaker && speaker !== 'Narrator' ? splitVoicedSegments(text) : null;
     const segments = split?.map((seg) => ({ text: seg.text, speaker: seg.quoted ? speaker : 'Narrator' }));
     this.ttsSpeakCallback(text, speaker, isPrompt, segments);

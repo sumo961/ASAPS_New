@@ -256,6 +256,9 @@ export class ConditionBeat extends Beat {
       case 'roleHolder':
         condition.role = this.role;
         condition.character = this.character;
+        // Only is / is not apply; an operator left over from another
+        // condition type (">=") would make the check always false.
+        condition.operator = this.operator === '!=' ? '!=' : '==';
         break;
       case 'gpsProximity':
         condition.targetLat = this.targetLat;

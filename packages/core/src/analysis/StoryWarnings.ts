@@ -12,13 +12,15 @@ import type { Story } from '../engine/Story';
 import type { Beat } from '../beats/Beat';
 import type { SimulatedPath, SimulatedStep, SimulationState } from './StateSimulationAnalyzer';
 import type { StateRequirement, Condition } from '../types';
+import { analyzeRoleFindings } from './roleFindings';
 
 export type StoryWarningCode =
   | 'keypad-softlock-loop'            // failTarget eventually leads back to the keypad with no state change
   | 'keypad-softlock-unlimited'       // maxAttempts=0 AND no state mutation on failure path
   | 'keypad-ungated'                  // no prerequisite check ancestor; player can always succeed
   | 'requires-unfulfillable'          // beat declares requires but no ancestor provides the state
-  | 'requires-violated-on-path';      // a specific path reaches the gated beat without satisfying requires
+  | 'requires-violated-on-path'       // a specific path reaches the gated beat without satisfying requires
+  | 'role';                           // cast roles: unknown role, non-candidate cast, recast, used before cast, bare AI partner
 
 export interface StoryWarning {
   code: StoryWarningCode;
@@ -56,6 +58,19 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
     const requires: StateRequirement[] | undefined = beat.requires || params.requires;
     if (!requires || requires.length === 0) continue;
     warnings.push(...detectRequiresWarnings(beat, requires, story, paths));
+  }
+
+  // 3. Cast roles (the same checks the generation review runs), so stories
+  // written by hand get them too.
+  const plainBeats = story.getAllBeats().map((b: any) => ({
+    id: b.id, name: b.name, type: b.type, speaker: b.speaker, characterRef: b.characterRef,
+    parameters: b.getParameters?.() ?? b.parameters, connections: b.connections,
+  }));
+  for (const f of analyzeRoleFindings(plainBeats, (story as any).getSettings?.()?.roles, story.getCharacters?.(), story.getFirstBeatId?.())) {
+    warnings.push({
+      code: 'role', severity: f.problem === 'unknown-role' || f.problem === 'not-candidate' ? 'error' : 'warn',
+      beatId: f.beatId, beatName: f.beatName || f.beatId, message: f.message, detail: { problem: f.problem, role: f.role },
+    });
   }
 
   return warnings;

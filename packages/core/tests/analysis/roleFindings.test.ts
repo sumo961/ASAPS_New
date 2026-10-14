@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeRoleFindings } from '../roleFindings';
-import { analyzeStoryFindings } from '../generationReview';
+import { analyzeRoleFindings } from '../../src/analysis/roleFindings';
+
 
 const roles = [{ id: 'confidant', candidates: ['char_a', 'char_b'] }];
 const chars = [{ id: 'char_a', displayName: 'Ana' }, { id: 'char_b', displayName: 'Ben' }, { id: 'char_c', displayName: 'Cleo' }];
@@ -34,9 +34,16 @@ describe('role findings', () => {
     expect(analyzeRoleFindings([one, two], [{ ...roles[0], recastable: true }], chars)).toEqual([]);
   });
 
-  it('runs as part of the story review, reading roles from the story', () => {
-    const story = { roles, characters: chars, beats: [{ id: 'b1', name: 'T', type: 'titleScreen', speaker: '@ghost', parameters: {} }] };
-    expect(analyzeStoryFindings(story).some(f => f.kind === 'role')).toBe(true);
+  it('Story Warnings report them for a hand-written story', async () => {
+    const { detectStoryWarnings } = await import('../../src/analysis/StoryWarnings');
+    const { Story } = await import('../../src/engine/Story');
+    const { createTestBeat } = await import('../test-utils');
+    const story = new Story({ title: 't', firstBeatId: 'b1' });
+    story.setSettings({ roles });
+    story.setCharacters(chars as any);
+    story.addBeat(createTestBeat({ id: 'b1', name: 'Start', type: 'infoText', speaker: '@ghost', parameters: { text: 'x' } } as any));
+    const w = detectStoryWarnings({ paths: [], story });
+    expect(w.map((x) => [x.code, x.severity, x.beatName])).toEqual([['role', 'error', 'Start']]);
   });
 });
 

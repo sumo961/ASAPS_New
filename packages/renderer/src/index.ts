@@ -104,7 +104,7 @@ export { isMobileDevice, getDeviceScalingInfo, type DeviceScalingInfo } from './
 export { TimerHudDisplay, type TimerHudConfig } from './components/TimerHudDisplay';
 
 // Export markdown-lite renderer
-export { renderMarkdownLite } from './utils/markdownLite';
+export { renderMarkdownLite, markdownLiteToPlain } from './utils/markdownLite';
 
 // Default element positions — exported so the Visual Editor can show the same
 // text box and button the runtime falls back to. Without them an author who

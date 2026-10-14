@@ -638,7 +638,7 @@ export function buildTranslationPrompt(
   // named only {{name}}, a syntax ASAPS does not use, so the one protection
   // that mattered was left to chance. The formatting markers are the
   // markdown-lite subset the renderer formats.
-  prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve variable references EXACTLY as written, untranslated: \${name}, $name$, {name} — the name inside must stay in the source language or the substitution breaks\n- Preserve formatting markers exactly: **bold**, *italic*, ~~strikethrough~~ and \\n line breaks — translate the words inside the markers, keep the markers themselves\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
+  prompt += `\n\nRules:\n- Preserve all HTML tags exactly as they are\n- Preserve variable references EXACTLY as written, untranslated: \${name}, $name$, {name} — the name inside must stay in the source language or the substitution breaks\n- Preserve formatting markers exactly: **bold**, *italic*, ~~strikethrough~~, ==highlight==, backslash escapes like \\* and \\n line breaks — translate the words inside the markers, keep the markers themselves\n- Return ONLY a valid JSON object with the same keys and translated values\n- Do not add any explanation or commentary`;
 
   return prompt;
 }

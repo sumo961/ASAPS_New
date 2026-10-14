@@ -75,6 +75,7 @@ export {
   PRONOUN_PRESETS,
   PRONOUN_KEYS,
   PLAYER_ROLE_ID,
+  renameRoleReferences,
   type CastRole,
   type RoleSelection,
   type PronounSet,

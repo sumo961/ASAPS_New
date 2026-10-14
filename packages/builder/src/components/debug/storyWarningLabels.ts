@@ -7,6 +7,7 @@ const LABELS: Record<StoryWarning['code'], string> = {
   'keypad-ungated': 'Keypad has no clue before it',
   'requires-unfulfillable': 'Requirement can never be met',
   'requires-violated-on-path': 'Requirement not met on some paths',
+  'role': 'Role',
 };
 
 export function storyWarningLabel(code: string): string {

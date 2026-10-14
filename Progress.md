@@ -1,5 +1,48 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.113, 2026-10-14)
+
+### Overview
+- **Text formatting (user request):**
+  - Backslash escapes: `\*` shows an asterisk instead of starting italic, likewise `\_ \~ \=`, and `\\` shows a backslash.
+  - New `==highlight==`.
+  - Choice buttons now show formatting too.
+  - Speech reads the words, not the markers.
+- **Roles follow-ups from the v0.9.113 User Guide audit, all four done:**
+  - Condition Check offers "Who plays a role".
+  - Dialog Tree line speakers list roles.
+  - Role problems show in Debug → Story Warnings for hand-written stories.
+  - Renaming a role's id updates every reference.
+
+### Text formatting
+- **`renderer/utils/markdownLite.ts`:**
+  - Escapes are held out of the formatting passes (private-use placeholders) and restored as the plain character; `\n` keeps meaning a line break.
+  - `==text==` renders as `<mark>` with a soft yellow that reads on light and dark themes.
+  - New `markdownLiteToPlain()`, used for wrapped-line measuring (PositionedBeatView) and for speech (`speakAloud`), so TTS no longer receives `**` markers.
+- **Bullet lines (`- item`) left out on purpose:** writers who start dialogue with "- " (a dialogue-dash convention) would have seen existing stories change.
+- **Choice buttons** render markdown-lite in the responsive and the hand-placed layout; hover text uses the plain form.
+- **Typewriter:** a letter-by-letter reveal never stops between a backslash and the character it escapes.
+- **Builder:**
+  - The formatting bar has a Highlight button and a `\* = *` hint (tooltip lists all escapes).
+  - Schema descriptions, the story/dialog/Co-Designer prompts and both translation prompts (StoryTranslator and the HtmlExporter copy) mention highlight and escapes.
+
+### Roles follow-ups
+- **Condition Check:** "Who plays a role" in the Condition Type list, using the shared role fields. The beat normalises a leftover operator to is / is not.
+- **Dialog Tree:** each line's speaker picker lists roles (`@confidant`).
+- **Story Warnings:** `analyzeRoleFindings` moved to core (`analysis/roleFindings.ts`; the builder keeps its import path). `detectStoryWarnings` adds `role` warnings — unknown role and non-candidate as errors, the rest as warnings — so hand-written stories get the checks in Debug → Story Warnings.
+- **Rename:**
+  - Core `renameRoleReferences()` rewrites `@old` strings, `${@old…}` placeholders, Cast Role targets, roleHolder conditions and a beat's own `role` (Choose Your Character, Condition Check).
+  - The Roles tab remembers the id a role had (`renamedFrom`, editor-only). Save Settings applies the settings and every changed beat as one BatchCommand, so a single Undo reverts it, then drops the field.
+  - Verified in the app: confidant → friend updated 3 beats (text, Cast Role effects, Condition Check, badge), and Undo restored all of them.
+
+### Verification
+- Suites: core 2902, renderer 674, builder 2864, player 8.
+- Preview (speech off):
+  - "Jonas pays 5 * 3 = **15** coins. [highlight] Not \*italic\* …" renders as intended.
+  - Choice buttons show "Side with **Ingrid**" and "Side with Tomas *".
+
+---
+
 ## 2026-10-14: Roles — one story, several people (v0.9.113)
 
 ### Overview

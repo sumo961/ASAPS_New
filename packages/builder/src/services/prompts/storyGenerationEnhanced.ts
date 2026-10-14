@@ -850,7 +850,8 @@ Fictional time condition example (CORRECT format):
 ## Text Formatting (markdown-lite)
 
 Player-facing prose supports a small markdown subset, rendered in every view
-(fixed, responsive, chat bubbles): **bold**, *italic*, ~~strikethrough~~.
+(fixed, responsive, chat bubbles): **bold**, *italic*, ~~strikethrough~~, ==highlight==.
+A backslash shows a marker character literally: write \\* for a real asterisk ("5 \\* 3"), \\_ for an underscore.
 - Use it SPARINGLY, for emphasis a reader should feel — a stressed word, a
   title of a book, a thought struck through. Most sentences need none.
 - Where it works: infoText/durScreen/explanation text, endScreen message,

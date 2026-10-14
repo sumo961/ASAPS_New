@@ -40,3 +40,10 @@ describe('revealBoundary', () => {
     expect(revealBoundary(TEXT, 6)).toBe(6);
   });
 });
+
+describe('letter reveal and escapes', () => {
+  it('never stops right after a backslash', () => {
+    expect(revealBoundary('5 \\* 3', 3, 'letter')).toBe(2);
+    expect(revealBoundary('5 \\* 3', 4, 'letter')).toBe(4);
+  });
+});

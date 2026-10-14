@@ -5,6 +5,9 @@
  *   **bold** or __bold__   → <strong>bold</strong>
  *   *italic* or _italic_   → <em>italic</em>
  *   ~~strikethrough~~      → <del>strikethrough</del>
+ *   ==highlight==          → <mark>highlight</mark>
+ *   \* \_ \~ \= \\        → the character itself, not formatting
+ *                            (so "5 \* 3" shows "5 * 3")
  *   \n (literal or real)   → <br/>
  *
  * HTML entities are escaped first to prevent XSS.
@@ -19,10 +22,29 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/** Characters a backslash turns back into plain text. `\n` stays a line break. */
+const ESCAPE = /\\([\\*_~=])/g;
+// Private-use characters hold escaped characters out of the formatting passes.
+const HOLD_OPEN = '\uE000';
+const HOLD_CLOSE = '\uE001';
+const HELD = /\uE000(\d+)\uE001/g;
+
+function holdEscapes(text: string): { text: string; held: string[] } {
+  const held: string[] = [];
+  return {
+    text: text.replace(ESCAPE, (_m, ch: string) => {
+      held.push(ch);
+      return `${HOLD_OPEN}${held.length - 1}${HOLD_CLOSE}`;
+    }),
+    held,
+  };
+}
+
 export function renderMarkdownLite(text: string): string {
   if (!text) return '';
 
-  let html = escapeHtml(text);
+  const { text: source, held } = holdEscapes(text);
+  let html = escapeHtml(source);
 
   // Bold: **text** or __text__. The closer must not be followed by another
   // marker character — otherwise "**bold and *italic***" closes the bold on
@@ -40,11 +62,30 @@ export function renderMarkdownLite(text: string): string {
   // Strikethrough: ~~text~~
   html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
+  // Highlight: ==text== (a soft marker that reads on light and dark themes)
+  html = html.replace(/==(.+?)==/g, '<mark style="background:rgba(250,204,21,0.35);color:inherit;padding:0 0.1em;border-radius:2px">$1</mark>');
+
   // Literal \n sequences → <br/>
   html = html.replace(/\\n/g, '<br/>');
 
   // Real newlines → <br/>
   html = html.replace(/\n/g, '<br/>');
 
-  return html;
+  // Escaped characters come back as themselves.
+  return html.replace(HELD, (_m, i: string) => escapeHtml(held[Number(i)] ?? ''));
+}
+
+/**
+ * The text a reader sees, without markdown-lite markers: for measuring
+ * wrapped lines and for speech (so "**Run!**" is not read with its
+ * asterisks). Escaped characters stay; literal \n becomes a newline.
+ */
+export function markdownLiteToPlain(text: string): string {
+  if (!text) return '';
+  const { text: source, held } = holdEscapes(text);
+  return source
+    .replace(/\\n/g, '\n')
+    .replace(/\*\*|__|~~|==|\*/g, '')
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, '$1')
+    .replace(HELD, (_m, i: string) => held[Number(i)] ?? '');
 }

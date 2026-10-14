@@ -50,7 +50,7 @@ Respond with JSON in this exact structure:
 }
 
 ## Text Formatting (markdown-lite)
-- Dialog node text may use **bold**, *italic*, ~~strikethrough~~ — sparingly, for emphasis a reader should feel
+- Dialog node text may use **bold**, *italic*, ~~strikethrough~~, ==highlight== — sparingly, for emphasis a reader should feel; write \\* for a literal asterisk
 - Choice text (the player's lines on buttons) stays PLAIN — no markers
 - Never emit raw HTML; it renders as literal escaped text
 

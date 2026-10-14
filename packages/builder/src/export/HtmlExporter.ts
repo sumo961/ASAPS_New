@@ -873,7 +873,7 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
 
               show('ai-progress', 'Translating: ' + translated + '/' + keys.length + ' strings...');
 
-              var sysPrompt = 'Translate the JSON values to ' + language + '. Keep keys unchanged. Keep HTML tags and variable references exactly as written (\${name}, $name$, {name}) — the name inside is not translated, or substitution breaks — and keep the formatting markers **bold**, *italic*, ~~strikethrough~~. Return a single JSON object with the same keys.';
+              var sysPrompt = 'Translate the JSON values to ' + language + '. Keep keys unchanged. Keep HTML tags and variable references exactly as written (\${name}, $name$, {name}) — the name inside is not translated, or substitution breaks — and keep the formatting markers **bold**, *italic*, ~~strikethrough~~, ==highlight== and backslash escapes like \\\\*. Return a single JSON object with the same keys.';
               var response = await callAI(sysPrompt, JSON.stringify(batch, null, 2), config);
 
               // Parse response
