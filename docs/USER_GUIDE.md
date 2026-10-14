@@ -583,7 +583,7 @@ In a responsive project the Visual Editor's left panel offers a **Layout Templat
 
 A Multi Choice whose buttons are people. Each choice names a character, and picking it puts that character into a [role](#roles): *the player* when the interactor chooses who to play, or any other role you set up ("who do you take with you?"). Each button shows the character's name with a short description underneath (or, if you like, the character's picture — see **Show options as** below), so the choice is made by who they are, not just what they're called. It sits in the palette's **Multi Choice → Buttons** group.
 
-![The Choose Your Character screen in the Preview: "Whose night is it?" above two buttons, Mara with "A doctor at the end of a double shift." underneath and Jonas with "The ferry mechanic who knows every bolt."](images/81-choose-your-character.png)
+![The Choose Your Character screen in the Preview: "The last ferry across the strait leaves at midnight. Whose night is it?" above two buttons, Mara with "A doctor at the end of a double shift, going home to her father." underneath and Jonas with "A ferry mechanic on his night off, who hates being a passenger."](images/81-choose-your-character.png)
 *Each button carries a description line. Everything after this beat follows the pick.*
 
 **Key Settings:**
@@ -593,7 +593,7 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 - **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
-![The same screen with Show options as set to Pictures with names: Mara's card shows her portrait above her name and description; Jonas has no portrait yet, so his card shows a large J.](images/83-choose-your-character-pictures.png)
+![The same screen with Show options as set to Pictures with names: Mara's card shows her portrait (a tired doctor in a coat and scarf on the night deck) above her name and description; Jonas has no portrait yet, so his card shows a large J.](images/83-choose-your-character-pictures.png)
 *Pictures with names. A character without a portrait shows their initial.*
 
 In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size). Picture cards fill the box you placed: a tall box is a card, and a box sized for a text button shows a small picture beside the name. **Reset Layout** in the Visual Editor lays the choices out as a row of cards.

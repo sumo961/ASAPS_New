@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.115, 2026-10-14)
+
+### Overview
+- **User Guide screenshots for Choose Your Character retaken** (UG-audit decisions 1 and 2 from the v0.9.115 release). Both now show the shipped Last Ferry text, and screenshot 83 gives Mara a real illustrated portrait instead of a placeholder avatar. Jonas still has none, so his card still shows the initial.
+
+### Documentation
+- `81-choose-your-character.png` (buttons) and `83-choose-your-character-pictures.png` (pictures with names) are taken from the same copy of The Last Ferry, Preview Window at Tablet landscape, 99%. The alt text matches the new descriptions.
+
+**Files modified:** `docs/USER_GUIDE.md`, `docs/images/81-choose-your-character.png`, `docs/images/83-choose-your-character-pictures.png`.
+
+---
+
 ## 2026-10-14: Pick your character by their picture (v0.9.115)
 
 ### Overview
