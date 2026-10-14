@@ -261,6 +261,50 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
       </div>
 
       <div>
+        <label className="block text-sm font-medium mb-1" title="Used when this character plays a role: ${@role.they}, ${@role.their} … in text">Pronouns</label>
+        {(() => {
+          const p = editedCharacter.pronouns;
+          const mode = typeof p === 'object' ? 'custom' : (p || 'they');
+          const custom = (typeof p === 'object' ? p : {}) as Record<string, string>;
+          return (
+            <>
+              <select
+                value={mode}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setEditedCharacter({
+                    ...editedCharacter,
+                    pronouns: v === 'custom' ? { they: '', them: '', their: '', theirs: '', themself: '' } : (v as 'she' | 'he' | 'they'),
+                  });
+                }}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                data-testid="character-pronouns"
+              >
+                <option value="she">she / her</option>
+                <option value="he">he / him</option>
+                <option value="they">they / them</option>
+                <option value="custom">Custom…</option>
+              </select>
+              {mode === 'custom' && (
+                <div className="grid grid-cols-5 gap-1 mt-1">
+                  {(['they', 'them', 'their', 'theirs', 'themself'] as const).map((k) => (
+                    <input
+                      key={k}
+                      type="text"
+                      value={custom[k] || ''}
+                      placeholder={k}
+                      onChange={(e) => setEditedCharacter({ ...editedCharacter, pronouns: { ...custom, [k]: e.target.value } })}
+                      className="px-2 py-1 text-sm border rounded"
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-1">Description</label>
         <textarea
           value={editedCharacter.description || ''}

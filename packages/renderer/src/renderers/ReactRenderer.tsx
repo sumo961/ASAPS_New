@@ -1,4 +1,4 @@
-import { uiString, isPresetSound, getPresetSound, splitVoicedSegments } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { renderMarkdownLite } from '../utils/markdownLite';
 import React from 'react';
@@ -2995,7 +2995,7 @@ export class ReactRenderer extends BaseRenderer {
     const projectLayoutMode = this.getState('projectLayoutMode') as string | undefined;
     const projectIsResponsive = projectLayoutMode === 'responsive';
     const treatAsAuthorPositioned = !projectIsResponsive && layoutAuthorPositioned(locations);
-    if (currentBeatType === 'multiChoice' && !treatAsAuthorPositioned) {
+    if (isMultiChoiceLike(currentBeatType) && !treatAsAuthorPositioned) {
       return;
     }
     // DialogTree's stacked / conversation / custom templates all
@@ -3141,7 +3141,7 @@ export class ReactRenderer extends BaseRenderer {
     );
   }
 
-  async renderChoices(choices: { id: string; text: string; isExit?: boolean; isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+  async renderChoices(choices: { id: string; text: string; description?: string; isExit?: boolean; isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
     this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
@@ -3327,7 +3327,7 @@ export class ReactRenderer extends BaseRenderer {
     const useSlotMode =
       !!effectiveSlotSpec &&
       !slotAuthorPositioned &&
-      (beatType === 'multiChoice' || dialogTreeSlotTemplate);
+      (isMultiChoiceLike(beatType) || dialogTreeSlotTemplate);
 
     if (useSlotMode && effectiveSlotSpec) {
       const slotBg = this.backgroundImageUrl
@@ -3367,7 +3367,7 @@ export class ReactRenderer extends BaseRenderer {
             backgroundColor={slotBg}
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
-            dynamicChoices={choices.map(c => ({ id: c.id, text: c.text }))}
+            dynamicChoices={choices.map(c => ({ id: c.id, text: c.text, ...(c.description ? { description: c.description } : {}) }))}
             layoutTemplate={slotTemplate}
             onAction={this.handleAction}
             characterLocations={this.pickFreePositioned(locations)}

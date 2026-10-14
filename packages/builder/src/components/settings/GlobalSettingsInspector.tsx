@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin } from 'lucide-react';
+import { Settings, Palette, Type, Box, Sliders, Monitor, Music, Copyright, Maximize, X, Save, Brush, ChevronDown, Check, Variable, Plus, Trash2, FileArchive, Image, Languages, Search, MapPin, Users } from 'lucide-react';
+import { RolesSettingsPanel } from './RolesSettingsPanel';
 import type { Asset } from '../assets/AssetManager';
 import { useFonts } from '../../hooks/useFonts';
 import { useThemes } from '../../hooks/useThemes';
@@ -39,7 +40,7 @@ interface GlobalSettingsInspectorProps {
   /** Filesystem path for directory-format projects (Electron only) */
   directoryPath?: string | null;
   /** Characters for portrait display in speaker settings */
-  characters?: Array<{ displayName: string; name: string; portrait?: { image?: string; assetId?: string } }>;
+  characters?: Array<{ id?: string; displayName: string; name: string; portrait?: { image?: string; assetId?: string } }>;
   /**
    * Phase 1 — request a layout-mode switch. The setting itself can't
    * be changed inline (it requires a migration step with confirm), so
@@ -78,7 +79,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     return initialSettings;
   });
   // Persisted: twelve tabs, and every open used to land on tab 1
-  const [activeTab, setActiveTab] = usePersistedState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'translation' | 'debug'>('asaps_ui_settings_tab', 'project');
+  const [activeTab, setActiveTab] = usePersistedState<'project' | 'colors' | 'fonts' | 'textbox' | 'effects' | 'hud' | 'sound' | 'xr' | 'copyright' | 'variables' | 'roles' | 'translation' | 'debug'>('asaps_ui_settings_tab', 'project');
   const [hasChanges, setHasChanges] = useState(false);
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [saveThemeDialogOpen, setSaveThemeDialogOpen] = useState(false);
@@ -714,6 +715,16 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           >
             <Variable className="w-4 h-4" />
             Variables
+          </button>
+          <button
+            onClick={() => setActiveTab('roles')}
+            className={`px-4 py-2 flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'roles' ? 'bg-blue-50 border-b-2 border-blue-500' : ''
+            }`}
+            title="Parts in the story that one of several characters can play (the player, a companion, …)"
+          >
+            <Users className="w-4 h-4" />
+            Roles
           </button>
           <button
             onClick={() => setActiveTab('translation')}
@@ -3415,6 +3426,14 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'roles' && (
+            <RolesSettingsPanel
+              roles={settings.roles}
+              characters={characters}
+              onChange={(roles) => handleChange('roles', undefined, roles)}
+            />
           )}
 
           {activeTab === 'variables' && (

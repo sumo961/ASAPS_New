@@ -71,6 +71,7 @@ import type { ThemeAssetUrls } from '../../hooks/useThemes';
 import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 import { notifyUndoable } from '../../utils/undoNotice';
+import { isMultiChoiceLike } from '@asaps/core';
 
 
 /**
@@ -1896,7 +1897,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               question: slotPreviewParams.question || 'Where do you want to go?',
               speaker: slotPreviewSpeaker,
             }
-        : beat.type === 'multiChoice'
+        : isMultiChoiceLike(beat.type)
           ? {
               question: slotPreviewParams.question || 'What do you want to say?',
               speaker: slotPreviewSpeaker,
@@ -4568,7 +4569,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           choices: translatedChoices
         };
       }
-      case 'multiChoice': {
+      case 'multiChoice':
+      case 'chooseCharacter': {
         const rawChoices = params.choices || [];
         const translatedChoices = rawChoices.map((c: any, i: number) => ({
           ...c,
@@ -5654,7 +5656,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // always — its templates include chat-scroll/chat-bubble
                   // which work regardless of project layout mode (they
                   // bypass the absolute path at runtime).
-                  if (beat.type === 'multiChoice' && projectIsResponsive) {
+                  if (isMultiChoiceLike(beat.type) && projectIsResponsive) {
                     return (beat as any).layoutTemplate || 'stacked';
                   }
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
@@ -5680,7 +5682,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     }
                     setHasChanges(true);
                   };
-                  if (beat.type === 'multiChoice' && projectIsResponsive) return handler;
+                  if (isMultiChoiceLike(beat.type) && projectIsResponsive) return handler;
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
                   return undefined;
                 })()}
@@ -5689,7 +5691,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // in slot/spatial layout — the panel's per-slot rows
                   // (Title lines, Pin, Action layout) read/write it.
                   // Falls through to undefined for purely-absolute beats.
-                  if (beat.type === 'multiChoice' && projectIsResponsive) {
+                  if (isMultiChoiceLike(beat.type) && projectIsResponsive) {
                     return (beat as any).slotIntent as Record<string, any> | undefined;
                   }
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') {
@@ -5707,7 +5709,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     onBeatUpdate(beat.id, { slotIntent: nextIntent } as any);
                     setHasChanges(true);
                   };
-                  if (beat.type === 'multiChoice' && projectIsResponsive) return handler;
+                  if (isMultiChoiceLike(beat.type) && projectIsResponsive) return handler;
                   if (beat.type === 'dialogTree' || beat.type === 'aiDialogTree') return handler;
                   if (projectIsResponsive && (isSlotModeBeatType(beat.type) || isSpatialModeBeatType(beat.type))) return handler;
                   return undefined;
@@ -6526,7 +6528,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   // multiChoice chat-* templates render through ChatDialogView
                   // in the responsive slot preview — same component the
                   // runtime uses, so the editor preview matches PW.
-                  const lt = beat!.type === 'multiChoice'
+                  const lt = isMultiChoiceLike(beat!.type)
                     ? (slotPreviewParams?.layoutTemplate as string | undefined)
                     : undefined;
                   if (lt === 'chat-bubble' || lt === 'chat-scroll') {
@@ -6605,7 +6607,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     slotAnimations={
                       (slotPreviewParams?.slotAnimations as SlotAnimations | undefined) ?? undefined
                     }
-                    dynamicChoices={(beat!.type === 'multiChoice'
+                    dynamicChoices={(isMultiChoiceLike(beat!.type)
                       || ((beat!.type === 'dialogTree' || beat!.type === 'aiDialogTree') && dialogTreeSlotTemplate))
                       ? (() => {
                           // multiChoice stores choices flat; dialogTree
@@ -6615,7 +6617,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                           // + body, which the dialogTree case in
                           // slotPreviewContent already walks to).
                           let rawChoices: any;
-                          if (beat!.type === 'multiChoice') {
+                          if (isMultiChoiceLike(beat!.type)) {
                             rawChoices = slotPreviewParams?.choices;
                           } else {
                             const curNode = dialogNodeAt(
@@ -6630,7 +6632,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
                         })()
                       : undefined}
-                    layoutTemplate={(beat!.type === 'multiChoice'
+                    layoutTemplate={(isMultiChoiceLike(beat!.type)
                       || beat!.type === 'dialogTree'
                       || beat!.type === 'aiDialogTree')
                       ? ((slotPreviewParams?.layoutTemplate === 'conversation'
@@ -7046,7 +7048,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               }
               // multiChoice: map layoutTemplate → presentationMode so VBE's
               // ChatDialogView preview fires for chat-scroll/chat-bubble.
-              if (beat.type === 'multiChoice') {
+              if (isMultiChoiceLike(beat.type)) {
                 const lt = (beat as any).layoutTemplate as string | undefined;
                 if (lt === 'chat-scroll' || lt === 'chat-bubble') return lt;
                 return 'positioned';

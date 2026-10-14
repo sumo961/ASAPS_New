@@ -2,7 +2,7 @@ import React from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
 import ReactDOM from 'react-dom';
 import type { Location, AnimationPath, AnimationState } from '@asaps/core';
-import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand } from '@asaps/core';
+import { getPresetSound, isPresetSound, getFontFamily, isBuiltInFont, barFill, resolveBand, isMultiChoiceLike } from '@asaps/core';
 import { getAudioManager } from '../audio/AudioManager';
 import { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_BEAT_TYPES } from '../utils/legacyTextAlias';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
@@ -957,7 +957,7 @@ export function adjustElementsForCollisions(
   // degenerate-overlap repair, no alignment — exactly the positions the
   // author dragged to. Designers were giving up on the old auto-layout;
   // we trust their placement (including buttons above the prompt).
-  if (beatType === 'multiChoice') {
+  if (isMultiChoiceLike(beatType)) {
     return [...otherElements, ...adjustedTextElements, ...buttonElements];
   }
 
@@ -1249,7 +1249,7 @@ function computeButtonSpaceReserve(
   });
   const keepsAuthoredLayout =
     beatType === 'endScreen' || beatType === 'endScreenCredits' ||
-    beatType === 'aiSummary' || beatType === 'multiChoice';
+    beatType === 'aiSummary' || isMultiChoiceLike(beatType);
   if (keepsAuthoredLayout || heights.length === 1) return Math.max(...heights);
   return heights.reduce((sum, h) => sum + h, 0) + 15 * (heights.length - 1);
 }
@@ -5441,7 +5441,7 @@ export function createPositionedElementData(
     // SchemaLocationInitializer) to the choice's id. Without this branch
     // every button fires with no actionId and the beat resolves the first
     // available choice — three buttons all advance to choice[0]'s target.
-    if (beatType === 'multiChoice' && content.choices && Array.isArray(content.choices)) {
+    if (isMultiChoiceLike(beatType) && content.choices && Array.isArray(content.choices)) {
       let choice = content.choices.find((c: any) => c.text === location.name);
       if (!choice && location.kind === 'button' && content.choices.length > 0) {
         // Button position fallback (covers locations baked before a
@@ -5456,6 +5456,9 @@ export function createPositionedElementData(
       if (choice) {
         actionId = choice.id;
         if (markVisited) targetBeatId = choice.target;
+        // Choose your character: a button placed by hand keeps its size, so
+        // the description shows on hover instead of as a second line.
+        if (choice.description) description = choice.description;
         console.log(`[createPositionedElementData] MultiChoice: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}"`);
       } else if (location.kind === 'button') {
         console.warn(`[createPositionedElementData] MultiChoice: NO MATCH for button "${location.name}"`);

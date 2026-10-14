@@ -31,6 +31,7 @@ import type { VisualElement } from './VisualBeatEditor';
 import type { Character, CharacterState } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
 import { useFonts } from '../../hooks/useFonts';
+import { isMultiChoiceLike } from '@asaps/core';
 
 // Transition types supported by the renderer
 type TransitionType = 'none' | 'fade' | 'slide' | 'zoom' | 'dissolve';
@@ -1143,7 +1144,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
         )}
 
         {/* Dialog Settings Section - For dialogTree and aiDialogTree beats */}
-        {beatType === 'multiChoice' && onLayoutTemplateChange && (
+        {isMultiChoiceLike(beatType) && onLayoutTemplateChange && (
           <div className="border-b border-gray-200">
             <button
               onClick={() => toggleSection('dialogSettings')}
@@ -1187,7 +1188,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
 
-        {(beatType === 'multiChoice' || beatType === 'dialogTree' || beatType === 'aiDialogTree') && layoutTemplate === 'custom' && onSlotIntentChange && (() => {
+        {(isMultiChoiceLike(beatType) || beatType === 'dialogTree' || beatType === 'aiDialogTree') && layoutTemplate === 'custom' && onSlotIntentChange && (() => {
           // 3×3 anchor picker per slot. Phase 1 of "custom" — discrete
           // positions, fast to author, covers the 9 canonical placements
           // (top-left, top-center, top-right, mid-left, … bottom-right).

@@ -117,6 +117,20 @@ const BEAT_TYPE_GUIDE = `
 - Connections: Multiple → derived from each choice's target
 - ⚠️ Use dialogTree instead when the dialog needs MULTIPLE TURNS (player asks → NPC responds → player picks again) or NESTED choices.
 
+**chooseCharacter** - "Choose your character": a multiChoice whose options each cast a character into a ROLE
+- Use: the player picks who to play (role "player"), or who comes along / whom to confide in (any other role). Requires the role in the top-level "roles" array (see Cast Roles below).
+- Parameters: role (role id, default "player"), question (default "Who will you be?"), choices — one per candidate: { "id", "character": "<character id>", "text": label (empty = the character's name), "description": one short sentence the player can choose by, "target" }. Usually every option has the SAME target: the story stays one story, and later beats refer to the role.
+  {
+    "role": "player",
+    "question": "Whose night is it?",
+    "choices": [
+      { "id": "c_mara", "character": "char_mara", "text": "Mara", "description": "A doctor at the end of a double shift.", "target": "beat_ferry" },
+      { "id": "c_jonas", "character": "char_jonas", "text": "Jonas", "description": "The ferry mechanic who knows every bolt.", "target": "beat_ferry" }
+    ]
+  }
+- After the pick, write "@player" (or "@companion" …) as speaker or AI-conversation npcName, and \${@player.name} / \${@player.they} in text — never duplicate branches per character.
+- Same layouts, effects and conditions as multiChoice; a choice's own effects run AFTER the cast, so an effect with character "@player" lands on the one just chosen.
+
 **dialogTree** - Multi-turn NPC dialogue with nested choices (for back-and-forth conversation)
 - Use this when the player needs a real back-and-forth with an NPC: ask a question, NPC responds, player picks a follow-up, NPC responds again, etc. The nesting is the value.
 - Use multiChoice instead for one-shot choice screens (no follow-up turn).
@@ -996,6 +1010,26 @@ character appears: their HUD shows from their first scene). Player-chosen or plo
 variants instead keep fixed selection: \`defaultVariantId\` on the character plus
 \`setCharacterVariant\` Effects at the transition points.
 
+### Cast Roles (one story, several possible people)
+A **role** is a part that one of several characters plays, decided while the story runs: the
+player picks who to be, or "the confidant" is whoever the player sided with earlier. Use a role
+instead of duplicating beats per character. (Variants are different moods of ONE person; roles
+are DIFFERENT people with their own names, counters and feelings.)
+Declare roles in a top-level "roles" array:
+\`\`\`json
+"roles": [
+  { "id": "player", "name": "The player", "candidates": ["char_mara", "char_jonas"], "selection": "cast" },
+  { "id": "confidant", "name": "The confidant", "candidates": ["char_ingrid", "char_tomas"], "defaultCharacterId": "char_ingrid" }
+]
+\`\`\`
+- selection: "cast" (a chooseCharacter beat or a castRole effect fills it), "random" (drawn at story start — rehearsal variety across DIFFERENT people), "fixed" (always the default). recastable: true only if the story may change the holder later. keepOnRestart: true keeps the holder across an ending's Restart.
+- Refer to a role as "@confidant" wherever a character goes: beat speaker, dialog node speaker, aiConversation / aiDialogTree npcName, effect target/character, condition character.
+- In text: \${@confidant} or \${@confidant.name} = the holder's name; pronouns \${@confidant.they} \${@confidant.them} \${@confidant.their} \${@confidant.theirs} \${@confidant.themself}, agreement \${@confidant.is} \${@confidant.has} \${@confidant.was} ("\${@confidant.they} \${@confidant.is} late"); a capital key capitalises: \${@confidant.They}. Give every candidate "pronouns": "she" | "he" | "they".
+- Cast it with a chooseCharacter beat, or with an effect on any choice: { "type": "castRole", "target": "confidant", "character": "char_tomas" } ("you side with Tomas" → Tomas becomes the confidant).
+- For the few lines that must differ per holder, a condition: { "type": "roleHolder", "role": "confidant", "character": "char_tomas", "operator": "==" }.
+- A role named "player" makes the implicit 'player' key (counters, feelings, sentiment targets) follow the chosen protagonist; the inventory stays the player's whoever plays.
+- Keep role-dependent prose short (names, pronouns) or let AI beats write it; long hand-written passages rarely fit two different people.
+
 ### Speaker System on Beats
 Visible beats (titleScreen, infoText, durScreen, multiChoice, dialogTree, movementChoice, pickProp, endScreen, videoBeat, inputText, hyperText) have a **speaker** property that controls who is "speaking" the beat's text.
 
@@ -1730,6 +1764,7 @@ Generate complete, sophisticated interactive story structures that:
       "connections": [{ "targetId": "beat_0" }]
     }
   ],
+  "roles": [],
   "variables": [
     {
       "name": "cluesFound",

@@ -143,6 +143,10 @@ export function summarizeChoiceEffects(
         if (e.target) variables.push(`${e.target} = ${JSON.stringify(e.value)}`);
         break;
       }
+      case 'castRole': {
+        if (e.target && e.character) variables.push(`@${e.target.replace(/^@/, '')} = ${resolveName(e.character)}`);
+        break;
+      }
       case 'addInventory': {
         if (e.target) inventory.push(`+${e.target}`);
         break;

@@ -253,7 +253,7 @@ interface SlotFlowViewProps {
    * layoutTemplate. The schema's `actionSlot.buttons` is still honoured
    * when dynamicChoices is absent (e.g. infoText's Continue).
    */
-  dynamicChoices?: { id: string; text: string }[];
+  dynamicChoices?: { id: string; text: string; description?: string }[];
   /**
    * Mark-visited dimming for dynamic choices. The fixed-canvas path has done
    * this since the feature shipped; slot mode silently ignored the setting —
@@ -306,6 +306,23 @@ const BUTTON_CEILING = 22;
 const READABLE_MAX_WIDTH = 760;
 
 let uidCounter = 0;
+
+
+/** A choice button's label, with an optional smaller description line under it. */
+const ChoiceLabel: React.FC<{ text: string; description?: string }> = ({ text, description }) => {
+  if (!description) return <>{text}</>;
+  return (
+    <>
+      <span style={{ display: 'block' }}>{text}</span>
+      <span
+        data-slotflow-choice-description
+        style={{ display: 'block', fontSize: '0.72em', fontWeight: 'normal', opacity: 0.85, marginTop: '0.25em', lineHeight: 1.3 }}
+      >
+        {description}
+      </span>
+    </>
+  );
+};
 
 export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   beatType,
@@ -2077,6 +2094,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const buttonCatalog: Array<{
           id: string;
           text: string;
+          /** Second, smaller line (Choose your character). */
+          description?: string;
           onClick: () => void;
           show: boolean;
         }> = dynamicChoices && dynamicChoices.length > 0
@@ -2088,6 +2107,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           ? dynamicChoices.map(c => ({
               id: c.id,
               text: c.text,
+              description: c.description,
               onClick: () => dispatchAction(c.id),
               show: true,
             }))
@@ -2223,7 +2243,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                         ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                       }}
                     >
-                      {b.text}
+                      <ChoiceLabel text={b.text} description={b.description} />
                     </button>
                   );
                 })}
@@ -2398,7 +2418,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                     }}
                   >
-                    {b.text}
+                    <ChoiceLabel text={b.text} description={b.description} />
                   </button>
                 );
               })}

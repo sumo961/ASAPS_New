@@ -569,6 +569,8 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
               for (var j = 0; j < params.choices.length; j++) {
                 var label = params.choices[j].displayText || params.choices[j].text || params.choices[j].location;
                 if (label) strings[prefix + '.parameters.choices.' + j + '.displayText'] = label;
+                // Choose your character: the line under the name (mirrors StoryTranslator).
+                if (params.choices[j].description) strings[prefix + '.parameters.choices.' + j + '.description'] = params.choices[j].description;
               }
             }
             // PickProp

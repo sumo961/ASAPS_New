@@ -5,7 +5,7 @@
  * projects, assets, command history, and auto-save drafts.
  */
 
-import type { Beat, BeatConfig, Story, ThemeDefinition, TranslationResource, TranslationManifest } from '@asaps/core';
+import type { Beat, BeatConfig, Story, ThemeDefinition, TranslationResource, TranslationManifest, CastRole } from '@asaps/core';
 
 // ============================================================================
 // Global Settings Types (per-project)
@@ -330,6 +330,12 @@ export interface GlobalSettings {
      *  going back to defaultValue. A host restart still starts fresh. */
     keepOnRestart?: boolean;
   }[];
+
+  /**
+   * Cast roles (Settings → Roles): parts that one of several characters
+   * fills at runtime, referenced as '@id' (docs/Character-Roles-Design.md).
+   */
+  roles?: CastRole[];
 
   /**
    * Player-facing UI labels ("Continue", "Inventory", …) overriding the

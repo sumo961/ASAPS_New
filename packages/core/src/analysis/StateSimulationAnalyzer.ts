@@ -27,6 +27,7 @@ import {
   createEmptyConstraintSet,
 } from './ConstraintSet';
 import type { BackwardAnalysisResult, PathRequirement, DecisionPoint } from './BackwardAnalyzer';
+import { isMultiChoiceLike } from '../beats/MultiChoiceBeat';
 
 // ============================================================================
 // Types
@@ -948,7 +949,7 @@ export class StateSimulationAnalyzer {
       return false;
     }
 
-    if (beat.type === 'movementChoice' || beat.type === 'multiChoice') {
+    if (beat.type === 'movementChoice' || isMultiChoiceLike(beat.type)) {
       return anyHasEffects(params.choices);
     }
 
@@ -1194,7 +1195,8 @@ export class StateSimulationAnalyzer {
         break;
       }
 
-      case 'multiChoice': {
+      case 'multiChoice':
+      case 'chooseCharacter': {
         // Links skip '__self__' choices, so match the choice by its link.
         const mc: any[] = params.choices || [];
         const choice = connection
@@ -1535,6 +1537,7 @@ export class StateSimulationAnalyzer {
       // place, or the AI's classification. They were followed first-link-
       // only, so everything behind their other links read as unreachable.
       'multiChoice',
+      'chooseCharacter',
       'aiCondition',
       'aiConversation',
       'arBeat',

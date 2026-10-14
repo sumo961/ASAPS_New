@@ -522,6 +522,8 @@ export const PreviewWindow: React.FC = () => {
       drawn: boolean;
       hud: 'shown' | 'until first appearance' | 'until a variant is chosen';
     }>;
+    /** Cast roles: who plays each now, and whether anything has cast it yet. */
+    roles?: Array<{ id: string; name: string; holder: string | null; cast: boolean; candidates: Array<{ id: string; name: string }> }>;
   }>({});
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
 
@@ -1894,6 +1896,18 @@ export const PreviewWindow: React.FC = () => {
           };
         });
 
+        const charName = (id: string) => {
+          const c = (previewDataRef.current?.characters || []).find((x: any) => x.id === id) as any;
+          return c?.displayName || c?.name || id;
+        };
+        const roles = ((ctx as any).getRoles?.() ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.name || r.id,
+          holder: (ctx as any).getRoleHolder?.(r.id) ?? null,
+          cast: !!(ctx as any).isRoleCast?.(r.id),
+          candidates: (r.candidates || []).map((id: string) => ({ id, name: charName(id) })),
+        }));
+
         setDebugInfo({
           visitedBeats,
           seededBeats: Array.from(seededBeatsRef.current),
@@ -1902,6 +1916,7 @@ export const PreviewWindow: React.FC = () => {
           inventory: ctx.getInventoryEntries(),
           timers,
           characters,
+          roles,
         });
 
         // Echo visited-beats + current-beat back to the builder so it can
@@ -2015,6 +2030,7 @@ export const PreviewWindow: React.FC = () => {
       context.on('characterVariantChanged', updateDebugInfo);
       // A character's HUD appears when the player first meets them.
       context.on('characterAppeared', updateDebugInfo);
+      context.on('roleCast', updateDebugInfo);
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer
@@ -3320,6 +3336,34 @@ export const PreviewWindow: React.FC = () => {
                     </div>
                   );
                 })()}
+
+                {/* Roles — who plays each cast role now; pick another to test
+                    that version of the story from here on. */}
+                {debugInfo.roles && debugInfo.roles.length > 0 && (
+                  <div className="bg-white p-3 rounded-lg" data-testid="debug-roles">
+                    <div className="text-sm font-medium text-gray-600 mb-2">Roles</div>
+                    <div className="space-y-1">
+                      {debugInfo.roles.map((r) => (
+                        <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="font-mono text-gray-600" title={r.name}>@{r.id}</span>
+                          <select
+                            value={r.holder ?? ''}
+                            title={r.cast ? 'Who plays this role now — pick another to test it' : 'Not chosen yet: this is the default'}
+                            onChange={(e) => {
+                              const ctx = engineRef.current?.getContext() as any;
+                              if (e.target.value) ctx?.castRole?.(r.id, e.target.value);
+                            }}
+                            className="min-w-0 max-w-[60%] px-1 py-0.5 border border-gray-300 rounded text-xs"
+                          >
+                            {r.candidates.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}{!r.cast && c.id === r.holder ? ' (default)' : ''}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Characters — the runtime's automatic per-character state:
                     which variant is active (random draw or chosen; switch it

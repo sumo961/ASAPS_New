@@ -15,6 +15,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import type { Beat, Condition } from '@asaps/core';
 import { SmartNameDropdown } from './SmartNameDropdown';
 import { summarizeConditions } from '../utils/conditionSummary';
+import { RoleHolderConditionFields } from './RoleHolderConditionFields';
+import { useProjectRoles } from '../contexts/RolesContext';
 
 interface AvailableOption {
   name: string;
@@ -44,7 +46,7 @@ interface ChoiceConditionsEditorProps {
   characters?: Array<{ id: string; name?: string; displayName?: string; role?: string }>;
 }
 
-type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat' | 'sentiment';
+type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat' | 'sentiment' | 'roleHolder';
 
 const GATE_TYPES: Array<{ value: GateType; label: string }> = [
   { value: 'inventory', label: 'item' },
@@ -52,6 +54,7 @@ const GATE_TYPES: Array<{ value: GateType; label: string }> = [
   { value: 'counter', label: 'counter' },
   { value: 'visitedBeat', label: 'visited beat' },
   { value: 'sentiment', label: 'feeling' },
+  { value: 'roleHolder', label: 'role' },
 ];
 
 /** Common sentiment labels, offered as suggestions — any emotion name in the story's palette works. */
@@ -72,6 +75,8 @@ function defaultConditionFor(type: GateType): Condition {
       // `sentimentTarget` receives it. baseline 'literal' = current value;
       // 'initial' = change since the story started.
       return { type: 'sentiment', character: '', sentimentTarget: 'player', sentimentEmotion: 'trust', operator: '>=', value: 0.3, baseline: 'literal' } as Condition;
+    case 'roleHolder':
+      return { type: 'roleHolder', role: '', character: '', operator: '==' } as Condition;
   }
 }
 
@@ -85,6 +90,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
   characters,
 }) => {
   const conditions = value ?? [];
+  const roles = useProjectRoles();
   const charLabel = (c: { id: string; name?: string; displayName?: string }) => c.displayName || c.name || c.id;
 
   const update = (index: number, patch: Partial<Condition>) => {
@@ -124,7 +130,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
       </div>
 
       {conditions.map((cond, i) => {
-        const gate: GateType = (['inventory', 'variable', 'counter', 'visitedBeat', 'sentiment'] as const)
+        const gate: GateType = (['inventory', 'variable', 'counter', 'visitedBeat', 'sentiment', 'roleHolder'] as const)
           .includes(cond.type as GateType) ? (cond.type as GateType) : 'variable';
         return (
           <div key={i} className="flex items-start gap-1 flex-wrap p-1.5 bg-violet-50 border border-violet-200 rounded">
@@ -133,7 +139,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
               onChange={e => replace(i, defaultConditionFor(e.target.value as GateType))}
               className="px-1.5 py-1 border border-gray-300 rounded text-xs bg-white"
             >
-              {GATE_TYPES.map(t => (
+              {GATE_TYPES.filter(t => t.value !== 'roleHolder' || roles.length > 0 || gate === 'roleHolder').map(t => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
@@ -329,6 +335,16 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
                   <option value="not">not visited</option>
                 </select>
               </>
+            )}
+
+            {gate === 'roleHolder' && (
+              <RoleHolderConditionFields
+                role={(cond as any).role}
+                character={cond.character}
+                operator={cond.operator}
+                characters={characters}
+                onChange={patch => update(i, patch as Partial<Condition>)}
+              />
             )}
 
             <button

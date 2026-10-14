@@ -48,6 +48,7 @@ import { Story, ASMLParser, DEFAULT_EMOTION_PALETTE, DEFAULT_TRAIT_MODULATIONS, 
 import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
+import { RolesProvider } from './contexts/RolesContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './storage/types';
@@ -3163,7 +3164,7 @@ function App() {
    */
   const pruneResolvedFindings = useCallback(() => {
     const beats = state.beats.map((b: any) => (typeof b.toJSON === 'function' ? b.toJSON() : b));
-    const live = new Set(analyzeStoryFindings({ beats, variables: (globalSettingsRef.current ?? globalSettings)?.variables }).map(f => f.id));
+    const live = new Set(analyzeStoryFindings({ beats, variables: (globalSettingsRef.current ?? globalSettings)?.variables, roles: (globalSettingsRef.current ?? globalSettings)?.roles, characters }).map(f => f.id));
     setImportIssues(prev => {
       if (!prev) return prev;
       const findings = (prev.findings ?? []).filter(f => live.has(f.id));
@@ -3172,7 +3173,7 @@ function App() {
       const remaining = brokenTargets.length + prev.otherErrors.length + proposals.length + findings.length;
       return remaining ? { ...prev, findings, proposals, brokenTargets } : null;
     });
-  }, [state.beats, globalSettings]);
+  }, [state.beats, globalSettings, characters]);
 
   const handleApplyProposal = useCallback(async (proposal: FixProposal) => {
     const cmd = proposalCommand(proposal);
@@ -6557,6 +6558,7 @@ function App() {
   }, [markChanged]);
 
   return (
+    <RolesProvider roles={(globalSettings as any)?.roles}>
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
         title={state.title}
@@ -7263,6 +7265,7 @@ function App() {
       {/* VCS Toast Notifications */}
       <VCSToast />
     </div>
+    </RolesProvider>
   );
 }
 

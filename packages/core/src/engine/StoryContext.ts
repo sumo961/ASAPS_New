@@ -3,6 +3,7 @@ import type { Condition, Effect, FictionalTime, GeoPoint } from '../types';
 import type { Story } from './Story';
 import { TimerManager } from './TimerManager';
 import { resolveCharacterKey, resolveCharacter } from '../utils/characterRef';
+import { normalizeRoles, isRoleRef, stripRolePrefix, fallbackHolder, PLAYER_ROLE_ID, type CastRole } from './roles';
 import { resolveCharacterWithVariant, findCharacterVariant } from '../utils/characterVariant';
 import { modulateEmotionDelta } from './PersonalityTraits';
 import { coerceToDeclaredType, alignForComparison, type DeclaredVariableType } from './variableValues';
@@ -173,6 +174,10 @@ interface StoryState {
   // has run. Outer key = canonical Character.id. Gates HUDs under
   // hudReveal 'onAppearance'.
   appearedCharacters: Record<string, true>;
+  // Who holds each cast role (docs/Character-Roles-Design.md). Key = role
+  // id, value = Character.id. A role absent here falls back to its default
+  // holder, then its first candidate.
+  roleHolders: Record<string, string>;
   // Initial-value capture for delta-from-initial condition baselines
   // (v0.9.45). Each map mirrors the live affect map but is populated
   // *lazily on first touch* — the first mutator call for a (character,
@@ -289,6 +294,7 @@ export interface SerializedStoryState {
   characterGoalStatus?: Record<string, Record<string, GoalStatus>>;
   activeCharacterVariants?: Record<string, string>;
   appearedCharacters?: Record<string, true>;
+  roleHolders?: Record<string, string>;
   characterVariables?: Record<string, Record<string, any>>;
   characterFlags?: Record<string, Record<string, boolean>>;
   // Baseline + bookmark state (v0.9.45). All optional so prior save files
@@ -450,6 +456,7 @@ export class StoryContext extends EventEmitter {
       characterGoalStatus: {},
       activeCharacterVariants: {},
       appearedCharacters: {},
+      roleHolders: {},
       initialMoods: {},
       initialEmotionLevels: {},
       initialSentiments: {},
@@ -486,6 +493,7 @@ export class StoryContext extends EventEmitter {
       this.seedCharacterCountersFromStory();
     }
     this.seedStoryVariables();
+    this.seedRoles();
 
     // Forward timer events
     this.timerManager.on('timerExpired', (data) => this.emit('timerExpired', data));
@@ -671,7 +679,7 @@ export class StoryContext extends EventEmitter {
    * global player inventory ('player' / empty).
    */
   private ensureCanonicalCharacterBucket(ref: string): string | null {
-    if (ref === 'player' || !ref) return null;
+    if (this.isPlayerInventoryRef(ref)) return null;
     const canonical = this.resolveCharRef(ref);
     if (!canonical) return null;
 
@@ -708,7 +716,7 @@ export class StoryContext extends EventEmitter {
   }
 
   addInventoryItem(character: string, item: string, quantity: number = 1): void {
-    if (character === 'player' || !character) {
+    if (this.isPlayerInventoryRef(character)) {
       this.addToInventory(item, quantity);
       return;
     }
@@ -728,7 +736,7 @@ export class StoryContext extends EventEmitter {
   }
 
   removeInventoryItem(character: string, item: string, quantity: number = 1): void {
-    if (character === 'player' || !character) {
+    if (this.isPlayerInventoryRef(character)) {
       this.removeFromInventory(item, quantity);
       return;
     }
@@ -748,7 +756,7 @@ export class StoryContext extends EventEmitter {
   }
 
   hasInventoryItem(character: string, item: string): boolean {
-    if (character === 'player' || !character) {
+    if (this.isPlayerInventoryRef(character)) {
       return this.hasInInventory(item);
     }
     const key = this.ensureCanonicalCharacterBucket(character) ?? character;
@@ -759,7 +767,7 @@ export class StoryContext extends EventEmitter {
   }
 
   getCharacterInventoryQuantity(character: string, item: string): number {
-    if (character === 'player' || !character) {
+    if (this.isPlayerInventoryRef(character)) {
       return this.getInventoryQuantity(item);
     }
     const key = this.ensureCanonicalCharacterBucket(character) ?? character;
@@ -781,9 +789,96 @@ export class StoryContext extends EventEmitter {
   // These coexist with the un-namespaced `variables` and `counters` for
   // story-global state. Beats opt in to character-scoped storage explicitly.
 
+  // ======== Cast roles (docs/Character-Roles-Design.md) ========
+
+  /** The roles declared in Project Settings. */
+  getRoles(): CastRole[] {
+    return normalizeRoles((this.story as any)?.getSettings?.()?.roles);
+  }
+
+  getRole(roleRef: string): CastRole | undefined {
+    const id = stripRolePrefix(roleRef);
+    return this.getRoles().find((r) => r.id === id);
+  }
+
+  /**
+   * The Character.id holding a role: the cast holder, else the default,
+   * else the first candidate. null for an unknown role or one with no
+   * candidates.
+   */
+  getRoleHolder(roleRef: string): string | null {
+    const role = this.getRole(roleRef);
+    if (!role) return null;
+    return this.state.roleHolders[role.id] || fallbackHolder(role);
+  }
+
+  /** Holders as cast so far (roles not cast yet are absent). */
+  getRoleHolders(): Record<string, string> {
+    return { ...this.state.roleHolders };
+  }
+
+  /** Has something cast this role (or drawn it at story start)? */
+  isRoleCast(roleRef: string): boolean {
+    return !!this.state.roleHolders[stripRolePrefix(roleRef)];
+  }
+
+  /**
+   * Cast a role. Applies what was authored: recasting a role that is not
+   * marked recastable is flagged while authoring (story review), not
+   * silently ignored here.
+   */
+  castRole(roleRef: string, characterRef: string): void {
+    const role = this.getRole(roleRef);
+    if (!role) {
+      console.warn(`castRole: no role '${roleRef}' in Project Settings`);
+      return;
+    }
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    const character = resolveCharacter(this.resolveRoleRef(characterRef), characters);
+    const characterId = character?.id ?? characterRef;
+    const previous = this.state.roleHolders[role.id];
+    if (previous === characterId) return;
+    this.state.roleHolders[role.id] = characterId;
+    this.emit('roleCast', { role: role.id, characterId, previous });
+  }
+
+  /**
+   * '@confidant' → the holder's Character.id. The implicit 'player' key
+   * follows a role with id 'player' when the story declares one. Anything
+   * else (and an unknown role) comes back unchanged.
+   */
+  resolveRoleRef(ref: string): string {
+    if (isRoleRef(ref)) return this.getRoleHolder(ref) ?? ref;
+    if (ref === PLAYER_ROLE_ID && this.getRole(PLAYER_ROLE_ID)) return this.getRoleHolder(PLAYER_ROLE_ID) ?? ref;
+    return ref;
+  }
+
+  /**
+   * Draw 'random' roles and set 'fixed' ones at story start. 'cast' roles
+   * stay open until a castRole (they read as their default meanwhile).
+   * Never replaces a holder already set.
+   */
+  seedRoles(): void {
+    for (const role of this.getRoles()) {
+      if (this.state.roleHolders[role.id]) continue;
+      if (role.selection === 'random' && role.candidates.length > 0) {
+        this.state.roleHolders[role.id] = role.candidates[Math.floor(Math.random() * role.candidates.length)];
+      } else if (role.selection === 'fixed') {
+        const holder = fallbackHolder(role);
+        if (holder) this.state.roleHolders[role.id] = holder;
+      }
+    }
+  }
+
+  /** The protagonist's bag belongs to the player, whoever plays (D6). */
+  private isPlayerInventoryRef(ref: string | null | undefined): boolean {
+    return !ref || ref === PLAYER_ROLE_ID || ref === '@' + PLAYER_ROLE_ID;
+  }
+
   /** Resolve a character ref to its canonical storage key, using this story's character list. */
   private resolveCharRef(ref: string | null | undefined): string | null {
     if (!ref) return null;
+    ref = this.resolveRoleRef(ref);
     const characters = (this.story as any)?.getCharacters?.() as
       | { id: string; name?: string; displayName?: string }[]
       | undefined;
@@ -1418,7 +1513,7 @@ export class StoryContext extends EventEmitter {
     // Only defined characters — a free-text speaker ("Narrator", a generic
     // label) resolves to nobody and is not recorded.
     const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
-    const character = resolveCharacter(charRef, characters);
+    const character = resolveCharacter(this.resolveRoleRef(charRef), characters);
     if (!character?.id || this.state.appearedCharacters[character.id]) return;
     this.state.appearedCharacters[character.id] = true;
     // Hosts repaint HUDs on this: a dialog node can introduce someone
@@ -1462,6 +1557,12 @@ export class StoryContext extends EventEmitter {
     // the base persona is in play until one is switched in (Late Light's
     // Clare and Nathan each have one transition variant; their HUDs were
     // hidden until it).
+    // A candidate of the player role is the protagonist only once picked:
+    // until then nobody's HUD shows, and afterwards only the holder's.
+    const playerRole = this.getRole(PLAYER_ROLE_ID);
+    if (playerRole?.candidates.includes(key)) {
+      return this.isRoleCast(PLAYER_ROLE_ID) && this.getRoleHolder(PLAYER_ROLE_ID) === key;
+    }
     const reveal = base?.hudReveal ?? (base?.role === 'player' ? 'fromStart' : 'onAppearance');
     if (reveal === 'onVariantChosen') return this.hasSettledVariant(key);
     return reveal === 'fromStart' || this.hasCharacterAppeared(key);
@@ -2043,6 +2144,23 @@ export class StoryContext extends EventEmitter {
       }
     }
 
+    // Role holder: "the confidant is Mara". `role` names the role,
+    // `character` the character compared against the current holder.
+    if (condition.type === 'roleHolder') {
+      const roleId = (condition as any).role as string | undefined;
+      if (!roleId) {
+        console.warn('roleHolder condition missing role');
+        return false;
+      }
+      const holder = this.getRoleHolder(roleId) || '';
+      const wanted = this.resolveCharRef(condition.character || String(condition.value ?? '')) || '';
+      switch (condition.operator) {
+        case '==': return holder === wanted;
+        case '!=': return holder !== wanted;
+        default: return false;
+      }
+    }
+
     // Goal conditions (Step 8). Compares a character's runtime goal status
     // against an authored target string. When `goalStatus` is set on the
     // condition, the operator compares against it; otherwise falls back to
@@ -2378,6 +2496,12 @@ export class StoryContext extends EventEmitter {
         }
         break;
       }
+      // Cast a role: target = role id ('confidant' or '@confidant'),
+      // character = who fills it from now on.
+      case 'castRole': {
+        if (effect.target && effect.character) this.castRole(effect.target, effect.character);
+        break;
+      }
       // v0.9.45 — snapshot mood / emotion / sentiment state under a name
       // so subsequent condition baselines can compare against it. With
       // scope 'all' (default), every character's slots are captured. With
@@ -2584,6 +2708,7 @@ export class StoryContext extends EventEmitter {
       characterGoalStatus: {},
       activeCharacterVariants: {},
       appearedCharacters: {},
+      roleHolders: {},
       initialMoods: {},
       initialEmotionLevels: {},
       initialSentiments: {},
@@ -2604,6 +2729,7 @@ export class StoryContext extends EventEmitter {
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
     this.seedStoryVariables();
+    this.seedRoles();
     this.emit('reset');
 
     // Emit change events so UI listeners (countdown meter, debug panel) update
@@ -2635,6 +2761,8 @@ export class StoryContext extends EventEmitter {
       this.state.characterGoalStatus = {};
       this.state.activeCharacterVariants = {};
       this.state.appearedCharacters = {};
+      this.state.roleHolders = {};
+      this.seedRoles();
       this.state.initialMoods = {};
       this.state.initialEmotionLevels = {};
       this.state.initialSentiments = {};
@@ -2694,6 +2822,7 @@ export class StoryContext extends EventEmitter {
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
     this.seedStoryVariables();
+    this.seedRoles();
   }
 
   /**
@@ -2756,6 +2885,7 @@ export class StoryContext extends EventEmitter {
     variables: Record<string, unknown>;
     counters: Array<{ key: string; name: string; value: number }>;
     variants: Array<{ key: string; variantId: string }>;
+    roles: Record<string, string>;
   } {
     const variables: Record<string, unknown> = {};
     for (const def of this.storyVariableDefinitions()) {
@@ -2776,10 +2906,16 @@ export class StoryContext extends EventEmitter {
       const variantId = this.state.activeCharacterVariants[key];
       if (c.keepVariantOnRestart && variantId) variants.push({ key, variantId });
     }
-    return { variables, counters, variants };
+    const roles: Record<string, string> = {};
+    for (const role of this.getRoles()) {
+      const holder = this.state.roleHolders[role.id];
+      if (role.keepOnRestart && holder) roles[role.id] = holder;
+    }
+    return { variables, counters, variants, roles };
   }
 
   private restoreKeptAcrossRestarts(kept: ReturnType<StoryContext['captureKeptAcrossRestarts']>): void {
+    for (const [roleId, characterId] of Object.entries(kept.roles)) this.state.roleHolders[roleId] = characterId;
     for (const [name, value] of Object.entries(kept.variables)) this.setVariable(name, value);
     // The variant first: switching it in re-seeds that persona's affect (and
     // so every counter bound to a feeling). Plain counters need nothing here —
@@ -3267,6 +3403,7 @@ export class StoryContext extends EventEmitter {
       ),
       activeCharacterVariants: { ...this.state.activeCharacterVariants },
       appearedCharacters: { ...this.state.appearedCharacters },
+      roleHolders: { ...this.state.roleHolders },
       // v0.9.45 — baseline + bookmark snapshots so save/load preserves
       // delta-vs-initial / delta-vs-bookmark comparisons across sessions.
       initialMoods: Object.fromEntries(
@@ -3358,6 +3495,7 @@ export class StoryContext extends EventEmitter {
         ? { ...serialized.activeCharacterVariants }
         : {},
       appearedCharacters: serialized.appearedCharacters ? { ...serialized.appearedCharacters } : {},
+      roleHolders: serialized.roleHolders ? { ...serialized.roleHolders } : {},
       // v0.9.45 — restore baseline snapshots and named bookmarks; default
       // to empty maps for older saves (forward-compat).
       initialMoods: serialized.initialMoods

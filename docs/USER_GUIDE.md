@@ -565,6 +565,28 @@ In a responsive project the Visual Editor's left panel offers a **Layout Templat
 
 ---
 
+<a id="choose-your-character"></a>
+### Choose Your Character
+
+**Purpose:** The interactor picks who to be — or who comes along.
+
+A Multi Choice whose buttons are people. Each choice names a character, and picking it puts that character into a [role](#roles): *the player* when the interactor chooses who to play, or any other role you set up ("who do you take with you?"). Each button shows the character's name with a short description underneath, so the choice is made by who they are, not just what they're called. It sits in the palette's **Multi Choice → Buttons** group.
+
+![The Choose Your Character screen in the Preview: "Whose night is it?" above two buttons, Mara with "A doctor at the end of a double shift." underneath and Jonas with "The ferry mechanic who knows every bolt."](images/81-choose-your-character.png)
+*Each button carries a description line. Everything after this beat follows the pick.*
+
+**Key Settings:**
+- **Role** - Which role the pick fills (from Project Settings → Roles). **Add a choice for each character of this role** creates one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
+- **Question** - The prompt above the buttons ("Who will you be?")
+- **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
+- Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
+
+In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size).
+
+**When to Use:** Story openings where the interactor picks a protagonist; any moment that decides who fills a part for the rest of the story.
+
+---
+
 ### Movement Choice
 
 **Purpose:** Location-based navigation.
@@ -1327,6 +1349,7 @@ You can ignore all of this and ship a perfectly good story with just names and p
    - **Display Name** - What interactors see (e.g., "Elena Blackwood")
    - **Name** - How you and the AI refer to the character while writing — in the speaker picker, AI prompts and exports (e.g., "elena")
    - **Kind** - Player, NPC, or Companion (the Character Manager's filter lets you show *All kinds* or just one)
+   - **Pronouns** - she/her, he/him, they/them or your own; used when the character plays a [role](#roles) and text says `${@role.they}`
    - **Description** - Notes for yourself
 
    The character's fixed **ID** is shown in small print at the bottom of the Basic tab; conditions and saved games refer to it, so it never changes.
@@ -1604,6 +1627,41 @@ Your player character (the character whose **Kind** is Player) automatically app
 When you assign the player character as a beat's speaker, the character's actual display name is stored (not the generic "Interactor"). This means speaker labels and portraits work naturally for the player character, just like any other character.
 
 **TTS behavior:** The player character is silent by default in text-to-speech mode. If you assign a TTS voice to the player character, their text will be spoken — and in multi-choice beats (like Dialog Trees), clicked choices are spoken aloud in the player character's voice.
+
+<a id="roles"></a>
+### Roles — One Story, Several Possible People
+
+Sometimes the person in a scene depends on what happened earlier: the confidant in the last act is whoever the interactor sided with, Mara or Jonas. Or the interactor picks who to play at the start. Without roles you'd write the scene twice. With a **role** you write it once for *the confidant*, and the story fills in whoever plays the part.
+
+**Variants or roles?** [Variants](#character-affect) are different moods of *one* person: same name, same history. A role is filled by *different* people, each with their own name, portrait, voice, counters and feelings. Trust that Mara builds stays Mara's, even if Jonas plays the confidant later.
+
+**Setting up a role.** Open **Project Settings → Roles** and click **Add Role** (or **Player role** for the protagonist). Give it a name, tick the characters who can play it, and choose **Who plays it**:
+- **Chosen in the story** — a [Choose Your Character](#choose-your-character) beat or a **Cast Role** effect on a choice decides. Until then the **default** plays it.
+- **Drawn at random at the start** — each playthrough draws one of the characters (rehearsal stories with different people).
+- **Always the default** — handy while the other characters are still unwritten.
+
+![Project Settings → Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story](images/82-project-settings-roles.png)
+
+**Using a role.** Wherever you pick a character, roles are listed first as *@ The confidant*: a beat's or dialog line's **Speaker**, an AI Conversation's or AI Dialog Tree's **NPC**, the character in an effect or a condition. In text, write:
+
+| You write | The interactor sees |
+|---|---|
+| `${@confidant}` or `${@confidant.name}` | the name of whoever plays the role |
+| `${@confidant.they}` `.them` `.their` `.theirs` `.themself` | their pronouns |
+| `${@confidant.is}` `.has` `.was` | the verb that agrees: *she is*, *they are* |
+| `${@confidant.They}` | the same, capitalised for the start of a sentence |
+
+So *"${@confidant.They} ${@confidant.is} waiting."* reads *"She is waiting."* or *"They are waiting."* Set each character's **Pronouns** in the Character Editor (she/her, he/him, they/them, or your own); without a setting, they/them is used.
+
+**Deciding who plays it.** Besides the Choose Your Character beat, any choice can cast a role with the **Cast Role** effect (*@ The confidant is played by Tomas*). For the few lines that really must differ per person, use the **Who plays a role** condition (*@ The confidant is played by Tomas*) on a choice or a Condition Check.
+
+**The player role.** A role called `player` makes the interactor's own counters, feelings and sentiment targets follow the character they chose. The inventory stays the player's whoever plays, so picking up the key doesn't depend on who you are. Until the pick, none of the candidates' HUDs show; afterwards only the chosen one's.
+
+**Trying both versions.** In the Preview's **Debug Info**, the **Roles** card shows who plays each role right now; pick another name to test that version from here on.
+
+**What the story review checks.** A reference to a role that doesn't exist, casting someone who isn't on the role's list, and a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one).
+
+**A writing tip.** Roles work best when the role-dependent text is short (names, pronouns) or written by AI beats. A long hand-written passage rarely fits two different people; give those few lines a *Who plays a role* condition instead. Translations need extra care too: in many languages adjectives and verb endings change with the person.
 
 ### Character Templates
 

@@ -58,6 +58,21 @@
       },
       "notes": "displayText is the translated/display label; text is the internal identifier. soundEffect plays when this choice is selected. Effects apply per-choice (variable/counter/inventory/affect/etc.) — same surface as DialogTree's dialogChoice and MovementChoice's movementOption. conditions[] HIDES this option until every condition matches the story state (variable / counter / inventory / visitedBeat / sentiment - same shapes as conditionBeat). Prefer a conditional choice over duplicating a whole menu or forcing an outcome: e.g. an accusation option that appears only after the player has seen the decisive clue ({\"type\": \"visitedBeat\", \"beatId\": \"beat_clue\"})."
     },
+    "characterOption": {
+      "description": "An option in a Choose your character beat: a Multi Choice option that names the character it casts into the beat's role.",
+      "schema": {
+        "id": "string",
+        "character": "string",
+        "text": "string?",
+        "displayText": "string?",
+        "description": "string?",
+        "target": "string?",
+        "conditions": "condition[]?",
+        "effects": "effect[]?",
+        "soundEffect": "string?"
+      },
+      "notes": "character is the Character.id taken into the role when this option is picked (before the option's own effects run, so an effect on '@player' lands on the new holder). text is the label; leave it empty to show the character's current name. description is a smaller second line under the label: who this person is, in one short sentence the player can choose by. target is where the story goes after this pick; usually every option has the same target (an option without one goes where the others go). conditions[] hides the option (e.g. a character unlocked on a second playthrough)."
+    },
     "movementOption": {
       "description": "A movement choice",
       "schema": {
@@ -101,7 +116,7 @@
     "condition": {
       "description": "Condition for beat logic, choice visibility (\"show only if…\") and requirements. The type list mirrors conditionTypes (a test keeps them equal); conditionTypes lists each type's required and optional fields.",
       "schema": {
-        "type": "'variable' | 'counter' | 'counterCompare' | 'timer' | 'inventory' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'emotion' | 'sentiment' | 'trait' | 'goal' | 'characterVariant' | 'gpsProximity' | 'indoorProximity' | 'permissionGranted'",
+        "type": "'variable' | 'counter' | 'counterCompare' | 'timer' | 'inventory' | 'visitedBeat' | 'fictionalTime' | 'mood' | 'emotion' | 'sentiment' | 'trait' | 'goal' | 'characterVariant' | 'roleHolder' | 'gpsProximity' | 'indoorProximity' | 'permissionGranted'",
         "operator": "'==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not'",
         "variableName": "string",
         "value": "any",
@@ -112,9 +127,9 @@
       }
     },
     "effect": {
-      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
+      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}; castRole {target: role id from Project Settings roles (e.g. 'confidant'), character: character id who fills it from now on}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
       "schema": {
-        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound'",
+        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound' | 'castRole'",
         "target": "string",
         "value": "any?",
         "character": "string?",
@@ -344,6 +359,17 @@
         "value"
       ],
       "description": "Branch on which variant is currently active on a character. variantId or value carries the compared variant id."
+    },
+    "roleHolder": {
+      "required": [
+        "role",
+        "character",
+        "operator"
+      ],
+      "optional": [
+        "value"
+      ],
+      "description": "Branch on who currently holds a cast role: role is the role id (Project Settings → Roles), character the character id, operator == or !=. Use for the few lines or images that must differ per holder; prefer ${@role.name} / pronoun placeholders for text."
     },
     "gpsProximity": {
       "required": [
@@ -1098,6 +1124,173 @@
       "sound": true,
       "renderer": "multiChoice",
       "_authoringNote": "Simpler-than-DialogTree counterpart in the Multi Choice → Buttons sub-group. Use this when the player picks ONE of several responses on a single screen — no nested follow-ups, no spatial map, no in-text links. For multi-turn back-and-forth use DialogTree; for spatial map navigation use MovementChoice. layoutMode:'slot' + dynamicSource on the action slot lets the responsive renderer treat each choice as a flow button without the schema needing to enumerate them by name like infoText's `continueButton`."
+    },
+    "chooseCharacter": {
+      "category": "visible",
+      "displayName": "Choose Your Character",
+      "icon": "🎭",
+      "description": "The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description.",
+      "connectionType": "multiple",
+      "parameters": {
+        "role": {
+          "type": "string",
+          "required": true,
+          "default": "player",
+          "description": "The role the picked character fills (a role id from Project Settings → Roles, e.g. 'player' for the protagonist). Later beats refer to it as @player in speaker/NPC/character fields and ${@player.name}, ${@player.they} in text.",
+          "ui": {
+            "control": "role",
+            "label": "Role",
+            "hidden": true
+          }
+        },
+        "question": {
+          "type": "string",
+          "required": true,
+          "ui": {
+            "control": "textarea",
+            "rows": 3
+          },
+          "default": "Who will you be?",
+          "description": "Prompt shown above the characters. Supports ${@role.name} placeholders like any text."
+        },
+        "choices": {
+          "type": "array<characterOption>",
+          "required": true,
+          "minItems": 1,
+          "description": "One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen."
+        },
+        "choiceDelay": {
+          "type": "number",
+          "required": false,
+          "description": "Delay in seconds before the choices fade in (lets the player read the prompt first)",
+          "ui": {
+            "control": "number",
+            "min": 0,
+            "max": 30,
+            "step": 0.5,
+            "label": "Choice Delay (seconds)"
+          }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Block and dim choices that lead to previously visited beats"
+        },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored."
+        },
+        "slotIntent": {
+          "type": "object",
+          "required": false,
+          "description": "Soft responsive layout intent (responsive projects only). Optional per-choice pinning: slotIntent.actions.buttonAnchors maps a choice id to a stage anchor ({h:'left'|'center'|'right', v:'top'|'bottom', relativeTo:'stage', gap}) and lifts that ONE choice out of the shared button row — e.g. a 'Leave' choice in the top-right corner while the real answers stay under the question. Choices pinned to the same spot stack in one column; the question and row step around pinned choices on every device. Unpinned choices stay in the row. Visual-Editor managed (Elements → Action slot → choice → Pin); NEVER serialized as baked locations[].",
+          "ui": {
+            "hidden": true
+          }
+        },
+        "layoutTemplate": {
+          "type": "string",
+          "required": false,
+          "default": "stacked",
+          "description": "How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel.",
+          "ui": {
+            "control": "select",
+            "options": [
+              "stacked",
+              "conversation",
+              "chat-bubble",
+              "custom"
+            ],
+            "label": "Layout",
+            "scope": "ve-left"
+          }
+        },
+        "speaker": {
+          "type": "string",
+          "default": "",
+          "description": "Who speaks the prompt (for TTS voice routing and optional display)",
+          "ui": {
+            "control": "speaker",
+            "label": "Speaker",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "showSpeaker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show speaker name to the interactor",
+          "ui": {
+            "control": "speaker-visibility",
+            "label": "Show Speaker Name",
+            "group": "Speaker",
+            "scope": "beat"
+          }
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "tier": "advanced",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
+        },
+        "fixedFrame": {
+          "type": "boolean",
+          "required": false,
+          "description": "Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story.",
+          "ui": {
+            "tier": "advanced",
+            "label": "Keep shape on phones",
+            "help": "Letterbox this beat at its authored proportions instead of cropping it to fill a phone screen."
+          }
+        }
+      },
+      "locations": [
+        "question",
+        "choices"
+      ],
+      "locationMapping": {
+        "question": "question"
+      },
+      "layoutMode": "slot",
+      "slots": [
+        {
+          "name": "speaker",
+          "role": "speaker",
+          "source": "speaker"
+        },
+        {
+          "name": "question",
+          "role": "body",
+          "source": "question",
+          "grow": true,
+          "scroll": true
+        },
+        {
+          "name": "actions",
+          "role": "action",
+          "dynamicSource": "choices"
+        }
+      ],
+      "transitions": true,
+      "sound": true,
+      "renderer": "multiChoice",
+      "aiNotes": {
+        "purpose": "Let the player choose a character for a cast role — usually who they play (role 'player'), or who comes along (a companion role). The rest of the story refers to the role (@player, ${@player.name}) instead of duplicating branches per character.",
+        "examples": [
+          "Story opening: 'Who will you be?' — Mara (a night-shift doctor) or Jonas (a ferry mechanic); later beats use ${@player.name}",
+          "Mid-story: 'Who do you take with you?' casts the companion role, and the AI conversation partner is @companion"
+        ]
+      }
     },
     "movementChoice": {
       "category": "visible",

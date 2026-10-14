@@ -4,7 +4,7 @@
  * inside WorkspaceView.
  */
 const VISUAL_BEAT_TYPES = new Set([
-  'titleScreen', 'infoText', 'durScreen', 'pickProp', 'movementChoice', 'multiChoice',
+  'titleScreen', 'infoText', 'durScreen', 'pickProp', 'movementChoice', 'multiChoice', 'chooseCharacter',
   'dialogTree', 'endScreen', 'videoBeat', 'inputText', 'hyperText', 'onlineContent',
   'aiDialogTree', 'aiSummary', 'aiInfoText', 'aiDurScreen', 'aiConversation', 'keypad',
   'panorama', 'gpsLocation', 'indoorLocation',

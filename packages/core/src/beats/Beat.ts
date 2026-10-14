@@ -10,6 +10,7 @@ import type { IRenderer } from '../types';
 
 import { StoryContext } from '../engine/StoryContext';
 import { resolveCharacter } from '../utils/characterRef';
+import { isRoleRef, rolePlaceholderText } from '../engine/roles';
 
 /**
  * Beat types whose defaultTarget can fire on a timer (defaultTargetDelay
@@ -595,6 +596,13 @@ export abstract class Beat {
   protected processText(text: string, context: StoryContext): string {
     if (!text) return text;
 
+    // A speaker field holding just '@confidant' names the role's holder.
+    const whole = /^\s*@([A-Za-z0-9_-]+)\s*$/.exec(text);
+    if (whole && typeof (context as any).getMergedCharacter === 'function') {
+      const name = rolePlaceholderText((context as any).getMergedCharacter('@' + whole[1]), 'name');
+      if (name) return name;
+    }
+
     // A placeholder names a variable or a counter — authors write "Time
     // left: ${Clock}" without caring which store Clock lives in, and
     // counters used to show up literally. Variables win on a name clash
@@ -613,6 +621,15 @@ export abstract class Beat {
       return value !== undefined && value !== null ? String(value) : match;
     };
 
+    // ${@confidant} / ${@confidant.name} / ${@confidant.they} — whoever holds
+    // the cast role now (docs/Character-Roles-Design.md). An unknown role or
+    // key stays visible so the author sees it.
+    text = text.replace(/\$\{\s*@([A-Za-z0-9_-]+)(?:\.([A-Za-z]+))?\s*\}/g, (match, role: string, key?: string) => {
+      const holder = typeof (context as any).getMergedCharacter === 'function'
+        ? (context as any).getMergedCharacter('@' + role)
+        : undefined;
+      return rolePlaceholderText(holder, key) ?? match;
+    });
     // ${name} — the documented form
     text = text.replace(/\$\{([^}]+)\}/g, sub);
     // $name$ (legacy)
@@ -654,8 +671,10 @@ export abstract class Beat {
     storedSpeaker: string | undefined,
     context: { getMergedCharacter?: (ref: string) => any } | null | undefined,
   ): string {
-    if (characterRef && context && typeof context.getMergedCharacter === 'function') {
-      const ch = context.getMergedCharacter(characterRef);
+    // A speaker typed as '@confidant' is a role reference too.
+    const ref = characterRef || (isRoleRef(storedSpeaker) ? storedSpeaker : undefined);
+    if (ref && context && typeof context.getMergedCharacter === 'function') {
+      const ch = context.getMergedCharacter(ref);
       const name = ch && (ch.displayName || ch.name);
       if (typeof name === 'string' && name) return name;
     }

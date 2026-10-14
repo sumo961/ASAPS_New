@@ -5,6 +5,7 @@ import { ExplanationBeat } from './ExplanationBeat';
 import { DialogTreeBeat } from './DialogTreeBeat';
 import { ConversationChoiceBeat } from './ConversationChoiceBeat';
 import { MultiChoiceBeat } from './MultiChoiceBeat';
+import { ChooseCharacterBeat } from './ChooseCharacterBeat';
 import { MovementChoiceBeat } from './MovementChoiceBeat';
 import { PickPropBeat } from './PickPropBeat';
 import { VideoBeat } from './VideoBeat';
@@ -76,6 +77,7 @@ export class BeatTypeRegistry {
     this.registerBeatType('dialogTree', DialogTreeBeat);
     this.registerBeatType('conversationChoice', ConversationChoiceBeat); // Legacy
     this.registerBeatType('multiChoice', MultiChoiceBeat);
+    this.registerBeatType('chooseCharacter', ChooseCharacterBeat);
     this.registerBeatType('movementChoice', MovementChoiceBeat);
     this.registerBeatType('pickProp', PickPropBeat);
     this.registerBeatType('videoBeat', VideoBeat);

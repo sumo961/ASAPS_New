@@ -13,6 +13,7 @@ import type {
   FixProposal, GenerationReview,
 } from '../types/generationReview';
 import { PARAMETER_DERIVED_TYPES } from './beatConnectionModel';
+import { analyzeRoleFindings } from './roleFindings';
 
 /**
  * Beat types whose only exit is the single `connection` parameter — the
@@ -29,7 +30,7 @@ export const SINGLE_EXIT_BEAT_TYPES: ReadonlySet<string> = new Set([
 const nameOf = (story: any, id: string): string | undefined =>
   (story?.beats || []).find((b: any) => b?.id === id)?.name;
 
-/** Every deterministic finding in a story. Order: missing targets, unreachable beats, thresholds. */
+/** Every deterministic finding in a story. Order: missing targets, unreachable beats, endings, thresholds, roles. */
 export function analyzeStoryFindings(story: any): GenerationFinding[] {
   const out: GenerationFinding[] = [];
   const beats: any[] = Array.isArray(story?.beats) ? story.beats : [];
@@ -115,6 +116,8 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
       out.push(f);
     }
   }
+  // Cast roles: unknown @role references, non-candidate casts, recasts.
+  out.push(...analyzeRoleFindings(beats, story?.roles ?? story?.globalSettings?.roles, story?.characters));
   return out;
 }
 

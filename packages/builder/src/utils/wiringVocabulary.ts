@@ -49,6 +49,7 @@ export const EFFECT_SPECS: Record<EffectType, EffectSpec> = {
   setCharacterVariant: { required: ['target', 'variantId'], optional: ['suppressSeed'], summary: 'target = character; variantId' },
   bookmarkAffectState: { required: ['bookmarkName'], optional: ['target', 'scope'], summary: "bookmarkName; scope? 'all'|'character' (then target = character)" },
   playSound: { required: ['target'], optional: ['value'], summary: 'target = sound asset id / preset / URL; value? = volume 0..1' },
+  castRole: { required: ['target', 'character'], optional: [], summary: "target = role id from Project Settings roles (e.g. 'confidant'); character = character id who fills it from now on" },
 };
 
 const GOAL_STATUSES = new Set(['open', 'met', 'failed', 'abandoned']);
@@ -192,6 +193,7 @@ export function describeEffect(e: Json): string {
     case 'addReflection': return `${String(e.target)} reflects "${String(e.reflectionText).slice(0, 40)}"`;
     case 'setGoalStatus': return `${String(e.target)} goal ${String(e.goalId)} → ${String(e.goalStatus)}`;
     case 'setCharacterVariant': return `${String(e.target)} becomes ${String(e.variantId)}`;
+    case 'castRole': return `@${String(e.target).replace(/^@/, '')} is played by ${String(e.character)}`;
     case 'bookmarkAffectState': return `bookmark "${String(e.bookmarkName)}"`;
     case 'playSound': return `play ${String(e.target)}`;
     default: return String(e.type);

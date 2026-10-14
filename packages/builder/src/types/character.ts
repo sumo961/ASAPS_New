@@ -14,6 +14,12 @@ export interface Character {
   name: string;
   displayName: string;
   role: 'player' | 'npc' | 'companion';
+  /**
+   * Pronouns for ${@role.they}-style placeholders when this character holds
+   * a cast role: 'she' | 'he' | 'they', or a custom set (missing forms fall
+   * back to they/them). Absent ⇒ they/them.
+   */
+  pronouns?: 'she' | 'he' | 'they' | Partial<Record<'they' | 'them' | 'their' | 'theirs' | 'themself' | 'is' | 'has' | 'was', string>>;
   
   // Visual Configuration
   visual: {

@@ -263,6 +263,7 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       break;
 
     case 'multiChoice':
+    case 'chooseCharacter':
       if (Array.isArray(params.choices)) {
         for (let j = 0; j < params.choices.length; j++) {
           const choice = params.choices[j];
@@ -271,6 +272,8 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
           // renders displayText || text (routing is by choice id).
           const choiceLabel = choice.displayText || choice.text;
           if (choiceLabel) strings[`${prefix}.parameters.choices.${j}.displayText`] = choiceLabel;
+          // Choose your character: the line under the name.
+          if (choice.description) strings[`${prefix}.parameters.choices.${j}.description`] = choice.description;
         }
       }
       break;

@@ -23,7 +23,7 @@ import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import { applyTreeLayoutToBeats } from './TreeLayoutAlgorithm';
 import { storyLinks as storyLinksOf, dedupeLinks } from './storyLinks';
-import { mergeGeneratedVariables } from './generatedVariables';
+import { mergeGeneratedVariables, applyGeneratedRoles } from './generatedVariables';
 import { validateStoryLogic, formatLogicValidationResult } from './storyLogicValidator';
 import { themeToGlobalSettings } from '../themes/migration/GlobalSettingsAdapter';
 import { analyzeStoryFindings } from './generationReview';
@@ -98,7 +98,7 @@ export interface ApplyGeneratedStoryResult {
 
 /** Beat types the generators may emit, including the aliases the registry maps. */
 const KNOWN_BEAT_TYPES = new Set([
-  'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'multiChoice', 'movementChoice',
+  'titleScreen', 'infoText', 'dialogTree', 'conversationChoice', 'multiChoice', 'chooseCharacter', 'movementChoice',
   'pickProp', 'videoBeat', 'endScreen', 'durScreen', 'inputText', 'hyperText',
   'setVariable', 'setGlobal', 'setCounter', 'counter', 'variable', 'conditionBeat', 'conditionCheck', 'condition',
   'randomTarget', 'setTimer', 'addRemoveInventory', 'addInventory', 'removeInventory',
@@ -288,6 +288,11 @@ export async function applyGeneratedStory(
     settings = mergedVars;
     deps.commitGlobalSettings(settings);
     console.log(`[applyGeneratedStory] Wired ${settings.variables?.length ?? 0} variable(s) into globalSettings.variables`);
+  }
+  const withRoles = applyGeneratedRoles(settings, story.roles);
+  if (withRoles) {
+    settings = withRoles;
+    deps.commitGlobalSettings(settings);
   }
 
   // A generated story becomes a new project, so it starts from the default

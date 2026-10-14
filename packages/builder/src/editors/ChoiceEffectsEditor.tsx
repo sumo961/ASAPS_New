@@ -9,6 +9,7 @@ import type { AvailableVariable } from '../hooks/useAvailableCountersAndVariable
 import type { AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 import { DEFAULT_EFFECT_TEMPLATES, findEffectTemplate } from './effectTemplates';
 import { summarizeChoiceEffects } from './summarizeChoiceEffects';
+import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 
 type EffectType = Effect['type'];
 
@@ -37,6 +38,8 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // v0.9.45 — snapshot mood / emotion / sentiment state under a name so
   // future condition baselines can compare against it.
   bookmarkAffectState: 'Bookmark Affect State',
+  // Fill a cast role (Project Settings → Roles) with a character.
+  castRole: 'Cast Role',
 };
 
 interface ChoiceEffectsEditorProps {
@@ -93,6 +96,9 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
   if (!characterOptions.some((o) => o.name === 'player')) {
     characterOptions.unshift({ name: 'player', displayName: 'Player' });
   }
+  // Cast roles first: an effect on '@confidant' lands on whoever holds it.
+  const roles = useProjectRoles();
+  characterOptions.unshift(...roles.map((r) => ({ name: `@${r.id}`, displayName: roleOptionLabel(r) })));
   const counterOptions: DropdownOption[] = availableCounters.map(c => ({
     name: c.name,
     displayName: c.displayName,
@@ -275,6 +281,10 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               } else if (newType === 'setCharacterVariant') {
                 updates.value = undefined;
                 (updates as any).variantId = (effect as any).variantId ?? '';
+              } else if (newType === 'castRole') {
+                updates.value = undefined;
+                updates.target = roles[0]?.id ?? '';
+                updates.character = '';
               } else if (newType === 'bookmarkAffectState') {
                 // Bookmark snapshots mood / emotion / sentiment state under
                 // an author-named handle. Default scope is 'all' (no target
@@ -294,7 +304,32 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           </select>
 
           {/* Target field */}
-          {hideTarget ? null : isAffect ? (
+          {effect.type === 'castRole' ? (() => {
+            const role = roles.find((r) => r.id === effect.target);
+            const candidates = (availableCharacters || []).filter((c) => !role || role.candidates.includes(c.id));
+            return (
+              <>
+                <select
+                  value={effect.target || ''}
+                  onChange={(e) => updateEffect(index, { target: e.target.value })}
+                  className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
+                  title="The role to fill (Project Settings → Roles)"
+                >
+                  <option value="">Role…</option>
+                  {roles.map((r) => <option key={r.id} value={r.id}>{roleOptionLabel(r)}</option>)}
+                </select>
+                <span className="text-xs text-gray-500">is played by</span>
+                <select
+                  value={effect.character || ''}
+                  onChange={(e) => updateEffect(index, { character: e.target.value })}
+                  className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
+                >
+                  <option value="">Character…</option>
+                  {candidates.map((c) => <option key={c.id} value={c.id}>{c.displayName || c.name || c.id}</option>)}
+                </select>
+              </>
+            );
+          })() : hideTarget ? null : isAffect ? (
             // Affect effects target a character — present a SmartNameDropdown
             // backed by the project's actual character roster (plus the
             // sentinel "player"). Falls back to a free-text input only when

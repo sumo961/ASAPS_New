@@ -8,6 +8,7 @@ import { CharacterRefField, type UsedName } from './characters/CharacterRefField
 import { CounterOwnerPicker } from './CounterOwnerPicker';
 import { GpsPointCurator } from './visual/GpsPointCurator';
 import { FormattingToolbar } from './FormattingToolbar';
+import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 
 // Type definitions for beat schema
 interface ParameterDefinition {
@@ -265,6 +266,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   onDefineAsCharacter,
   onDevelopCharacter,
 }) => {
+  const projectRoles = useProjectRoles();
   // Map alias types to canonical types for schema lookup
   const canonicalType = BEAT_TYPE_ALIASES[beatType] || beatType;
 
@@ -515,6 +517,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                   { value: '', label: '(Default — Narrator)' },
                   { value: 'Narrator', label: 'Narrator' },
                   { value: playerSpeakerValue, label: playerSpeakerLabel },
+                  // Cast roles: whoever plays the role speaks.
+                  ...projectRoles.map((r) => ({ value: `@${r.id}`, label: roleOptionLabel(r) })),
                 ]}
                 placeholder="Type or pick a speaker…"
               />
@@ -754,6 +758,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                 characters={npcCharacters}
                 usedNames={usedNames}
                 onDefineAsCharacter={onDefineAsCharacter}
+                // Cast roles: the conversation partner is whoever plays it.
+                pinnedOptions={projectRoles.filter((r) => r.id !== 'player').map((r) => ({ value: `@${r.id}`, label: roleOptionLabel(r) }))}
                 placeholder="Pick or name an NPC…"
               />
               {onDevelopCharacter && (

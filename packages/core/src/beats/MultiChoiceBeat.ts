@@ -31,6 +31,17 @@ function normalizeLayoutTemplate(v: unknown): MultiChoiceLayoutTemplate {
   return 'stacked';
 }
 
+/**
+ * Beat types that ARE a Multi Choice on screen (same parameters, slots,
+ * layouts, Visual Editor and choice editor): Choose your character is a
+ * Multi Choice whose choices cast a role. Renderer and builder code that
+ * special-cases Multi Choice checks this instead of the literal type.
+ */
+export const MULTI_CHOICE_LIKE_TYPES = ['multiChoice', 'chooseCharacter'] as const;
+export function isMultiChoiceLike(type: string | null | undefined): boolean {
+  return !!type && (MULTI_CHOICE_LIKE_TYPES as readonly string[]).includes(type);
+}
+
 export class MultiChoiceBeat extends Beat {
   public question: string;
   public choices: MultiChoiceOption[];
@@ -142,7 +153,7 @@ export class MultiChoiceBeat extends Beat {
     // responsive layout. ReactRenderer.renderChoices reads currentBeatType
     // to look up the slot spec; layoutTemplate drives the within-SlotFlowView
     // visual (stacked vs. conversation).
-    renderer.setState('currentBeatType', 'multiChoice');
+    renderer.setState('currentBeatType', this.type || 'multiChoice');
     renderer.setState('layoutTemplate', this.layoutTemplate);
 
     // chat-bubble template routes through ChatDialogView (same path
@@ -167,7 +178,7 @@ export class MultiChoiceBeat extends Beat {
     }
 
     while (true) {
-      const availableChoices = this.choices.filter(choice => {
+      const availableChoices = this.choicesFor(context).filter(choice => {
         if (!choice.conditions || choice.conditions.length === 0) return true;
         return choice.conditions.every(condition => context.checkCondition(condition));
       });
@@ -208,6 +219,8 @@ export class MultiChoiceBeat extends Beat {
           // PositionedBeatView's button-position fallback covers baked
           // locations whose names no longer match the displayed label.
           text: this.processText(c.displayText || c.text, context),
+          // A second, smaller line under the label (Choose your character).
+          ...((c as any).description ? { description: this.processText((c as any).description, context) } : {}),
         })),
         locations,
       );
@@ -230,13 +243,14 @@ export class MultiChoiceBeat extends Beat {
       context.recordChoice({
         beatId: this.id,
         beatName: this.name || this.id,
-        beatType: 'multiChoice',
+        beatType: this.type || 'multiChoice',
         choiceText: selected.text,
         choiceContext: this.question,
       });
 
       // Apply effects from the selected choice (canonical effects array;
       // migrated from any flat counter fields in the constructor).
+      this.onChoiceTaken(selected, context);
       if (selected.effects && selected.effects.length > 0 && !alreadyChosen) {
         selected.effects.forEach(effect => context.applyEffect(effect));
       }
@@ -251,9 +265,22 @@ export class MultiChoiceBeat extends Beat {
         continue;
       }
 
-      return selected.target;
+      return this.targetFor(selected, context);
     }
 
     return this.getNextBeat(context);
   }
+
+  /** The choices to offer this time (before conditions). */
+  protected choicesFor(_context: StoryContext): MultiChoiceOption[] {
+    return this.choices;
+  }
+
+  /** Where a taken choice leads. */
+  protected targetFor(selected: MultiChoiceOption, _context: StoryContext): string | null {
+    return selected.target;
+  }
+
+  /** Called when a choice is taken, before its own effects run. */
+  protected onChoiceTaken(_selected: MultiChoiceOption, _context: StoryContext): void {}
 }

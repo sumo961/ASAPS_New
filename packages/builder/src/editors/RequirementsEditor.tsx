@@ -7,6 +7,7 @@
  * fallbackTarget (or just logs a warning if none is set).
  */
 
+import { RoleHolderConditionFields } from './RoleHolderConditionFields';
 import React from 'react';
 import { VariableValueInput, valueForPickedVariable } from './VariableValueInput';
 import { Plus, Trash2, ShieldCheck } from 'lucide-react';
@@ -51,6 +52,7 @@ interface RequirementsEditorProps {
 
 type CondType = 'inventory' | 'counter' | 'variable' | 'visitedBeat'
   | 'mood' | 'emotion' | 'trait' | 'sentiment' | 'goal' | 'characterVariant'
+  | 'roleHolder'
   // XR / sensor condition operators (v0.9.48 / S3+).
   | 'gpsProximity' | 'indoorProximity' | 'permissionGranted';
 
@@ -123,6 +125,7 @@ function condType(c: Condition): CondType {
   if (t === 'counter' || t === 'variable' || t === 'inventory' || t === 'visitedBeat') return t;
   if (t === 'mood' || t === 'emotion' || t === 'trait' || t === 'sentiment'
       || t === 'goal' || t === 'characterVariant') return t;
+  if (t === 'roleHolder') return t;
   if (t === 'gpsProximity' || t === 'indoorProximity' || t === 'permissionGranted') return t;
   return 'inventory';
 }
@@ -190,6 +193,9 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
         break;
       case 'characterVariant':
         newCond = { type: 'characterVariant', operator: '==', character: '', variantId: '' } as any;
+        break;
+      case 'roleHolder':
+        newCond = { type: 'roleHolder', operator: '==', role: '', character: '' } as any;
         break;
       // XR / sensor conditions (S3+).
       case 'gpsProximity':
@@ -326,6 +332,7 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                   <option value="sentiment">Sentiment toward target ≷ value</option>
                   <option value="goal">Goal status</option>
                   <option value="characterVariant">Active variant</option>
+                  <option value="roleHolder">Who plays a role</option>
                 </optgroup>
                 <optgroup label="XR / sensors">
                   <option value="gpsProximity">GPS proximity (within / outside radius)</option>
@@ -465,6 +472,18 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
                   </option>
                 ))}
               </select>
+            )}
+
+            {t === 'roleHolder' && (
+              <div className="flex flex-wrap gap-1 items-center">
+                <RoleHolderConditionFields
+                  role={(cond as any).role}
+                  character={(cond as any).character}
+                  operator={(cond as any).operator}
+                  characters={availableCharacters}
+                  onChange={patch => updateCondition(idx, patch as any)}
+                />
+              </div>
             )}
 
             {/* ===== Affect-stack condition operators ===== */}

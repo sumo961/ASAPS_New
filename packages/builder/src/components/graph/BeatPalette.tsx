@@ -42,6 +42,7 @@ const BEAT_COLORS: Record<string, string> = {
   arBeat: '#0ea5e9',
   // Visible — multi choice
   multiChoice: '#a78bfa',
+  chooseCharacter: '#c084fc',
   dialogTree: '#8b5cf6',
   aiDialogTree: '#7c3aed',
   aiConversation: '#7c3aed',
@@ -135,7 +136,7 @@ const TAXONOMY: Array<{
     subgroups: [
       {
         label: 'Buttons',
-        beats: ['multiChoice', 'dialogTree', 'aiDialogTree', 'pickProp'],
+        beats: ['multiChoice', 'chooseCharacter', 'dialogTree', 'aiDialogTree', 'pickProp'],
       },
       {
         label: 'Input',

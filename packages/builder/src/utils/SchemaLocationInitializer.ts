@@ -9,6 +9,7 @@
 import type { Beat } from '@asaps/core';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { yawPitchToStage } from './panoramaCoordinates';
+import { isMultiChoiceLike } from '@asaps/core';
 
 export interface VisualElement {
   id: string;
@@ -239,7 +240,7 @@ function getDefaultTextForLocation(
   }
 
   // MultiChoice — the prompt is stored as `question`, same as movementChoice.
-  if (beatType === 'multiChoice') {
+  if (isMultiChoiceLike(beatType)) {
     if (nameLower.includes('question')) return params.question || '';
   }
 
@@ -326,7 +327,7 @@ export function initializeLocationsFromSchema(
 
     // Skip 'choices' and 'props' locations for beats that handle them dynamically
     // These beats create individual choice/prop buttons programmatically from their parameters
-    if ((beat.type === 'movementChoice' || beat.type === 'dialogTree' || beat.type === 'multiChoice') && locationName === 'choices') {
+    if ((beat.type === 'movementChoice' || beat.type === 'dialogTree' || isMultiChoiceLike(beat.type)) && locationName === 'choices') {
       return; // Skip - will be created dynamically below
     }
     if (beat.type === 'pickProp' && locationName === 'props') {
@@ -677,7 +678,7 @@ export function initializeLocationsFromSchema(
     });
   }
 
-  if (beat.type === 'multiChoice' && Array.isArray(params.choices)) {
+  if (isMultiChoiceLike(beat.type) && Array.isArray(params.choices)) {
     // Same per-choice button generation as movementChoice, but with button
     // type (multiChoice is non-spatial — no hotspot semantics).
     const choiceSizes = params.choices.map((choice: any, index: number) => {
@@ -1033,7 +1034,7 @@ export function regenerateChoiceElements(
     });
   }
 
-  if (beatType === 'multiChoice' && Array.isArray(params.choices)) {
+  if (isMultiChoiceLike(beatType) && Array.isArray(params.choices)) {
     const choiceSizes = params.choices.map((choice: any, index: number) => {
       const choiceText = choice.text || `Choice ${index + 1}`;
       const sized = autoSizeText(choiceText, 16, 200, 600, true);

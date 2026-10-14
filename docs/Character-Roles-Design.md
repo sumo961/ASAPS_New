@@ -1,6 +1,6 @@
 # Character Roles (recastable cast) — Design
 
-**Status: APPROVED in part (Hartmut, 2026-10-06): D1, D3, D7, D9 decided; phase 0 in progress. D2, D4, D5, D6, D8 open until phase 1.**
+**Status: APPROVED (Hartmut, 2026-10-06 and 2026-10-14). Phase 0 released v0.9.110. Next: the thin slice (below), then the rest of phase 1.**
 **Date: 2026-10-05 · Author: session work after the Field App location fixes**
 
 ## The question
@@ -294,17 +294,33 @@ Decided 2026-10-06:
 - **D9 Phase 0 first:** `npcPersonality` becomes "In this scene" notes, no
   more copying, migration — shipped before roles.
 
-Open until phase 1:
+Decided 2026-10-14:
 
-- **D2 Reference syntax.** `@confidant` in character fields and
-  `${@confidant.name}` in text?
-- **D4 Uncast role.** Default holder, else first candidate + review finding
-  (proposed), or should the story stop with an error?
-- **D5 Pronouns.** Pronoun sets only, or also `.is`/`.has`/`.was` agreement
-  helpers for English?
-- **D6 Protagonist's inventory.** Follows the role (proposed) or the
-  character?
-- **D8 Analyzer budget.** Raise the combination cap or sample castings?
+- **D2 Reference syntax: `@confidant`** in character fields,
+  `${@confidant.name}` (or `${@confidant}`) and `${@confidant.they}` in text.
+- **D5 Pronouns: sets plus agreement helpers.** `.they .them .their .theirs
+  .themself` and `.is .has .was` (so "they are" / "she is" read right).
+  A capitalised key (`${@confidant.They}`) capitalises the result.
+- **D6 Protagonist's inventory follows the role**: the global `'player'`
+  bag, whoever plays.
+- **Order: thin slice first.** Before the rest of phase 1, build the parts
+  the "Choose your character" beat needs: roles, `castRole`, `roleHolder`,
+  `@role` resolution (speakers, AI NPCs, state), text placeholders and
+  pronouns, the player role, and the beat itself, with authoring UI for
+  roles, pronouns, the effect, the condition and the pickers. Preview-as,
+  the Flowchart badge and the analyzers follow afterwards.
+
+Taken as proposed (not asked again):
+
+- **D4 Uncast role:** default holder, else the first candidate; the review
+  flags a role that can be read before anything casts it.
+- **D8 Analyzer budget:** sampling, decided when the analyzers learn roles.
+
+**Storage, changed from the proposal above:** roles live in Project
+Settings (`globalSettings.roles`, beside the declared story variables)
+rather than in a new story-level array. Settings already travel to the
+Preview Window, every export and the player, so roles need no new
+plumbing; the runtime reads them from `story.getSettings().roles`.
 
 ## Risks
 

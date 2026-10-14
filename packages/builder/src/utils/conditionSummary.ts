@@ -42,6 +42,10 @@ export function summarizeCondition(
       const delta = (c as any).baseline === 'initial' ? 'Δ' : '';
       return `${holder} ${feeling}→${target} ${delta}${OP_TEXT[c.operator] ?? c.operator} ${c.value}`;
     }
+    case 'roleHolder': {
+      const role = String((c as any).role || '?').replace(/^@/, '');
+      return `@${role} ${c.operator === '!=' ? '≠' : '='} ${c.character || '?'}`;
+    }
     default:
       // Affect / XR / timer types — name the type rather than invent syntax
       return `${c.type}${c.variableName ? ` ${c.variableName}` : ''}`;

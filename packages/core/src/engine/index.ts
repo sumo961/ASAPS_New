@@ -65,3 +65,18 @@ export type {
   PermissionState,
   SensorPermissionName,
 } from './SensorService';
+export {
+  normalizeRoles,
+  isRoleRef,
+  stripRolePrefix,
+  fallbackHolder,
+  pronounSetFor,
+  rolePlaceholderText,
+  PRONOUN_PRESETS,
+  PRONOUN_KEYS,
+  PLAYER_ROLE_ID,
+  type CastRole,
+  type RoleSelection,
+  type PronounSet,
+  type PronounKey,
+} from './roles';

@@ -102,6 +102,18 @@ STORY STATE — what exists and how to use it
   as "continue → …". Beats whose exits are choices use setChoiceEffects.
 - Character counters live on a character (updateCharacter "counters") and
   can show as that character's meter.
+- Cast ROLES (Project Settings → Roles) are parts one of several characters
+  plays: "@player" when the player picks who to be, "@confidant" for whoever
+  the player sided with. Write "@confidant" wherever a character goes
+  (speaker, npcName, effect target/character, condition character) and
+  \${@confidant.name}, \${@confidant.they}, \${@confidant.their},
+  \${@confidant.is} in text. Cast one with an effect
+  { "type": "castRole", "target": "confidant", "character": "<character id>" }
+  or a chooseCharacter beat (a multiChoice whose choices each name a
+  "character" and a short "description"). Branch per holder only where a
+  line truly differs: { "type": "roleHolder", "role": "confidant",
+  "character": "<id>", "operator": "==" }. You cannot create roles: when a
+  story needs one, tell the author to add it under Project Settings → Roles.
 - Show a value in player-facing text with \${name} — "Time left: \${Clock}
   min." Works for variables AND counters. Always write \${name}, never {name}.
 

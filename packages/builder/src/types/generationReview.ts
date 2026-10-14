@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -71,7 +71,14 @@ export interface RestartWithoutTargetFinding extends FindingBase {
   beatType: 'endScreen' | 'aiSummary';
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding;
+/** A cast-role problem: unknown role, a non-candidate cast, or a non-recastable role cast in several beats. */
+export interface RoleFinding extends FindingBase {
+  kind: 'role';
+  problem: 'unknown-role' | 'not-candidate' | 'recast';
+  role: string;
+}
+
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding;
 
 export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES } from '@asaps/core';
+import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles } from '@asaps/core';
 import { VariableValueInput } from '../editors/VariableValueInput';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
@@ -175,6 +175,9 @@ import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 
 const MIN_INSPECTOR_WIDTH = 280;
+const MULTI_CHOICE_OWNED_FIELDS = {
+  question: () => null,
+};
 const DEFAULT_INSPECTOR_WIDTH = 320;
 const INSPECTOR_WIDTH_STORAGE_KEY = 'asaps-inspector-width';
 // Vertical resize of the AI-suggestions footer (report finding 9: workspace
@@ -631,6 +634,32 @@ export const Inspector: React.FC<InspectorProps> = ({
     handleParameterChange('choices', [...existingChoices, newChoice]);
   };
 
+  // Choose your character: one option per candidate of the role. Options
+  // already naming a candidate are kept as edited; new ones take the
+  // character's name, the first sentence of their description, and the
+  // target the other options share.
+  const handleFillChoicesFromRole = (roleId: string) => {
+    const role = normalizeRoles((globalSettings as any)?.roles).find(r => r.id === roleId);
+    if (!role) return;
+    const existing = (localBeat.parameters?.choices || []) as any[];
+    const sharedTarget = existing.find(c => c.target)?.target || '';
+    const choices = role.candidates.map(charId => {
+      const kept = existing.find(c => c.character === charId);
+      if (kept) return kept;
+      const ch = characters.find(c => c.id === charId);
+      const firstSentence = (ch?.description || '').split(/(?<=[.!?])\s/)[0]?.trim() || '';
+      return {
+        id: `choice_cast_${charId}`,
+        character: charId,
+        text: ch?.displayName || ch?.name || charId,
+        ...(firstSentence ? { description: firstSentence } : {}),
+        target: sharedTarget,
+      };
+    });
+    handleParameterChange('choices', choices);
+    rebuildConnectionsAndUpdate({ ...localBeat, parameters: { ...localBeat.parameters, role: roleId, choices } });
+  };
+
   const handleRemoveChoice = (index: number) => {
     const newChoices = localBeat.parameters?.choices?.filter((_: any, i: number) => i !== index) || [];
     handleParameterChange('choices', newChoices);
@@ -1022,8 +1051,9 @@ export const Inspector: React.FC<InspectorProps> = ({
           choices: params.choices || []
         };
       case 'multiChoice':
+      case 'chooseCharacter':
         return {
-          text: params.question || 'What do you say?',
+          text: params.question || (beat.type === 'chooseCharacter' ? 'Who will you be?' : 'What do you say?'),
           choices: params.choices || []
         };
       case 'pickProp':
@@ -1089,7 +1119,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       if (beatDef?.connectionType === 'multiple') {
         if (beat.type === 'movementChoice' && !beatData.parameters.choices) {
           beatData.parameters.choices = [];
-        } else if (beat.type === 'multiChoice' && !beatData.parameters.choices) {
+        } else if (isMultiChoiceLike(beat.type) && !beatData.parameters.choices) {
           beatData.parameters.choices = [];
         } else if (beat.type === 'pickProp' && !beatData.parameters.props) {
           beatData.parameters.props = [];
@@ -1302,11 +1332,13 @@ export const Inspector: React.FC<InspectorProps> = ({
         break;
       case 'movementChoice':
       case 'multiChoice':
+      case 'chooseCharacter':
         if (!localBeat.parameters?.choices?.length) {
           errors.push('At least one choice is required');
         } else {
           localBeat.parameters.choices.forEach((choice: any, i: number) => {
             if (!choice.target) errors.push(`Choice ${i + 1} needs a target`);
+            if (localBeat.type === 'chooseCharacter' && !choice.character) errors.push(`Choice ${i + 1} needs a character`);
           });
         }
         break;
@@ -1999,6 +2031,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                     onBeatPropertyChange={handleChange}
                     usedNames={usedNames}
                     onDefineAsCharacter={onDefineAsCharacter}
+                    // Multi Choice / Choose Your Character: the shared choice
+                    // editor below has the Question — the form showed it twice.
+                    customRenderers={isMultiChoiceLike(beat.type) ? MULTI_CHOICE_OWNED_FIELDS : undefined}
                   />
                 )}
 
@@ -4135,14 +4170,53 @@ export const Inspector: React.FC<InspectorProps> = ({
                     per-choice effects. The spatial-specific fields (location-
                     name picker, "Create hotspot", show-text-on-hover) are
                     conditionally hidden below. */}
-                {(beat.type === 'movementChoice' || beat.type === 'multiChoice') && (
+                {(beat.type === 'movementChoice' || isMultiChoiceLike(beat.type)) && (
                   <div className="space-y-3">
+                    {beat.type === 'chooseCharacter' && (() => {
+                      const roles = normalizeRoles((globalSettings as any)?.roles);
+                      const roleId = localBeat.parameters?.role || 'player';
+                      const role = roles.find(r => r.id === roleId);
+                      return (
+                        <div className="space-y-1" data-testid="choose-character-role">
+                          <label className="block text-sm font-medium text-gray-700">Role</label>
+                          <div className="space-y-1">
+                            <select
+                              value={roleId}
+                              onChange={(e) => {
+                                handleParameterChange('role', e.target.value);
+                                if (!(localBeat.parameters?.choices || []).length) handleFillChoicesFromRole(e.target.value);
+                              }}
+                              className="w-full px-2 py-1 text-sm border rounded"
+                            >
+                              {!role && <option value={roleId}>{roleId} (not in Project Settings)</option>}
+                              {roles.map(r => (
+                                <option key={r.id} value={r.id}>{r.name || r.id} (@{r.id})</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => handleFillChoicesFromRole(roleId)}
+                              disabled={!role}
+                              className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+                              title="One choice per candidate of this role; choices you already edited are kept"
+                            >
+                              Add a choice for each character of this role
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {role
+                              ? `The player's pick plays @${role.id} from here on: speakers, AI partners and text like \${@${role.id}.name} follow it.`
+                              : 'Add roles in Project Settings → Roles. A role lists the characters who can fill it.'}
+                          </p>
+                        </div>
+                      );
+                    })()}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
                       {/* Multi-line: generated stories put a paragraph of scene
                           text here, which a one-line field made uneditable. */}
                       <TextFieldWithVariables
-                        value={localBeat.parameters?.question || (beat.type === 'multiChoice' ? 'What do you say?' : 'Where do you want to go?')}
+                        value={localBeat.parameters?.question || (beat.type === 'chooseCharacter' ? 'Who will you be?' : beat.type === 'multiChoice' ? 'What do you say?' : 'Where do you want to go?')}
                         onChange={(val) => handleParameterChange('question', val)}
                         availableVariables={availableVariables}
                         multiline
@@ -4151,7 +4225,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                       />
                     </div>
 
-                    {showAdvanced && (
+                    {/* Multi Choice gets these from the schema form above. */}
+                    {showAdvanced && !isMultiChoiceLike(beat.type) && (
                       <div className="space-y-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4199,7 +4274,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </span>
                           </label>
                         </div>
-                        {beat.type !== 'multiChoice' && (
+                        {!isMultiChoiceLike(beat.type) && (
                           <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -4272,11 +4347,35 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 type="text"
                                 value={choice.text}
                                 onChange={(e) => handleUpdateChoice(index, 'text', e.target.value)}
-                                placeholder="Choice text"
+                                placeholder={beat.type === 'chooseCharacter' ? "Label (empty: the character's name)" : 'Choice text'}
                                 className="w-full px-2 py-1 text-sm border rounded"
                               />
+                              {beat.type === 'chooseCharacter' && (
+                                <>
+                                  <select
+                                    value={(choice as any).character || ''}
+                                    onChange={(e) => handleUpdateChoice(index, 'character', e.target.value)}
+                                    className="w-full px-2 py-1 text-sm border rounded"
+                                    title="The character this choice casts into the role"
+                                  >
+                                    <option value="">Character…</option>
+                                    {characters.map(c => (
+                                      <option key={c.id} value={c.id}>{c.displayName || c.name}</option>
+                                    ))}
+                                  </select>
+                                  <TextFieldWithVariables
+                                    value={(choice as any).description || ''}
+                                    onChange={(val) => handleUpdateChoice(index, 'description', val)}
+                                    availableVariables={availableVariables}
+                                    multiline
+                                    rows={2}
+                                    placeholder="Description: who this person is (shown under the name)"
+                                    className="w-full px-2 py-1 text-sm border rounded"
+                                  />
+                                </>
+                              )}
 
-                              {beat.type !== 'multiChoice' && (
+                              {!isMultiChoiceLike(beat.type) && (
                                 <input
                                   type="text"
                                   value={choice.location || ''}
@@ -4289,7 +4388,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           )}
 
                           {/* Hotspot/Prop Association — movementChoice only */}
-                          {beat.type !== 'multiChoice' && (
+                          {!isMultiChoiceLike(beat.type) && (
                           <div className="flex gap-2">
                             <select
                               value={choice.locationName || ''}
@@ -4337,7 +4436,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                               SpatialFlowView and the canvas editor lets the
                               author drag-place them visually. multiChoice
                               skips this entirely — it's button-only. */}
-                          {beat.type !== 'multiChoice' && (() => {
+                          {!isMultiChoiceLike(beat.type) && (() => {
                             const sp = (choice as any).hotspot;
                             return (
                               <div>

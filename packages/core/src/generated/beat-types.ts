@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-13T16:05:33.422Z
+ * Generated: 2026-10-14T11:20:54.126Z
  */
 
 // ============================================
@@ -53,6 +53,21 @@ export interface MultiChoiceOption {
   text: string;
   displayText?: string;
   target: string;
+  conditions?: Condition[];
+  effects?: Effect[];
+  soundEffect?: string;
+}
+
+/**
+ * An option in a Choose your character beat: a Multi Choice option that names the character it casts into the beat's role.
+ */
+export interface CharacterOption {
+  id: string;
+  character: string;
+  text?: string;
+  displayText?: string;
+  description?: string;
+  target?: string;
   conditions?: Condition[];
   effects?: Effect[];
   soundEffect?: string;
@@ -259,6 +274,38 @@ export interface MultiChoiceParameters {
   question: string;
   /** Array of choice buttons. Each has its own target + per-choice effect/condition bundle (same surface as DialogTree's choices). */
   choices: MultiChoiceOption[];
+  /** Delay in seconds before the choices fade in (lets the player read the prompt first) */
+  choiceDelay?: number | undefined;
+  /** Block and dim choices that lead to previously visited beats */
+  markVisited?: boolean | undefined;
+  /** When true, a choice stays selectable on revisits but its effects[] (and, for pickProp, the inventory add) fire only the FIRST time it is picked. Use on evidence/clue beats so re-examining a document never re-scores suspicion counters. Differs from markVisited, which dims AND blocks the choice entirely: effectsOncePerChoice = re-readable but once-scored. */
+  effectsOncePerChoice?: boolean | undefined;
+  /** Soft responsive layout intent (responsive projects only). Optional per-choice pinning: slotIntent.actions.buttonAnchors maps a choice id to a stage anchor ({h:'left'|'center'|'right', v:'top'|'bottom', relativeTo:'stage', gap}) and lifts that ONE choice out of the shared button row — e.g. a 'Leave' choice in the top-right corner while the real answers stay under the question. Choices pinned to the same spot stack in one column; the question and row step around pinned choices on every device. Unpinned choices stay in the row. Visual-Editor managed (Elements → Action slot → choice → Pin); NEVER serialized as baked locations[]. */
+  slotIntent?: Object | undefined;
+  /** How the beat renders in responsive mode. 'stacked' (default) is the standard question-on-top / buttons-below layout. 'conversation' lays the prompt and buttons side-by-side — useful when the prompt has a speaker and reads like NPC dialogue. 'chat-bubble' renders as a single bubble (NPC says X, player picks). 'custom' reads slotIntent anchors for fine-grained author control. NOTE: 'chat-scroll' is intentionally not exposed here — MultiChoice is single-screen by design; for multi-turn scrollable chat use DialogTree. Lives in the LEFT-side VE settings panel. */
+  layoutTemplate?: string | undefined;
+  /** Who speaks the prompt (for TTS voice routing and optional display) */
+  speaker?: string | undefined;
+  /** Show speaker name to the interactor */
+  showSpeaker?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
+  /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
+  fixedFrame?: boolean | undefined;
+}
+
+/**
+ * Choose Your Character - The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description.
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface ChooseCharacterParameters {
+  /** The role the picked character fills (a role id from Project Settings → Roles, e.g. 'player' for the protagonist). Later beats refer to it as @player in speaker/NPC/character fields and ${@player.name}, ${@player.they} in text. */
+  role: string;
+  /** Prompt shown above the characters. Supports ${@role.name} placeholders like any text. */
+  question: string;
+  /** One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen. */
+  choices: CharacterOption[];
   /** Delay in seconds before the choices fade in (lets the player read the prompt first) */
   choiceDelay?: number | undefined;
   /** Block and dim choices that lead to previously visited beats */
@@ -1252,6 +1299,7 @@ export type BeatType =
   | 'explanation'
   | 'dialogTree'
   | 'multiChoice'
+  | 'chooseCharacter'
   | 'movementChoice'
   | 'pickProp'
   | 'videoBeat'
@@ -1291,6 +1339,7 @@ export interface BeatParameterMap {
   'explanation': ExplanationParameters;
   'dialogTree': DialogTreeParameters;
   'multiChoice': MultiChoiceParameters;
+  'chooseCharacter': ChooseCharacterParameters;
   'movementChoice': MovementChoiceParameters;
   'pickProp': PickPropParameters;
   'videoBeat': VideoBeatParameters;

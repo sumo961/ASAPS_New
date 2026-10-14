@@ -1,5 +1,88 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.112, 2026-10-14)
+
+### Overview
+- **Roles and Choose Your Character:** a story can now refer to a *part* instead of a fixed person. "The confidant" is whoever the interactor sided with; "the player" is whoever they picked on the new Choose Your Character screen. Each scene is written once: `@confidant` as speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in text. This is the thin slice of phase 1 in `docs/Character-Roles-Design.md` (decisions D2, D5, D6 and the order taken 2026-10-14).
+- **Dependabot:** 11 of 14 alerts cleared, both criticals included.
+
+### Roles (runtime)
+- Roles live in Project Settings (`globalSettings.roles`, beside the variables), so they reach the Preview, every export and the player without new plumbing. Each role has: id, name, description, the characters who can play it (candidates), who plays it (`cast` / `random` / `fixed`), a default, `recastable` and `keepOnRestart`.
+- `StoryContext`: `roleHolders` state (kept in saves). `getRoles`, `getRoleHolder`, `castRole`, `isRoleCast`, `resolveRoleRef`.
+  - An uncast role reads as its default, else its first candidate (D4).
+  - `random` roles are drawn at start and `fixed` roles set. `reset` and the Characters part of a selective reset draw again. `keepOnRestart` survives an ending's Restart.
+- `'@role'` resolves in front of the existing character resolution, so every per-character store follows: counters, feelings, variants, HUD reveal and "has appeared". State stays on the character: trust built while Mara held the role stays Mara's.
+- **Player role (D6):** a role with id `player` makes the implicit `'player'` key follow the chosen protagonist (counters, feelings, sentiment targets). The inventory stays the global player bag, whoever plays. Candidates of the player role show their HUD only once picked.
+- New effect `castRole` {target: role, character}. New condition `roleHolder` {role, character, ==/!=}.
+- **Text:** `${@role}`, `${@role.name}`, pronouns `.they .them .their .theirs .themself`, agreement `.is .has .was`. A capital key capitalises (D5). A speaker field holding `@role` shows the holder's name, and the portrait and voice lookups follow, because they are keyed by that name.
+- New optional `pronouns` on Character: `she`, `he`, `they`, or a custom set.
+- AI Conversation and AI Dialog Tree: `npcName` `@role` builds the dossier, scene notes and display name of the current holder.
+
+### Choose Your Character beat (`chooseCharacter`)
+- A copy of Multi Choice, as Hartmut asked, with the same screen, layouts, Visual Editor and choice editor. `MultiChoiceBeat` gained small hooks (`choicesFor`, `onChoiceTaken`, `targetFor`).
+- Each option names a `character` and an optional `description`. Taking it casts the character into the beat's `role` *before* the option's own effects, so an effect on `@player` lands on the new holder.
+- An empty label shows the character's name. An option without a target goes where the others go. With no options authored, the role's candidates are offered.
+- **Descriptions:** a second, smaller line on responsive buttons (`renderChoices` gained `description`). On hand-placed fixed buttons they show as hover text.
+- `isMultiChoiceLike()` replaces the literal `'multiChoice'` checks in the renderer, the Visual Editor, the location initializer, the Inspector, the analyzer and the translators. Both translation extractors now also extract option descriptions.
+
+### Authoring
+- **Project Settings → Roles** tab (`RolesSettingsPanel`) with a **Player role** shortcut.
+- **Inspector for Choose Your Character:** a Role picker, **Add a choice for each character of this role**, and per-option Character and Description fields.
+- **Pickers:** speaker and AI-partner pickers list roles first ("@ The confidant") through a new `RolesContext`.
+- Effects editor: **Cast Role**. Condition editors (choice "Show only if…" and Requirements): **Who plays a role**. The edge summary shows `@confidant = Ingrid`.
+- Character Editor: **Pronouns**.
+- Preview **Debug Info → Roles:** who plays each role now, with a picker to switch for testing.
+- **Story review findings:** reference to an undeclared role; casting a non-candidate; a non-recastable role cast in more than one beat (D3).
+- Inspector side fix: Multi Choice showed its Question twice (schema form plus choice editor), and Choice Delay / Mark Visited / Effects once also appeared twice under Show Advanced. Each now appears once.
+
+### AI generation
+- Schema: the `chooseCharacter` beat, `characterOption`, the `castRole` effect, the `roleHolder` condition, and descriptions that teach them.
+- Prompts: story generation (the Choose Your Character beat, a Cast Roles section, top-level `roles`), dialog generation (`@role` speakers) and the Co-Designer (roles, `castRole`, `roleHolder`; it cannot create roles).
+- `applyGeneratedStory` imports `roles[]` into Project Settings.
+- The Co-Designer vocabulary knows `castRole`.
+
+### Verification
+- Core 2879 (17 new in `CastRoles.test.ts`), renderer 669, builder 2853 (4 new role-finding tests), player 7, desktop 24, MCP 29.
+- **Played in the Preview Window** (test project "QA cast roles"):
+  - Choose screen with descriptions → pick Jonas → "Jonas steps onto the ferry. He is tired, and his coat is wet."
+  - `@player` speaker shows "Jonas". Siding with Tomas (they/them) → speaker "Tomas", "They were sure…", and Tomas's HUD appears.
+  - The Roles debug card switched holders.
+  - TTS was off (new standing rule: speech off for every playback I drive).
+- **Device sweep of the choose screen** (responsive): Desktop, Tablet L/P and Phone L/P all clean. Question, both buttons and their descriptions sit inside the stage and inside their buttons, with no overlaps.
+
+### Not yet (rest of phase 1)
+- Preview-as selector in the Inspector and the Visual Editor.
+- A Flowchart badge on casting beats.
+- The analyzers do not explore castings (D8: sampling).
+- Speaker portrait and TTS lookups are still keyed by name, which works because names are resolved in core.
+- The Co-Designer cannot define roles.
+- A Visual Editor placeholder for descriptions.
+
+### Dependabot (4212cbc9)
+- Root override shell-quote 1.9.0 → ^1.12.0 (our own pin had become the vulnerable version).
+- web-service's nested qs re-resolved.
+- `npm audit fix` in mcp-server-desktop: @modelcontextprotocol/sdk 1.32.1, proxy-addr 2.0.8, ip-address, fast-uri, source-map-js.
+- Left: braces, postcss-selector-parser, sprintf-js (build tooling, no in-range fix).
+
+**Files modified:**
+- `beat-definitions/core-beats.json`, `packages/core/src/generated/beat-types.ts`
+- core: `engine/roles.ts` (new), `engine/StoryContext.ts`, `engine/index.ts`, `beats/ChooseCharacterBeat.ts` (new), `beats/MultiChoiceBeat.ts`, `beats/Beat.ts`, `beats/AIConversationBeat.ts`, `beats/AIDialogTreeBeat.ts`, `beats/BeatRegistry.ts`, `beats/index.ts`, `types/index.ts`, `analysis/StateSimulationAnalyzer.ts`; `tests/engine/CastRoles.test.ts` (new)
+- renderer: `renderers/ReactRenderer.tsx`, `components/SlotFlowView.tsx`, `components/PositionedBeatView.tsx`, `utils/DefaultLocationGenerator.ts`
+- builder:
+  - new files: `contexts/RolesContext.tsx`, `components/settings/RolesSettingsPanel.tsx`, `editors/RoleHolderConditionFields.tsx`, `utils/roleFindings.ts`
+  - Inspector and settings: `components/Inspector.tsx`, `components/SchemaFormGenerator.tsx`, `components/settings/GlobalSettingsInspector.tsx`, `components/characters/CharacterEditor.tsx`
+  - editors: `editors/ChoiceEffectsEditor.tsx`, `editors/ChoiceConditionsEditor.tsx`, `editors/RequirementsEditor.tsx`, `editors/summarizeChoiceEffects.ts`
+  - Preview, Visual Editor and app: `pages/PreviewWindow.tsx`, `components/visual/VisualWorkspace.tsx`, `components/visual/VisualPropertiesPanel.tsx`, `components/graph/BeatPalette.tsx`, `App.tsx`
+  - utils: `utils/generationReview.ts`, `utils/generatedVariables.ts`, `utils/applyGeneratedStory.ts`, `utils/wiringVocabulary.ts`, `utils/conditionSummary.ts`, `utils/SchemaLocationInitializer.ts`, `utils/beatConnectionModel.ts`, `utils/visualBeatTypes.ts`
+  - types and services: `types/generationReview.ts`, `types/character.ts`, `storage/types.ts`, `services/AIValidator.ts`
+  - export: `export/StoryTranslator.ts`, `export/HtmlExporter.ts`
+  - prompts: `services/prompts/storyGenerationEnhanced.ts`, `services/prompts/dialogGeneration.ts`, `components/ai/codesigner/systemPrompt.ts`
+  - `public/player-web.js` (rebuilt); `utils/__tests__/roleFindings.test.ts` (new)
+- docs: `docs/USER_GUIDE.md` (Choose Your Character, Roles, Pronouns; images 81, 82), `docs/Character-Roles-Design.md`
+- `package.json`, `package-lock.json`, `mcp-server-desktop/package-lock.json` (Dependabot)
+
+---
+
 ## 2026-10-13: Several characters in one conversation, and story state you can trust (v0.9.112)
 
 ### Overview

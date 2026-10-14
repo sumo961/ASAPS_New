@@ -473,11 +473,16 @@ export class AIConversationBeat extends Beat {
     // defined character (so the dossier + personality auto-fill work). Resolve
     // it to a human name for everything the player/LLM sees; buildDossierForRef
     // keeps using the raw ref because it matches by id.
-    const npcDisplayName = resolveCharacterDisplayName(this.npcName, characters);
-    const characterDossier = buildDossierForRef(this.npcName, characters, context);
+    // '@confidant' → whoever holds the role now; a casting made during the
+    // conversation does not swap the partner mid-scene.
+    const npcRef = typeof (context as any).resolveRoleRef === 'function'
+      ? (context as any).resolveRoleRef(this.npcName) as string
+      : this.npcName;
+    const npcDisplayName = resolveCharacterDisplayName(npcRef, characters);
+    const characterDossier = buildDossierForRef(npcRef, characters, context);
     // "In this scene" notes; a copy of the linked character's description
     // (what older builds put here) is dropped — the dossier already has it.
-    const sceneNotes = sceneNotesFor(this.npcPersonality, this.npcName, characters);
+    const sceneNotes = sceneNotesFor(this.npcPersonality, npcRef, characters);
 
     const conversationHistory: ConversationTurn[] = [];
     const firedOnceDirections = new Set<string>();
@@ -738,7 +743,7 @@ export class AIConversationBeat extends Beat {
           // Generate NPC exit message if a prompt is provided
           if (exitMessagePrompt) {
             try {
-              const exitSystemPrompt = `You are ${npcDisplayName}.\n\n${npcIdentityBlock(buildDossierForRef(this.npcName, characters, context), sceneNotes)}\n\n` +
+              const exitSystemPrompt = `You are ${npcDisplayName}.\n\n${npcIdentityBlock(buildDossierForRef(npcRef, characters, context), sceneNotes)}\n\n` +
                 `SCENARIO: ${this.scenario}\n\n` +
                 `Generate a brief farewell/response that DIRECTLY acknowledges what the player just said. Instruction: ${exitMessagePrompt}\n` +
                 `Keep it to 1-2 sentences. Respond in the SAME LANGUAGE as the conversation.\n` +
@@ -771,7 +776,7 @@ export class AIConversationBeat extends Beat {
         // rebuilt on every turn (Mode A) so character-scoped state changes
         // (e.g. counters set by a previous direction firing) feed back into
         // the LLM's understanding of who the NPC currently is.
-        const turnDossier = buildDossierForRef(this.npcName, characters, context);
+        const turnDossier = buildDossierForRef(npcRef, characters, context);
         const systemPrompt = buildConversationSystemPrompt({
           npcName: npcDisplayName,
           npcPersonality: sceneNotes,
@@ -826,7 +831,7 @@ export class AIConversationBeat extends Beat {
       // mid-exchange — the counterpart of a direction exit's exitMessage.
       if (this.fallbackExitMessage?.trim()) {
         try {
-          const closingPrompt = `You are ${npcDisplayName}.\n\n${npcIdentityBlock(buildDossierForRef(this.npcName, characters, context), sceneNotes)}\n\n` +
+          const closingPrompt = `You are ${npcDisplayName}.\n\n${npcIdentityBlock(buildDossierForRef(npcRef, characters, context), sceneNotes)}\n\n` +
             `SCENARIO: ${this.scenario}\n\n` +
             `The conversation has to end now. Say a brief closing line that wraps it up naturally, ` +
             `consistent with everything said so far. Instruction: ${this.fallbackExitMessage}\n` +

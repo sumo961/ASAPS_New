@@ -187,6 +187,8 @@ export interface Condition {
     | 'variable' | 'inventory' | 'counter' | 'timer' | 'counterCompare'
     | 'visitedBeat' | 'fictionalTime' | 'mood' | 'sentiment' | 'emotion'
     | 'trait' | 'goal' | 'characterVariant'
+    // Cast roles: "the confidant is Mara" (role + character).
+    | 'roleHolder'
     // XR / sensor conditions (v0.9.48 / S3+).
     //   gpsProximity     — branch on player's distance to a GPS target
     //   indoorProximity  — branch on a beacon's signal strength
@@ -208,6 +210,7 @@ export interface Condition {
   // For inventory conditions
   item?: string;                   // Inventory item name to check
   character?: string;              // Character whose inventory to check (default: 'player')
+  role?: string;                   // For roleHolder: the role id ('confidant' or '@confidant')
   checkType?: 'has' | 'notHas' | 'quantity'; // Type of inventory check
   // For inventory quantity check
   quantityCheck?: boolean;         // Whether to check quantity (vs just existence)
@@ -423,11 +426,12 @@ export interface GeoPoint {
  *  - setCharacterVariant — switch the active persona variant
  *  - bookmarkAffectState — snapshot affect under a bookmark name (for baselines)
  *  - playSound — one-shot sound (asset id, preset or URL; value = volume)
+ *  - castRole — fill a cast role (target = role id, character = who)
  */
 export const EFFECT_TYPES = [
   'setVariable', 'addInventory', 'removeInventory', 'incrementCounter', 'setCounter',
   'nudgeMood', 'addSentiment', 'fireEmotion', 'addReflection', 'setGoalStatus',
-  'setCharacterVariant', 'bookmarkAffectState', 'playSound',
+  'setCharacterVariant', 'bookmarkAffectState', 'playSound', 'castRole',
 ] as const;
 export type EffectType = (typeof EFFECT_TYPES)[number];
 
@@ -691,7 +695,7 @@ export interface IRenderer {
   renderTitleScreen(title: string, author: string, buttonText: string, locations?: Location[]): Promise<void>;
   renderText(text: string, buttonText: string, locations?: Location[]): Promise<void>;
   renderDialog(speaker: string, text: string, emotion?: string, locations?: Location[]): Promise<void>;
-  renderChoices(choices: { id: string; text: string; isExit?: boolean; /** A Continue button that moves the scene on: not a player reply (chat shows no bubble for it). */ isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
+  renderChoices(choices: { id: string; text: string; /** A smaller second line under the label (Choose your character). */ description?: string; isExit?: boolean; /** A Continue button that moves the scene on: not a player reply (chat shows no bubble for it). */ isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderMovement(question: string, choices: { id: string; text: string; displayText?: string; location: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderPropSelection(question: string, props: { id: string; name: string; displayName?: string; description: string; locationName?: string; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string>;
   renderVideo(videoFile: string, autoplay: boolean, controls: boolean, locations?: Location[], skipButton?: boolean, captions?: Array<{ start: number; end: number; text: string }>): Promise<void>;

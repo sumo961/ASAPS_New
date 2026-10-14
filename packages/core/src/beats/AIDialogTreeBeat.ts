@@ -301,6 +301,12 @@ export class AIDialogTreeBeat extends Beat {
     }
   }
 
+  /** The NPC field with '@role' resolved to the role's current holder. */
+  private npcRef(context: StoryContext): string {
+    const resolve = (context as any).resolveRoleRef;
+    return typeof resolve === 'function' ? resolve.call(context, this.npcName) : this.npcName;
+  }
+
   protected async performAction(
     context: StoryContext,
     renderer: IRenderer
@@ -340,7 +346,7 @@ export class AIDialogTreeBeat extends Beat {
     // inspector) to a human display name for all rendering + LLM-prompt uses.
     // The raw ref is kept for buildDossierForRef, which matches by id.
     this._npcDisplay =
-      resolveCharacterDisplayName(this.npcName, (context.getStory() as any)?.getCharacters?.() || [])
+      resolveCharacterDisplayName(this.npcRef(context), (context.getStory() as any)?.getCharacters?.() || [])
       || 'the character';
 
     // Clear chat history when starting a new dialog in chat mode
@@ -479,10 +485,10 @@ export class AIDialogTreeBeat extends Beat {
     // generates dialog grounded in the canonical character data instead of
     // re-imagining the NPC from scratch each beat.
     const characters = (story as any)?.getCharacters?.() || [];
-    const characterDossier = buildDossierForRef(this.npcName, characters, context);
+    const characterDossier = buildDossierForRef(this.npcRef(context), characters, context);
     // Dossier = identity; the NPC Personality field = "In this scene" notes
     // (a copy of the character's description is dropped).
-    this._npcIdentity = npcIdentityBlock(characterDossier, sceneNotesFor(this.npcPersonality, this.npcName, characters));
+    this._npcIdentity = npcIdentityBlock(characterDossier, sceneNotesFor(this.npcPersonality, this.npcRef(context), characters));
 
     // Build the generation prompt
     const prompt = `Generate a dialog tree for the following scenario:

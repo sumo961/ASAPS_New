@@ -1,3 +1,4 @@
+import { normalizeRoles } from '@asaps/core';
 import type { GlobalSettings } from '../storage/types';
 
 /**
@@ -53,4 +54,20 @@ export function mergeGeneratedVariables(
   for (const v of generated) if (!byName.has(v.name)) byName.set(v.name, v);
 
   return { ...base, variables: Array.from(byName.values()) } as GlobalSettings;
+}
+
+/**
+ * A generated story's top-level `roles[]` (cast roles) become
+ * `globalSettings.roles`. A generated story is a new project, so its roles
+ * replace any the previous project had; none generated ⇒ none kept.
+ * Returns null when nothing changes.
+ */
+export function applyGeneratedRoles(
+  base: GlobalSettings,
+  storyRoles: unknown,
+): GlobalSettings | null {
+  const roles = normalizeRoles(storyRoles);
+  const had = Array.isArray((base as any).roles) && (base as any).roles.length > 0;
+  if (roles.length === 0 && !had) return null;
+  return { ...base, roles } as GlobalSettings;
 }
