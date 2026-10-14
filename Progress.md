@@ -1,6 +1,6 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.113, 2026-10-14)
+## 2026-10-14: Show an asterisk, highlight a word, and roles everywhere you need them (v0.9.114)
 
 ### Overview
 - **Text formatting (user request):**
@@ -25,6 +25,11 @@
 - **Builder:**
   - The formatting bar has a Highlight button and a `\* = *` hint (tooltip lists all escapes).
   - Schema descriptions, the story/dialog/Co-Designer prompts and both translation prompts (StoryTranslator and the HtmlExporter copy) mention highlight and escapes.
+- **The formatting bar everywhere text shows formatting:**
+  - It used to appear only on schema-driven fields such as Info Text.
+  - `TextFieldWithVariables` now carries it: multi-line fields always show it, single-line fields while focused (opt out with `formatting={false}`).
+  - That covers Dialog Tree lines and player choices, Multi Choice / Choose Your Character / Keypad / Panorama questions and fallback text, credits text, and choice labels (now a TextFieldWithVariables in the Inspector).
+  - Flowchart edge labels show the plain text, without markers.
 
 ### Roles follow-ups
 - **Condition Check:** "Who plays a role" in the Condition Type list, using the shared role fields. The beat normalises a leftover operator to is / is not.
@@ -33,7 +38,10 @@
 - **Rename:**
   - Core `renameRoleReferences()` rewrites `@old` strings, `${@old…}` placeholders, Cast Role targets, roleHolder conditions and a beat's own `role` (Choose Your Character, Condition Check).
   - The Roles tab remembers the id a role had (`renamedFrom`, editor-only). Save Settings applies the settings and every changed beat as one BatchCommand, so a single Undo reverts it, then drops the field.
+  - Beat Requirements are renamed too, and Story Warnings check them.
   - Verified in the app: confidant → friend updated 3 beats (text, Cast Role effects, Condition Check, badge), and Undo restored all of them.
+
+**Files modified:** `renderer/src/utils/markdownLite.ts`, `typewriterGranularity.ts`, `components/SlotFlowView.tsx`, `components/PositionedBeatView.tsx`, `renderers/ReactRenderer.tsx`, `index.ts`; `core/src/analysis/roleFindings.ts` (moved from builder), `StoryWarnings.ts`, `index.ts`, `engine/roles.ts`, `engine/index.ts`, `beats/ConditionBeat.ts`; `builder/src/App.tsx`, `components/Inspector.tsx`, `components/FormattingToolbar.tsx`, `components/SchemaFormGenerator.tsx`, `components/graph/CustomEdge.tsx`, `editors/TextFieldWithVariables.tsx`, `components/settings/RolesSettingsPanel.tsx`, `components/debug/storyWarningLabels.ts`, `editors/DialogTreeEditor.tsx`, `export/StoryTranslator.ts`, `export/HtmlExporter.ts`, prompts (story, dialog, Co-Designer), `utils/roleFindings.ts` (re-export), `types/generationReview.ts`; `beat-definitions/core-beats.json`; `docs/USER_GUIDE.md`; tests (markdownLite, typewriterGranularity, roleFindings, CastRoles).
 
 ### Verification
 - Suites: core 2902, renderer 674, builder 2864, player 8.

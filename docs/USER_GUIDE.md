@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.113*
+*Last revised against v0.9.114*
 
 ---
 
@@ -442,11 +442,12 @@ formatting marks — write them inline or select text and use the **B** / *I* /
 | `*text*` | *italic* |
 | `~~text~~` | ~~strikethrough~~ |
 | `==text==` | highlighted |
-| `\*` | a plain asterisk: `5 \* 3` shows *5 \* 3* |
+| `\*` | a plain asterisk: `5 \* 3` shows 5 * 3 |
 
 **Showing a marker character itself:** put a backslash in front of it —
 `\*`, `\_`, `\~`, `\=` — and it shows as typed instead of starting
 formatting; `\\` shows one backslash. (`\n` still means a line break.)
+Forgot which? Hover the small `\* = *` hint at the end of the formatting bar.
 
 This works in body text, end-screen messages, input prompts, chat
 bubbles and choice buttons. Hyper Text bodies stay plain so link words
@@ -523,7 +524,7 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 
 **Layout on responsive stages.** In a responsive project the *Visual Editor's* left panel adds a **Layout Template** for dialog beats — *Stacked (Visual Novel)*, *Conversation (side-by-side)*, *Chat - Scrollable History*, *Chat - Single Bubble*, or *Custom (drag-place)*. Conversation puts the NPC text on one side and the choices on the other; it needs genuine side-by-side room, so below roughly 640 px of usable width (a phone held upright) the same beat quietly falls back to the stacked flow — nothing to configure, and your choices and effects are untouched. Long NPC speeches scroll inside their card instead of running off the bottom of the stage, and a narrow corner HUD indents the text beside it rather than pushing everything down.
 
-**Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand.
+**Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand. If your project has [roles](#roles), they're pinned at the top of the list (*@ The confidant*): the line is then spoken by whoever plays that role.
 
 <a id="then-another-character-speaks"></a>
 **Several characters before the player answers.** Characters can also talk to each other: Granny speaks, the Wolf answers, and only then does the player choose. Under a line that has no player responses yet, click **Then another character speaks**. A new line appears directly below, marked *then, after the reading time*, already set to a different character (when your project has more than one), and you can chain as many lines as the scene needs. Only the last line of the chain takes player responses — add them there. While playing, each line gets its reading time (plus any speech) and then the next speaker follows by itself; a **Continue** button lets fast readers skip ahead. In chat layouts the lines appear as bubbles one after another, with no reply from the player in between. To take a line out of the chain, use its ✕: everything after it goes with it, and the line above waits for player responses again.
@@ -1598,7 +1599,7 @@ When AI translation runs on your project, character name translations are auto-p
 
 Anywhere in the Inspector that asks for a character — a beat's speaker, an inventory recipient, an AI NPC name, a per-node speaker inside a Dialog Tree — you'll see the same control: a **Character combobox**. Click into it (or start typing) and a dropdown opens with everything you might want to pick:
 
-- **Pinned options** at the top — context-specific shortcuts. For a beat speaker the pins are *(Default — Narrator)*, *Narrator*, and your Player character (shown as e.g. *"Red (Player)"*). For inventory beats and the player-side fields the pin is *Player*.
+- **Pinned options** at the top — context-specific shortcuts. For a beat speaker the pins are *(Default — Narrator)*, *Narrator*, and your Player character (shown as e.g. *"Red (Player)"*), followed by your [roles](#roles) (*@ The confidant*) when the project has any; a Dialog Tree line's NPC Speaker pins just the roles. For inventory beats and the player-side fields the pin is *Player*.
 - **Characters** — every Character you've defined in the Character Manager, each with its color dot and display name.
 - **Used names** — every free-text speaker / character name used elsewhere in your project, with a usage count next to each (e.g. *"Mysterious Stranger 3×"*). Picking one stores it as free text — handy for keeping ad-hoc names consistent without committing to a full Character record.
 - **+ Define "<typed name>" as a Character** — appears at the bottom of the dropdown when whatever you've typed isn't yet a defined Character. Click it to open the Character Manager pre-filled with that name, ready for you to add details.
@@ -1654,7 +1655,7 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 - **Drawn at random at the start** — each playthrough draws one of the characters (rehearsal stories with different people).
 - **Always the default** — handy while the other characters are still unwritten.
 
-**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise the review flags it), and **Keep across restarts** lets an ending's Restart keep who plays it. Changing the *Referenced as* id updates every beat that uses it when you click **Save Settings** — speakers, AI partners, `${@…}` text, Cast Role effects, conditions and Choose Your Character — as one step you can undo.
+**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise Story Warnings and the review banner flag it), and **Keep across restarts** lets an ending's Restart keep who plays it. Changing the *Referenced as* id updates every beat that uses it when you click **Save Settings** — speakers, AI partners, `${@…}` text, Cast Role effects, choice conditions, Condition Check beats, beat Requirements and Choose Your Character — as one step you can undo.
 
 ![Project Settings → Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story](images/82-project-settings-roles.png)
 
@@ -2736,9 +2737,9 @@ At runtime, one text is randomly selected from the main text plus all variations
 
 ## Rich Text Formatting
 
-Text boxes in ASAPS Modern support a lightweight markdown syntax for basic formatting. This works in every prose surface the interactor reads — Info Text, Dialog Tree NPC lines, Duration Screen, end-screen messages, input prompts, and chat bubbles — in both fixed and responsive layout, including after a typewriter reveal finishes.
+Text boxes in ASAPS Modern support a lightweight markdown syntax for basic formatting. This works in every prose surface the interactor reads — Info Text, Dialog Tree NPC lines, Duration Screen, end-screen messages, input prompts, chat bubbles, and choice buttons — in both fixed and responsive layout, including after a typewriter reveal finishes.
 
-You don't have to remember the syntax: prose fields in the Inspector carry a small **B** / *I* / ~~S~~ bar — select text and click to wrap or unwrap it.
+You don't have to remember the syntax: prose fields in the Inspector carry a small **B** / *I* / ~~S~~ / **H** (highlight) bar — select text and click to wrap or unwrap it. Hover the `\* = *` hint at its end for the backslash escapes.
 
 One place deliberately stays plain: **Hyper Text bodies** (link words must match the text exactly, and markers would break the match). Choice buttons show formatting like body text. If you translate your story, the markers carry over — the words inside get translated, the marks stay.
 
@@ -2762,7 +2763,7 @@ One place deliberately stays plain: **Hyper Text bodies** (link words must match
 She paused, then added: "~~Especially~~ **especially** those who forget."
 ```
 
-This renders with proper bold, italic, and strikethrough formatting in the preview and exported stories. Speech reads the words, not the markers. HTML entities are safely escaped, so you cannot inject raw HTML.
+This renders with proper bold, italic, strikethrough, and highlight formatting in the preview and exported stories. Speech reads the words, not the markers. HTML entities are safely escaped, so you cannot inject raw HTML.
 
 ---
 

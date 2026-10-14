@@ -22,8 +22,16 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.113** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.113 lets one story be played by
+Current release: **v0.9.114** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.114 lets you show an asterisk**:
+put a backslash before a formatting character (`5 \* 3` shows "5 * 3"
+instead of starting italics), mark words with `==highlight==`, and choice
+buttons now show bold and italic too. Roles reach the remaining places: a
+Condition Check can branch on who plays a role, Dialog Tree lines can be
+spoken by a role, hand-written stories get the role checks in Debug → Story
+Warnings, and renaming a role updates every beat that uses it.
+
+**v0.9.113 let one story be played by
 different people**: set up a role in Project Settings → Roles ("the
 player", "the confidant"), and write each scene once for it — the role as
 speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in
