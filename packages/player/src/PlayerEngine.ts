@@ -1,4 +1,4 @@
-import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry } from '@asaps/core';
+import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
 import { toMeterCounterData } from '@asaps/renderer';
@@ -771,10 +771,10 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
     if ('setCharacterPortraitResolver' in renderer && characters.length > 0) {
       renderer.setCharacterPortraitResolver((speakerName: string): string | undefined => {
         if (!speakerName) return undefined;
-        const lower = speakerName.toLowerCase();
-        const char = characters.find((c: any) =>
-          c.displayName?.toLowerCase() === lower || c.name?.toLowerCase() === lower
-        );
+        // The character as it looks now (active variant merged in), found by
+        // its base or its current name — '@role' speakers arrive resolved.
+        const ctx = this.engine?.getContext() as any;
+        const char: any = findSpeakerCharacter(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
         if (!char?.portrait) return undefined;
         if (char.portrait.assetId && this.assetMap.has(char.portrait.assetId)) {
           return this.assetMap.get(char.portrait.assetId);

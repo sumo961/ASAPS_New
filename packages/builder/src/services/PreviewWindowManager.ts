@@ -39,6 +39,7 @@ export interface PreviewMessage {
     | 'STORY_UPDATE'
     | 'NAVIGATE_TO_BEAT'
     | 'STATE_PRESET'
+    | 'ROLE_PREVIEW'
     | 'CLOSE'
     | 'PING'
     | 'VISITED_BEATS_UPDATE';
@@ -64,6 +65,8 @@ export interface PreviewMessage {
     /** Staged renderer-chrome translations (uiStrings catalog) for the
      *  active language — applied via setUIStrings, no AI needed. */
     uiStrings?: Record<string, string> | null;
+    /** The editor's "Preview as" casting (role id → character id). */
+    rolePreviewCasting?: Record<string, string>;
     /** Beat IDs visited during the current preview session */
     visitedBeats?: string[];
     /** Currently-active beat (painted more prominently than past-visited beats) */
@@ -374,6 +377,20 @@ class PreviewWindowManager {
       payload: { statePreset: preset },
     };
 
+    if (this.isElectron) {
+      (window as any).electronAPI?.preview?.sendMessage?.(message);
+    } else if (this.previewWindow) {
+      this.previewWindow.postMessage(message, window.location.origin);
+    }
+  }
+
+  /**
+   * Send the editor's "Preview as" casting. Read when the next run starts;
+   * never restarts or reloads a run in progress.
+   */
+  sendRolePreview(casting: Record<string, string>): void {
+    if (!this.isWindowOpen()) return;
+    const message: PreviewMessage = { type: 'ROLE_PREVIEW', payload: { rolePreviewCasting: casting } };
     if (this.isElectron) {
       (window as any).electronAPI?.preview?.sendMessage?.(message);
     } else if (this.previewWindow) {

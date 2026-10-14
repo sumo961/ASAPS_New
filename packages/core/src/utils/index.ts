@@ -46,7 +46,7 @@ export {
   type AssetDeviceClass,
 } from './assetVariant';
 export { waitForTTS, waitForReadingTime } from './ttsWait';
-export { resolveCharacter, resolveCharacterKey, isKnownCharacter } from './characterRef';
+export { resolveCharacter, resolveCharacterKey, isKnownCharacter, findSpeakerCharacter } from './characterRef';
 export { splitVoicedSegments, type VoicedSegment } from './voicedSegments';
 export { storyLinks, beatLinks, dedupeLinks, beatTargetIds, type StoryLink } from './storyLinks';
 export { buildDossier, buildDossierForRef, isCopiedCharacterDescription, sceneNotesFor, describeMoodAxis, selfFeelingLabel, type BuildDossierOptions, type DossierInteraction } from './dossier';

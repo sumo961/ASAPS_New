@@ -60,6 +60,8 @@ export class ConditionBeat extends Beat {
   public goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
   // characterVariant-specific parameter — the variant id under test.
   public variantId?: string;
+  // roleHolder: the cast role under test (character = who should hold it).
+  public role?: string;
   // XR-condition fields (v0.9.48 / S3+).
   // gpsProximity: targetLat/Lng + radiusMeters; runtime measures
   //   haversine distance from cached SensorService location.
@@ -146,6 +148,7 @@ export class ConditionBeat extends Beat {
     this.goalId = conditionObj.goalId || (params as any).goalId || (config as any).goalId;
     this.goalStatus = conditionObj.goalStatus || (params as any).goalStatus || (config as any).goalStatus;
     this.variantId = conditionObj.variantId || (params as any).variantId || (config as any).variantId;
+    this.role = conditionObj.role || (params as any).role || (config as any).role;
     this.targetLat = conditionObj.targetLat ?? (params as any).targetLat ?? (config as any).targetLat;
     this.targetLng = conditionObj.targetLng ?? (params as any).targetLng ?? (config as any).targetLng;
     this.radiusMeters = conditionObj.radiusMeters ?? (params as any).radiusMeters ?? (config as any).radiusMeters;
@@ -236,6 +239,38 @@ export class ConditionBeat extends Beat {
         condition.traitName = this.traitName;
         condition.value = this.value ?? this.val ?? 0;
         break;
+      // These used to fall to the default branch, which kept only
+      // variableName/value — the runtime then never saw the goal, the
+      // variant or the role under test, and the check always failed.
+      case 'goal':
+        condition.character = this.character;
+        condition.goalId = this.goalId;
+        if (this.goalStatus) condition.goalStatus = this.goalStatus;
+        if (this.value !== undefined) condition.value = this.value;
+        break;
+      case 'characterVariant':
+        condition.character = this.character;
+        condition.variantId = this.variantId;
+        if (this.value !== undefined) condition.value = this.value;
+        break;
+      case 'roleHolder':
+        condition.role = this.role;
+        condition.character = this.character;
+        break;
+      case 'gpsProximity':
+        condition.targetLat = this.targetLat;
+        condition.targetLng = this.targetLng;
+        condition.radiusMeters = this.radiusMeters;
+        condition.proximityMode = this.proximityMode;
+        break;
+      case 'indoorProximity':
+        condition.beaconUuid = this.beaconUuid;
+        condition.beaconRangeMeters = this.beaconRangeMeters;
+        condition.proximityMode = this.proximityMode;
+        break;
+      case 'permissionGranted':
+        condition.permissions = Array.isArray(this.permission) ? this.permission : this.permission ? [this.permission] : [];
+        break;
       default:
         condition.variableName = this.variableName || this.variable;
         condition.value = this.value ?? this.val;
@@ -284,6 +319,7 @@ export class ConditionBeat extends Beat {
       goalId: this.goalId,
       goalStatus: this.goalStatus,
       variantId: this.variantId,
+      role: this.role,
       targetLat: this.targetLat,
       targetLng: this.targetLng,
       radiusMeters: this.radiusMeters,
@@ -547,6 +583,11 @@ export class ConditionBeat extends Beat {
     } else if (conditionObj.variantId !== undefined) {
       this.variantId = conditionObj.variantId;
     }
+    if (params.role !== undefined) {
+      this.role = params.role;
+    } else if (conditionObj.role !== undefined) {
+      this.role = conditionObj.role;
+    }
     if (params.targetLat !== undefined) {
       this.targetLat = params.targetLat;
     } else if (conditionObj.targetLat !== undefined) {
@@ -625,6 +666,20 @@ export class ConditionBeat extends Beat {
         break;
       case 'trait':
         isValidCondition = !!(this.character && this.traitName);
+        break;
+      case 'goal':
+        isValidCondition = !!(this.character && this.goalId);
+        break;
+      case 'characterVariant':
+        isValidCondition = !!this.character;
+        break;
+      case 'roleHolder':
+        isValidCondition = !!(this.role && this.character);
+        break;
+      case 'gpsProximity':
+      case 'indoorProximity':
+      case 'permissionGranted':
+        isValidCondition = true;
         break;
       case 'counter':
       default:

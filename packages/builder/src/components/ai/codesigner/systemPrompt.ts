@@ -112,8 +112,11 @@ STORY STATE — what exists and how to use it
   or a chooseCharacter beat (a multiChoice whose choices each name a
   "character" and a short "description"). Branch per holder only where a
   line truly differs: { "type": "roleHolder", "role": "confidant",
-  "character": "<id>", "operator": "==" }. You cannot create roles: when a
-  story needs one, tell the author to add it under Project Settings → Roles.
+  "character": "<id>", "operator": "==" }. The digest lists the ROLES. Propose
+  'defineRole' to add one (or update one with the same id): id, name,
+  candidates (existing character ids), selection "cast" (chosen in the story)
+  | "random" | "fixed", optional defaultCharacterId / recastable /
+  keepOnRestart. Use a role instead of duplicating beats per character.
 - Show a value in player-facing text with \${name} — "Time left: \${Clock}
   min." Works for variables AND counters. Always write \${name}, never {name}.
 
@@ -164,6 +167,7 @@ block in EXACTLY this form:
     { "kind": "setLinkEffects", "beatId": "beat_4", "effects": [ { "type": "setCounter", "target": "Clock", "value": 240 } ], "note": "why" },
     { "kind": "setChoiceConditions", "beatId": "beat_5", "choiceId": "choice_3", "conditions": [ { "type": "inventory", "item": "brass_key" } ], "note": "why" },
     { "kind": "defineVariable", "name": "caseVariant", "defaultValue": "", "description": "which case version this playthrough uses", "note": "why" },
+    { "kind": "defineRole", "id": "confidant", "name": "The confidant", "candidates": ["char_ingrid", "char_tomas"], "selection": "cast", "description": "whoever the player sided with", "note": "why" },
     { "kind": "editChoiceText", "beatId": "beat_3", "choiceId": "choice_2", "text": "Call now — the school says the boy hasn't come home", "note": "why" },
     { "kind": "addChoice", "beatId": "beat_3", "parentId": "choice_1", "choice": { "text": "…", "target": "beat_24", "effects": [ { "type": "incrementCounter", "target": "Tension", "value": 1 } ] }, "note": "why" },
     { "kind": "replaceBeat", "beatId": "beat_27", "parameters": { "dialogTree": { "id": "n0", "speaker": "Parent", "text": "…", "choices": [ { "id": "c1", "text": "…", "target": "beat_32", "effects": [] }, { "id": "c2", "text": "…", "dialogNode": { "id": "n1", "speaker": "Parent", "text": "…", "choices": [ { "id": "c2a", "text": "…", "target": "beat_33" } ] } } ] } }, "note": "why" },

@@ -51,6 +51,8 @@ export interface StoryDigestInput {
   beats: DigestBeat[];
   characters?: DigestCharacter[];
   variables?: Array<{ name?: string; initialValue?: unknown; keepOnRestart?: boolean }>;
+  /** Cast roles from Project Settings (docs/Character-Roles-Design.md). */
+  roles?: Array<{ id?: string; name?: string; candidates?: string[]; selection?: string; defaultCharacterId?: string; recastable?: boolean }>;
   clusters?: Array<{ id?: string; name?: string }>;
 }
 
@@ -268,6 +270,17 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
   if (declared.length > 0) {
     const kept = new Set((input.variables ?? []).filter(v => v.keepOnRestart).map(v => v.name));
     lines.push('', `VARIABLES (declared in Project Settings): ${declared.map(n => (kept.has(n) ? `${n} (kept across restarts)` : n)).join(', ')}`);
+  }
+  const roles = (input.roles ?? []).filter(r => r?.id);
+  if (roles.length > 0) {
+    lines.push('', 'ROLES (Project Settings; refer to one as "@id"):');
+    for (const r of roles) {
+      const bits = [`played by ${(r.candidates ?? []).join(' / ') || 'nobody yet'}`];
+      if (r.selection && r.selection !== 'cast') bits.push(r.selection === 'random' ? 'drawn at random' : 'always the default');
+      if (r.defaultCharacterId) bits.push(`default ${r.defaultCharacterId}`);
+      if (r.recastable) bits.push('can be recast');
+      lines.push(`- @${r.id}${r.name ? ` "${r.name}"` : ''}: ${bits.join('; ')}`);
+    }
   }
   const inUse = storyStateInUse(input.beats, input.characters);
   // `playthrough` is built in (the run count) — never "undeclared".

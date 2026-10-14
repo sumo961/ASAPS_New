@@ -4,7 +4,7 @@
  * candidate, or casts a non-recastable role in more than one beat.
  * Deterministic and pure, like the rest of the generation review.
  */
-import { normalizeRoles, type CastRole } from '@asaps/core';
+import { normalizeRoles, beatTargetIds, type CastRole } from '@asaps/core';
 import type { RoleFinding } from '../types/generationReview';
 
 interface CastSite { beatId: string; beatName?: string; role: string; character?: string }
@@ -31,6 +31,18 @@ function castSites(beat: any): CastSite[] {
   return out;
 }
 
+/**
+ * Roles a beat casts (Flowchart badge). Accepts a Beat instance or plain
+ * beat data.
+ */
+export function beatCastRoles(beat: any): string[] {
+  if (!beat) return [];
+  const plain = typeof beat.getParameters === 'function'
+    ? { id: beat.id, name: beat.name, type: beat.type, parameters: beat.getParameters(), connections: beat.connections }
+    : beat;
+  return [...new Set(castSites(plain).map((s) => s.role))];
+}
+
 /** '@role' values and ${@role…} placeholders anywhere in a beat. */
 function referencedRoles(beat: any): Set<string> {
   const refs = new Set<string>();
@@ -49,7 +61,12 @@ function referencedRoles(beat: any): Set<string> {
   return refs;
 }
 
-export function analyzeRoleFindings(beats: any[], rawRoles: unknown, characters?: Array<{ id: string; displayName?: string; name?: string }>): RoleFinding[] {
+export function analyzeRoleFindings(
+  beats: any[],
+  rawRoles: unknown,
+  characters?: Array<{ id: string; displayName?: string; name?: string; description?: string }>,
+  startBeatId?: string | null,
+): RoleFinding[] {
   const roles = normalizeRoles(rawRoles);
   const byId = new Map<string, CastRole>(roles.map((r) => [r.id, r]));
   const charName = (id?: string) => {
@@ -84,6 +101,52 @@ export function analyzeRoleFindings(beats: any[], rawRoles: unknown, characters?
     if (!list.some((s) => s.beatId === site.beatId)) list.push(site);
     sitesByRole.set(role.id, list);
   }
+  // D4: a role the story reads before anything chooses who plays it. Walk
+  // from the start without passing a beat that casts it; with no default
+  // set, the first character on its list plays it until then.
+  if (startBeatId) {
+    const byBeat = new Map<string, any>(beats.filter((b) => b?.id).map((b) => [b.id, b]));
+    for (const role of roles) {
+      if (role.selection !== 'cast' || role.defaultCharacterId || role.candidates.length === 0) continue;
+      const casting = new Set((sitesByRole.get(role.id) ?? []).map((s) => s.beatId));
+      const seen = new Set<string>();
+      const queue = [startBeatId];
+      let early: any = null;
+      while (queue.length && !early) {
+        const id = queue.shift()!;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const beat = byBeat.get(id);
+        if (!beat) continue;
+        if (referencedRoles(beat).has(role.id) && !casting.has(id)) { early = beat; break; }
+        if (casting.has(id)) continue;
+        for (const t of beatTargetIds(beat)) if (!seen.has(t)) queue.push(t);
+      }
+      if (early) {
+        out.push({
+          id: `role:before-cast:${role.id}`, kind: 'role', problem: 'before-cast', beatId: early.id, beatName: early.name, role: role.id,
+          message: `"${early.name || early.id}" uses @${role.id} before anything chooses who plays it, so ${charName(role.candidates[0])} (first on the role's list) plays it there. Choose someone earlier, or set the role's default.`,
+        });
+      }
+    }
+  }
+
+  // An AI partner played by a role: each candidate needs something for the
+  // AI to go on, or the conversation runs on a bare name.
+  for (const beat of beats) {
+    if (beat?.type !== 'aiConversation' && beat?.type !== 'aiDialogTree') continue;
+    const npc = String(beat.parameters?.npcName ?? '');
+    const m = /^@([A-Za-z0-9_-]+)$/.exec(npc.trim());
+    const role = m && byId.get(m[1]);
+    if (!role || String(beat.parameters?.npcPersonality ?? '').trim()) continue;
+    const bare = role.candidates.filter((id) => !characters?.find((c) => c.id === id)?.description?.trim());
+    if (bare.length === 0) continue;
+    out.push({
+      id: `role:bare-npc:${beat.id}`, kind: 'role', problem: 'bare-npc', beatId: beat.id, beatName: beat.name, role: role.id,
+      message: `"${beat.name || beat.id}" talks to @${role.id}, but ${bare.map(charName).join(' and ')} ${bare.length > 1 ? 'have' : 'has'} no description and the beat has no "In this scene" notes — the AI would play them from a name alone.`,
+    });
+  }
+
   for (const [roleId, sites] of sitesByRole) {
     const role = byId.get(roleId)!;
     if (role.recastable || sites.length < 2) continue;

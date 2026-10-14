@@ -71,10 +71,10 @@ export interface RestartWithoutTargetFinding extends FindingBase {
   beatType: 'endScreen' | 'aiSummary';
 }
 
-/** A cast-role problem: unknown role, a non-candidate cast, or a non-recastable role cast in several beats. */
+/** A cast-role problem: unknown role, a non-candidate cast, a non-recastable role cast in several beats, a role read before it is cast, or an AI partner role with nothing to go on. */
 export interface RoleFinding extends FindingBase {
   kind: 'role';
-  problem: 'unknown-role' | 'not-candidate' | 'recast';
+  problem: 'unknown-role' | 'not-candidate' | 'recast' | 'before-cast' | 'bare-npc';
   role: string;
 }
 

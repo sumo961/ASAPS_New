@@ -117,7 +117,7 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
     }
   }
   // Cast roles: unknown @role references, non-candidate casts, recasts.
-  out.push(...analyzeRoleFindings(beats, story?.roles ?? story?.globalSettings?.roles, story?.characters));
+  out.push(...analyzeRoleFindings(beats, story?.roles ?? story?.globalSettings?.roles, story?.characters, storyStartBeatId(story)));
   return out;
 }
 

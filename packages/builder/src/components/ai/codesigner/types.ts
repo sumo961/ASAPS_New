@@ -84,6 +84,19 @@ export type ChangeProposal =
       note?: string;
     }
   | {
+      /** Add or update a cast role in Project Settings (docs/Character-Roles-Design.md). */
+      kind: 'defineRole';
+      id: string;
+      name?: string;
+      description?: string;
+      candidates: string[];
+      selection?: 'cast' | 'random' | 'fixed';
+      defaultCharacterId?: string;
+      recastable?: boolean;
+      keepOnRestart?: boolean;
+      note?: string;
+    }
+  | {
       /** Rewrite one option's player-facing label (choice / prop / hotspot / dialog node or choice); wiring kept. */
       kind: 'editChoiceText';
       beatId: string;

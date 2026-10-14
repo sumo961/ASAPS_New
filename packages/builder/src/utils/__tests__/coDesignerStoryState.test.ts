@@ -66,3 +66,34 @@ describe('Co-Designer prompt parts (prompt caching)', () => {
     expect(buildCoDesignerSystemPrompt(ctx, { beatContentToolAvailable: true }).trimEnd().endsWith('DIGEST-XYZ')).toBe(true);
   });
 });
+
+describe('defineRole', () => {
+  const reply = (proposals: unknown[]) => extractProposalsFromReply('x\n```asaps-proposals\n' + JSON.stringify({ title: 't', proposals }) + '\n```');
+
+  it('parses a role, rejects one without candidates or with an unusable id', () => {
+    const out = reply([
+      { kind: 'defineRole', id: '@confidant', name: 'The confidant', candidates: ['char_a', 'char_b'], selection: 'random', defaultCharacterId: 'char_x' },
+      { kind: 'defineRole', id: 'nobody', candidates: [] },
+      { kind: 'defineRole', id: 'the confidant', candidates: ['char_a'] },
+    ]);
+    expect(out.proposalSet?.proposals).toEqual([
+      { kind: 'defineRole', id: 'confidant', name: 'The confidant', candidates: ['char_a', 'char_b'], selection: 'random', note: undefined },
+    ]);
+    expect(out.problems).toHaveLength(2);
+  });
+
+  it('adds the role, refuses unknown characters', () => {
+    const defineRole = vi.fn(() => 'added' as const);
+    const ctx = { beats: [], updateBeat: vi.fn(), addBeat: vi.fn(), connectBeats: vi.fn(), defineRole, characters: [{ id: 'char_a' }, { id: 'char_b' }] };
+    const ok = reply([{ kind: 'defineRole', id: 'confidant', candidates: ['char_a', 'char_b'] }]).proposalSet!.proposals;
+    expect(applyChangeProposals(ok, ctx as any)[0]).toMatchObject({ ok: true, detail: expect.stringContaining('Added role @confidant') });
+    expect(defineRole).toHaveBeenCalledWith({ id: 'confidant', candidates: ['char_a', 'char_b'], selection: 'cast' });
+    const bad = reply([{ kind: 'defineRole', id: 'x', candidates: ['char_ghost'] }]).proposalSet!.proposals;
+    expect(applyChangeProposals(bad, ctx as any)[0]).toMatchObject({ ok: false, detail: expect.stringContaining('char_ghost') });
+  });
+
+  it('the digest lists roles', () => {
+    const digest = buildStoryDigest({ beats: [], roles: [{ id: 'confidant', name: 'The confidant', candidates: ['char_a', 'char_b'], selection: 'random' }] });
+    expect(digest).toContain('- @confidant "The confidant": played by char_a / char_b; drawn at random');
+  });
+});

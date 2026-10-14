@@ -6,6 +6,7 @@
  * presets for testing.
  */
 
+import { rolesReferencedIn } from '../utils/rolePreview';
 import { StoryContext, type Story, type StatePreset } from '@asaps/core';
 import {
   StateSimulationAnalyzer,
@@ -401,9 +402,12 @@ function createEmptyState(): SimulationState {
  * condition (beat conditions, choice guards, requirements) and every text
  * placeholder.
  */
-export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string>; context: StoryContext } {
+export function relevantState(story: Story, targetBeatId: string): { conditions: any[]; placeholders: Set<string>; roles: Set<string>; context: StoryContext } {
   const conditions: any[] = [];
   const placeholders = new Set<string>();
+  // Cast roles used ahead ('@role' speakers / AI partners, ${@role…} text):
+  // who plays them changes what the player sees.
+  const roles = new Set<string>();
   const seenConds = new Set<string>();
   const seen = new Set<string>();
   const queue = [targetBeatId];
@@ -427,8 +431,11 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
     const data = { p: beat.getParameters?.(), r: beat.requires, c: beat.connections };
     collect(data);
     for (const m of JSON.stringify(data).matchAll(/\$\{([^}]+)\}|(?<!\$)\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)\$/g)) {
-      placeholders.add((m[1] ?? m[2] ?? m[3]).trim());
+      const name = (m[1] ?? m[2] ?? m[3]).trim();
+      if (!name.startsWith('@')) placeholders.add(name);
     }
+    rolesReferencedIn({ ...data, s: beat.speaker, cr: beat.characterRef }, roles);
+    if (beat.type === 'chooseCharacter') roles.add(String(beat.getParameters?.()?.role || 'player').replace(/^@/, ''));
     // A restart resets state: nothing past it depends on the arrival state.
     for (const c of beat.getConnections?.() ?? []) if (c.role !== 'restart') queue.push(c.targetId);
     for (const r of beat.requires ?? []) if (r?.fallbackTarget) queue.push(r.fallbackTarget);
@@ -437,7 +444,7 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
   // A runtime context for evaluating them (feelings need the story's cast).
   let context: StoryContext;
   try { context = new StoryContext(undefined, story); } catch { context = new StoryContext(); }
-  return { conditions, placeholders, context };
+  return { conditions, placeholders, roles, context };
 }
 
 /**
@@ -445,7 +452,7 @@ export function relevantState(story: Story, targetBeatId: string): { conditions:
  * ahead comes out the same and every placeholder reads the same. The kept
  * preset keeps its FULL state (play is unchanged); pathCount sums the rest.
  */
-function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string>; context: StoryContext }): GeneratedPreset[] {
+function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions: any[]; placeholders: Set<string>; roles: Set<string>; context: StoryContext }): GeneratedPreset[] {
   const seen = new Map<string, GeneratedPreset>();
   for (const p of presets) {
     const { variables, counters, inventory, affect } = p.preset.state;
@@ -453,7 +460,8 @@ function condenseByRelevance(presets: GeneratedPreset[], relevant: { conditions:
     ctx.loadSimulationState((affect ?? {}) as any, variables, counters, inventory);
     const outcomes = relevant.conditions.map((c) => { try { return ctx.checkCondition(c) ? 1 : 0; } catch { return -1; } });
     const texts = [...relevant.placeholders].map((n) => variables[n] ?? counters[n] ?? null);
-    const key = JSON.stringify([outcomes, texts]);
+    const holders = [...relevant.roles].map((r) => (ctx as any).getRoleHolder?.(r) ?? null);
+    const key = JSON.stringify([outcomes, texts, holders]);
     const kept = seen.get(key);
     if (kept) kept.pathCount += p.pathCount;
     else seen.set(key, p);

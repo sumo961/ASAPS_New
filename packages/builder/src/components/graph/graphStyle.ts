@@ -34,6 +34,8 @@ export const beatTypeIcons: Record<string, string> = {
   infoText: '📝',
   dialogTree: '🌳',
   conversationChoice: '💬',
+  multiChoice: '🔘',
+  chooseCharacter: '🎭',
   movementChoice: '🚶',
   pickProp: '🎒',
   videoBeat: '🎥',

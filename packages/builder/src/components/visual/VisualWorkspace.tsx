@@ -72,6 +72,8 @@ import { getCommandManager } from '../../commands/CommandManager';
 import { VisualElementsSnapshotCommand } from '../../commands/ElementCommands';
 import { notifyUndoable } from '../../utils/undoNotice';
 import { isMultiChoiceLike } from '@asaps/core';
+import { useRolePreview } from '../../contexts/RolesContext';
+import { previewRoles } from '../../utils/rolePreview';
 
 
 /**
@@ -921,6 +923,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Slot-mode preview: which simulated viewport, and the latest per-slot
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
+  // Preview as: role placeholders and '@role' speakers show the character
+  // the author picked in the Inspector (never written to the beat).
+  const { holderOf: previewHolderId } = useRolePreview();
+  const previewHolder = (roleId: string) => {
+    const id = previewHolderId(roleId);
+    return id ? (characters || []).find((c) => c.id === id) : undefined;
+  };
 
   /**
    * Screen-docked HUDs for the responsive preview.
@@ -1719,7 +1728,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // VisualWorkspace re-renders on beat updates, so recomputing here is both
   // correct and cheap.
   const slotPreviewParams =
-    isSlotPreview && beat ? beat.getParameters() : undefined;
+    isSlotPreview && beat ? previewRoles(beat.getParameters(), previewHolder) : undefined;
 
   // Drag-to-snap: attach pointerdown handlers to body + action slot DOM
   // elements when slot preview is active and layoutTemplate is 'custom'.
@@ -1874,7 +1883,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const globalOn = !!(globalSettings as any)?.speakerDisplay?.showNames;
     const show = override === true ? true : override === false ? false : globalOn;
     if (!show) return '';
-    return ((beat as any).speaker as string) || '';
+    return previewRoles(((beat as any).speaker as string) || '', previewHolder);
   })();
   const slotPreviewContent: Record<string, any> | null =
     !isSlotPreview || !beat || !slotPreviewParams
@@ -4665,11 +4674,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const getBeatContentWithSpeaker = () => {
     const content = getBeatContent();
     if (!content || !beat) return content;
-    return {
+    return previewRoles({
       ...content,
       speaker: content.speaker || beat.speaker,
       showSpeaker: beat.showSpeaker,
-    };
+    }, previewHolder);
   };
 
   // Handle asset selection

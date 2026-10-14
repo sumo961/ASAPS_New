@@ -179,7 +179,7 @@ const BLOCK_RE = /```asaps-proposals\s*([\s\S]*?)```/;
 const VALID_KINDS = new Set([
   'editText', 'updateParams', 'addBeat', 'addNote', 'updateCharacter',
   'setChoiceEffects', 'setChoiceConditions', 'setRequirements',
-  'editChoiceText', 'addChoice', 'replaceBeat', 'defineVariable', 'setLinkEffects',
+  'editChoiceText', 'addChoice', 'replaceBeat', 'defineVariable', 'defineRole', 'setLinkEffects',
 ]);
 
 /** Warnings from the last normalizeProposal rejection (why an entry was dropped). */
@@ -249,6 +249,22 @@ function normalizeProposal(raw: any): ChangeProposal | null {
       const defaultValue = typeof v === 'number' || typeof v === 'boolean' ? v : typeof v === 'string' ? v : '';
       if (name === 'playthrough') return reject(raw.kind, '"playthrough" is built in (the run count) — use it directly, don\'t declare it');
       return { kind: 'defineVariable', name, defaultValue, description: typeof raw.description === 'string' ? raw.description : undefined, ...(raw.keepOnRestart === true ? { keepOnRestart: true } : {}), note: typeof raw.note === 'string' ? raw.note : undefined };
+    }
+    case 'defineRole': {
+      const id = typeof raw.id === 'string' ? raw.id.trim().replace(/^@/, '') : '';
+      if (!/^[A-Za-z0-9_-]+$/.test(id)) return reject(raw.kind, `"${raw.id}" is not a usable role id (letters, digits, _ or -) — it is referenced as @id`);
+      const candidates = Array.isArray(raw.candidates) ? raw.candidates.filter((c: unknown): c is string => typeof c === 'string' && c.length > 0) : [];
+      if (candidates.length === 0) return reject(raw.kind, 'needs candidates: the ids of the characters who can play it');
+      const selection = raw.selection === 'random' || raw.selection === 'fixed' ? raw.selection : 'cast';
+      return {
+        kind: 'defineRole', id, candidates, selection,
+        ...(typeof raw.name === 'string' && raw.name.trim() ? { name: raw.name.trim() } : {}),
+        ...(typeof raw.description === 'string' && raw.description.trim() ? { description: raw.description.trim() } : {}),
+        ...(typeof raw.defaultCharacterId === 'string' && candidates.includes(raw.defaultCharacterId) ? { defaultCharacterId: raw.defaultCharacterId } : {}),
+        ...(raw.recastable === true ? { recastable: true } : {}),
+        ...(raw.keepOnRestart === true ? { keepOnRestart: true } : {}),
+        note: typeof raw.note === 'string' ? raw.note : undefined,
+      };
     }
     case 'editChoiceText': {
       const choiceId = raw.choiceId ?? raw.optionId ?? raw.nodeId;
@@ -388,6 +404,8 @@ export function describeProposal(p: ChangeProposal): string {
         : `Remove effects from ${p.beatId}'s link`;
     case 'defineVariable':
       return `Declare story variable ${p.name} = ${JSON.stringify(p.defaultValue)}${p.keepOnRestart ? ' (kept across restarts)' : ''}`;
+    case 'defineRole':
+      return `Role @${p.id}${p.name ? ` "${p.name}"` : ''}: played by ${p.candidates.join(' / ')}${p.selection === 'random' ? ' (drawn at random)' : p.selection === 'fixed' ? ' (always the default)' : ''}`;
     case 'editChoiceText':
       return `Reword ${p.beatId} › ${p.choiceId}: "${p.text.length > 80 ? `${p.text.slice(0, 77)}…` : p.text}"`;
     case 'addChoice':

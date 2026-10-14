@@ -10,6 +10,7 @@ import { StoryContext } from '../../src/engine/StoryContext';
 import { Story } from '../../src/engine/Story';
 import { ChooseCharacterBeat } from '../../src/beats/ChooseCharacterBeat';
 import { InfoTextBeat } from '../../src/beats/InfoTextBeat';
+import { ConditionBeat } from '../../src/beats/ConditionBeat';
 import { Beat } from '../../src/beats/Beat';
 import { pronounSetFor, rolePlaceholderText, normalizeRoles } from '../../src/engine/roles';
 import type { IRenderer } from '../../src/types';
@@ -212,5 +213,29 @@ describe('HUDs of player-role candidates', () => {
     ctx.castRole('player', 'char_jonas');
     expect(ctx.isCharacterHudRevealed('char_jonas')).toBe(true);
     expect(ctx.isCharacterHudRevealed('char_mara')).toBe(false);
+  });
+});
+
+describe('Condition Check beat with character conditions', () => {
+  // These types used to lose their fields in the beat and always took the false branch.
+  const run = async (condition: any, ctx: StoryContext) => {
+    const beat = new ConditionBeat({ id: 'c', type: 'conditionBeat', parameters: { condition, trueTarget: 'yes', falseTarget: 'no' } } as any);
+    return (beat as any).performAction(ctx, renderer());
+  };
+
+  it('roleHolder', async () => {
+    const ctx = new StoryContext(undefined, storyWith([confidant]));
+    ctx.castRole('confidant', 'char_jonas');
+    expect(await run({ type: 'roleHolder', role: 'confidant', character: 'char_jonas', operator: '==' }, ctx)).toBe('yes');
+    expect(await run({ type: 'roleHolder', role: 'confidant', character: 'char_mara', operator: '==' }, ctx)).toBe('no');
+  });
+
+  it('characterVariant and goal', async () => {
+    const story = storyWith([], [{ ...MARA, variants: [{ id: 'calm' }, { id: 'angry' }], goals: [{ id: 'g1', description: 'x' }] }]);
+    const ctx = new StoryContext(undefined, story);
+    ctx.setActiveCharacterVariant('char_mara', 'angry');
+    expect(await run({ type: 'characterVariant', character: 'char_mara', variantId: 'angry', operator: '==' }, ctx)).toBe('yes');
+    ctx.setGoalStatus('char_mara', 'g1', 'met', { suppressEmotion: true });
+    expect(await run({ type: 'goal', character: 'char_mara', goalId: 'g1', goalStatus: 'met', operator: '==' }, ctx)).toBe('yes');
   });
 });

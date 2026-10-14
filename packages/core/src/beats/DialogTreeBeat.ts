@@ -567,12 +567,15 @@ export class DialogTreeBeat extends Beat {
       const layout = computeDialogTreeLayout({
         phase: {
           id: phaseId,
-          speaker: this.currentNode.speaker || '',
-          text: this.currentNode.text || '',
+          // Processed like what is shown (${…} placeholders, '@role'
+          // speakers): the layout names its buttons after these texts, and
+          // the buttons are matched to the choices by them.
+          speaker: this.processText(this.currentNode.speaker || '', context),
+          text: this.processText(this.currentNode.text || '', context),
           // A continue step is not a reply button.
           choices: (this.currentNode.choices || []).filter(c => !c.continue).map((c, idx) => ({
             id: c.id || `choice_${idx}`,
-            text: c.text || '',
+            text: this.processText(c.text || '', context),
           })),
         },
         stageWidth,

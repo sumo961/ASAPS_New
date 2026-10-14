@@ -1657,9 +1657,24 @@ So *"${@confidant.They} ${@confidant.is} waiting."* reads *"She is waiting."* or
 
 **The player role.** A role called `player` makes the interactor's own counters, feelings and sentiment targets follow the character they chose. The inventory stays the player's whoever plays, so picking up the key doesn't depend on who you are. Until the pick, none of the candidates' HUDs show; afterwards only the chosen one's.
 
-**Trying both versions.** In the Preview's **Debug Info**, the **Roles** card shows who plays each role right now; pick another name to test that version from here on.
+**Trying both versions.** While you write, select a beat that uses a role: the top of the Inspector shows **Preview as** with one picker per role. The Visual Editor then draws the beat as that person would play it — names, pronouns and portrait — while the text fields keep your `${@confidant…}` wording. When you start the Preview, your **Preview as** pick fills every role the story hasn't decided yet:
+- **From a beat** (with *Start fresh*), the roles nobody has chosen on the way there take your pick, so the scene plays as you saw it in the Visual Editor. Random roles take your pick too. A *Start as if…* state keeps the casting of the path it comes from, and the start states list each casting separately ("Via … → Side with Tomas").
+- **From the beginning**, the story makes its own choices: a Choose Your Character beat or a Cast Role effect still decides, and random roles are still drawn. Only roles the story never decides take your pick.
 
-**What the story review checks.** A reference to a role that doesn't exist, casting someone who isn't on the role's list, and a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one).
+While the story plays, the Preview's **Debug Info → Roles** card shows who plays each role right now, and why: *from Preview as*, *drawn at random*, *chosen in the story*, *set here*, or *default (not chosen yet)*. Pick another name there to test that version from that point on; this only affects the running test, never your Preview as setting.
+
+**In the Flowchart**, a beat that decides who plays a role carries a **🎭 @role** badge, so you can see where the story chooses.
+
+**What the story review checks:**
+- a reference to a role that doesn't exist;
+- casting someone who isn't on the role's list;
+- a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one);
+- a role the story uses *before* anything chooses who plays it, when it has no default (the first character on its list stands in until then);
+- an AI Conversation partner played by a role, where one of the characters has no description and the beat has no *In this scene* notes — the AI would play them from a name alone.
+
+**Path analysis** follows castings like any other story state: a random role is explored once for each character, and a *Who plays a role* branch is reached on the paths where that person was chosen.
+
+**With the Co-Designer.** The Co-Designer sees the story's roles and can propose a new one (or changes to an existing one) for you to accept, besides writing `@confidant` speakers, Cast Role effects and Choose Your Character beats.
 
 **A writing tip.** Roles work best when the role-dependent text is short (names, pronouns) or written by AI beats. A long hand-written passage rarely fits two different people; give those few lines a *Who plays a role* condition instead. Translations need extra care too: in many languages adjectives and verb endings change with the person.
 

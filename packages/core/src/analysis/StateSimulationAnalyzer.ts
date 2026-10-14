@@ -169,7 +169,23 @@ function hashState(state: SimulationState): string {
     parts.push(`i:${char}=[${sortedItems.join(',')}]`);
   }
 
+  // Who plays each role: two castings at one beat are different stories.
+  // Casts still pending (applied at the next runtime session) count already.
+  const holders: Record<string, string> = { ...((state.runtime as any)?.roleHolders ?? {}) };
+  for (const e of state.pendingRuntime ?? []) {
+    if (e?.type === 'castRole' && e.target && e.character) holders[String(e.target).replace(/^@/, '')] = e.character;
+  }
+  for (const role of Object.keys(holders).sort()) parts.push(`r:${role}=${holders[role]}`);
+
   return parts.join('|');
+}
+
+/** At most `cap` items, spread evenly over the list (first and last kept). */
+function spreadSample<T>(items: T[], cap: number): T[] {
+  if (items.length <= cap) return items;
+  const out: T[] = [];
+  for (let i = 0; i < cap; i++) out.push(items[Math.round((i * (items.length - 1)) / (cap - 1))]);
+  return out;
 }
 
 // ============================================================================
@@ -251,15 +267,25 @@ export class StateSimulationAnalyzer {
     if (!ctx) return [base];
     const characters: any[] = ((this.story as any).getCharacters?.() ?? []) as any[];
     const random = characters.filter((c) => c?.variantSelectionPolicy === 'random' && Array.isArray(c.variants) && c.variants.some((v: any) => v?.id));
-    let combos: Array<Array<[string, string]>> = [[]];
-    for (const c of random) {
-      const next: Array<Array<[string, string]>> = [];
-      for (const combo of combos) for (const v of c.variants.filter((x: any) => x?.id)) next.push([...combo, [c.id, v.id]]);
-      combos = next.slice(0, 16);
-    }
+    // Random roles start once per candidate too (D8: the combinations of
+    // variants × castings are sampled evenly down to 16, not truncated).
+    const randomRoles = ctx.getRoles().filter((r) => r.selection === 'random' && r.candidates.length > 0);
+    type Pick = ['variant' | 'role', string, string];
+    let combos: Pick[][] = [[]];
+    const widen = (options: Pick[]) => {
+      const next: Pick[][] = [];
+      for (const combo of combos) for (const o of options) next.push([...combo, o]);
+      combos = next;
+    };
+    for (const c of random) widen(c.variants.filter((x: any) => x?.id).map((v: any) => ['variant', c.id, v.id] as Pick));
+    for (const r of randomRoles) widen(r.candidates.map((id) => ['role', r.id, id] as Pick));
+    combos = spreadSample(combos, 16);
     return combos.map((combo) => {
       ctx.reset();
-      for (const [charId, variantId] of combo) ctx.setActiveCharacterVariant(charId, variantId, { seedAffect: true });
+      for (const [kind, key, value] of combo) {
+        if (kind === 'variant') ctx.setActiveCharacterVariant(key, value, { seedAffect: true });
+        else ctx.castRole(key, value);
+      }
       return { ...this.seededInitialState(), runtime: ctx.getAffectSnapshot() };
     });
   }
@@ -912,8 +938,8 @@ export class StateSimulationAnalyzer {
   }
 
   private hasPerChoiceEffects(beat: Beat): boolean {
-    if (beat.type === 'pickProp') {
-      return true; // Each prop adds a different inventory item
+    if (beat.type === 'pickProp' || beat.type === 'chooseCharacter') {
+      return true; // Each prop adds a different item; each option casts someone else
     }
 
     const params = beat.getParameters();
@@ -1203,6 +1229,10 @@ export class StateSimulationAnalyzer {
           ? mc.find((c) => c?.target === connection.targetId && (c.text || c.id) === connection.label) ?? mc.find((c) => c?.target === connection.targetId)
           : mc[choiceIndex];
         if (choice) {
+          // Choose Your Character casts before the option's own effects.
+          if (beat.type === 'chooseCharacter' && choice.character) {
+            this.applyEffectsList([{ type: 'castRole', target: params.role || 'player', character: choice.character }], state);
+          }
           this.applyEffectsList(choice.effects, state);
           this.applyInlineChoiceFields(choice, state);
         }

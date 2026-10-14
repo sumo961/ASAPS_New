@@ -5,6 +5,7 @@ import { FileChangeIndicator } from '../vcs/FileChangeIndicator';
 import { TranslationStaleIndicator } from '../translation/TranslationStaleIndicator';
 import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
 import { beatTypeIcons, DEFAULT_BEAT_ICON } from './graphStyle';
+import { beatCastRoles } from '../../utils/roleFindings';
 
 interface BeatNodeData {
   beat: Beat;
@@ -252,6 +253,11 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
             <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded"
               title="In cluster">C</span>
           )}
+          {/* Casts a role: from here on someone else may be "@confidant". */}
+          {beatCastRoles(data.beat).map((role) => (
+            <span key={role} className="text-xs bg-fuchsia-100 text-fuchsia-700 px-1.5 py-0.5 rounded truncate max-w-[110px]"
+              title={`Decides who plays @${role}`} data-testid="cast-badge">🎭 @{role}</span>
+          ))}
         </div>
       )}
 

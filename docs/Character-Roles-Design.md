@@ -1,6 +1,6 @@
 # Character Roles (recastable cast) — Design
 
-**Status: APPROVED (Hartmut, 2026-10-06 and 2026-10-14). Phase 0 released v0.9.110. Next: the thin slice (below), then the rest of phase 1.**
+**Status: APPROVED (Hartmut, 2026-10-06 and 2026-10-14). Phase 0 released v0.9.110. Phase 1 and the Choose Your Character beat BUILT 2026-10-14 (thin slice 612f62c8, then Preview-as, Flowchart badge, analyzers, findings, Co-Designer, variant-aware portraits, tripwire). The player role of phase 2 came with the thin slice.**
 **Date: 2026-10-05 · Author: session work after the Field App location fixes**
 
 ## The question

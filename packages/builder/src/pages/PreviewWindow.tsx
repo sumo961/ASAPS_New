@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
-import { Story, StoryEngine, Beat, BeatTypeRegistry } from '@asaps/core';
+import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
 import { harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
@@ -29,6 +29,8 @@ import { getSavedSTTConfig } from '../hooks/useSTT';
 import { resolvePortraitUrl } from '../utils/speakerUtils';
 import { CharacterAffectPanel } from '../components/characters/CharacterAffectPanel';
 import { MockSensorPanel } from '../components/preview/MockSensorPanel';
+import { rolesToSeedAtStart, type RoleHolderSource } from '../utils/rolePreview';
+import { beatCastRoles } from '../utils/roleFindings';
 import { usePersistedState } from '../utils/persistedState';
 import {
   createRuntimeAIService,
@@ -202,6 +204,15 @@ function createAIServiceAdapter(): IAIService | null {
   }), savedConfig.baseUrl ? 'the AI provider' : 'OpenAI');
 }
 
+/** Debug → Roles: why this character plays the role in this run. */
+const ROLE_SOURCE_LABELS: Record<RoleHolderSource | 'default', string> = {
+  preview: 'from Preview as',
+  random: 'drawn at random',
+  story: 'chosen in the story',
+  debug: 'set here',
+  default: 'default (not chosen yet)',
+};
+
 interface PreviewData {
   storyData?: SerializedStoryData;
   beatId?: string;
@@ -216,6 +227,8 @@ interface PreviewData {
   activeLanguage?: string | null;
   /** Staged uiStrings translations for the active language (offline path). */
   uiStrings?: Record<string, string> | null;
+  /** The editor's "Preview as" casting (role id → character id). */
+  rolePreviewCasting?: Record<string, string>;
 }
 
 /** Convert a BCP 47 language code to a readable language name (e.g., 'es' → 'Spanish') */
@@ -523,7 +536,7 @@ export const PreviewWindow: React.FC = () => {
       hud: 'shown' | 'until first appearance' | 'until a variant is chosen';
     }>;
     /** Cast roles: who plays each now, and whether anything has cast it yet. */
-    roles?: Array<{ id: string; name: string; holder: string | null; cast: boolean; candidates: Array<{ id: string; name: string }> }>;
+    roles?: Array<{ id: string; name: string; holder: string | null; cast: boolean; source: RoleHolderSource | 'default'; candidates: Array<{ id: string; name: string }> }>;
   }>({});
   const [activeTimers, setActiveTimers] = useState<any[]>([]);
 
@@ -553,6 +566,10 @@ export const PreviewWindow: React.FC = () => {
   // "visited in this run". Reset on every (re)start.
   const seededBeatsRef = useRef<Set<string>>(new Set());
   const previewDataRef = useRef<PreviewData | null>(null);
+  /** The editor's "Preview as" casting, latest (initial data or ROLE_PREVIEW). */
+  const rolePreviewCastingRef = useRef<Record<string, string>>({});
+  /** Where each role's current holder came from in this run (Debug → Roles). */
+  const roleSourceRef = useRef<Record<string, { holder: string; source: RoleHolderSource }>>({});
 
   /**
    * Screen-docked HUDs for the beat on screen, assembled by the same builder
@@ -659,6 +676,7 @@ export const PreviewWindow: React.FC = () => {
   // Keep previewData ref in sync so resolver closures always access latest data
   useEffect(() => {
     previewDataRef.current = previewData;
+    if (previewData?.rolePreviewCasting) rolePreviewCastingRef.current = previewData.rolePreviewCasting;
   }, [previewData]);
 
   // Detect if running in Electron (synchronous, before effects)
@@ -757,6 +775,11 @@ export const PreviewWindow: React.FC = () => {
           if (message.payload?.statePreset) {
             setSelectedPreset(message.payload.statePreset);
           }
+          break;
+
+        case 'ROLE_PREVIEW':
+          // Read at the next start; a run in progress is left alone.
+          rolePreviewCastingRef.current = message.payload?.rolePreviewCasting ?? {};
           break;
 
         case 'CLOSE':
@@ -1109,7 +1132,16 @@ export const PreviewWindow: React.FC = () => {
       reactRenderer.setCharacterPortraitResolver((speakerName: string) => {
         const pd = previewDataRef.current;
         if (!pd?.characters?.length) return undefined;
-        return resolvePortraitUrl(speakerName, pd.characters, pd.assets || []);
+        // The character as it looks now (active variant merged in), found by
+        // its base or its current name — '@role' speakers arrive resolved.
+        const ctx = engineRef.current?.getContext() as any;
+        const ch: any = findSpeakerCharacter(speakerName, pd.characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
+        if (!ch?.portrait) return resolvePortraitUrl(speakerName, pd.characters, pd.assets || []);
+        if (ch.portrait.assetId) {
+          const asset = (pd.assets || []).find((a: any) => a.id === ch.portrait.assetId);
+          if (asset?.url) return asset.url;
+        }
+        return ch.portrait.image;
       });
 
       // Set up sound blob resolver for beat sounds
@@ -1843,6 +1875,31 @@ export const PreviewWindow: React.FC = () => {
         seededBeatsRef.current = new Set();
       }
 
+      // Roles: the editor's "Preview as" fills the roles this run hasn't
+      // decided (utils/rolePreview.ts says which), and every holder keeps a
+      // note of where it came from for Debug → Roles.
+      {
+        const ctx = context as any;
+        const roles = ctx.getRoles?.() ?? [];
+        const runStart = overrideBeatId || startBeatId || undefined;
+        const fromBeginning = !runStart || runStart === story.getFirstBeatId();
+        const castByStory = new Set<string>(story.getAllBeats().flatMap((b) => beatCastRoles(b)));
+        const seeds = rolesToSeedAtStart({
+          roles, previewCasting: rolePreviewCastingRef.current, fromBeginning, castByStory,
+          alreadyCast: (id) => !!ctx.isRoleCast?.(id),
+        });
+        const sources: Record<string, { holder: string; source: RoleHolderSource }> = {};
+        for (const r of roles) {
+          const held = ctx.getRoleHolders?.()[r.id];
+          if (held && r.selection === 'random') sources[r.id] = { holder: held, source: 'random' };
+        }
+        for (const [roleId, characterId] of Object.entries(seeds)) {
+          sources[roleId] = { holder: characterId, source: 'preview' };
+        }
+        roleSourceRef.current = sources;
+        for (const [roleId, characterId] of Object.entries(seeds)) ctx.castRole?.(roleId, characterId);
+      }
+
       // Set up beat tracking and debug info updates
       const updateDebugInfo = () => {
         const ctx = engineRef.current?.getContext();
@@ -1905,6 +1962,12 @@ export const PreviewWindow: React.FC = () => {
           name: r.name || r.id,
           holder: (ctx as any).getRoleHolder?.(r.id) ?? null,
           cast: !!(ctx as any).isRoleCast?.(r.id),
+          source: (() => {
+            const holder = (ctx as any).getRoleHolder?.(r.id);
+            const noted = roleSourceRef.current[r.id];
+            if (noted && noted.holder === holder) return noted.source;
+            return (ctx as any).isRoleCast?.(r.id) ? 'story' : 'default';
+          })() as RoleHolderSource | 'default',
           candidates: (r.candidates || []).map((id: string) => ({ id, name: charName(id) })),
         }));
 
@@ -2030,7 +2093,13 @@ export const PreviewWindow: React.FC = () => {
       context.on('characterVariantChanged', updateDebugInfo);
       // A character's HUD appears when the player first meets them.
       context.on('characterAppeared', updateDebugInfo);
-      context.on('roleCast', updateDebugInfo);
+      // A cast the story makes (or the Debug panel) replaces the noted source.
+      context.on('roleCast', ({ role, characterId }: { role: string; characterId: string }) => {
+        if (roleSourceRef.current[role]?.holder !== characterId) {
+          roleSourceRef.current = { ...roleSourceRef.current, [role]: { holder: characterId, source: 'story' } };
+        }
+        updateDebugInfo();
+      });
 
       // On in-story restart (EndScreen/AISummary → context.reset / selectiveReset),
       // the renderer's HUD state is not cleared automatically. Clear stale timer
@@ -3344,21 +3413,28 @@ export const PreviewWindow: React.FC = () => {
                     <div className="text-sm font-medium text-gray-600 mb-2">Roles</div>
                     <div className="space-y-1">
                       {debugInfo.roles.map((r) => (
-                        <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
+                        <div key={r.id}>
+                        <div className="flex items-center justify-between gap-2 text-xs">
                           <span className="font-mono text-gray-600" title={r.name}>@{r.id}</span>
                           <select
                             value={r.holder ?? ''}
                             title={r.cast ? 'Who plays this role now — pick another to test it' : 'Not chosen yet: this is the default'}
                             onChange={(e) => {
                               const ctx = engineRef.current?.getContext() as any;
-                              if (e.target.value) ctx?.castRole?.(r.id, e.target.value);
+                              if (!e.target.value) return;
+                              roleSourceRef.current = { ...roleSourceRef.current, [r.id]: { holder: e.target.value, source: 'debug' } };
+                              ctx?.castRole?.(r.id, e.target.value);
                             }}
                             className="min-w-0 max-w-[60%] px-1 py-0.5 border border-gray-300 rounded text-xs"
                           >
                             {r.candidates.map((c) => (
-                              <option key={c.id} value={c.id}>{c.name}{!r.cast && c.id === r.holder ? ' (default)' : ''}</option>
+                              <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                           </select>
+                        </div>
+                        <div className="text-[10px] text-gray-500 text-right -mt-0.5" data-testid={`debug-role-source-${r.id}`}>
+                          {ROLE_SOURCE_LABELS[r.source]}
+                        </div>
                         </div>
                       ))}
                     </div>

@@ -906,6 +906,12 @@ function App() {
     };
   }, []);
 
+  // The editor's "Preview as" casting (RolesContext); the Preview Window
+  // uses it for roles the story hasn't decided when a run starts.
+  const [rolePreviewCasting, setRolePreviewCasting] = useState<Record<string, string>>({});
+  useEffect(() => {
+    previewWindowManager.sendRolePreview(rolePreviewCasting);
+  }, [rolePreviewCasting]);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
     project: {
       width: 1024,
@@ -4854,6 +4860,7 @@ function App() {
       previewWindowManager.open({
         storyData,
         settings: globalSettings,
+        rolePreviewCasting,
         assets: assets,
         characters: translatedChars,
         emotionPalette: emotionPalette,
@@ -5913,6 +5920,7 @@ function App() {
         beats: state.beats as any,
         characters: characters as any,
         variables: (globalSettings as any)?.variables,
+        roles: (globalSettings as any)?.roles,
         clusters: state.clusters,
       }, { maxChars: 240_000 - structure.length - 100 });
       localStorage.setItem(
@@ -6190,6 +6198,15 @@ function App() {
         globalSettingsRef.current = next;
         setGlobalSettings(next);
         return true;
+      },
+      defineRole: (role) => {
+        const base = globalSettingsRef.current ?? globalSettings;
+        const existing = Array.isArray((base as any).roles) ? (base as any).roles as any[] : [];
+        const replaced = existing.some((r) => r?.id === role.id);
+        const next = { ...base, roles: replaced ? existing.map((r) => (r?.id === role.id ? { ...r, ...role } : r)) : [...existing, role] } as any;
+        globalSettingsRef.current = next;
+        setGlobalSettings(next);
+        return replaced ? 'updated' : 'added';
       },
       characters: characters as any,
       updateCharacter: (characterId, updates) => {
@@ -6558,7 +6575,7 @@ function App() {
   }, [markChanged]);
 
   return (
-    <RolesProvider roles={(globalSettings as any)?.roles}>
+    <RolesProvider roles={(globalSettings as any)?.roles} previewCasting={rolePreviewCasting} onPreviewCastingChange={setRolePreviewCasting}>
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
         title={state.title}

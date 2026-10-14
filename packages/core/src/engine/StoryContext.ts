@@ -3314,6 +3314,8 @@ export class StoryContext extends EventEmitter {
     'characterMoods', 'characterSentiments', 'characterEmotionLevels', 'characterReflections',
     'characterGoalStatus', 'activeCharacterVariants', 'appearedCharacters',
     'initialMoods', 'initialEmotionLevels', 'initialSentiments', 'affectBookmarks',
+    // Who plays each cast role: path analysis follows castings like feelings.
+    'roleHolders',
   ] as const;
 
   /** Snapshot of the affect state only (see AFFECT_KEYS) — a plain deep
@@ -3329,6 +3331,9 @@ export class StoryContext extends EventEmitter {
   restoreAffectSnapshot(snapshot: Partial<SerializedStoryState>): void {
     const st = this.state as any;
     for (const k of StoryContext.AFFECT_KEYS) {
+      // A snapshot from before roles existed says nothing about them: keep
+      // the holders this run already has (random draws, fixed roles).
+      if (k === 'roleHolders' && (snapshot as any)[k] === undefined) continue;
       const v = (snapshot as any)[k] ?? {};
       // Baselines only gain entries (per character: new keys / list items,
       // each written once) and bookmarks are replaced whole — copying two

@@ -132,6 +132,8 @@ export interface ApplyContext {
    *  base traits — needed to derive a variant's E/A from its stance. */
   characters?: Array<{ id?: string; name?: string; displayName?: string; traits?: Record<string, number>; counters?: Array<Record<string, unknown>> }>;
   /** Declare a story variable; false when one by that name already exists. */
+  /** Add or update a cast role in Project Settings; says which happened. */
+  defineRole?: (role: { id: string; name?: string; description?: string; candidates: string[]; selection?: 'cast' | 'random' | 'fixed'; defaultCharacterId?: string; recastable?: boolean; keepOnRestart?: boolean }) => 'added' | 'updated';
   defineVariable?: (v: { name: string; defaultValue: string | number | boolean; description?: string; keepOnRestart?: boolean }) => boolean;
   /** Character field update (NOT in the undo history — noted in the result). */
   updateCharacter?: (characterId: string, updates: Record<string, unknown>) => void;
@@ -353,6 +355,23 @@ export function applyChangeProposals(
           results.push(added
             ? { index, ok: true, detail: `Declared story variable ${p.name} (starts as ${JSON.stringify(p.defaultValue)}) — see Project Settings → Variables` }
             : { index, ok: true, detail: `Story variable ${p.name} already exists — left as it is` });
+          return;
+        }
+
+        case 'defineRole': {
+          if (!ctx.defineRole) {
+            results.push({ index, ok: false, detail: 'Roles cannot be defined from here' });
+            return;
+          }
+          const known = new Set((ctx.characters ?? []).map((c: any) => c.id));
+          const unknown = p.candidates.filter((id) => known.size > 0 && !known.has(id));
+          if (unknown.length > 0) {
+            results.push({ index, ok: false, detail: `No character ${unknown.join(', ')} in this story — create them first, or use existing ids` });
+            return;
+          }
+          const { kind: _kind, note: _note, ...role } = p;
+          const how = ctx.defineRole(role);
+          results.push({ index, ok: true, detail: `${how === 'added' ? 'Added' : 'Updated'} role @${p.id} — see Project Settings → Roles` });
           return;
         }
 

@@ -1,4 +1,5 @@
 import type { Story } from '../engine/Story';
+import { normalizeRoles } from '../engine/roles';
 import type { Beat } from '../beats/Beat';
 import type { Connection, Condition } from '../types';
 import { StoryContext, PLAYTHROUGH_VARIABLE } from '../engine/StoryContext';
@@ -617,6 +618,20 @@ export class ReachabilityAnalyzer {
       case 'timer':
         // These are runtime-dependent, assume satisfiable
         return { condition, isSatisfiable: true };
+
+      case 'roleHolder': {
+        // Any candidate can come to play the role; anyone else never does.
+        const roleId = String((condition as any).role || '').replace(/^@/, '');
+        const role = normalizeRoles((this.story as any).getSettings?.()?.roles).find((r) => r.id === roleId);
+        const who = (condition as any).character;
+        if (!role) {
+          return { condition, isSatisfiable: false, reason: `There is no role "${roleId}" in Project Settings`, suggestedFix: 'Add the role under Project Settings → Roles' };
+        }
+        if (operator === '==' && who && !role.candidates.includes(who)) {
+          return { condition, isSatisfiable: false, reason: `${who} is not one of the characters who can play @${roleId}`, suggestedFix: `Add ${who} to the role's characters, or test for one of them` };
+        }
+        return { condition, isSatisfiable: true };
+      }
 
       default:
         return { condition, isSatisfiable: true };

@@ -171,6 +171,8 @@ interface InspectorProps {
 // third edge because multiChoice was missing from this list while its sibling
 // movementChoice was in it). Single source for both save paths.
 import { PARAMETER_DERIVED_TYPES } from '../utils/beatConnectionModel';
+import { RolePreviewBar } from './characters/RolePreviewBar';
+import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 
@@ -1820,6 +1822,14 @@ export const Inspector: React.FC<InspectorProps> = ({
           <div className="text-sm text-gray-500">
             {beat.type} • ID: {beat.id}
           </div>
+          {/* Preview as: which character the editor shows for the roles this beat uses. */}
+          {(() => {
+            const used = [...rolesReferencedIn({ speaker: localBeat.speaker, characterRef: localBeat.characterRef, parameters: localBeat.parameters })];
+            if (localBeat.type === 'chooseCharacter') used.push(String(localBeat.parameters?.role || 'player').replace(/^@/, ''));
+            return used.length > 0 ? (
+              <div className="mt-2"><RolePreviewBar roleIds={used} characters={characters} /></div>
+            ) : null;
+          })()}
         </div>
 
         {/* Advisory editing lock warning */}

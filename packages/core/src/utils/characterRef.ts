@@ -78,3 +78,25 @@ export function isKnownCharacter<C extends CharacterLike>(
 ): boolean {
   return resolveCharacter(ref, characters) !== null;
 }
+
+/**
+ * The character a displayed speaker name belongs to, as it looks now: the
+ * active variant merged in (its portrait, its name). Speaker names reach the
+ * renderer already resolved — '@role' to the holder, a linked character to
+ * its current (variant) name — so portraits look the name up here, matching
+ * the base and the merged names alike.
+ */
+export function findSpeakerCharacter<C extends CharacterLike>(
+  speakerName: string | null | undefined,
+  characters: ReadonlyArray<C> | null | undefined,
+  merged?: (id: string) => C | undefined,
+): C | null {
+  if (!speakerName || !characters?.length) return null;
+  const lower = speakerName.toLowerCase();
+  const is = (c?: CharacterLike) => !!c && (c.displayName?.toLowerCase() === lower || c.name?.toLowerCase() === lower);
+  for (const base of characters) {
+    const now = merged?.(base.id) ?? base;
+    if (is(now) || is(base)) return now;
+  }
+  return null;
+}

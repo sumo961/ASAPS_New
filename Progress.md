@@ -50,13 +50,46 @@
   - TTS was off (new standing rule: speech off for every playback I drive).
 - **Device sweep of the choose screen** (responsive): Desktop, Tablet L/P and Phone L/P all clean. Question, both buttons and their descriptions sit inside the stage and inside their buttons, with no overlaps.
 
-### Not yet (rest of phase 1)
-- Preview-as selector in the Inspector and the Visual Editor.
-- A Flowchart badge on casting beats.
-- The analyzers do not explore castings (D8: sampling).
-- Speaker portrait and TTS lookups are still keyed by name, which works because names are resolved in core.
-- The Co-Designer cannot define roles.
-- A Visual Editor placeholder for descriptions.
+### Rest of phase 1 (after 612f62c8)
+- **Preview as:** a bar at the top of the Inspector, shown for any beat that uses a role, with one picker per role. The Visual Editor draws the beat with that casting: `${@role…}` and `@role` speakers are substituted in the content it renders, never written to the beat.
+  - The casting lives in `RolesContext` for the session only.
+  - `utils/rolePreview.ts` holds `previewRoles` and `rolesReferencedIn`; `RolePreviewBar` is the picker.
+- **Flowchart:** a "🎭 @role" badge on beats that cast (`beatCastRoles`). Multi Choice and Choose Your Character got their own icons; Multi Choice had shown the generic one.
+- **Analyzers (D8):**
+  - `roleHolders` joins the runtime snapshot the path simulation carries (`AFFECT_KEYS`), and the state key, so two castings at one beat aren't merged. Pending casts count too.
+  - Random roles start once per candidate. Variant × casting combinations are sampled evenly down to 16 instead of truncated.
+  - Choose Your Character casts in the simulation, and its options are never merged.
+  - Reachability: a roleHolder condition is satisfiable only for a candidate of an existing role.
+- **Review findings (D4 and the AI-partner check):** a role read before anything casts it (no default); an AI partner role whose candidate has no description, on a beat without scene notes.
+- **Co-Designer:** the digest lists ROLES. A new `defineRole` proposal adds or updates a role and refuses unknown characters. The prompt and examples are updated.
+- **Portraits:** speaker portraits (Preview and the exported player) now find the character as it looks *now*, through `findSpeakerCharacter`: the active variant's portrait, matched by base or variant name.
+  - Before, a variant's own portrait and a variant display name were both missed. Name-keyed lookup stays, because core resolves `@role` to the holder's name before the renderer sees it.
+- **Tripwire** (`RoleTripwire.test.ts`): eight beat types played with an `@confidant` speaker and `${@confidant…}` text, asserting that no `@` reaches the screen. It found a real gap.
+  - The Dialog Tree's auto layout named its buttons after the raw choice text, while the buttons showed processed text.
+  - The layout now gets processed speaker, text and choices, which also fixes `${variable}` choices in that layout.
+- **Condition Check fix (pre-existing):** goal, active variant, role and the XR conditions lost their fields inside the Condition Check beat. The beat rebuilt its condition from a fixed list, and these fell to a default branch, so they always took the false path. They now carry their fields.
+- Verified in the app (speech off):
+  - Preview as set to Tomas → the Visual Editor shows "Tomas leans closer to Mara. … They were sure …" with speaker Tomas, while the Inspector text keeps the placeholders.
+  - Badges on "Who are you" (@player) and "Pick a side" (@confidant).
+- Suites: core 2894, renderer 669, builder 2859, player 7.
+
+### Preview as ↔ Debug panel (Hartmut: avoid confusion; one-way sync)
+- The casting moved up into App, which hands it to `RolesContext`. It is sent to the Preview Window when it opens and on every change (new `ROLE_PREVIEW` message). It is read when a run starts and never restarts a run.
+- **At start** (`rolesToSeedAtStart`):
+  - From a beat: every role nobody has chosen takes the Preview as pick, and so do random and fixed roles.
+  - From the beginning: only roles the story never casts and that aren't random — the story's own pick and draw are what is being tested.
+  - Roles a "Start as if…" preset already set are kept.
+- **Debug → Roles** says where each holder came from: from Preview as / drawn at random / chosen in the story / set here / default (not chosen yet). A switch there affects only the running test.
+- **Start states:** "Start as if…" presets were merging paths that differed only in casting. "Via Mara → Side with Ingrid · 4 paths" covered Tomas too. Roles used ahead now join the grouping key (`relevantState().roles`).
+- Old affect snapshots without `roleHolders` no longer wipe the run's random or fixed holders (`restoreAffectSnapshot`).
+- Verified in the Preview (speech off), with Preview as confidant = Tomas:
+  - From the beginning: both roles "default (not chosen yet)" — the story casts them itself.
+  - From "Confidant" with the offered start state: Ingrid, "chosen in the story" (that path sided with Ingrid).
+  - From "Confidant", Start fresh: Tomas, "from Preview as" — "Tomas leans closer to Mara. … They were sure …".
+
+### Still open
+- Fixed-layout hand-placed buttons show descriptions only on hover.
+- Translations of role text in gendered languages need per-language care.
 
 ### Dependabot (4212cbc9)
 - Root override shell-quote 1.9.0 → ^1.12.0 (our own pin had become the vulnerable version).
@@ -78,7 +111,11 @@
   - export: `export/StoryTranslator.ts`, `export/HtmlExporter.ts`
   - prompts: `services/prompts/storyGenerationEnhanced.ts`, `services/prompts/dialogGeneration.ts`, `components/ai/codesigner/systemPrompt.ts`
   - `public/player-web.js` (rebuilt); `utils/__tests__/roleFindings.test.ts` (new)
-- docs: `docs/USER_GUIDE.md` (Choose Your Character, Roles, Pronouns; images 81, 82), `docs/Character-Roles-Design.md`
+- docs: `docs/USER_GUIDE.md` (Choose Your Character, Roles, Pronouns, Preview as, badge, findings, Co-Designer; images 81, 82), `docs/Character-Roles-Design.md`
+- rest of phase 1:
+  - core: `analysis/StateSimulationAnalyzer.ts`, `analysis/ReachabilityAnalyzer.ts`, `beats/ConditionBeat.ts`, `beats/DialogTreeBeat.ts`, `utils/characterRef.ts`, `utils/index.ts`; tests `analysis/StateSimulationRoles.test.ts`, `engine/RoleTripwire.test.ts`
+  - builder: `contexts/RolesContext.tsx`, `utils/rolePreview.ts` (new), `components/characters/RolePreviewBar.tsx` (new), `components/graph/BeatNode.tsx`, `components/graph/graphStyle.ts`, `utils/roleFindings.ts`, `utils/storyDigest.ts`, `utils/applyChangeProposals.ts`, `components/ai/codesigner/*`, `pages/PreviewWindow.tsx`
+  - player: `PlayerEngine.ts`
 - `package.json`, `package-lock.json`, `mcp-server-desktop/package-lock.json` (Dependabot)
 
 ---
