@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.114*
+*Last revised against v0.9.115*
 
 ---
 
@@ -581,7 +581,7 @@ In a responsive project the Visual Editor's left panel offers a **Layout Templat
 
 **Purpose:** The interactor picks who to be — or who comes along.
 
-A Multi Choice whose buttons are people. Each choice names a character, and picking it puts that character into a [role](#roles): *the player* when the interactor chooses who to play, or any other role you set up ("who do you take with you?"). Each button shows the character's name with a short description underneath, so the choice is made by who they are, not just what they're called. It sits in the palette's **Multi Choice → Buttons** group.
+A Multi Choice whose buttons are people. Each choice names a character, and picking it puts that character into a [role](#roles): *the player* when the interactor chooses who to play, or any other role you set up ("who do you take with you?"). Each button shows the character's name with a short description underneath (or, if you like, the character's picture — see **Show options as** below), so the choice is made by who they are, not just what they're called. It sits in the palette's **Multi Choice → Buttons** group.
 
 ![The Choose Your Character screen in the Preview: "Whose night is it?" above two buttons, Mara with "A doctor at the end of a double shift." underneath and Jonas with "The ferry mechanic who knows every bolt."](images/81-choose-your-character.png)
 *Each button carries a description line. Everything after this beat follows the pick.*
@@ -590,7 +590,7 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 - **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
 - **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go. The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
-- **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. **Other picture…** on a choice uses any image instead of the portrait, for example a full-figure drawing; ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
+- **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
 ![The same screen with Show options as set to Pictures with names: Mara's card shows her portrait above her name and description; Jonas has no portrait yet, so his card shows a large J.](images/83-choose-your-character-pictures.png)
@@ -2824,7 +2824,7 @@ The **Viewport** dropdown next to the Fit button lets you preview your story at 
 
 Picking a preset locks the preview container to that exact pixel size and orientation. The container stays stable across preset swaps so you can A/B between, say, Phone portrait and Tablet portrait without the renderer fully remounting. The active size is also shown as a small chip on the preview frame.
 
-This is particularly useful for **responsive-mode projects**, where the same story renders differently depending on viewport width and orientation — flipping between presets is how you sanity-check that your slot intents land the way you want on a phone, a tablet, and a desktop. Fixed-canvas projects also respect the preset, but since their layout is pixel-baked, the viewport switcher just changes how much of the stage you see at once.
+This is particularly useful for **responsive-mode projects**, where the same story renders differently depending on viewport width and orientation — flipping between presets is how you sanity-check that your slot intents land the way you want on a phone, a tablet, and a desktop. Fixed-canvas projects respect the preset too: the whole stage is scaled down to fit inside it, with bars at the sides or top and bottom where the shapes differ, just as the exported player does on that device. Nothing is cut off, so at Phone portrait you see exactly how small your landscape canvas gets on a phone held upright. *(Before v0.9.115 the preview drew the canvas at full size and cropped it at smaller presets.)*
 
 <a id="mock-sensors"></a>
 ### Testing Location Beats: the Mock Sensors Panel
@@ -3996,7 +3996,7 @@ Quick reference for all beat types.
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
 | Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), per-line speakers, *Then another character speaks* (several characters before the player answers), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
 | Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template and per-choice pins (responsive), markVisited, effectsOncePerChoice |
-| Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, target, conditions, effects), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
+| Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, picture, target, conditions, effects), show options as (buttons / pictures with names / pictures only), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |

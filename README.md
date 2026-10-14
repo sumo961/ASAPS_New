@@ -22,11 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.114** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.114 lets you show an asterisk**:
+Current release: **v0.9.115** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.115 lets players pick their
+character by picture**: a Choose Your Character beat can now show its
+options as portrait cards — with names, or pictures only — instead of text
+buttons (Inspector → *Show options as*). Each card uses the character's
+portrait, and any option can use a different picture. The Preview Window
+also fits fixed-layout projects into phone and tablet presets instead of
+cropping them.
+
+**v0.9.114 let you show an asterisk**:
 put a backslash before a formatting character (`5 \* 3` shows "5 * 3"
 instead of starting italics), mark words with `==highlight==`, and choice
-buttons now show bold and italic too. Roles reach the remaining places: a
+buttons showed bold and italic too. Roles reached the remaining places: a
 Condition Check can branch on who plays a role, Dialog Tree lines can be
 spoken by a role, hand-written stories get the role checks in Debug → Story
 Warnings, and renaming a role updates every beat that uses it.

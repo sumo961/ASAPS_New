@@ -1,8 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.114, 2026-10-14)
+## 2026-10-14: Pick your character by their picture (v0.9.115)
 
 ### Overview
+This release lets players pick who they play by face, and fixes the Preview Window for fixed-layout projects at phone and tablet presets.
 - **Choose Your Character can show pictures instead of text buttons** (Hartmut's request). A new beat setting, *Show options as*: Buttons (default), Pictures with names, or Pictures only. The picture is the character's portrait, and any choice can use its own image instead.
 - **Preview Window fits fixed-layout projects into device presets.** At a phone or tablet preset, a fixed canvas used to be drawn at full size and cropped; it now letterboxes into the preset like the exported player.
 
