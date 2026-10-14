@@ -71,3 +71,41 @@ export function applyGeneratedRoles(
   if (roles.length === 0 && !had) return null;
   return { ...base, roles } as GlobalSettings;
 }
+
+/**
+ * Roles a generated story uses without declaring them, inferred from how
+ * it uses them: a Choose Your Character beat names its role and its
+ * characters; a castRole effect names a role and a character. Only roles
+ * with at least one such character are inferred — an "@id" seen only in
+ * text stays undeclared and the review flags it. Declared roles win.
+ */
+export function inferUndeclaredRoles(story: { beats?: any[]; roles?: unknown }): Array<{ id: string; candidates: string[]; selection: 'cast' }> {
+  const declared = new Set(normalizeRoles(story.roles).map((r) => r.id));
+  const found = new Map<string, Set<string>>();
+  const add = (role: unknown, character: unknown) => {
+    if (typeof role !== 'string' || !role.trim()) return;
+    const id = role.trim().replace(/^@/, '');
+    if (declared.has(id)) return;
+    if (!found.has(id)) found.set(id, new Set());
+    if (typeof character === 'string' && character.trim()) found.get(id)!.add(character.trim());
+  };
+  const walk = (v: any) => {
+    if (Array.isArray(v)) { v.forEach(walk); return; }
+    if (!v || typeof v !== 'object') return;
+    if (v.type === 'castRole') add(v.target, v.character);
+    for (const k of Object.keys(v)) walk(v[k]);
+  };
+  for (const beat of story.beats ?? []) {
+    const params = beat?.parameters ?? {};
+    if (beat?.type === 'chooseCharacter') {
+      const role = params.role ?? 'player';
+      add(role, undefined);
+      for (const c of Array.isArray(params.choices) ? params.choices : []) add(role, c?.character);
+    }
+    walk(params);
+    walk(beat?.connections);
+  }
+  return [...found.entries()]
+    .filter(([, chars]) => chars.size > 0)
+    .map(([id, chars]) => ({ id, candidates: [...chars], selection: 'cast' as const }));
+}

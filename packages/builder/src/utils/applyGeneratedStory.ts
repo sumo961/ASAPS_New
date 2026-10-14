@@ -23,7 +23,7 @@ import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import { applyTreeLayoutToBeats } from './TreeLayoutAlgorithm';
 import { storyLinks as storyLinksOf, dedupeLinks } from './storyLinks';
-import { mergeGeneratedVariables, applyGeneratedRoles } from './generatedVariables';
+import { mergeGeneratedVariables, applyGeneratedRoles, inferUndeclaredRoles } from './generatedVariables';
 import { validateStoryLogic, formatLogicValidationResult } from './storyLogicValidator';
 import { themeToGlobalSettings } from '../themes/migration/GlobalSettingsAdapter';
 import { analyzeStoryFindings } from './generationReview';
@@ -268,7 +268,19 @@ export async function applyGeneratedStory(
   //     After normalize on purpose: the proposals' parameter paths must match
   //     the shape the beats are loaded in. The import proceeds regardless — a
   //     story with a few bad links is mostly good work.
-  const findings: GenerationFinding[] = story?.generationIssues?.findings ?? analyzeStoryFindings(story);
+  // Roles the story uses but forgot to declare are declared from how it uses
+  // them (Choose Your Character options, Cast Role effects) — as undeclared
+  // variables are — before the review looks for unknown roles.
+  const inferredRoles = inferUndeclaredRoles(story);
+  if (inferredRoles.length > 0) {
+    story.roles = [...(Array.isArray(story.roles) ? story.roles : []), ...inferredRoles];
+    console.log('[applyGeneratedStory] Declared roles the story used:', inferredRoles.map((r) => r.id).join(', '));
+  }
+  const inferredIds = new Set(inferredRoles.map((r) => r.id));
+  // Findings computed before the roles were declared (by the generator's
+  // validator) would still call them unknown.
+  const findings: GenerationFinding[] = (story?.generationIssues?.findings ?? analyzeStoryFindings(story))
+    .filter((f: GenerationFinding) => !(f.kind === 'role' && (f as any).problem === 'unknown-role' && inferredIds.has((f as any).role)));
   deps.reportImportValidation(story, findings);
 
   // 4. A generated story is a new project: nothing of the previous one bleeds through.
@@ -282,7 +294,17 @@ export async function applyGeneratedStory(
   // 6. Global settings: variables → suggested theme → fictional-time HUD.
   //    Each step builds on the previous commit, so the theme sees the
   //    merged variables and the HUD sees the theme.
-  let settings = deps.getGlobalSettings();
+  // A generated story is a new project: the open project's story-specific
+  // settings (its declared variables, cast roles, start beat) must not carry
+  // over. (The theme step below used to rebuild the settings from scratch,
+  // which hid this — and also dropped the generated variables and roles.)
+  const current = deps.getGlobalSettings();
+  let settings = {
+    ...current,
+    variables: [],
+    roles: [],
+    debug: { ...((current as any).debug ?? {}), firstbeat: '' },
+  } as GlobalSettings;
   const mergedVars = mergeGeneratedVariables(settings, story.variables);
   if (mergedVars) {
     settings = mergedVars;

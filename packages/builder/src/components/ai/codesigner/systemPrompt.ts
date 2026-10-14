@@ -107,7 +107,8 @@ STORY STATE — what exists and how to use it
   the player sided with. Write "@confidant" wherever a character goes
   (speaker, npcName, effect target/character, condition character) and
   \${@confidant.name}, \${@confidant.they}, \${@confidant.their},
-  \${@confidant.is} in text. Cast one with an effect
+  \${@confidant.is} in text (after a pronoun placeholder use a past-tense
+  verb or .is/.has/.was — "\${@confidant.They} press" reads "She press"). Cast one with an effect
   { "type": "castRole", "target": "confidant", "character": "<character id>" }
   or a chooseCharacter beat (a multiChoice whose choices each name a
   "character" and a short "description"). Branch per holder only where a

@@ -263,3 +263,40 @@ describe('withFictionalTimeHud — display format (2026-09-26)', () => {
     expect(out.hudOverlays.fictionalTime.displayFormat).toBe('day-number');
   });
 });
+
+describe('a generated story starts with its own story settings', () => {
+  it("drops the open project's variables, roles and start beat; keeps the generated ones", async () => {
+    const deps = makeDeps({
+      getGlobalSettings: () => ({ variables: [{ name: 'oldVar', type: 'string' }], roles: [{ id: 'old', candidates: ['x'] }], debug: { firstbeat: 'old_beat', showvals: true } }) as any,
+      resolveTheme: vi.fn(async () => ({ meta: { id: 'builtin-ink-and-brass', name: 'Ink & Brass' } })) as any,
+    });
+    let committed: any = null;
+    (deps as any).commitGlobalSettings = vi.fn((next: any) => { committed = next; });
+    await applyGeneratedStory({ ...story(), roles: [{ id: 'player', candidates: ['pc'] }] }, deps, { fallbackTitle: 'x' });
+    expect(committed.variables.map((v: any) => v.name)).toEqual(['trust']);
+    expect(committed.roles.map((r: any) => r.id)).toEqual(['player']);
+    expect(committed.debug.firstbeat).toBe('');
+  });
+});
+
+describe('roles a generated story forgot to declare', () => {
+  it('are declared from Choose Your Character options and Cast Role effects', async () => {
+    const deps = makeDeps();
+    let committed: any = null;
+    (deps as any).commitGlobalSettings = vi.fn((next: any) => { committed = next; });
+    const s: any = story();
+    s.beats.push(
+      { id: 'pick', type: 'chooseCharacter', name: 'Pick', parameters: { role: 'player', choices: [{ id: 'a', character: 'pc', target: 'b1' }, { id: 'b', character: 'npc2', target: 'b1' }] } },
+      { id: 'side', type: 'multiChoice', name: 'Side', parameters: { question: 'q', choices: [{ id: 'x', text: 'X', target: 'b1', effects: [{ type: 'castRole', target: 'confidant', character: 'npc3' }] }] } },
+      { id: 'talk2', type: 'infoText', name: 'T', parameters: { text: '${@ghost} waves' } },
+    );
+    s.generationIssues = { findings: [{ id: 'role:unknown:pick:player', kind: 'role', problem: 'unknown-role', role: 'player', beatId: 'pick', message: 'm' }] };
+    await applyGeneratedStory(s, deps, { fallbackTitle: 'x' });
+    expect(committed.roles).toEqual([
+      { id: 'player', candidates: ['pc', 'npc2'], selection: 'cast' },
+      { id: 'confidant', candidates: ['npc3'], selection: 'cast' },
+    ]);
+    const reported = (deps.reportImportValidation as any).mock.calls[0][1];
+    expect(reported.some((f: any) => f.role === 'player')).toBe(false);
+  });
+});

@@ -103,3 +103,23 @@ describe('extractThemeOverrides', () => {
     expect(overrides!.colors).toBeDefined();
   });
 });
+
+describe('themeToGlobalSettings keeps what is not part of the look', () => {
+  it('declared variables, cast roles, HUD overlays and other project settings survive a theme', async () => {
+    const { themeToGlobalSettings } = await import('../GlobalSettingsAdapter');
+    const { INK_AND_BRASS_THEME } = await import('@asaps/core');
+    const existing: any = {
+      project: { width: 1024, height: 768, aspectRatio: '4:3', scalingMode: 'fit' },
+      variables: [{ name: 'met', type: 'boolean', defaultValue: true }],
+      roles: [{ id: 'player', candidates: ['a', 'b'] }],
+      hudOverlays: { countdownMeter: { enabled: true } },
+      translation: { sourceLanguage: 'sv' },
+    };
+    const next: any = themeToGlobalSettings(INK_AND_BRASS_THEME as any, existing);
+    expect(next.variables).toEqual(existing.variables);
+    expect(next.roles).toEqual(existing.roles);
+    expect(next.hudOverlays).toEqual(existing.hudOverlays);
+    expect(next.translation).toEqual(existing.translation);
+    expect(next.colors.bgColor).toBeTruthy();
+  });
+});

@@ -223,6 +223,11 @@ export function themeToGlobalSettings(
   const textBoxOpacity = theme.textBox.opacity !== undefined ? theme.textBox.opacity : textBoxBgAlpha;
 
   return {
+    // A theme is a look: everything else in the project's settings — declared
+    // variables, cast roles, HUD overlays, translation, location, TTS — stays.
+    // (This used to build the settings from scratch, so applying a theme, or
+    // importing a generated story, silently dropped all of them.)
+    ...(existingSettings as GlobalSettings | undefined),
     project: existingSettings?.project || {
       width: 1024,
       height: 768,

@@ -1015,6 +1015,7 @@ A **role** is a part that one of several characters plays, decided while the sto
 player picks who to be, or "the confidant" is whoever the player sided with earlier. Use a role
 instead of duplicating beats per character. (Variants are different moods of ONE person; roles
 are DIFFERENT people with their own names, counters and feelings.)
+🚨 EVERY role the story uses — any "@id" speaker / npcName / effect / condition, any \${@id…} text, any chooseCharacter "role" — MUST be declared in the top-level "roles" array, with its candidates (character ids). An undeclared role shows as raw "@id" text to the player. Stories without roles omit "roles" entirely.
 Declare roles in a top-level "roles" array:
 \`\`\`json
 "roles": [
@@ -1024,7 +1025,7 @@ Declare roles in a top-level "roles" array:
 \`\`\`
 - selection: "cast" (a chooseCharacter beat or a castRole effect fills it), "random" (drawn at story start — rehearsal variety across DIFFERENT people), "fixed" (always the default). recastable: true only if the story may change the holder later. keepOnRestart: true keeps the holder across an ending's Restart.
 - Refer to a role as "@confidant" wherever a character goes: beat speaker, dialog node speaker, aiConversation / aiDialogTree npcName, effect target/character, condition character.
-- In text: \${@confidant} or \${@confidant.name} = the holder's name; pronouns \${@confidant.they} \${@confidant.them} \${@confidant.their} \${@confidant.theirs} \${@confidant.themself}, agreement \${@confidant.is} \${@confidant.has} \${@confidant.was} ("\${@confidant.they} \${@confidant.is} late"); a capital key capitalises: \${@confidant.They}. Give every candidate "pronouns": "she" | "he" | "they".
+- In text: \${@confidant} or \${@confidant.name} = the holder's name; pronouns \${@confidant.they} \${@confidant.them} \${@confidant.their} \${@confidant.theirs} \${@confidant.themself}, agreement \${@confidant.is} \${@confidant.has} \${@confidant.was} ("\${@confidant.they} \${@confidant.is} late"); a capital key capitalises: \${@confidant.They}. 🚨 After a pronoun placeholder write a PAST-tense verb ("\${@confidant.They} pressed") or use .is/.has/.was — never a present-tense verb: "\${@confidant.They} press" reads "She press" for one holder. Or simply repeat the name. Give every candidate "pronouns": "she" | "he" | "they".
 - Cast it with a chooseCharacter beat, or with an effect on any choice: { "type": "castRole", "target": "confidant", "character": "char_tomas" } ("you side with Tomas" → Tomas becomes the confidant).
 - For the few lines that must differ per holder, a condition: { "type": "roleHolder", "role": "confidant", "character": "char_tomas", "operator": "==" }.
 - A role named "player" makes the implicit 'player' key (counters, feelings, sentiment targets) follow the chosen protagonist; the inventory stays the player's whoever plays.
@@ -1764,7 +1765,9 @@ Generate complete, sophisticated interactive story structures that:
       "connections": [{ "targetId": "beat_0" }]
     }
   ],
-  "roles": [],
+  "roles": [
+    { "id": "confidant", "name": "The confidant", "candidates": ["char_npc", "char_npc2"], "selection": "cast" }
+  ],
   "variables": [
     {
       "name": "cluesFound",

@@ -497,7 +497,7 @@ function App() {
       : (typeof storyData?.getAllBeats === 'function' ? storyData.getAllBeats() : undefined);
     if (!rawBeats?.length) return;
     const beats = rawBeats.map((b: any) => (typeof b?.toJSON === 'function' ? b.toJSON() : b));
-    reportImportValidation({ beats, variables: project.globalSettings?.variables });
+    reportImportValidation({ beats, variables: project.globalSettings?.variables, roles: (project.globalSettings as any)?.roles, characters: storyData?.characters ?? storyData?.getCharacters?.() });
   }, [reportImportValidation]);
 
   /**
@@ -3228,7 +3228,7 @@ function App() {
       const validator = getAIValidator();
       await validator.ensureSchemaLoaded();
       const beats = state.beats.map((b: any) => (typeof b.toJSON === 'function' ? b.toJSON() : b));
-      const ctx = { story: { beats, variables: (globalSettingsRef.current ?? globalSettings)?.variables }, schema: validator.getSchema() };
+      const ctx = { story: { beats, variables: (globalSettingsRef.current ?? globalSettings)?.variables, roles: (globalSettingsRef.current ?? globalSettings)?.roles, characters }, schema: validator.getSchema() };
       const result = await requestAIFix(
         finding, ctx,
         (sys, user, signal) => getAIService().completeTurn(sys, user, { maxTokens: 4000, signal }),
@@ -3243,7 +3243,7 @@ function App() {
     } finally {
       if (aiFixAbortRef.current === controller) aiFixAbortRef.current = null;
     }
-  }, [state.beats, globalSettings]);
+  }, [state.beats, globalSettings, characters]);
 
   const handleRejectAIFix = useCallback(() => {
     if (aiFix?.status === 'ready' && aiFix.suggestion) recordAIEdits(aiFixRejectedEntries(aiFix.suggestion));
