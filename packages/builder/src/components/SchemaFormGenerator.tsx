@@ -404,7 +404,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
           // matches literal words). Available in translation mode too — the
           // translation must reproduce the source's markers.
           const showFormatBar =
-            ['text', 'message', 'prompt'].includes(paramName) && beatType !== 'hyperText';
+            ['text', 'message', 'prompt', 'question', 'fallbackText', 'creditsPageBody', 'creditsBody'].includes(paramName) && beatType !== 'hyperText';
           return (
             <div key={paramName}>
               <label className="block text-sm font-medium text-gray-700 mb-1">

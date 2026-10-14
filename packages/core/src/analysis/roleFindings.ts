@@ -67,7 +67,7 @@ function referencedRoles(beat: any): Set<string> {
     if (Array.isArray(v)) { v.forEach(walk); return; }
     if (v && typeof v === 'object') for (const k of Object.keys(v)) walk(v[k]);
   };
-  walk({ speaker: beat.speaker, characterRef: beat.characterRef, parameters: beat.parameters, connections: beat.connections });
+  walk({ speaker: beat.speaker, characterRef: beat.characterRef, parameters: beat.parameters, connections: beat.connections, requires: beat.requires });
   if (beat.type === 'chooseCharacter') refs.add(String(beat.parameters?.role ?? 'player').replace(/^@/, ''));
   return refs;
 }

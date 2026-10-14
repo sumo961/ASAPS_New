@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { AvailableVariable } from '../hooks/useAvailableCountersAndVariables';
+import { FormattingToolbar } from '../components/FormattingToolbar';
 
 interface TextFieldWithVariablesProps {
   value: string;
@@ -9,6 +10,13 @@ interface TextFieldWithVariablesProps {
   multiline?: boolean;
   className?: string;
   rows?: number;
+  /**
+   * Show the B / I / S / H formatting bar (markdown-lite). On by default —
+   * these fields hold player-facing text; pass false where formatting would
+   * not render (Hyper Text bodies, internal names). Multi-line fields show it
+   * always, one-line fields while they are being edited.
+   */
+  formatting?: boolean;
 }
 
 /**
@@ -22,9 +30,12 @@ export const TextFieldWithVariables: React.FC<TextFieldWithVariablesProps> = ({
   multiline = false,
   className = '',
   rows = 3,
+  formatting = true,
 }) => {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const showBar = formatting && (multiline || focused);
 
   const insertVariable = (varName: string) => {
     const el = inputRef.current;
@@ -50,7 +61,12 @@ export const TextFieldWithVariables: React.FC<TextFieldWithVariablesProps> = ({
   };
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onFocus={() => setFocused(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
+    >
+      {showBar && <FormattingToolbar getTextarea={() => inputRef.current} onChange={onChange} />}
       <div className="flex items-start gap-1">
         {multiline ? (
           <textarea

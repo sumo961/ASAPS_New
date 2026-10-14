@@ -7054,6 +7054,8 @@ function App() {
                 characterRef: beat.characterRef,
                 parameters: beat.getParameters ? beat.getParameters() : beat.parameters,
                 connections: beat.connections,
+                // Requirements ("Who plays a role") live on the beat itself.
+                requires: beat.requires,
               };
               let after: Record<string, any> = before;
               for (const r of renames) after = renameRoleReferences(after, r.from, r.to);

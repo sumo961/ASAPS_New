@@ -1,5 +1,6 @@
 import React from 'react';
 import { EdgeProps, getBezierPath, EdgeLabelRenderer, BaseEdge, useNodes } from 'reactflow';
+import { markdownLiteToPlain } from '@asaps/renderer';
 
 export const CustomEdge: React.FC<EdgeProps> = ({
   id,
@@ -12,10 +13,12 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   sourcePosition,
   targetPosition,
   style = {},
-  label,
+  label: rawLabel,
   markerEnd,
   data,
 }) => {
+  // Choice labels may carry formatting (**bold**, \* escapes): show the words.
+  const label = typeof rawLabel === 'string' ? markdownLiteToPlain(rawLabel) : rawLabel;
   const nodes = useNodes();
 
   // Check if this edge needs to route around a cluster

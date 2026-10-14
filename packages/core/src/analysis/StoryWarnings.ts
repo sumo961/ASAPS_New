@@ -64,7 +64,7 @@ export function detectStoryWarnings(cfg: DetectConfig): StoryWarning[] {
   // written by hand get them too.
   const plainBeats = story.getAllBeats().map((b: any) => ({
     id: b.id, name: b.name, type: b.type, speaker: b.speaker, characterRef: b.characterRef,
-    parameters: b.getParameters?.() ?? b.parameters, connections: b.connections,
+    parameters: b.getParameters?.() ?? b.parameters, connections: b.connections, requires: b.requires,
   }));
   for (const f of analyzeRoleFindings(plainBeats, (story as any).getSettings?.()?.roles, story.getCharacters?.(), story.getFirstBeatId?.())) {
     warnings.push({

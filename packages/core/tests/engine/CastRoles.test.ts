@@ -268,3 +268,11 @@ describe('renaming a role', () => {
     expect(renameRoleReferences(plain, 'confidant', 'friend')).toBe(plain);
   });
 });
+
+describe('renaming a role reaches beat requirements', () => {
+  it('rewrites a Who plays a role requirement', async () => {
+    const { renameRoleReferences } = await import('../../src/engine/roles');
+    const beat = { requires: [{ condition: { type: 'roleHolder', role: 'confidant', character: 'x', operator: '==' }, explanation: 'e' }] };
+    expect((renameRoleReferences(beat, 'confidant', 'friend') as any).requires[0].condition.role).toBe('friend');
+  });
+});

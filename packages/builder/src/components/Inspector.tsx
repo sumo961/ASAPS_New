@@ -4367,10 +4367,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </>
                           ) : (
                             <>
-                              <input
-                                type="text"
+                              <TextFieldWithVariables
                                 value={choice.text}
-                                onChange={(e) => handleUpdateChoice(index, 'text', e.target.value)}
+                                onChange={(val) => handleUpdateChoice(index, 'text', val)}
+                                availableVariables={availableVariables}
                                 placeholder={beat.type === 'chooseCharacter' ? "Label (empty: the character's name)" : 'Choice text'}
                                 className="w-full px-2 py-1 text-sm border rounded"
                               />

@@ -73,7 +73,7 @@ export const FormattingToolbar: React.FC<{
   /** Resolve the textarea this bar formats, at click time — selection is
    *  read from and restored to it. A getter rather than a ref so the bar
    *  never holds a stale node across re-renders of a mapped field list. */
-  getTextarea: () => HTMLTextAreaElement | null;
+  getTextarea: () => HTMLTextAreaElement | HTMLInputElement | null;
   onChange: (value: string) => void;
 }> = ({ getTextarea, onChange }) => {
   const apply = (marker: string) => {
