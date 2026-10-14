@@ -528,9 +528,14 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       }
     }
 
-    // Set story settings
-    if (storyData.settings) {
-      story.setSettings(storyData.settings);
+    // Story settings. The runtime reads Project Settings from here — declared
+    // variables (starting values, types, keep across restarts) and cast roles —
+    // and an export carries them in project.globalSettings, while the story's
+    // own `settings` is usually empty. The Preview hands the runtime the
+    // project settings too; story-level keys still win where both exist.
+    const projectSettings = data.project?.globalSettings || data.globalSettings;
+    if (projectSettings || storyData.settings) {
+      story.setSettings({ ...(projectSettings || {}), ...(storyData.settings || {}) });
     }
 
     // Set environment (props, nodes for backgrounds)
