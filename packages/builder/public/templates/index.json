@@ -16,6 +16,21 @@
    "requiresAI": true
   },
   {
+   "id": "last-ferry",
+   "file": "last-ferry.asapst",
+   "title": "The Last Ferry — choose your character",
+   "description": "A night crossing in a storm. Pick who you are, back one of the crew in an argument, and see who stands by you when the ferry lurches.",
+   "whatItShows": "Roles end to end: a Choose Your Character beat casts the player (Mara or Jonas), a choice casts the confidant (Ingrid or Tomas), and the captain is drawn at random. Every scene is written once — @role speakers, ${@player.name} and ${@confidant.they} in text — while each character keeps their own trust meter. Play it twice as different people.",
+   "tags": [
+    "roles",
+    "choose your character",
+    "pronouns"
+   ],
+   "beats": 9,
+   "characters": 6,
+   "requiresAI": false
+  },
+  {
    "id": "counter-displays",
    "file": "counter-displays.asapst",
    "title": "Counters that read affect",

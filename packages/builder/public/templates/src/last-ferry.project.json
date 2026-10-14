@@ -1,0 +1,910 @@
+{
+ "metadata": {
+  "exportVersion": "1.1.0",
+  "exportedAt": "2026-10-14T00:00:00.000Z",
+  "exportedBy": "ASAPS Builder",
+  "projectId": "template-last-ferry",
+  "projectName": "The Last Ferry — choose your character"
+ },
+ "project": {
+  "id": "template-last-ferry",
+  "name": "The Last Ferry — choose your character",
+  "description": "A night crossing played by whoever the player picks, with a crew member who becomes their confidant and a captain drawn at random — one story, several people.",
+  "story": {
+   "title": "The Last Ferry",
+   "author": "ASAPS",
+   "beats": [
+    {
+     "id": "beat_title",
+     "name": "Title",
+     "type": "titleScreen",
+     "locations": [],
+     "x": 60,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_pick",
+       "label": "Begin"
+      }
+     ],
+     "parameters": {
+      "title": "The Last Ferry",
+      "subtitle": "One crossing, played by whoever you choose",
+      "buttonText": "Begin"
+     }
+    },
+    {
+     "id": "beat_pick",
+     "name": "Whose night is it?",
+     "type": "chooseCharacter",
+     "locations": [],
+     "x": 300,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_boarding",
+       "label": "Mara"
+      },
+      {
+       "targetId": "beat_boarding",
+       "label": "Jonas"
+      }
+     ],
+     "parameters": {
+      "role": "player",
+      "question": "The last ferry across the strait leaves at midnight. Whose night is it?",
+      "choices": [
+       {
+        "id": "pick_mara",
+        "character": "char_mara",
+        "text": "Mara",
+        "description": "A doctor at the end of a double shift, going home to her father.",
+        "target": "beat_boarding"
+       },
+       {
+        "id": "pick_jonas",
+        "character": "char_jonas",
+        "text": "Jonas",
+        "description": "A ferry mechanic on his night off, who hates being a passenger.",
+        "target": "beat_boarding"
+       }
+      ]
+     }
+    },
+    {
+     "id": "beat_boarding",
+     "name": "Boarding",
+     "type": "infoText",
+     "locations": [],
+     "x": 540,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_argument",
+       "label": "Listen"
+      }
+     ],
+     "parameters": {
+      "text": "${@player.name} runs the last fifty metres to the ramp. ${@player.They} ${@player.is} soaked by the time the gate clangs shut behind ${@player.them}.\n\nThe ferry is nearly empty: a trucker asleep across three seats, a family with too much luggage, and two of the crew arguing by the stairs. The captain comes down to see what the noise is about.",
+      "buttonText": "Listen"
+     }
+    },
+    {
+     "id": "beat_argument",
+     "name": "The argument",
+     "type": "dialogTree",
+     "locations": [],
+     "x": 780,
+     "y": 260,
+     "connections": [],
+     "parameters": {
+      "dialogTree": {
+       "id": "n_captain",
+       "speaker": "@captain",
+       "text": "Evening. ${@captain}. This is my last crossing tonight, and if the wind holds we'll be across by one.",
+       "choices": [
+        {
+         "id": "c_n_ingrid",
+         "text": "",
+         "continue": true,
+         "dialogNode": {
+          "id": "n_ingrid",
+          "speaker": "Ingrid",
+          "text": "It won't hold. The forecast changed an hour ago. We should turn back while we still can.",
+          "choices": [
+           {
+            "id": "c_n_tomas",
+            "text": "",
+            "continue": true,
+            "dialogNode": {
+             "id": "n_tomas",
+             "speaker": "Tomas",
+             "text": "We've crossed in worse. Turn back now and forty people sleep in their cars on the quay. Some of them have children.",
+             "choices": [
+              {
+               "id": "c_n_ask",
+               "text": "",
+               "continue": true,
+               "dialogNode": {
+                "id": "n_ask",
+                "speaker": "@captain",
+                "text": "${@player.name}. You're the only passenger still awake, and you heard them both. If this were your ship — what would you do?",
+                "choices": [
+                 {
+                  "id": "side_ingrid",
+                  "text": "Turn back. Ingrid has read the weather right.",
+                  "target": "beat_storm",
+                  "effects": [
+                   {
+                    "type": "castRole",
+                    "target": "confidant",
+                    "character": "char_ingrid"
+                   },
+                   {
+                    "type": "addSentiment",
+                    "target": "char_ingrid",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.3
+                   },
+                   {
+                    "type": "addSentiment",
+                    "target": "char_tomas",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.1
+                   }
+                  ]
+                 },
+                 {
+                  "id": "side_tomas",
+                  "text": "Keep going. Tomas is right about the people below.",
+                  "target": "beat_storm",
+                  "effects": [
+                   {
+                    "type": "castRole",
+                    "target": "confidant",
+                    "character": "char_tomas"
+                   },
+                   {
+                    "type": "addSentiment",
+                    "target": "char_tomas",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": 0.3
+                   },
+                   {
+                    "type": "addSentiment",
+                    "target": "char_ingrid",
+                    "sentimentTarget": "player",
+                    "sentimentEmotion": "trust",
+                    "strengthDelta": -0.1
+                   }
+                  ]
+                 }
+                ]
+               }
+              }
+             ]
+            }
+           }
+          ]
+         }
+        }
+       ]
+      },
+      "speaker": "@captain",
+      "showSpeaker": true
+     },
+     "speaker": "@captain",
+     "showSpeaker": true
+    },
+    {
+     "id": "beat_storm",
+     "name": "Halfway",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 1020,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_confide",
+       "label": "Kneel by the child and check the cut on her head."
+      },
+      {
+       "targetId": "beat_confide",
+       "label": "Follow the sound down to the engine room."
+      },
+      {
+       "targetId": "beat_confide",
+       "label": "Hold on to the rail and watch the harbour lights."
+      }
+     ],
+     "parameters": {
+      "question": "Halfway across, the ferry lurches. Somewhere below, metal groans, and a child starts to cry. ${@confidant} is already running for the stairs.",
+      "choices": [
+       {
+        "id": "st_child",
+        "text": "Kneel by the child and check the cut on her head.",
+        "target": "beat_confide",
+        "conditions": [
+         {
+          "type": "roleHolder",
+          "role": "player",
+          "character": "char_mara",
+          "operator": "=="
+         }
+        ],
+        "effects": [
+         {
+          "type": "addSentiment",
+          "target": "@confidant",
+          "sentimentTarget": "player",
+          "sentimentEmotion": "trust",
+          "strengthDelta": 0.2
+         }
+        ]
+       },
+       {
+        "id": "st_engine",
+        "text": "Follow the sound down to the engine room.",
+        "target": "beat_confide",
+        "conditions": [
+         {
+          "type": "roleHolder",
+          "role": "player",
+          "character": "char_jonas",
+          "operator": "=="
+         }
+        ],
+        "effects": [
+         {
+          "type": "addSentiment",
+          "target": "@confidant",
+          "sentimentTarget": "player",
+          "sentimentEmotion": "trust",
+          "strengthDelta": 0.2
+         }
+        ]
+       },
+       {
+        "id": "st_rail",
+        "text": "Hold on to the rail and watch the harbour lights.",
+        "target": "beat_confide"
+       }
+      ]
+     }
+    },
+    {
+     "id": "beat_confide",
+     "name": "On the stairs",
+     "type": "multiChoice",
+     "locations": [],
+     "x": 1260,
+     "y": 260,
+     "connections": [
+      {
+       "targetId": "beat_check",
+       "label": "Because I thought you were right."
+      },
+      {
+       "targetId": "beat_check",
+       "label": "Can I see the notebook?"
+      },
+      {
+       "targetId": "beat_check",
+       "label": "Don't make it a thing."
+      }
+     ],
+     "parameters": {
+      "speaker": "@confidant",
+      "showSpeaker": true,
+      "question": "${@confidant} finds ${@player.name} on the stairs when the worst is over. \"You backed me in front of the captain. Nobody does that. Why did you?\"",
+      "choices": [
+       {
+        "id": "cf_meant",
+        "text": "Because I thought you were right.",
+        "target": "beat_check",
+        "effects": [
+         {
+          "type": "addSentiment",
+          "target": "@confidant",
+          "sentimentTarget": "player",
+          "sentimentEmotion": "trust",
+          "strengthDelta": 0.2
+         }
+        ]
+       },
+       {
+        "id": "cf_notebook",
+        "text": "Can I see the notebook?",
+        "target": "beat_check",
+        "conditions": [
+         {
+          "type": "roleHolder",
+          "role": "confidant",
+          "character": "char_tomas",
+          "operator": "=="
+         }
+        ],
+        "effects": [
+         {
+          "type": "addSentiment",
+          "target": "@confidant",
+          "sentimentTarget": "player",
+          "sentimentEmotion": "trust",
+          "strengthDelta": 0.3
+         }
+        ]
+       },
+       {
+        "id": "cf_shrug",
+        "text": "Don't make it a thing.",
+        "target": "beat_check"
+       }
+      ]
+     },
+     "speaker": "@confidant",
+     "showSpeaker": true
+    },
+    {
+     "id": "beat_check",
+     "name": "Does the confidant trust you?",
+     "type": "conditionBeat",
+     "locations": [],
+     "x": 1500,
+     "y": 260,
+     "connections": [],
+     "parameters": {
+      "conditionType": "sentiment",
+      "character": "@confidant",
+      "sentimentTarget": "player",
+      "sentimentEmotion": "trust",
+      "operator": ">=",
+      "value": 0.5,
+      "condition": {
+       "type": "sentiment",
+       "character": "@confidant",
+       "sentimentTarget": "player",
+       "sentimentEmotion": "trust",
+       "operator": ">=",
+       "value": 0.5
+      },
+      "trueTarget": "beat_end_trust",
+      "falseTarget": "beat_end_alone"
+     }
+    },
+    {
+     "id": "beat_end_trust",
+     "name": "Ending: a friend on the strait",
+     "type": "endScreen",
+     "locations": [],
+     "x": 1740,
+     "y": 160,
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
+     "parameters": {
+      "message": "The ferry noses into the harbour at ten past one. ${@confidant} walks ${@player.name} to the ramp and doesn't say goodbye, just: \"Next time you cross, find me.\"\n\nOn the quay, ${@player.name} looks back once. ${@confidant.name} is still standing at the rail, watching ${@player.them} go.",
+      "showRestart": true,
+      "restartText": "Cross again as someone else",
+      "reset": true
+     }
+    },
+    {
+     "id": "beat_end_alone",
+     "name": "Ending: just a passenger",
+     "type": "endScreen",
+     "locations": [],
+     "x": 1740,
+     "y": 360,
+     "connections": [
+      {
+       "targetId": "beat_title",
+       "label": "Restart"
+      }
+     ],
+     "parameters": {
+      "message": "The ferry noses into the harbour at ten past one. The crew are busy with the ramp, and ${@confidant} doesn't look up as ${@player.name} walks past.\n\nIt was a crossing. ${@player.They} ${@player.was} a passenger. That is all.",
+      "showRestart": true,
+      "restartText": "Cross again as someone else",
+      "reset": true
+     }
+    }
+   ],
+   "characters": [
+    {
+     "id": "char_mara",
+     "name": "mara",
+     "displayName": "Mara",
+     "role": "player",
+     "pronouns": "she",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "A doctor at the end of a double shift. She has not slept since yesterday and is going home to her father, who called her twice tonight without leaving a message.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": [],
+     "color": "#7dd3fc"
+    },
+    {
+     "id": "char_jonas",
+     "name": "jonas",
+     "displayName": "Jonas",
+     "role": "player",
+     "pronouns": "he",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "A ferry mechanic on his night off. He knows every bolt of this ship and hates being a passenger on it.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": [],
+     "color": "#fca5a5"
+    },
+    {
+     "id": "char_ingrid",
+     "name": "ingrid",
+     "displayName": "Ingrid",
+     "role": "npc",
+     "pronouns": "she",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "The first mate, the captain's sister. Careful, quick to worry, and usually right about the weather.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": [
+      {
+       "name": "trust",
+       "displayName": "Trust",
+       "value": 0,
+       "min": -100,
+       "max": 100,
+       "visible": true,
+       "color": "#d9a441",
+       "showLevelMeter": true,
+       "levelMeterOrientation": "horizontal",
+       "showNumericValue": true,
+       "numericFormat": "band",
+       "source": {
+        "kind": "sentiment",
+        "toEntityRef": "player",
+        "emotion": "trust"
+       },
+       "bands": [
+        {
+         "from": -100,
+         "label": "cold"
+        },
+        {
+         "from": -20,
+         "label": "guarded"
+        },
+        {
+         "from": 20,
+         "label": "warming"
+        },
+        {
+         "from": 50,
+         "label": "trusts you"
+        }
+       ]
+      }
+     ],
+     "color": "#c4b5fd",
+     "initialSentiments": [
+      {
+       "toEntityRef": "player",
+       "emotion": "trust",
+       "strength": 0.1
+      }
+     ],
+     "meterFrame": {
+      "dockMode": "screen",
+      "anchor": "top",
+      "screenPosition": "screen-top-left",
+      "offset": {
+       "x": 0,
+       "y": 0
+      },
+      "style": {
+       "backgroundColor": "#1b1f2b",
+       "borderColor": "#3d4356",
+       "borderWidth": 1,
+       "borderRadius": 6,
+       "padding": 8,
+       "opacity": 90
+      },
+      "meterHeight": 12,
+      "meterSpacing": 6,
+      "showLabels": true,
+      "meterWidth": 130
+     }
+    },
+    {
+     "id": "char_tomas",
+     "name": "tomas",
+     "displayName": "Tomas",
+     "role": "npc",
+     "pronouns": "they",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "A deckhand who writes everything down in a notebook: tides, faces, promises. Calm until someone treats the crew as cargo.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": [
+      {
+       "name": "trust",
+       "displayName": "Trust",
+       "value": 0,
+       "min": -100,
+       "max": 100,
+       "visible": true,
+       "color": "#d9a441",
+       "showLevelMeter": true,
+       "levelMeterOrientation": "horizontal",
+       "showNumericValue": true,
+       "numericFormat": "band",
+       "source": {
+        "kind": "sentiment",
+        "toEntityRef": "player",
+        "emotion": "trust"
+       },
+       "bands": [
+        {
+         "from": -100,
+         "label": "cold"
+        },
+        {
+         "from": -20,
+         "label": "guarded"
+        },
+        {
+         "from": 20,
+         "label": "warming"
+        },
+        {
+         "from": 50,
+         "label": "trusts you"
+        }
+       ]
+      }
+     ],
+     "color": "#86efac",
+     "initialSentiments": [
+      {
+       "toEntityRef": "player",
+       "emotion": "trust",
+       "strength": 0.1
+      }
+     ],
+     "meterFrame": {
+      "dockMode": "screen",
+      "anchor": "top",
+      "screenPosition": "screen-top-left",
+      "offset": {
+       "x": 0,
+       "y": 0
+      },
+      "style": {
+       "backgroundColor": "#1b1f2b",
+       "borderColor": "#3d4356",
+       "borderWidth": 1,
+       "borderRadius": 6,
+       "padding": 8,
+       "opacity": 90
+      },
+      "meterHeight": 12,
+      "meterSpacing": 6,
+      "showLabels": true,
+      "meterWidth": 130
+     }
+    },
+    {
+     "id": "char_holm",
+     "name": "holm",
+     "displayName": "Captain Holm",
+     "role": "npc",
+     "pronouns": "he",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "Thirty years on the strait, three weeks from retirement. Says little and means all of it.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": []
+    },
+    {
+     "id": "char_aaltonen",
+     "name": "aaltonen",
+     "displayName": "Captain Aaltonen",
+     "role": "npc",
+     "pronouns": "she",
+     "visual": {
+      "type": "static"
+     },
+     "states": [
+      {
+       "id": "default",
+       "name": "default",
+       "displayName": "Default"
+      }
+     ],
+     "defaultState": "default",
+     "description": "New to this route, sharp, and determined that nobody will ever call her crossing the one that went wrong.",
+     "createdAt": "2026-10-14T00:00:00.000Z",
+     "updatedAt": "2026-10-14T00:00:00.000Z",
+     "inventory": [],
+     "counters": []
+    }
+   ],
+   "connections": [],
+   "metadata": {
+    "title": "The Last Ferry",
+    "author": "ASAPS",
+    "description": "One crossing, played by whoever you choose.",
+    "firstBeatId": "beat_title"
+   },
+   "settings": {},
+   "environment": {
+    "props": [],
+    "nodes": []
+   },
+   "clusters": [],
+   "containerBeatPositions": [],
+   "assets": [],
+   "globalSettings": {
+    "project": {
+     "width": 1024,
+     "height": 768,
+     "aspectRatio": "4:3",
+     "scalingMode": "fit",
+     "layoutMode": "responsive"
+    },
+    "colors": {
+     "pcolor": "#d9a441",
+     "palpha": 100,
+     "ptextcolor": "#201607",
+     "nonpcolor": "#1b1f2b",
+     "nonpalpha": 93,
+     "nonptextcolor": "#eae7de",
+     "bgColor": "#14161f",
+     "textBoxBorder": "#3d4356"
+    },
+    "fonts": {
+     "titleFont": "Georgia",
+     "textFont": "System",
+     "btnFont": "System",
+     "fontSize": {
+      "title": 40,
+      "text": 19,
+      "button": 16
+     }
+    },
+    "textbox": {
+     "radius": 14,
+     "buttonRadius": 999,
+     "padding": 22,
+     "borderWidth": 1,
+     "opacity": 93,
+     "position": "bottom",
+     "boxVisibility": "all"
+    },
+    "textEffects": {
+     "animation": "none",
+     "typewriterSpeed": 50,
+     "fadeInDuration": 500
+    },
+    "hotspots": {
+     "visible": true,
+     "labels": true,
+     "highlightColor": "#ffff00",
+     "opacity": 30,
+     "showInPreview": "visible",
+     "labelDisplay": "hover"
+    },
+    "sound": {
+     "backgroundMusic": "",
+     "backgroundVolume": 50,
+     "mute": false
+    },
+    "copyright": {
+     "notice": "",
+     "year": "2026",
+     "owner": ""
+    },
+    "debug": {
+     "firstbeat": "",
+     "showvals": false
+    },
+    "roles": [
+     {
+      "id": "player",
+      "name": "The player",
+      "description": "Whose night it is: picked on the second screen.",
+      "candidates": [
+       "char_mara",
+       "char_jonas"
+      ],
+      "selection": "cast"
+     },
+     {
+      "id": "confidant",
+      "name": "The confidant",
+      "description": "The crew member the player backs in the argument.",
+      "candidates": [
+       "char_ingrid",
+       "char_tomas"
+      ],
+      "selection": "cast"
+     },
+     {
+      "id": "captain",
+      "name": "The captain",
+      "description": "Whoever has the last crossing tonight — drawn at random each playthrough.",
+      "candidates": [
+       "char_holm",
+       "char_aaltonen"
+      ],
+      "selection": "random"
+     }
+    ]
+   }
+  },
+  "settings": {},
+  "assetIds": [],
+  "createdAt": "2026-10-14T00:00:00.000Z",
+  "modifiedAt": "2026-10-14T00:00:00.000Z",
+  "version": 1,
+  "globalSettings": {
+   "project": {
+    "width": 1024,
+    "height": 768,
+    "aspectRatio": "4:3",
+    "scalingMode": "fit",
+    "layoutMode": "responsive"
+   },
+   "colors": {
+    "pcolor": "#d9a441",
+    "palpha": 100,
+    "ptextcolor": "#201607",
+    "nonpcolor": "#1b1f2b",
+    "nonpalpha": 93,
+    "nonptextcolor": "#eae7de",
+    "bgColor": "#14161f",
+    "textBoxBorder": "#3d4356"
+   },
+   "fonts": {
+    "titleFont": "Georgia",
+    "textFont": "System",
+    "btnFont": "System",
+    "fontSize": {
+     "title": 40,
+     "text": 19,
+     "button": 16
+    }
+   },
+   "textbox": {
+    "radius": 14,
+    "buttonRadius": 999,
+    "padding": 22,
+    "borderWidth": 1,
+    "opacity": 93,
+    "position": "bottom",
+    "boxVisibility": "all"
+   },
+   "textEffects": {
+    "animation": "none",
+    "typewriterSpeed": 50,
+    "fadeInDuration": 500
+   },
+   "hotspots": {
+    "visible": true,
+    "labels": true,
+    "highlightColor": "#ffff00",
+    "opacity": 30,
+    "showInPreview": "visible",
+    "labelDisplay": "hover"
+   },
+   "sound": {
+    "backgroundMusic": "",
+    "backgroundVolume": 50,
+    "mute": false
+   },
+   "copyright": {
+    "notice": "",
+    "year": "2026",
+    "owner": ""
+   },
+   "debug": {
+    "firstbeat": "",
+    "showvals": false
+   },
+   "roles": [
+    {
+     "id": "player",
+     "name": "The player",
+     "description": "Whose night it is: picked on the second screen.",
+     "candidates": [
+      "char_mara",
+      "char_jonas"
+     ],
+     "selection": "cast"
+    },
+    {
+     "id": "confidant",
+     "name": "The confidant",
+     "description": "The crew member the player backs in the argument.",
+     "candidates": [
+      "char_ingrid",
+      "char_tomas"
+     ],
+     "selection": "cast"
+    },
+    {
+     "id": "captain",
+     "name": "The captain",
+     "description": "Whoever has the last crossing tonight — drawn at random each playthrough.",
+     "candidates": [
+      "char_holm",
+      "char_aaltonen"
+     ],
+     "selection": "random"
+    }
+   ]
+  },
+  "projectType": "template",
+  "themeId": "builtin-ink-and-brass"
+ }
+}

@@ -1676,6 +1676,8 @@ While the story plays, the Preview's **Debug Info → Roles** card shows who pla
 
 **With the Co-Designer.** The Co-Designer sees the story's roles and can propose a new one (or changes to an existing one) for you to accept, besides writing `@confidant` speakers, Cast Role effects and Choose Your Character beats.
 
+**See it working.** The template **The Last Ferry — choose your character** (New → from template) uses all of this in nine beats: Choose Your Character casts the player (Mara or Jonas), backing one of the crew in an argument casts the confidant (Ingrid or Tomas), and the captain is drawn at random. Ingrid and Tomas each keep their own trust meter, and a few choices appear only for one person (*Can I see the notebook?* only when Tomas is the confidant). Play it twice as different people and compare.
+
 **A writing tip.** Roles work best when the role-dependent text is short (names, pronouns) or written by AI beats. A long hand-written passage rarely fits two different people; give those few lines a *Who plays a role* condition instead. Translations need extra care too: in many languages adjectives and verb endings change with the person.
 
 ### Character Templates

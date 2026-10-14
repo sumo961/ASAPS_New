@@ -314,3 +314,30 @@ describe('ordinary-wonders template content (the GPS walk)', () => {
     expect(inner).toEqual(data);
   });
 });
+
+describe('The Last Ferry (roles example)', () => {
+  const data = JSON.parse(readFileSync(join(templatesDir, 'src/last-ferry.project.json'), 'utf-8'));
+  const story = data.project.story;
+  const roles = data.project.globalSettings.roles;
+
+  it('declares the three roles over existing characters', () => {
+    const ids = new Set(story.characters.map((c: any) => c.id));
+    expect(roles.map((r: any) => r.id)).toEqual(['player', 'confidant', 'captain']);
+    for (const r of roles) for (const c of r.candidates) expect(ids.has(c), `${r.id}: ${c}`).toBe(true);
+    for (const c of story.characters) expect(['she', 'he', 'they']).toContain(c.pronouns);
+  });
+
+  it('casts the player with Choose Your Character and the confidant with a choice', () => {
+    const pick = story.beats.find((b: any) => b.type === 'chooseCharacter');
+    expect(pick.parameters.role).toBe('player');
+    expect(pick.parameters.choices.map((c: any) => c.character)).toEqual(['char_mara', 'char_jonas']);
+    expect(JSON.stringify(story.beats)).toContain('"type":"castRole","target":"confidant"');
+  });
+
+  it('has a valid graph and passes the story review without findings', async () => {
+    const ids = new Set(story.beats.map((b: any) => b.id));
+    for (const b of story.beats) for (const c of b.connections) expect(ids.has(c.targetId)).toBe(true);
+    const { analyzeStoryFindings } = await import('../generationReview');
+    expect(analyzeStoryFindings({ ...story, roles, firstBeatId: story.metadata.firstBeatId })).toEqual([]);
+  });
+});

@@ -87,6 +87,22 @@
   - From "Confidant" with the offered start state: Ingrid, "chosen in the story" (that path sided with Ingrid).
   - From "Confidant", Start fresh: Tomas, "from Preview as" — "Tomas leans closer to Mara. … They were sure …".
 
+### Example story: "The Last Ferry — choose your character" (template)
+- 9 beats, 6 characters, no AI, Ink & Brass look; listed second in the template gallery. It shows:
+  - Choose Your Character for @player (Mara / Jonas, with descriptions);
+  - a choice that casts @confidant (Ingrid / Tomas) through Cast Role effects;
+  - a random @captain (Holm / Aaltonen);
+  - continue steps in a Dialog Tree (captain → Ingrid → Tomas → captain);
+  - `${@player…}` / `${@confidant…}` text with she/he/they;
+  - choices shown only for one holder (roleHolder conditions);
+  - per-character trust meters bound to sentiment;
+  - a Condition Check on the confidant's trust choosing between two endings.
+- Played twice in the Preview (speech off):
+  - Mara → Ingrid → the child → "Because…": Captain Holm, "She is soaked…", trust ending with Ingrid "trusts you" and Tomas "guarded".
+  - Jonas → Tomas → the rail → "Don't make it a thing": Captain Aaltonen, the notebook option shown, "He was a passenger" ending.
+- One line was ambiguous with two women ("She is still standing at the rail, watching her go"); it now names the confidant.
+- `bundledTemplates.test.ts`: the roles exist over real characters; the beat and the cast effect are present; the graph is valid; the story review returns no findings.
+
 ### Still open
 - Fixed-layout hand-placed buttons show descriptions only on hover.
 - Translations of role text in gendered languages need per-language care.
