@@ -1,10 +1,44 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.112, 2026-10-14)
+## 2026-10-14: Roles — one story, several people (v0.9.113)
 
 ### Overview
-- **Roles and Choose Your Character:** a story can now refer to a *part* instead of a fixed person. "The confidant" is whoever the interactor sided with; "the player" is whoever they picked on the new Choose Your Character screen. Each scene is written once: `@confidant` as speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in text. This is the thin slice of phase 1 in `docs/Character-Roles-Design.md` (decisions D2, D5, D6 and the order taken 2026-10-14).
+- **Roles:** a story can refer to a *part* instead of a fixed person. "The confidant" is whoever the interactor sided with; "the player" is whoever they picked. Each scene is written once: `@confidant` as speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in text. Counters and feelings stay with each character.
+- **Choose Your Character:** a new beat, a Multi Choice whose buttons are people, each with a description line.
+- **Authoring:** a Roles tab in Project Settings, a Pronouns field, a Cast Role effect and a "Who plays a role" condition. "Preview as" shows a scene as a chosen person in the Visual Editor. The Preview's Debug panel says who plays each role and why. Beats that cast carry a Flowchart badge.
+- **Checks and tools:** path analysis, "Start as if…" states, the story review and the Co-Designer all know roles.
+- **Example:** the new template "The Last Ferry — choose your character".
+- **Fixes along the way:**
+  - Condition Check beats with goal, variant or location conditions always took the false branch.
+  - Speaker portraits ignored a character's active variant.
+  - The Multi Choice Inspector showed some fields twice.
+- **Found by the release checklist, fixed before tagging:**
+  - Exported stories ignored Project Settings: role text showed raw, and declared variables lost their starting values and types (785afb11).
+  - Applying a theme, including the default one on every generated-story import, dropped declared variables, roles, HUD overlays, translation and location settings (713cd81e).
 - **Dependabot:** 11 of 14 alerts cleared, both criticals included.
+- Design: phase 1 of `docs/Character-Roles-Design.md` plus the Choose Your Character beat (decisions D2, D5, D6 and the order taken 2026-10-14).
+
+### Release checklist (v0.9.113)
+- **Generated story played end to end** in the dev Electron app (your AI provider; speech off).
+  - The brief asked for a character pick and a confidant: "The Keeper's Apprentice", Short, 11–12 beats, about 2 minutes.
+  - First run: the generator used a Choose Your Character beat (@player) and a dialog that casts @confidant on its own. Project Settings → Roles was empty, though, and the review flagged every role as unknown.
+  - Three causes, all fixed:
+    - the theme step dropped `roles` (and `variables`) from the settings;
+    - the prompt's shape example showed `"roles": []`;
+    - the load-time review was not given the roles.
+  - Third run: both roles declared (Ines/Kofi, Maren/Sami), the banner clean. Played twice to an ending:
+    - first options: Ines + Maren → "The Apprentice";
+    - last options: Kofi + Sami → "The Morning Ferry".
+    - No `@` or `${` reached the screen.
+  - One generated line read "She press it" (a present-tense verb after a pronoun placeholder). The prompts now say to use a past-tense verb or .is/.has/.was.
+- **Device-preset sweep**, Choose Your Character screen: Desktop / Tablet L·P / Phone L·P in a responsive and a fixed project. Question, buttons and descriptions sit inside the stage and inside their buttons, with no overlaps.
+  - The first fixed-mode run measured Desktop five times: the sweep set the first dropdown, which is now Debug → Roles. Re-run with the preset dropdown.
+- **Export at non-1:1:** the fixed test story exported as one HTML file, opened at 1100×620 and 1500×950. Buttons and descriptions on screen.
+  - The export showed `${@player.name}` literally: the player ignored `project.globalSettings`. Fixed in 785afb11; after re-export: "Jonas steps onto the ferry. He is tired, and his coat is wet.", and the `@player` speaker shows Jonas.
+- **Suites:** core 2894, renderer 669, builder 2869+, player 8, desktop 24, MCP 29 (re-run before tagging).
+- **User Guide audit:**
+  - Four statements in the new sections corrected: which pickers list roles, no role check in Condition Check's type list, when review findings show, role ids.
+  - About 20 other places updated: templates, Flowchart badge, Preview as, debug Roles card, Requirements, glossary.
 
 ### Roles (runtime)
 - Roles live in Project Settings (`globalSettings.roles`, beside the variables), so they reach the Preview, every export and the player without new plumbing. Each role has: id, name, description, the characters who can play it (candidates), who plays it (`cast` / `random` / `fixed`), a default, `recastable` and `keepOnRestart`.

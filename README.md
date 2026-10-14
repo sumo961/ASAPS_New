@@ -22,8 +22,23 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.112** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.112 lets several characters
+Current release: **v0.9.113** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.113 lets one story be played by
+different people**: set up a role in Project Settings → Roles ("the
+player", "the confidant"), and write each scene once for it — the role as
+speaker or AI partner, `${@confidant.name}` and `${@confidant.they}` in
+text. A new **Choose Your Character** beat lets the player pick who to be,
+with a short description under each name; a choice can also decide who
+fills a role later, or a role can be drawn at random. Each character keeps
+their own counters and feelings. **Preview as** shows a scene as any of
+the candidates while you write, and the template **The Last Ferry** shows
+it all in nine beats. Condition Check beats testing a goal, a variant or a
+location now work (they always took the false branch), and two older
+losses are fixed: choosing a theme (and importing a generated story) no
+longer drops your declared variables, and exported stories now start
+variables at the values you set in Project Settings.
+
+**v0.9.112 let several characters
 talk before the player answers**: in a Dialog Tree, click **Then another
 character speaks** under a line, and the next character's line follows by
 itself after the reading time, with no made-up player reply in between.

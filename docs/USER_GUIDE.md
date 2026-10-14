@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.112*
+*Last revised against v0.9.113*
 
 ---
 
@@ -184,9 +184,10 @@ Either way, clicking **Use template** creates *your own copy* of the template as
 
 **Make your own templates.** Use **Export → Template (.asapst)** (under *Share for editing*) to turn any project into a distributable template. See [Export Options](#part-7-testing--publishing) in Part 7.
 
-**Bundled templates.** ASAPS ships with five. Each plays through to an ending whose **Play Again** starts a clean new run from the title screen:
+**Bundled templates.** ASAPS ships with six. Each plays through to an ending whose **Play Again** starts a clean new run from the title screen:
 
 - **Rehearsal: The Difficult Client** — one client character with four dispositions (cooperative, hostile, avoidant, ambivalent) drawn at random each playthrough, built on the AI Conversation beat plus character variants. Play it twice and compare. The session ends when you, as the caseworker, close the appointment (an **Exit** direction: Karin answers in character and the story moves on to the Debrief), or after 12 turns with a closing line because the next client is waiting (the **Fallback Exit Target**) — both visible in the Inspector, so you can see how the way out is built when you adapt it. It carries a purple **AI** badge in the gallery because it needs an AI provider configured to play (see [Setting Up AI](#part-6-ai-features)).
+- **The Last Ferry — choose your character** *(new in v0.9.113)* — a short ferry crossing in nine beats that shows [roles](#roles) at work: a [Choose Your Character](#choose-your-character) beat lets you play Mara or Jonas, backing one of the crew in an argument decides who becomes your confidant (Ingrid or Tomas), and the captain is drawn at random. Each scene is written once, for the role. Play it twice as different people and compare. Needs no AI provider.
 - **Counters that read affect** *(new in v0.9.89)* — a character called Ada carrying four meters in one HUD frame: *Gold* (an ordinary counter you set by hand) beside *Trust*, *Fear* and *Spirits*, which are wired to her actual feelings. Three choices move her sentiment, her fear and her mood — and **none of them names a counter**. The meters simply report. It needs no AI provider, and the result beat loops back to the choice so you can push Trust below zero and watch the bar grow the other way from the centre. This is the working companion to [Counters that read affect](#counter-binding) in Part 4.
 - **The Oil Lamp — a museum story** — one object seen three ways (as a made thing, a used thing, a taken thing). Shows the Clean Editorial look, a hub that dims paths you've already taken, and in-text hyperlinks. Text-first and asset-free.
 - **23:47 — a chat thriller** — a stranger's phone on a night train and a thread you can't put down. Chat-bubble beats for scripted texting hand off to a live AI conversation and back, in the Dark Cinematic look. Needs an AI provider (purple **AI** badge).
@@ -328,6 +329,8 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 - **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
 - **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
 
+**Who plays a role.** A beat that decides who plays a [role](#roles) — a Choose Your Character beat, or a choice with a **Cast Role** effect — carries a small **🎭 @role** badge (for example *🎭 @confidant*), so you can see at a glance where the story casts its people.
+
 The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per pair of beats that are linked, restart links included.
 
 ![A restart link in the flowchart: the End Screen's dashed teal ↺ Restart arrow leads back to the Title Screen](images/73-restart-link-flowchart.png)
@@ -367,6 +370,8 @@ When you select a beat, the Inspector shows everything about it:
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
+**Preview as.** When the selected beat refers to a [role](#roles) — a speaker such as *@ The confidant*, or text like `${@confidant.name}` — a small **Preview as** bar appears at the top of the Inspector with one picker per role. It only changes what the Visual Editor shows while you write (and who the Preview starts with); the story itself is untouched.
+
 **Links are always picked, never typed.** Every setting that names another beat — a link's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target* — is a dropdown of your story's beats. If a stored beat has since been deleted, the picker keeps showing it as missing so you can spot and fix it.
 
 **Effects on a single link.** On a beat with one way on (an Info Text, a Title Screen…), the **Connections** section has a small **When the player continues (optional)** box under the target. Effects you add there — start a counter, record which route was taken, nudge a feeling — run as the player leaves the beat by that link. It's the same effect editor that choices use.
@@ -383,7 +388,7 @@ Your beat shopping catalog, docked to the right edge of the flowchart. Drag any 
 The palette is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need:
 
 - **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**).
-- **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
+- **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, **Choose Your Character**, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
 - **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, **Set GPS Location**, Set Timer, Update Affect).
 
@@ -504,7 +509,7 @@ This is where interactivity shines. Present text and multiple choices, each pote
 **When to Use:** Conversations, decision points, anywhere the interactor needs options.
 
 <a id="conditional-choices"></a>
-**Earned options — choices that appear only when they've been earned.** Directly under a choice's **Target** in the Inspector sits a small **Show only if…** editor (the same one Movement Choice destinations, Pick Prop props, and hotspots carry). Add a condition there and the choice is *hidden* until every condition holds — an inventory **item** the player has (or lacks), a **variable** value, a **counter** comparison, a **visited beat** (visited or not yet visited), or a **feeling** — how a character feels toward the player (or another character): pick who feels it, the emotion (*trust*, *fear*, any name from your emotion palette; leave it empty to sum all feelings), whom it is toward, and a strength between −1 and 1 (0.3 is mild, 0.6 strong). Tick *since start* to test how much the feeling has *changed* rather than where it stands. This is the tool for the "Ask about the mysterious symbol" option that should only exist once the player has actually found the note. Two habits make it pay off:
+**Earned options — choices that appear only when they've been earned.** Directly under a choice's **Target** in the Inspector sits a small **Show only if…** editor (the same one Movement Choice destinations, Pick Prop props, and hotspots carry). Add a condition there and the choice is *hidden* until every condition holds — an inventory **item** the player has (or lacks), a **variable** value, a **counter** comparison, a **visited beat** (visited or not yet visited), a **role** (who plays a [role](#roles) — offered once your project has roles), or a **feeling** — how a character feels toward the player (or another character): pick who feels it, the emotion (*trust*, *fear*, any name from your emotion palette; leave it empty to sum all feelings), whom it is toward, and a strength between −1 and 1 (0.3 is mild, 0.6 strong). Tick *since start* to test how much the feeling has *changed* rather than where it stands. This is the tool for the "Ask about the mysterious symbol" option that should only exist once the player has actually found the note. Two habits make it pay off:
 
 - **Prefer a conditional choice over a duplicated menu.** One dialog with an accusation choice gated on *visited beat: the decisive clue* beats two near-identical dialogs (one with the accusation, one without) that drift apart the moment you edit one of them.
 - **Let discoveries unlock options, not decide them.** Finding the clue should make the accusation *possible*; the player still chooses whether to make it. Gating hides options — it never forces an outcome.
@@ -542,7 +547,7 @@ Leave both off and a choice is simply repeatable, effects and all — sometimes 
 
 **Seeing the depth from the flowchart:** A dialog with nested exchanges — choices that open deeper dialog nodes inside the same beat — used to look identical to a one-liner on the graph. Now a multi-phase Dialog Tree node draws with a **stacked-card edge** and a row of **green dots** (one per exchange, capped at six); hover the dots for the count. The same count appears as a green **N phases** chip on the Dialog Tree Editor's header in the Inspector, where the actual structure lives. The node itself stays the same size no matter how deep the dialog goes.
 
-**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, or **append a reflection** to a Mode B character's memory. Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
+**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, **append a reflection** to a Mode B character's memory, or **cast a role** (decide who plays a [role](#roles) from here on). Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
 
 ---
 
@@ -576,9 +581,9 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 *Each button carries a description line. Everything after this beat follows the pick.*
 
 **Key Settings:**
-- **Role** - Which role the pick fills (from Project Settings → Roles). **Add a choice for each character of this role** creates one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
+- **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
-- **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
+- **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go. The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
 In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size).
@@ -954,6 +959,7 @@ This is especially useful for "New Game+" experiences where you want interactors
 
 - **A story variable** — **Project Settings → Variables**, tick **Keep across restarts** on it. Every other variable goes back to its default value.
 - **A character's counter** — Character Editor → **Counters** tab, tick **Keep across restarts** on that counter (next to *Show Level Meter* — it works whether or not the counter is shown).
+- **Who plays a role** — **Project Settings → Roles**, tick **Keep across restarts** on the role. The person the player chose to be stays chosen on replay.
 - **A character's chosen variant** — Character Editor → **Affect** tab → Variants, tick **Keep the chosen variant across restarts** (it appears as soon as the character has a variant). A persona the player picked stays theirs on replay, with that persona's starting feelings.
 
 ![The Variants section of a character with four variants: the "At story start" dropdown set to Pick randomly each playthrough, and below it the "Keep the chosen variant across restarts" checkbox](images/79-keep-variant-across-restarts.png)
@@ -1056,6 +1062,9 @@ Check something and go different directions based on the result. "If this, go he
 - Timer status (is the countdown active?)
 - Fictional time (is it past midnight in the story?)
 - **Character affect** (added in v0.9.43): mood, emotion intensity, trait value, sentiment toward another character, goal status, or which variant of a character is currently active
+- **Location and sensors**: GPS proximity, indoor (beacon) proximity, or whether a device permission was granted
+
+> **Fixed in v0.9.113:** a Condition Check on **Goal status**, **Active variant** or one of the location/sensor checks used to lose its settings when the story ran and always took the *false* branch. They now work as set up. If you built a workaround for that, it's worth a second look.
 
 **Example Logic:**
 ```
@@ -1635,14 +1644,16 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 
 **Variants or roles?** [Variants](#character-affect) are different moods of *one* person: same name, same history. A role is filled by *different* people, each with their own name, portrait, voice, counters and feelings. Trust that Mara builds stays Mara's, even if Jonas plays the confidant later.
 
-**Setting up a role.** Open **Project Settings → Roles** and click **Add Role** (or **Player role** for the protagonist). Give it a name, tick the characters who can play it, and choose **Who plays it**:
+**Setting up a role.** Open **Project Settings → Roles** and click **Add Role** (or **Player role** for the protagonist). Give it a **Name** ("The confidant") and, next to it, the short id you'll write in the story under **Referenced as** (type `confidant` to use it as `@confidant`; a new role starts as `role_1`, the Player role as `player`). Add an optional **Description**, tick the characters under **Can be played by**, and choose **Who plays it**:
 - **Chosen in the story** — a [Choose Your Character](#choose-your-character) beat or a **Cast Role** effect on a choice decides. Until then the **default** plays it.
 - **Drawn at random at the start** — each playthrough draws one of the characters (rehearsal stories with different people).
 - **Always the default** — handy while the other characters are still unwritten.
 
+**Default (before anyone is chosen)** picks who stands in until the story decides; left at *First of the list*, the first ticked character does. Two checkboxes finish the role: **Can be recast later** allows a second casting to replace the first (otherwise the review flags it), and **Keep across restarts** lets an ending's Restart keep who plays it. Renaming the *Referenced as* id does not update places that already use it, so settle on it early.
+
 ![Project Settings → Roles: a role named "The player", referenced as @player, playable by Mara and Jonas, chosen in the story](images/82-project-settings-roles.png)
 
-**Using a role.** Wherever you pick a character, roles are listed first as *@ The confidant*: a beat's or dialog line's **Speaker**, an AI Conversation's or AI Dialog Tree's **NPC**, the character in an effect or a condition. In text, write:
+**Using a role.** Roles appear as *@ The confidant* in the character pickers: a beat's **Speaker** (below *Narrator* and the player), an AI Conversation's or AI Dialog Tree's **NPC** (every role except `player`), and the character an affect effect such as **Add Sentiment** or **Fire Emotion** is aimed at (listed first). In a Dialog Tree, the per-line speaker picker doesn't list roles yet; type `@confidant` into it. In text, write:
 
 | You write | The interactor sees |
 |---|---|
@@ -1653,7 +1664,7 @@ Sometimes the person in a scene depends on what happened earlier: the confidant 
 
 So *"${@confidant.They} ${@confidant.is} waiting."* reads *"She is waiting."* or *"They are waiting."* Set each character's **Pronouns** in the Character Editor (she/her, he/him, they/them, or your own); without a setting, they/them is used.
 
-**Deciding who plays it.** Besides the Choose Your Character beat, any choice can cast a role with the **Cast Role** effect (*@ The confidant is played by Tomas*). For the few lines that really must differ per person, use the **Who plays a role** condition (*@ The confidant is played by Tomas*) on a choice or a Condition Check.
+**Deciding who plays it.** Besides the Choose Your Character beat, any choice can cast a role with the **Cast Role** effect (*@ The confidant is played by Tomas*). For the few lines that really must differ per person, use a role condition (*@ The confidant is played by Tomas*, or *is not played by*): pick **role** in a choice's [Show only if…](#conditional-choices) editor to show a choice to one person only, or **Who plays a role** in a beat's [Requirements](#per-beat-requirements) to guard a whole beat. (The Condition Check beat's own *Condition Type* list doesn't offer it.)
 
 **The player role.** A role called `player` makes the interactor's own counters, feelings and sentiment targets follow the character they chose. The inventory stays the player's whoever plays, so picking up the key doesn't depend on who you are. Until the pick, none of the candidates' HUDs show; afterwards only the chosen one's.
 
@@ -1665,7 +1676,7 @@ While the story plays, the Preview's **Debug Info → Roles** card shows who pla
 
 **In the Flowchart**, a beat that decides who plays a role carries a **🎭 @role** badge, so you can see where the story chooses.
 
-**What the story review checks:**
+**What the review banner checks.** When a story arrives from the [Story Generator](#after-generation-the-review-banner) or from Claude Desktop, the review banner also lists role problems:
 - a reference to a role that doesn't exist;
 - casting someone who isn't on the role's list;
 - a role cast in more than one beat while **Can be recast later** is off (the later choice would replace the earlier one);
@@ -2554,6 +2565,7 @@ When a suggestion is concrete enough, the Co-Designer turns it into a **proposal
 - **Wiring** — what a choice **does** (its effects), when a choice is **shown** (its visibility conditions), what a beat **requires** before it can be entered (its entry gate, with a fallback), the effects on a **link** a player continues along, and a Random Target branch's **effects and weight**
 - **Characters** — display name, description, colour, personality traits, variants, the *At story start* policy and [Show HUD](#hud-reveal)
 - **Story variables** — declare a new variable with its starting value
+- **Roles** — add a [role](#roles) or change an existing one (who can play it, how it is chosen, its default), and use it: `@role` speakers, **Cast Role** effects, Choose Your Character beats
 
 ![A Co-Designer proposal card: "Reword Clare's cool reply in Second greeting" with the old choice text struck through in red above the new wording in green, and Dismiss / Apply 1 selected buttons](images/77-co-designer-proposal.png)
 *A proposal card: one row per change, the current text struck through above the proposed one. Nothing changes until you press Apply.*
@@ -2833,7 +2845,7 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
    - A badge indicates if the path includes typed input
 4. Select a preset to load that state; the preview restarts paused so you can look before you play
 
-**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant. A story that tests the built-in [playthrough](#keep-across-restarts) is explored as a first run and as a replay, so a returning player's state can show up as a preset of its own.
+**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant — likewise a [role](#roles) drawn at random is explored once per character, and paths that cast a role differently stay separate presets. A story that tests the built-in [playthrough](#keep-across-restarts) is explored as a first run and as a replay, so a returning player's state can show up as a preset of its own.
 
 **Only the states that play differently.** A long story can reach a beat by hundreds of routes. The list is condensed: two paths become one preset when nothing ahead of this beat — no condition, choice guard, entry requirement or `${…}` text placeholder — would come out differently. What's left is the handful of states worth testing. The **↻** button in the menu header re-runs the analysis after you've edited the story.
 
@@ -2884,6 +2896,10 @@ The **Debug Info** panel (toggle with the **Debug** button on the toolbar) shows
 **Characters** *(when a character has variants, or a HUD that is still hidden)*:
 - **‹character›.variant** (for example `karin.variant`) — which variant is active, with a dropdown to switch to another one for testing (marked *variant drawn at random* when the story's random policy picked it)
 - Whether each character's HUD is **shown** yet, or *hidden until first appearance* / *hidden until a variant is chosen* — see [Show HUD](#hud-reveal)
+
+**Roles** *(when your project has [roles](#roles))*:
+- Who plays each role right now, with a dropdown to switch to someone else for testing from this point on
+- Why they play it: *from Preview as*, *drawn at random*, *chosen in the story*, *set here*, or *default (not chosen yet)*
 
 **Variables:**
 - All story variables and their current values
@@ -3414,6 +3430,8 @@ Each requirement card carries the same blue-tinted **Apply a template** dropdown
 ![Requirements editor with a sentiment delta-from-initial condition seeded by a template](images/41-requirement-template-delta.png)
 *A requirement on the **Summary Setup** beat, seeded by the *Sentiment — trust toward player has grown since start* template and pointed at Alex. The template wrote everything below the *Apply a template* row in one click; the only tweak the author has to make is filling in the character. Note the **Compared to** value of *delta from initial (story-start / first-touch)* — the requirement reads "Alex's trust toward the player has grown by at least 0.3 since the start of this run", which is what a "thoughtful-ally" summary beat almost certainly means dramatically.*
 
+Requirements can also test who plays a [role](#roles): **Who plays a role** → *@ The confidant is played by Tomas* (or *is not played by*).
+
 Use requirements when the gating concept *belongs to the destination beat* — "this private conversation only makes sense if Alex is in a state to talk" — rather than when it belongs to the choice that leads there. The runtime treats both the same way; the distinction is for you, the author, when you re-read your own story.
 
 ## Animations
@@ -3523,6 +3541,9 @@ Each overlay has its own *Enabled* toggle and renders on the running stage when 
 - Every variable **starts at its Default Value** when the story begins, and goes back to it when an ending's Restart resets variables. (Before v0.9.104 the default was ignored in play and variables started empty; stories that relied on that should check their defaults.)
 - **Keep across restarts** on a variable lets it survive an ending's Restart instead — see [Keeping just some things across a restart](#keep-across-restarts).
 - Built in, no need to declare it: **playthrough** counts the runs (1, 2, …); use `${playthrough}` in text or test it in a condition.
+
+**Settings → Roles:**
+- Parts in the story that one of several characters can play — *the player*, *the confidant*: **Add Role** or **Player role**, then the characters who can play it, **Who plays it** (chosen in the story, drawn at random, or always the default), a default, **Can be recast later** and **Keep across restarts**. See [Roles — One Story, Several Possible People](#roles).
 
 **Settings → Translation:**
 - Source language and translation management
@@ -3961,6 +3982,7 @@ Quick reference for all beat types.
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
 | Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), per-line speakers, *Then another character speaks* (several characters before the player answers), NPC auto-exit target (skippable Continue), presentation mode, layout template (responsive), markVisited, effectsOncePerChoice |
 | Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template and per-choice pins (responsive), markVisited, effectsOncePerChoice |
+| Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, target, conditions, effects), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
@@ -4126,6 +4148,8 @@ Quick reference for all beat types.
 **Variant** - An alternate persona overlay on a character that shares the character's stable id but carries its own personality, mood, sentiments, dossier policy, portrait, and (optional) display name. Switched at runtime via the `setCharacterVariant` effect, or drawn at random each playthrough when the character's story-start policy is *Pick randomly each playthrough*.
 
 **Variant Selection Policy** - The per-character "At story start" setting (shown when a character has 2+ variants): *Use default variant* starts with the persona marked default (the base character or one of its variants); *Pick randomly each playthrough* draws a fresh variant on every story start and preview restart. An authored `setCharacterVariant` effect always overrides the policy.
+
+**Role (cast role)** - A part in the story — *the player*, *the confidant* — that one of several characters plays, decided in the story (Choose Your Character beat or a Cast Role effect), drawn at random, or fixed. Defined in Project Settings → Roles; referenced as `@confidant` in character pickers and `${@confidant.name}` / `${@confidant.they}` in text. Counters and feelings stay with each character, not with the role.
 
 **Interpersonal Stance / Stance Pad** - A character's or variant's way of meeting other people, plotted on a 2D "Leary's Rose" pad: warmth (cold ↔ warm) × dominance (submissive ↔ dominant), with corner labels *hostile*, *leading*, *withdrawn*, *cooperative*. The pad is a lens on Big Five extraversion and agreeableness — dragging the dot updates both. Appears on the base Personality card, on each variant card, and on the AI character helper's preview cards.
 
