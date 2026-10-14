@@ -120,6 +120,7 @@ const BEAT_TYPE_GUIDE = `
 **chooseCharacter** - "Choose your character": a multiChoice whose options each cast a character into a ROLE
 - Use: the player picks who to play (role "player"), or who comes along / whom to confide in (any other role). Requires the role in the top-level "roles" array (see Cast Roles below).
 - Parameters: role (role id, default "player"), question (default "Who will you be?"), choices — one per candidate: { "id", "character": "<character id>", "text": label (empty = the character's name), "description": one short sentence the player can choose by, "target" }. Usually every option has the SAME target: the story stays one story, and later beats refer to the role.
+- optionStyle: "buttons" (default) | "pictures" (a picture card per option, name and description under it) | "picturesOnly". The picture is the character's portrait. A new story has no portraits yet, so leave optionStyle out; the author switches to pictures once the characters have portraits.
   {
     "role": "player",
     "question": "Whose night is it?",

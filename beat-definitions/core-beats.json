@@ -66,12 +66,13 @@
         "text": "string?",
         "displayText": "string?",
         "description": "string?",
+        "image": "string?",
         "target": "string?",
         "conditions": "condition[]?",
         "effects": "effect[]?",
         "soundEffect": "string?"
       },
-      "notes": "character is the Character.id taken into the role when this option is picked (before the option's own effects run, so an effect on '@player' lands on the new holder). text is the label; leave it empty to show the character's current name. description is a smaller second line under the label: who this person is, in one short sentence the player can choose by. target is where the story goes after this pick; usually every option has the same target (an option without one goes where the others go). conditions[] hides the option (e.g. a character unlocked on a second playthrough)."
+      "notes": "character is the Character.id taken into the role when this option is picked (before the option's own effects run, so an effect on '@player' lands on the new holder). text is the label; leave it empty to show the character's current name. description is a smaller second line under the label: who this person is, in one short sentence the player can choose by. target is where the story goes after this pick; usually every option has the same target (an option without one goes where the others go). conditions[] hides the option (e.g. a character unlocked on a second playthrough). image is a picture for this option (an image asset id or URL), shown when the beat's optionStyle is 'pictures' or 'picturesOnly'; leave it empty to use the character's portrait (the active variant's portrait when it has one)."
     },
     "movementOption": {
       "description": "A movement choice",
@@ -1129,7 +1130,7 @@
       "category": "visible",
       "displayName": "Choose Your Character",
       "icon": "🎭",
-      "description": "The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description.",
+      "description": "The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description, as a button or as a picture card (optionStyle).",
       "connectionType": "multiple",
       "parameters": {
         "role": {
@@ -1158,6 +1159,30 @@
           "required": true,
           "minItems": 1,
           "description": "One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen."
+        },
+        "optionStyle": {
+          "type": "string",
+          "required": false,
+          "default": "buttons",
+          "description": "How the options look. 'buttons' (default): text buttons with the name and description. 'pictures': a picture card per option, with the name (and description) under the picture. 'picturesOnly': just the pictures; the name is still read out and given to screen readers. The picture is the character's portrait, or the option's own image. Use pictures when the characters have portraits and looks help the player choose; a character without any picture shows a card with their initial.",
+          "ui": {
+            "control": "select",
+            "label": "Show options as",
+            "options": [
+              {
+                "value": "buttons",
+                "label": "Buttons"
+              },
+              {
+                "value": "pictures",
+                "label": "Pictures with names"
+              },
+              {
+                "value": "picturesOnly",
+                "label": "Pictures only"
+              }
+            ]
+          }
         },
         "choiceDelay": {
           "type": "number",

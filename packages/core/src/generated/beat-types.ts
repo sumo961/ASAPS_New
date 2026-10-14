@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-14T15:44:39.924Z
+ * Generated: 2026-10-14T19:52:41.356Z
  */
 
 // ============================================
@@ -67,6 +67,7 @@ export interface CharacterOption {
   text?: string;
   displayText?: string;
   description?: string;
+  image?: string;
   target?: string;
   conditions?: Condition[];
   effects?: Effect[];
@@ -295,7 +296,7 @@ export interface MultiChoiceParameters {
 }
 
 /**
- * Choose Your Character - The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description.
+ * Choose Your Character - The player picks who to be (or who joins them): a Multi Choice whose options each cast a character into a role from Project Settings → Roles. Each option shows the character's name and a short description, as a button or as a picture card (optionStyle).
  * Category: visible
  * Connection Type: multiple
  */
@@ -306,6 +307,8 @@ export interface ChooseCharacterParameters {
   question: string;
   /** One option per character the player can pick. Each names its character; the label defaults to the character's name, and description adds a second line. Filled from the role's candidates when the role is chosen. */
   choices: CharacterOption[];
+  /** How the options look. 'buttons' (default): text buttons with the name and description. 'pictures': a picture card per option, with the name (and description) under the picture. 'picturesOnly': just the pictures; the name is still read out and given to screen readers. The picture is the character's portrait, or the option's own image. Use pictures when the characters have portraits and looks help the player choose; a character without any picture shows a card with their initial. */
+  optionStyle?: string | undefined;
   /** Delay in seconds before the choices fade in (lets the player read the prompt first) */
   choiceDelay?: number | undefined;
   /** Block and dim choices that lead to previously visited beats */

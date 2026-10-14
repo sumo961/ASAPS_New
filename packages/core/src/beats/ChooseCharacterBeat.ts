@@ -16,9 +16,20 @@ import { stripRolePrefix } from '../engine/roles';
  * With no options authored, the role's candidates are offered as they are.
  * An option without a target goes where the other options go (usually all
  * options share one target).
+ *
+ * `optionStyle` shows the options as picture cards instead of buttons:
+ * each option's own `image`, else its character's portrait (the active
+ * variant's when it has one).
  */
+export type CharacterOptionStyle = 'buttons' | 'pictures' | 'picturesOnly';
+
+function normalizeOptionStyle(v: unknown): CharacterOptionStyle {
+  return v === 'pictures' || v === 'picturesOnly' ? v : 'buttons';
+}
+
 export class ChooseCharacterBeat extends MultiChoiceBeat {
   public role: string;
+  public optionStyle: CharacterOptionStyle;
 
   constructor(config: BeatConfig & { parameters?: Record<string, any> } & Record<string, any>) {
     super({
@@ -26,15 +37,21 @@ export class ChooseCharacterBeat extends MultiChoiceBeat {
       question: (config as any).question || config.parameters?.question || 'Who will you be?',
     } as any);
     this.role = stripRolePrefix(String((config as any).role ?? config.parameters?.role ?? 'player'));
+    this.optionStyle = normalizeOptionStyle((config as any).optionStyle ?? config.parameters?.optionStyle);
   }
 
   getParameters(): Record<string, any> {
-    return { ...super.getParameters(), role: this.role };
+    return { ...super.getParameters(), role: this.role, optionStyle: this.optionStyle };
   }
 
   updateParameters(params: Record<string, any>): void {
     super.updateParameters(params);
     if (params.role !== undefined) this.role = stripRolePrefix(String(params.role));
+    if (params.optionStyle !== undefined) this.optionStyle = normalizeOptionStyle(params.optionStyle);
+  }
+
+  protected choiceStyle(): string {
+    return this.optionStyle;
   }
 
   protected choicesFor(context: StoryContext): MultiChoiceOption[] {
@@ -42,10 +59,16 @@ export class ChooseCharacterBeat extends MultiChoiceBeat {
     const options: CharacterOption[] = authored.length > 0
       ? authored
       : (context.getRole(this.role)?.candidates ?? []).map((id) => ({ id: `cast_${id}`, character: id }));
+    const pictures = this.optionStyle !== 'buttons';
     return options.map((o) => {
-      const option = { ...o, text: o.text ?? '', target: o.target ?? '' } as MultiChoiceOption;
+      const option = { ...o, text: o.text ?? '', target: o.target ?? '' } as MultiChoiceOption & { image?: string };
+      const ch = o.character ? context.getMergedCharacter(o.character) : undefined;
+      if (pictures && !option.image) {
+        const portrait = (ch as any)?.portrait as { assetId?: string; image?: string } | undefined;
+        const image = portrait?.assetId || portrait?.image;
+        if (image) option.image = image;
+      }
       if (option.text || option.displayText || !o.character) return option;
-      const ch = context.getMergedCharacter(o.character);
       return { ...option, text: ch?.displayName || ch?.name || o.character };
     });
   }

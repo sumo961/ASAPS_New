@@ -111,7 +111,10 @@ STORY STATE — what exists and how to use it
   verb or .is/.has/.was — "\${@confidant.They} press" reads "She press"). Cast one with an effect
   { "type": "castRole", "target": "confidant", "character": "<character id>" }
   or a chooseCharacter beat (a multiChoice whose choices each name a
-  "character" and a short "description"). Branch per holder only where a
+  "character" and a short "description"; its optionStyle "pictures" |
+  "picturesOnly" shows picture cards — each character's portrait, or a
+  choice's own "image" asset id — instead of buttons, worth it only when
+  the characters have portraits). Branch per holder only where a
   line truly differs: { "type": "roleHolder", "role": "confidant",
   "character": "<id>", "operator": "==" }. The digest lists the ROLES. Propose
   'defineRole' to add one (or update one with the same id): id, name,

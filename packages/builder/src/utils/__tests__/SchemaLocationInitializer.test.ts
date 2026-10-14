@@ -181,6 +181,24 @@ describe('regenerateChoiceElements', () => {
     expect(els[1].name).toBe('Choice 2');
   });
 
+  it('chooseCharacter with pictures: a centred row of portrait cards', () => {
+    const choices = [{ character: 'a' }, { character: 'b' }, { character: 'c' }];
+    for (const els of [
+      regenerateChoiceElements('chooseCharacter', { optionStyle: 'pictures', choices }),
+      initializeLocationsFromSchema(beat('chooseCharacter'), { optionStyle: 'pictures', choices }).filter((e) => e.type === 'button'),
+    ]) {
+      expect(els).toHaveLength(3);
+      expect(new Set(els.map((e) => e.y)).size).toBe(1);
+      expect(els[0].height).toBeGreaterThan(els[0].width);
+      const left = els[0].x;
+      const right = 1024 - (els[2].x + els[2].width);
+      expect(Math.abs(left - right)).toBeLessThanOrEqual(1);
+    }
+    // Buttons stay a column of text buttons.
+    const plain = regenerateChoiceElements('chooseCharacter', { choices });
+    expect(plain[0].height).toBe(50);
+  });
+
   it('pickProp: prop type when assetId present, button otherwise', () => {
     const els = regenerateChoiceElements('pickProp', { props: [{ name: 'Key', assetId: 'a1' }, { name: 'Map' }] });
     expect(els).toHaveLength(2);

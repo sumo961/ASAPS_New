@@ -252,6 +252,45 @@ function getDefaultTextForLocation(
   return undefined;
 }
 
+/** Choose your character with picture cards (optionStyle 'pictures' | 'picturesOnly'). */
+function isPictureOptionStyle(style: unknown): boolean {
+  return style === 'pictures' || style === 'picturesOnly';
+}
+
+/**
+ * Picture cards for Choose your character: one centred row of portrait
+ * cards (3:4 picture, plus room for the name under it with 'pictures'),
+ * narrower when many options must share the stage width.
+ */
+function pictureChoiceElements(params: Record<string, any>, stageWidth: number, y: number): VisualElement[] {
+  const choices = params.choices as any[];
+  const gap = 20;
+  const cardW = Math.max(100, Math.min(180, Math.floor((stageWidth - 80 - gap * (choices.length - 1)) / choices.length)));
+  const cardH = Math.round(cardW * 4 / 3) + 12 + (params.optionStyle === 'pictures' ? 56 : 0);
+  const rowW = choices.length * cardW + (choices.length - 1) * gap;
+  return choices.map((choice, index) => {
+    const label = choice.text || `Choice ${index + 1}`;
+    return {
+      id: `choice_${index}_${Date.now()}`,
+      type: 'button',
+      name: label,
+      text: label,
+      x: Math.round((stageWidth - rowW) / 2 + index * (cardW + gap)),
+      y,
+      z: 10 + index,
+      width: cardW,
+      height: cardH,
+      rotation: 0,
+      scale: 1,
+      visible: true,
+      locked: false,
+      font: undefined,
+      fontSize: 16,
+      textAlign: 'center',
+    } as VisualElement;
+  });
+}
+
 /**
  * Initialize default visual elements for a beat based on schema
  */
@@ -678,7 +717,9 @@ export function initializeLocationsFromSchema(
     });
   }
 
-  if (isMultiChoiceLike(beat.type) && Array.isArray(params.choices)) {
+  if (beat.type === 'chooseCharacter' && isPictureOptionStyle(params.optionStyle) && Array.isArray(params.choices) && params.choices.length > 0) {
+    elements.push(...pictureChoiceElements(params, stageWidth, currentY));
+  } else if (isMultiChoiceLike(beat.type) && Array.isArray(params.choices)) {
     // Same per-choice button generation as movementChoice, but with button
     // type (multiChoice is non-spatial — no hotspot semantics).
     const choiceSizes = params.choices.map((choice: any, index: number) => {
@@ -1034,7 +1075,9 @@ export function regenerateChoiceElements(
     });
   }
 
-  if (isMultiChoiceLike(beatType) && Array.isArray(params.choices)) {
+  if (beatType === 'chooseCharacter' && isPictureOptionStyle(params.optionStyle) && Array.isArray(params.choices) && params.choices.length > 0) {
+    elements.push(...pictureChoiceElements(params, stageWidth, currentY));
+  } else if (isMultiChoiceLike(beatType) && Array.isArray(params.choices)) {
     const choiceSizes = params.choices.map((choice: any, index: number) => {
       const choiceText = choice.text || `Choice ${index + 1}`;
       const sized = autoSizeText(choiceText, 16, 200, 600, true);

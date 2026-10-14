@@ -201,6 +201,44 @@ describe('Choose your character beat', () => {
     const r = renderer('cast_char_mara');
     await (new ChooseCharacterBeat({ id: 'pick', type: 'chooseCharacter', parameters: { role: 'player' } } as any) as any).performAction(ctx, r);
     expect(r.setState).toHaveBeenCalledWith('currentBeatType', 'chooseCharacter');
+    expect(r.setState).toHaveBeenCalledWith('choiceStyle', 'buttons');
+  });
+
+  it('picture cards: the option image, else the portrait of the active variant', async () => {
+    const characters = [
+      { ...MARA, portrait: { assetId: 'asset_mara', image: 'blob:mara' } },
+      { ...JONAS, portrait: { image: 'https://x/jonas.png' }, variants: [{ id: 'old', portrait: { assetId: 'asset_jonas_old' } }] },
+      ALEX,
+    ];
+    const ctx = new StoryContext(undefined, storyWith([{ id: 'player', candidates: ['char_mara', 'char_jonas', 'char_alex'] }], characters));
+    ctx.setActiveCharacterVariant('char_jonas', 'old');
+    const r = renderer('o1');
+    const beat = new ChooseCharacterBeat({
+      id: 'pick', type: 'chooseCharacter',
+      parameters: {
+        role: 'player',
+        optionStyle: 'picturesOnly',
+        choices: [
+          { id: 'o1', character: 'char_mara' },
+          { id: 'o2', character: 'char_jonas' },
+          { id: 'o3', character: 'char_alex', image: 'asset_alex_full' },
+        ],
+      },
+    } as any);
+    await (beat as any).performAction(ctx, r);
+    const offered = (r.renderChoices as any).mock.calls[0][0];
+    expect(offered.map((c: any) => c.image)).toEqual(['asset_mara', 'asset_jonas_old', 'asset_alex_full']);
+    expect(r.setState).toHaveBeenCalledWith('choiceStyle', 'picturesOnly');
+    expect(beat.getParameters().optionStyle).toBe('picturesOnly');
+  });
+
+  it('buttons (the default) offer no portraits; an unknown style reads as buttons', async () => {
+    const ctx = new StoryContext(undefined, storyWith(roles, [{ ...MARA, portrait: { assetId: 'asset_mara' } }, JONAS]));
+    const r = renderer('cast_char_mara');
+    const beat = new ChooseCharacterBeat({ id: 'pick', type: 'chooseCharacter', parameters: { role: 'player', optionStyle: 'cards' } } as any);
+    await (beat as any).performAction(ctx, r);
+    expect((r.renderChoices as any).mock.calls[0][0].some((c: any) => c.image)).toBe(false);
+    expect(beat.optionStyle).toBe('buttons');
   });
 });
 

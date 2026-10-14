@@ -3,7 +3,66 @@
 ## Unreleased (since v0.9.114, 2026-10-14)
 
 ### Overview
+- **Choose Your Character can show pictures instead of text buttons** (Hartmut's request). A new beat setting, *Show options as*: Buttons (default), Pictures with names, or Pictures only. The picture is the character's portrait, and any choice can use its own image instead.
 - **Preview Window fits fixed-layout projects into device presets.** At a phone or tablet preset, a fixed canvas used to be drawn at full size and cropped; it now letterboxes into the preset like the exported player.
+
+### Choose Your Character: picture cards
+- **Schema:**
+  - `chooseCharacter.optionStyle`: `'buttons' | 'pictures' | 'picturesOnly'`.
+  - `characterOption.image`: an asset id or URL; empty means the portrait.
+  - The Inspector shows the setting through the schema form.
+- **Core:**
+  - `ChooseCharacterBeat.choicesFor` adds each option's `image`: its own, else the merged character's `portrait.assetId || portrait.image`, so the active variant's portrait wins.
+  - Every Multi Choice sets renderer state `choiceStyle` (plain Multi Choice: `'buttons'`), so a picture beat never leaves the next one drawn as cards.
+  - `IRenderer.renderChoices` choices carry `image`.
+- **Renderer:**
+  - New `components/ChoicePicture.tsx` draws the inside of a picture choice.
+    - `card`: picture above the name and description.
+    - `chip`: thumbnail beside the name.
+    - A character without a picture gets a tile with their initial, and their name always shows.
+  - `ReactRenderer.resolveChoiceImage` resolves the image: an asset id goes through the asset resolver; a value that is already a URL or path is used as it is.
+  - **Responsive layout (`SlotFlowView`):**
+    - The action row becomes a centred, wrapping row of cards.
+    - Card width is `clamp(110px, 20vw, 220px)` of the stage, and the picture is capped at 30% of the stage height. On short stages the picture shrinks, so names and descriptions don't wrap into tall columns.
+    - Corners are capped at 12px, so a pill theme doesn't round the picture into a capsule.
+    - *Pictures only* puts the name and description in `aria-label` and `title`.
+  - **Fixed layout (`PositionedBeatView`):**
+    - The element data carries `picture`.
+    - The button fills the box the author placed, without text-fit sizing: a tall box draws as a card, a box sized for a text button as a chip.
+    - With *Pictures only*, the hover text is the name and description.
+    - Generated positions (no saved boxes) are one row of cards along the bottom.
+- **Builder:**
+  - **Inspector:** each option gets a picture row: a thumbnail, *Portrait* / the asset name / *No portrait: shows an initial*, **Other picture…** (asset picker) and ✕ to go back to the portrait.
+  - **Visual Editor:**
+    - Shows the cards in both layouts.
+    - A Choose Your Character option with an empty label now shows the character's name in the editor; it used to show the choice id.
+  - **`SchemaLocationInitializer`:** a picture beat in a fixed project is laid out as a centred row of portrait cards, both when it is first created and on **Reset Layout**.
+- **AI generation:**
+  - `storyGenerationEnhanced` and the Co-Designer prompt know `optionStyle`.
+  - Generated stories leave it out, since a new story has no portraits.
+- **Verified:**
+  - QA copies of The Last Ferry with a portrait for Mara and none for Jonas, both layouts:
+    - every preset: cards inside the stage, stage inside its pane, no overlap;
+    - picking a card casts the character and the next beat follows ("Mara… She is soaked" / "Jonas… He is soaked");
+    - *Pictures only* shown in the Visual Editor;
+    - the fixed export played at 1117×683, cards on screen and the portrait loaded.
+  - Suites green: core 2905, renderer 680, builder 2865.
+
+**Files modified:**
+- `beat-definitions/core-beats.json`
+- `core/src/beats/{ChooseCharacterBeat,MultiChoiceBeat}.ts`
+- `core/src/types/index.ts`
+- `core/src/generated/beat-types.ts`
+- `renderer/src/components/{ChoicePicture (new),SlotFlowView,PositionedBeatView}.tsx`
+- `renderer/src/renderers/ReactRenderer.tsx`
+- `builder/src/components/Inspector.tsx`
+- `builder/src/components/visual/VisualWorkspace.tsx`
+- `builder/src/utils/SchemaLocationInitializer.ts`
+- `builder/src/services/prompts/storyGenerationEnhanced.ts`
+- `builder/src/components/ai/codesigner/systemPrompt.ts`
+- `docs/USER_GUIDE.md`
+- `docs/images/83-choose-your-character-pictures.png`
+- tests: `core/tests/engine/CastRoles.test.ts`, `renderer/tests/components/PictureChoices.test.tsx` (new), `builder/src/utils/__tests__/SchemaLocationInitializer.test.ts`
 
 ### Preview Window
 - **Cause:** since February the Preview Window turned off the renderer's own fit scaling (`setDisableScaling(true)`) and scaled the whole stage box itself. With a preset, the box is the preset size, so the 1024×768 canvas inside it was never shrunk.

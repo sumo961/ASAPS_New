@@ -4396,6 +4396,43 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     placeholder="Description: who this person is (shown under the name)"
                                     className="w-full px-2 py-1 text-sm border rounded"
                                   />
+                                  {(localBeat.parameters?.optionStyle === 'pictures' || localBeat.parameters?.optionStyle === 'picturesOnly') && (() => {
+                                    // The option's own picture, else the character's portrait.
+                                    const own = (choice as any).image as string | undefined;
+                                    const ch: any = characters.find(c => c.id === (choice as any).character);
+                                    const ref = own || ch?.portrait?.assetId || ch?.portrait?.image;
+                                    const url = ref ? (assets.find(a => a.id === ref)?.url || (/[/:]/.test(ref) ? ref : undefined)) : undefined;
+                                    return (
+                                      <div className="flex items-center gap-2" data-testid={`choice-picture-${index}`}>
+                                        <div className="w-9 h-12 rounded border bg-gray-100 overflow-hidden flex items-center justify-center text-xs text-gray-400 flex-shrink-0">
+                                          {url ? <img src={url} alt="" className="w-full h-full object-cover" /> : 'none'}
+                                        </div>
+                                        <span className="flex-1 text-xs text-gray-600 truncate">
+                                          {own
+                                            ? (assets.find(a => a.id === own)?.name || 'Own picture')
+                                            : ch?.portrait ? 'Portrait' : 'No portrait: shows an initial'}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleAssetSelection('character', (asset) => handleUpdateChoice(index, 'image', asset.id))}
+                                          className="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                          title="Use another picture for this option instead of the character's portrait"
+                                        >
+                                          {own ? 'Change' : 'Other picture…'}
+                                        </button>
+                                        {own && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleUpdateChoice(index, 'image', undefined)}
+                                            className="px-1 text-xs text-gray-500 hover:text-red-600"
+                                            title="Use the character's portrait again"
+                                          >
+                                            ✕
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </>
                               )}
 

@@ -20,6 +20,7 @@ import { KeypadElement } from './KeypadElement';
 import { WebViewElement } from './WebViewElement';
 import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
 import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
+import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePictureStyle } from './ChoicePicture';
 import { revealBoundary } from '../utils/typewriterGranularity';
 
 // Default stage dimensions (can be overridden by project settings)
@@ -461,6 +462,8 @@ export interface PositionedElementData {
   counterBands?: Array<{ from: number; label: string }>;
   /** Optional tooltip/hover description for interactive elements (e.g., pickProp items) */
   description?: string;
+  /** A picture choice (Choose your character's picture cards): drawn in the button's box. */
+  picture?: { url?: string; style: ChoicePictureStyle };
   /** Keypad-specific fields (for kind='keypad') */
   keypadLayout?: 'numeric' | 'phone' | 'pin';
   keypadMaxDigits?: number;
@@ -2710,6 +2713,12 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           : neededH;
       }
 
+      // A picture choice fills the box the author placed, as it is.
+      if (element.picture) {
+        smartBtnDims.width = location.width || 180;
+        smartBtnDims.height = location.height || 240;
+      }
+
       // The button must be FULLY visible: clamp so its bottom never passes the
       // stage edge (baked layouts have put buttons at y + height > stage).
       const btnTop = Math.max(
@@ -2763,6 +2772,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
             theme={theme}
             isVisited={isButtonVisited}
             description={description}
+            picture={element.picture}
             soundBlobResolver={soundBlobResolver}
             onTriggerClickAnimation={onTriggerClickAnimation}
             mobileFontScale={mobileFontScale}
@@ -3648,10 +3658,11 @@ const ButtonElement: React.FC<{
   isVisited?: boolean; // Whether this choice leads to an already-visited beat
   showTextOnHover?: boolean; // Only show text when hovering over the hotspot
   description?: string; // Tooltip text shown on hover (e.g., pickProp item description)
+  picture?: { url?: string; style: ChoicePictureStyle }; // Picture choice drawn instead of the label
   soundBlobResolver?: (assetId: string) => Promise<Blob | null>; // Resolver for sound blobs
   onTriggerClickAnimation?: () => Promise<void>; // Trigger onClick animations and wait for completion
   mobileFontScale?: number; // Mobile font scale multiplier (1.0 = normal)
-}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, description, soundBlobResolver, onTriggerClickAnimation, mobileFontScale = 1.0 }) => {
+}> = ({ style, content, location, actionId, onAction, interactive: interactiveProp, hideButtonBox = false, editorMode = false, theme, isVisited = false, showTextOnHover = false, description, picture, soundBlobResolver, onTriggerClickAnimation, mobileFontScale = 1.0 }) => {
   // Visited choices are non-interactive (greyed out and not clickable)
   const interactive = interactiveProp && !isVisited;
   const [isHovered, setIsHovered] = React.useState(false);
@@ -3785,6 +3796,9 @@ const ButtonElement: React.FC<{
     maxWidth: '100%',  // Never exceed container width - allows text wrapping
     minHeight: `${computedFontSize * 1.4 + (paddingVertical * 2) + 4}px`, // Font + padding + border
     overflow: 'hidden',  // Prevent content from overflowing
+    // A picture choice fills the box edge to edge.
+    // A pill radius would round the picture into a capsule.
+    ...(picture ? { padding: 6, minWidth: 0, alignItems: 'stretch', borderRadius: hideButtonBox || buttonImageUrl ? 0 : 12 } : {}),
   };
 
 
@@ -3849,7 +3863,9 @@ const ButtonElement: React.FC<{
   // 2. For any interactive element with a description: show description on hover
   const showLabels = theme.hotspot?.showLabels ?? true;
   const showLabelTooltip = hideButtonBox && isPreviewMode && labelDisplay === 'hover' && showLabels && content && content.length > 0 && isHovered;
-  const showDescriptionTooltip = isPreviewMode && description && description.length > 0 && isHovered;
+  // A 'pictures' card already shows its description; 'picturesOnly' tells it on hover.
+  const showDescriptionTooltip = isPreviewMode && description && description.length > 0 && isHovered
+    && picture?.style !== 'pictures';
   const showTooltip = showLabelTooltip || showDescriptionTooltip;
 
   // Handle mouse move to track cursor position for tooltip
@@ -3858,7 +3874,7 @@ const ButtonElement: React.FC<{
   };
 
   // Build tooltip text: description takes priority, label as fallback for hotspot tooltips
-  const tooltipText = markdownLiteToPlain(description || content);
+  const tooltipText = picture ? pictureChoiceLabel(content, description) : markdownLiteToPlain(description || content);
   const tooltipHasDescription = !!description;
 
   // Tooltip styles using theme colors
@@ -3893,8 +3909,18 @@ const ButtonElement: React.FC<{
         onMouseLeave={() => setIsHovered(false)}
         onMouseMove={handleMouseMove}
         disabled={!interactive}
+        aria-label={picture?.style === 'picturesOnly' ? pictureChoiceLabel(content, description) : undefined}
       >
-        {shouldShowText ? <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(content) }} /> : ''}
+        {picture ? (
+          <ChoicePicture
+            url={picture.url}
+            text={content}
+            description={description}
+            style={picture.style}
+            layout={location.height < location.width * 0.8 ? 'chip' : 'card'}
+            fill
+          />
+        ) : shouldShowText ? <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(content) }} /> : ''}
       </button>
       {showTooltip && ReactDOM.createPortal(
         <div style={tooltipStyle}>{tooltipText}</div>,
@@ -5334,6 +5360,7 @@ export function createPositionedElementData(
     let actionId: string | undefined;
     let targetBeatId: string | undefined;
     let description: string | undefined;
+    let picture: PositionedElementData['picture'];
     const markVisited = content.markVisited || false;
 
     // For movementChoice: match location.name to choice properties with multiple fallbacks
@@ -5459,6 +5486,7 @@ export function createPositionedElementData(
         // Choose your character: a button placed by hand keeps its size, so
         // the description shows on hover instead of as a second line.
         if (choice.description) description = choice.description;
+        if (isPictureChoiceStyle(content.choiceStyle)) picture = { url: choice.imageUrl, style: content.choiceStyle };
         console.log(`[createPositionedElementData] MultiChoice: location "${location.name}" → choice ID "${actionId}", target "${targetBeatId}"`);
       } else if (location.kind === 'button') {
         console.warn(`[createPositionedElementData] MultiChoice: NO MATCH for button "${location.name}"`);
@@ -5577,6 +5605,7 @@ export function createPositionedElementData(
       targetBeatId,
       markVisited,
       description,
+      picture,
       hyperlinks,
       counterValue,
       counterMin,

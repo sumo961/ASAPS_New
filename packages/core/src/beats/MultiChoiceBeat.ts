@@ -155,6 +155,9 @@ export class MultiChoiceBeat extends Beat {
     // visual (stacked vs. conversation).
     renderer.setState('currentBeatType', this.type || 'multiChoice');
     renderer.setState('layoutTemplate', this.layoutTemplate);
+    // Buttons or picture cards (Choose your character). Set on every
+    // Multi Choice so a picture beat never leaves the next one in cards.
+    renderer.setState('choiceStyle', this.choiceStyle());
 
     // chat-bubble template routes through ChatDialogView (same path
     // DialogTree uses). presentationMode is the legacy state key the
@@ -221,6 +224,8 @@ export class MultiChoiceBeat extends Beat {
           text: this.processText(c.displayText || c.text, context),
           // A second, smaller line under the label (Choose your character).
           ...((c as any).description ? { description: this.processText((c as any).description, context) } : {}),
+          // A picture for the option (asset id or URL), shown as a card.
+          ...((c as any).image ? { image: (c as any).image } : {}),
         })),
         locations,
       );
@@ -269,6 +274,11 @@ export class MultiChoiceBeat extends Beat {
     }
 
     return this.getNextBeat(context);
+  }
+
+  /** 'buttons', or picture cards: 'pictures' (with names) | 'picturesOnly'. */
+  protected choiceStyle(): string {
+    return 'buttons';
   }
 
   /** The choices to offer this time (before conditions). */

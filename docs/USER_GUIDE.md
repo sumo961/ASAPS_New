@@ -590,9 +590,13 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 - **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
 - **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go. The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
+- **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. **Other picture…** on a choice uses any image instead of the portrait, for example a full-figure drawing; ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
-In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size).
+![The same screen with Show options as set to Pictures with names: Mara's card shows her portrait above her name and description; Jonas has no portrait yet, so his card shows a large J.](images/83-choose-your-character-pictures.png)
+*Pictures with names. A character without a portrait shows their initial.*
+
+In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size). Picture cards fill the box you placed: a tall box is a card, and a box sized for a text button shows a small picture beside the name. **Reset Layout** in the Visual Editor lays the choices out as a row of cards.
 
 **When to Use:** Story openings where the interactor picks a protagonist; any moment that decides who fills a part for the rest of the story.
 

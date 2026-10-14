@@ -930,6 +930,18 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const id = previewHolderId(roleId);
     return id ? (characters || []).find((c) => c.id === id) : undefined;
   };
+  // Choose your character: an option's label defaults to its character's
+  // name; the picture styles show the option's image, else the portrait.
+  const characterOptionView = (c: any, style: unknown): { text: string; imageUrl?: string } => {
+    const ch: any = c?.character ? (characters || []).find((x) => x.id === c.character) : undefined;
+    const text = c?.text || ch?.displayName || ch?.name || c?.id || '';
+    if (style !== 'pictures' && style !== 'picturesOnly') return { text };
+    const ref: string | undefined = c?.image || ch?.portrait?.assetId || ch?.portrait?.image;
+    const imageUrl = ref
+      ? ((assets || []).find((a) => a.id === ref)?.url || (/[/:]/.test(ref) ? ref : undefined))
+      : undefined;
+    return { text, imageUrl };
+  };
 
   /**
    * Screen-docked HUDs for the responsive preview.
@@ -4581,10 +4593,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       case 'multiChoice':
       case 'chooseCharacter': {
         const rawChoices = params.choices || [];
-        const translatedChoices = rawChoices.map((c: any, i: number) => ({
-          ...c,
-          text: translations[`choices.${i}.text`] ?? c.text,
-        }));
+        const translatedChoices = rawChoices.map((c: any, i: number) => {
+          const choice = { ...c, text: translations[`choices.${i}.text`] ?? c.text };
+          return beat?.type === 'chooseCharacter'
+            ? { ...choice, ...characterOptionView(choice, params.optionStyle) }
+            : choice;
+        });
         const question = t('question', params.question || 'What do you say?');
         return {
           speaker: params.speaker || '',
@@ -4593,6 +4607,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           // keys off content.text) shows the prompt in chat-bubble mode.
           text: question,
           choices: translatedChoices,
+          ...(beat?.type === 'chooseCharacter' ? { choiceStyle: params.optionStyle } : {}),
         };
       }
       case 'pickProp': {
@@ -6635,12 +6650,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             ) ?? (slotPreviewParams as any)?.dialogTree;
                             rawChoices = curNode?.choices;
                           }
-                          const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string }> : [];
+                          const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string; description?: string }> : [];
+                          if (beat!.type === 'chooseCharacter' && cs.length > 0) {
+                            return cs.map((c) => ({
+                              id: c.id,
+                              ...characterOptionView(c, slotPreviewParams?.optionStyle),
+                              ...(c.description ? { description: c.description } : {}),
+                            }));
+                          }
                           return cs.length > 0
                             ? cs.map((c) => ({ id: c.id, text: c.text || c.id }))
                             : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
                         })()
                       : undefined}
+                    choiceStyle={beat!.type === 'chooseCharacter' ? slotPreviewParams?.optionStyle : undefined}
                     layoutTemplate={(isMultiChoiceLike(beat!.type)
                       || beat!.type === 'dialogTree'
                       || beat!.type === 'aiDialogTree')

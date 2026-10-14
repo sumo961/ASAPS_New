@@ -19,6 +19,7 @@ import { generateDefaultLocations } from '../utils/DefaultLocationGenerator';
 import { isTextAliasSlot, LEGACY_TEXT_LOCATION_NAME } from '../utils/legacyTextAlias';
 import { isMobileDevice } from '../utils/mobileDetection';
 import { SlotFlowView } from '../components/SlotFlowView';
+import { isPictureChoiceStyle, type ChoicePictureStyle } from '../components/ChoicePicture';
 import { HudOverlaysLayer } from '../components/HudOverlaysLayer';
 import { beatSuppressesScreenHuds } from '../utils/hudVisibility';
 import { SpatialFlowView } from '../components/SpatialFlowView';
@@ -3143,7 +3144,16 @@ export class ReactRenderer extends BaseRenderer {
     );
   }
 
-  async renderChoices(choices: { id: string; text: string; description?: string; isExit?: boolean; isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
+  /**
+   * A picture choice's image as a URL: an asset id through the asset
+   * resolver, else the value itself when it is already a URL or path.
+   */
+  private resolveChoiceImage(image: string | undefined): string | undefined {
+    if (!image) return undefined;
+    return this.resolveAssetUrl(image) || (/[/:]/.test(image) ? image : undefined);
+  }
+
+  async renderChoices(choices: { id: string; text: string; description?: string; image?: string; isExit?: boolean; isContinue?: boolean; hotspot?: { x: number; y: number; width: number; height: number; shape?: 'rect' | 'ellipse' } }[], locations?: Location[]): Promise<string> {
     this.applyHudSuppression(null);
     // Get background asset ID from renderer state
     const backgroundAssetId = this.getState('backgroundAssetId');
@@ -3331,6 +3341,12 @@ export class ReactRenderer extends BaseRenderer {
       !slotAuthorPositioned &&
       (isMultiChoiceLike(beatType) || dialogTreeSlotTemplate);
 
+    // Choose your character's picture cards. Only Multi Choice beats set
+    // choiceStyle, so it is read for them alone.
+    const pictureStyle = isMultiChoiceLike(beatType) && isPictureChoiceStyle(this.getState('choiceStyle'))
+      ? (this.getState('choiceStyle') as ChoicePictureStyle)
+      : null;
+
     if (useSlotMode && effectiveSlotSpec) {
       const slotBg = this.backgroundImageUrl
         ? 'transparent'
@@ -3369,7 +3385,13 @@ export class ReactRenderer extends BaseRenderer {
             backgroundColor={slotBg}
             slotIntent={slotIntent}
             slotAnimations={slotAnimations}
-            dynamicChoices={choices.map(c => ({ id: c.id, text: c.text, ...(c.description ? { description: c.description } : {}) }))}
+            dynamicChoices={choices.map(c => ({
+              id: c.id,
+              text: c.text,
+              ...(c.description ? { description: c.description } : {}),
+              ...(pictureStyle ? { imageUrl: this.resolveChoiceImage(c.image) } : {}),
+            }))}
+            choiceStyle={pictureStyle ?? undefined}
             layoutTemplate={slotTemplate}
             onAction={this.handleAction}
             characterLocations={this.pickFreePositioned(locations)}
@@ -3384,6 +3406,11 @@ export class ReactRenderer extends BaseRenderer {
       });
     }
 
+    // Picture choices carry their resolved image to the positioned view.
+    const positionedChoices = pictureStyle
+      ? choices.map(c => ({ ...c, imageUrl: this.resolveChoiceImage(c.image) }))
+      : choices;
+
     // Use positioned rendering if locations are available
     if (locations && locations.length > 0) {
       // Check if current choices match the location names (for buttons)
@@ -3396,8 +3423,9 @@ export class ReactRenderer extends BaseRenderer {
         // Choices match button locations - use positioned rendering as-is
         const content: Record<string, any> = {
           text: dialogContext.text || '',
-          choices,
-          markVisited
+          choices: positionedChoices,
+          markVisited,
+          choiceStyle: pictureStyle,
         };
         return this.renderPositionedBeat(beatType, content, locations, true);
       }
@@ -3416,23 +3444,42 @@ export class ReactRenderer extends BaseRenderer {
         let buttonY = stageHeight - 200 - (choices.length * (buttonHeight + buttonSpacing));
 
         const generatedLocations: Location[] = [...nonButtonLocations];
-        choices.forEach((choice, index) => {
-          generatedLocations.push({
-            kind: 'button',
-            name: choice.text,
-            x: Math.round(centerX - buttonWidth / 2),
-            y: Math.round(buttonY),
-            width: buttonWidth,
-            height: buttonHeight,
-            zIndex: 10 + index,
+        if (pictureStyle) {
+          // Picture cards: one centred row along the bottom.
+          const cardW = Math.min(180, Math.floor((stageWidth - 40) / choices.length) - 16);
+          const cardH = Math.round(cardW * (pictureStyle === 'pictures' ? 1.6 : 1.33));
+          const rowW = choices.length * cardW + (choices.length - 1) * 16;
+          choices.forEach((choice, index) => {
+            generatedLocations.push({
+              kind: 'button',
+              name: choice.text,
+              x: Math.round((stageWidth - rowW) / 2 + index * (cardW + 16)),
+              y: Math.max(8, stageHeight - cardH - 40),
+              width: cardW,
+              height: cardH,
+              zIndex: 10 + index,
+            });
           });
-          buttonY += buttonHeight + buttonSpacing;
-        });
+        } else {
+          choices.forEach((choice, index) => {
+            generatedLocations.push({
+              kind: 'button',
+              name: choice.text,
+              x: Math.round(centerX - buttonWidth / 2),
+              y: Math.round(buttonY),
+              width: buttonWidth,
+              height: buttonHeight,
+              zIndex: 10 + index,
+            });
+            buttonY += buttonHeight + buttonSpacing;
+          });
+        }
 
         const content: Record<string, any> = {
           text: dialogContext.text || '',
-          choices,
-          markVisited
+          choices: positionedChoices,
+          markVisited,
+          choiceStyle: pictureStyle,
         };
         return this.renderPositionedBeat(beatType, content, generatedLocations, true);
       }
@@ -3484,8 +3531,9 @@ export class ReactRenderer extends BaseRenderer {
 
       const content: Record<string, any> = {
         text: dialogContext.text || '',
-        choices,
-        markVisited
+        choices: positionedChoices,
+        markVisited,
+        choiceStyle: pictureStyle,
       };
       return this.renderPositionedBeat(beatType, content, mappedLocations, true);
     }
@@ -3493,8 +3541,9 @@ export class ReactRenderer extends BaseRenderer {
     // No locations provided - generate default locations from schema
     const content: Record<string, any> = {
       text: dialogContext.text || '',
-      choices,
-      markVisited
+      choices: positionedChoices,
+      markVisited,
+      choiceStyle: pictureStyle,
     };
     const defaultLocations = generateDefaultLocations(beatType, content);
     return this.renderPositionedBeat(beatType, content, defaultLocations, true);

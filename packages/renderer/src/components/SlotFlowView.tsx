@@ -35,6 +35,7 @@ import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from '.
 import type { SlotSpec } from '../utils/slotLayout';
 import { KeypadElement } from './KeypadElement';
 import { QRScanElement } from './QRScanElement';
+import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel } from './ChoicePicture';
 import { renderMarkdownLite } from '../utils/markdownLite';
 import { revealBoundary, type TypewriterGranularity } from '../utils/typewriterGranularity';
 import { ImageInputElement } from './ImageInputElement';
@@ -253,7 +254,12 @@ interface SlotFlowViewProps {
    * layoutTemplate. The schema's `actionSlot.buttons` is still honoured
    * when dynamicChoices is absent (e.g. infoText's Continue).
    */
-  dynamicChoices?: { id: string; text: string; description?: string }[];
+  dynamicChoices?: { id: string; text: string; description?: string; imageUrl?: string }[];
+  /**
+   * Choose your character's picture cards: 'pictures' (picture + name) or
+   * 'picturesOnly'. Anything else draws the usual text buttons.
+   */
+  choiceStyle?: string;
   /**
    * Mark-visited dimming for dynamic choices. The fixed-canvas path has done
    * this since the feature shipped; slot mode silently ignored the setting —
@@ -366,6 +372,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
   dynamicChoices,
+  choiceStyle,
   markVisited = false,
   visitedChoiceIds = [],
   layoutTemplate = 'stacked',
@@ -2097,6 +2104,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           text: string;
           /** Second, smaller line (Choose your character). */
           description?: string;
+          /** Picture card image (Choose your character). */
+          imageUrl?: string;
           onClick: () => void;
           show: boolean;
         }> = dynamicChoices && dynamicChoices.length > 0
@@ -2109,6 +2118,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               id: c.id,
               text: c.text,
               description: c.description,
+              imageUrl: c.imageUrl,
               onClick: () => dispatchAction(c.id),
               show: true,
             }))
@@ -2134,6 +2144,22 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         const flowButtons = buttonCatalog.filter(
           b => b.show && !buttonAnchors?.[b.id]
         );
+        // Picture cards (Choose your character): a wrapping row of cards
+        // instead of the stacked list of text buttons.
+        const pictureStyle = hasDynamicChoices && isPictureChoiceStyle(choiceStyle) ? choiceStyle : null;
+        // Width follows the stage width so names and descriptions wrap in a
+        // readable column; on short stages the picture gets shorter instead.
+        const cardWidth = `clamp(110px, ${vwU(20)}, 220px)`;
+        const pictureButtonStyle: React.CSSProperties = pictureStyle
+          // A pill radius would round the picture into a capsule.
+          ? { padding: 6, minWidth: 0, width: cardWidth, flexShrink: 0, display: 'flex', borderRadius: 12, fontSize: `clamp(var(--slotflow-btn-floor), ${buttonFluid}, ${BUTTON_CEILING}px)` }
+          : {};
+        const choiceContent = (b: { text: string; description?: string; imageUrl?: string }) => pictureStyle
+          ? <ChoicePicture url={b.imageUrl} text={b.text} description={b.description} style={pictureStyle} maxPictureHeight={vhU(30)} />
+          : <ChoiceLabel text={b.text} description={b.description} />;
+        const choiceA11y = (b: { text: string; description?: string }) => pictureStyle
+          ? { 'aria-label': pictureChoiceLabel(b.text, pictureStyle === 'picturesOnly' ? b.description : undefined), title: pictureStyle === 'picturesOnly' ? pictureChoiceLabel(b.text, b.description) : undefined }
+          : {};
         const anchoredButtons = buttonCatalog.filter(
           b => b.show && buttonAnchors?.[b.id]
         );
@@ -2235,16 +2261,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       disabled={isVisited}
                       aria-disabled={isVisited || undefined}
                       onClick={handleClick}
+                      {...choiceA11y(b)}
                       style={{
                         ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
                         maxWidth: '100%',
+                        ...pictureButtonStyle,
                         ...a.style,
                         ...(isVisited ? { opacity: 0.4, cursor: 'default' } : {}),
                         ...(editorMode ? { cursor: 'pointer' } : null),
                         ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
                       }}
                     >
-                      <ChoiceLabel text={b.text} description={b.description} />
+                      {choiceContent(b)}
                     </button>
                   );
                 })}
@@ -2311,14 +2339,21 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       alignContent: 'start',
                     }
                   : {}),
+                // Picture cards wrap in a centred row (beats the list and
+                // the two-column grid above).
+                ...(pictureStyle
+                  ? { display: 'flex', flexDirection: 'row' as const, flexWrap: 'wrap' as const }
+                  : {}),
                 // Conversation right-aligns buttons at their NATURAL
                 // widths inside the panel — the panel sizes to the
                 // widest button + padding, and each button fits its
                 // text on one line. Stacked / custom stretches buttons
                 // to a common width for the centered visual-novel look.
-                alignItems: hasDynamicChoices
-                  ? (isConversation ? 'flex-end' : 'stretch')
-                  : undefined,
+                alignItems: pictureStyle
+                  ? 'flex-start'
+                  : hasDynamicChoices
+                    ? (isConversation ? 'flex-end' : 'stretch')
+                    : undefined,
                 // Move the whole action panel left/center/right based on
                 // the anchor. In conversation the panel is row-aligned
                 // (top-of-row) to keep buttons next to the body; in
@@ -2353,9 +2388,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // hidden with no way to scroll it into view). When the
                 // row isn't squeezed it hugs its content, so start vs
                 // center is invisible there — safe to force.
-                justifyContent: isConversation
-                  ? 'flex-start'
-                  : ((hasDynamicChoices && !customActionStyle) ? 'flex-start' : actionJustify),
+                justifyContent: pictureStyle
+                  ? (isConversation ? 'flex-end' : 'center')
+                  : isConversation
+                    ? 'flex-start'
+                    : ((hasDynamicChoices && !customActionStyle) ? 'flex-start' : actionJustify),
                 gap: `clamp(12px, ${vwU(2)}, 24px)`,
                 paddingTop: isConversation
                   ? `clamp(24px, ${vhU(5)}, 64px)`
@@ -2408,8 +2445,10 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                     disabled={isVisited}
                     aria-disabled={isVisited || undefined}
                     onClick={handleClick}
+                    {...choiceA11y(b)}
                     style={{
                       ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
+                      ...pictureButtonStyle,
                       ...(isVisited ? { opacity: 0.4, cursor: 'default' } : {}),
                       ...(editorMode ? { cursor: 'pointer' } : null),
                       ...(editorSelected ? { outline: '2px solid #fbbf24', outlineOffset: 2 } : null),
@@ -2419,7 +2458,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       ...(ovWidthPx ? { maxWidth: ovWidthPx } : null),
                     }}
                   >
-                    <ChoiceLabel text={b.text} description={b.description} />
+                    {choiceContent(b)}
                   </button>
                 );
               })}
