@@ -1,13 +1,19 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.116, 2026-10-15)
+## 2026-10-16: Scenes that remember (v0.9.117)
 
 ### Overview
+Dialog Tree lines that react to earlier play and record what the player witnessed, plus the editor and preview finally using the project's canvas size. Three open items from v0.9.112 are closed (continue-step conditions/effects, speaker colours, hidden AI Conversation links).
 - **The Visual Editor and the Preview Window now use the project's canvas size.** Project Settings → canvas (4:3, 16:9, free size) only reached the exported player; the editor, default positions and the preview stayed at 1024×768. A 16:9 project was laid out on a 4:3 stage and exported at 16:9.
 - **Dialog Tree Inspector reads the authoritative layout field.** Chat settings (avatars, NPC Response Delay) were hidden for Dialog Trees that only have `layoutTemplate`, and the delay showed 0 while chat layouts actually wait 1.5s.
 - **Dialog Tree: conditions and effects on "then another character speaks" lines.** A scene can react to earlier play (a bystander steps in only if the player helped before) and record what the player witnessed. The engine already supported both; the editor had no controls.
 - **Speakers in the Dialog Tree editor no longer share colours** (the colour came from a name hash: Tim and Zoe in the bullying story were both blue).
 - **Old AI Conversation beats: a hidden plain link moves into Fallback Exit Target on load**, where the Inspector shows it.
+
+### Release check (2026-10-16)
+- Generated social-worker story (1280×720) played to its ending in the Preview Window on the first- and last-choice paths; no placeholder leaks.
+- QA copy of the bullying story with a conditional Zoe line: in the Preview Window and in a one-file HTML export at 1117×683, the "defended" path plays Zoe's line and the end screen shows witnessed=true; the other path plays Tim's line. No buttons off-screen.
+- User Guide audit: Presentation Mode/Layout Template are one setting, NPC delay default 1.5 s, stale "1024×768 stage" passages now say the project canvas, Fallback Exit Target notes the load-time move, lines-that-depend details.
 
 ### Canvas size
 - **Cause:** `App.tsx` held a `projectSettings` state fixed at 1024×768 (`setProjectSettings` was never called); it fed the Visual Editor, the default-position initializer and the preview update. `PreviewWindow.tsx` also had its own `STAGE_WIDTH/HEIGHT` constants. Only `PlayerEngine.getStageDimensions` read `globalSettings.project`.

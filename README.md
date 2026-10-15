@@ -22,14 +22,23 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.116** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.116 lets a group scene play out
-before the player answers**: a Dialog Tree has a new setting, *Players can
-skip ahead* (Inspector → Show Advanced Options). Turn it off and the lines
-other characters say in a row play at reading pace, with no Continue
-button, until it is the player's turn. In chat layouts the typing
-indicator now also shows before each next speaker, not only after the
-player's answer.
+Current release: **v0.9.117** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.117 lets a conversation react to
+what the player did before**: a line where another character speaks next
+can now have conditions (a bystander steps in only if the player stood up
+for someone earlier) and effects (the story remembers what the player
+witnessed). Use the new *Conditions & effects* button on the line's
+connector in the Dialog Tree editor. The Visual Editor and the Preview
+Window also use the canvas size from Project Settings now, so a 16:9
+project is laid out on a 16:9 stage, and speakers in the editor no longer
+share colours.
+
+**v0.9.116 let a group scene play out before the player answers**: a Dialog
+Tree has a new setting, *Players can skip ahead* (Inspector → Show Advanced
+Options). Turn it off and the lines other characters say in a row play at
+reading pace, with no Continue button, until it is the player's turn. In
+chat layouts the typing indicator now also shows before each next speaker,
+not only after the player's answer.
 
 **v0.9.115 let players pick their
 character by picture**: a Choose Your Character beat could show its
