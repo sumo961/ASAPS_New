@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.115*
+*Last revised against v0.9.116*
 
 ---
 
@@ -507,6 +507,11 @@ This is where interactivity shines. Present text and multiple choices, each pote
   - *Chat — scrolling history* - Messaging app style
   - *Chat — single bubble* - One speech bubble at a time
 
+Presentation Mode and the pacing settings below sit under **Show Advanced Options** at the bottom of the Inspector:
+- **Show character avatars** and **NPC Response Delay (seconds)** - Chat modes only: portraits next to the bubbles, and how long the typing indicator shows before a character's line
+- **Choice Delay (seconds)** - Hold the choices back for a moment so the line gets read first
+- **Players can skip ahead** - On by default: a **Continue** button lets the player move on from lines they don't answer. Turn it off and those lines play at reading pace (see *Several characters before the player answers* below)
+
 **Each Choice Can Have:**
 - **Text** - What the option says
 - **Target** - Which beat to go to
@@ -539,7 +544,7 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 - Set auto-exit to a beat to advance there after the NPC speaks
 - Set auto-exit to **Return to initial choices** (`__self__`) to loop back to the root of the dialog tree
 
-The farewell line is never a frozen screen: a **Continue** button appears right away, and whichever comes first — the player's tap or the reading time (plus any speech) — moves the story on. Fast readers skip ahead; slow readers are never cut off. In chat layouts that Continue tap doesn't add a reply bubble from the player.
+The farewell line is never a frozen screen: a **Continue** button appears right away, and whichever comes first — the player's tap or the reading time (plus any speech) — moves the story on. Fast readers skip ahead; slow readers are never cut off. In chat layouts that Continue tap doesn't add a reply bubble from the player. With **Players can skip ahead** turned off (under **Show Advanced Options**), there is no Continue button and the story moves on after the reading time.
 
 **Recursive Dialogs:** Set a choice's target to `__self__` to loop back to the root of the dialog tree. This is powerful for "hub" conversations where the interactor can ask multiple questions before leaving. Combined with **per-choice visited tracking**, choices the interactor has already picked can be visually dimmed or blocked.
 

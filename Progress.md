@@ -1,8 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.115, 2026-10-14)
+## 2026-10-15: Wait your turn in a group scene (v0.9.116)
 
 ### Overview
+A small release from a user report: a Dialog Tree can make the player sit through a group scene until it is their turn, and chat layouts show the typing indicator between two characters' lines.
 - **Dialog Tree: the player can be made to wait for their turn** (user report). New setting *Players can skip ahead* (on by default); in chat layouts the typing indicator now also shows between two characters' lines.
 - **User Guide screenshots for Choose Your Character retaken** (UG-audit decisions 1 and 2 from the v0.9.115 release). Both now show the shipped Last Ferry text, and screenshot 83 gives Mara a real illustrated portrait instead of a placeholder avatar. Jonas still has none, so his card still shows the initial.
 

@@ -22,13 +22,21 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.115** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.115 lets players pick their
-character by picture**: a Choose Your Character beat can now show its
+Current release: **v0.9.116** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.116 lets a group scene play out
+before the player answers**: a Dialog Tree has a new setting, *Players can
+skip ahead* (Inspector → Show Advanced Options). Turn it off and the lines
+other characters say in a row play at reading pace, with no Continue
+button, until it is the player's turn. In chat layouts the typing
+indicator now also shows before each next speaker, not only after the
+player's answer.
+
+**v0.9.115 let players pick their
+character by picture**: a Choose Your Character beat could show its
 options as portrait cards — with names, or pictures only — instead of text
-buttons (Inspector → *Show options as*). Each card uses the character's
-portrait, and any option can use a different picture. The Preview Window
-also fits fixed-layout projects into phone and tablet presets instead of
+buttons (Inspector → *Show options as*). Each card used the character's
+portrait, and any option could use a different picture. The Preview Window
+also fit fixed-layout projects into phone and tablet presets instead of
 cropping them.
 
 **v0.9.114 let you show an asterisk**:
