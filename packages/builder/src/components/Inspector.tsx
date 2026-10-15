@@ -176,6 +176,7 @@ import { RoleHolderConditionFields } from '../editors/RoleHolderConditionFields'
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
+import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
 
 const MIN_INSPECTOR_WIDTH = 280;
 const MULTI_CHOICE_OWNED_FIELDS = {
@@ -3863,8 +3864,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                             </span>
                           </label>
                           <select
-                            value={localBeat.parameters?.presentationMode || 'positioned'}
-                            onChange={(e) => handleParameterChange('presentationMode', e.target.value)}
+                            data-testid="dialog-presentation-mode"
+                            value={dialogChatMode(localBeat.parameters) ?? 'positioned'}
+                            onChange={(e) => handleParametersChange(presentationModePatch(localBeat.parameters, e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
                             <option value="positioned">Positioned (traditional elements / spatial)</option>
@@ -3872,8 +3874,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             <option value="chat-bubble">Chat — single bubble</option>
                           </select>
                         </div>
-                        {(localBeat.parameters?.presentationMode === 'chat-scroll' ||
-                          localBeat.parameters?.presentationMode === 'chat-bubble') && (
+                        {dialogChatMode(localBeat.parameters) && (
                           <>
                             <div className="flex items-center gap-2">
                               <input
@@ -3896,7 +3897,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                               </label>
                               <input
                                 type="number"
-                                value={localBeat.parameters?.responseDelay || 0}
+                                data-testid="dialog-response-delay"
+                                value={localBeat.parameters?.responseDelay ?? DIALOG_CHAT_RESPONSE_DELAY}
                                 onChange={(e) => handleParameterChange('responseDelay', parseFloat(e.target.value))}
                                 min="0"
                                 max="10"

@@ -15,7 +15,7 @@ export { SetTimerBeat } from './SetTimerBeat';
 export { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 //export { DialogTreeBeat, DialogNode, DialogChoice } from './DialogTreeBeat';
 export type { DialogNode, DialogChoice } from '../generated/beat-types';
-export { DialogTreeBeat, type PhaseOverride } from './DialogTreeBeat';
+export { DialogTreeBeat, type PhaseOverride, type DialogTreeLayoutTemplate, isChatLayoutTemplate, normalizeDialogTreeLayoutTemplate, DIALOG_CHAT_RESPONSE_DELAY } from './DialogTreeBeat';
 export { DurScreenBeat } from './DurScreenBeat';
 export { VideoBeat } from './VideoBeat';
 export { ConversationChoiceBeat } from './ConversationChoiceBeat';

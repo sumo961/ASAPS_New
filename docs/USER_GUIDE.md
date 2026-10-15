@@ -3497,7 +3497,7 @@ Use sprite sheets for frame-by-frame animation:
 *The Settings panel*
 
 **Settings → Project:**
-- Stage dimensions and aspect ratio (4:3, 16:9, etc.)
+- Stage dimensions and aspect ratio (4:3, 16:9, etc.). This is your design canvas: the Visual Editor stage, the Preview Window's *Fit window* view and the exported player all use it. *(Before v0.9.117 only the export did; the editor and preview stayed at 1024×768.)* If you change it after laying out a fixed-canvas project, check your beats in the Visual Editor — positions stay where you put them, so a 4:3 layout on a 16:9 canvas leaves room on the right.
 - Scaling mode
 - Mobile display settings (font scaling, safe zone preview)
 - **Layout Mode** — *Responsive layout* (green) or *Fixed canvas* (amber). Switching runs the one-shot migrator with a preview; see [Responsive vs Fixed Layout](#responsive-vs-fixed-layout).

@@ -1,5 +1,27 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.116, 2026-10-15)
+
+### Overview
+- **The Visual Editor and the Preview Window now use the project's canvas size.** Project Settings → canvas (4:3, 16:9, free size) only reached the exported player; the editor, default positions and the preview stayed at 1024×768. A 16:9 project was laid out on a 4:3 stage and exported at 16:9.
+- **Dialog Tree Inspector reads the authoritative layout field.** Chat settings (avatars, NPC Response Delay) were hidden for Dialog Trees that only have `layoutTemplate`, and the delay showed 0 while chat layouts actually wait 1.5s.
+
+### Canvas size
+- **Cause:** `App.tsx` held a `projectSettings` state fixed at 1024×768 (`setProjectSettings` was never called); it fed the Visual Editor, the default-position initializer and the preview update. `PreviewWindow.tsx` also had its own `STAGE_WIDTH/HEIGHT` constants. Only `PlayerEngine.getStageDimensions` read `globalSettings.project`.
+- **Fix:** `projectSettings` is derived from `globalSettings.project`. The Preview Window takes the design canvas from `previewData.settings.project` (stage box, fit scale, renderer `setStageDimensions` + `stageSize`, default positions). The Visual Editor's responsive *Authored* preview size uses the canvas too.
+- **Effect on existing projects:** a project whose canvas was set to something other than 1024×768 now shows its real canvas in the editor and preview — what its export already looked like. Positions are unchanged.
+- **Verified:** the social-worker training story (canvas 1280×720): Visual Editor "Stage: 1280 × 720px (16:9)"; Preview Window stage 1280×720, matching its export; every preset keeps the content inside the stage (phone portrait letterboxes).
+
+### Dialog Tree Inspector
+- New `utils/dialogPresentation.ts`: the chat mode comes from `layoutTemplate` (legacy `presentationMode` only when there is none); the Presentation Mode picker writes both fields together.
+- NPC Response Delay shows the runtime default (`DIALOG_CHAT_RESPONSE_DELAY` = 1.5, now exported from core and also used by the Visual Editor) instead of 0; the schema's wrong `default: 0` is gone.
+- `DialogTreeBeat` tells the renderer a presentation mode derived from `layoutTemplate` only, so a stale legacy value can't pick a different render path.
+- **Verified:** a Dialog Tree with only `layoutTemplate: chat-scroll`: the Inspector shows *Chat — scrolling history* and 1.5 (before: *Positioned*, delay hidden).
+
+**Files modified:** `builder/src/App.tsx`, `builder/src/pages/PreviewWindow.tsx`, `builder/src/components/visual/VisualWorkspace.tsx`, `builder/src/components/Inspector.tsx`, `builder/src/utils/dialogPresentation.ts` (new), `core/src/beats/{DialogTreeBeat,index}.ts`, `beat-definitions/core-beats.json`, `docs/USER_GUIDE.md`; tests `builder/src/utils/__tests__/dialogPresentation.test.ts`, `core/tests/beats/DialogTreePresentation.test.ts` (new). Suites green: core 2911, renderer 681, builder 2868.
+
+---
+
 ## 2026-10-15: Wait your turn in a group scene (v0.9.116)
 
 ### Overview

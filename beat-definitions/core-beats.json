@@ -885,8 +885,7 @@
         "responseDelay": {
           "type": "number",
           "required": false,
-          "default": 0,
-          "description": "Delay in seconds before an NPC speaks in chat mode, with a typing indicator: after the player answers, and between two characters' lines (a 'Then another character speaks' handover)",
+          "description": "Delay in seconds before an NPC speaks in chat mode, with a typing indicator: after the player answers, and between two characters' lines (a 'Then another character speaks' handover). Unset: 1.5 seconds in chat layouts",
           "ui": {
             "control": "number",
             "min": 0,

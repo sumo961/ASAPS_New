@@ -39,9 +39,17 @@ import {
   createDirectOpenAITransport,
 } from '@asaps/core';
 
-// Stage dimensions (matching StoryPreview)
-const STAGE_WIDTH = 1024;
-const STAGE_HEIGHT = 768;
+// Design canvas when the project sets none (Project Settings → canvas).
+const DEFAULT_STAGE_WIDTH = 1024;
+const DEFAULT_STAGE_HEIGHT = 768;
+
+/** The project's design canvas: the size the exported player draws at. */
+function designStageOf(settings: any): { width: number; height: number } {
+  return {
+    width: settings?.project?.width || DEFAULT_STAGE_WIDTH,
+    height: settings?.project?.height || DEFAULT_STAGE_HEIGHT,
+  };
+}
 
 /**
  * Phase 1 — viewport presets for the PW viewport switcher.
@@ -451,13 +459,20 @@ export const PreviewWindow: React.FC = () => {
     null | { id: string; width: number; height: number; label: string }
   >(null);
   const [isAutoFit, setIsAutoFit] = useState(true);
+  /** The project's design canvas (Project Settings), as the export uses it. */
+  const designStage = useMemo(
+    () => designStageOf(previewData?.settings),
+    [previewData?.settings?.project?.width, previewData?.settings?.project?.height],
+  );
+  const designStageRef = useRef(designStage);
+  designStageRef.current = designStage;
   /** Stage box currently on screen — the device preset when one is chosen. */
   const activeStage = useMemo(
     () => ({
-      width: previewViewport ? previewViewport.width : STAGE_WIDTH,
-      height: previewViewport ? previewViewport.height : STAGE_HEIGHT,
+      width: previewViewport ? previewViewport.width : designStage.width,
+      height: previewViewport ? previewViewport.height : designStage.height,
     }),
-    [previewViewport],
+    [previewViewport, designStage],
   );
   // Ref mirror so renderer-setup code (which runs outside React's render
   // cycle) always reads the current preset.
@@ -1055,8 +1070,8 @@ export const PreviewWindow: React.FC = () => {
       // where the action button sits. "Fit window" looked right only because
       // it happens to be the case where the two sizes agree.
       const vp = previewViewportRef.current;
-      const activeWidth = vp ? vp.width : STAGE_WIDTH;
-      const activeHeight = vp ? vp.height : STAGE_HEIGHT;
+      const activeWidth = vp ? vp.width : designStageRef.current.width;
+      const activeHeight = vp ? vp.height : designStageRef.current.height;
 
       const scaleX = availableWidth / activeWidth;
       const scaleY = availableHeight / activeHeight;
@@ -1083,7 +1098,7 @@ export const PreviewWindow: React.FC = () => {
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
     };
-  }, [isAutoFit, story, previewViewport]);
+  }, [isAutoFit, story, previewViewport, designStage]);
 
   // Initialize renderer
   useEffect(() => {
@@ -1092,8 +1107,8 @@ export const PreviewWindow: React.FC = () => {
     if (!rendererRef.current) {
       const reactRenderer = new ReactRenderer({
         container: containerRef.current,
-        width: STAGE_WIDTH,
-        height: STAGE_HEIGHT,
+        width: designStageRef.current.width,
+        height: designStageRef.current.height,
       });
       // Dev-only hook so automated checks can read the live renderer (theme, state).
       if (import.meta.env.DEV) (window as any).__previewRenderer = reactRenderer;
@@ -1743,10 +1758,8 @@ export const PreviewWindow: React.FC = () => {
 
       // Set stage size for DialogTreeBeat to use
       // This ensures preview uses the same stage dimensions as the visual editor
-      rendererRef.current.setState('stageSize', {
-        width: previewData.projectSettings?.width || 1024,
-        height: previewData.projectSettings?.height || 768,
-      });
+      rendererRef.current.setStageDimensions(designStage.width, designStage.height);
+      rendererRef.current.setState('stageSize', { width: designStage.width, height: designStage.height });
 
       // Set HUD overlay configs from global settings
       const hudOverlays = settings?.hudOverlays;
@@ -1818,7 +1831,7 @@ export const PreviewWindow: React.FC = () => {
       // projects and stay empty (→ spatial path) in responsive ones.
       const allBeats = story.getAllBeats();
       const projectLayoutMode = resolveLayoutMode(previewData?.settings, allBeats);
-      initializeBeatLocations(allBeats, STAGE_WIDTH, STAGE_HEIGHT, projectLayoutMode);
+      initializeBeatLocations(allBeats, designStage.width, designStage.height, projectLayoutMode);
       // Surface the resolved project layout mode to the renderer so its
       // routing (slot vs absolute) can treat the project flag as
       // authoritative for slot/spatial beats — leftover baked locations
@@ -3212,8 +3225,8 @@ export const PreviewWindow: React.FC = () => {
               its wrapping changes. */}
           <div
             style={{
-              width: (previewViewport ? previewViewport.width : STAGE_WIDTH) * scale,
-              height: (previewViewport ? previewViewport.height : STAGE_HEIGHT) * scale,
+              width: activeStage.width * scale,
+              height: activeStage.height * scale,
               flexShrink: 0,
               position: 'relative',
             }}
@@ -3227,8 +3240,8 @@ export const PreviewWindow: React.FC = () => {
                  the transform entirely, so anything larger than the pane was
                  silently cropped rather than shown smaller. */
               style={{
-                width: previewViewport ? previewViewport.width : STAGE_WIDTH,
-                height: previewViewport ? previewViewport.height : STAGE_HEIGHT,
+                width: activeStage.width,
+                height: activeStage.height,
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left',
                 overflow: 'hidden',

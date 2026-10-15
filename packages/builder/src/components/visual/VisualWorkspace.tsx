@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions } from '@asaps/core';
+import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions, DIALOG_CHAT_RESPONSE_DELAY } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
 import { choiceStateOptionsAsync, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
 import { XRMapEditor } from './XRMapEditor';
@@ -923,6 +923,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Slot-mode preview: which simulated viewport, and the latest per-slot
   // intent-resolution report from SlotFlowView (override-visibility / 3c).
   const [slotPreviewViewportId, setSlotPreviewViewportId] = useState<string>('authored');
+  // "Authored" is the project's design canvas (Project Settings), not a fixed 1024×768.
+  const slotPreviewViewports = useMemo(
+    () => SLOT_PREVIEW_VIEWPORTS.map(v => v.id === 'authored'
+      ? { ...v, width: projectSettings?.width || 1024, height: projectSettings?.height || 768 }
+      : v),
+    [projectSettings?.width, projectSettings?.height],
+  );
   // Preview as: role placeholders and '@role' speakers show the character
   // the author picked in the Inspector (never written to the beat).
   const { holderOf: previewHolderId } = useRolePreview();
@@ -5649,7 +5656,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   onBeatUpdate(beat.id, { showAvatars: show } as any);
                   setHasChanges(true);
                 } : undefined}
-                responseDelay={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).responseDelay ?? 1.5) : undefined}
+                responseDelay={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') ? ((beat as any).responseDelay ?? DIALOG_CHAT_RESPONSE_DELAY) : undefined}
                 onResponseDelayChange={(beat.type === 'dialogTree' || beat.type === 'aiDialogTree') && onBeatUpdate ? (delay) => {
                   (beat as any).responseDelay = delay;
                   onBeatUpdate(beat.id, { responseDelay: delay } as any);
@@ -6137,8 +6144,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
              (the no-bake guard). Draggable intent handles = next increment. */
           (() => {
             const selVp =
-              SLOT_PREVIEW_VIEWPORTS.find(v => v.id === slotPreviewViewportId) ??
-              SLOT_PREVIEW_VIEWPORTS[2];
+              slotPreviewViewports.find(v => v.id === slotPreviewViewportId) ??
+              slotPreviewViewports[2];
             // Fixed device rect vs the "Editor" preset (fills the area).
             const isFixed = selVp.width != null && selVp.height != null;
             // Project orientation policy → preview consequence. Phone/Tablet
@@ -6852,7 +6859,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     </span>
                   )}
                   <div className="flex rounded overflow-hidden border border-white/20">
-                    {SLOT_PREVIEW_VIEWPORTS.map(vp => (
+                    {slotPreviewViewports.map(vp => (
                       <button
                         key={vp.id}
                         type="button"

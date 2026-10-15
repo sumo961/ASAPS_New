@@ -814,14 +814,6 @@ function App() {
     };
   }, []);
 
-  // Project and global settings
-  const [projectSettings, setProjectSettings] = useState({
-    width: 1024,
-    height: 768,
-    aspectRatio: '4:3',
-    scalingMode: 'contain',
-    boxVisibility: 'all' as const
-  });
 
   // Update global settings when story title changes
   useEffect(() => {
@@ -990,6 +982,17 @@ function App() {
       showvals: false
     }
   });
+
+  // The design canvas the Visual Editor and the Preview Window lay out on.
+  // It follows Project Settings → canvas, the size the exported player draws
+  // at; it used to be a fixed 1024×768 that ignored the setting.
+  const projectSettings = useMemo(() => ({
+    width: globalSettings.project?.width || 1024,
+    height: globalSettings.project?.height || 768,
+    aspectRatio: globalSettings.project?.aspectRatio || '4:3',
+    scalingMode: 'contain',
+    boxVisibility: 'all' as const,
+  }), [globalSettings.project?.width, globalSettings.project?.height, globalSettings.project?.aspectRatio]);
 
   // Update globalSettingsRef whenever globalSettings changes
   useEffect(() => {

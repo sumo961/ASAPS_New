@@ -54,6 +54,10 @@ export function isChatLayoutTemplate(template: DialogTreeLayoutTemplate): boolea
   return template === 'chat-scroll' || template === 'chat-bubble';
 }
 
+/** The typing pause before an NPC line in a chat layout when the beat sets
+ *  no responseDelay. Editors show it as the field's value. */
+export const DIALOG_CHAT_RESPONSE_DELAY = 1.5;
+
 /** The placeholder older imports wrote for "the scene goes on". */
 function isLegacyContinueChoice(choice: DialogChoice): boolean {
   return !choice.continue && (choice.id === 'auto_continue' || choice.text?.trim() === '[Continue]');
@@ -521,13 +525,15 @@ export class DialogTreeBeat extends Beat {
     // `presentationMode` alongside `layoutTemplate` for one release so any
     // renderer code that still reads the old state key doesn't break.
     renderer.setState('layoutTemplate', this.layoutTemplate);
-    renderer.setState('presentationMode', this.presentationMode || (this.layoutTemplate === 'chat-scroll' || this.layoutTemplate === 'chat-bubble' ? this.layoutTemplate : 'positioned'));
+    // Derived from layoutTemplate (authoritative): a stale legacy
+    // presentationMode must not pick a different render path.
+    renderer.setState('presentationMode', isChatLayoutTemplate(this.layoutTemplate) ? this.layoutTemplate : 'positioned');
     // Bug 26 — per-beat spatial-fit override for the spatial layer.
     renderer.setState('spatialFit', this.spatialFit);
     renderer.setState('showAvatars', this.showAvatars ?? true);
     // Default responseDelay to 1.5s for chat modes if not explicitly set
     const isChatMode = isChatLayoutTemplate(this.layoutTemplate);
-    const defaultDelay = isChatMode ? 1.5 : 0;
+    const defaultDelay = isChatMode ? DIALOG_CHAT_RESPONSE_DELAY : 0;
     renderer.setState('responseDelay', this.responseDelay ?? defaultDelay);
 
     // Set player name for chat display (try common variable names)
