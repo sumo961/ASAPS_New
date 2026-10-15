@@ -3,7 +3,19 @@
 ## Unreleased (since v0.9.115, 2026-10-14)
 
 ### Overview
+- **Dialog Tree: the player can be made to wait for their turn** (user report). New setting *Players can skip ahead* (on by default); in chat layouts the typing indicator now also shows between two characters' lines.
 - **User Guide screenshots for Choose Your Character retaken** (UG-audit decisions 1 and 2 from the v0.9.115 release). Both now show the shipped Last Ferry text, and screenshot 83 gives Mara a real illustrated portrait instead of a placeholder avatar. Jonas still has none, so his card still shows the initial.
+
+### Dialog Tree: waiting for your turn (user report, Group 1 bullying story)
+- **Report:** in a group scene (Bully → *Then another character speaks* → Tim → player answers) the Continue button showed after the first line, so the player could skip the others; and no typing indicator showed before Tim's line.
+- **Diagnosis:** the story was authored correctly. The Continue button on a continue step is deliberate (skippable reading-time wait, same as an NPC farewell line). The chat typing indicator only ran after a *player* answer, never between two characters' lines.
+- **Typing indicator:** `ReactRenderer.renderDialog` (chat layouts) shows it for the beat's response delay before a line that follows another character's line. The voice starts with the bubble.
+- **New Dialog Tree setting `allowSkipAhead`** (Hartmut's decision: beat setting, on by default, covers all NPC lines). Inspector → Show Advanced Options → **Players can skip ahead**. Off: continue steps and farewell lines show no Continue button and move on after TTS + reading time. `DialogTreeBeat.waitOnNpcLine` replaces three copies of the wait; with skipping off it calls `renderChoices([])` so slot layouts (stacked / conversation) still paint the line.
+- **AI generation:** schema descriptions (`allowSkipAhead`, `responseDelay`), `storyGenerationEnhanced` and the Co-Designer prompt know the setting; `dialogGeneration` now says a Continue button exists.
+- **Verified** in the Preview Window with the reported story: default → Continue button, then the typing indicator for 1.5s, then Tim, then the answers. With skipping off (set through the Inspector) → no button, the same pacing, in chat-scroll, stacked, conversation and custom layouts. Suites green: core 2908, renderer 681, builder 2865.
+- **Authoring notes for the reporter (not bugs):** the second line's speaker is typed "Tim" but linked to the character *Bully's Friend*, so the player sees "Bully's Friend" (and both chat avatars show "B"); the "Nuh uh, you're stupid" answer leads to an empty *Mark* line with nothing after it.
+
+**Files modified:** `beat-definitions/core-beats.json`, `core/src/beats/DialogTreeBeat.ts`, `core/src/generated/beat-types.ts`, `renderer/src/renderers/ReactRenderer.tsx`, `builder/src/components/Inspector.tsx`, `builder/src/services/prompts/{storyGenerationEnhanced,dialogGeneration}.ts`, `builder/src/components/ai/codesigner/systemPrompt.ts`, `docs/USER_GUIDE.md`, `builder/public/player-web.js`; tests `core/tests/beats/DialogTreeContinueStep.test.ts`, `renderer/tests/renderers/ReactRenderer.test.tsx`.
 
 ### Documentation
 - `81-choose-your-character.png` (buttons) and `83-choose-your-character-pictures.png` (pictures with names) are taken from the same copy of The Last Ferry, Preview Window at Tablet landscape, 99%. The alt text matches the new descriptions.

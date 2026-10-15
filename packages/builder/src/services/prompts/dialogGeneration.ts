@@ -80,7 +80,7 @@ Respond with JSON in this exact structure:
    - Example: { "id": "n1", "speaker": "Guard", "text": "Go away!", "target": "beat_kicked_out", "choices": [] }
 9. SEVERAL CHARACTERS IN A ROW: to let another character speak right after this line, BEFORE the player answers, give the node ONE choice with "continue": true and empty text, leading to the next speaker's node:
    - { "id": "n0", "speaker": "Mara", "text": "We can't stay here.", "choices": [ { "id": "c_next", "text": "", "continue": true, "dialogNode": { "id": "n1", "speaker": "Jonas", "text": "And go where?", "choices": [ ...player choices... ] } } ] }
-   - The player sees no reply buttons; the next line follows after the reading time. Chain as many lines as the scene needs, then give the player real choices.
+   - The player sees no reply buttons, only a Continue button to skip ahead; the next line follows by itself after the reading time. Chain as many lines as the scene needs, then give the player real choices.
    - This is the only exception to rule 4: a continue step is not a player line, so its text stays empty.
 
 ## Layout

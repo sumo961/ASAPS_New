@@ -75,6 +75,9 @@ export class DialogTreeBeat extends Beat {
   public emotion?: string;
   public choiceDelay?: number; // Delay in seconds before showing choices
   public responseDelay?: number; // Delay in seconds before NPC responds (for natural chat pacing)
+  /** Whether a line a character says without the player answering
+   *  (continue step, NPC farewell) shows a Continue button. Unset = true. */
+  public allowSkipAhead?: boolean;
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
   // Opt-in: effects (counters/variables/inventory) fire only the FIRST
   // time a given choice is selected; the choice itself stays selectable.
@@ -109,6 +112,7 @@ export class DialogTreeBeat extends Beat {
     const dialogTreeParam = config.dialogTree || config.parameters?.dialogTree;
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.responseDelay = config.parameters?.responseDelay;
+    this.allowSkipAhead = config.parameters?.allowSkipAhead;
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
@@ -353,6 +357,32 @@ export class DialogTreeBeat extends Beat {
     return connections;
   }
 
+  /**
+   * The wait on a line a character says without the player answering
+   * (continue step, NPC farewell): TTS plus reading time, never a frozen
+   * screen. With skipping allowed (default) a Continue button renders at
+   * once and whichever fires first wins; the un-clicked renderChoices
+   * promise is abandoned on timer win and the next render replaces it.
+   * With skipping off, the line is drawn without a button (empty choice
+   * list: slot layouts only paint the line in renderChoices) and the
+   * player waits for their turn.
+   */
+  private async waitOnNpcLine(renderer: IRenderer, text: string, continueId: string, locations: Location[]): Promise<void> {
+    const advanceTimer = (async () => {
+      await waitForTTS(renderer);
+      await waitForReadingTime(renderer, text);
+    })();
+    const choices = this.allowSkipAhead === false
+      ? []
+      : [{ id: continueId, text: uiString('continue'), isExit: true, isContinue: true }];
+    // A renderer that rejects or throws here must not break the scene —
+    // degrade to the pure timer.
+    const continueClick: Promise<unknown> = Promise.resolve()
+      .then(() => renderer.renderChoices(choices, locations))
+      .catch(() => new Promise<never>(() => { /* never */ }));
+    await (choices.length ? Promise.race([advanceTimer, continueClick]) : advanceTimer);
+  }
+
   getParameters(): Record<string, any> {
     // NOTE: speaker/text/emotion are stored ONLY in dialogTree to avoid duplication.
     // The dialogTree is the single source of truth for dialog content.
@@ -368,6 +398,7 @@ export class DialogTreeBeat extends Beat {
       node: this.node,
       choiceDelay: this.choiceDelay,
       responseDelay: this.responseDelay,
+      allowSkipAhead: this.allowSkipAhead,
       markVisited: this.markVisited,
       effectsOncePerChoice: this.effectsOncePerChoice,
       backgroundUrl: this.backgroundUrl,
@@ -409,6 +440,7 @@ export class DialogTreeBeat extends Beat {
     if (params.node !== undefined) this.node = params.node;
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.responseDelay !== undefined) this.responseDelay = params.responseDelay;
+    if (params.allowSkipAhead !== undefined) this.allowSkipAhead = params.allowSkipAhead;
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;
@@ -666,17 +698,7 @@ export class DialogTreeBeat extends Beat {
         // trees). The un-clicked renderChoices promise is abandoned on
         // timer win; the next render replaces the button and the
         // renderer's resolveAction slot.
-        const advanceTimer = (async () => {
-          await waitForTTS(renderer);
-          await waitForReadingTime(renderer, processedText);
-          return '__timer__';
-        })();
-        // A renderer that rejects or throws on this auxiliary button must
-          // not break the exit — degrade to the pure timer.
-          const continueClick: Promise<string> = Promise.resolve()
-            .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
-            .catch(() => new Promise<string>(() => { /* never */ }));
-        await Promise.race([advanceTimer, continueClick]);
+        await this.waitOnNpcLine(renderer, processedText, `${nodePath}___npc_exit`, locations);
 
         if (this.currentNode.target === '__self__') {
           this.currentNode = this.dialogTree;
@@ -690,19 +712,11 @@ export class DialogTreeBeat extends Beat {
       }
 
       // Continue step: the scene goes on to the next line (usually another
-      // character) without a player reply. Same skippable wait as an NPC
-      // exit; the player is not recorded as having said anything.
+      // character) without a player reply. Same wait as an NPC exit; the
+      // player is not recorded as having said anything.
       const continueStep = continueStepOf(earlyVisibleChoices);
       if (continueStep) {
-        const advanceTimer3 = (async () => {
-          await waitForTTS(renderer);
-          await waitForReadingTime(renderer, processedText);
-          return '__timer__';
-        })();
-        const continueClick3: Promise<string> = Promise.resolve()
-          .then(() => renderer.renderChoices([{ id: `${nodePath}___continue`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
-          .catch(() => new Promise<string>(() => { /* never */ }));
-        await Promise.race([advanceTimer3, continueClick3]);
+        await this.waitOnNpcLine(renderer, processedText, `${nodePath}___continue`, locations);
 
         const alreadyTaken = this.effectsOncePerChoice
           && context.getVisitedChoicesForBeat(this.id).includes(`${nodePath}_${continueStep.id}`);
@@ -737,18 +751,8 @@ export class DialogTreeBeat extends Beat {
         if (visibleChoices.length === 0) {
           // No visible choices — fall back to node-level target if available
           if (this.currentNode.target) {
-            // Same skippable-wait contract as the NPC-exit branch above.
-            const advanceTimer2 = (async () => {
-              await waitForTTS(renderer);
-              await waitForReadingTime(renderer, processedText);
-              return '__timer__';
-            })();
-            // A renderer that rejects or throws on this auxiliary button must
-              // not break the exit — degrade to the pure timer.
-              const continueClick2: Promise<string> = Promise.resolve()
-                .then(() => renderer.renderChoices([{ id: `${nodePath}___npc_exit_f`, text: uiString('continue'), isExit: true, isContinue: true }], locations))
-                .catch(() => new Promise<string>(() => { /* never */ }));
-            await Promise.race([advanceTimer2, continueClick2]);
+            // Same wait as the NPC-exit branch above.
+            await this.waitOnNpcLine(renderer, processedText, `${nodePath}___npc_exit_f`, locations);
             if (this.currentNode.target === '__self__') {
               this.currentNode = this.dialogTree;
               nodePath = 'root';

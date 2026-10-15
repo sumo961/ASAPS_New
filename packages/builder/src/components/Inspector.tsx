@@ -3922,6 +3922,22 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            id="allowSkipAhead-dialog"
+                            data-testid="dialog-allow-skip-ahead"
+                            checked={localBeat.parameters?.allowSkipAhead ?? true}
+                            onChange={(e) => handleParameterChange('allowSkipAhead', e.target.checked)}
+                            className="rounded border-gray-300 mt-0.5"
+                          />
+                          <label htmlFor="allowSkipAhead-dialog" className="text-sm text-gray-700">
+                            Players can skip ahead
+                            <span className="text-xs text-gray-500 block font-normal">
+                              A Continue button while other characters speak. Off: the lines play at reading pace and the player waits for their turn.
+                            </span>
+                          </label>
+                        </div>
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"

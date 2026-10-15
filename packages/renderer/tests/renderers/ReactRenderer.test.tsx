@@ -146,6 +146,20 @@ describe('chat avatars (roadmap Tier-1 item 4)', () => {
     });
     expect(container.querySelector('img')).toBeNull();
   });
+
+  it('shows the typing indicator before a line that follows another character', async () => {
+    renderer.setState('presentationMode', 'chat-scroll');
+    renderer.setState('responseDelay', 0.3);
+    await renderer.renderDialog('Bully', "It's all Zoe's fault!");
+    // The first line of a scene comes at once.
+    expect(container.innerHTML).not.toContain('typingDot');
+    const second = renderer.renderDialog('Tim', "Yeah, that's right!!");
+    await waitFor(() => expect(container.innerHTML).toContain('typingDot'));
+    expect(container.textContent).not.toContain("Yeah, that's right!!");
+    await second;
+    await waitFor(() => expect(container.textContent).toContain("Yeah, that's right!!"));
+    expect(container.innerHTML).not.toContain('typingDot');
+  });
 });
 
 describe('visual transitions (dissolve identity + direction + easing, v0.9.86)', () => {

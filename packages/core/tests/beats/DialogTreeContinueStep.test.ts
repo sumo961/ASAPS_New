@@ -77,6 +77,46 @@ describe('DialogTree continue step', () => {
     expect(result).toBe('beat_wait');
   });
 
+  it('with skipping off, the line shows no Continue button and the scene waits its turn', async () => {
+    const context = new StoryContext();
+    const { renderer, dialogs, choiceCalls } = mockRenderer([]);
+    (renderer.renderChoices as any).mockImplementationOnce(async (choices: any[]) => {
+      choiceCalls.push(choices);
+      return new Promise<string>(() => {});
+    }).mockImplementationOnce(async (choices: any[]) => {
+      choiceCalls.push(choices);
+      return 'root.c_next_c2';
+    });
+
+    const result = await scene({ parameters: { allowSkipAhead: false } }).execute(context, renderer);
+
+    expect(dialogs).toEqual(["Mara: We can't stay here.", 'Jonas: And go where?']);
+    // The line is drawn with no button; then the player's replies.
+    expect(choiceCalls[0]).toEqual([]);
+    expect(choiceCalls[1].map((c: any) => c.text)).toEqual(['We take the ferry.', 'We wait.']);
+    expect(result).toBe('beat_wait');
+    expect(context.getVariable('heardJonas')).toBe(true);
+  });
+
+  it('with skipping off, a farewell line moves on by itself without a button', async () => {
+    const beat = new DialogTreeBeat({
+      id: 'bye', name: 'Bye', type: 'dialogTree',
+      dialogTree: { id: 'n0', speaker: 'Guard', text: 'Go away!', choices: [], target: 'beat_out' },
+      parameters: { allowSkipAhead: false },
+    } as any);
+    const { renderer, choiceCalls } = mockRenderer([]);
+    expect(await beat.execute(new StoryContext(), renderer)).toBe('beat_out');
+    expect(choiceCalls).toEqual([[]]);
+  });
+
+  it('keeps allowSkipAhead through a parameter update; unset means skippable', () => {
+    const beat = scene();
+    expect(beat.getParameters().allowSkipAhead).toBeUndefined();
+    beat.updateParameters({ allowSkipAhead: false });
+    const copy = new DialogTreeBeat({ id: 'c', name: 'C', type: 'dialogTree', parameters: beat.getParameters() } as any);
+    expect(copy.getParameters().allowSkipAhead).toBe(false);
+  });
+
   it('takes the first continue step whose conditions match', async () => {
     const beat = new DialogTreeBeat({
       id: 'cond', name: 'Cond', type: 'dialogTree',

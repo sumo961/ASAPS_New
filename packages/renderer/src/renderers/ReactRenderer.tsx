@@ -2934,6 +2934,18 @@ export class ReactRenderer extends BaseRenderer {
     // Store dialog context for renderChoices to use later
     this.setState('dialogContext', { speaker, text, emotion });
 
+    // In chat, a line that follows another character's line (continue step)
+    // gets the same typing pause a reply after the player's answer gets in
+    // renderChatDialog. Before the TTS, so the voice starts with the bubble.
+    if (this.currentPresentationMode !== 'positioned') {
+      const previous = this.chatMessages[this.chatMessages.length - 1];
+      const responseDelay = (this.getState('responseDelay') as number) || 0;
+      if (previous && !previous.isPlayer && responseDelay > 0) {
+        this.renderChatView([], true);
+        await new Promise(r => setTimeout(r, responseDelay * 1000));
+      }
+    }
+
     // Fire TTS for dialog text (speaker is passed for voice differentiation)
     this.speakAloud(text, speaker);
 

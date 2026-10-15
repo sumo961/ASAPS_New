@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-14T19:52:41.356Z
+ * Generated: 2026-10-15T10:27:28.152Z
  */
 
 // ============================================
@@ -253,8 +253,10 @@ export interface DialogTreeParameters {
   presentationMode?: string | undefined;
   /** Show character avatars in chat mode */
   showAvatars?: boolean | undefined;
-  /** Delay in seconds before NPC responds in chat mode (shows typing indicator) */
+  /** Delay in seconds before an NPC speaks in chat mode, with a typing indicator: after the player answers, and between two characters' lines (a 'Then another character speaks' handover) */
   responseDelay?: number | undefined;
+  /** Whether the player can skip ahead while other characters speak. On (default): every line a character says without the player answering (a 'Then another character speaks' handover, or a farewell line that ends the dialog) shows a Continue button, and also moves on by itself after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace. */
+  allowSkipAhead?: boolean | undefined;
   /** Displays per-node speaker names as labels during dialog */
   showSpeaker?: boolean | undefined;
   /** How the background image fits the stage. 'contain' (default) preserves the full image with letterboxed bars when aspect ratios differ; 'cover' fills the stage and may crop the image's edges. Edited in the VE left sidebar (Background section), not the inspector. */

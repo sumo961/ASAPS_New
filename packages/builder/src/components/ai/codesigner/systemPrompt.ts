@@ -286,7 +286,10 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
     on). It may carry effects and conditions like any option. To have a
     second character speak before the player answers, add a continue step:
     "continue": true, empty "text", and a "dialogNode" with the other
-    speaker's line — the player sees no reply, the line follows by itself.
+    speaker's line — the player sees no reply, the line follows by itself
+    (a Continue button lets them skip ahead; the beat parameter
+    "allowSkipAhead": false removes it, so the player sits through the
+    exchange until it is their turn).
   - 'replaceBeat' makes a NEW VERSION of a whole beat, side by side: you give
     the complete new "parameters" (optionally a different "beatType", e.g. a
     dialogTree reworked as an aiConversation, and a "name"). The app adds it,
