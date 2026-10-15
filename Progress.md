@@ -5,6 +5,9 @@
 ### Overview
 - **The Visual Editor and the Preview Window now use the project's canvas size.** Project Settings → canvas (4:3, 16:9, free size) only reached the exported player; the editor, default positions and the preview stayed at 1024×768. A 16:9 project was laid out on a 4:3 stage and exported at 16:9.
 - **Dialog Tree Inspector reads the authoritative layout field.** Chat settings (avatars, NPC Response Delay) were hidden for Dialog Trees that only have `layoutTemplate`, and the delay showed 0 while chat layouts actually wait 1.5s.
+- **Dialog Tree: conditions and effects on "then another character speaks" lines.** A scene can react to earlier play (a bystander steps in only if the player helped before) and record what the player witnessed. The engine already supported both; the editor had no controls.
+- **Speakers in the Dialog Tree editor no longer share colours** (the colour came from a name hash: Tim and Zoe in the bullying story were both blue).
+- **Old AI Conversation beats: a hidden plain link moves into Fallback Exit Target on load**, where the Inspector shows it.
 
 ### Canvas size
 - **Cause:** `App.tsx` held a `projectSettings` state fixed at 1024×768 (`setProjectSettings` was never called); it fed the Visual Editor, the default-position initializer and the preview update. `PreviewWindow.tsx` also had its own `STAGE_WIDTH/HEIGHT` constants. Only `PlayerEngine.getStageDimensions` read `globalSettings.project`.
@@ -18,7 +21,20 @@
 - `DialogTreeBeat` tells the renderer a presentation mode derived from `layoutTemplate` only, so a stale legacy value can't pick a different render path.
 - **Verified:** a Dialog Tree with only `layoutTemplate: chat-scroll`: the Inspector shows *Chat — scrolling history* and 1.5 (before: *Positioned*, delay hidden).
 
-**Files modified:** `builder/src/App.tsx`, `builder/src/pages/PreviewWindow.tsx`, `builder/src/components/visual/VisualWorkspace.tsx`, `builder/src/components/Inspector.tsx`, `builder/src/utils/dialogPresentation.ts` (new), `core/src/beats/{DialogTreeBeat,index}.ts`, `beat-definitions/core-beats.json`, `docs/USER_GUIDE.md`; tests `builder/src/utils/__tests__/dialogPresentation.test.ts`, `core/tests/beats/DialogTreePresentation.test.ts` (new). Suites green: core 2911, renderer 681, builder 2868.
+### Dialog Tree: lines that depend on the story (open item from v0.9.112)
+- Each continue step's connector has a **Conditions & effects** panel (`ChoiceConditionsEditor` with *This line plays only if…*, `ChoiceEffectsEditor` with *When this line plays:*); badges show the counts, the connector reads *then, if …* / *otherwise, if …* / *otherwise* (`describeCondition`).
+- Several continue steps per node, in the engine's order (first whose conditions hold plays; none → the node's player replies; no replies → the conversation ends). **Or another character speaks, if…** (on a line with replies) and **Or a different line, if…** (under a chain) insert the new step above the first unconditional one and open its panel. A step after an unconditional one is marked *Never plays*; replies hidden by an unconditional step say so.
+- The Visual Editor's conditional-choice banner names a continue step by its line (*Zoe: Leave Tim out of this.*) instead of its id.
+- AI guidance: schema note for dialog choices (the old "a node with a continue choice should have no other choices" was wrong), `storyGenerationEnhanced.ts`, `dialogGeneration.ts`, Co-Designer `systemPrompt.ts`.
+- **Verified** on a copy of the Group 1 bullying story: conditional Zoe line before Tim's, badges ◇ 1 ⚡ 1, *Or a different line, if…* inserted above Tim's line with *Never plays* on Tim until a condition was added; undo records each edit.
+
+### Speaker colours
+- `utils/speakerColors.ts`: palette slots in order of first appearance in the tree (hash only for a speaker not in the tree yet), so up to eight speakers never collide.
+
+### AI Conversation hidden links (open item from v0.9.112)
+- `migrateHiddenSoleLinks` in `projectDeserializer.ts` (on load): for a beat type whose schema keeps its exit in one parameter (`soleLinkParameter`: aiConversation → `fallbackExitTarget`), a lone plain link without condition or effects moves into the empty field; a plain link duplicating a filled field is dropped. Other cases are left alone (they would change how the story plays). **Verified:** a QA beat with a plain link now shows *Fallback Exit Target: Who Are You*.
+
+**Files modified:** `builder/src/App.tsx`, `builder/src/pages/PreviewWindow.tsx`, `builder/src/components/visual/VisualWorkspace.tsx`, `builder/src/components/Inspector.tsx`, `builder/src/utils/dialogPresentation.ts` (new), `core/src/beats/{DialogTreeBeat,index}.ts`, `beat-definitions/core-beats.json`, `docs/USER_GUIDE.md`; tests `builder/src/utils/__tests__/dialogPresentation.test.ts`, `core/tests/beats/DialogTreePresentation.test.ts` (new). Then: `builder/src/editors/{DialogTreeEditor,ChoiceConditionsEditor}.tsx`, `builder/src/utils/{speakerColors (new),projectDeserializer}.ts`, prompt files above; tests `editors/__tests__/DialogTreeContinueStep.test.tsx`, `utils/__tests__/{speakerColors,migrateHiddenSoleLinks}.test.ts` (new), `core/tests/beats/DialogTreeContinueStep.test.ts`. Suites green: core 2912, builder 2880.
 
 ---
 

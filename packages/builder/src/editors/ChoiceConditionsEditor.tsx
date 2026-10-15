@@ -44,6 +44,10 @@ interface ChoiceConditionsEditorProps {
   availableInventoryItems: AvailableOption[];
   /** Story characters, for the feeling gate's holder / target pickers. Optional — without it those fields are free text. */
   characters?: Array<{ id: string; name?: string; displayName?: string; role?: string }>;
+  /** Heading; a dialog continue step reads "This line plays only if…". */
+  label?: string;
+  /** Tooltip on the Add button. */
+  addTitle?: string;
 }
 
 type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat' | 'sentiment' | 'roleHolder';
@@ -88,6 +92,8 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
   availableVariables,
   availableInventoryItems,
   characters,
+  label = 'Show only if…',
+  addTitle = "Add a condition — the choice is shown only when every condition holds. The guard appears on this choice's edge in the flowchart.",
 }) => {
   const conditions = value ?? [];
   const roles = useProjectRoles();
@@ -117,13 +123,13 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-violet-700 flex items-center gap-1">
-          <span aria-hidden>◇</span> Show only if…
+          <span aria-hidden>◇</span> {label}
           {conditions.length > 1 && <span className="text-[10px] text-gray-500">(all must hold)</span>}
         </div>
         <button
           onClick={add}
           className="text-[11px] text-violet-700 hover:text-violet-900 flex items-center gap-0.5"
-          title="Add a condition — the choice is shown only when every condition holds. The guard appears on this choice's edge in the flowchart."
+          title={addTitle}
         >
           <Plus className="w-3 h-3" /> Add
         </button>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   MessageSquare,
   Plus,
@@ -19,7 +19,8 @@ import {
   Minimize2,
   Maximize2,
   Sparkles,
-  Loader2
+  Loader2,
+  SlidersHorizontal
 } from 'lucide-react';
 import type { Beat, Effect } from '@asaps/core';
 import { useAI } from '../hooks/useAI';
@@ -28,6 +29,8 @@ import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 import type { DialogGenerationRequest } from '../types/ai';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
 import { ChoiceConditionsEditor } from './ChoiceConditionsEditor';
+import { describeCondition } from '../utils/wiringVocabulary';
+import { assignSpeakerColorSlots, hashSpeakerSlot, speakerColorKey } from '../utils/speakerColors';
 import { TextFieldWithVariables } from './TextFieldWithVariables';
 import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 import { dialogTreePhaseCount } from '../utils/dialogTreePhases';
@@ -118,18 +121,6 @@ const SPEAKER_COLORS = [
   { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-700', accent: 'bg-teal-500' },
 ];
 
-// Get consistent color for a speaker based on name hash
-const getSpeakerColor = (speaker: string): typeof SPEAKER_COLORS[0] => {
-  if (!speaker) return SPEAKER_COLORS[0];
-  // Simple hash function for consistent color assignment
-  let hash = 0;
-  for (let i = 0; i < speaker.length; i++) {
-    hash = ((hash << 5) - hash) + speaker.charCodeAt(i);
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return SPEAKER_COLORS[Math.abs(hash) % SPEAKER_COLORS.length];
-};
-
 export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   dialogTree,
   onChange,
@@ -149,6 +140,12 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   beatHasAuthorLocations = false,
 }) => {
   const projectRoles = useProjectRoles();
+  // Speakers keep a colour in the order they first speak in this tree.
+  const speakerSlots = useMemo(() => assignSpeakerColorSlots(dialogTree), [dialogTree]);
+  const getSpeakerColor = (speaker: string | undefined): typeof SPEAKER_COLORS[0] => {
+    const key = speakerColorKey(speaker);
+    return SPEAKER_COLORS[(speakerSlots.get(key) ?? hashSpeakerSlot(key)) % SPEAKER_COLORS.length];
+  };
   // Custom speaker input state
   const [customSpeakerValue, setCustomSpeakerValue] = useState<string>('');
   // AI hook
@@ -160,6 +157,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     return new Set(['root']);
   });
   const [expandedChoices, setExpandedChoices] = useState<Set<string>>(new Set());
+  // Continue steps whose conditions & effects panel is open (by choice id).
+  const [openStepSettings, setOpenStepSettings] = useState<Set<string>>(new Set());
 
   // P3-3c-14 — the dialog node currently focused on the canvas (via
   // walker). Set by an `asaps:dialogTreeWalkChanged` event dispatched
@@ -351,27 +350,29 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
 
   // "Then another character speaks": a continue step to a new node. The new
   // line goes to a different character than this one when there is one.
-  const addContinueAtPath = (path: string[]) => {
+  // The engine plays the first continue step whose conditions hold, so a new
+  // step goes before the first one without conditions (which always plays);
+  // a conditional one ("…if") opens its conditions for editing.
+  const addContinueAtPath = (path: string[], conditional = false) => {
     const node = getNodeAtPath(dialogTree, path);
     if (!node) return;
     const nextSpeaker = characters.find(c => c && c !== node.speaker) ?? '';
-    const updated = updateNodeAtPath(dialogTree, path, {
-      choices: [
-        ...(node.choices || []),
-        {
-          id: `continue_${Date.now()}`,
-          text: '',
-          continue: true,
-          dialogNode: {
-            id: `node_${Date.now()}`,
-            speaker: nextSpeaker,
-            text: '',
-            choices: [],
-          },
-        },
-      ],
-    });
-    onChange(updated);
+    const step: DialogChoice = {
+      id: `continue_${Date.now()}`,
+      text: '',
+      continue: true,
+      dialogNode: {
+        id: `node_${Date.now()}`,
+        speaker: nextSpeaker,
+        text: '',
+        choices: [],
+      },
+    };
+    const choices = [...(node.choices || [])];
+    const always = choices.findIndex(c => c.continue && !c.conditions?.length);
+    choices.splice(always >= 0 ? always : choices.length, 0, step);
+    onChange(updateNodeAtPath(dialogTree, path, { choices }));
+    if (conditional) setOpenStepSettings(prev => new Set(prev).add(step.id));
   };
 
   // Update choice at path
@@ -544,9 +545,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const isExpanded = expandedNodes.has(nodeId);
     const isNPC = depth % 2 === 0; // Even depths are NPC, odd are player
     // A continue step is not a player reply; it is drawn as the next line.
+    // The engine plays the first one whose conditions hold; the player's
+    // replies come only when none does, so a step without conditions hides
+    // the replies and every step after it.
     const replyChoices = (node.choices || []).filter(c => !c.continue);
-    const continueIndex = (node.choices || []).findIndex(c => c.continue);
-    const continueStep = continueIndex >= 0 ? node.choices[continueIndex] : undefined;
+    const continueSteps = (node.choices || [])
+      .map((choice, index) => ({ choice, index }))
+      .filter(({ choice }) => choice.continue);
+    const alwaysStep = continueSteps.findIndex(({ choice }) => !choice.conditions?.length);
+    const repliesReachable = alwaysStep < 0;
     const hasChoices = replyChoices.length > 0;
     // For root node or nodes without choices, always show as expanded to display "Add Player Response"
     // For nested nodes (depth > 0), always show content since parent choice was already expanded to get here
@@ -701,7 +708,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               onClick={onRemoveSelf}
               className="p-1 text-red-500 hover:bg-red-50 rounded"
               title={chained
-                ? 'Remove this line and everything that follows it. The line above then waits for player responses again.'
+                ? 'Remove this line and everything that follows it.'
                 : 'Remove NPC response and any nested player choices below it. The parent player choice stays — pick a new onward target for it from its dropdown.'}
             >
               <X className="w-3 h-3" />
@@ -711,8 +718,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         
         {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
         {/* Hide choices when NPC auto-exit is set (they are unreachable) */}
-        {(shouldShowContent) && !node.target && !(continueStep && !hasChoices) && (
+        {(shouldShowContent) && !node.target && (repliesReachable || hasChoices) && (
           <div className={`${expanded ? 'ml-10 pl-3' : 'ml-6 pl-2'} border-l-2 border-gray-200`}>
+            {isNPC && continueSteps.length > 0 && (
+              <p className="text-xs text-gray-500 mb-1" data-testid="dialog-replies-otherwise">
+                {repliesReachable
+                  ? 'Unless one of the lines below plays, the player answers:'
+                  : 'Never offered: the line below has no condition, so it always plays instead.'}
+              </p>
+            )}
             {node.choices && node.choices.map((choice, index) => {
               if (choice.continue) return null; // drawn below as the next line
               const choiceId = `${nodeId}.choice_${index}`;
@@ -1018,9 +1032,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               );
             })}
             
-            {/* Add choice button for NPC nodes. A line followed by another
-                character's line takes no player replies. */}
-            {isNPC && !continueStep && (
+            {/* Add choice button for NPC nodes. A line that always moves on
+                to another character's line takes no player replies. */}
+            {isNPC && repliesReachable && (
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   onClick={() => addChoiceAtPath(path)}
@@ -1029,14 +1043,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   <Plus className="w-3 h-3" />
                   Add Player Response
                 </button>
-                {!hasChoices && (
+                {continueSteps.length === 0 && (
                   <button
-                    onClick={() => addContinueAtPath(path)}
+                    onClick={() => addContinueAtPath(path, hasChoices)}
+                    data-testid="dialog-add-continue"
                     className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 flex items-center gap-1"
-                    title="Another character speaks next, before the player answers. The story moves on to that line after the reading time."
+                    title={hasChoices
+                      ? 'Another character speaks instead of the player answering, when the conditions you set hold (for example, a bystander steps in if the player helped earlier).'
+                      : 'Another character speaks next, before the player answers. The story moves on to that line after the reading time.'}
                   >
                     <Users className="w-3 h-3" />
-                    Then another character speaks
+                    {hasChoices ? 'Or another character speaks, if…' : 'Then another character speaks'}
                   </button>
                 )}
               </div>
@@ -1044,20 +1061,105 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           </div>
         )}
 
-        {/* The next line of the scene, reached without a player reply. */}
-        {isNPC && !node.target && continueStep?.dialogNode && (
-          <div>
-            <div className="flex items-center gap-1.5 ml-3 my-1 text-xs text-gray-500">
-              <ChevronDown className="w-3 h-3" />
-              <span>then, after the reading time</span>
+        {/* The next line of the scene, reached without a player reply: the
+            first step whose conditions hold plays. */}
+        {isNPC && !node.target && continueSteps.length > 0 && (
+          <div data-testid="dialog-continue-steps">
+            {continueSteps.map(({ choice: step, index: stepIndex }, k) => {
+              const conds = step.conditions ?? [];
+              const effects = step.effects ?? [];
+              const when = conds.map(c => describeCondition(c as any)).join(' and ');
+              const label = k === 0
+                ? (conds.length ? `then, if ${when}` : 'then, after the reading time')
+                : (conds.length ? `otherwise, if ${when}` : 'otherwise');
+              const isOpen = openStepSettings.has(step.id);
+              const unreachable = alwaysStep >= 0 && k > alwaysStep;
+              return (
+                <div key={step.id} data-testid="dialog-continue-step">
+                  <div className="flex items-center gap-1.5 ml-3 my-1 text-xs text-gray-500">
+                    <ChevronDown className="w-3 h-3 flex-shrink-0" />
+                    <span className={`min-w-0 break-words ${conds.length ? 'text-violet-700' : ''}`}>{label}</span>
+                    <button
+                      type="button"
+                      data-testid="dialog-continue-settings"
+                      onClick={() => setOpenStepSettings(prev => {
+                        const next = new Set(prev);
+                        if (next.has(step.id)) next.delete(step.id); else next.add(step.id);
+                        return next;
+                      })}
+                      className={`ml-auto flex-shrink-0 px-1.5 py-0.5 rounded border flex items-center gap-1 ${
+                        isOpen ? 'bg-violet-100 border-violet-300 text-violet-800' : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                      title="When this line plays (conditions) and what it changes in the story (effects)"
+                    >
+                      <SlidersHorizontal className="w-3 h-3" />
+                      {conds.length > 0 && <span>◇ {conds.length}</span>}
+                      {effects.length > 0 && <span>⚡ {effects.length}</span>}
+                      {!conds.length && !effects.length && <span>Conditions & effects</span>}
+                    </button>
+                  </div>
+                  {isOpen && (
+                    <div className="ml-3 mb-2 p-2 bg-white border border-violet-200 rounded-lg space-y-2" data-testid="dialog-continue-panel">
+                      <ChoiceConditionsEditor
+                        label="This line plays only if…"
+                        addTitle="Add a condition — this line plays only when every condition holds. Otherwise the next line below plays, or the player answers."
+                        characters={characterObjects}
+                        value={step.conditions}
+                        onChange={(next) => updateChoiceAtPath(path, stepIndex, { conditions: next })}
+                        allBeats={allBeats}
+                        availableCounters={effectCounters}
+                        availableVariables={effectVariables}
+                        availableInventoryItems={effectInventoryItems}
+                      />
+                      <div>
+                        <span className="text-xs text-gray-600">When this line plays:</span>
+                        <ChoiceEffectsEditor
+                          effects={effects}
+                          onChange={(next) => updateChoiceAtPath(path, stepIndex, { effects: next })}
+                          availableCounters={effectCounters}
+                          availableVariables={effectVariables}
+                          availableInventoryItems={effectInventoryItems}
+                          availableCharacters={characterObjects}
+                          emotionPalette={emotionPalette}
+                          compact
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {unreachable && (
+                    <p className="ml-3 mb-1 text-[11px] text-amber-700" data-testid="dialog-continue-unreachable">
+                      ⚠ Never plays: the line above has no condition, so it always plays first. Give that one a condition, or remove this one.
+                    </p>
+                  )}
+                  {step.dialogNode ? renderDialogNode(
+                    step.dialogNode,
+                    [...path, `choice_${stepIndex}`],
+                    depth + 2,
+                    () => removeChoiceAtPath(path, stepIndex),
+                    true,
+                  ) : step.target ? (
+                    <div className="ml-3 text-xs text-green-700 flex items-center gap-1">
+                      <ArrowRight className="w-3 h-3" />
+                      {step.target === '__self__' ? 'Loop to start' : (allBeats?.find(b => b.id === step.target)?.name || step.target)}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+            <div className="ml-3 mt-1 mb-2 flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => addContinueAtPath(path, true)}
+                data-testid="dialog-add-alternative"
+                className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-xs hover:bg-blue-100 flex items-center gap-1"
+                title="A different next line that plays when its conditions hold (checked from the top; the first that holds plays)."
+              >
+                <Plus className="w-3 h-3" />
+                Or a different line, if…
+              </button>
+              {repliesReachable && !hasChoices && (
+                <span className="text-[11px] text-gray-500">If no condition holds, the conversation ends here.</span>
+              )}
             </div>
-            {renderDialogNode(
-              continueStep.dialogNode,
-              [...path, `choice_${continueIndex}`],
-              depth + 2,
-              () => removeChoiceAtPath(path, continueIndex),
-              true,
-            )}
           </div>
         )}
       </div>

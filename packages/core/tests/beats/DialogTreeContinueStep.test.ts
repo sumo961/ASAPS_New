@@ -135,6 +135,35 @@ describe('DialogTree continue step', () => {
     expect(dialogs[1]).toBe('Jonas: Fine by me.');
   });
 
+  it('a conditional line steps in before the replies; with no match the player answers', async () => {
+    const make = () => new DialogTreeBeat({
+      id: 'bully', name: 'Bully', type: 'dialogTree',
+      dialogTree: {
+        id: 'n0', speaker: 'Bully', text: 'Nice shoes.',
+        choices: [
+          { id: 'zoe', text: '', continue: true,
+            conditions: [{ type: 'variable', variable: 'defended', operator: '==', value: true }],
+            effects: [{ type: 'setVariable', target: 'witnessed', value: true }],
+            dialogNode: { id: 'z', speaker: 'Zoe', text: 'Leave him alone.', choices: [], target: 'beat_zoe' } },
+          { id: 'r', text: 'Stop it.', target: 'beat_reply' },
+        ],
+      },
+    } as any);
+
+    const plain = mockRenderer(['root_r']);
+    const quiet = new StoryContext();
+    expect(await make().execute(quiet, plain.renderer)).toBe('beat_reply');
+    expect(plain.choiceCalls[0].map((c: any) => c.text)).toEqual(['Stop it.']);
+    expect(quiet.getVariable('witnessed')).toBeUndefined();
+
+    const helped = new StoryContext();
+    helped.setVariable('defended', true);
+    const step = mockRenderer([]);
+    expect(await make().execute(helped, step.renderer)).toBe('beat_zoe');
+    expect(step.dialogs[1]).toBe('Zoe: Leave him alone.');
+    expect(helped.getVariable('witnessed')).toBe(true);
+  });
+
   it('keeps the continue flag through a parameter update', () => {
     const beat = scene();
     beat.updateParameters({ ...beat.getParameters() });

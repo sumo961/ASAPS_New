@@ -6087,7 +6087,13 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         {beat?.type === 'dialogTree' && choiceStateKey === 'all' && (() => {
           const node = dialogNodeAt((beat?.getParameters?.() as any)?.dialogTree, dialogTreeNodePath);
           const conditional = (node?.choices ?? [])
-            .map((c: any) => ({ text: c?.text || c?.id, when: choiceConditionSummary(c) }))
+            // A continue step has no text: name it by the line it leads to.
+            .map((c: any) => ({
+              text: c?.continue
+                ? `${c?.dialogNode?.speaker || 'Next'}: ${c?.dialogNode?.text || '…'}`
+                : (c?.text || c?.id),
+              when: choiceConditionSummary(c),
+            }))
             .filter((c: { when: string | null }) => c.when);
           if (!conditional.length) return null;
           return (

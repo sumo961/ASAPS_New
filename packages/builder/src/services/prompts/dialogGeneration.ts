@@ -82,6 +82,7 @@ Respond with JSON in this exact structure:
    - { "id": "n0", "speaker": "Mara", "text": "We can't stay here.", "choices": [ { "id": "c_next", "text": "", "continue": true, "dialogNode": { "id": "n1", "speaker": "Jonas", "text": "And go where?", "choices": [ ...player choices... ] } } ] }
    - The player sees no reply buttons, only a Continue button to skip ahead; the next line follows by itself after the reading time. Chain as many lines as the scene needs, then give the player real choices.
    - This is the only exception to rule 4: a continue step is not a player line, so its text stays empty.
+   - A continue step may carry "conditions" and "effects". Conditional continue steps are checked in order, the first that matches plays, and if none matches the node's player choices show instead: the scene can react to what the player did earlier. Effects apply when the line plays (e.g. record that the player witnessed something).
 
 ## Layout
 The dialogTree renders according to its "layoutTemplate" parameter:

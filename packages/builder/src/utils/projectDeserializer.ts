@@ -9,6 +9,7 @@ import { BeatTypeRegistry, Story, normalizeCharacter, isCopiedCharacterDescripti
 import type { Beat } from '@asaps/core';
 import type { Project } from '../storage/types';
 import { salvageBeatLocations } from './projectRepair';
+import { soleLinkParameter } from './beatTypeReference';
 
 /**
  * Extract target ID from various formats
@@ -305,6 +306,39 @@ export function migrateCopiedNpcDescriptions(beats: Beat[], characters: any[]): 
   }
   if (cleared) console.log(`[loadProjectData] Cleared ${cleared} NPC scene-notes field(s) that only repeated the character's description`);
   return cleared;
+}
+
+/**
+ * Beats whose schema keeps the exit in one parameter (aiConversation's
+ * fallbackExitTarget, see soleLinkParameter) could carry a plain link from
+ * older builds: invisible in the Inspector and used only while that field is
+ * empty. Such a link moves into the field when it is the beat's only plain
+ * link and has no condition or effects (the story plays exactly as before);
+ * a plain link duplicating a filled field is dropped. Anything else is left.
+ */
+export function migrateHiddenSoleLinks(beats: Beat[]): number {
+  let moved = 0;
+  for (const beat of beats) {
+    const linkParam = soleLinkParameter(beat.type);
+    const plain: any[] = (beat as any).connections ?? [];
+    if (!linkParam || plain.length === 0) continue;
+    const params = (beat.getParameters?.() ?? {}) as Record<string, any>;
+    const isBare = (c: any) => !c.condition && !(Array.isArray(c.effects) && c.effects.length);
+    const targetOf = (c: any) => c.targetId || c.target;
+    if (!params[linkParam]) {
+      if (plain.length !== 1 || !isBare(plain[0]) || !targetOf(plain[0])) continue;
+      beat.updateParameters({ ...params, [linkParam]: targetOf(plain[0]) });
+      (beat as any).connections = [];
+      moved++;
+    } else {
+      const kept = plain.filter(c => !(isBare(c) && targetOf(c) === params[linkParam]));
+      if (kept.length === plain.length) continue;
+      (beat as any).connections = kept;
+      moved++;
+    }
+  }
+  if (moved) console.log(`[loadProjectData] Moved ${moved} hidden plain link(s) into the beat's exit field`);
+  return moved;
 }
 
 function normalizeBeatType(type: string): string {
@@ -694,6 +728,7 @@ export function loadProjectData(project: Project): {
   }
   const characters: any[] = rawCharacters.map((c: any) => normalizeCharacter(c).character);
   migrateCopiedNpcDescriptions(beats, characters);
+  migrateHiddenSoleLinks(beats);
 
   // Extract clusters
   let clusters: any[] = [];
