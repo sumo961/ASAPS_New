@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { PlayerEngine, PlayerUI, type PlayerSettings } from '@asaps/player';
-import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner , harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
+import { ReactRenderer, type RenderContext, OrientationGate, type OrientationPolicy, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, computeStageFitScale, type ScreenHudCharacter, type HudBox, type HudCorner , harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor } from '@asaps/renderer';
 import { setUIStrings, buildLoadingTranslationMap, translateLoadingMessage, resolveProjectLayoutMode, type LayoutMode } from '@asaps/core';
 import { WebAIService, getAIConfigStatus, showAISettings } from './WebAIProvider';
 import { WebTTSService } from './WebTTSProvider';
@@ -140,9 +140,14 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         // Chrome sitting entirely outside the stage (letterbox margins) is not
         // in anyone's way.
         if (x + w <= 0 || y + h <= 0 || x >= stage.width || y >= stage.height) return;
-        const corner: HudCorner =
-          `${y + h / 2 < stage.height / 2 ? 'top' : 'bottom'}-${x + w / 2 < stage.width / 2 ? 'left' : 'right'}` as HudCorner;
-        found.push({ id: `chrome-${i}`, corner, width: Math.round(w), height: Math.round(h), kind: 'chrome' });
+        const top = y + h / 2 < stage.height / 2;
+        const left = x + w / 2 < stage.width / 2;
+        const corner: HudCorner = `${top ? 'top' : 'bottom'}-${left ? 'left' : 'right'}` as HudCorner;
+        // Reserve from the corner to the far edge of the chrome, not just its
+        // size: a button inset 16px from the corner blocks those 16px too.
+        const reachX = left ? x + w : stage.width - x;
+        const reachY = top ? y + h : stage.height - y;
+        found.push({ id: `chrome-${i}`, corner, width: Math.round(reachX), height: Math.round(reachY), kind: 'chrome' });
       });
 
       setChromeBoxes((prev) =>
@@ -426,11 +431,8 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           const character = chars.find((c: any) => c.id === characterId);
           if (!character || !character.inventoryFrame) return null;
 
-          const isPlayer = character.role === 'player';
           const ctxAny = context as any;
-          const runtimeInventory = isPlayer
-            ? (ctxAny.getInventoryEntries?.() || [])
-            : (ctxAny.getState?.().characterInventories?.[character.name] || []);
+          const runtimeInventory = ctxAny.getCharacterInventoryEntries?.(character.id) || [];
           if (!runtimeInventory.length) return null;
 
           const assetsList = (story as any).getAssets?.() || [];
@@ -439,7 +441,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
             (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url,
           );
           return {
-            items: buildRuntimeInventoryItems(runtimeInventory, character.inventory || [], harvest),
+            items: buildRuntimeInventoryItems(
+              runtimeInventory,
+              resolveItemDefinitionIcons(itemCatalogFor(character, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
+              harvest,
+            ),
             config: character.inventoryFrame,
           };
         });
@@ -931,6 +937,11 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
 
     const chars = (story as any).getCharacters?.() || [];
     const assetsList = (story as any).getAssets?.() || [];
+    let harvestCache: ReturnType<typeof harvestPickPropData> | null = null;
+    const inventoryHarvest = () => harvestCache ??= harvestPickPropData(
+      (story as any).getAllBeats?.() || [],
+      (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url,
+    );
 
     // A character's HUDs wait until the interactor has met them.
     const isHudRevealed = (c: any): boolean => !!(ctx as any).isCharacterHudRevealed?.(c.id);
@@ -952,11 +963,14 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           toMeterCounterData(counter, c.id, ctx as any, scoped, (n: string) => ctx.getCounter?.(n)),
         ),
         inventoryFrame: c.inventoryFrame,
-        inventoryItems: (c.inventory || []).map((it: any) => ({
-          id: it.id, name: it.name, displayName: it.displayName || it.name,
-          description: it.description || '', icon: it.icon || '',
-          quantity: it.quantity ?? 1, category: it.category || '',
-        })),
+        // What the character carries NOW (parity with the Preview Window).
+        inventoryItems: c.inventoryFrame
+          ? buildRuntimeInventoryItems(
+            (ctx as any).getCharacterInventoryEntries?.(c.id) || [],
+            resolveItemDefinitionIcons(itemCatalogFor(c, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
+            inventoryHarvest(),
+          )
+          : [],
         moodFrame: c.moodFrame,
         mood: ctx.getCharacterMood(c.id),
       };
@@ -1156,6 +1170,9 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
       {enableAI && playerReady && !aiStatus.embedded && (
         <button
           onClick={handleAISettings}
+          // Reserved like the language panel, so corner HUDs (inventory,
+          // meters) stack around it instead of under it.
+          data-asaps-chrome
           title={aiStatus.configured ? 'AI Configured - Click to change' : 'Configure AI API Key'}
           style={{
             position: 'absolute',

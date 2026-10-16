@@ -83,6 +83,7 @@ Respond with JSON in this exact structure:
    - The player sees no reply buttons, only a Continue button to skip ahead; the next line follows by itself after the reading time. Chain as many lines as the scene needs, then give the player real choices.
    - This is the only exception to rule 4: a continue step is not a player line, so its text stays empty.
    - A continue step may carry "conditions" and "effects". Conditional continue steps are checked in order, the first that matches plays, and if none matches the node's player choices show instead: the scene can react to what the player did earlier. Effects apply when the line plays (e.g. record that the player witnessed something).
+10. SPEAKER LOOKS: when a speaker is a defined character with visual states (pictures such as "angry" or "sad", listed with the character), a node may set "speakerState" to one of those state ids. The speaker's figure and picture show it from that line on, until another line changes it. Leave it out when no states are listed.
 
 ## Layout
 The dialogTree renders according to its "layoutTemplate" parameter:

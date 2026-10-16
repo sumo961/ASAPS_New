@@ -37,8 +37,8 @@ const BOOLEAN_FIELDS = new Set(['suppressEmotion', 'suppressSeed']);
 
 export const EFFECT_SPECS: Record<EffectType, EffectSpec> = {
   setVariable: { required: ['target'], optional: ['value'], summary: 'target = variable name, value = new value' },
-  addInventory: { required: ['target'], optional: ['character'], summary: 'target = item name; character? = owner (default the player)' },
-  removeInventory: { required: ['target'], optional: ['character'], summary: 'target = item name; character? = owner' },
+  addInventory: { required: ['target'], optional: ['character', 'itemImage'], summary: 'target = item name; character? = owner (default the player); itemImage? = image asset id the inventory shows for the item' },
+  removeInventory: { required: ['target'], optional: ['character', 'itemImage'], summary: 'target = item name; character? = owner; itemImage? = image asset id for the item' },
   incrementCounter: { required: ['target'], optional: ['value', 'character'], summary: 'target = counter name, value = delta (default 1, may be negative); character? = owner of a per-character counter' },
   setCounter: { required: ['target', 'value'], optional: ['character'], summary: 'target = counter name, value = new value; character? = owner' },
   nudgeMood: { required: ['target'], optional: ['valenceDelta', 'arousalDelta'], nonZeroOneOf: ['valenceDelta', 'arousalDelta'], summary: 'target = character; valenceDelta / arousalDelta in -1..1 (at least one non-zero)' },

@@ -2168,6 +2168,31 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 </span>
               </label>
 
+              <label className="flex items-start gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  data-testid="setting-message-history"
+                  checked={settings.hudOverlays?.messageHistory || false}
+                  onChange={(e) => {
+                    setSettings({
+                      ...settings,
+                      hudOverlays: { ...settings.hudOverlays, messageHistory: e.target.checked },
+                    });
+                    setHasChanges(true);
+                  }}
+                />
+                <span>
+                  Message history
+                  <span className="block text-xs text-gray-500">
+                    Players can reopen the conversations they have had so far, like chats in a
+                    messenger: every Dialog Tree played, with the lines as they were shown and the
+                    player's replies. It's history only; nothing replays. Opens from the player's
+                    menu (Messages) and from the Preview Window's toolbar.
+                  </span>
+                </span>
+              </label>
+
               {/* Timer HUD Section */}
               <div className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">

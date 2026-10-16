@@ -30,6 +30,12 @@ export const UI_STRING_DEFAULTS = {
   typeYourResponse: 'Type your response...',
   listening: 'Listening...',
 
+  // Message history (conversations played so far)
+  messagesTitle: 'Messages',
+  messagesEmpty: 'No conversations yet.',
+  messagesBack: 'Back',
+  messagesClose: 'Close',
+
   // Inventory HUD chrome
   inventoryTitle: 'Inventory',
   inventoryExpandHint: '{title} ({count} items) - click to expand',

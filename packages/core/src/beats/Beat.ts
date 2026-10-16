@@ -354,6 +354,9 @@ export abstract class Beat {
       // Always set backgroundAssetId centrally so individual beats don't need to
       // This ensures the background is cleared when a beat doesn't have one
       renderer.setState('backgroundAssetId', this.node || null);
+      // Character states set by dialog lines ("angry") last for that
+      // conversation only; every beat starts from the authored states.
+      renderer.setState('speakerStates', undefined);
       
       // Prefetch: while the user reads/interacts with this beat, start generating
       // content for any connected AI beats in the background

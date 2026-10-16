@@ -19,7 +19,7 @@ import {
   Mountain,
 } from 'lucide-react';
 import { notify, errorMessage } from '../../utils/notify';
-import { ACCEPT, ACCEPT_ANY } from '../../utils/assetAccept';
+import { ACCEPT, ACCEPT_ANY, assetTypeForFile, withMimeFromName } from '../../utils/assetAccept';
 
 /**
  * Phase 3.3 — iOS-style multi-resource asset variant. Points to
@@ -120,12 +120,12 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
     console.log('[AssetManager] Files to upload:', files.length);
 
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+      const file = withMimeFromName(files[i]);
       console.log('[AssetManager] Processing file:', file.name, 'type:', file.type, 'size:', file.size);
-      const fileType = getFileType(file);
+      const fileType = assetTypeForFile(file);
 
       if (!fileType) {
-        console.warn(`[AssetManager] Unsupported file type: ${file.type}`);
+        notify.warning(`${file.name} wasn't added: ASAPS can't use this kind of file as an asset.`);
         continue;
       }
 
@@ -177,14 +177,14 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
     try {
       const response = await fetch(urlInput);
       const blob = await response.blob();
-      const fileType = getFileTypeFromMime(blob.type);
+      const fileName = urlInput.split('/').pop()?.split(/[?#]/)[0] || 'remote-asset';
+      const fileType = assetTypeForFile({ name: fileName, type: blob.type });
 
       if (!fileType) {
         notify.warning('That URL is not a supported asset type.', { detail: blob.type || 'unknown type' });
         return;
       }
 
-      const fileName = urlInput.split('/').pop() || 'remote-asset';
       const asset: Asset = {
         id: `asset_${Date.now()}`,
         name: fileName,
@@ -223,18 +223,6 @@ export const AssetManager: React.FC<AssetManagerProps> = ({
       console.error('Failed to load asset from URL:', error);
       notify.error('Could not load an asset from that URL. Check the address and try again.', { detail: errorMessage(error) });
     }
-  };
-
-  const getFileType = (file: File): Asset['type'] | null => {
-    return getFileTypeFromMime(file.type);
-  };
-
-  const getFileTypeFromMime = (mimeType: string): Asset['type'] | null => {
-    if (mimeType.startsWith('image/')) return 'image';
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType.includes('font') || mimeType.includes('ttf') || mimeType.includes('otf')) return 'font';
-    return null;
   };
 
   const guessImageSubType = (filename: string): Asset['subType'] => {

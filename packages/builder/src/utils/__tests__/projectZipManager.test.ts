@@ -472,6 +472,41 @@ describe('projectZipManager', () => {
       expect(mockStorage.createAsset).toHaveBeenCalled();
     });
 
+    it('gives an asset a fresh id when another project already owns its id, and repoints the story', async () => {
+      const zip = new JSZip();
+      zip.file('project.json', JSON.stringify({
+        metadata: { exportVersion: '1.1.0', projectId: 'copy-id', projectName: 'Copy' },
+        project: {
+          id: 'copy-id', name: 'Copy', settings: {},
+          story: {
+            beats: [{ id: 'b1', type: 'chooseCharacter', parameters: { choices: [{ id: 'c1', text: 'Zoe', image: 'asset_1' }] } }],
+            characters: [{ id: 'z', name: 'Zoe', portrait: { assetId: 'asset_1' }, states: [{ id: 'calm', visual: { assetId: 'asset_1' } }] }],
+          },
+        },
+      }));
+      zip.file('characters/asset_1_zoe.png', new Blob(['png']));
+      zip.file('characters/asset_1.json', JSON.stringify({ id: 'asset_1', filename: 'zoe.png', type: 'image', mimeType: 'image/png', size: 3 }));
+      const zipFile = new File([await zip.generateAsync({ type: 'blob' })], 'copy.asaps');
+
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+      mockStorage.getAsset.mockResolvedValueOnce({ success: true, data: { id: 'asset_1', projectId: 'original-project' } });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: false });
+
+      expect(result.success).toBe(true);
+      const created = mockStorage.createAsset.mock.calls[0][0];
+      expect(created.id).not.toBe('asset_1');
+      expect(created.projectId).toBe('copy-id');
+      const story = mockStorage.createProject.mock.calls[0][0].story;
+      expect(JSON.stringify(story)).not.toContain('"asset_1"');
+      expect(story.characters[0].portrait.assetId).toBe(created.id);
+      expect(story.characters[0].states[0].visual.assetId).toBe(created.id);
+      const beat = story.beats[0];
+      expect((beat.parameters ?? beat.getParameters?.()).choices[0].image).toBe(created.id);
+    });
+
     it('should fail if project.json is missing', async () => {
       const zip = new JSZip();
       const zipBlob = await zip.generateAsync({ type: 'blob' });

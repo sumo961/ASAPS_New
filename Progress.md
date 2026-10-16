@@ -1,5 +1,62 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.117, 2026-10-16)
+
+### Overview
+Five items from Hartmut's list plus a follow-up: inventory pictures, starting items handed out, a pull that failed over the lock file, custom fonts on Windows, character looks per dialog line, and a message history.
+- **Inventory pictures from Inventory beats and effects.** The Inventory Management beat has an **Item picture** and add/remove inventory effects a **Picture** button. Before, only items listed on a character or picked up through Pick Prop had pictures.
+- **The screen-corner inventory panel shows what the character carries.** It listed the character's authored items whether held or not, so items given during play never appeared (Preview Window and exported player). The per-character lookups also read the store by name while the engine keys it by id.
+- **Pull no longer fails over `.asaps-editing.json`** ("Your local changes … would be overwritten by merge", reported on Windows). The app rewrites that tracked file whenever a beat is selected; pull, branch switch and merge now set it aside and merge the local locks back.
+- **Custom fonts work.** Windows reports no file type for `.ttf`, so the Asset Manager skipped the file silently. Fonts were also never registered in the Preview Window or the exported players.
+- **Dialog Tree lines can change how the speaker looks** (one of their character states, e.g. angry): the figure on stage and the speaker picture/chat avatar follow from that line on.
+- **Message history** (Project Settings → HUD, off by default): players reopen the Dialog Trees played so far as messenger-style chats, from Menu → Messages; the Preview Window has a toolbar button.
+
+### Inventory pictures
+- `addRemoveInventory.itemImage` (schema, beat class, generated types) and `Effect.itemImage` on addInventory/removeInventory; Inspector `asset-picker` schema control (image accept) via a new `ImageAssetField` on a `ProjectAssetsContext`, so the effects editor gets it in all eight hosts without prop threading.
+- Runtime: `harvestPickPropData` also collects inventory-beat and effect pictures (they fill gaps; authored item and Pick Prop pictures win). `.asaps` import remaps and export ships these asset ids (`itemImageHolders`).
+- New core `StoryContext.getCharacterInventoryEntries(charRef)` (id-keyed bucket; the player's character also holds the global inventory) used by every inventory HUD path: Preview Window, web player, PlayerEngine (now on the shared renderer helpers too).
+- Co-Designer vocabulary and the schema effect description know `itemImage`.
+
+### Starting inventory
+- Items listed on a character (Character → Inventory) are now handed out at story start (`StoryContext.seedCharacterInventoriesFromStory`): the player's character into the player inventory, others into their own; again on restart and on an inventory reset; never doubled. The guide had always called them starting items, but the runtime never gave them out.
+- Path analysis starts with them too, and now simulates Inventory beats that remove (it read `operation`, the beat stores `action`). Preview presets add an item only when it isn't already held.
+
+- An item is shown with the owner's record first, then any other character's (`itemCatalogFor`): stories keep a "storage" character as their item catalogue (Grupp 5 Birka: the fish picture lives on The Storage). Verified on that story in the Preview Window and an export: Fish appears at the lake and disappears after the harbour, which was the students' report.
+- Item pictures on a character's list resolve from their asset in every player (`resolveItemDefinitionIcons`, renderer); the Preview Window and web player only used the stored URL, a builder blob URL that is empty or dead elsewhere.
+
+### Importing a copy of a project that is already in the library (web builder)
+- Assets kept their original ids; when another project already owned an id, the store kept the old record and the imported project had no pictures at all. Such assets now get a fresh id, and the story is repointed.
+- The import remap and the export scan now also cover character portraits (and variant portrait overrides) and Choose Your Character option pictures.
+
+### Pull and the editing-lock file
+- `GitAdapter.withEditingLocksSetAside` around `gitPull`, `gitSwitchBranch`, `gitMerge`; pure three-way merge in `vcs/editingLockMerge.ts` (local changes per beat id win, the rest comes from the incoming file). Skips writing back while a merge or rebase is in progress.
+- Tests: unit merge tests plus a real-git test (bare remote, two clones) that reproduces the reported error with plain `git pull` and passes with the app's pull and branch switch.
+
+### Custom fonts
+- `assetTypeForFile` / `withMimeFromName` (utils/assetAccept.ts): type from the extension when the browser gives no MIME type; unsupported files now say so instead of a console warning.
+- Preview Window registers the project's fonts (`preloadFonts`); fontRegistry keys rules by URL (blob URLs change on reopen) and escapes CSS strings.
+- Players register `fonts/` assets with `FontFace` under the builder's name (`utils/customFonts.ts`), and quote custom family names.
+
+### Speaker looks per dialog line
+- Dialog node `speakerState` (schema, DialogTreeBeat migration keeps it). The engine publishes `speakerStates` (by character id and name) from the line on; `Beat.execute` clears it per beat. ReactRenderer applies it in the character, portrait and avatar resolvers; Preview Window and PlayerEngine portrait resolvers return the state picture.
+- Dialog Tree editor: a look menu next to each NPC line's speaker when the character has states. Co-Designer digest lists state ids; Co-Designer and dialog-generation prompts explain `speakerState`.
+
+### Message history
+- Core: `beginConversation` / `recordConversationLine` / `getConversations`; NPC lines and player replies as shown, the speaker's look per line, a marker on revisits; saved with games, cleared on restart and on a history reset.
+- Renderer `ConversationHistoryPanel` (chat list + transcript, narrow layout with Back); UI strings messagesTitle/Empty/Back/Close (translated with the catalog).
+- Preview Window toolbar button; PlayerUI menu entry; setting `hudOverlays.messageHistory`.
+
+### Exported player
+- The "Configure AI API Key" button is reserved chrome, and chrome is reserved from the corner edge, so the inventory panel no longer sits under it.
+
+### Verification
+- Suites: core 2917, renderer 687, player 10, builder 2891 (incl. new tests), all green.
+- In the app (QA copy, project id qa_v118_states): item pictures in the Inspector and effect editor; Preview Window: lamp and note with their pictures in the inventory panel, Zoe calm → angry on stage and in chat avatars, Windows Regular font loaded and used, Messages panel; one-file export at 1117×683: same, plus Menu → Messages and the inventory clear of the AI button.
+
+**Files modified:** beat-definitions/core-beats.json, core (StoryContext, Beat, DialogTreeBeat, AddRemoveInventoryBeat, types, uiStrings, generated types), renderer (ReactRenderer, runtimeInventory, ConversationHistoryPanel, index), player (PlayerEngine, PlayerUI, utils/customFonts), player-web (WebPlayer), builder (GitAdapter, editingLockMerge, AssetManager, assetAccept, fontRegistry, PreviewWindow, App, ProjectAssetsContext, ImageAssetField, SchemaFormGenerator, ChoiceEffectsEditor, DialogTreeEditor, GlobalSettingsInspector, storage/types, projectZipManager, wiringVocabulary, storyDigest, prompts), docs/USER_GUIDE.md
+
+---
+
 ## 2026-10-16: Scenes that remember (v0.9.117)
 
 ### Overview

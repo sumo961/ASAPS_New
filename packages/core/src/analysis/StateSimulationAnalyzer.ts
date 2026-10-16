@@ -242,6 +242,20 @@ export class StateSimulationAnalyzer {
     for (const def of Array.isArray(defs) ? defs : []) {
       if (def?.name && def.defaultValue !== undefined && def.defaultValue !== '') state.variables.set(def.name, def.defaultValue);
     }
+    // Characters start with the items listed on them (the runtime hands
+    // them out too): the player's under 'player', others under id and name.
+    for (const char of ((this.story as any).getCharacters?.() || []) as any[]) {
+      const names = (Array.isArray(char?.inventory) ? char.inventory : [])
+        .map((it: any) => (typeof it?.name === 'string' ? it.name.trim() : ''))
+        .filter(Boolean);
+      if (names.length === 0) continue;
+      const keys = char.role === 'player' ? ['player'] : [char.id, char.name].filter(Boolean);
+      for (const key of keys) {
+        const inv = state.inventory.get(key) ?? new Set<string>();
+        names.forEach((n: string) => inv.add(n));
+        state.inventory.set(key, inv);
+      }
+    }
     return state;
   }
 
@@ -1033,7 +1047,9 @@ export class StateSimulationAnalyzer {
       case 'addRemoveInventory': {
         const character = params.character || 'player';
         const item = params.item || params.prop;
-        const operation = params.operation || 'add';
+        // The beat stores 'action'; 'operation' was read before, so removes
+        // were never simulated.
+        const operation = params.action || params.operation || 'add';
         const quantity = params.quantity || 1;
 
         if (!item) break;

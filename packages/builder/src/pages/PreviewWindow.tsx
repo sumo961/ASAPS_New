@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Type, Zap, ZoomIn, ZoomOut, Maximize2, Package, ChevronDown, ChevronRight, Database, RefreshCw, Info, PanelRightClose, PanelRightOpen, Speech, Download, Mic, MicOff, MessagesSquare } from 'lucide-react';
 import { Story, StoryEngine, Beat, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
 import type { StatePreset, IAIService } from '@asaps/core';
 import { UI_STRING_DEFAULTS, setUIStrings, translateLoadingMessage, buildLoadingTranslationMap, type UIStringKey } from '@asaps/core';
-import { harvestPickPropData, buildRuntimeInventoryItems } from '@asaps/renderer';
+import { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, ConversationHistoryPanel } from '@asaps/renderer';
+import type { ConversationLine } from '@asaps/core';
 import { ReactRenderer, getAudioManager, beatSuppressesScreenHuds, toMeterCounterData, resolveMeterFrame, ScreenHudLayer, buildScreenHudLayout, type ScreenHudCharacter } from '@asaps/renderer';
 import { storyUsesAffect, anyLiveAffect } from '../utils/storyUsesAffect';
 import { convertGlobalSettingsToTheme } from '../utils/themeConverter';
@@ -32,6 +33,7 @@ import { MockSensorPanel } from '../components/preview/MockSensorPanel';
 import { rolesToSeedAtStart, type RoleHolderSource } from '../utils/rolePreview';
 import { beatCastRoles } from '../utils/roleFindings';
 import { usePersistedState } from '../utils/persistedState';
+import { preloadFonts } from '../utils/fontRegistry';
 import {
   createRuntimeAIService,
   createProxyTransport,
@@ -526,6 +528,9 @@ export const PreviewWindow: React.FC = () => {
   // ~40% of the window went to a variable dump before anything ran) and
   // persisted, so authors who live in it keep it with one click ever.
   const [showDebugPanel, setShowDebugPanel] = usePersistedState<boolean>('asaps_ui_pw_debug', false);
+  // Message history (Project Settings → HUD → Message history): the
+  // conversations played so far, opened from the toolbar.
+  const [messagesOpen, setMessagesOpen] = useState(false);
   // True while an explainHuds beat is showing its callouts unacknowledged.
   const explainOverlayActive = !!(
     currentBeat && (currentBeat as any).explainHuds && !explainAcknowledged[currentBeat.id]
@@ -596,6 +601,22 @@ export const PreviewWindow: React.FC = () => {
    * `debugInfo` is a dependency on purpose: it changes whenever affect moves,
    * which is exactly when a bound meter's value and its band phrase change.
    */
+  /** A message-history line's speaker picture: the state the line showed, else the portrait. */
+  const resolveLinePicture = (line: ConversationLine): string | undefined => {
+    const pd = previewDataRef.current;
+    if (!pd?.characters?.length) return undefined;
+    const assets = pd.assets || [];
+    const urlOf = (visual: any): string | undefined => {
+      const asset = visual?.assetId ? assets.find((a: any) => a.id === visual.assetId) : undefined;
+      return asset?.url || (visual?.image && !String(visual.image).startsWith('blob:') ? visual.image : undefined);
+    };
+    const ch: any = (line.characterId && pd.characters.find((x: any) => x.id === line.characterId))
+      || findSpeakerCharacter(line.speaker, pd.characters as any[]);
+    if (!ch) return line.fromPlayer ? undefined : resolvePortraitUrl(line.speaker, pd.characters, assets);
+    const state = line.speakerState ? (ch.states || []).find((st: any) => st.id === line.speakerState) : undefined;
+    return urlOf(state?.visual) || urlOf(ch.portrait) || ch.portrait?.image;
+  };
+
   const screenHud = useMemo(() => {
     const ctx = engineRef.current?.getContext();
     if (!ctx) return null;
@@ -608,6 +629,13 @@ export const PreviewWindow: React.FC = () => {
     const chars = previewDataRef.current?.characters || [];
     const assetsList = previewDataRef.current?.assets || [];
     void debugInfo;
+    // Item pictures and labels from pickProp / inventory beats, walked once
+    // and only when some character has an inventory HUD.
+    let harvestCache: ReturnType<typeof harvestPickPropData> | null = null;
+    const inventoryHarvest = () => harvestCache ??= harvestPickPropData(
+      (ctx as any).getStory?.()?.getAllBeats?.() || [],
+      (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url,
+    );
 
     // A character's HUDs wait until the player has met them (and their
     // variant is settled) — core isCharacterHudRevealed, shared with the
@@ -631,11 +659,15 @@ export const PreviewWindow: React.FC = () => {
           toMeterCounterData(counter, c.id, ctx as any, scoped, (n: string) => countersRef.current[n]),
         ),
         inventoryFrame: c.inventoryFrame,
-        inventoryItems: (c.inventory || []).map((it: any) => ({
-          id: it.id, name: it.name, displayName: it.displayName || it.name,
-          description: it.description || '', icon: it.icon || '',
-          quantity: it.quantity ?? 1, category: it.category || '',
-        })),
+        // What the character carries NOW. The authored items are the
+        // catalogue (names, labels, pictures), not a list to show as is.
+        inventoryItems: c.inventoryFrame
+          ? buildRuntimeInventoryItems(
+            (ctx as any).getCharacterInventoryEntries?.(c.id) || [],
+            resolveItemDefinitionIcons(itemCatalogFor(c, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url),
+            inventoryHarvest(),
+          )
+          : [],
         moodFrame: c.moodFrame,
         mood: ctx.getCharacterMood(c.id),
       };
@@ -689,6 +721,12 @@ export const PreviewWindow: React.FC = () => {
   const navigatedBeatIdRef = useRef<string | null>(null); // Track manually navigated beat to prevent STORY_UPDATE from overwriting
 
   // Keep previewData ref in sync so resolver closures always access latest data
+  // Custom fonts are @font-face rules in the document that uses them; this
+  // window is its own document, so it registers the project's fonts too.
+  useEffect(() => {
+    if (previewData?.assets) preloadFonts(previewData.assets);
+  }, [previewData?.assets]);
+
   useEffect(() => {
     previewDataRef.current = previewData;
     if (previewData?.rolePreviewCasting) rolePreviewCastingRef.current = previewData.rolePreviewCasting;
@@ -1147,13 +1185,20 @@ export const PreviewWindow: React.FC = () => {
       });
 
       // Set up portrait resolver for speaker portraits in dialog
-      reactRenderer.setCharacterPortraitResolver((speakerName: string) => {
+      reactRenderer.setCharacterPortraitResolver((speakerName: string, stateId?: string) => {
         const pd = previewDataRef.current;
         if (!pd?.characters?.length) return undefined;
         // The character as it looks now (active variant merged in), found by
         // its base or its current name — '@role' speakers arrive resolved.
         const ctx = engineRef.current?.getContext() as any;
         const ch: any = findSpeakerCharacter(speakerName, pd.characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
+        // A dialog line put the speaker in another state: show that state's picture.
+        if (stateId) {
+          const st = (ch?.states || []).find((x: any) => x.id === stateId);
+          const stAsset = st?.visual?.assetId ? (pd.assets || []).find((a: any) => a.id === st.visual.assetId) : undefined;
+          const stUrl = stAsset?.url || (st?.visual?.image && !st.visual.image.startsWith('blob:') ? st.visual.image : undefined);
+          if (stUrl) return stUrl;
+        }
         if (!ch?.portrait) return resolvePortraitUrl(speakerName, pd.characters, pd.assets || []);
         if (ch.portrait.assetId) {
           const asset = (pd.assets || []).find((a: any) => a.id === ch.portrait.assetId);
@@ -1338,10 +1383,9 @@ export const PreviewWindow: React.FC = () => {
           return null;
         }
 
-        const isPlayer = character.role === 'player';
-        const runtimeInventory = isPlayer
-          ? ctx.getInventoryEntries()
-          : (ctx.getState().characterInventories[character.name] || []);
+        // What the character carries now (the player's character includes
+        // the global player inventory) — core, shared with the players.
+        const runtimeInventory = ctx.getCharacterInventoryEntries(character.id);
 
         if (runtimeInventory.length === 0) {
           return null;
@@ -1356,7 +1400,7 @@ export const PreviewWindow: React.FC = () => {
         );
         const itemData = buildRuntimeInventoryItems(
           runtimeInventory,
-          character.inventory || [],
+          resolveItemDefinitionIcons(itemCatalogFor(character, pd?.characters || []), (assetId: string) => pd?.assets?.find(a => a.id === assetId)?.url),
           harvest,
         );
 
@@ -1877,7 +1921,8 @@ export const PreviewWindow: React.FC = () => {
       if (presetToApply) {
         Object.entries(presetToApply.state.variables).forEach(([key, value]) => context.setVariable(key, value));
         Object.entries(presetToApply.state.counters).forEach(([key, value]) => context.setCounter(key, value));
-        presetToApply.state.inventory.forEach(item => context.addToInventory(item));
+        // Presets list item names; starting items are already handed out.
+        presetToApply.state.inventory.forEach(item => { if (!context.hasInInventory(item)) context.addToInventory(item); });
         presetToApply.state.visitedBeats.forEach(beatId => context.markBeatVisited(beatId));
         // The characters' feelings at this point of the story (path analysis).
         if (presetToApply.state.affect) (context as any).restoreAffectSnapshot?.(presetToApply.state.affect);
@@ -3276,6 +3321,13 @@ export const PreviewWindow: React.FC = () => {
                   collapseKey={currentBeat?.id}
                 />
               )}
+              {messagesOpen && (
+                <ConversationHistoryPanel
+                  conversations={(engineRef.current?.getContext() as any)?.getConversations?.() || []}
+                  onClose={() => setMessagesOpen(false)}
+                  resolvePicture={resolveLinePicture}
+                />
+              )}
               {startBlockedReason && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-red-600 text-white text-sm shadow-lg">
                   {startBlockedReason}
@@ -3776,6 +3828,16 @@ export const PreviewWindow: React.FC = () => {
           >
             <Package className="w-4 h-4" />
           </button>
+          {(previewData?.settings as any)?.hudOverlays?.messageHistory && (
+            <button
+              onClick={() => setMessagesOpen(prev => !prev)}
+              className={`p-1.5 rounded flex items-center gap-1 text-sm ${messagesOpen ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-gray-300'}`}
+              title={messagesOpen ? 'Close the message history' : 'Message history: the conversations played so far'}
+              data-testid="pw-messages"
+            >
+              <MessagesSquare className="w-4 h-4" />
+            </button>
+          )}
           <div className="w-px h-5 bg-gray-400 mx-1" />
           <button
             onClick={() => setShowDebugPanel(!showDebugPanel)}

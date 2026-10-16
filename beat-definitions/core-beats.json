@@ -19,12 +19,13 @@
         "speaker": "string",
         "text": "string",
         "emotion": "string?",
+        "speakerState": "string?",
         "conditions": "condition[]?",
         "choices": "dialogChoice[]",
         "effects": "effect[]?",
         "target": "string?"
       },
-      "notes": "dialogNode displays text. If 'target' is set and no visible choices exist, auto-advances to the target beat after a delay (NPC exit). A choice with continue: true moves on to the next node (often another character) the same way, without a player reply. Otherwise waits for player to click a choice. conditions[] on a NODE skips the node when unmet; conditions[] on its choices hide individual replies until the story state matches."
+      "notes": "dialogNode displays text. If 'target' is set and no visible choices exist, auto-advances to the target beat after a delay (NPC exit). A choice with continue: true moves on to the next node (often another character) the same way, without a player reply. Otherwise waits for player to click a choice. conditions[] on a NODE skips the node when unmet; conditions[] on its choices hide individual replies until the story state matches. speakerState is the id of one of the speaking character's states (Character → states, e.g. an 'angry' or 'sad' picture): from this line on, the speaker's figure on stage and their speaker picture show that state, until another line changes it or the beat ends. Only for speakers who are defined characters with states; leave it out otherwise."
     },
     "dialogChoice": {
       "description": "A player choice in dialog. Can exit to a beat or continue with nested dialog.",
@@ -128,7 +129,7 @@
       }
     },
     "effect": {
-      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}; castRole {target: role id from Project Settings roles (e.g. 'confidant'), character: character id who fills it from now on}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
+      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner, itemImage?: image asset id the inventory HUD shows for the item when nothing else gives it a picture}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}; castRole {target: role id from Project Settings roles (e.g. 'confidant'), character: character id who fills it from now on}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
       "schema": {
         "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound' | 'castRole'",
         "target": "string",
@@ -2886,6 +2887,16 @@
           "ui": {
             "control": "character-ref",
             "label": "To character"
+          }
+        },
+        "itemImage": {
+          "type": "string",
+          "required": false,
+          "description": "Picture for the item in the inventory HUD (an image asset id). Give one when the item is new to the story, i.e. not in a character's starting inventory and not picked up through a Pick Prop beat that already shows it. The picture belongs to the item name, so every later add or transfer of the same item shows it too. Add/remove inventory effects on choices and links take the same picture as itemImage.",
+          "ui": {
+            "control": "asset-picker",
+            "accept": "image/*",
+            "label": "Item picture"
           }
         },
         "connection": {

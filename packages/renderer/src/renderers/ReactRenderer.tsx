@@ -1498,7 +1498,23 @@ export class ReactRenderer extends BaseRenderer {
    * The resolver should look up the character, find the state, and return the image URL
    */
   setCharacterResolver(resolver: (characterId: string, stateId?: string) => string | undefined): void {
-    this.characterResolver = resolver;
+    // A dialog line can put its speaker in another state ("angry"); that
+    // wins over the state the stage element was authored with.
+    this.characterResolver = (characterId, stateId) =>
+      resolver(characterId, this.speakerStateFor(characterId) ?? stateId);
+  }
+
+  /**
+   * The character state a dialog line set for this character or speaker
+   * name (DialogTreeBeat publishes them as 'speakerStates' — keyed by
+   * character id and by lower-cased display name — and they hold for the
+   * rest of the conversation).
+   */
+  private speakerStateFor(key: string | undefined): string | undefined {
+    if (!key) return undefined;
+    const states = this.getState('speakerStates') as Record<string, string> | undefined;
+    if (!states) return undefined;
+    return states[key] ?? states[key.toLowerCase()];
   }
 
   /**
@@ -1574,16 +1590,22 @@ export class ReactRenderer extends BaseRenderer {
    * This allows the renderer to get avatar images for chat mode dialogs
    * The resolver should look up the character and return an avatar URL
    */
-  setCharacterAvatarResolver(resolver: (characterId: string) => string | undefined): void {
-    this.characterAvatarResolver = resolver;
+  setCharacterAvatarResolver(resolver: (characterId: string, stateId?: string) => string | undefined): void {
+    this.characterAvatarResolver = (characterId) => {
+      const state = this.speakerStateFor(characterId);
+      return state ? resolver(characterId, state) : resolver(characterId);
+    };
   }
 
   /**
    * Set the character portrait resolver function
    * Resolves speaker name to portrait image URL for dialog display
    */
-  setCharacterPortraitResolver(resolver: (speakerName: string) => string | undefined): void {
-    this.characterPortraitResolver = resolver;
+  setCharacterPortraitResolver(resolver: (speakerName: string, stateId?: string) => string | undefined): void {
+    this.characterPortraitResolver = (speakerName) => {
+      const state = this.speakerStateFor(speakerName);
+      return state ? resolver(speakerName, state) : resolver(speakerName);
+    };
   }
 
   /**

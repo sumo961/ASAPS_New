@@ -41,6 +41,8 @@ export interface DigestCharacter {
     stance?: { warmth?: number; dominance?: number };
   }> | unknown[];
   variantSelectionPolicy?: 'fixed' | 'random';
+  /** Visual states (pictures such as 'angry'); a dialog line's speakerState names one by id. */
+  states?: Array<{ id?: string; name?: string; displayName?: string }> | unknown[];
   hudReveal?: 'onAppearance' | 'fromStart' | 'onVariantChosen';
   defaultVariantId?: string;
   keepVariantOnRestart?: boolean;
@@ -242,6 +244,10 @@ export function buildStoryDigest(input: StoryDigestInput, options: StoryDigestOp
         if (c.keepVariantOnRestart) bits.push('variant kept across restarts');
         if (c.hudReveal === 'fromStart') bits.push('HUD from the start');
         else if (c.defaultVariantId) bits.push(`default variant: ${c.defaultVariantId}`);
+      }
+      const looks = Array.isArray(c.states) ? (c.states as any[]).filter((st) => st?.id) : [];
+      if (looks.length > 0) {
+        bits.push(`states (speakerState ids): ${looks.map((st: any) => st.id === (st.displayName || st.name) || !(st.displayName || st.name) ? st.id : `${st.id} "${st.displayName || st.name}"`).join(', ')}`);
       }
       if (c.counters && c.counters.length > 0) {
         // Mark bound counters. They read affect state and cannot be written

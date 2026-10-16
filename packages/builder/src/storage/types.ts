@@ -168,6 +168,8 @@ export interface GlobalSettings {
     /** Show screen HUDs on title screens too (default off — the title
      *  screen is distraction-free; see renderer utils/hudVisibility). */
     showOnTitleScreen?: boolean;
+    /** Message history: players can reopen the conversations (dialog trees) played so far. */
+    messageHistory?: boolean;
     timerHud?: {
       enabled: boolean;
       mode?: 'timer' | 'static'; // Deprecated: HUD auto-detects

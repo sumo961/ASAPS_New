@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-15T22:23:48.486Z
+ * Generated: 2026-10-16T13:04:35.432Z
  */
 
 // ============================================
@@ -20,6 +20,7 @@ export interface DialogNode {
   speaker: string;
   text: string;
   emotion?: string;
+  speakerState?: string;
   conditions?: Condition[];
   choices: DialogChoice[];
   effects?: Effect[];
@@ -673,6 +674,8 @@ export interface AddRemoveInventoryParameters {
   fromChar?: string | undefined;
   /** Target character (for transfer) */
   toChar?: string | undefined;
+  /** Picture for the item in the inventory HUD (an image asset id). Give one when the item is new to the story, i.e. not in a character's starting inventory and not picked up through a Pick Prop beat that already shows it. The picture belongs to the item name, so every later add or transfer of the same item shows it too. Add/remove inventory effects on choices and links take the same picture as itemImage. */
+  itemImage?: string | undefined;
   /** Next beat after inventory change */
   connection: Connection;
 }

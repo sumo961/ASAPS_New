@@ -109,6 +109,28 @@ export interface ChoiceRecord {
 /** Built-in story variable: which playthrough this is (1, 2, …). Readable as ${playthrough} and in conditions. */
 export const PLAYTHROUGH_VARIABLE = 'playthrough';
 
+/** One line of a played conversation, as the player saw it. */
+export interface ConversationLine {
+  speaker: string;
+  text: string;
+  /** The player's own reply. */
+  fromPlayer?: boolean;
+  /** The defined character speaking, when there is one (for their picture). */
+  characterId?: string;
+  /** The character state the line showed the speaker in ("angry"). */
+  speakerState?: string;
+  /** First line of a later visit to the same conversation. */
+  newVisit?: boolean;
+}
+
+/** A played conversation (one dialog tree beat), for the message history. */
+export interface ConversationRecord {
+  beatId: string;
+  lines: ConversationLine[];
+  /** When it last got a line (ms) — the history lists recent ones first. */
+  updatedAt: number;
+}
+
 export interface ResetOptions {
   variables?: boolean;
   /** Story counters AND every character's counters (back to their authored values). */
@@ -308,6 +330,7 @@ export interface SerializedStoryState {
   timers: Record<string, { value: number; target?: string }>;
   history: string[]; // Include beat history for proper restoration
   choiceHistory?: ChoiceRecord[]; // Rich choice tracking for AI context
+  conversations?: ConversationRecord[]; // Played dialog trees, for the message history
   fictionalTime?: FictionalTime; // Fictional time state
   geoPoints?: Record<string, GeoPoint[]>; // Named GPS point sets (optional for older saves)
 }
@@ -405,6 +428,10 @@ export class StoryContext extends EventEmitter {
   private explicitVariantSet: Record<string, boolean> = {};
   private history: string[] = [];
   private choiceHistory: ChoiceRecord[] = [];
+  /** Played conversations, oldest first (see recordConversationLine). */
+  private conversations: ConversationRecord[] = [];
+  /** Conversations entered again whose next line starts a new visit. */
+  private conversationRevisits = new Set<string>();
   private aiOutputHistory: AIOutputRecord[] = [];
   private timeline: TimelineEvent[] = [];
   private story?: Story;
@@ -491,6 +518,7 @@ export class StoryContext extends EventEmitter {
     if (story) {
       this.seedCharacterAffectFromStory();
       this.seedCharacterCountersFromStory();
+      this.seedCharacterInventoriesFromStory();
     }
     this.seedStoryVariables();
     this.seedRoles();
@@ -764,6 +792,28 @@ export class StoryContext extends EventEmitter {
     if (!charInventory) return false;
     const existing = charInventory.find(entry => entry.name === item);
     return existing !== undefined && existing.quantity > 0;
+  }
+
+  /**
+   * What a character carries now, for HUDs. A defined character's bucket is
+   * keyed by its id (whatever name or link the granting beat used); the
+   * player's character also holds the global player inventory, which is
+   * where 'player' / Player-pinned beats and effects put items.
+   */
+  getCharacterInventoryEntries(charRef: string): InventoryEntry[] {
+    const key = this.resolveCharRef(charRef);
+    const own = (key && this.state.characterInventories[key]) || this.state.characterInventories[charRef] || [];
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    const isPlayerCharacter = this.isPlayerInventoryRef(charRef)
+      || characters?.find((c) => c?.id === key)?.role === 'player';
+    if (!isPlayerCharacter) return own.map((entry) => ({ ...entry }));
+    const merged = this.state.inventory.map((entry) => ({ ...entry }));
+    for (const entry of own) {
+      const existing = merged.find((e) => e.name === entry.name);
+      if (existing) existing.quantity += entry.quantity;
+      else merged.push({ ...entry });
+    }
+    return merged;
   }
 
   getCharacterInventoryQuantity(character: string, item: string): number {
@@ -1505,6 +1555,13 @@ export class StoryContext extends EventEmitter {
     const variants = Array.isArray(base?.variants) ? base.variants.filter((v: any) => v?.id) : [];
     if (variants.length === 0) return true;
     return base.variantSelectionPolicy === 'random' && !!this.state.activeCharacterVariants[key];
+  }
+
+  /** A character ref, role ref or speaker name → the defined character's id (null for a free-text speaker). */
+  resolveCharacterId(ref: string | null | undefined): string | null {
+    if (!ref) return null;
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    return resolveCharacter(this.resolveRoleRef(ref), characters)?.id ?? null;
   }
 
   /** Record that the player has met this character (a beat or node featuring them ran). */
@@ -2595,6 +2652,38 @@ export class StoryContext extends EventEmitter {
   }
 
   /**
+   * A dialog tree beat starts (again). Its lines join the same conversation
+   * in the message history; on a later visit the first new line is marked.
+   */
+  beginConversation(beatId: string): void {
+    if (this.conversations.some(c => c.beatId === beatId && c.lines.length > 0)) {
+      this.conversationRevisits.add(beatId);
+    }
+  }
+
+  /** Add a line the player saw (or said) to a conversation's history. */
+  recordConversationLine(beatId: string, line: ConversationLine): void {
+    if (!line.text) return;
+    let record = this.conversations.find(c => c.beatId === beatId);
+    if (!record) {
+      record = { beatId, lines: [], updatedAt: 0 };
+      this.conversations.push(record);
+    }
+    const entry: ConversationLine = { ...line };
+    if (this.conversationRevisits.delete(beatId)) entry.newVisit = true;
+    record.lines.push(entry);
+    record.updatedAt = Date.now();
+    this.emit('conversationRecorded', { beatId });
+  }
+
+  /** Played conversations, most recently active first. */
+  getConversations(): ConversationRecord[] {
+    return this.conversations
+      .map(c => ({ ...c, lines: c.lines.map(l => ({ ...l })) }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  /**
    * Record AI-generated output for session logging and future AI context
    */
   recordAIOutput(output: Omit<AIOutputRecord, 'timestamp'>): void {
@@ -2722,12 +2811,15 @@ export class StoryContext extends EventEmitter {
     this.restartedFromBeatId = null;
     this.history = [];
     this.choiceHistory = [];
+    this.conversations = [];
+    this.conversationRevisits.clear();
     this.aiOutputHistory = [];
     this.timeline = [];
     // Re-seed authored initial affect after the wipe so a story restart
     // begins from the same emotional starting point each time.
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
+    this.seedCharacterInventoriesFromStory();
     this.seedStoryVariables();
     this.seedRoles();
     this.emit('reset');
@@ -2780,6 +2872,7 @@ export class StoryContext extends EventEmitter {
     if (options.inventory) {
       this.state.inventory = [];
       this.state.characterInventories = {};
+      this.seedCharacterInventoriesFromStory();
     }
     if (options.timers) {
       this.timerManager.stopAllTimers();
@@ -2795,6 +2888,8 @@ export class StoryContext extends EventEmitter {
     if (options.history) {
       this.history = [];
       this.choiceHistory = [];
+      this.conversations = [];
+      this.conversationRevisits.clear();
       this.aiOutputHistory = [];
       this.timeline = [];
     }
@@ -2821,6 +2916,7 @@ export class StoryContext extends EventEmitter {
     this.story = story;
     this.seedCharacterAffectFromStory();
     this.seedCharacterCountersFromStory();
+    this.seedCharacterInventoriesFromStory();
     this.seedStoryVariables();
     this.seedRoles();
   }
@@ -2990,6 +3086,39 @@ export class StoryContext extends EventEmitter {
    * that ran before this call) is never overwritten. Idempotent; called
    * from the constructor, reset, and setStory.
    */
+  /**
+   * Hand out the items listed on each character (Character → Inventory) at
+   * the start of the story. The player's character gets them in the player
+   * inventory — where 'player' beats, effects and conditions look — every
+   * other character in their own. Only items the owner doesn't hold yet are
+   * added, so seeding again (setStory after the constructor) never doubles.
+   */
+  seedCharacterInventoriesFromStory(): void {
+    const characters = (this.story as any)?.getCharacters?.() as Array<any> | undefined;
+    if (!characters) return;
+    let seeded = false;
+    for (const char of characters) {
+      if (!char?.id) continue;
+      const merged = (this.getMergedCharacter(char.id) || char) as { inventory?: Array<{ name?: string; quantity?: number }> };
+      const items = Array.isArray(merged.inventory) ? merged.inventory : [];
+      if (items.length === 0) continue;
+      const isPlayer = char.role === 'player';
+      const key = isPlayer ? null : (this.resolveCharRef(char.id) ?? char.id);
+      for (const item of items) {
+        const name = typeof item?.name === 'string' ? item.name.trim() : '';
+        if (!name) continue;
+        const quantity = typeof item.quantity === 'number' && item.quantity > 0 ? Math.floor(item.quantity) : 1;
+        const bucket = isPlayer
+          ? this.state.inventory
+          : (this.state.characterInventories[key!] ??= []);
+        if (bucket.some((entry) => entry.name === name)) continue;
+        bucket.push({ name, quantity });
+        seeded = true;
+      }
+    }
+    if (seeded) this.emit('inventoryChanged');
+  }
+
   seedCharacterCountersFromStory(): void {
     const story = this.story;
     if (!story) return;
@@ -3435,6 +3564,7 @@ export class StoryContext extends EventEmitter {
       timers: { ...this.state.timers },
       history: [...this.history],
       choiceHistory: this.choiceHistory.map(c => ({ ...c })),
+      conversations: this.conversations.map(c => ({ ...c, lines: c.lines.map(l => ({ ...l })) })),
       fictionalTime: this.state.fictionalTime ? { ...this.state.fictionalTime } : undefined,
       geoPoints: Object.fromEntries(
         Object.entries(this.state.geoPoints || {}).map(([k, v]) => [k, v.map(p => ({ ...p }))])
@@ -3538,6 +3668,10 @@ export class StoryContext extends EventEmitter {
     this.choiceHistory = serialized.choiceHistory
       ? serialized.choiceHistory.map(c => ({ ...c }))
       : [];
+    this.conversations = Array.isArray(serialized.conversations)
+      ? serialized.conversations.map(c => ({ ...c, lines: (c.lines || []).map(l => ({ ...l })) }))
+      : [];
+    this.conversationRevisits.clear();
 
     // Restart any saved timers
     for (const [name, timer] of Object.entries(serialized.timers)) {

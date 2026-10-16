@@ -1,8 +1,9 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
-import type { IRenderer, StoryMetadata, BeatConfig } from '@asaps/core';
+import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
-import { toMeterCounterData } from '@asaps/renderer';
+import { toMeterCounterData, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
+import { fontFamilyFromAssetFilename, registerFontAsset } from './utils/customFonts';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
 import { WebSaveAdapter } from './storage/WebSaveAdapter';
 import { EventEmitter } from 'eventemitter3';
@@ -112,7 +113,11 @@ const FONT_FAMILIES: Record<string, string> = {
  * Get CSS font-family from font name
  */
 function getFontFamily(fontName: string): string {
-  return FONT_FAMILIES[fontName] || fontName;
+  if (FONT_FAMILIES[fontName]) return FONT_FAMILIES[fontName];
+  // A custom font's name ("Windows Regular") — quote it so names that are
+  // not valid CSS identifiers still work; leave existing stacks alone.
+  if (!fontName || fontName.includes(',') || /^['"]/.test(fontName)) return fontName;
+  return `'${fontName.replace(/'/g, "\\'")}', sans-serif`;
 }
 
 /**
@@ -663,6 +668,10 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
             filename: assetInfo.name,
           });
 
+          if (assetInfo.type === 'font') {
+            await registerFontAsset(fontFamilyFromAssetFilename(filename, assetId), loaded.blob);
+          }
+
           console.log(`[PlayerEngine] Loaded asset: ${assetId} -> ${loaded.url.substring(0, 50)}...`);
         }
       } catch (err) {
@@ -774,12 +783,19 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
 
     // Character portrait resolver for speaker portraits
     if ('setCharacterPortraitResolver' in renderer && characters.length > 0) {
-      renderer.setCharacterPortraitResolver((speakerName: string): string | undefined => {
+      renderer.setCharacterPortraitResolver((speakerName: string, stateId?: string): string | undefined => {
         if (!speakerName) return undefined;
         // The character as it looks now (active variant merged in), found by
         // its base or its current name — '@role' speakers arrive resolved.
         const ctx = this.engine?.getContext() as any;
         const char: any = findSpeakerCharacter(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
+        // A dialog line put the speaker in another state: show that state's picture.
+        if (stateId) {
+          const st = (char?.states || []).find((x: any) => x.id === stateId || x.name === stateId);
+          const stUrl = (st?.visual?.assetId && this.assetMap.get(st.visual.assetId))
+            || (st?.visual?.image && !st.visual.image.startsWith('blob:') ? st.visual.image : undefined);
+          if (stUrl) return stUrl;
+        }
         if (!char?.portrait) return undefined;
         if (char.portrait.assetId && this.assetMap.has(char.portrait.assetId)) {
           return this.assetMap.get(char.portrait.assetId);
@@ -1024,49 +1040,29 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
           return null;
         }
 
-        const isPlayer = character.role === 'player';
-        const runtimeInventory = isPlayer
-          ? ctx.getInventoryEntries()
-          : (ctx.getState().characterInventories?.[character.name] || []);
-
-        console.log(`[InventoryResolver] Character "${characterId}" (${isPlayer ? 'player' : 'npc'}): ${runtimeInventory.length} items, showOnDemand=${character.inventoryFrame.showOnDemand}`);
-
+        // What the character carries now (the player's character includes
+        // the global player inventory) — core, shared with every player.
+        const runtimeInventory = (ctx as any).getCharacterInventoryEntries(character.id) as Array<{ name: string; quantity: number }>;
         if (runtimeInventory.length === 0) {
           return null;
         }
 
-        // Build item data from runtime inventory
-        const itemDefinitions = character.inventory || [];
-        const itemData = runtimeInventory.map((entry: { name: string; quantity: number }) => {
-          const definition = itemDefinitions.find((def: any) => def.name === entry.name);
-          if (definition) {
-            // Try to resolve icon from asset map, then prop asset map
-            const iconAssetId = definition.icon || definition.iconAssetId;
-            const iconUrl = iconAssetId ? this.assetMap.get(iconAssetId) : undefined;
-            const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase());
-            return {
-              id: definition.id || entry.name,
-              name: definition.name,
-              displayName: definition.displayName || definition.name,
-              description: definition.description || '',
-              icon: iconUrl || propIcon || '',
-              quantity: entry.quantity,
-              category: definition.category || '',
-            };
-          }
-          // No definition - try prop asset/display name maps
-          const propIcon = propAssetMap.get(entry.name) || propAssetMap.get(entry.name.toLowerCase()) || '';
-          const propDisplayName = propDisplayNameMap.get(entry.name) || propDisplayNameMap.get(entry.name.toLowerCase());
-          return {
-            id: entry.name,
-            name: entry.name,
-            displayName: propDisplayName || entry.name,
-            description: '',
-            icon: propIcon,
-            quantity: entry.quantity,
-            category: '',
-          };
-        });
+        // Authored items give labels and pictures; their pictures are asset
+        // ids here (builder blob URLs don't survive the export).
+        const itemDefinitions = resolveItemDefinitionIcons(
+          itemCatalogFor(character, characters),
+          (assetId: string) => this.assetMap.get(assetId),
+          { dropBlobUrls: true },
+        );
+        // Pictures and labels from Pick Prop beats and from inventory beats
+        // and effects (itemImage) — @asaps/renderer, shared with the web player.
+        const harvest = harvestPickPropData(
+          (ctx as any).getStory?.()?.getAllBeats?.() || [],
+          (assetId: string) => this.assetMap.get(assetId),
+        );
+        for (const [name, url] of propAssetMap) if (!harvest.assets.has(name)) harvest.assets.set(name, url);
+        for (const [name, label] of propDisplayNameMap) if (!harvest.labels.has(name)) harvest.labels.set(name, label);
+        const itemData = buildRuntimeInventoryItems(runtimeInventory, itemDefinitions, harvest);
 
         return {
           items: itemData,
@@ -1528,6 +1524,29 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
    */
   getGlobalSettings(): GlobalSettings | null {
     return this.globalSettings;
+  }
+
+  /** Whether the story offers the message history (Project Settings → HUD). */
+  hasMessageHistory(): boolean {
+    return !!(this.globalSettings?.hudOverlays as any)?.messageHistory;
+  }
+
+  /** Conversations played so far, most recent first (the message history). */
+  getConversations(): ConversationRecord[] {
+    return (this.engine?.getContext() as any)?.getConversations?.() || [];
+  }
+
+  /** A message-history line's speaker picture: the state the line showed, else the portrait. */
+  resolveConversationPicture(line: ConversationLine): string | undefined {
+    const characters: any[] = (this.engine?.getContext() as any)?.getStory?.()?.getCharacters?.() || [];
+    const ch: any = (line.characterId && characters.find((c) => c.id === line.characterId))
+      || findSpeakerCharacter(line.speaker, characters);
+    if (!ch) return undefined;
+    const urlOf = (visual: any): string | undefined =>
+      (visual?.assetId && this.assetMap.get(visual.assetId))
+      || (visual?.image && !String(visual.image).startsWith('blob:') ? visual.image : undefined);
+    const state = line.speakerState ? (ch.states || []).find((st: any) => st.id === line.speakerState) : undefined;
+    return urlOf(state?.visual) || urlOf(ch.portrait);
   }
 
   /**

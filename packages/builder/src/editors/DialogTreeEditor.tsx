@@ -43,6 +43,8 @@ interface DialogNode {
   characterRef?: string;
   text: string;
   emotion?: string;
+  /** One of the speaking character's states (its id): the speaker shows it from this line on. */
+  speakerState?: string;
   conditions?: Condition[];
   choices: DialogChoice[];  // Required - always followed by player choices
   effects?: Effect[];
@@ -81,7 +83,7 @@ interface DialogTreeEditorProps {
   /** Full Character records — used by the per-node speaker combobox so dropdowns
    * can show colors / display names / proper id-keyed routing. When omitted, the
    * combobox falls back to the simple string list in `characters`. */
-  characterObjects?: Array<{ id: string; name: string; displayName?: string; color?: string; role?: string }>;
+  characterObjects?: Array<{ id: string; name: string; displayName?: string; color?: string; role?: string; states?: Array<{ id: string; name?: string; displayName?: string }> }>;
   variables?: string[];
   counters?: (string | CounterOption)[];  // Can be string (backward compat) or object
   availableCounters?: AvailableCounter[];
@@ -120,6 +122,24 @@ const SPEAKER_COLORS = [
   { bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-700', accent: 'bg-indigo-500' },
   { bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-700', accent: 'bg-teal-500' },
 ];
+
+/** The defined character speaking a line: by link, else by name (case-insensitive). */
+function findSpeakerCharacter<T extends { id: string; name: string; displayName?: string }>(
+  characters: ReadonlyArray<T> | undefined,
+  characterRef: string | undefined,
+  speaker: string | undefined,
+): T | undefined {
+  if (!characters?.length) return undefined;
+  if (characterRef) {
+    const linked = characters.find((c) => c.id === characterRef);
+    if (linked) return linked;
+  }
+  const name = (speaker || '').trim().toLowerCase();
+  if (!name) return undefined;
+  return characters.find((c) => c.id.toLowerCase() === name
+    || (c.name || '').toLowerCase() === name
+    || (c.displayName || '').toLowerCase() === name);
+}
 
 export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   dialogTree,
@@ -635,6 +655,28 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                   {speakerNameResolver ? speakerNameResolver(node.speaker) : node.speaker}
                 </span>
               )}
+              {isNPC && (() => {
+                const speakerCharacter = findSpeakerCharacter(characterObjects, node.characterRef, node.speaker);
+                const states = speakerCharacter?.states?.filter((st) => st?.id) || [];
+                if (states.length === 0 && !node.speakerState) return null;
+                return (
+                  <select
+                    value={node.speakerState || ''}
+                    onChange={(e) => onChange(updateNodeAtPath(dialogTree, path, { speakerState: e.target.value || undefined }))}
+                    className={`text-xs px-1.5 py-1 border rounded bg-white max-w-[9rem] ${node.speakerState && !states.some((st) => st.id === node.speakerState) ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
+                    title="How the speaker looks from this line on: one of their character states (Characters → States). Stays until another line changes it or the conversation ends."
+                    data-testid="dialog-speaker-state"
+                  >
+                    <option value="">{node.speakerState ? 'Keep current look' : 'Look: unchanged'}</option>
+                    {node.speakerState && !states.some((st) => st.id === node.speakerState) && (
+                      <option value={node.speakerState}>{node.speakerState} (missing state)</option>
+                    )}
+                    {states.map((st) => (
+                      <option key={st.id} value={st.id}>{st.displayName || st.name || st.id}</option>
+                    ))}
+                  </select>
+                );
+              })()}
               {/* Only show choice count for root node where collapse/expand is available */}
               {hasChoices && depth === 0 && (
                 <span className="text-xs text-gray-500">

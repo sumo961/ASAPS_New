@@ -448,6 +448,13 @@ export interface Effect {
    * `target` as the character ref. Ignored for non-counter effect types.
    */
   character?: string;
+  /**
+   * Picture for the item (an image asset id) on addInventory /
+   * removeInventory effects. The inventory HUD shows it for every entry with
+   * this item name, unless the character's authored item or a Pick Prop
+   * beat already gives that item a picture. Editor-chosen; no runtime logic.
+   */
+  itemImage?: string;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
   // top-level rather than nested under `value` so the existing effect-editor
   // UI can wire them up like any other effect property.

@@ -11,6 +11,8 @@ export class AddRemoveInventoryBeat extends Beat {
   private character: string;
   private fromChar: string;
   private toChar: string;
+  /** Picture (image asset id) the inventory HUD shows for this item. */
+  private itemImage: string;
 
   constructor(config: BeatConfig & {
     parameters?: Partial<AddRemoveInventoryParameters>;
@@ -22,6 +24,7 @@ export class AddRemoveInventoryBeat extends Beat {
     this.character = config.character || config.parameters?.character || 'player';
     this.fromChar = config.fromChar || config.parameters?.fromChar || '';
     this.toChar = config.toChar || config.parameters?.toChar || '';
+    this.itemImage = (config as any).itemImage || config.parameters?.itemImage || '';
   }
 
   getParameters(): Record<string, any> {
@@ -31,7 +34,8 @@ export class AddRemoveInventoryBeat extends Beat {
       quantity: this.quantity,
       character: this.character,
       fromChar: this.fromChar,
-      toChar: this.toChar
+      toChar: this.toChar,
+      ...(this.itemImage ? { itemImage: this.itemImage } : {}),
     };
   }
 
@@ -42,6 +46,7 @@ export class AddRemoveInventoryBeat extends Beat {
     if (params.character !== undefined) this.character = params.character;
     if (params.fromChar !== undefined) this.fromChar = params.fromChar;
     if (params.toChar !== undefined) this.toChar = params.toChar;
+    if ('itemImage' in params) this.itemImage = params.itemImage || '';
   }
 
   /**

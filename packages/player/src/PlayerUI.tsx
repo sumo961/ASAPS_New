@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { PlayerEngine } from './PlayerEngine';
 import type { SaveSlot } from './SaveSystem';
+import { ConversationHistoryPanel } from '@asaps/renderer';
+import { uiString } from '@asaps/core';
 
 /**
  * Player UI configuration
@@ -67,6 +69,9 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
   // UI state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<'none' | 'save' | 'load' | 'settings'>('none');
+  // Message history (Project Settings → HUD → Message history)
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const showMessages = player.hasMessageHistory?.() ?? false;
   const [saveSlots, setSaveSlots] = useState<SaveSlot[]>([]);
   const [autoSave, setAutoSave] = useState<SaveSlot | null>(null);
   const [settings, setSettings] = useState<PlayerSettings>(DEFAULT_SETTINGS);
@@ -461,6 +466,11 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
                   </button>
                 </>
               )}
+              {showMessages && (
+                <button style={styles.button} onClick={() => { setMessagesOpen(true); setIsMenuOpen(false); }}>
+                  {uiString('messagesTitle')}
+                </button>
+              )}
               {showSettings && (
                 <button style={styles.button} onClick={() => setActivePanel('settings')}>
                   Settings
@@ -486,6 +496,14 @@ export const PlayerUI: React.FC<PlayerUIProps> = ({
           )}
         </div>
       </div>
+
+      {messagesOpen && (
+        <ConversationHistoryPanel
+          conversations={player.getConversations()}
+          onClose={() => setMessagesOpen(false)}
+          resolvePicture={(line) => player.resolveConversationPicture(line)}
+        />
+      )}
 
       {/* Panels */}
       {activePanel !== 'none' && (

@@ -187,6 +187,8 @@ export class DialogTreeBeat extends Beat {
       ...(node.characterRef ? { characterRef: node.characterRef } : {}),
       text: node.text || '',
       emotion: node.emotion,
+      // The line's character state ("angry") — see performAction.
+      ...(node.speakerState ? { speakerState: node.speakerState } : {}),
       conditions: node.conditions,
       effects: node.effects,
       choices: [],
@@ -550,6 +552,8 @@ export class DialogTreeBeat extends Beat {
     }
 
     this.currentNode = this.dialogTree;
+    // The message history keeps every dialog tree as one conversation.
+    context.beginConversation(this.id);
 
     // Get base locations array for positioned rendering (characters, props, etc.)
     const baseLocations = Array.from(this.locations.values());
@@ -653,6 +657,18 @@ export class DialogTreeBeat extends Beat {
       // The player meets this node's speaker (HUD reveal on appearance).
       context.markCharacterAppeared((this.currentNode as any).characterRef || processedSpeaker);
 
+      // A line can put its speaker in one of their character states
+      // ("angry"): their figure on stage and their speaker picture show it
+      // from this line on, until another line changes it or the beat ends.
+      const lineState = (this.currentNode as any).speakerState as string | undefined;
+      if (lineState) {
+        const states = { ...((renderer.getState?.('speakerStates') as Record<string, string> | undefined) || {}) };
+        const characterId = context.resolveCharacterId((this.currentNode as any).characterRef || this.currentNode.speaker);
+        if (characterId) states[characterId] = lineState;
+        if (processedSpeaker) states[processedSpeaker.toLowerCase()] = lineState;
+        renderer.setState('speakerStates', states);
+      }
+
       // P3-3c-9 — per-node spatial detection (computed BEFORE renderDialog
       // so the absolute speaker/text render can be skipped on spatial
       // nodes; renderDialog reads `dialogNodeIsSpatial` and early-returns
@@ -693,6 +709,17 @@ export class DialogTreeBeat extends Beat {
         this.currentNode.emotion,
         locations
       );
+      {
+        const lineCharacterId = context.resolveCharacterId((this.currentNode as any).characterRef || this.currentNode.speaker);
+        const shownStates = renderer.getState?.('speakerStates') as Record<string, string> | undefined;
+        const shownState = shownStates?.[lineCharacterId || ''] ?? shownStates?.[processedSpeaker.toLowerCase()];
+        context.recordConversationLine(this.id, {
+          speaker: processedSpeaker,
+          text: processedText,
+          ...(lineCharacterId ? { characterId: lineCharacterId } : {}),
+          ...(shownState ? { speakerState: shownState } : {}),
+        });
+      }
 
       // Check for NPC exit node: has target set (choices are unreachable when target is set)
       if (this.currentNode.target) {
@@ -867,6 +894,11 @@ export class DialogTreeBeat extends Beat {
             choiceContext: this.currentNode?.text
               ? `${this.currentNode.speaker || 'NPC'}: "${this.currentNode.text.substring(0, 100)}${this.currentNode.text.length > 100 ? '...' : ''}"`
               : this.name || 'Dialog choice',
+          });
+          context.recordConversationLine(this.id, {
+            speaker: playerName,
+            text: this.processText(selectedChoice.text, context),
+            fromPlayer: true,
           });
 
           // Apply effects from the selected choice (canonical effects array,

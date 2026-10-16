@@ -514,7 +514,21 @@ export async function importProjectFromZip(
     for (const parsed of parsedAssets) {
       // Generate new asset ID or use original
       const originalId = parsed.id;
-      const newAssetId = options.generateNewId ? uuidv4() : (originalId || uuidv4());
+      let newAssetId = options.generateNewId ? uuidv4() : (originalId || uuidv4());
+      // The same id already belongs to ANOTHER project (a copy of a project
+      // that is already in the library): keeping it would leave this project
+      // without the asset — the store keeps one record per id, owned by the
+      // first project. Give it a fresh id; story references are remapped below.
+      if (!options.generateNewId && originalId) {
+        try {
+          const existing = await storage.getAsset(originalId);
+          if (existing.success && existing.data && existing.data.projectId && existing.data.projectId !== projectId) {
+            newAssetId = uuidv4();
+          }
+        } catch {
+          // lookup failed: keep the original id
+        }
+      }
 
       // Store old -> new mapping (needed for updating story references)
       if (originalId) {
@@ -938,6 +952,29 @@ function deserializeStory(storyData: any): any {
 /**
  * Update asset references in story when IDs change
  */
+/**
+ * Objects under a serialized beat's parameters and links that carry an
+ * inventory item picture (itemImage): the Inventory Management beat itself
+ * and add/remove inventory effects on choices, dialog lines and links.
+ */
+function itemImageHolders(beat: any): any[] {
+  const holders: any[] = [];
+  const seen = new Set<object>();
+  const walk = (node: any, depth: number) => {
+    if (!node || typeof node !== 'object' || depth > 12 || seen.has(node)) return;
+    seen.add(node);
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth + 1);
+      return;
+    }
+    if (typeof node.itemImage === 'string' && node.itemImage) holders.push(node);
+    for (const key of Object.keys(node)) walk(node[key], depth + 1);
+  };
+  walk(beat?.parameters, 0);
+  walk(beat?.connections, 0);
+  return holders;
+}
+
 function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any {
   // Deep clone to avoid mutating original
   const updated = JSON.parse(JSON.stringify(story));
@@ -1004,6 +1041,15 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
             }
           }
         }
+      }
+      // Inventory item pictures: on the Inventory Management beat and on
+      // add/remove inventory effects anywhere in its choices and links
+      for (const holder of itemImageHolders(beat)) {
+        if (assetIdMap.has(holder.itemImage)) holder.itemImage = assetIdMap.get(holder.itemImage);
+      }
+      // Choose Your Character option pictures
+      for (const choice of Array.isArray(beat.parameters?.choices) ? beat.parameters.choices : []) {
+        if (typeof choice?.image === 'string' && assetIdMap.has(choice.image)) choice.image = assetIdMap.get(choice.image);
       }
     }
   }
@@ -1075,6 +1121,11 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
             item.assetId = assetIdMap.get(item.assetId);
           }
         }
+      }
+      // Speaker portrait, and a variant's portrait override
+      for (const holder of [character, ...(Array.isArray(character.variants) ? character.variants : [])]) {
+        const id = holder?.portrait?.assetId;
+        if (id && assetIdMap.has(id)) holder.portrait.assetId = assetIdMap.get(id);
       }
     }
   }
@@ -1165,6 +1216,8 @@ function extractAssetIdsFromStory(story: any): string[] {
           for (const anchor of beat.parameters.anchors) addIfUuid(anchor?.assetId);
         }
       }
+      for (const holder of itemImageHolders(beat)) addIfUuid(holder.itemImage);
+      for (const choice of Array.isArray(beat.parameters?.choices) ? beat.parameters.choices : []) addIfUuid(choice?.image);
     }
   }
 
@@ -1206,6 +1259,10 @@ function extractAssetIdsFromStory(story: any): string[] {
         for (const item of character.inventory) {
           if (item.assetId) addIfUuid(item.assetId);
         }
+      }
+      // Speaker portrait, and a variant's portrait override
+      for (const holder of [character, ...(Array.isArray(character.variants) ? character.variants : [])]) {
+        addIfUuid(holder?.portrait?.assetId);
       }
     }
   }

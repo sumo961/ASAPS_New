@@ -10,6 +10,7 @@ import type { AvailableInventoryItem } from '../hooks/useAvailableCountersAndVar
 import { DEFAULT_EFFECT_TEMPLATES, findEffectTemplate } from './effectTemplates';
 import { summarizeChoiceEffects } from './summarizeChoiceEffects';
 import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
+import { ImageAssetField } from '../components/assets/ImageAssetField';
 
 type EffectType = Effect['type'];
 
@@ -247,6 +248,7 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
             onChange={(e) => {
               const newType = e.target.value as EffectType;
               const updates: Partial<Effect> = { type: newType };
+              if (newType !== 'addInventory' && newType !== 'removeInventory') updates.itemImage = undefined;
               // Reset value for inventory types (no value needed)
               if (newType === 'addInventory' || newType === 'removeInventory') {
                 updates.value = undefined;
@@ -394,6 +396,17 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           )}
 
           {/* Type-specific extra fields */}
+          {(effect.type === 'addInventory' || effect.type === 'removeInventory') && (
+            <ImageAssetField
+              compact
+              value={effect.itemImage}
+              onChange={(assetId) => updateEffect(index, { itemImage: assetId })}
+              chooseLabel="Picture"
+              modalTitle="Picture for this item in the inventory"
+              title="The picture the inventory shows for this item, if no character's starting inventory or Pick Prop beat already has one"
+              testId="effect-item-image"
+            />
+          )}
           {effect.type === 'nudgeMood' && (
             <>
               <div className="flex items-center gap-1 flex-shrink-0" title="Valence delta — positive = happier, negative = sadder. Runtime clamps to [-1, 1].">

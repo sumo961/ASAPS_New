@@ -5,6 +5,9 @@
  * branch info, and changed files for directory-based projects.
  */
 
+import type { EditingLockFile } from './EditingLocks';
+import { mergeEditingLocks, parseLockFile, sameLockFile } from './editingLockMerge';
+
 export interface GitFileStatus {
   /** Relative file path */
   path: string;
@@ -209,6 +212,76 @@ async function removeStaleIndexLock(projectPath: string): Promise<void> {
   }
 }
 
+/** The app-written editing-lock file (see EditingLocks.ts) */
+const EDITING_LOCK_FILE = '.asaps-editing.json';
+
+/**
+ * Run a git operation that updates the working tree (pull, branch switch,
+ * merge) with the local .asaps-editing.json set aside. The app rewrites
+ * that tracked file whenever a beat is selected, so without this git
+ * refuses with "Your local changes … would be overwritten". Afterwards the
+ * local lock changes are merged back onto whatever the operation brought in.
+ */
+async function withEditingLocksSetAside(
+  projectPath: string,
+  op: () => Promise<GitOperationResult>,
+): Promise<GitOperationResult> {
+  const api = window.electronAPI;
+  if (!api?.fs?.exists || !api.fs.readFile || !api.fs.writeFile || !api.fs.unlink) return op();
+  const run = getRunCommand();
+  const sep = projectPath.includes('\\') ? '\\' : '/';
+  const filePath = `${projectPath}${sep}${EDITING_LOCK_FILE}`;
+
+  let local: EditingLockFile | null = null;
+  let base: EditingLockFile | null = null;
+  let clean = false;
+  let code = '';
+  try {
+    const status = await run('git', ['status', '--porcelain', '--', EDITING_LOCK_FILE], projectPath);
+    code = status.exitCode === 0 ? status.stdout.slice(0, 2) : '';
+    if (!code.trim()) clean = true;
+  } catch {
+    clean = true;
+  }
+  if (clean) return op();
+
+  try {
+    if (await api.fs.exists(filePath)) {
+      local = parseLockFile(new TextDecoder().decode(await api.fs.readFile(filePath)));
+    }
+    const committed = await run('git', ['show', `HEAD:${EDITING_LOCK_FILE}`], projectPath);
+    base = committed.exitCode === 0 ? parseLockFile(committed.stdout) : null;
+
+    if (committed.exitCode === 0) {
+      await run('git', ['checkout', 'HEAD', '--', EDITING_LOCK_FILE], projectPath);
+    } else {
+      if (code !== '??') await run('git', ['rm', '--cached', '-q', '--', EDITING_LOCK_FILE], projectPath);
+      if (await api.fs.exists(filePath)) await api.fs.unlink(filePath);
+    }
+  } catch (e) {
+    // Couldn't set it aside — run the operation anyway; git reports the problem.
+    console.warn('[GitAdapter] Could not set editing locks aside:', e);
+  }
+
+  const result = await op();
+
+  try {
+    // Leave an in-progress merge or rebase alone; locks are re-acquired
+    // the next time a beat is selected.
+    if (await gitDetectMergeState(projectPath)) return result;
+    const incoming = (await api.fs.exists(filePath))
+      ? parseLockFile(new TextDecoder().decode(await api.fs.readFile(filePath)))
+      : null;
+    const merged = mergeEditingLocks(base, local, incoming);
+    if (!sameLockFile(merged, incoming)) {
+      await api.fs.writeFile(filePath, JSON.stringify(merged, null, 2) + '\n');
+    }
+  } catch (e) {
+    console.warn('[GitAdapter] Could not restore editing locks:', e);
+  }
+  return result;
+}
+
 /** Check if an error message indicates a lock file conflict */
 function isLockError(message: string): boolean {
   return message.includes('index.lock') || message.includes('Unable to create') && message.includes('.lock');
@@ -330,6 +403,10 @@ export async function gitForcePush(projectPath: string): Promise<GitOperationRes
 
 /** Pull from remote, optionally with rebase. Automatically sets upstream when missing. */
 export async function gitPull(projectPath: string, rebase = false): Promise<GitOperationResult> {
+  return withEditingLocksSetAside(projectPath, () => pullUnguarded(projectPath, rebase));
+}
+
+async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitOperationResult> {
   const run = getRunCommand();
   const args = rebase ? ['pull', '--rebase'] : ['pull'];
   const result = await run('git', args, projectPath);
@@ -477,14 +554,16 @@ export async function gitListBranches(projectPath: string): Promise<GitBranch[]>
 
 /** Switch to an existing branch */
 export async function gitSwitchBranch(projectPath: string, branchName: string): Promise<GitOperationResult> {
-  const run = getRunCommand();
-  const result = await run('git', ['checkout', branchName], projectPath);
-  return {
-    success: result.exitCode === 0,
-    message: result.exitCode === 0
-      ? result.stderr.trim() || `Switched to ${branchName}`
-      : result.stderr.trim(),
-  };
+  return withEditingLocksSetAside(projectPath, async () => {
+    const run = getRunCommand();
+    const result = await run('git', ['checkout', branchName], projectPath);
+    return {
+      success: result.exitCode === 0,
+      message: result.exitCode === 0
+        ? result.stderr.trim() || `Switched to ${branchName}`
+        : result.stderr.trim(),
+    };
+  });
 }
 
 /** Create a new branch and switch to it */
@@ -504,12 +583,14 @@ export async function gitCreateBranch(projectPath: string, branchName: string, s
 
 /** Merge another branch into the current branch */
 export async function gitMerge(projectPath: string, branchName: string): Promise<GitOperationResult> {
-  const run = getRunCommand();
-  const result = await run('git', ['merge', branchName], projectPath);
-  return {
-    success: result.exitCode === 0,
-    message: result.exitCode === 0 ? result.stdout.trim() : result.stderr.trim() || result.stdout.trim(),
-  };
+  return withEditingLocksSetAside(projectPath, async () => {
+    const run = getRunCommand();
+    const result = await run('git', ['merge', branchName], projectPath);
+    return {
+      success: result.exitCode === 0,
+      message: result.exitCode === 0 ? result.stdout.trim() : result.stderr.trim() || result.stdout.trim(),
+    };
+  });
 }
 
 /** Revert changes to specific files (discard local modifications) */

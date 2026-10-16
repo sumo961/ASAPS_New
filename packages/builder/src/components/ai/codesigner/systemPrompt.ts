@@ -293,7 +293,11 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
     effects like any option: conditional continue steps are checked in
     order, the first that matches plays, and with none matching the node's
     player replies show — so a bystander can step in only if the player
-    helped earlier; its effects record what the player witnessed.
+    helped earlier; its effects record what the player witnessed. A node
+    may set "speakerState" to one of its speaker's states (the ids the
+    digest lists under the character, e.g. an angry or sad picture): the
+    speaker's figure and picture show it from that line on, until another
+    line changes it. Only use ids the digest lists.
   - 'replaceBeat' makes a NEW VERSION of a whole beat, side by side: you give
     the complete new "parameters" (optionally a different "beatType", e.g. a
     dialogTree reworked as an aiConversation, and a "name"). The app adds it,

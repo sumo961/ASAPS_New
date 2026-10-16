@@ -67,9 +67,24 @@ function getFontStyleElement(): HTMLStyleElement {
 /**
  * Load a custom font via @font-face
  */
+/**
+ * Key for a loaded custom font. Includes the URL: asset URLs are blob URLs
+ * that change when a project is reopened, and a rule pointing at the old,
+ * revoked URL would leave the font unloadable.
+ */
+function customFontKey(id: string, url?: string): string {
+  return `${id}|${url ?? ''}`;
+}
+
+/** Escape a value for use inside a single-quoted CSS string. */
+function cssString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export function loadCustomFont(font: FontDefinition): void {
   if (font.type !== 'custom' || !font.url) return;
-  if (loadedFonts.has(font.id)) return; // Already loaded
+  const key = customFontKey(font.id, font.url);
+  if (loadedFonts.has(key)) return; // Already loaded
 
   const styleEl = getFontStyleElement();
 
@@ -81,8 +96,8 @@ export function loadCustomFont(font: FontDefinition): void {
 
   const fontFace = `
     @font-face {
-      font-family: '${font.displayName}';
-      src: url('${font.url}') format('${format}');
+      font-family: '${cssString(font.displayName)}';
+      src: url('${cssString(font.url)}') format('${format}');
       font-weight: normal;
       font-style: normal;
       font-display: swap;
@@ -90,7 +105,7 @@ export function loadCustomFont(font: FontDefinition): void {
   `;
 
   styleEl.textContent += fontFace;
-  loadedFonts.add(font.id);
+  loadedFonts.add(key);
   console.log(`[FontRegistry] Loaded custom font: ${font.displayName}`);
 }
 
@@ -107,11 +122,11 @@ export function fontAssetsToDefinitions(assets: Asset[]): FontDefinition[] {
       return {
         id: `custom-${asset.id}`,
         displayName,
-        fontFamily: `'${displayName}', sans-serif`,
+        fontFamily: `'${cssString(displayName)}', sans-serif`,
         type: 'custom' as const,
         assetId: asset.id,
         url: asset.url,
-        loaded: loadedFonts.has(`custom-${asset.id}`),
+        loaded: loadedFonts.has(customFontKey(`custom-${asset.id}`, asset.url)),
       };
     });
 }

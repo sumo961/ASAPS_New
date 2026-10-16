@@ -8,6 +8,7 @@ import { CharacterRefField, type UsedName } from './characters/CharacterRefField
 import { CounterOwnerPicker } from './CounterOwnerPicker';
 import { GpsPointCurator } from './visual/GpsPointCurator';
 import { FormattingToolbar } from './FormattingToolbar';
+import { ImageAssetField } from './assets/ImageAssetField';
 import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 
 // Type definitions for beat schema
@@ -22,7 +23,9 @@ interface ParameterDefinition {
   // For fields that reference beats (target selectors)
   targetField?: boolean;
   ui?: {
-    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner' | 'gps-point-curator' | 'beat-ref';
+    control?: 'text' | 'textarea' | 'select' | 'number' | 'text-variations' | 'speaker' | 'speaker-visibility' | 'npc-character' | 'character-ref' | 'affect-slider' | 'counter-owner' | 'gps-point-curator' | 'beat-ref' | 'asset-picker';
+    /** For 'asset-picker' control: the kind of file ('image/*'). Only image pickers are offered so far. */
+    accept?: string;
     /** For 'beat-ref' control: the label of the empty choice (what happens when no beat is picked). */
     emptyLabel?: string;
     /** For 'beat-ref' control: a boolean parameter that makes a pick REQUIRED
@@ -565,6 +568,26 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               // are offered but not selectable.
               forWriting
             />
+          );
+        }
+
+        // An image asset id (Inventory Management's item picture).
+        if (paramDef.ui?.control === 'asset-picker' && paramDef.ui.accept?.startsWith('image/')) {
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {paramDef.ui.label || label}
+              </label>
+              <ImageAssetField
+                value={typeof value === 'string' && value ? value : undefined}
+                onChange={(assetId) => handleChange(assetId)}
+                modalTitle={paramDef.ui.label || label}
+                testId={`asset-picker-${paramName}`}
+              />
+              {paramDef.description && (
+                <p className="text-xs text-gray-500 mt-1">{paramDef.description}</p>
+              )}
+            </div>
           );
         }
 

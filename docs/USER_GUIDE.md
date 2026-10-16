@@ -543,6 +543,9 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 
 In the Visual Editor, with **Show as** on *All choices*, the amber banner above the stage lists these lines with their conditions for the line you're looking at.
 
+<a id="speaker-looks"></a>
+**How the speaker looks on a line.** When a line's speaker is a character with [states](#character-appearances) (an *angry*, a *sad*, a *laughing* picture), a small **Look** menu appears next to the speaker in the Dialog Tree editor. Pick a state and, from that line on, the speaker's figure on the stage shows it, and so does their speaker picture next to the text or in a chat layout. The look stays until another line changes it, and the next beat starts again from the looks you set up in the Visual Editor. *Look: unchanged* keeps whatever the speaker showed before. Earlier bubbles in a chat keep the picture they had, so the conversation reads like it played.
+
 <a id="link-dont-label"></a>
 **Link the speaker, then decide about the label.** The Dialog Tree's **Show Speaker Name** setting (in the Inspector's *Speaker* group: *Default (use global setting)*, *Always show* or *Always hide*) decides whether the per-node names appear as labels over the lines, and it is kept when you save and reopen the project. It only hides the *label* — the speaker link still does its work. So a good habit is *link, don't label*: always link each line to the character who is present, and set **Show Speaker Name** to *Always hide* when your prose already says who is talking (*Karin sits down. "I don't see why we're here."*). The link is what makes the character's [HUD appear](#hud-reveal) when they first show up and what gives the line their [TTS voice](#quoted-speech-voice).
 
@@ -1191,6 +1194,8 @@ Give characters items or take them away. Items can be transferred between charac
 - Remove item from character
 - Transfer item from one character to another
 
+**Item picture.** Choose the picture the inventory shows for the item. Pick it once: the picture belongs to the item's name, so every later beat or effect that adds or hands over the same item shows it too. You need it for items that are new to the story. An item listed in a character's [inventory](#character-inventory) or picked up through a [Pick Prop](#pick-prop) beat already brings its own picture, and that one wins. The **Add Inventory** and **Remove Inventory** effects on choices, dialog lines and links have the same **Picture** button.
+
 **Character fields:** All three character slots (`Character`, `From character`, `To character`) use the [Character combobox](#character-combobox). **Player** is pinned at the top of the dropdown — picking it routes to the player's inventory and preserves the global single-inventory shortcut some authors rely on. Picking any defined Character stores a stable id link, so renaming a character later updates these references automatically.
 
 **When to Use:** Finding loot, using consumables, trading, losing items.
@@ -1400,7 +1405,7 @@ Characters can have multiple visual states:
 3. Name it (e.g., "happy", "angry", "wounded")
 4. Upload or select an image
 
-In your story, you can then show the character in different states. Elena can look happy when things go well and worried when they don't.
+In your story, you can then show the character in different states. Elena can look happy when things go well and worried when they don't. In the Visual Editor you choose the state a character element shows; in a Dialog Tree each line can change it as the conversation goes (see [How the speaker looks on a line](#speaker-looks)).
 
 ### Character Counters (Stats)
 
@@ -1584,9 +1589,9 @@ What can this character carry?
 
 1. Find **Inventory** in the character editor
 2. Configure inventory display (grid size, item sizing)
-3. Add starting items if any
+3. Add the items the character starts with, with their names, descriptions, pictures and quantities
 
-During the story, use Inventory beats to give or take items.
+The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it.
 
 ### Speaker Portraits
 
@@ -3522,6 +3527,8 @@ Use sprite sheets for frame-by-frame animation:
 - Font sizes
 - Line height
 
+Your own fonts (TrueType `.ttf`, OpenType `.otf`, `.woff` or `.woff2`) go into the project through **Assets → Fonts**. They then appear in these font menus under their file name (*Windows Regular.ttf* becomes **Windows Regular**), and they are used in the Visual Editor, the Preview Window and every export. Check that the font's licence lets you share it, since the font file travels with an exported story.
+
 **Settings → Text Box:**
 - Text box appearance: corners, padding, borders, position
 - **Background Opacity** — slider (0–100%) controlling how transparent the text-box background is
@@ -3551,6 +3558,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 **Settings → HUD:**
 - **Compact HUD on phones** — *Auto* (default: fold screen HUDs into a slim tap-to-expand strip on phone-sized stages), *Always*, or *Never*. See [On phones — the compact HUD strip](#counter-binding).
 - **Show HUDs on the title screen** — off by default for a distraction-free start; turn on if a HUD (say, a countdown that is already running) should be visible from the first frame.
+- <a id="message-history"></a>**Message history** — lets players reopen the conversations they have had so far, like the chats in a messenger app. Every Dialog Tree played becomes one chat, named after the people in it, with the lines as they were shown (with the speaker's look at the time) and the player's replies on the right. A conversation played again continues the same chat after a small *· · ·* divider. It's history only: nothing replays, and the story waits underneath. Players open it from the player's **Menu → Messages**; while you test, the Preview Window's toolbar has a speech-bubbles button for it. The history is kept in saved games and starts empty when the story restarts. Off by default.
 - Timer / Time Display overlay (timer name, default text, position)
 - Fictional Time overlay
 - Countdown Meter overlay
@@ -3872,7 +3880,7 @@ Merge conflicts in beats happen less often than you'd think because each beat is
 Even with per-beat files, two people editing the *same* beat at the same time will eventually conflict. ASAPS helps you avoid that by tracking who's currently editing what — **advisorily**, no actual locking:
 
 - When you select a beat in the Inspector, ASAPS writes a small entry into `.asaps-editing.json` in the project root.
-- That file rides along with normal commits/pushes/pulls.
+- That file rides along with normal commits/pushes/pulls. Because ASAPS rewrites it whenever you select a beat, it is almost always changed on your computer; **Pull**, switching branch and merging set your copy aside, bring in the other side, and then put your own locks back on top, so the lock file never makes a pull fail.
 - Collaborators see a **purple dot** on beats you're currently editing, and the Inspector banner says something like *"Alice is currently editing this beat"*.
 - Locks expire automatically after **2 hours**, so a crashed app or forgotten session doesn't leave a permanent ghost lock.
 

@@ -49,6 +49,7 @@ import type { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { getAIValidator } from './services/AIValidator';
 import { useSave, useProject, usePersistence } from './contexts/PersistenceContext';
 import { RolesProvider } from './contexts/RolesContext';
+import { ProjectAssetsProvider } from './contexts/ProjectAssetsContext';
 import { Character } from './types/character';
 import type { Asset } from './components/assets/AssetManager';
 import type { GlobalSettings } from './storage/types';
@@ -6579,6 +6580,7 @@ function App() {
 
   return (
     <RolesProvider roles={(globalSettings as any)?.roles} previewCasting={rolePreviewCasting} onPreviewCastingChange={setRolePreviewCasting}>
+    <ProjectAssetsProvider assets={assets} onAssetAdd={handleAssetAdd}>
     <div className="flex flex-col h-screen bg-gray-50">
       <Header
         title={state.title}
@@ -7321,6 +7323,7 @@ function App() {
       {/* VCS Toast Notifications */}
       <VCSToast />
     </div>
+    </ProjectAssetsProvider>
     </RolesProvider>
   );
 }
