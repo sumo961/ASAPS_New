@@ -504,7 +504,8 @@ describe('projectZipManager', () => {
       expect(story.characters[0].portrait.assetId).toBe(created.id);
       expect(story.characters[0].states[0].visual.assetId).toBe(created.id);
       const beat = story.beats[0];
-      expect((beat.parameters ?? beat.getParameters?.()).choices[0].image).toBe(created.id);
+      const params = beat.parameters ?? beat.getParameters?.() ?? {};
+      expect(params.choices[0].image).toBe(created.id);
     });
 
     it('should fail if project.json is missing', async () => {
