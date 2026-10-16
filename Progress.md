@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.118, 2026-10-16)
+
+### Overview
+- **Large sounds are stored again on the desktop app** (student report: "a wav works, but after save and reopen it is gone, and it doesn't reach the other computer through git"). Assets of 5 MB or more go to the desktop file cache, and that write used Node's `Buffer`, which the app page doesn't have (context isolation). It threw; the add fell back to on-screen only, so the sound played until the project closed, was never stored, and was never written into the project folder (so not into git). Images are usually under 5 MB, which is why they survived.
+
+### Fix
+- `HybridStorageAdapter.saveAssetToFilesystem` writes a `Uint8Array`; files read back from the cache get their MIME type again.
+- `App.handleAssetAdd`: when storing fails, the author now gets an error notice instead of an asset that silently vanishes on reopen.
+- Test: `HybridStorageLargeAssetElectron.test.ts` stores a 6 MB WAV and reads it back after a "reopen", with Node Buffer refused to the adapter as in Electron (fails on the old code with "Buffer is not defined"). Confirmed `typeof Buffer === 'undefined'` in the running desktop app.
+
+**Files modified:** packages/builder/src/storage/HybridStorageAdapter.ts, packages/builder/src/App.tsx, packages/builder/src/storage/__tests__/HybridStorageLargeAssetElectron.test.ts
+
+---
+
 ## 2026-10-16: Stories that show what you carry (v0.9.118)
 
 ### Overview

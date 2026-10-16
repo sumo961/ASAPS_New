@@ -372,7 +372,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
         const asset = await this.db!.get(STORES.assets, assetId);
         blob = asset?.blob || null;
       } else if (metadata.location === 'filesystem' && this.isElectron) {
-        blob = await this.loadAssetFromFilesystem(metadata.path!);
+        blob = await this.loadAssetFromFilesystem(metadata.path!, metadata.mimeType);
       } else if (metadata.location === 'cache-api') {
         // Lazy-init Cache API in case it wasn't available at startup
         if (!this.cache) {
@@ -809,7 +809,7 @@ export class HybridStorageAdapter implements IStorageAdapter {
         const asset = await this.db!.get(STORES.assets, info.id);
         return asset?.blob || null;
       } else if (info.location === 'filesystem' && this.isElectron) {
-        return await this.loadAssetFromFilesystem(info.path!);
+        return await this.loadAssetFromFilesystem(info.path!, info.mimeType);
       } else if (info.location === 'cache-api') {
         return await this.loadAssetFromCache(info.path!);
       }
@@ -856,7 +856,10 @@ export class HybridStorageAdapter implements IStorageAdapter {
     if (!dirExists) {
       await api.fs.mkdir(subfolder);
     }
-    await api.fs.writeFile(filepath, Buffer.from(buffer));
+    // Uint8Array, not Buffer: the renderer has no Node globals (context
+    // isolation), so Buffer.from threw for every asset over the size
+    // threshold — large sounds were never stored (lost on reopen and in git).
+    await api.fs.writeFile(filepath, new Uint8Array(buffer));
 
     return filepath;
   }
@@ -878,13 +881,13 @@ export class HybridStorageAdapter implements IStorageAdapter {
     return url;
   }
 
-  private async loadAssetFromFilesystem(path: string): Promise<Blob> {
+  private async loadAssetFromFilesystem(path: string, mimeType?: string): Promise<Blob> {
     const api = (window as any).electronAPI;
     if (!api?.fs?.readFile) {
       throw new Error('Electron filesystem API not available');
     }
     const buffer = await api.fs.readFile(path);
-    return new Blob([buffer]);
+    return new Blob([buffer], mimeType ? { type: mimeType } : undefined);
   }
 
   private async loadAssetFromCache(url: string): Promise<Blob | null> {

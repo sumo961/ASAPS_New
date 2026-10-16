@@ -5059,7 +5059,9 @@ function App() {
       return true;
     } catch (err) {
       console.error('[App] handleAssetAdd - Error saving asset:', err);
-      // Still add to local state as fallback
+      // It can still be used until the project is closed, but it was not
+      // stored: say so instead of letting it vanish on the next reopen.
+      notify.error(`${asset.name} could not be stored and will be missing when you reopen the project. Try adding it again.`, { detail: errorMessage(err) });
       setAssets(prev => [...prev, asset]);
       markChanged();
       return true;
