@@ -1,9 +1,11 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.117, 2026-10-16)
+## 2026-10-16: Stories that show what you carry (v0.9.118)
 
 ### Overview
-Five items from Hartmut's list plus a follow-up: inventory pictures, starting items handed out, a pull that failed over the lock file, custom fonts on Windows, character looks per dialog line, and a message history.
+Inventory that works on screen, characters whose look changes line by line, a message history, and three fixes from the classroom: a pull that failed over the lock file, custom fonts on Windows, and the students' report that adding and removing items showed nothing in the on-screen inventory.
+- **Characters start with the items listed on them.** The guide always called them starting items; the runtime never handed them out.
+- **Imported copies of a project keep their pictures** (web builder): assets whose ids already belonged to another project were left out.
 - **Inventory pictures from Inventory beats and effects.** The Inventory Management beat has an **Item picture** and add/remove inventory effects a **Picture** button. Before, only items listed on a character or picked up through Pick Prop had pictures.
 - **The screen-corner inventory panel shows what the character carries.** It listed the character's authored items whether held or not, so items given during play never appeared (Preview Window and exported player). The per-character lookups also read the store by name while the engine keys it by id.
 - **Pull no longer fails over `.asaps-editing.json`** ("Your local changes … would be overwritten by merge", reported on Windows). The app rewrites that tracked file whenever a beat is selected; pull, branch switch and merge now set it aside and merge the local locks back.

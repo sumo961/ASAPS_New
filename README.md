@@ -22,16 +22,25 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.117** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.117 lets a conversation react to
-what the player did before**: a line where another character speaks next
-can now have conditions (a bystander steps in only if the player stood up
-for someone earlier) and effects (the story remembers what the player
-witnessed). Use the new *Conditions & effects* button on the line's
-connector in the Dialog Tree editor. The Visual Editor and the Preview
-Window also use the canvas size from Project Settings now, so a 16:9
-project is laid out on a 16:9 stage, and speakers in the editor no longer
-share colours.
+Current release: **v0.9.118** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.118 makes the inventory work on
+screen**: items given or taken during play now appear and disappear in the
+inventory panel, with pictures you can choose on Inventory beats and
+effects, and the items listed on a character are theirs from the start. In
+a Dialog Tree each line can change how the speaker looks (an angry or sad
+picture), and with *Message history* turned on players can reread every
+conversation they have had, like chats in a messenger. Pulling with Git no
+longer fails because of the editing-lock file, and your own fonts work on
+Windows and in the Preview Window and exports.
+
+**v0.9.117 let a conversation react to what the player did before**: a
+line where another character speaks next can now have conditions (a
+bystander steps in only if the player stood up for someone earlier) and
+effects (the story remembers what the player witnessed). Use the new
+*Conditions & effects* button on the line's connector in the Dialog Tree
+editor. The Visual Editor and the Preview Window also use the canvas size
+from Project Settings now, so a 16:9 project is laid out on a 16:9 stage,
+and speakers in the editor no longer share colours.
 
 **v0.9.116 let a group scene play out before the player answers**: a Dialog
 Tree has a new setting, *Players can skip ahead* (Inspector → Show Advanced
