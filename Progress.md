@@ -1,8 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.118, 2026-10-16)
+## 2026-10-16: Sounds that stay (v0.9.119)
 
 ### Overview
+A one-fix release for a student report: sound files of 5 MB or more added in the desktop app disappeared after reopening the project and never reached git.
 - **Large sounds are stored again on the desktop app** (student report: "a wav works, but after save and reopen it is gone, and it doesn't reach the other computer through git"). Assets of 5 MB or more go to the desktop file cache, and that write used Node's `Buffer`, which the app page doesn't have (context isolation). It threw; the add fell back to on-screen only, so the sound played until the project closed, was never stored, and was never written into the project folder (so not into git). Images are usually under 5 MB, which is why they survived.
 
 ### Fix

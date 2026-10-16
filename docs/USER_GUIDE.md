@@ -2061,6 +2061,8 @@ Assets are your media files—the images, sounds, and videos that bring your exp
 - **Click Upload** and select files
 - **Add by URL** for web-hosted files
 
+If a file can't be saved with your project, an error notice tells you so. The file still works until you close the project, but it won't be there when you reopen it, so add it again.
+
 ### Supported Formats
 
 | Type | Formats |

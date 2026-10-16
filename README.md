@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.118** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.118 makes the inventory work on
+Current release: **v0.9.119** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.119 keeps your large sound
+files**: in the desktop app, a sound of 5 MB or more (a WAV of about half a
+minute) played while you worked but was gone after reopening the project,
+and never reached your collaborators through git. It is now stored like any
+other file, and if storing a file ever fails, ASAPS tells you. Sounds that
+already disappeared need to be added once more.
+
+**v0.9.118 made the inventory work on
 screen**: items given or taken during play now appear and disappear in the
 inventory panel, with pictures you can choose on Inventory beats and
 effects, and the items listed on a character are theirs from the start. In
