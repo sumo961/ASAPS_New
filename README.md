@@ -22,8 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.119** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.119 keeps your large sound
+Current release: **v0.9.120** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.120 keeps the deadlines in
+generated stories**: a story-clock check written by the AI ("did the player
+arrive before 9:18?") lost its time on import and always took the same
+branch. It now keeps it, and the review banner after generation tells you
+when a time check is decided before play starts, or when the AI wrote a
+setting a beat doesn't have. The Debug window no longer reports reachable
+endings as impossible or warns about beats with only one way in, the
+Inspector shows help written for authors, and the User Guide has pictures
+of the recent features.
+
+**v0.9.119 kept your large sound
 files**: in the desktop app, a sound of 5 MB or more (a WAV of about half a
 minute) played while you worked but was gone after reopening the project,
 and never reached your collaborators through git. It is now stored like any

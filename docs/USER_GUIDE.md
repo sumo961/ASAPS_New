@@ -370,6 +370,8 @@ When you select a beat, the Inspector shows everything about it:
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
+Many fields carry a short grey note underneath that says what the setting does, and some empty text fields show an example of what to type. When a setting is new to you, that note is a good first stop.
+
 **Preview as.** When the selected beat refers to a [role](#roles) — a speaker such as *@ The confidant*, or text like `${@confidant.name}` — a small **Preview as** bar appears at the top of the Inspector with one picker per role. It only changes what the Visual Editor shows while you write (and who the Preview starts with); the story itself is untouched.
 
 **Links are always picked, never typed.** Every setting that names another beat — a link's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target* — is a dropdown of your story's beats. If a stored beat has since been deleted, the picker keeps showing it as missing so you can spot and fix it.
@@ -2996,7 +2998,7 @@ Click the **Debug** button in the header to open the **Debug Tools** window. It 
 
 Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
 
-A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable with a default value in Project Settings counts as set, and so does the built-in **playthrough**.
+A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable counts as set when anything in the story can set it: an effect on a choice, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**.
 
 ### Path Analysis
 
