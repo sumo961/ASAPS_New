@@ -1,5 +1,15 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.119, 2026-10-16)
+
+### Overview
+- **User Guide screenshots for the v0.9.117–118 features** (84–92): the Look menu on a dialog line, a conditional "another character speaks" line with its Conditions & effects panel, the item picture on an Inventory Management beat and on an Add Inventory effect, Project Settings → HUD → Message history, the character States tab, the Preview with the angry wolf and the inventory panel, and the Messages panel wide and on a phone. Taken from a demo project built from the Red Riding Hood example art (headless builder, not the author's app). The old "Character Appearances" wording is gone with them.
+- **Inspector fields show author help, not AI guidance.** Schema fields printed the parameter's `description` (written for the AI generators) under most controls even when the schema had an author-facing `ui.help`; Quantity on an Inventory Management beat read "…the pipeline coerces emitted numbers/booleans to string so AI output validates…". Every schema control now prefers `ui.help` (and `ui.placeholder`), as the text field already did; fields without them are unchanged. The new Item picture field has its own short `ui.help`.
+
+**Files modified:** docs/USER_GUIDE.md, docs/images/84–92, packages/builder/src/components/SchemaFormGenerator.tsx, beat-definitions/core-beats.json
+
+---
+
 ## 2026-10-16: Sounds that stay (v0.9.119)
 
 ### Overview

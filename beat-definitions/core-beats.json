@@ -2896,7 +2896,8 @@
           "ui": {
             "control": "asset-picker",
             "accept": "image/*",
-            "label": "Item picture"
+            "label": "Item picture",
+            "help": "The picture the inventory shows for this item. Every other beat or effect that gives the same item shows it too."
           }
         },
         "connection": {

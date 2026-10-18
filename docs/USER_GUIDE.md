@@ -543,8 +543,14 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 
 In the Visual Editor, with **Show as** on *All choices*, the amber banner above the stage lists these lines with their conditions for the line you're looking at.
 
+![A "then, if woodsman_nearby == true" connector with its Conditions & effects panel open: "This line plays only if…" holds the condition woodsman_nearby == true, "When this line plays:" sets rescued_by_woodsman to true, and below it the Woodsman's line "Leave the girl alone, wolf!"](images/85-dialog-line-conditions.png)
+*The Woodsman steps in only when the story says he is nearby, and the story remembers that he did.*
+
 <a id="speaker-looks"></a>
 **How the speaker looks on a line.** When an NPC line's speaker is a character with [states](#character-states) (an *angry*, a *sad*, a *laughing* picture, made on the character's **States** tab), a small **Look** menu appears next to the speaker in the Dialog Tree editor. Pick a state and, from that line on, the speaker's figure on the stage shows it, and so does their speaker picture next to the text or in a chat layout (a state without a picture of its own leaves the usual portrait there). The look stays until another line changes it, and the next beat starts again from the looks you set up in the Visual Editor. *Look: unchanged* (it reads *Keep current look* once a state is picked) keeps whatever the speaker showed before. Earlier bubbles in a chat keep the picture they had, so the conversation reads like it played.
+
+![The Dialog Tree editor with two lines of the Wolf: the first line's Look menu reads "Look: unchanged", and his second line, "Sweets? Then hand them over. NOW!", is set to Angry.](images/84-dialog-line-look.png)
+*The Look menu sits next to the speaker of each NPC line. Here the Wolf turns angry on his second line.*
 
 <a id="link-dont-label"></a>
 **Link the speaker, then decide about the label.** The Dialog Tree's **Show Speaker Name** setting (in the Inspector's *Speaker* group: *Default (use global setting)*, *Always show* or *Always hide*) decides whether the per-node names appear as labels over the lines, and it is kept when you save and reopen the project. It only hides the *label* — the speaker link still does its work. So a good habit is *link, don't label*: always link each line to the character who is present, and set **Show Speaker Name** to *Always hide* when your prose already says who is talking (*Karin sits down. "I don't see why we're here."*). The link is what makes the character's [HUD appear](#hud-reveal) when they first show up and what gives the line their [TTS voice](#quoted-speech-voice).
@@ -1196,6 +1202,12 @@ Give characters items or take them away. Items can be transferred between charac
 
 **Item picture.** Click **Choose picture…** to pick (or upload) the picture the inventory shows for the item; **Change** swaps it and the small **×** removes it. Pick it once: the picture belongs to the item's name, so every other beat or effect that adds or hands over the same item shows it too. You need it for items that are new to the story. An item that already has a picture in a character's [inventory list](#character-inventory) (any character's, not only the one who holds it) or that is picked up through a [Pick Prop](#pick-prop) beat keeps that picture: it wins over the one chosen here. The **Add Inventory** and **Remove Inventory** effects on choices, dialog lines and links have the same small **Picture** button.
 
+![The Inspector for an Inventory Management beat: Action "Add to Inventory", Item "sweets", Quantity 1, Character "player", and Item picture showing Sweets.png with Change and × buttons.](images/87-inventory-item-picture.png)
+*An Inventory Management beat that gives the player sweets, with the picture the inventory shows for them.*
+
+![A player reply "Thank you, I will." whose effect is Add Inventory "present", with the present's picture and a Change button next to it.](images/86-effect-item-picture.png)
+*The same choice on an Add Inventory effect: the reply gives the player a present, and its picture.*
+
 **Character fields:** All three character slots (`Character`, `From character`, `To character`) use the [Character combobox](#character-combobox). **Player** is pinned at the top of the dropdown — picking it routes to the player's inventory and preserves the global single-inventory shortcut some authors rely on. Picking any defined Character stores a stable id link, so renaming a character later updates these references automatically.
 
 **When to Use:** Finding loot, using consumables, trading, losing items.
@@ -1409,6 +1421,9 @@ Characters can have several looks, which ASAPS calls **states**:
 
 In your story, you can then show the character in different states. Elena can look happy when things go well and worried when they don't. In the Visual Editor you choose the state a character element shows; in a Dialog Tree each line can change it as the conversation goes (see [How the speaker looks on a line](#speaker-looks)).
 
+![The character editor's States tab for the Wolf: two states, "friendly" (Friendly, marked Default) and "angry" (Angry), each with its picture, a Select Image button and, for the angry one, Set as Default.](images/89-character-states.png)
+*The Wolf has two states. Friendly is his default; a dialog line can switch him to Angry.*
+
 ### Character Counters (Stats)
 
 Track numeric values for each character:
@@ -1594,6 +1609,9 @@ What can this character carry?
 3. To show the items on screen, tick **Enable** under **Inventory Frame (HUD Overlay)** and choose where the panel sits and how it looks (item size, columns, style)
 
 The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it. An item that isn't on this character's list borrows its record from another character who lists it, so a "storage" character can describe items that others pick up.
+
+![The Preview: the Wolf, now angry, says "Sweets? Then hand them over. NOW!" with the replies Never! and Here, take them.; in the bottom-right corner the inventory panel shows the sweets' picture.](images/90-angry-wolf-inventory.png)
+*Play in the Preview: the sweets the player was given appear in the inventory panel, and the Wolf shows the angry look his line asked for.*
 
 ### Speaker Portraits
 
@@ -3568,6 +3586,15 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 - Fictional Time overlay
 - Countdown Meter overlay
 Each overlay has its own *Enabled* toggle and renders on the running stage when on.
+
+![Project Settings, HUD tab: Compact HUD on phones, "Show HUDs on the title screen" unticked, and "Message history" ticked with its explanation.](images/88-project-settings-message-history.png)
+*Message history is one tick in Project Settings → HUD.*
+
+![The Messages panel over the story: on the left one chat, "Wolf", with his latest line; on the right the conversation, the Wolf's two lines with his friendly and then his angry picture, and the player's reply "Sweets for my granny." on the right in gold.](images/91-message-history.png)
+*The message history in the Preview. Each line keeps the picture the speaker had when it was said.*
+
+![The same panel on a phone: the chat fills the screen, with a Back link to the list of chats above it.](images/92-message-history-phone.png)
+*On a phone the list and the chat take turns; Back returns to the list.*
 
 **Settings → Sound:**
 - Background music and volume settings
