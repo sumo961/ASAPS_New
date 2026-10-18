@@ -84,7 +84,7 @@ import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, 
 import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
 import { CLUSTER_HEADER_H } from './components/graph/graphStyle';
 import { reconcileLegacyMaxTokens } from './utils/aiConfigBudget';
-import { analyzeStoryFindings, proposeFixes, planBeatEdit, createGenerationReview, openFindings } from './utils/generationReview';
+import { analyzeStoryFindings, proposeFixes, planBeatEdit, createGenerationReview, openFindings, describeIgnoredParameters } from './utils/generationReview';
 import type { GenerationFinding, FixProposal, GenerationReview } from './types/generationReview';
 import { requestAIFix } from './services/findingFixService';
 import type { AIFixState } from './components/ImportIssuesBanner';
@@ -430,6 +430,10 @@ function App() {
     const proposedFindingIds = new Set(proposals.map(p => p.findingId));
     const generationErrors: string[] = (story?.generationIssues?.errors ?? [])
       .filter((m: unknown): m is string => typeof m === 'string' && !/non-existent beat|unreachable beat|never runs|cannot satisfy/i.test(m));
+    // Settings the generator wrote that the beat type doesn't have are
+    // dropped on import. That used to be a console-only warning — and was how
+    // a time gate silently lost its deadline. Say it in the banner.
+    generationErrors.push(...describeIgnoredParameters(story));
     const unproposed = typed.filter(f => !proposedFindingIds.has(f.id));
     if (validation.valid && generationErrors.length === 0 && proposals.length === 0 && unproposed.length === 0) {
       setImportIssues(null);
@@ -498,7 +502,7 @@ function App() {
       : (typeof storyData?.getAllBeats === 'function' ? storyData.getAllBeats() : undefined);
     if (!rawBeats?.length) return;
     const beats = rawBeats.map((b: any) => (typeof b?.toJSON === 'function' ? b.toJSON() : b));
-    reportImportValidation({ beats, variables: project.globalSettings?.variables, roles: (project.globalSettings as any)?.roles, characters: storyData?.characters ?? storyData?.getCharacters?.() });
+    reportImportValidation({ beats, variables: project.globalSettings?.variables, roles: (project.globalSettings as any)?.roles, characters: storyData?.characters ?? storyData?.getCharacters?.(), globalSettings: project.globalSettings });
   }, [reportImportValidation]);
 
   /**

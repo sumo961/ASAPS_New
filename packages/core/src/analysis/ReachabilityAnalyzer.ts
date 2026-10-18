@@ -55,7 +55,7 @@ export interface ReachabilityWarning {
   beatId: string;
   message: string;
   severity: 'warning' | 'error';
-  type: 'hard-to-reach' | 'single-path' | 'conditional-only';
+  type: 'hard-to-reach' | 'conditional-only';
 }
 
 /**
@@ -386,19 +386,13 @@ export class ReachabilityAnalyzer {
         }
       }
 
-      // Analyze choice-based beats with counter effects
-      if (beat.type === 'movementChoice' || beat.type === 'pickProp') {
-        const choices = params.choices || params.props || [];
-
-        for (const choice of choices) {
-          this.analyzeChoiceCounterEffects(choice);
-        }
-      }
-
-      // Analyze dialogTree choices
-      if (beat.type === 'dialogTree' && params.dialogTree) {
-        this.analyzeDialogTreeForCounters(params.dialogTree);
-      }
+      // Effects wherever a beat keeps them: choices of every choice beat
+      // (multiChoice, chooseCharacter, movementChoice, pickProp, hotspots …),
+      // dialog lines and continue steps, random branches, link effects,
+      // updateAffect rows. Only movementChoice/pickProp/dialogTree counter
+      // effects were read before, and setVariable effects never — so any
+      // variable a choice sets read as "never set in the story".
+      this.collectEffectsOf(beat, params);
 
       // Analyze inputText and keypad beats (user input saved to variable/counter)
       if (beat.type === 'inputText' || beat.type === 'keypad') {
@@ -428,32 +422,58 @@ export class ReachabilityAnalyzer {
     }
   }
 
-  /**
-   * Recursively analyze dialog tree for counter modifications
-   */
-  /**
-   * Extract counter modifications from a choice's effects array or flat counter fields
-   */
-  private analyzeChoiceCounterEffects(choice: any): void {
-    // Check effects array first (canonical format)
-    if (choice.effects && Array.isArray(choice.effects)) {
-      for (const effect of choice.effects) {
-        if (effect.type === 'incrementCounter' || effect.type === 'setCounter') {
-          const counterName = effect.target;
-          const value = Number(effect.value) || 0;
-          if (counterName) {
-            if (!this.counterModifications.has(counterName)) {
-              this.counterModifications.set(counterName, { min: 0, max: 0 });
-            }
-            const range = this.counterModifications.get(counterName)!;
-            if (value > 0) range.max += value;
-            else range.min += value;
-          }
-        }
+  /** Walk a beat's parameters and links and record every state-changing effect. */
+  private collectEffectsOf(beat: any, params: any): void {
+    const seen = new Set<object>();
+    const visit = (node: any, depth: number): void => {
+      if (!node || typeof node !== 'object' || depth > 16 || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const child of node) visit(child, depth + 1);
+        return;
+      }
+      this.recordEffect(node);
+      // Legacy flat counter fields on a choice (counter + counterValue, or counterEffect)
+      if (node.counterEffect || (node.counter !== undefined && node.counterValue !== undefined)) {
+        this.analyzeChoiceCounterEffects(node);
+      }
+      for (const key of Object.keys(node)) visit(node[key], depth + 1);
+    };
+    visit(params, 0);
+    visit(beat.connections, 0);
+  }
+
+  /** Record one effect object (setVariable / incrementCounter / setCounter). */
+  private recordEffect(effect: any): void {
+    if (effect.type === 'setVariable') {
+      const name = effect.target || effect.variable || effect.variableName;
+      if (typeof name !== 'string' || !name) return;
+      if (!this.variableValues.has(name)) this.variableValues.set(name, new Set());
+      this.variableValues.get(name)!.add(effect.value);
+    } else if (effect.type === 'incrementCounter' || effect.type === 'setCounter') {
+      const name = effect.target;
+      if (typeof name !== 'string' || !name) return;
+      if (!this.counterModifications.has(name)) this.counterModifications.set(name, { min: 0, max: 0 });
+      const range = this.counterModifications.get(name)!;
+      if (effect.type === 'setCounter') {
+        const value = Number(effect.value) || 0;
+        range.max = Math.max(range.max, value);
+        range.min = Math.min(range.min, value);
+      } else {
+        // The runtime treats a missing or non-numeric delta as +1.
+        const delta = Number(effect.value) || 1;
+        if (delta > 0) range.max += delta;
+        else range.min += delta;
       }
     }
+  }
 
-    // Fallback: flat counter fields (legacy)
+  /**
+   * Extract counter modifications from a choice's flat counter fields (legacy)
+   */
+  private analyzeChoiceCounterEffects(choice: any): void {
+    // effects[] entries are recorded by recordEffect; this reads only the
+    // legacy flat fields, unless an effect already covers the same counter.
     const counterName = choice.counterEffect?.counter || choice.counter;
     const counterValue = choice.counterEffect?.value ?? choice.counterValue;
     if (counterName && counterValue !== undefined) {
@@ -469,23 +489,6 @@ export class ReachabilityAnalyzer {
         const range = this.counterModifications.get(counterName)!;
         if (value > 0) range.max += value;
         else range.min += value;
-      }
-    }
-  }
-
-  private analyzeDialogTreeForCounters(node: any): void {
-    if (!node) return;
-
-    if (node.choices) {
-      for (const choice of node.choices) {
-        this.analyzeChoiceCounterEffects(choice);
-
-        if (choice.nextNode) {
-          this.analyzeDialogTreeForCounters(choice.nextNode);
-        }
-        if (choice.dialogNode) {
-          this.analyzeDialogTreeForCounters(choice.dialogNode);
-        }
       }
     }
   }
@@ -896,15 +899,8 @@ export class ReachabilityAnalyzer {
           type: 'conditional-only'
         });
       }
-      // Warning: Only reachable via one path (but not if it's already flagged as conditional-only)
-      else if (incoming.length === 1 && beat.id !== this.story.getFirstBeatId()) {
-        warnings.push({
-          beatId: beat.id,
-          message: `Beat "${beat.name}" has only one incoming connection`,
-          severity: 'warning',
-          type: 'single-path'
-        });
-      }
+      // (A beat with a single way in is ordinary story structure, not a
+      // problem — that warning flooded the report and was removed.)
     }
 
     return warnings;

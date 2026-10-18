@@ -9,7 +9,7 @@ import {
 } from './counterRangeAnalysis';
 import type {
   GenerationFinding, MissingTargetFinding, UnreachableBeatFinding, UnsatisfiableThresholdFinding,
-  RestartWithoutTargetFinding,
+  RestartWithoutTargetFinding, TimeGateFinding,
   FixProposal, GenerationReview,
 } from '../types/generationReview';
 import { PARAMETER_DERIVED_TYPES } from './beatConnectionModel';
@@ -116,6 +116,7 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
       out.push(f);
     }
   }
+  out.push(...analyzeTimeGates(story, beats));
   // Cast roles: unknown @role references, non-candidate casts, recasts.
   out.push(...analyzeRoleFindings(beats, story?.roles ?? story?.globalSettings?.roles, story?.characters, storyStartBeatId(story)));
   return out;
@@ -370,4 +371,129 @@ export function createGenerationReview(args: {
 /** Findings that are neither applied nor skipped. */
 export function openFindings(review: GenerationReview): GenerationFinding[] {
   return review.findings.filter((f) => (review.status[f.id] ?? 'open') === 'open');
+}
+
+
+// ---------------------------------------------------------------------------
+// Fictional-time gates decided before play
+// ---------------------------------------------------------------------------
+
+type ClockTime = { year: number; month: number; day: number; hour: number; minute: number };
+
+const toMinutes = (t: ClockTime): number => Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute) / 60000;
+const pad = (n: number) => String(n).padStart(2, '0');
+const showTime = (t: ClockTime): string => `${t.year}-${pad(t.month)}-${pad(t.day)} ${pad(t.hour)}:${pad(t.minute)}`;
+
+function clockFrom(o: any, prefix: 'time' | ''): ClockTime | null {
+  if (!o || typeof o !== 'object') return null;
+  const get = (k: string) => {
+    const v = prefix ? o[`time${k[0].toUpperCase()}${k.slice(1)}`] : o[k];
+    return v === undefined || v === '' ? undefined : Number(v);
+  };
+  const year = get('year');
+  if (year === undefined || isNaN(year)) return null;
+  return { year, month: get('month') ?? 1, day: get('day') ?? 1, hour: get('hour') ?? 0, minute: get('minute') ?? 0 };
+}
+
+/**
+ * The time a Condition Check compares against, as the runtime will see it:
+ * timeYear … fields, else compareTime (flat or in `condition`), else the
+ * beat's default of 2024-01-01 00:00.
+ */
+function readTimeGate(beat: any): { time: ClockTime; operator: string; trueTarget?: string; falseTarget?: string } | null {
+  if (beat?.type !== 'conditionBeat') return null;
+  const p = beat.parameters || {};
+  const cond = p.condition && typeof p.condition === 'object' ? p.condition : {};
+  if ((p.conditionType ?? cond.type) !== 'fictionalTime') return null;
+  const time = clockFrom(p, 'time') ?? clockFrom(cond, 'time') ?? clockFrom(p.compareTime, '') ?? clockFrom(cond.compareTime, '')
+    ?? { year: 2024, month: 1, day: 1, hour: 0, minute: 0 };
+  const target = (v: any) => (typeof v === 'string' ? v : v?.target);
+  return {
+    time,
+    operator: String(p.operator ?? cond.operator ?? '=='),
+    trueTarget: p.trueTarget ?? target(p.trueConnection),
+    falseTarget: p.falseTarget ?? target(p.falseConnection),
+  };
+}
+
+/** Every fictional-time gate whose answer is fixed before play starts. */
+export function analyzeTimeGates(story: any, beats: any[]): TimeGateFinding[] {
+  const gates = beats.map((b) => ({ beat: b, gate: readTimeGate(b) })).filter((g) => g.gate);
+  if (gates.length === 0) return [];
+
+  // Where the clock can start: the project's initial time and every beat
+  // that sets it. Advances only move it forward; a backwards move (negative
+  // advance, rewind) makes "earliest" unknowable, so say nothing then.
+  const starts: ClockTime[] = [];
+  const gs = story?.globalSettings ?? {};
+  for (const init of [gs.hudOverlays?.fictionalTime?.initialTime, gs.fictionalTime?.initialTime, story?.settings?.hudOverlays?.fictionalTime?.initialTime]) {
+    const t = clockFrom(init, '');
+    if (t) starts.push(t);
+  }
+  for (const b of beats) {
+    const p = b?.parameters || {};
+    if (b?.type !== 'setVariable' || p.type !== 'fictionalTime') continue;
+    const op = String(p.operation ?? 'set');
+    if (op === 'set') {
+      const t = clockFrom(p, 'time');
+      if (t) starts.push(t);
+    } else if (Number(p.value) < 0 || /rewind|subtract|back/i.test(op)) {
+      return [];
+    }
+  }
+
+  const out: TimeGateFinding[] = [];
+  for (const { beat, gate } of gates) {
+    const g = gate!;
+    const name = beat.name || beat.id;
+    if (starts.length === 0) {
+      // Only when the project settings are part of what we were given —
+      // the start time may live there, and a reloaded story may not carry them.
+      if (g.trueTarget && story?.globalSettings) out.push({
+        id: `time-gate:${beat.id}:true`, kind: 'time-gate', beatId: beat.id, beatName: beat.name, branch: 'true', targetId: g.trueTarget,
+        message: `"${name}" checks the story clock, but nothing in the story sets the clock, so its true branch never runs.`,
+      });
+      continue;
+    }
+    const earliest = starts.reduce((a, b) => (toMinutes(b) < toMinutes(a) ? b : a));
+    const c = toMinutes(g.time);
+    const e = toMinutes(earliest);
+    const neverTrue = (g.operator === '<' && c <= e) || ((g.operator === '<=' || g.operator === '==') && c < e);
+    const alwaysTrue = (g.operator === '>' && c < e) || (g.operator === '>=' && c <= e) || (g.operator === '!=' && c < e);
+    const clock = `the clock starts at ${showTime(earliest)} and only moves forward`;
+    if (neverTrue && g.trueTarget) out.push({
+      id: `time-gate:${beat.id}:true`, kind: 'time-gate', beatId: beat.id, beatName: beat.name, branch: 'true', targetId: g.trueTarget,
+      message: `"${name}" checks the clock ${g.operator} ${showTime(g.time)}, but ${clock}, so its true branch never runs.`,
+    });
+    if (alwaysTrue && g.falseTarget) out.push({
+      id: `time-gate:${beat.id}:false`, kind: 'time-gate', beatId: beat.id, beatName: beat.name, branch: 'false', targetId: g.falseTarget,
+      message: `"${name}" checks the clock ${g.operator} ${showTime(g.time)}, which is always true because ${clock}, so its false branch never runs.`,
+    });
+  }
+  return out;
+}
+
+/**
+ * The generator's "Parameter X not defined in schema" warnings, phrased for
+ * the author: a setting the beat type doesn't have is ignored on import, and
+ * whatever it was meant to say is lost (the "compareTime" a time gate's
+ * deadline was written in, for one).
+ */
+export function describeIgnoredParameters(story: any): string[] {
+  const warnings: unknown[] = Array.isArray(story?.generationIssues?.warnings) ? story.generationIssues.warnings : [];
+  const beats: any[] = Array.isArray(story?.beats) ? story.beats : [];
+  const byBeat = new Map<string, { label: string; params: string[] }>();
+  for (const w of warnings) {
+    if (typeof w !== 'string') continue;
+    const m = w.match(/beats\[(\d+)\][^']*Parameter '([^']+)' not defined in schema for beat type '([^']+)'/);
+    if (!m) continue;
+    const beat = beats[Number(m[1])];
+    const key = beat?.id ?? m[1];
+    const label = `"${beat?.name || beat?.id || `beat ${m[1]}`}" (${m[3]})`;
+    const entry = byBeat.get(key) ?? { label, params: [] };
+    if (!entry.params.includes(m[2])) entry.params.push(m[2]);
+    byBeat.set(key, entry);
+  }
+  return [...byBeat.values()].map(({ label, params }) =>
+    `${label} came with ${params.length === 1 ? 'a setting' : 'settings'} this kind of beat doesn't have (${params.map((p) => `"${p}"`).join(', ')}), so ${params.length === 1 ? 'it was' : 'they were'} ignored. Check that the beat still does what the story needs.`);
 }

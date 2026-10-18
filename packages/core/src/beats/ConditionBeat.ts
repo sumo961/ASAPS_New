@@ -136,6 +136,7 @@ export class ConditionBeat extends Beat {
     this.timeDay = conditionObj.timeDay ?? params.timeDay ?? (config as any).timeDay;
     this.timeHour = conditionObj.timeHour ?? params.timeHour ?? (config as any).timeHour;
     this.timeMinute = conditionObj.timeMinute ?? params.timeMinute ?? (config as any).timeMinute;
+    this.applyCompareTime(conditionObj, params, config);
     // Mood / sentiment parameters (Step 4)
     this.moodAxis = (conditionObj.moodAxis || (params as any).moodAxis || (config as any).moodAxis || 'valence') as 'valence' | 'arousal';
     this.sentimentTarget = conditionObj.sentimentTarget || (params as any).sentimentTarget || (config as any).sentimentTarget;
@@ -280,6 +281,30 @@ export class ConditionBeat extends Beat {
     }
 
     return condition;
+  }
+
+  /**
+   * The generation prompt (and the runtime Condition type) express a
+   * fictional-time check as `compareTime: {year, month, day, hour, minute}`,
+   * nested in `condition` or flat in the parameters, while this beat stores
+   * timeYear … timeMinute. compareTime was never read, so every generated
+   * time gate fell back to 2024-01-01 00:00. Fill the fields it names that
+   * no explicit time* field already set (`override`: an update's compareTime wins).
+   */
+  private applyCompareTime(conditionObj: any, params: any, config: any, override = false): void {
+    const ct = (params as any)?.compareTime ?? conditionObj?.compareTime ?? config?.compareTime;
+    if (!ct || typeof ct !== 'object') return;
+    const explicit = (key: string) => (params as any)?.[key] !== undefined || conditionObj?.[key] !== undefined;
+    const take = (key: 'timeYear' | 'timeMonth' | 'timeDay' | 'timeHour' | 'timeMinute', v: unknown) => {
+      if (typeof v !== 'number' && !(typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)))) return;
+      if (explicit(key)) return;
+      if (override || this[key] === undefined) this[key] = Number(v);
+    };
+    take('timeYear', ct.year);
+    take('timeMonth', ct.month);
+    take('timeDay', ct.day);
+    take('timeHour', ct.hour);
+    take('timeMinute', ct.minute);
   }
 
   getParameters(): Record<string, any> {
@@ -524,6 +549,7 @@ export class ConditionBeat extends Beat {
     } else if (conditionObj.timeMinute !== undefined) {
       this.timeMinute = conditionObj.timeMinute;
     }
+    this.applyCompareTime(conditionObj, params, null, true);
 
     // Trait parameter (Step 6)
     if (params.traitName !== undefined) {

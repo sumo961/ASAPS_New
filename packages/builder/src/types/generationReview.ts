@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -78,7 +78,18 @@ export interface RoleFinding extends FindingBase {
   role: string;
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding;
+/**
+ * A fictional-time gate whose answer is fixed before play starts: it
+ * compares against a time before the earliest the story clock can show (the
+ * clock only moves forward), or the story never sets a clock at all.
+ */
+export interface TimeGateFinding extends FindingBase {
+  kind: 'time-gate';
+  branch: 'true' | 'false';
+  targetId: string;
+}
+
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding;
 
 export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 

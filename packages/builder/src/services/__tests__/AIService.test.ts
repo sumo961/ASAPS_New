@@ -625,3 +625,29 @@ describe('transformBeatFormat routes the single link by schema (2026-09-08)', ()
     expect(svc().transformBeatFormat({ id: 'd', type: 'durScreen', parameters: { name: 't', value: 3 }, connections: [{ targetId: 'n' }] }).parameters.connection.target).toBe('n');
   });
 });
+
+describe('transformBeatFormat keeps the time of a fictional-time gate', () => {
+  // "Stopped Under the City": "Route: On Time?" was generated with a
+  // compareTime of 2025-11-18 09:18; the pipeline dropped it and the gate
+  // compared against 2024-01-01 00:00, so Elin was always too late.
+  const svc = () => {
+    const s = new AIService();
+    (s as any).validator = { getSchema: () => ({ beatTypes: { conditionBeat: { parameters: {} } } }) };
+    return s as any;
+  };
+  const time = { year: 2025, month: 11, day: 18, hour: 9, minute: 18 };
+
+  it('nested condition.compareTime (as the prompt teaches)', () => {
+    const out = svc().transformBeatFormat({ id: 'b', type: 'conditionBeat', parameters: {
+      condition: { type: 'fictionalTime', operator: '<=', compareTime: time }, trueConnection: { target: 'x' }, falseConnection: { target: 'y' } } });
+    expect(out.parameters).toMatchObject({ conditionType: 'fictionalTime', timeYear: 2025, timeMonth: 11, timeDay: 18, timeHour: 9, timeMinute: 18 });
+    expect(out.parameters.compareTime).toBeUndefined();
+  });
+
+  it('flat compareTime (as the model sometimes writes it)', () => {
+    const out = svc().transformBeatFormat({ id: 'b', type: 'conditionBeat', parameters: {
+      conditionType: 'fictionalTime', operator: '<=', compareTime: time, trueTarget: 'x', falseTarget: 'y' } });
+    expect(out.parameters).toMatchObject({ timeYear: 2025, timeHour: 9, timeMinute: 18 });
+    expect(out.parameters.compareTime).toBeUndefined();
+  });
+});

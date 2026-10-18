@@ -627,6 +627,22 @@ export class AIService {
         }
       }
 
+      // Fictional-time gates: the prompt teaches compareTime {year, month,
+      // day, hour, minute} (nested in condition, or the model puts it flat);
+      // the beat and the Inspector use timeYear … timeMinute. Without this
+      // the time was dropped and the gate compared against 2024-01-01 00:00.
+      {
+        const ct = (params.condition && params.condition.compareTime) || params.compareTime;
+        if (ct && typeof ct === 'object') {
+          const map: Array<[string, string]> = [['year', 'timeYear'], ['month', 'timeMonth'], ['day', 'timeDay'], ['hour', 'timeHour'], ['minute', 'timeMinute']];
+          for (const [from, to] of map) {
+            if (ct[from] !== undefined && params[to] === undefined) params[to] = Number(ct[from]);
+          }
+          delete params.compareTime;
+          console.log(`[AIService] Flattened compareTime → timeYear…timeMinute for beat ${beat.id}`);
+        }
+      }
+
       // CRITICAL FIX: For inventory conditions, AI often uses variableName instead of item
       // Convert variableName → item when conditionType is 'inventory'
       if (params.conditionType === 'inventory' && params.variableName && !params.item) {

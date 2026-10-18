@@ -339,6 +339,39 @@ describe('ReachabilityAnalyzer', () => {
     });
   });
 
+  describe('Effects wherever beats keep them', () => {
+    // "Stopped Under the City": Multi Choice choices set jonasPath / elinPath
+    // and raise the character counter "revealed"; the analyzer read none of
+    // them and reported six ending routes as impossible.
+    it('sees setVariable and counter effects on Multi Choice choices, links and random branches', () => {
+      const story = new Story({ title: 'Effects', author: 'Test', firstBeatId: 'turn' });
+      story.addBeat(createTestBeat({
+        id: 'turn', name: 'Turning Point', type: 'multiChoice',
+        parameters: {
+          choices: [
+            { id: 'a', text: 'Confess', target: 'end', effects: [{ type: 'setVariable', target: 'jonasPath', value: 'confess' }] },
+            { id: 'b', text: 'Whisper', target: 'end', effects: [{ type: 'incrementCounter', target: 'revealed', value: 2, character: 'char_jonas' }] },
+          ],
+        },
+        connections: [{ targetId: 'end', effects: [{ type: 'setVariable', target: 'elinPath', value: 'post' }] }],
+      }));
+      story.addBeat(createTestBeat({
+        id: 'dice', name: 'Dice', type: 'randomTarget',
+        parameters: { choices: [{ target: 'end', weight: 1, effects: [{ type: 'setCounter', target: 'luck', value: 3 }] }] },
+      }));
+      story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: {} }));
+
+      const analyzer = new ReachabilityAnalyzer(story);
+      expect(analyzer.analyzeCondition({ type: 'variable', operator: '==', left: 'jonasPath', right: 'confess' } as any).isSatisfiable).toBe(true);
+      expect(analyzer.analyzeCondition({ type: 'variable', operator: '==', left: 'elinPath', right: 'post' } as any).isSatisfiable).toBe(true);
+      expect(analyzer.analyzeCondition({ type: 'counter', operator: '>=', left: 'revealed', right: 2 } as any).isSatisfiable).toBe(true);
+      expect(analyzer.analyzeCondition({ type: 'counter', operator: '>=', left: 'luck', right: 3 } as any).isSatisfiable).toBe(true);
+      // Still catches what really can't happen.
+      expect(analyzer.analyzeCondition({ type: 'variable', operator: '==', left: 'jonasPath', right: 'silent' } as any).isSatisfiable).toBe(false);
+      expect(analyzer.analyzeCondition({ type: 'counter', operator: '>=', left: 'revealed', right: 5 } as any).isSatisfiable).toBe(false);
+    });
+  });
+
   describe('Counter Range Analysis', () => {
     it('should analyze counter modifications', () => {
       const story = new Story({
@@ -439,9 +472,8 @@ describe('ReachabilityAnalyzer', () => {
       const analyzer = new ReachabilityAnalyzer(story);
       const result = analyzer.analyze();
 
-      const middleWarning = result.warnings.find(w => w.beatId === 'middle');
-      expect(middleWarning).toBeDefined();
-      expect(middleWarning?.type).toBe('single-path');
+      // A single way in is ordinary structure, not a warning.
+      expect(result.warnings.find(w => w.beatId === 'middle')).toBeUndefined();
     });
 
     it('should warn about conditional-only reachable beats', () => {

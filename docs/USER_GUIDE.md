@@ -2584,6 +2584,8 @@ A few things worth knowing:
   ![An AI fix card: the model's reasoning, the exact edit as before → after, Accept and Reject](images/71-ask-ai-fix.png)
 - **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source, your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
 - **Endings that don't say where Restart leads** are listed as well (an End Screen or AI Summary showing a Restart button with no [restart target](#restart-target)). For an AI Summary the banner proposes restarting at the story's start — the start beat from Project Settings, otherwise the title screen; for an End Screen you pick the *Restart leads to* beat in the Inspector.
+- **Time checks that are decided before play starts** are listed too: a Condition Check on the story clock that compares against a time before the clock ever shows (the clock only moves forward), so one of its branches can never run — or a clock check in a story that never sets a clock. The row names the time it checks and the time the clock starts at; fix the time in the Inspector.
+- **Settings the AI wrote that a beat doesn't have** are named in the banner ("came with a setting this kind of beat doesn't have … so it was ignored"). The beat imports without it, so check that it still does what the story needs.
 - The same banner appears for stories injected from Claude Desktop via MCP.
 
 <a id="co-designer"></a>
