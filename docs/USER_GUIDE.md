@@ -2251,6 +2251,19 @@ Each character placement includes:
    - Text box styling
    - Position and size
 
+### Button Positions on a Fixed Canvas: Lock position
+
+On a fixed canvas, ASAPS keeps buttons readable when the story plays (in the Preview and in exported stories alike):
+
+- A button that would overlap the text box moves down below it.
+- Buttons that would overlap each other are spaced apart.
+- Buttons whose X positions are scattered are lined up in one column.
+- If the buttons run off the bottom of the stage, they all move up together.
+
+That suits most scenes. When you want a button exactly where you put it — on top of a picture, or overlapping the text on purpose — select it and tick **Lock position** in the properties panel. A locked button never moves; the other buttons still make room around it.
+
+Lock position only appears in fixed-canvas projects (responsive layouts arrange buttons themselves), and it matters for beats such as Movement Choice and Pick Prop. **Multi Choice** buttons always stay exactly where you put them, so they never need it. **Dialog Tree** buttons form a stack under the text box instead (see [Dialog-Tree Choices](#dialog-choices-visual-editor)), so they don't show the checkbox.
+
 ### Hotspots: Invisible Click Zones
 
 Create clickable areas that don't have visible content:
@@ -3034,7 +3047,7 @@ These are advice only: nothing changes at runtime. The analysis explores the sam
 ### Story Logic
 
 ![Debug Tools — Story Logic tab](images/33-debug-story-logic.png)
-*The Story Logic tab, surfacing hub beats reachable from many paths.*
+*The Story Logic tab: hub beats reachable from several paths, and a Line Without Exit warning: Grandma's last line has no replies and no exit link, with the fix it suggests.*
 
 Pattern-based validation that runs on the project's structure:
 - **Hub Beat Analysis** — beats reachable from multiple paths. Each hub gets a card with its incoming-path count and a reminder to check that the text doesn't assume a specific player state.

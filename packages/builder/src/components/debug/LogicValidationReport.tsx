@@ -423,7 +423,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
                       <p className="text-sm text-yellow-700 mb-2">{issue.message}</p>
                       {issue.problematicText && (
                         <p className="text-xs text-yellow-600 mb-2">
-                          <strong>Detected patterns:</strong> {issue.problematicText}
+                          <strong>{issue.category === 'dialog_line_without_exit' ? 'The line:' : 'Detected patterns:'}</strong> {issue.problematicText}
                         </p>
                       )}
                       {issue.suggestedFix && (
@@ -478,6 +478,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
           <li><strong>Hub State Assumption:</strong> Hub beats (reachable from multiple paths) shouldn't assume player has gathered specific items/clues</li>
           <li><strong>Undescribed Item:</strong> Items picked up via pickProp should be described in the following beat (what does the letter say? what does the photo show?)</li>
           <li><strong>Ungated State Reference:</strong> Text referencing player state without a conditionBeat checking it first</li>
+          <li><strong>Line Without Exit:</strong> A Dialog Tree line with no replies and no exit link ends the scene the moment it appears, so players never read it: give it an exit link or replies</li>
         </ul>
       </div>
     </div>

@@ -1,5 +1,16 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.122, 2026-10-19)
+
+### Overview
+- **User Guide:** new section *Button Positions on a Fixed Canvas: Lock position* (what the player rearranges — push below text, spacing, column alignment, shift up on overflow — and that Lock position keeps a button put; which beat types it applies to). Screenshot 33 (Debug → Story Logic) retaken on a Red Riding Hood copy with a Line Without Exit warning.
+- **Story Logic panel:** a Line Without Exit card labels the quoted line "The line:" (it said "Detected patterns:", the keyword checks' label), and the legend explains the new category.
+- The panel's note promising AI-powered story analysis stays: the feature is planned (decision 2026-10-19).
+
+**Files modified:** docs/USER_GUIDE.md, docs/images/33-debug-story-logic.png, packages/builder/src/components/debug/LogicValidationReport.tsx
+
+---
+
 ## 2026-10-19: Names in colour, buttons that stay put (v0.9.122)
 
 ### Overview
