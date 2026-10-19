@@ -54,6 +54,7 @@ interface GlobalSettings {
     animation: 'none' | 'typewriter' | 'fade';
     typewriterSpeed: number;
     fadeInDuration: number;
+    buttonEntrance?: 'slide' | 'none';
   };
   hotspots?: {
     visible: boolean;
@@ -85,6 +86,7 @@ interface GlobalSettings {
     nameStyle?: string;
     namePosition?: string;
     nameColor?: string;
+    useCharacterColors?: boolean;
     graphicPosition?: string;
     graphicSize?: number;
   };
@@ -221,6 +223,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       typewriterSpeed: settings.textEffects.typewriterSpeed,
       fadeInDuration: settings.textEffects.fadeInDuration,
       typewriterGranularity: (settings.textEffects as any).typewriterGranularity,
+      buttonEntrance: settings.textEffects.buttonEntrance,
     } : undefined,
     hotspot: settings.hotspots ? {
       highlightColor: settings.hotspots.highlightColor || '#ffff00',
@@ -236,7 +239,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       const showNames = sd.showNames ?? (nameStyle !== 'off');
       const graphicPosition = sd.graphicPosition || 'off';
       const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
-      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, graphicPosition, graphicSize: sd.graphicSize };
+      return { showNames, showGraphics, nameStyle, namePosition: sd.namePosition || 'left', nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize };
     })() : undefined,
   };
 }
@@ -803,6 +806,16 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         return char.portrait.image;
       });
       console.log('[PlayerEngine] Set up character portrait resolver');
+    }
+
+    // Speaker name colors: each character's Theme Color (Project Settings →
+    // Speaker Display → "Use each character's Theme Color").
+    if ('setSpeakerColorResolver' in renderer && characters.length > 0) {
+      (renderer as any).setSpeakerColorResolver((speakerName: string): string | undefined => {
+        const ctx = this.engine?.getContext() as any;
+        const char: any = findSpeakerCharacter(speakerName, characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
+        return typeof char?.color === 'string' && char.color ? char.color : undefined;
+      });
     }
 
     // Asset resolver - resolves asset IDs to blob URLs

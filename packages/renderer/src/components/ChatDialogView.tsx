@@ -1,6 +1,15 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
 import type { RenderThemeSettings, ReservedHudRect } from './PositionedBeatView';
+
+/** The player asked their system for less motion. */
+function prefersReducedMotion(): boolean {
+  try {
+    return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { renderMarkdownLite } from '../utils/markdownLite';
 
@@ -323,37 +332,42 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
           borderTop: `1px solid rgba(255, 255, 255, 0.1)`,
         }}
       >
-        {choices.map((choice, index) => (
-          <button
-            key={choice.id}
-            onClick={() => onChoiceSelect?.(choice.id)}
-            className="transition-all duration-200"
-            style={{
-              backgroundColor: button.backgroundColor,
-              color: button.textColor,
-              border: `${button.borderWidth}px solid ${button.borderColor}`,
-              borderRadius: pillSafeRadius(button.borderRadius, 20),
-              padding: '8px 16px',
-              fontFamily: fonts.buttonFont,
-              fontSize: Math.round(14 * fontScale),
-              cursor: 'pointer',
-              opacity: choicesVisible ? 1 : 0,
-              transform: choicesVisible ? 'translateY(0)' : 'translateY(10px)',
-              transition: 'all 0.3s ease-out',
-              transitionDelay: `${index * 50}ms`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = button.hoverBackgroundColor;
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = button.backgroundColor;
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            {choice.text}
-          </button>
-        ))}
+        {choices.map((choice, index) => {
+          // The small rise of the buttons follows the project's choice
+          // entrance setting and the player's reduced-motion preference.
+          const rise = theme?.textEffects?.buttonEntrance !== 'none' && !prefersReducedMotion();
+          return (
+            <button
+              key={choice.id}
+              onClick={() => onChoiceSelect?.(choice.id)}
+              className="transition-all duration-200"
+              style={{
+                backgroundColor: button.backgroundColor,
+                color: button.textColor,
+                border: `${button.borderWidth}px solid ${button.borderColor}`,
+                borderRadius: pillSafeRadius(button.borderRadius, 20),
+                padding: '8px 16px',
+                fontFamily: fonts.buttonFont,
+                fontSize: Math.round(14 * fontScale),
+                cursor: 'pointer',
+                opacity: choicesVisible ? 1 : 0,
+                transform: choicesVisible || !rise ? 'translateY(0)' : 'translateY(10px)',
+                transition: 'all 0.3s ease-out',
+                transitionDelay: `${index * 50}ms`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = button.hoverBackgroundColor;
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = button.backgroundColor;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              {choice.text}
+            </button>
+          );
+        })}
       </div>
     );
   };

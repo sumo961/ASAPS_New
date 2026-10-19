@@ -554,6 +554,8 @@ export interface RenderThemeSettings {
      *  or whole lines. The clock stays character-based, so speed and total
      *  duration are identical across granularities. */
     typewriterGranularity?: 'letter' | 'word' | 'line';
+    /** Choice buttons' entrance in responsive layouts: 'slide' (default) or 'none'. */
+    buttonEntrance?: 'slide' | 'none';
   };
   /** Hotspot styling */
   hotspot?: {
@@ -570,7 +572,8 @@ export interface RenderThemeSettings {
     showGraphics?: boolean;                    // Master toggle: show speaker portraits globally
     nameStyle: 'off' | 'label' | 'inline';   // Off / label above text box / bold first line inside text box
     namePosition: 'left' | 'right';           // Which side the name appears on
-    nameColor?: string;                       // Custom color for inline name (default: inherit)
+    nameColor?: string;                       // Name color, label and inline (default: label light grey, inline text color)
+    useCharacterColors?: boolean;             // Hosts resolve each speaker's Theme Color into nameColor
     graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
     graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
   };

@@ -343,3 +343,31 @@ describe('painted stage (hosts lay their screen HUDs out for the same box)', () 
     expect(renderer.getPaintedStage()).toBe('stage');
   });
 });
+
+// "Use each character's Theme Color": the current speaker's color becomes the
+// name color handed to every view; off, or no color, keeps the project's.
+describe('ReactRenderer speaker name colors', () => {
+  const base = { speakerDisplay: { nameStyle: 'label', namePosition: 'left', graphicPosition: 'off', nameColor: '#eeeeee', useCharacterColors: true } } as any;
+  const colors: Record<string, string> = { Grandma: '#c0392b' };
+
+  it("gives the current speaker's Theme Color as the name color, and the same theme object while nothing changes", () => {
+    renderer.setTheme(base);
+    renderer.setSpeakerColorResolver((s) => colors[s]);
+    renderer.setState('beatSpeaker', 'Grandma');
+    const t1 = (renderer as any).speakerTheme();
+    expect(t1.speakerDisplay.nameColor).toBe('#c0392b');
+    expect((renderer as any).speakerTheme()).toBe(t1);
+    expect(base.speakerDisplay.nameColor).toBe('#eeeeee');
+  });
+
+  it("keeps the project's theme for speakers without a color, or with the option off", () => {
+    renderer.setSpeakerColorResolver((s) => colors[s]);
+    renderer.setTheme(base);
+    renderer.setState('beatSpeaker', 'Riley');
+    expect((renderer as any).speakerTheme()).toBe(base);
+    const off = { speakerDisplay: { ...base.speakerDisplay, useCharacterColors: false } } as any;
+    renderer.setTheme(off);
+    renderer.setState('beatSpeaker', 'Grandma');
+    expect((renderer as any).speakerTheme()).toBe(off);
+  });
+});

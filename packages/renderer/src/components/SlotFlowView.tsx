@@ -1463,6 +1463,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           animation-timing-function: ease-out;
           animation-fill-mode: both;
         }
+        /* The choices' slide was the one motion that ignored the player's
+           reduced-motion preference. */
+        @media (prefers-reduced-motion: reduce) {
+          .${scope} .slotflow-action-slide-in { animation: none; }
+        }
       `}</style>
 
       {/* Body slot — one scrollable surface in BOTH phases. In phase 1
@@ -2291,7 +2296,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
         return (
           <>
             <div
-              className={`${a.className ?? ''} ${(isConversation || customActionStyle) ? '' : 'slotflow-action-slide-in'}`}
+              className={`${a.className ?? ''} ${(isConversation || customActionStyle || theme.textEffects?.buttonEntrance === 'none') ? '' : 'slotflow-action-slide-in'}`}
               data-slotflow-slot={actionSlot.name}
               style={{
                 // Position + zIndex so this row stacks ABOVE the

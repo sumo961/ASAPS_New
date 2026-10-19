@@ -123,6 +123,7 @@ export function normalizeSpeakerDisplay(sd: any): {
   nameStyle: 'off' | 'label' | 'inline';
   namePosition: 'left' | 'right';
   nameColor?: string;
+  useCharacterColors?: boolean;
   graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';
   graphicSize?: number;
 } {
@@ -137,6 +138,7 @@ export function normalizeSpeakerDisplay(sd: any): {
       nameStyle: sd.nameStyle,
       namePosition: sd.namePosition || 'left',
       nameColor: sd.nameColor,
+      useCharacterColors: sd.useCharacterColors,
       graphicPosition: sd.graphicPosition || 'off',
       graphicSize: sd.graphicSize,
     };
@@ -166,7 +168,7 @@ export function normalizeSpeakerDisplay(sd: any): {
   // Derive showNames/showGraphics from migrated values
   const showNames = sd.showNames ?? (nameStyle !== 'off');
   const showGraphics = sd.showGraphics ?? (graphicPosition !== 'off');
-  return { showNames, showGraphics, nameStyle, namePosition, graphicPosition, graphicSize: sd.graphicSize };
+  return { showNames, showGraphics, nameStyle, namePosition, nameColor: sd.nameColor, useCharacterColors: sd.useCharacterColors, graphicPosition, graphicSize: sd.graphicSize };
 }
 
 /**
@@ -327,6 +329,7 @@ export function convertGlobalSettingsToTheme(settings: GlobalSettings): RenderTh
       typewriterSpeed: textEffects.typewriterSpeed,
       fadeInDuration: textEffects.fadeInDuration,
       typewriterGranularity: textEffects.typewriterGranularity,
+      buttonEntrance: textEffects.buttonEntrance,
     },
     hotspot: {
       highlightColor: hotspots.highlightColor || '#ffff00',

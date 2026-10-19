@@ -96,6 +96,10 @@ export interface GlobalSettings {
     /** Typewriter reveal unit — letters (classic), whole words, or whole
      *  lines. Optional; absent means 'letter' (all pre-existing projects). */
     typewriterGranularity?: 'letter' | 'word' | 'line';
+    /** How choice buttons appear in responsive layouts: a short slide up
+     *  (default, also when absent) or 'none'. Reduced-motion players never
+     *  get the slide. */
+    buttonEntrance?: 'slide' | 'none';
   };
   hotspots: {
     visible: boolean;
@@ -154,7 +158,8 @@ export interface GlobalSettings {
     showGraphics?: boolean;                    // Master toggle: show speaker portraits globally (default derived from graphicPosition)
     nameStyle: 'off' | 'label' | 'inline';   // Off / label above text box / bold first line inside text box
     namePosition: 'left' | 'right';           // Which side the name appears on
-    nameColor?: string;                       // Custom color for inline name (default: inherit)
+    nameColor?: string;                       // Name color, label and inline (default: label light grey, inline text color)
+    useCharacterColors?: boolean;             // Each speaker's name in their character's Theme Color (falls back to nameColor)
     graphicPosition: 'off' | 'inside-left' | 'inside-right' | 'above-left' | 'above-right';  // Portrait placement
     graphicSize?: number;                     // Portrait size in px (default 48 inside, 80 above)
   };

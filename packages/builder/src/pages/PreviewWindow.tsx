@@ -1207,6 +1207,16 @@ export const PreviewWindow: React.FC = () => {
         return ch.portrait.image;
       });
 
+      // Speaker name colors: each character's Theme Color, when the project
+      // turns that on (Speaker Display → "Use each character's Theme Color").
+      reactRenderer.setSpeakerColorResolver((speakerName: string) => {
+        const pd = previewDataRef.current;
+        if (!pd?.characters?.length) return undefined;
+        const ctx = engineRef.current?.getContext() as any;
+        const ch: any = findSpeakerCharacter(speakerName, pd.characters as any[], ctx?.getMergedCharacter ? (id: string) => ctx.getMergedCharacter(id) : undefined);
+        return typeof ch?.color === 'string' && ch.color ? ch.color : undefined;
+      });
+
       // Set up sound blob resolver for beat sounds
       // This fetches audio from URLs and converts to blobs for the audio manager
       // Uses ref so it always accesses latest assets

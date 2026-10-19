@@ -2272,7 +2272,9 @@ When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs acro
 - **The column** — drag a button sideways, or type its **X** and **Width** in the properties panel, and every button of the dialog moves to that column.
 - **The order** — drag a button up or down and drop it where it should go: the choices themselves are reordered in the Dialog Tree (the Inspector follows along). It's one undo step.
 
-The **Y** field is shown but read-only — the stack decides it. When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
+The **Y** field is shown but read-only — the stack decides it. To move the whole stack up or down, move or resize the **text box**: the buttons always start just below it. When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
+
+(Multi Choice buttons are different: each one goes wherever you put it, Y included.)
 
 **"Show as" — see what a player sees.** Some choices only appear when they've been [earned](#conditional-choices). On the right of the Dialog path bar, the **Show as** dropdown (in both layout modes; when the canvas is narrow the bar wraps and Show as moves onto a second line) switches the canvas between:
 
@@ -3574,6 +3576,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 
 **Settings → Effects:**
 - Text animations (typewriter, fade)
+- **Choice Buttons** — in responsive layouts, choice and Continue buttons slide up into place when a beat starts. Choose *Appear in place* to switch that off. Players whose device is set to reduce motion never see the slide either way.
 - Hotspot visibility (Hotspot Area Visibility, Label Display)
 - <a id="speaker-display"></a>**Speaker Display** (sub-section) — controls how speaker names and portrait graphics appear during playback:
   - **Show speaker names** — Master toggle for displaying character names during dialog
@@ -3583,7 +3586,8 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
     - *Inline* — Name shown bold at the start of the text inside the box
     - *Off* — Name hidden
   - **Name position** — Left or right alignment for the speaker name
-  - **Name color** — Custom color for the speaker name text
+  - **Name color** — Custom color for the speaker name, for both Label and Inline names
+  - **Use each character's Theme Color** — every speaker's name in their own color: the *Theme Color* you give a character in **Characters**. Speakers without one use the Name color. (Chat-style dialog layouts keep their own name styling.)
   - **Portrait position** — Where the portrait image appears:
     - *Inside left / Inside right* — Small portrait inside the text box
     - *Above left / Above right* — Larger portrait above the text box

@@ -367,3 +367,19 @@ describe('convertGlobalSettingsToTheme', () => {
     });
   });
 });
+
+// User questions 2026-10-19: switch off the buttons' slide; color each
+// speaker's name. Both settings must reach the renderer's theme.
+describe('choice entrance and speaker name colors', () => {
+  it('passes the choice-button entrance through (absent stays absent = slide)', () => {
+    expect(convertGlobalSettingsToTheme(makeSettings({ textEffects: { buttonEntrance: 'none' } })).textEffects?.buttonEntrance).toBe('none');
+    expect(convertGlobalSettingsToTheme(makeSettings()).textEffects?.buttonEntrance).toBeUndefined();
+  });
+
+  it('passes name color and "use character colors" through, in the old speaker-display format too', () => {
+    const now = convertGlobalSettingsToTheme(makeSettings({ speakerDisplay: { nameStyle: 'label', namePosition: 'left', graphicPosition: 'off', nameColor: '#ff0', useCharacterColors: true } }));
+    expect(now.speakerDisplay).toMatchObject({ nameColor: '#ff0', useCharacterColors: true });
+    const old = convertGlobalSettingsToTheme(makeSettings({ speakerDisplay: { namePosition: 'left', graphicPosition: 'off', nameColor: '#0ff', useCharacterColors: true } }));
+    expect(old.speakerDisplay).toMatchObject({ nameStyle: 'label', nameColor: '#0ff', useCharacterColors: true });
+  });
+});

@@ -1825,6 +1825,24 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </div>
                 )}
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                    Choice Buttons
+                  </label>
+                  <select
+                    value={settings.textEffects.buttonEntrance ?? 'slide'}
+                    onChange={(e) => handleChange('textEffects', 'buttonEntrance', e.target.value)}
+                    className="w-full px-3 py-2 border rounded"
+                  >
+                    <option value="slide">Slide up into place</option>
+                    <option value="none">Appear in place</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    How choice and Continue buttons arrive in responsive layouts.
+                    Players whose device asks for reduced motion never see the slide.
+                  </p>
+                </div>
+
                 <div className="pt-4 border-t">
                   <h4 className="font-medium text-gray-700 mb-3">Hotspot Settings</h4>
 
@@ -1976,8 +1994,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       </div>
                     )}
 
-                    {/* Name Color - shown when inline */}
-                    {settings.speakerDisplay?.nameStyle === 'inline' && (
+                    {/* Name Color - label and inline both draw it */}
+                    {(settings.speakerDisplay?.nameStyle ?? 'off') !== 'off' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-600 mb-1">
                           Name Color
@@ -1985,12 +2003,24 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         <div className="flex items-center gap-2">
                           <input
                             type="color"
-                            value={settings.speakerDisplay?.nameColor ?? '#ffffff'}
+                            value={settings.speakerDisplay?.nameColor ?? (settings.speakerDisplay?.nameStyle === 'label' ? '#f0f0f0' : '#ffffff')}
                             onChange={(e) => handleChange('speakerDisplay', 'nameColor', e.target.value)}
                             className="w-10 h-10 rounded border cursor-pointer"
                           />
-                          <span className="text-xs text-gray-500">{settings.speakerDisplay?.nameColor ?? 'inherit'}</span>
+                          <span className="text-xs text-gray-500">{settings.speakerDisplay?.nameColor ?? 'default'}</span>
                         </div>
+                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer mt-2">
+                          <input
+                            type="checkbox"
+                            checked={settings.speakerDisplay?.useCharacterColors ?? false}
+                            onChange={(e) => handleChange('speakerDisplay', 'useCharacterColors', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <span>Use each character's Theme Color</span>
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Set in Characters → a character → Theme Color. Speakers without one use the Name Color.
+                        </p>
                       </div>
                     )}
                   </div>

@@ -2457,7 +2457,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                   type="number"
                                   readOnly
                                   value={Math.round(dialogStackDrawn.get(selected.id)?.y ?? effectiveY)}
-                                  title="Choices stack below the text in their order — drag a button up or down to reorder"
+                                  title="Choices stack below the text in their order: move or resize the text box to move them, drag a button up or down to reorder"
                                   className="w-full px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
                                 />
                               ) : (
@@ -2686,8 +2686,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     auto-shift; the renderer keeps the authored x/y
                     even if it overlaps text or other buttons. Only
                     meaningful in fixed/absolute mode; the responsive
-                    flow doesn't run collision detection. */}
-                {layoutMode === 'absolute' && (
+                    flow doesn't run collision detection. A Dialog Tree's
+                    choice buttons are a stack placed under the text, so
+                    there is nothing to lock: no checkbox for them. */}
+                {layoutMode === 'absolute' && !(dialogStackDrawn && selected.type === 'button' && /^choice_\d+$/.test(selected.id)) && (
                   <label className="flex items-center gap-2 text-xs text-gray-700">
                     <input
                       type="checkbox"

@@ -1062,6 +1062,9 @@ export class ReactRenderer extends BaseRenderer {
   protected currentShowAvatars: boolean = true;  // NEW: Whether to show avatars in chat mode
   private characterAvatarResolver: ((characterId: string) => string | undefined) | null = null;  // NEW: Character avatar resolver
   private characterPortraitResolver: ((speakerName: string) => string | undefined) | null = null;  // Speaker portrait resolver
+  /** A speaker's character Theme Color (speakerDisplay.useCharacterColors). */
+  private speakerColorResolver: ((speakerName: string) => string | undefined) | null = null;
+  private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; theme: RenderThemeSettings } | null = null;
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
@@ -1595,6 +1598,30 @@ export class ReactRenderer extends BaseRenderer {
       const state = this.speakerStateFor(characterId);
       return state ? resolver(characterId, state) : resolver(characterId);
     };
+  }
+
+  /** Resolve a speaker to their character's Theme Color (for speaker names). */
+  setSpeakerColorResolver(resolver: ((speakerName: string) => string | undefined) | null): void {
+    this.speakerColorResolver = resolver;
+  }
+
+  /**
+   * The theme for what is on stage now: with "use character colors" on, the
+   * current speaker's Theme Color becomes the name color (else the project's
+   * Name Color stands). The same object comes back while nothing changed, so
+   * views don't re-render for it.
+   */
+  protected speakerTheme(): RenderThemeSettings | undefined {
+    const base = this.theme;
+    if (!base?.speakerDisplay?.useCharacterColors || !this.speakerColorResolver) return base;
+    const speaker = this.getState('beatSpeaker') as string | undefined;
+    const color = speaker ? this.speakerColorResolver(speaker) : undefined;
+    if (!color) return base;
+    const c = this.speakerThemeCache;
+    if (c && c.base === base && c.color === color) return c.theme;
+    const theme = { ...base, speakerDisplay: { ...base.speakerDisplay, nameColor: color } };
+    this.speakerThemeCache = { base, color, theme };
+    return theme;
   }
 
   /**
@@ -2185,7 +2212,7 @@ export class ReactRenderer extends BaseRenderer {
                   choices={[]}
                   mode={'chat-scroll'}
                   showAvatars={this.currentShowAvatars}
-                  theme={this.theme}
+                  theme={this.speakerTheme()}
                   backgroundUrl={null}
                   backgroundColor="transparent"
                   onChoiceSelect={() => {}}
@@ -2218,7 +2245,7 @@ export class ReactRenderer extends BaseRenderer {
                     choices={[]}
                     mode={'chat-scroll'}
                     showAvatars={this.currentShowAvatars}
-                    theme={this.theme}
+                    theme={this.speakerTheme()}
                     backgroundUrl={this.backgroundImageUrl}
                     backgroundColor={backgroundColor}
                     onChoiceSelect={() => {}}
@@ -2667,7 +2694,7 @@ export class ReactRenderer extends BaseRenderer {
             beatType={beatType}
             spatial={spatialSpec}
             content={content}
-            theme={this.theme}
+            theme={this.speakerTheme()}
             imageUrl={this.backgroundImageUrl}
             imageVariants={this.backgroundImageVariants ?? undefined}
             backgroundColor={spBg}
@@ -2727,7 +2754,7 @@ export class ReactRenderer extends BaseRenderer {
             beatType={beatType}
             slots={slotSpec}
             content={content}
-            theme={this.theme}
+            theme={this.speakerTheme()}
             backgroundUrl={this.backgroundImageUrl}
             backgroundFit={(() => {
               // Per-beat fit, pushed into renderer state by Beat.execute —
@@ -2816,7 +2843,7 @@ export class ReactRenderer extends BaseRenderer {
               interactive={true}
               hideTextBoxes={this.hideTextBoxes}
               hideButtonBoxes={this.hideButtonBoxes}
-              theme={this.theme}
+              theme={this.speakerTheme()}
               previewMode={false}
               visitedBeats={this.visitedBeats}
               visitedChoiceIds={this.visitedChoiceIds}
@@ -3163,7 +3190,7 @@ export class ReactRenderer extends BaseRenderer {
           choices={choices}
           mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
           showAvatars={this.currentShowAvatars}
-          theme={this.theme}
+          theme={this.speakerTheme()}
           // Background already painted on the outer wrapper; the inner
           // view stays transparent so the scroll area lets the bg show.
           backgroundUrl={null}
@@ -3292,7 +3319,7 @@ export class ReactRenderer extends BaseRenderer {
                 speaker: speakerVisible ? (dialogContext.speaker || '') : '',
                 text: dialogContext.text || '',
               }}
-              theme={this.theme}
+              theme={this.speakerTheme()}
               imageUrl={this.backgroundImageUrl}
             imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
@@ -3414,7 +3441,7 @@ export class ReactRenderer extends BaseRenderer {
               speaker: dialogContext.speaker || '',
               [bodyKey]: dialogContext.text || '',
             }}
-            theme={this.theme}
+            theme={this.speakerTheme()}
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
             slotIntent={slotIntent}
@@ -3667,7 +3694,7 @@ export class ReactRenderer extends BaseRenderer {
               beatType="movementChoice"
               spatial={spatialSpec}
               content={{ question }}
-              theme={this.theme}
+              theme={this.speakerTheme()}
               imageUrl={this.backgroundImageUrl}
             imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
@@ -3719,7 +3746,7 @@ export class ReactRenderer extends BaseRenderer {
             beatType="movementChoice"
             slots={moveSlots}
             content={{ question }}
-            theme={this.theme}
+            theme={this.speakerTheme()}
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
             slotIntent={this.getState('slotIntent') as SlotIntent | undefined}
@@ -3814,7 +3841,7 @@ export class ReactRenderer extends BaseRenderer {
               beatType="pickProp"
               spatial={spatialSpec}
               content={{ question }}
-              theme={this.theme}
+              theme={this.speakerTheme()}
               imageUrl={this.backgroundImageUrl}
             imageVariants={this.backgroundImageVariants ?? undefined}
               backgroundColor={bg}
@@ -3865,7 +3892,7 @@ export class ReactRenderer extends BaseRenderer {
             beatType="pickProp"
             slots={propSlots}
             content={{ question }}
-            theme={this.theme}
+            theme={this.speakerTheme()}
             backgroundUrl={this.backgroundImageUrl}
             backgroundColor={slotBg}
             slotIntent={this.getState('slotIntent') as SlotIntent | undefined}
@@ -4778,7 +4805,7 @@ export class ReactRenderer extends BaseRenderer {
         subMessage={options?.subMessage}
         spinnerType={options?.spinnerType}
         backgroundUrl={this.backgroundImageUrl}
-        theme={this.theme}
+        theme={this.speakerTheme()}
         cancelLabel={options?.cancelLabel}
         onCancel={options?.onCancel}
       />
