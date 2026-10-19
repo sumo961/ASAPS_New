@@ -109,6 +109,8 @@ export class ReachabilityAnalyzer {
   private config: Required<ReachabilityConfig>;
   private counterModifications: Map<string, { min: number; max: number }>;
   private variableValues: Map<string, Set<any>>;
+  /** Variables with a Project Settings default: they never start unset. */
+  private variablesWithStartValue = new Set<string>();
   private stateAnalyzed: boolean = false;
   private brokenConnections: BrokenConnection[] = [];
   private conditionBeatWarnings: ConditionBeatWarning[] = [];
@@ -300,6 +302,7 @@ export class ReachabilityAnalyzer {
   private analyzeStateModifications(): void {
     this.counterModifications.clear();
     this.variableValues.clear();
+    this.variablesWithStartValue.clear();
 
     // Values a variable has without any beat setting it: its Project
     // Settings default (the runtime starts it there), and the built-in
@@ -309,6 +312,7 @@ export class ReachabilityAnalyzer {
       if (def?.name && def.defaultValue !== undefined && def.defaultValue !== '') {
         if (!this.variableValues.has(def.name)) this.variableValues.set(def.name, new Set());
         this.variableValues.get(def.name)!.add(def.defaultValue);
+        this.variablesWithStartValue.add(def.name);
       }
     }
     this.variableValues.set(PLAYTHROUGH_VARIABLE, new Set(['__user_input__']));
@@ -1016,8 +1020,18 @@ export class ReachabilityAnalyzer {
   private isConditionAlwaysTrue(condition: Condition): boolean {
     const { type, operator, left, right } = condition;
 
+    // A variable is always true only if every value it can hold passes —
+    // including its start value. Without a declared default it starts unset,
+    // which a test against a value fails, so it is never "always true".
+    if (type === 'variable') {
+      if (!left || !this.variablesWithStartValue.has(left)) return false;
+      const possibleValues = this.variableValues.get(left);
+      if (!possibleValues || possibleValues.size === 0 || possibleValues.has('__user_input__')) return false;
+      return Array.from(possibleValues).every((val) => this.compareValues(val, operator, right));
+    }
+
     // For counter conditions, check if the minimum value already satisfies the condition
-    if (type === 'counter' || type === 'variable') {
+    if (type === 'counter') {
       const varName = left;
       if (!varName) return false;
 

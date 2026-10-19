@@ -1,5 +1,16 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.120, 2026-10-18)
+
+### Overview
+- **Debug → Reachability: no more "condition is always true" for text variables.** After v0.9.120 counted choice effects, "Stopped Under the City" showed five condition branches as unreachable (`jonasPath == silent`, `elinPath == post` …). The always-true test treated every variable like a counter and compared the text as a number (`"silent"` → 0, and an unset counter is 0). A variable test is now always true only when the variable has a start value and every value it can take passes. The bug was older; v0.9.120 exposed it, because before that these variables counted as never set. On the real story: 48/48 reachable, no condition warnings.
+- **Opening the folder of the project already on screen now loads it.** The load step only runs when the project id changes, so File → Open Project Folder on a folder with the same id did nothing, while quietly switching the save target to that folder and leaving auto-save paused. It now reloads from disk.
+- **A copied project folder gets its own id.** "Stopped Under the City" and "Stopped Under the City 2" (a second folder the same imported project was saved into) shared one id, so they shared a library entry and asset cache. Opening a folder whose id belongs to another folder that still holds it now gives the opened folder a new id and its own name, both written to its project.json: the folder's name ("… 2") or, if that name is taken, a numbered one. A notice says so. This covers Finder duplicates too.
+
+**Files modified:** packages/core/src/analysis/ReachabilityAnalyzer.ts, packages/builder/src/App.tsx, packages/builder/src/contexts/PersistenceContext.tsx, packages/builder/src/storage/adapters/DirectoryAdapter.ts, tests (ReachabilityAnalyzer, DirectoryAdapter.behavior)
+
+---
+
 ## 2026-10-18: Deadlines that hold (v0.9.120)
 
 ### Overview

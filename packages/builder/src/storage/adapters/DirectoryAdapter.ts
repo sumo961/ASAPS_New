@@ -442,6 +442,28 @@ export class DirectoryAdapter implements PersistenceAdapter {
     await api.writeFile(projectPath, deterministicStringify(updated));
   }
 
+  /** The project id stored in a folder's project.json, or null if unreadable. */
+  async readFolderProjectId(dirPath: string): Promise<string | null> {
+    try {
+      const reader = this.createReader();
+      const data = JSON.parse(await reader.readText(joinPath(dirPath, 'project.json')));
+      return typeof data?.id === 'string' && data.id ? data.id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Give the open folder a new project id (and name) in its project.json. */
+  async assignProjectId(id: string, name?: string): Promise<void> {
+    if (!this.projectPath) throw new Error('No project path set');
+    const api = window.electronAPI?.fs;
+    if (!api) throw new Error('Requires Electron filesystem API');
+    const reader = this.createReader();
+    const projectPath = joinPath(this.projectPath, 'project.json');
+    const existing = JSON.parse(await reader.readText(projectPath));
+    await api.writeFile(projectPath, deterministicStringify({ ...existing, id, ...(name ? { name } : {}) }));
+  }
+
   /**
    * Watch for external file changes
    */

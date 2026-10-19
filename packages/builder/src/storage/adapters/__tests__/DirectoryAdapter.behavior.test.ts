@@ -350,3 +350,23 @@ describe('watchForChanges', () => {
     expect(unwatch).toHaveBeenCalledOnce();
   });
 });
+
+// A copied project folder keeps its original's id; opening it gives it its own.
+describe('DirectoryAdapter — project id of a folder', () => {
+  it('reads the id from a folder project.json, null when missing or unreadable', async () => {
+    fakeFs.files.set('/a/project.json', JSON.stringify({ _format: '1.0', id: 'p-1', name: 'A' }));
+    fakeFs.files.set('/bad/project.json', '{ not json');
+    const a = new DirectoryAdapter();
+    expect(await a.readFolderProjectId('/a')).toBe('p-1');
+    expect(await a.readFolderProjectId('/bad')).toBeNull();
+    expect(await a.readFolderProjectId('/none')).toBeNull();
+  });
+
+  it('assignProjectId rewrites only the id in the open folder', async () => {
+    fakeFs.files.set('/copy/project.json', JSON.stringify({ _format: '1.0', id: 'p-1', name: 'A', firstBeatId: '0' }));
+    await adapterAt('/copy').assignProjectId('p-2');
+    expect(JSON.parse(fakeFs.files.get('/copy/project.json') as string)).toEqual({ _format: '1.0', id: 'p-2', name: 'A', firstBeatId: '0' });
+    await adapterAt('/copy').assignProjectId('p-3', 'A 2');
+    expect(JSON.parse(fakeFs.files.get('/copy/project.json') as string)).toMatchObject({ id: 'p-3', name: 'A 2' });
+  });
+});

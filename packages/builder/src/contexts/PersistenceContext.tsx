@@ -1093,6 +1093,42 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       const adapter = new DirectoryAdapter();
       const project = await adapter.openProject(dirPath);
 
+      // A copied project folder (Finder duplicate, or a second folder the same
+      // project was saved into) carries the original's id. Under one id the two
+      // folders share a library entry and asset cache, and opening one while
+      // the other is on screen does nothing. When the id already belongs to
+      // another folder that still holds it, this folder is the copy: it gets
+      // its own id.
+      try {
+        const known = await storage.getProject(project.id);
+        const otherPath: string | undefined = known.success ? (known.data as any)?.directoryPath : undefined;
+        const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
+        if (otherPath && !samePath(otherPath, dirPath)
+            && (await adapter.readFolderProjectId(otherPath)) === project.id) {
+          const { v4: uuidv4 } = await import('uuid');
+          const newId = uuidv4();
+          // Same name too would leave two indistinguishable projects: the
+          // copy takes its folder's name ("… 2"), or a numbered one.
+          const listed = await storage.listProjects();
+          const names = listed.success && Array.isArray(listed.data)
+            ? listed.data.filter((p: Project) => p.id !== project.id).map((p: Project) => p.name)
+            : [];
+          names.push(project.name);
+          const folderName = dirPath.split(/[\\/]/).filter(Boolean).pop() || project.name;
+          const newName = findUniqueProjectName(folderName, names);
+          lastOwnWriteRef.current = Date.now();
+          await adapter.assignProjectId(newId, newName);
+          console.log('[PersistenceProvider] Folder shared its id with', otherPath, '— new id', newId, 'name', newName);
+          project.id = newId;
+          project.name = newName;
+          const story: any = project.story;
+          if (story?.metadata && typeof story.metadata === 'object') story.metadata.title = newName;
+          notify.info(`This folder was a copy of "${known.data?.name}" and is now its own project, "${newName}".`);
+        }
+      } catch (e) {
+        console.warn('[PersistenceProvider] Could not check the folder for a shared project id:', e);
+      }
+
       // Stamp directory metadata on the project for session persistence
       project.directoryPath = dirPath;
       project.storageFormat = 'directory';

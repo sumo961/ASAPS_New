@@ -63,6 +63,7 @@ import { isProjectNew } from './utils/newProjectRegistry';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
+import { DirectoryAdapter } from './storage/adapters/DirectoryAdapter';
 import { assetToStored, extractBlobFromAsset } from './storage/AssetStorageAdapter';
 import { SearchPanel } from './components/search';
 import { HelperCommandInput } from './components/ai/HelperCommandInput';
@@ -1185,7 +1186,17 @@ function App() {
         // "switching" branch, which closes overlay panels and clears assets.
         // Clearing it would force the lighter "REPLACING" branch and cause
         // panels/assets from the previous project to bleed into the new one.
+        // But the load effect only runs when the id changes: opening the
+        // folder of the project already on screen (or a copy with its id)
+        // did nothing. Mark the loaded project as a different one so the
+        // folder loads, through that same switching branch.
+        const loadedBefore = loadedProjectIdRef.current;
+        const folderId = await new DirectoryAdapter().readFolderProjectId(folderPath);
+        if (folderId && folderId === loadedBefore) {
+          loadedProjectIdRef.current = `reopen:${folderId}`;
+        }
         const success = await openDirectoryProject(folderPath);
+        if (!success) loadedProjectIdRef.current = loadedBefore;
         if (success) {
           console.log('[Electron] Directory project opened successfully');
           // Initialize VCS tracking for the directory

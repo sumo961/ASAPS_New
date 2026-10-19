@@ -370,6 +370,37 @@ describe('ReachabilityAnalyzer', () => {
       expect(analyzer.analyzeCondition({ type: 'variable', operator: '==', left: 'jonasPath', right: 'silent' } as any).isSatisfiable).toBe(false);
       expect(analyzer.analyzeCondition({ type: 'counter', operator: '>=', left: 'revealed', right: 5 } as any).isSatisfiable).toBe(false);
     });
+
+    // Same story: once the choices counted, "jonasPath == silent" was called
+    // always true (the text compared as the number 0, like an unset counter).
+    it('does not call a text-variable test always true when other values are possible', () => {
+      const story = new Story({ title: 'Paths', author: 'Test', firstBeatId: 'turn' });
+      story.setSettings({ variables: [{ name: 'jonasPath', type: 'string', defaultValue: '' }, { name: 'mood', type: 'string', defaultValue: 'calm' }] });
+      story.addBeat(createTestBeat({
+        id: 'turn', name: 'Turning Point', type: 'multiChoice',
+        parameters: {
+          choices: [
+            { id: 'a', text: 'Confess', target: 'check', effects: [{ type: 'setVariable', target: 'jonasPath', value: 'confess' }] },
+            { id: 'b', text: 'Stay silent', target: 'check', effects: [{ type: 'setVariable', target: 'jonasPath', value: 'silent' }] },
+          ],
+        },
+      }));
+      story.addBeat(createTestBeat({
+        id: 'check', name: 'Silent?', type: 'conditionBeat',
+        parameters: { conditionType: 'variable', variableName: 'jonasPath', operator: '==', value: 'silent', trueTarget: 'mood', falseTarget: 'b2' },
+      }));
+      story.addBeat(createTestBeat({
+        id: 'mood', name: 'Calm?', type: 'conditionBeat',
+        parameters: { conditionType: 'variable', variableName: 'mood', operator: '==', value: 'calm', trueTarget: 'end', falseTarget: 'b2' },
+      }));
+      story.addBeat(createTestBeat({ id: 'b2', name: 'Other', type: 'endScreen', parameters: {} }));
+      story.addBeat(createTestBeat({ id: 'end', name: 'End', type: 'endScreen', parameters: {} }));
+
+      const warnings = new ReachabilityAnalyzer(story).analyze().conditionBeatWarnings;
+      expect(warnings.find((w) => w.conditionBeatId === 'check')).toBeUndefined();
+      // A variable nothing changes from its default really is always true.
+      expect(warnings.find((w) => w.conditionBeatId === 'mood')?.unreachableBranch).toBe('false');
+    });
   });
 
   describe('Counter Range Analysis', () => {
