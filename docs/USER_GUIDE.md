@@ -1403,6 +1403,7 @@ You can ignore all of this and ship a perfectly good story with just names and p
    - **Kind** - Player, NPC, or Companion (the Character Manager's filter lets you show *All kinds* or just one)
    - **Pronouns** - she/her, he/him, they/them or your own; used when the character plays a [role](#roles) and text says `${@role.they}`
    - **Description** - Notes for yourself
+   - **Theme Color** - The character's colour: it marks them around the builder, and with [Use each character's Theme Color](#speaker-display) on, their name is drawn in it when they speak
 
    The character's fixed **ID** is shown in small print at the bottom of the Basic tab; conditions and saved games refer to it, so it never changes.
 
@@ -2589,6 +2590,7 @@ A few things worth knowing:
 - **Every decision is recorded.** Whatever you apply, skip or reject here — and every batch the Co-Designer proposes — goes into the project's **AI changes** log (**AI ▸ AI changes** in the header; `generation/ai-edits.json` in a folder project). It lists each proposal with its source, your decision, and a jump to the beats concerned, and it travels with the project through folders, zips and version control. Declined proposals are kept too: knowing what you turned down is part of the record of who wrote what.
 - **Endings that don't say where Restart leads** are listed as well (an End Screen or AI Summary showing a Restart button with no [restart target](#restart-target)). For an AI Summary the banner proposes restarting at the story's start — the start beat from Project Settings, otherwise the title screen; for an End Screen you pick the *Restart leads to* beat in the Inspector.
 - **Time checks that are decided before play starts** are listed too: a Condition Check on the story clock that compares against a time before the clock ever shows (the clock only moves forward), so one of its branches can never run — or a clock check in a story that never sets a clock. The row names the time it checks and the time the clock starts at; fix the time in the Inspector.
+- **Dialog Tree lines with no replies and no exit link** are listed too, quoting the line: the scene would end there and go on by the beat's own link (or stop, if it has none). Give the line an exit link or replies in the Dialog Tree editor.
 - **Settings the AI wrote that a beat doesn't have** are named in the banner ("came with a setting this kind of beat doesn't have … so it was ignored"). The beat imports without it, so check that it still does what the story needs.
 - The same banner appears for stories injected from Claude Desktop via MCP.
 
@@ -3036,7 +3038,7 @@ These are advice only: nothing changes at runtime. The analysis explores the sam
 
 Pattern-based validation that runs on the project's structure:
 - **Hub Beat Analysis** — beats reachable from multiple paths. Each hub gets a card with its incoming-path count and a reminder to check that the text doesn't assume a specific player state.
-- **Warnings / Info** — undefined variables, missing connections, unused counters, and similar logic issues.
+- **Warnings / Info** — text that assumes something the player may not have ("with the evidence you gathered…") without a condition check on the way in, Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. The scene ends on such a line and goes on by the beat's own link, or the story stops there if the beat has none; give the line an exit link (or replies) so the scene says where it goes.
 
 > Story Logic uses keyword pattern matching for now. AI-powered semantic analysis (where an LLM reads each hub beat in context and flags continuity issues) is on the roadmap — when an AI provider is configured, the panel offers richer warnings.
 
@@ -3576,7 +3578,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
 
 **Settings → Effects:**
 - Text animations (typewriter, fade)
-- **Choice Buttons** — in responsive layouts, choice and Continue buttons slide up into place when a beat starts. Choose *Appear in place* to switch that off. Players whose device is set to reduce motion never see the slide either way.
+- **Choice Buttons** — in responsive layouts, choice and Continue buttons slide up into place when a beat starts (in chat layouts, the reply buttons rise in a little). Choose *Appear in place* to switch that off. Players whose device is set to reduce motion never see the slide either way.
 - Hotspot visibility (Hotspot Area Visibility, Label Display)
 - <a id="speaker-display"></a>**Speaker Display** (sub-section) — controls how speaker names and portrait graphics appear during playback:
   - **Show speaker names** — Master toggle for displaying character names during dialog

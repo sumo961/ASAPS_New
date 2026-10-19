@@ -22,8 +22,16 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.121** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.121 is a follow-up**: the Debug
+Current release: **v0.9.122** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.122 answers three questions from
+users**: each speaker's name can now appear in their character's own colour
+(Project Settings → Effects → Speaker Display), the name colour can be set
+for names shown above the text box too, and the little slide of the choice
+buttons can be switched off (it also stops for players whose device asks for
+less motion). Debug and the review after generating a story now point out
+dialog lines that lead nowhere.
+
+**v0.9.121 was a follow-up**: the Debug
 window no longer calls a check on a text variable ("did Jonas stay
 silent?") "always true", opening the project folder that is already open
 reloads it instead of quietly changing where your work is saved, and a

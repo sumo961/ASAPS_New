@@ -1,8 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.121, 2026-10-18)
+## 2026-10-19: Names in colour, buttons that stay put (v0.9.122)
 
 ### Overview
+Answers to three user questions: speaker names can take each character's Theme Color, Name Color works for Label names too, and the choice buttons' slide can be switched off (and now respects reduced motion). Also: Debug and the review banner report Dialog Tree lines that lead nowhere, the generators are told never to write them, and the Reachability screenshot in the guide is current.
 - **User Guide screenshot 31 retaken** (Debug → Reachability, from the bundled "Someone Made Her Promises"): the old one still counted the removed single-connection warnings.
 - The generators now state the rule outright (dialogGeneration, storyGenerationEnhanced, Co-Designer system prompt): every Dialog Tree line leads on, through choices or an exit target; a closing NPC line gets "target". Before, they implied it ("choices array", NPC AUTO-EXIT) but allowed an empty array without a target.
 - The runtime is deliberately unchanged: such a line is a broken story to fix, not a shape the player engine supports.
