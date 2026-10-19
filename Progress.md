@@ -1,16 +1,5 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.122, 2026-10-19)
-
-### Overview
-- **User Guide:** new section *Button Positions on a Fixed Canvas: Lock position* (what the player rearranges — push below text, spacing, column alignment, shift up on overflow — and that Lock position keeps a button put; which beat types it applies to). Screenshot 33 (Debug → Story Logic) retaken on a Red Riding Hood copy with a Line Without Exit warning.
-- **Story Logic panel:** a Line Without Exit card labels the quoted line "The line:" (it said "Detected patterns:", the keyword checks' label), and the legend explains the new category.
-- The panel's note promising AI-powered story analysis stays: the feature is planned (decision 2026-10-19).
-
-**Files modified:** docs/USER_GUIDE.md, docs/images/33-debug-story-logic.png, packages/builder/src/components/debug/LogicValidationReport.tsx
-
----
-
 ## 2026-10-19: Names in colour, buttons that stay put (v0.9.122)
 
 ### Overview
@@ -26,7 +15,11 @@ Answers to three user questions: speaker names can take each character's Theme C
   - *Buttons sliding up:* new **Choice Buttons** setting (Effects): *Slide up into place* (default) or *Appear in place* (`textEffects.buttonEntrance`), for the responsive action row and the chat layouts' button rise. The slide also respects the player's reduced-motion preference now: it was the one motion that ignored it.
   - *Dialog Tree button Y:* unchanged by design (the stack sits under the text box), but the guide and the Y field's tooltip now say that moving or resizing the text box moves the stack, and the guide notes Multi Choice buttons take any Y. The **Lock position** checkbox, which could not act on Dialog Tree stack buttons, is no longer shown for them.
 
-**Files modified:** docs/images/31-debug-reachability.png, packages/builder/src/utils/storyLogicValidator.ts, packages/builder/src/utils/generationReview.ts, packages/builder/src/types/generationReview.ts, packages/builder/src/components/debug/LogicValidationReport.tsx, packages/builder/src/components/settings/GlobalSettingsInspector.tsx, packages/builder/src/components/visual/VisualPropertiesPanel.tsx, packages/builder/src/storage/types.ts, packages/builder/src/utils/themeConverter.ts, packages/builder/src/pages/PreviewWindow.tsx, packages/player/src/PlayerEngine.ts, packages/renderer/src/renderers/ReactRenderer.tsx, packages/renderer/src/components/{SlotFlowView,ChatDialogView,PositionedBeatView}.tsx, docs/USER_GUIDE.md, tests (storyLogicValidator, convertGlobalSettingsToTheme, ReactRenderer)
+- **User Guide:** new section *Button Positions on a Fixed Canvas: Lock position* (what the player rearranges — push below text, spacing, column alignment, shift up on overflow — and that Lock position keeps a button put; which beat types it applies to). Screenshot 33 (Debug → Story Logic) retaken on a Red Riding Hood copy with a Line Without Exit warning.
+- **Story Logic panel:** a Line Without Exit card labels the quoted line "The line:" (it said "Detected patterns:", the keyword checks' label), and the legend explains the new category.
+- The panel's note promising AI-powered story analysis stays: the feature is planned (decision 2026-10-19).
+
+**Files modified:** docs/images/31-debug-reachability.png, packages/builder/src/utils/storyLogicValidator.ts, packages/builder/src/utils/generationReview.ts, packages/builder/src/types/generationReview.ts, packages/builder/src/components/debug/LogicValidationReport.tsx, packages/builder/src/components/settings/GlobalSettingsInspector.tsx, packages/builder/src/components/visual/VisualPropertiesPanel.tsx, packages/builder/src/storage/types.ts, packages/builder/src/utils/themeConverter.ts, packages/builder/src/pages/PreviewWindow.tsx, packages/player/src/PlayerEngine.ts, packages/renderer/src/renderers/ReactRenderer.tsx, packages/renderer/src/components/{SlotFlowView,ChatDialogView,PositionedBeatView}.tsx, docs/USER_GUIDE.md, docs/images/33-debug-story-logic.png, tests (storyLogicValidator, convertGlobalSettingsToTheme, ReactRenderer)
 
 ---
 
