@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.120** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.120 keeps the deadlines in
+Current release: **v0.9.121** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.121 is a follow-up**: the Debug
+window no longer calls a check on a text variable ("did Jonas stay
+silent?") "always true", opening the project folder that is already open
+reloads it instead of quietly changing where your work is saved, and a
+project folder you copied in Finder becomes its own project with its own
+name the first time you open it.
+
+**v0.9.120 kept the deadlines in
 generated stories**: a story-clock check written by the AI ("did the player
 arrive before 9:18?") lost its time on import and always took the same
 branch. It now keeps it, and the review banner after generation tells you

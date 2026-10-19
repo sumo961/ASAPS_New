@@ -3195,6 +3195,15 @@ machines — but if you edit the *same* project on two machines at once, the
 sync service decides which edit survives. And if a project's files change
 outside the app while it's open (a sync pull, a git checkout, a text
 editor), ASAPS warns you once and tells you which copy wins if you save.
+To pick up the files as they are on disk, choose **File → Open Project
+Folder** on that same folder: it reloads the project.
+
+**Duplicated a project folder?** Copying a folder in Finder or Explorer is a
+fine way to branch off an experiment. When you open the copy while the
+original is still in your project list, ASAPS makes the copy a project of
+its own: it gets its own identity and takes the
+folder's name (or a numbered one if that name is taken), saved into its
+`project.json`, and a notice tells you so. The original stays as it was.
 
 ### Export Options
 
@@ -3792,7 +3801,7 @@ The **File menu** has the three entry points:
 |-----------|--------------|
 | **File → New Project on GitHub…** | Creates a fresh project folder on disk, sets up Git, and publishes a brand-new repository to GitHub — all in one dialog. Best for "I'm starting something new and I want it backed up from day one." |
 | **File → Open Project from GitHub…** | Clones an existing GitHub repository into a local folder and opens it. This is the path collaborators take when joining a project someone else created. |
-| **File → Open Project Folder (VCS)…** | Opens an existing folder on your disk that's already a directory-format project (and usually already a Git repo). ASAPS auto-detects the repo and turns on the VCS panel. |
+| **File → Open Project Folder…** | Opens an existing folder on your disk that's already a directory-format project (and usually already a Git repo). ASAPS auto-detects the repo and turns on the VCS panel. |
 
 Whichever path you pick, if it's your first time using GitHub from ASAPS the app will hand you off to a guided onboarding flow before doing the actual work.
 
