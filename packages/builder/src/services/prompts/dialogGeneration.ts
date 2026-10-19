@@ -65,6 +65,7 @@ Respond with JSON in this exact structure:
 
 ## Structure Rules
 1. Every dialogNode has: id, speaker, text, and choices array
+   - 🚨 Every node must lead somewhere: at least one choice, OR a node "target" (rule 8). A node with an empty choices array and no target ends the scene the moment its line appears — the player never reads it, and the app reports it as a broken line. A closing NPC line gets "target": the next beat.
 2. Each choice has text (player's line) and EITHER 'target' (beat ID) OR 'dialogNode' (NPC responds)
    - Special target "__self__": loops back to the same dialog beat (for interrogation, shopping, multi-question conversations)
    - Combine with markVisited to gray out already-asked questions

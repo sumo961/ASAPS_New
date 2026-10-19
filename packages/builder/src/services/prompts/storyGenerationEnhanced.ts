@@ -166,6 +166,7 @@ const BEAT_TYPE_GUIDE = `
 - choice: { id, text, target? | dialogNode? } - What player clicks (text IS the player's line)
 - target (string): Beat ID to exit dialog
 - dialogNode (nested): NPC responds, conversation continues
+- 🚨 Every node must lead somewhere: at least one choice, or a node "target" (NPC AUTO-EXIT below). A node with no choices and no target ends the scene the instant its line appears, so nobody reads it, and the app reports it as broken. Give a closing NPC line "target": the next beat.
 - Connections: Multiple → based on dialog choices leading to beat targets
 - COUNTER EFFECTS: Choices can modify counters
   { "id": "c1", "text": "I'll help you!", "target": "beat_5", "effects": [{ "type": "incrementCounter", "target": "trust", "value": 5 }] }

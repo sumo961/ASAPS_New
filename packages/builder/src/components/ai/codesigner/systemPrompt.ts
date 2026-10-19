@@ -283,7 +283,8 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
     target), or to a dialog tree — the root node by default, or "parentId":
     a node id, or the id of a choice that continues into a node. The choice
     needs a "target" beat (exit) or a "dialogNode" (the conversation goes
-    on). It may carry effects and conditions like any option. To have a
+    on). Every node must itself lead on: choices, or a node "target" —
+    a node with neither ends the scene the moment its line appears. It may carry effects and conditions like any option. To have a
     second character speak before the player answers, add a continue step:
     "continue": true, empty "text", and a "dialogNode" with the other
     speaker's line — the player sees no reply, the line follows by itself
