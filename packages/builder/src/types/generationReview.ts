@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate' | 'line-without-exit';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -89,7 +89,16 @@ export interface TimeGateFinding extends FindingBase {
   targetId: string;
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding;
+/**
+ * A Dialog Tree line nothing follows (no replies, no continue step, no exit
+ * link): the scene ends on it and goes on by the beat's own link, if any.
+ */
+export interface LineWithoutExitFinding extends FindingBase {
+  kind: 'line-without-exit';
+  nodeId?: string;
+}
+
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding | LineWithoutExitFinding;
 
 export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 

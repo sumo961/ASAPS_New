@@ -11,7 +11,7 @@ import { beatTargetIds } from './storyLinks';
 
 export interface LogicIssue {
   type: 'error' | 'warning' | 'info';
-  category: 'hub_state_assumption' | 'ungated_state_reference' | 'missing_condition_gate' | 'narrative_inconsistency' | 'undescribed_item';
+  category: 'hub_state_assumption' | 'ungated_state_reference' | 'missing_condition_gate' | 'narrative_inconsistency' | 'undescribed_item' | 'dialog_line_without_exit';
   message: string;
   beatId: string;
   beatName?: string;
@@ -246,6 +246,67 @@ function validatePickPropDescriptions(beats: any[]): LogicIssue[] {
   return issues;
 }
 
+/** A Dialog Tree line nothing follows: no replies, no continue step, no exit link. */
+export interface LineWithoutExit {
+  beatId: string;
+  beatName?: string;
+  nodeId?: string;
+  text: string;
+  /** Name (or id) of the beat the scene falls back to, if the beat links on. */
+  fallbackTo?: string;
+}
+
+/**
+ * Dialog Tree lines that end the scene without saying where it goes: no
+ * replies, no continue step, no exit link. The scene then ends on that line
+ * and moves on by the beat's own link, if it has one. The editor ends a
+ * scene with an exit link on the last line; this shape comes from older
+ * files, hand-written JSON and imports.
+ */
+export function findDialogLinesWithoutExit(beats: any[]): LineWithoutExit[] {
+  const byId = new Map((beats || []).map((b: any) => [b.id, b]));
+  const out: LineWithoutExit[] = [];
+  for (const beat of beats || []) {
+    if (beat?.type !== 'dialogTree') continue;
+    const tree = beat.parameters?.dialogTree ?? beat.dialogTree;
+    if (!tree || typeof tree !== 'object') continue;
+    // The beat's own link (not its lines' targets): where an ended scene goes.
+    const link = (Array.isArray(beat.connections) ? beat.connections : [])
+      .map((c: any) => c?.targetId || c?.targetBeatId || c?.target)
+      .find((id: any) => typeof id === 'string' && byId.has(id));
+    const fallbackTo = link ? (byId.get(link)?.name || link) : undefined;
+    const seen = new Set<any>();
+    const visit = (node: any): void => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      const choices = Array.isArray(node.choices) ? node.choices : [];
+      // An old `next` (beat id or nested line) is a way on, too.
+      const goesOn = choices.length > 0 || !!node.target || !!node.next;
+      if (!goesOn && typeof node.text === 'string' && node.text.trim()) {
+        out.push({ beatId: beat.id, beatName: beat.name, nodeId: node.id, text: node.text.trim(), fallbackTo });
+      }
+      for (const c of choices) visit(c?.dialogNode);
+      if (node.next && typeof node.next === 'object') visit(node.next);
+    };
+    visit(tree);
+  }
+  return out;
+}
+
+/** The start of a line, for messages. */
+function lineSnippet(text: string): string {
+  const flat = text.replace(/\s+/g, ' ');
+  return flat.length > 60 ? `${flat.slice(0, 57)}…` : flat;
+}
+
+/** Author sentence for a line nothing follows (Story Logic and the import banner). */
+export function describeLineWithoutExit(l: LineWithoutExit): string {
+  const where = l.fallbackTo
+    ? `the scene ends there and goes on by the beat's own link to "${l.fallbackTo}"`
+    : `the scene ends there, and the beat has no link, so the story stops`;
+  return `In "${l.beatName || l.beatId}", the line "${lineSnippet(l.text)}" has no replies and no exit link: ${where}.`;
+}
+
 /**
  * Validate story logic for narrative consistency
  */
@@ -268,6 +329,21 @@ export function validateStoryLogic(story: any): LogicValidationResult {
   // Check for undescribed pickProp items
   const pickPropIssues = validatePickPropDescriptions(beats);
   issues.push(...pickPropIssues);
+
+  for (const line of findDialogLinesWithoutExit(beats)) {
+    issues.push({
+      type: 'warning',
+      category: 'dialog_line_without_exit',
+      message: describeLineWithoutExit(line),
+      beatId: line.beatId,
+      beatName: line.beatName,
+      beatType: 'dialogTree',
+      problematicText: line.text,
+      suggestedFix: line.fallbackTo
+        ? `Give the line an exit link to "${line.fallbackTo}" (or replies) so the scene says where it goes.`
+        : 'Give the line an exit link to the beat that should come next, or add replies.',
+    });
+  }
 
   // Identify hub beats (beats with multiple incoming connections)
   for (const [beatId, sources] of incomingPaths.entries()) {

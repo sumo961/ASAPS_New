@@ -12,6 +12,8 @@ import { describe, it, expect } from 'vitest';
 import {
   validateStoryLogic,
   formatLogicValidationResult,
+  findDialogLinesWithoutExit,
+  describeLineWithoutExit,
 } from '../storyLogicValidator';
 
 const info = (id: string, text: string, target?: string) => ({
@@ -141,5 +143,37 @@ describe('formatLogicValidationResult', () => {
     expect(out).toMatch(/Hub Beats.*: 1/);
     expect(out).toMatch(/Warnings \(1\)/);
     expect(out).toContain('[hub]');
+  });
+});
+
+// RED: A Modern Tale — Grandma's last line had no replies and no exit link,
+// so the scene ended on it the moment it was drawn. It is now reported.
+describe('Dialog Tree lines nothing follows', () => {
+  const tree = (lastLine: Record<string, unknown>) => ({
+    id: 'wisdom', name: 'Heart to Heart', type: 'dialogTree',
+    connections: [{ targetId: 'reflection' }],
+    parameters: { dialogTree: {
+      id: 'n0', speaker: 'Grandma', text: 'Listen, Riley.',
+      choices: [{ id: 'c', text: '', continue: true, dialogNode: { id: 'n1', speaker: 'Grandma', text: 'Be brave enough to be yourself.', ...lastLine } }],
+    } },
+  });
+  const reflection = { id: 'reflection', name: 'Reflection', type: 'infoText', parameters: {} };
+
+  it('reports a closing line with no replies and no exit link, naming where the scene goes', () => {
+    const lines = findDialogLinesWithoutExit([tree({}), reflection]);
+    expect(lines).toEqual([expect.objectContaining({ beatId: 'wisdom', nodeId: 'n1', fallbackTo: 'Reflection' })]);
+    const issue = validateStoryLogic({ beats: [tree({}), reflection] }).issues.find((i) => i.category === 'dialog_line_without_exit');
+    expect(issue?.message).toBe('In "Heart to Heart", the line "Be brave enough to be yourself." has no replies and no exit link: the scene ends there and goes on by the beat\'s own link to "Reflection".');
+  });
+
+  it('says so when the beat has no link either', () => {
+    const lonely = { ...tree({}), connections: [] };
+    expect(describeLineWithoutExit(findDialogLinesWithoutExit([lonely])[0])).toMatch(/the beat has no link, so the story stops/);
+  });
+
+  it('accepts a line with an exit link, with replies, or with an old `next`', () => {
+    expect(findDialogLinesWithoutExit([tree({ target: 'reflection' }), reflection])).toEqual([]);
+    expect(findDialogLinesWithoutExit([tree({ choices: [{ id: 'r', text: 'Thanks', target: 'reflection' }] }), reflection])).toEqual([]);
+    expect(findDialogLinesWithoutExit([tree({ next: 'reflection' }), reflection])).toEqual([]);
   });
 });

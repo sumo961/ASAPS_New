@@ -165,6 +165,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
       case 'undescribed_item':
         return <Package className="w-4 h-4" />;
       case 'ungated_state_reference':
+      case 'dialog_line_without_exit':
         return <FileText className="w-4 h-4" />;
       default:
         return <AlertTriangle className="w-4 h-4" />;
@@ -183,6 +184,8 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
         return 'Missing Condition Gate';
       case 'narrative_inconsistency':
         return 'Narrative Inconsistency';
+      case 'dialog_line_without_exit':
+        return 'Line Without Exit';
       default:
         return category;
     }

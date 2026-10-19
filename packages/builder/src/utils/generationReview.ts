@@ -14,6 +14,7 @@ import type {
 } from '../types/generationReview';
 import { PARAMETER_DERIVED_TYPES } from './beatConnectionModel';
 import { analyzeRoleFindings } from './roleFindings';
+import { findDialogLinesWithoutExit, describeLineWithoutExit } from './storyLogicValidator';
 
 /**
  * Beat types whose only exit is the single `connection` parameter — the
@@ -117,6 +118,13 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
     }
   }
   out.push(...analyzeTimeGates(story, beats));
+  for (const line of findDialogLinesWithoutExit(beats)) {
+    out.push({
+      id: `line-without-exit:${line.beatId}:${line.nodeId ?? ''}`, kind: 'line-without-exit',
+      beatId: line.beatId, beatName: line.beatName, nodeId: line.nodeId,
+      message: describeLineWithoutExit(line),
+    });
+  }
   // Cast roles: unknown @role references, non-candidate casts, recasts.
   out.push(...analyzeRoleFindings(beats, story?.roles ?? story?.globalSettings?.roles, story?.characters, storyStartBeatId(story)));
   return out;

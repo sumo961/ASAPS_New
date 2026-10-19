@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.121, 2026-10-18)
+
+### Overview
+- **User Guide screenshot 31 retaken** (Debug → Reachability, from the bundled "Someone Made Her Promises"): the old one still counted the removed single-connection warnings.
+- The runtime is deliberately unchanged: such a line is a broken story to fix, not a shape the player engine supports.
+- **Dialog Tree lines nothing follows are reported.** A line with no replies, no continue step and no exit link ends the scene the moment it is drawn, so the player never reads it, and the author was never told. Debug → Story Logic now warns ("Line Without Exit"), and so does the generation review banner (finding `line-without-exit`), naming the line and where the scene goes instead: the beat's own link, or nowhere. The editor ends a scene with an exit link on the last line; this shape comes from older files, hand-written JSON and imports. One detector serves both (`findDialogLinesWithoutExit` in utils/storyLogicValidator.ts).
+- **Red Riding Hood example repaired (local file only; examples/ is git-ignored).** Two replies led to beats that were never written ("Keep it surface-level", "Change the subject"); they now lead to two new short scenes, "Small Talk" and "Change of Subject". Grandma's "Heart to Heart" pointed at a second line that didn't exist; the line is written, with an exit link to "Reflection". Debug: 25/25 reachable, no broken links, no Story Logic warnings; all three paths played in the Preview.
+
+**Files modified:** docs/images/31-debug-reachability.png, packages/builder/src/utils/storyLogicValidator.ts, packages/builder/src/utils/generationReview.ts, packages/builder/src/types/generationReview.ts, packages/builder/src/components/debug/LogicValidationReport.tsx, tests (storyLogicValidator)
+
+---
+
 ## 2026-10-18: Folders that know who they are (v0.9.121)
 
 ### Overview
