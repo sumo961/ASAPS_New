@@ -3169,13 +3169,48 @@ export class ReactRenderer extends BaseRenderer {
     // mobile. We let the view fill the parent at 100% × 100% and use
     // clamp()/vw-based padding inside. Bubbles still pick up theme.fonts
     // and (in a follow-on) theme.textBox.
+    const chatView = (
+      <ChatDialogView
+        onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
+        messages={[...this.chatMessages]}
+        choices={choices}
+        mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
+        showAvatars={this.currentShowAvatars}
+        theme={this.speakerTheme()}
+        // Background already painted on the outer wrapper; the inner
+        // view stays transparent so the scroll area lets the bg show.
+        backgroundUrl={null}
+        backgroundColor="transparent"
+        onChoiceSelect={this.handleAction}
+        characterAvatarResolver={this.characterAvatarResolver || undefined}
+        showTypingIndicator={showTypingIndicator}
+        fontScale={this.mobileFontScale}
+        responsive
+      />
+    );
+
+    // A messenger look (2026-10-20): the chat in a window on the stage, over
+    // an optional frame picture (a phone screen with its buttons). Both live
+    // in a box with the stage's proportions so window and picture line up.
+    const chatWindow = this.getState('chatWindow') as { x: number; y: number; width: number; height: number } | null;
+    const frameId = this.getState('chatFrameImage') as string | null;
+    const frameUrl = frameId ? (this.resolveAssetUrl(frameId) || (/[/:]/.test(frameId) ? frameId : undefined)) : undefined;
+    const stageW = this.context.width || 1024;
+    const stageH = this.context.height || 768;
+    const framed = !!(chatWindow || frameUrl);
+    const pct = (v: number, of: number) => `${(v / of) * 100}%`;
+
     this.renderComponent(
       <div
         style={{
           width: '100%',
           height: '100%',
           display: 'flex',
+          alignItems: framed ? 'center' : undefined,
+          justifyContent: framed ? 'center' : undefined,
           overflow: 'hidden',
+          // Lets the framed box size itself to this area (cqw / cqh).
+          containerType: framed ? 'size' : undefined,
           // Background lives on the outer wrapper so the message area
           // can scroll over it without the bg scrolling too.
           backgroundImage: this.backgroundImageUrl ? `url(${this.backgroundImageUrl})` : undefined,
@@ -3184,23 +3219,24 @@ export class ReactRenderer extends BaseRenderer {
           backgroundPosition: 'center',
         }}
       >
-        <ChatDialogView
-          onSubscribeReservedHudRects={this.hudSuppressed ? undefined : ((l) => this.subscribeToReservedHudRects(l))}
-          messages={[...this.chatMessages]}
-          choices={choices}
-          mode={this.currentPresentationMode as 'chat-scroll' | 'chat-bubble'}
-          showAvatars={this.currentShowAvatars}
-          theme={this.speakerTheme()}
-          // Background already painted on the outer wrapper; the inner
-          // view stays transparent so the scroll area lets the bg show.
-          backgroundUrl={null}
-          backgroundColor="transparent"
-          onChoiceSelect={this.handleAction}
-          characterAvatarResolver={this.characterAvatarResolver || undefined}
-          showTypingIndicator={showTypingIndicator}
-          fontScale={this.mobileFontScale}
-          responsive
-        />
+        {framed ? (
+          <div
+            data-testid="chat-frame"
+            style={{ position: 'relative', flex: 'none', width: `min(100cqw, calc(100cqh * ${stageW / stageH}))`, aspectRatio: `${stageW} / ${stageH}` }}
+          >
+            {frameUrl && (
+              <img src={frameUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
+            )}
+            <div
+              data-testid="chat-window"
+              style={chatWindow
+                ? { position: 'absolute', left: pct(chatWindow.x, stageW), top: pct(chatWindow.y, stageH), width: pct(chatWindow.width, stageW), height: pct(chatWindow.height, stageH), display: 'flex', overflow: 'hidden' }
+                : { position: 'absolute', inset: 0, display: 'flex', overflow: 'hidden' }}
+            >
+              {chatView}
+            </div>
+          </div>
+        ) : chatView}
       </div>
     );
   }

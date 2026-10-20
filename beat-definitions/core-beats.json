@@ -129,9 +129,9 @@
       }
     },
     "effect": {
-      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner, itemImage?: image asset id the inventory HUD shows for the item when nothing else gives it a picture}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}; castRole {target: role id from Project Settings roles (e.g. 'confidant'), character: character id who fills it from now on}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
+      "description": "Effect to apply to story state when a choice is taken (or a dialog node / location entry fires). The list of types mirrors the engine (core EFFECT_TYPES; a test keeps them equal). Fields per type: setVariable {target: variable name, value}; addInventory / removeInventory {target: item name, character?: owner, itemImage?: image asset id the inventory HUD shows for the item when nothing else gives it a picture}; incrementCounter {target: counter name, value: delta, character?: owner for a per-character counter}; setCounter {target: counter name, value, character?}; nudgeMood {target: character, valenceDelta?, arousalDelta?}; addSentiment {target: character who feels it, sentimentTarget: who it is about (character id or 'player'), sentimentEmotion: e.g. 'trust', strengthDelta}; fireEmotion {target: character, emotion, emotionDelta}; addReflection {target: character, reflectionText, reflectionSalience?}; setGoalStatus {target: character, goalId, goalStatus: 'open'|'met'|'failed'|'abandoned', suppressEmotion?}; setCharacterVariant {target: character, variantId, suppressSeed?}; bookmarkAffectState {target: character (for scope 'character'), bookmarkName, scope?: 'all'|'character'}; playSound {target: sound asset id / preset / URL, value?: volume 0..1}; setVolume {target: 'music' (the background music) or 'all' (every sound), value: percent of the project's own level 0..100 (0 = silent), fadeSeconds?: how long the change takes — fade music out before a quiet scene, back in after}; castRole {target: role id from Project Settings roles (e.g. 'confidant'), character: character id who fills it from now on}. Never incrementCounter/setCounter a counter bound to a feeling (read-only) — move the feeling (addSentiment / nudgeMood / fireEmotion) instead.",
       "schema": {
-        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound' | 'castRole'",
+        "type": "'setVariable' | 'addInventory' | 'removeInventory' | 'incrementCounter' | 'setCounter' | 'nudgeMood' | 'addSentiment' | 'fireEmotion' | 'addReflection' | 'setGoalStatus' | 'setCharacterVariant' | 'bookmarkAffectState' | 'playSound' | 'setVolume' | 'castRole'",
         "target": "string",
         "value": "any?",
         "character": "string?",
@@ -882,6 +882,24 @@
           "required": false,
           "default": true,
           "description": "Show character avatars in chat mode"
+        },
+        "chatFrameImage": {
+          "type": "string",
+          "required": false,
+          "description": "Chat layouts: a picture drawn behind the conversation (an image asset id) — e.g. a phone or messenger screen with its buttons. Place the conversation inside it with chatWindow.",
+          "ui": {
+            "control": "asset-picker",
+            "accept": "image/*",
+            "label": "Chat frame picture",
+            "help": "A picture behind the chat, like a phone or messenger screen. Move and resize the chat window on the canvas so it sits inside the picture's screen.",
+            "dependsOn": { "field": "layoutTemplate", "value": ["chat-scroll", "chat-bubble"] }
+          }
+        },
+        "chatWindow": {
+          "type": "object",
+          "required": false,
+          "description": "Chat layouts: where the conversation sits on the stage, {x, y, width, height} in stage pixels. Unset: the whole stage. Leave room around it for a frame picture (chatFrameImage) or the background.",
+          "ui": { "hidden": true }
         },
         "responseDelay": {
           "type": "number",

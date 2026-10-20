@@ -951,6 +951,7 @@ Each beat can override the Timer HUD content via timeDisplayMode:
 Any effect host (choice, dialog node, movement option, GPS/indoor location entry) accepts a **playSound** effect — the location-triggered-sound mechanic:
 - { "type": "playSound", "target": "<asset id | preset id | URL>" }
 - Use it for a door closing on a choice, an alarm when a threshold is crossed, a sting on a bad ending. One per choice at most; silence is a legitimate default and constant sound is fatiguing.
+- **setVolume** changes the background music: { "type": "setVolume", "target": "music", "value": 20, "fadeSeconds": 3 } — value is a percent of the project's music level (0 = silent, 100 = normal), fadeSeconds how long it takes. Fade the music down before a quiet or tense scene and back to 100 after it; "target": "all" changes every sound.
 
 ## Character & Speaker System
 

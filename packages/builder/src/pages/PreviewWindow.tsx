@@ -1618,6 +1618,10 @@ export const PreviewWindow: React.FC = () => {
       engine.getContext().on('playSound', ({ sound, volume }: { sound: string; volume?: number }) => {
         void (reactRenderer as any).playEffectSound?.(sound, volume);
       });
+      // setVolume effect: fade the music (or everything) on the audio engine.
+      engine.getContext().on('setVolume', ({ target, volume, fadeMs }: { target: 'music' | 'all'; volume: number; fadeMs: number }) => {
+        getAudioManager().setVolumeLevel(target, volume, fadeMs);
+      });
 
       // Push the SensorService into renderer state right after engine
       // construction so spatial sounds, the GPS beat's renderMap, and

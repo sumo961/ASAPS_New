@@ -770,5 +770,31 @@ describe('projectZipManager', () => {
       const projectCall = mockStorage.createProject.mock.calls[0][0];
       expect(projectCall.story.beats[0].node).not.toBe('old_asset_id');
     });
+
+    it('remaps a Dialog Tree chat frame picture with its asset', async () => {
+      const zip = new JSZip();
+      zip.file('project.json', JSON.stringify({
+        metadata: { exportVersion: '1.0.0', projectId: 'test-id', projectName: 'Test' },
+        project: {
+          id: 'test-id', name: 'Test', settings: {},
+          story: { beats: [{ id: 'beat_1', type: 'dialogTree', parameters: { layoutTemplate: 'chat-scroll', chatFrameImage: 'old_frame' } }] },
+        },
+      }));
+      zip.file('backgrounds/phone.png', new Blob(['data']));
+      zip.file('backgrounds/old_frame.json', JSON.stringify({ id: 'old_frame', filename: 'phone.png', type: 'image' }));
+      const zipFile = new File([await zip.generateAsync({ type: 'blob' })], 'test.zip');
+
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: true });
+      expect(result.success).toBe(true);
+
+      const frame = mockStorage.createProject.mock.calls[0][0].story.beats[0].parameters.chatFrameImage;
+      const created = mockStorage.createAsset.mock.calls.map((c: any[]) => c[0].id ?? c[0]?.metadata?.id);
+      expect(frame).not.toBe('old_frame');
+      expect(created).toContain(frame);
+    });
   });
 });

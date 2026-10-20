@@ -10,7 +10,21 @@ import {
   gitListRemotes, gitAddRemote,
   type GitBranch,
 } from '../../vcs/GitAdapter';
-import { confirmAction } from '../../utils/notify';
+import { confirmAction, notify } from '../../utils/notify';
+
+/** Git's refusal in words an author can act on (it used to vanish silently). */
+export function explainGitRefusal(what: string, message: string): string {
+  const files = message.split('\n').map((l) => l.trim())
+    .filter((l) => /\.\w+$/.test(l) && !/^(error|fatal|hint|Please|Aborting)\b/i.test(l));
+  const list = files.length ? ` (${files.slice(0, 5).join(', ')}${files.length > 5 ? ', …' : ''})` : '';
+  if (/would be overwritten by (checkout|merge)/i.test(message)) {
+    return `${what}: you have changes that aren't committed${list}. Commit them in Pending Changes first (or discard them there if you don't need them), then try again.`;
+  }
+  if (/resolve your current index|unmerged|needs merge/i.test(message)) {
+    return `${what}: an earlier merge isn't finished. Click the conflicts button in the VCS status bar and choose Keep both, then try again.`;
+  }
+  return `${what}: ${message || 'Git refused without saying why.'}`;
+}
 
 export const BranchesTab: React.FC = () => {
   const vcs = useVCSStatus();
@@ -43,6 +57,8 @@ export const BranchesTab: React.FC = () => {
     loadBranches();
   }, [loadBranches]);
 
+  const reportFailure = (what: string, message: string) => notify.error(explainGitRefusal(what, message));
+
   const handleSwitch = useCallback(async (branchName: string) => {
     if (!vcs?.projectPath) return;
     if (vcs.isDirty) {
@@ -57,6 +73,8 @@ export const BranchesTab: React.FC = () => {
     if (result.success) {
       await vcs.refresh();
       await loadBranches();
+    } else {
+      reportFailure(`Couldn't switch to ${branchName}`, result.message);
     }
   }, [vcs, loadBranches]);
 
@@ -68,6 +86,8 @@ export const BranchesTab: React.FC = () => {
       setShowCreate(false);
       await vcs.refresh();
       await loadBranches();
+    } else {
+      reportFailure(`Couldn't create ${newBranchName.trim()}`, result.message);
     }
   }, [vcs, newBranchName, loadBranches]);
 
@@ -82,6 +102,10 @@ export const BranchesTab: React.FC = () => {
     if (result.success) {
       await vcs.refresh();
       await loadBranches();
+    } else {
+      // A merge that stopped on conflicts shows in the status bar (Keep both).
+      await vcs.refresh();
+      reportFailure(`Couldn't merge ${branchName}`, result.message);
     }
   }, [vcs, loadBranches]);
 

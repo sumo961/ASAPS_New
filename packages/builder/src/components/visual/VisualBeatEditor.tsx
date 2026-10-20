@@ -95,6 +95,19 @@ function resolveCharacterImageUrl(
   return state.visual.image || defaultImage || spriteFallback();
 }
 
+
+/**
+ * Where an element may be dragged: partly off the stage is fine (a figure
+ * cropped at the edge, a graphic placed at x = -20), as long as a strip of
+ * it stays on stage to grab. Clamping to 0 pushed a scaled-down figure —
+ * which shrinks toward its centre — right with no way back (2026-10-20).
+ */
+const MIN_ON_STAGE = 24;
+export function clampOnStage(pos: number, size: number, stage: number): number {
+  const keep = Math.min(MIN_ON_STAGE, size);
+  return Math.max(keep - size, Math.min(stage - keep, pos));
+}
+
 export interface VisualElement {
   id: string;
   type: 'character' | 'prop' | 'text' | 'hotspot' | 'dialog' | 'button' | 'meter' | 'keypad';
@@ -150,6 +163,8 @@ export interface VisualElement {
 interface VisualBeatEditorProps {
   backgroundAssetId?: string;
   backgroundUrl?: string; // Direct URL from ASML import
+  /** Chat layouts: the frame picture (asset id) the chat window sits in, shown see-through so the window can be lined up with it. */
+  chatFrameImageAssetId?: string;
   backgroundSound?: string;
   elements: VisualElement[];
   onElementsChange: (elements: VisualElement[]) => void;
@@ -218,6 +233,7 @@ interface VisualBeatEditorProps {
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   backgroundAssetId,
   backgroundUrl: backgroundUrlProp,
+  chatFrameImageAssetId,
   backgroundSound,
   elements = [],
   onElementsChange,
@@ -407,6 +423,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
   const backgroundAsset = assets.find(a => a.id === backgroundAssetId);
   // Prioritize asset lookup (fresh URL) over direct URL (may be stale blob URL)
   const resolvedBackgroundUrl = backgroundAsset?.url || backgroundUrlProp;
+  const chatFrameUrl = chatFrameImageAssetId ? assets?.find((a: any) => a.id === chatFrameImageAssetId)?.url : undefined;
 
   // Resolve speaker portrait URL from character data
   // Resolve global speaker toggles + per-beat override
@@ -494,8 +511,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         if (!selectedSet.has(el.id) || el.locked) return el;
         return {
           ...el,
-          x: Math.max(0, Math.min(stageWidth - el.width, el.x + dx)),
-          y: Math.max(0, Math.min(stageHeight - el.height, el.y + dy)),
+          x: clampOnStage(el.x + dx, el.width, stageWidth),
+          y: clampOnStage(el.y + dy, el.height, stageHeight),
         };
       });
       onElementsChange(updated);
@@ -863,10 +880,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
     const effectiveHeight = baseHeight * scale;
 
     // Calculate the new effective position (where user is dragging to)
-    let newEffectiveX = Math.max(0, Math.min(stageWidth - effectiveWidth,
-      (e.clientX - rect.left) / zoom - dragOffset.x));
-    let newEffectiveY = Math.max(0, Math.min(stageHeight - effectiveHeight,
-      (e.clientY - rect.top) / zoom - dragOffset.y));
+    let newEffectiveX = clampOnStage((e.clientX - rect.left) / zoom - dragOffset.x, effectiveWidth, stageWidth);
+    let newEffectiveY = clampOnStage((e.clientY - rect.top) / zoom - dragOffset.y, effectiveHeight, stageHeight);
 
     // Convert effective position back to base position
     let newX = newEffectiveX - (baseWidth - effectiveWidth) / 2;
@@ -925,8 +940,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         if (!off) return el;
         return {
           ...el,
-          x: Math.max(0, Math.min(stageWidth - el.width, newX + off.dx)),
-          y: Math.max(0, Math.min(stageHeight - el.height, newY + off.dy)),
+          x: clampOnStage(newX + off.dx, el.width, stageWidth),
+          y: clampOnStage(newY + off.dy, el.height, stageHeight),
         };
       });
       onElementsChange(updatedElements);
@@ -1628,6 +1643,18 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   characterInventoryResolver={showHud ? characterInventoryResolver : undefined}
                   inventoryVisible={showHud}
                   reservedHudRects={screenHudLayout?.rects}
+                />
+              )}
+
+              {/* Chat frame picture (chat layouts): drawn behind the chat when
+                  the story plays; see-through here so the chat window can be
+                  placed inside its screen. */}
+              {chatFrameUrl && (
+                <img
+                  src={chatFrameUrl}
+                  alt=""
+                  data-testid="ve-chat-frame"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', opacity: 0.6, pointerEvents: 'none' }}
                 />
               )}
 

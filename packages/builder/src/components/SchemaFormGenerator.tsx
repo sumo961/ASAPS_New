@@ -56,7 +56,7 @@ interface ParameterDefinition {
     // Hint text shown below select fields (e.g. recommendations)
     hint?: string;
     // Conditional visibility - only show when another field has the specified value
-    dependsOn?: { field: string; value: any };
+    dependsOn?: { field: string; value: any | any[] };
     /** Disclosure tier (B2). 'advanced' fields render only when the author's
      * persisted tier preference is advanced. Omit (or 'basic') = always shown.
      * Editor-only metadata — no runtime or AI-generation meaning. */
@@ -1724,7 +1724,8 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
     // Check dependsOn condition
     if (paramDef.ui?.dependsOn) {
       const { field, value } = paramDef.ui.dependsOn;
-      if (parameters[field] !== value) continue;
+      // A list means "any of these values" (as for array-item fields).
+      if (Array.isArray(value) ? !value.includes(parameters[field]) : parameters[field] !== value) continue;
     }
 
     const groupKey = paramDef.ui?.group;

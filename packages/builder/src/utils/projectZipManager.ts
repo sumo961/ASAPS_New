@@ -1040,6 +1040,10 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
         if (beat.parameters.markerAssetId && assetIdMap.has(beat.parameters.markerAssetId)) {
           beat.parameters.markerAssetId = assetIdMap.get(beat.parameters.markerAssetId);
         }
+        // Dialog Tree chat frame picture
+        if (beat.parameters.chatFrameImage && assetIdMap.has(beat.parameters.chatFrameImage)) {
+          beat.parameters.chatFrameImage = assetIdMap.get(beat.parameters.chatFrameImage);
+        }
         if (Array.isArray(beat.parameters.anchors)) {
           for (const anchor of beat.parameters.anchors) {
             if (anchor?.assetId && assetIdMap.has(anchor.assetId)) {

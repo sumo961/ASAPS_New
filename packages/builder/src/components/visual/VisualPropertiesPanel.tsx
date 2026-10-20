@@ -42,9 +42,13 @@ type BeatTransition = import('@asaps/core').Transition;
 
 interface VisualPropertiesPanelProps {
   /** Dialog-tree choice buttons form a stack: where each is drawn (by
-   *  element id). Their Y is shown from here and is not editable — the
-   *  order decides it (drag to reorder). */
+   *  element id). Their Y moves the whole stack (onDialogStackTop); the
+   *  order still comes from dragging. */
   dialogStackDrawn?: Map<string, { x: number; y: number; width: number; height: number }>;
+  /** Set the stack's position from a button's typed Y, or null to follow the text box again. */
+  onDialogStackTop?: (buttonId: string, y: number | null) => void;
+  /** The stack has an author-set position (instead of following the text box). */
+  dialogStackPinned?: boolean;
   /**
    * Layout mode of the current beat instance — drives Inspector mode-
    * awareness. 'absolute' (default) keeps today's Transform (Position X/Y +
@@ -165,6 +169,8 @@ const formatBeatType = (beatType: string): string => {
 
 export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   dialogStackDrawn,
+  onDialogStackTop,
+  dialogStackPinned = false,
   layoutMode = 'absolute',
   backgroundAssetId,
   elements,
@@ -2453,13 +2459,29 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             <div>
                               <label className="text-xs text-gray-600">Y</label>
                               {dialogStackDrawn && selected.type === 'button' && /^choice_\d+$/.test(selected.id) ? (
-                                <input
-                                  type="number"
-                                  readOnly
-                                  value={Math.round(dialogStackDrawn.get(selected.id)?.y ?? effectiveY)}
-                                  title="Choices stack below the text in their order: move or resize the text box to move them, drag a button up or down to reorder"
-                                  className="w-full px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50 text-gray-500"
-                                />
+                                <>
+                                  <input
+                                    type="number"
+                                    readOnly={!onDialogStackTop}
+                                    value={Math.round(dialogStackDrawn.get(selected.id)?.y ?? effectiveY)}
+                                    onChange={(e) => {
+                                      const v = parseInt(e.target.value);
+                                      if (Number.isFinite(v)) onDialogStackTop?.(selected.id, v);
+                                    }}
+                                    title="The choices move together as a stack, in their order (drag a button up or down to reorder)"
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                  />
+                                  {dialogStackPinned && onDialogStackTop && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onDialogStackTop(selected.id, null)}
+                                      className="mt-1 text-xs text-blue-600 hover:underline"
+                                      title="Place the choices right below the text box again"
+                                    >
+                                      Follow the text box
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                               <input
                                 type="number"

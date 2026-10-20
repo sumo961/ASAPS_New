@@ -50,6 +50,13 @@ export function normalizeDialogTreeLayoutTemplate(v: unknown): DialogTreeLayoutT
 /** True when the layout template is one of the existing chat-style modes
  *  (uses ChatDialogView). Replaces the old `presentationMode !== 'positioned'`
  *  check in five places below. */
+/** A chat window rectangle with positive size, or undefined. */
+function validChatWindow(v: any): { x: number; y: number; width: number; height: number } | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = { x: Number(v.x), y: Number(v.y), width: Number(v.width), height: Number(v.height) };
+  return [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width > 0 && r.height > 0 ? r : undefined;
+}
+
 export function isChatLayoutTemplate(template: DialogTreeLayoutTemplate): boolean {
   return template === 'chat-scroll' || template === 'chat-bubble';
 }
@@ -103,6 +110,12 @@ export class DialogTreeBeat extends Beat {
    *  v0.9.63 strips it. New writes should target layoutTemplate. */
   public presentationMode?: 'positioned' | 'chat-scroll' | 'chat-bubble';
   public showAvatars?: boolean; // Show character avatars in chat mode
+  /** Chat templates: where the conversation sits on the stage (stage px);
+   *  unset = the whole stage. A messenger look needs room around it. */
+  public chatWindow?: { x: number; y: number; width: number; height: number };
+  /** Chat templates: a picture drawn behind the chat — e.g. a phone or
+   *  messenger screen with its buttons — that the chat window sits in. */
+  public chatFrameImage?: string;
   public spatialFit?: 'contain' | 'cover'; // Bug 26 — per-beat background fit
   private currentNode: DialogNode | null = null;
 
@@ -144,6 +157,8 @@ export class DialogTreeBeat extends Beat {
     // never writes via this field.
     this.presentationMode = legacyPM;
     this.showAvatars = config.parameters?.showAvatars ?? true;
+    this.chatWindow = validChatWindow((config.parameters as any)?.chatWindow);
+    this.chatFrameImage = (config.parameters as any)?.chatFrameImage || undefined;
     const fit = (config.parameters as any)?.spatialFit ?? (config as any).spatialFit;
     this.spatialFit = fit === 'cover' || fit === 'contain' ? fit : undefined;
 
@@ -417,6 +432,8 @@ export class DialogTreeBeat extends Beat {
       // older ASML / ZIP readers don't blow up; v0.9.63 will drop it.
       presentationMode: this.presentationMode,
       showAvatars: this.showAvatars,
+      ...(this.chatWindow ? { chatWindow: this.chatWindow } : {}),
+      ...(this.chatFrameImage ? { chatFrameImage: this.chatFrameImage } : {}),
       spatialFit: this.spatialFit,
     };
   }
@@ -468,6 +485,8 @@ export class DialogTreeBeat extends Beat {
     if (params.slotIntent !== undefined) this.slotIntent = params.slotIntent;
     if (params.slotAnimations !== undefined) this.slotAnimations = params.slotAnimations;
     if (params.showAvatars !== undefined) this.showAvatars = params.showAvatars;
+    if (params.chatWindow !== undefined) this.chatWindow = validChatWindow(params.chatWindow);
+    if (params.chatFrameImage !== undefined) this.chatFrameImage = params.chatFrameImage || undefined;
     if (params.spatialFit !== undefined) {
       this.spatialFit = params.spatialFit === 'cover' || params.spatialFit === 'contain'
         ? params.spatialFit : undefined;
@@ -533,6 +552,8 @@ export class DialogTreeBeat extends Beat {
     // Bug 26 — per-beat spatial-fit override for the spatial layer.
     renderer.setState('spatialFit', this.spatialFit);
     renderer.setState('showAvatars', this.showAvatars ?? true);
+    renderer.setState('chatWindow', this.chatWindow ?? null);
+    renderer.setState('chatFrameImage', this.chatFrameImage ?? null);
     // Default responseDelay to 1.5s for chat modes if not explicitly set
     const isChatMode = isChatLayoutTemplate(this.layoutTemplate);
     const defaultDelay = isChatMode ? DIALOG_CHAT_RESPONSE_DELAY : 0;

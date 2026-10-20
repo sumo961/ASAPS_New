@@ -36,6 +36,8 @@ const EFFECT_TYPE_LABELS: Record<EffectType, string> = {
   // Play a one-shot sound (asset id, preset id, or URL) — the
   // location-triggered-sound mechanic, available on every effect host.
   playSound: 'Play Sound',
+  // Music volume, at once or as a fade (target 'music' | 'all').
+  setVolume: 'Set Music Volume',
   // v0.9.45 — snapshot mood / emotion / sentiment state under a name so
   // future condition baselines can compare against it.
   bookmarkAffectState: 'Bookmark Affect State',
@@ -283,6 +285,10 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
               } else if (newType === 'setCharacterVariant') {
                 updates.value = undefined;
                 (updates as any).variantId = (effect as any).variantId ?? '';
+              } else if (newType === 'setVolume') {
+                updates.target = 'music';
+                updates.value = 0;
+                updates.fadeSeconds = 2;
               } else if (newType === 'castRole') {
                 updates.value = undefined;
                 updates.target = roles[0]?.id ?? '';
@@ -306,7 +312,40 @@ export const ChoiceEffectsEditor: React.FC<ChoiceEffectsEditorProps> = ({
           </select>
 
           {/* Target field */}
-          {effect.type === 'castRole' ? (() => {
+          {effect.type === 'setVolume' ? (
+            <>
+              <select
+                value={effect.target === 'all' ? 'all' : 'music'}
+                onChange={(e) => updateEffect(index, { target: e.target.value })}
+                className="px-1.5 py-1 text-xs border rounded bg-white flex-shrink-0"
+                title="The background music, or every sound"
+              >
+                <option value="music">Music</option>
+                <option value="all">All sound</option>
+              </select>
+              <span className="text-xs text-gray-500">to</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={Number.isFinite(Number(effect.value)) ? Number(effect.value) : 100}
+                onChange={(e) => updateEffect(index, { value: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                className="px-1.5 py-1 text-xs border rounded w-14 flex-shrink-0"
+                title="Percent of the project's own level (Project Settings → Sound): 0 = silent, 100 = back to normal"
+              />
+              <span className="text-xs text-gray-500">% over</span>
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                value={Number(effect.fadeSeconds) || 0}
+                onChange={(e) => updateEffect(index, { fadeSeconds: Math.max(0, Number(e.target.value) || 0) })}
+                className="px-1.5 py-1 text-xs border rounded w-12 flex-shrink-0"
+                title="How long the change takes, in seconds (0 = at once)"
+              />
+              <span className="text-xs text-gray-500">s</span>
+            </>
+          ) : effect.type === 'castRole' ? (() => {
             const role = roles.find((r) => r.id === effect.target);
             const candidates = (availableCharacters || []).filter((c) => !role || role.candidates.includes(c.id));
             return (

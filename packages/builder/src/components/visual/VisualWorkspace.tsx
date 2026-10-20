@@ -2260,8 +2260,34 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Convert to VisualElements using the shared layout's method
     const elements = layout.toVisualElements() as VisualElement[];
     console.log(`[VisualWorkspace] generatePhaseElements output:`, elements.map(el => ({ id: el.id, name: el.name, text: el.text?.substring(0, 30), z: el.z })));
+    // Chat layouts draw the conversation in a chat window: the NPC text box
+    // stands for that window (its position and size are the window's), so
+    // moving it moves the conversation — before, its fields did nothing.
+    const params: any = beat?.type === 'dialogTree' && beat.getParameters ? beat.getParameters() : null;
+    if (params && /^chat-/.test(String(params.layoutTemplate || ''))) {
+      const win = params.chatWindow ?? { x: 0, y: 0, width: stageWidth, height: stageHeight };
+      return elements.map(el => (el.id === 'npc'
+        ? { ...el, ...win, name: 'Chat window', text: 'The conversation appears here' }
+        : el));
+    }
     return elements;
-  }, [globalSettings]);
+  }, [globalSettings, beat]);
+
+  /**
+   * Chat layouts: store the chat window from the NPC element (moved or
+   * resized on the canvas or in the fields) on the beat, undoably.
+   */
+  const commitChatWindow = useCallback((elements: VisualElement[]) => {
+    if (!beat || beat.type !== 'dialogTree' || !beat.getParameters) return;
+    const params: any = beat.getParameters();
+    if (!/^chat-/.test(String(params.layoutTemplate || ''))) return;
+    const npc = elements.find(e => e.id === 'npc');
+    if (!npc) return;
+    const win = { x: Math.round(npc.x), y: Math.round(npc.y), width: Math.round(npc.width), height: Math.round(npc.height) };
+    const was = params.chatWindow;
+    if (was && was.x === win.x && was.y === win.y && was.width === win.width && was.height === win.height) return;
+    onBeatUpdate?.(beat.id, { parameters: { ...params, chatWindow: win } } as any);
+  }, [beat, onBeatUpdate]);
 
   /**
    * Sync visual elements to beat.locations Map
@@ -2713,12 +2739,15 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const phaseKeyToSave = prevPhaseIdRef.current || selectedPhaseId;
       if ((prevBeat.type === 'dialogTree' || prevBeat.type === 'endScreen') && phaseKeyToSave) {
         const phaseKey = phaseKeyToSave;
-        const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
+        const overrides: Record<string, any> = {};
 
+        const existingPhase = (params.phaseOverrides || {})[phaseKey] || {};
         visualElementsRef.current.forEach((el: VisualElement) => {
           // Save ALL elements to phaseOverrides (dialog, buttons, and others)
-          // Now includes z-index to preserve reordering
+          // Now includes z-index to preserve reordering. Other fields an
+          // override carries (a dialog stack's stackY) are kept.
           overrides[el.id] = {
+            ...existingPhase[el.id],
             x: el.x,
             y: el.y,
             width: el.width,
@@ -2797,10 +2826,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Calculate overrides: elements that differ from auto-layout
     // For simplicity, save all element positions as overrides
     // Now includes z-index to preserve reordering
-    const overrides: Record<string, Partial<{ x: number; y: number; width: number; height: number; z: number }>> = {};
+    const overrides: Record<string, any> = {};
+    const existingPhase = (params.phaseOverrides || {})[phaseKey] || {};
 
     visualElements.forEach(el => {
       overrides[el.id] = {
+        ...existingPhase[el.id], // keep fields like a dialog stack's stackY
         x: el.x,
         y: el.y,
         width: el.width,
@@ -2872,6 +2903,34 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     computedPositionsRef.current = positions;
     setDrawnPositions(positions);
   }, []);
+
+  /**
+   * The Y field of a dialog button moves the whole stack (user request,
+   * 2026-10-20): its top goes where the typed Y puts that button, stored as
+   * stackY on every choice of the line; null = follow the text box again.
+   */
+  // Read each render: the beat is updated in place, so a memo on it goes stale.
+  const dialogStackPinned = !!beat && beat.type === 'dialogTree' && !!selectedPhaseId
+    && Object.entries(((beat.getParameters?.() as any)?.phaseOverrides?.[selectedPhaseId] ?? {}) as Record<string, any>)
+      .some(([k, o]) => /^choice_\d+$/.test(k) && typeof o?.stackY === 'number');
+  const setDialogStackTop = useCallback((buttonId: string, y: number | null) => {
+    if (!beat || beat.type !== 'dialogTree' || !selectedPhaseId) return;
+    const params: any = beat.getParameters ? beat.getParameters() : {};
+    const existing = params.phaseOverrides?.[selectedPhaseId] ?? {};
+    const drawn = computedPositionsRef.current;
+    const ys = [...drawn.entries()].filter(([id]) => /^choice_\d+$/.test(id)).map(([, p]) => p.y);
+    const top = ys.length ? Math.min(...ys) : 0;
+    const offset = (drawn.get(buttonId)?.y ?? top) - top;
+    const node = dialogNodeAt(params.dialogTree, dialogTreeNodePath);
+    const count = Math.max(Array.isArray(node?.choices) ? node.choices.length : 0, ys.length);
+    const next: Record<string, any> = { ...existing };
+    for (let i = 0; i < count; i++) {
+      const o = { ...(existing[`choice_${i}`] ?? {}) };
+      if (y === null) delete o.stackY; else o.stackY = Math.round(y - offset);
+      next[`choice_${i}`] = o;
+    }
+    onBeatUpdate?.(beat.id, { parameters: { ...params, phaseOverrides: { ...(params.phaseOverrides ?? {}), [selectedPhaseId]: next } } } as any);
+  }, [beat, selectedPhaseId, dialogTreeNodePath, onBeatUpdate]);
 
   const commitDialogButtonStack = useCallback((elements: VisualElement[], prev: VisualElement[], fromDrag = false): VisualElement[] | null => {
     if (!beat || beat.type !== 'dialogTree' || !selectedPhaseId) return null;
@@ -2981,10 +3040,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     // Check if choices changed - force reload when choices are added,
     // removed or reordered, or the "Show as" state changes
     const currentChoicesCount = selectedPhase.choices?.length || 0;
-    // …and the button column (x/width): an undo of a column edit must re-stack.
+    // …and the button column (x/width) and stack top (stackY): an undo of a
+    // column edit, or "Follow the text box", must re-stack.
     const phaseOv = (beat.getParameters?.() as any)?.phaseOverrides?.[selectedPhaseId] ?? {};
     const columnSig = Object.keys(phaseOv).filter(k => /^choice_\d+$/.test(k)).sort()
-      .map(k => `${phaseOv[k]?.x},${phaseOv[k]?.width}`).join(';');
+      .map(k => `${phaseOv[k]?.x},${phaseOv[k]?.width},${phaseOv[k]?.stackY}`).join(';');
     const choicesSig = `${(selectedPhase.choices || []).map((c: any) => c?.id).join('|')}#${choiceStateKey}#${columnSig}`;
     const choicesChanged = prevChoicesCountRef.current !== currentChoicesCount || prevChoicesSigRef.current !== choicesSig;
 
@@ -5158,6 +5218,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             {activeTab === 'elements' && (
               <VisualPropertiesPanel
                 dialogStackDrawn={beat?.type === 'dialogTree' ? drawnPositions : undefined}
+                onDialogStackTop={beat?.type === 'dialogTree' ? setDialogStackTop : undefined}
+                dialogStackPinned={dialogStackPinned}
                 layoutMode={
                   // Mirror the canvas gates (schemaSlot/schemaSpatial above):
                   // the panel and the canvas must agree on the mode, or the
@@ -5279,6 +5341,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     ? commitDialogButtonStack(updatedElements, visualElements)
                     : null;
                   const finalElements = restacked ?? updatedElements;
+                  if (updates.x !== undefined || updates.y !== undefined || updates.width !== undefined || updates.height !== undefined) {
+                    commitChatWindow(finalElements);
+                  }
 
                   // Update state and sync to beat.locations
                   setVisualElements(finalElements);
@@ -7020,6 +7085,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           <VisualBeatEditor
             backgroundAssetId={backgroundAssetId}
             backgroundUrl={backgroundUrl}
+            chatFrameImageAssetId={beat?.type === 'dialogTree' && /^chat-/.test(String((beat.getParameters?.() as any)?.layoutTemplate || '')) ? (beat.getParameters?.() as any)?.chatFrameImage : undefined}
             backgroundSound={backgroundSound}
             elements={visualElements}
             onInteractionStart={() => {
@@ -7046,6 +7112,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   setVisualElements(restacked);
                   syncElementsToBeatLocations(restacked, beat);
                 }
+                commitChatWindow(visualElementsRef.current);
               }
               commitSnapshot('Move/resize element');
             }}

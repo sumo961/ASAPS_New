@@ -331,6 +331,26 @@ describe('Asset operations', () => {
     expect(res.success).toBe(true);
     expect(res.data?.length).toBe(1);
   });
+
+  // A 57 MB WAV added to a project that already had (v1) pictures never
+  // reached the project folder or Git: v1 alone was returned (2026-10-20).
+  it('getProjectAssets returns v1 assets AND newer v2 ones (a large file cached on disk)', async () => {
+    await mgr.createAsset(makeAsset({ id: 'pic_old', projectId: 'pB' }));
+    const { openDB } = await import('idb');
+    const db = await openDB('asaps-storage');
+    await db.put('asset-metadata' as any, {
+      id: 'wav_new', projectId: 'pB', location: 'filesystem', path: '/cache/wav_new.wav',
+      size: 57_000_000, mimeType: 'audio/wav', filename: 'music.wav', uploadedAt: new Date().toISOString(),
+    } as any);
+    db.close();
+    (window as any).electronAPI = { fs: { readFile: async () => new Uint8Array([1, 2, 3]) } };
+    try {
+      const res = await mgr.getProjectAssets('pB');
+      expect(res.data?.map((a) => a.id).sort()).toEqual(['pic_old', 'wav_new']);
+    } finally {
+      delete (window as any).electronAPI;
+    }
+  });
 });
 
 describe('Command history operations', () => {

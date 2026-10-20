@@ -1,7 +1,7 @@
 import { StoryEngine, Story, SerializedStoryState, ASMLParser, BeatTypeRegistry, findSpeakerCharacter } from '@asaps/core';
 import type { IRenderer, StoryMetadata, BeatConfig, ConversationLine, ConversationRecord } from '@asaps/core';
 import type { RenderThemeSettings } from '@asaps/renderer';
-import { toMeterCounterData, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor } from '@asaps/renderer';
+import { toMeterCounterData, harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, getAudioManager } from '@asaps/renderer';
 import { AssetResolver } from './AssetResolver';
 import { fontFamilyFromAssetFilename, registerFontAsset } from './utils/customFonts';
 import { SaveSystem, SaveSlot, ISaveStorageAdapter } from './SaveSystem';
@@ -288,6 +288,10 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   private storyTitle: string = '';
   private globalSettings: GlobalSettings | null = null;
   private backgroundMusicAudio: HTMLAudioElement | null = null;
+  /** The background music's own level (Project Settings) and the setVolume level on top. */
+  private musicBaseVolume = 0.5;
+  private musicLevel = 1;
+  private musicFadeFrame: number | null = null;
   private assetMap: Map<string, string> = new Map();
   /**
    * Phase 3.3 — per-asset orientation/device-class variants, loaded
@@ -1027,6 +1031,13 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       this.engine?.getContext()?.on('playSound', ({ sound, volume }: { sound: string; volume?: number }) => {
         void (renderer as any).playEffectSound?.(sound, volume);
       });
+      // setVolume effect: cluster music and sounds fade on the audio engine;
+      // the background music here is an <audio> element, faded alongside.
+      this.engine?.getContext()?.on('setVolume', ({ target, volume, fadeMs }: { target: 'music' | 'all'; volume: number; fadeMs: number }) => {
+        getAudioManager().setVolumeLevel(target, volume, fadeMs);
+        this.musicLevel = volume;
+        this.fadeBackgroundMusic(fadeMs);
+      });
     }
 
     // Character inventory resolver - provides inventory HUD data for characters
@@ -1192,6 +1203,26 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
   /**
    * Start playing background music from globalSettings
    */
+
+  /**
+   * Ramp the background music element to its level × the setVolume level
+   * over `fadeMs` (frame by frame — an <audio> element has no ramp of its own).
+   */
+  private fadeBackgroundMusic(fadeMs: number): void {
+    const audio = this.backgroundMusicAudio;
+    if (!audio) return;
+    if (this.musicFadeFrame !== null) cancelAnimationFrame(this.musicFadeFrame);
+    const from = audio.volume;
+    const to = Math.max(0, Math.min(1, this.musicBaseVolume * this.musicLevel));
+    if (fadeMs <= 0 || typeof requestAnimationFrame === 'undefined') { audio.volume = to; return; }
+    const start = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / fadeMs);
+      audio.volume = from + (to - from) * t;
+      this.musicFadeFrame = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    this.musicFadeFrame = requestAnimationFrame(step);
+  }
   private async startBackgroundMusic(): Promise<void> {
     const soundSettings = this.globalSettings?.sound;
     const assetId = soundSettings?.backgroundMusicAssetId;
@@ -1217,7 +1248,8 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
       // Create and configure audio element
       this.backgroundMusicAudio = new Audio(url);
       this.backgroundMusicAudio.loop = true;
-      this.backgroundMusicAudio.volume = (soundSettings?.backgroundVolume ?? 50) / 100;
+      this.musicBaseVolume = (soundSettings?.backgroundVolume ?? 50) / 100;
+      this.backgroundMusicAudio.volume = this.musicBaseVolume * this.musicLevel;
 
       // Play the audio
       try {

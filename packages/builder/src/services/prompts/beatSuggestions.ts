@@ -84,7 +84,8 @@ Shorthand for a plain counter:
 - "soundEffect": filename to play when selected
 
 Or an "effects" array for the full vocabulary — inventory, variables,
-{ "type": "playSound", "target": "…" }, and the affect effects that shift how
+{ "type": "playSound", "target": "…" }, music fades
+{ "type": "setVolume", "target": "music", "value": 0..100, "fadeSeconds": … }, and the affect effects that shift how
 a character feels: addSentiment, nudgeMood, fireEmotion. When a scene is about
 a relationship, moving the feeling is usually the truer consequence than
 incrementing a number.

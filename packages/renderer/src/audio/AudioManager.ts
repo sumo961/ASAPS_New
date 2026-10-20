@@ -24,6 +24,11 @@ interface TrackedSound {
 export class AudioManager {
   private audioContext: AudioContext | null = null;
   private masterGainNode: GainNode | null = null;
+  /** Music (looping background music, cluster music) goes through this bus, so a setVolume effect can fade it. */
+  private musicBusNode: GainNode | null = null;
+  /** setVolume levels (0–1): music bus, and everything (on top of masterVolume). */
+  private musicLevel = 1;
+  private allLevel = 1;
   private soundBuffers: Map<string, AudioBuffer> = new Map();
   private activeSourceNodes: Set<AudioBufferSourceNode> = new Set();
   private masterVolume: number;
@@ -56,8 +61,11 @@ export class AudioManager {
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.masterGainNode = this.audioContext.createGain();
-      this.masterGainNode.gain.value = this.masterVolume;
+      this.masterGainNode.gain.value = this.masterVolume * this.allLevel;
       this.masterGainNode.connect(this.audioContext.destination);
+      this.musicBusNode = this.audioContext.createGain();
+      this.musicBusNode.gain.value = this.musicLevel;
+      this.musicBusNode.connect(this.masterGainNode);
       console.log('[AudioManager] Audio context initialized');
     } catch (error) {
       console.error('[AudioManager] Failed to initialize audio context:', error);
@@ -138,9 +146,9 @@ export class AudioManager {
       const gainNode = this.audioContext.createGain();
       gainNode.gain.value = Math.max(0, Math.min(1, volume));
 
-      // Connect: source -> gain -> master gain -> destination
+      // Connect: source -> gain -> (music bus for looping music) -> master gain -> destination
       source.connect(gainNode);
-      gainNode.connect(this.masterGainNode);
+      gainNode.connect(loop && this.musicBusNode ? this.musicBusNode : this.masterGainNode);
 
       // Track active source
       this.activeSourceNodes.add(source);
@@ -205,9 +213,9 @@ export class AudioManager {
       const gainNode = this.audioContext.createGain();
       gainNode.gain.value = Math.max(0, Math.min(1, volume));
 
-      // Connect: source -> gain -> master gain -> destination
+      // Connect: source -> gain -> (music bus for looping music) -> master gain -> destination
       source.connect(gainNode);
-      gainNode.connect(this.masterGainNode);
+      gainNode.connect(loop && this.musicBusNode ? this.musicBusNode : this.masterGainNode);
 
       // Track active source
       this.activeSourceNodes.add(source);
@@ -756,7 +764,7 @@ export class AudioManager {
       );
 
       bufferSource.connect(gainNode);
-      gainNode.connect(this.masterGainNode);
+      gainNode.connect(this.musicBusNode ?? this.masterGainNode);
 
       this.activeSourceNodes.add(bufferSource);
       bufferSource.onended = () => {
@@ -819,9 +827,34 @@ export class AudioManager {
    */
   setMasterVolume(volume: number): void {
     this.masterVolume = Math.max(0, Math.min(1, volume));
-    if (this.masterGainNode) {
-      this.masterGainNode.gain.value = this.masterVolume;
+    if (this.masterGainNode && !this.muted) {
+      this.masterGainNode.gain.value = this.masterVolume * this.allLevel;
     }
+  }
+
+  /**
+   * The setVolume effect: the music (target 'music') or everything ('all')
+   * to `level` (0–1 of its normal level), ramping over `fadeMs` on the audio
+   * clock. Applies to what plays now and to what starts later.
+   */
+  setVolumeLevel(target: 'music' | 'all', level: number, fadeMs = 0): void {
+    const to = Math.max(0, Math.min(1, level));
+    if (target === 'music') this.musicLevel = to; else this.allLevel = to;
+    this.initAudioContext();
+    const ctx = this.audioContext;
+    const node = target === 'music' ? this.musicBusNode : this.masterGainNode;
+    if (!ctx || !node) return;
+    const value = target === 'music' ? to : (this.muted ? 0 : this.masterVolume * to);
+    const now = ctx.currentTime;
+    node.gain.cancelScheduledValues(now);
+    node.gain.setValueAtTime(node.gain.value, now);
+    if (fadeMs > 0) node.gain.linearRampToValueAtTime(value, now + fadeMs / 1000);
+    else node.gain.setValueAtTime(value, now);
+  }
+
+  /** Current setVolume level (0–1) for 'music' or 'all'. */
+  getVolumeLevel(target: 'music' | 'all'): number {
+    return target === 'music' ? this.musicLevel : this.allLevel;
   }
 
   /**
@@ -840,7 +873,7 @@ export class AudioManager {
 
     // Use gain-based muting to pause/resume without stopping
     if (this.masterGainNode) {
-      this.masterGainNode.gain.value = muted ? 0 : this.masterVolume;
+      this.masterGainNode.gain.value = muted ? 0 : this.masterVolume * this.allLevel;
     }
 
     console.log(`[AudioManager] Sound ${muted ? 'muted' : 'unmuted'}`);

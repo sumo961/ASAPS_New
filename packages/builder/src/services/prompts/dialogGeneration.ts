@@ -109,6 +109,7 @@ Both a choice and a dialogNode can carry an "effects" array. This is the full vo
   - { "type": "fireEmotion", "target": "char_jenkins", "emotion": "fear", "emotionDelta": 0.3 }
   - For these affect effects "target" is the CHARACTER, not a counter — the opposite of the counter effects above.
 - Sound: { "type": "playSound", "target": "<asset id | preset id | URL>" }
+- Music volume: { "type": "setVolume", "target": "music", "value": 20, "fadeSeconds": 3 } — value is a percent of the project's music level (0 = silent, 100 = back to normal); fade the music down for a quiet or tense moment and back up after it
 
 Never write to a counter that is BOUND to affect state (one carrying a "source" in the character's definition). Those are read-only displays of a feeling — the next appraisal discards your write. Move the feeling instead, with addSentiment / fireEmotion / nudgeMood, and the meter follows.
 

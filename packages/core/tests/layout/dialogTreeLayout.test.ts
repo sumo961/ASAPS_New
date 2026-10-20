@@ -462,3 +462,21 @@ describe('dialogTreeLayout', () => {
     });
   });
 });
+
+// "What if I want to change the Y of the buttons in a dialogue?" (2026-10-20):
+// the stack's top can be set; the buttons still follow each other in order.
+describe('computeDialogTreeLayout — author-set stack top', () => {
+  const defaultInput: DialogTreeLayoutInput = {
+    phase: { id: 'p', speaker: 'NPC', text: 'Hello, traveler!', choices: [{ id: 'choice_0', text: 'Tell me' }, { id: 'choice_1', text: 'Goodbye' }] },
+    stageWidth: 1024,
+    stageHeight: 768,
+    theme: DEFAULT_DIALOG_TREE_THEME,
+  };
+  it('starts the stack at stackY when a button carries it, keeping the order and gaps', () => {
+    const free = computeDialogTreeLayout(defaultInput);
+    const pinned = computeDialogTreeLayout({ ...defaultInput, overrides: { choice_0: { stackY: 500 }, choice_1: { stackY: 500 } } });
+    expect(pinned.buttons[0].y).toBe(500);
+    expect(pinned.buttons[1].y - pinned.buttons[0].y).toBe(free.buttons[1].y - free.buttons[0].y);
+    expect(free.buttons[0].y).toBe(free.dialog.y + free.dialog.height + 20);
+  });
+});

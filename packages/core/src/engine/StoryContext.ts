@@ -2446,6 +2446,18 @@ export class StoryContext extends EventEmitter {
           volume: typeof effect.value === 'number' ? effect.value : undefined,
         });
         break;
+      // Music volume, faded or at once — hosts route it to their audio
+      // (PreviewWindow / PlayerEngine), like playSound. value = percent of
+      // the project's own music level; target 'all' = everything.
+      case 'setVolume': {
+        const pct = Number(effect.value);
+        this.emit('setVolume', {
+          target: effect.target === 'all' ? 'all' : 'music',
+          volume: Number.isFinite(pct) ? Math.max(0, Math.min(1, pct / 100)) : 1,
+          fadeMs: Math.max(0, Number(effect.fadeSeconds) || 0) * 1000,
+        });
+        break;
+      }
       case 'setVariable':
         this.setVariable(effect.target, effect.value);
         break;

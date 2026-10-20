@@ -396,15 +396,18 @@ export class StorageManager {
    * Falls back to v2 asset-metadata store if v1 assets store is empty
    */
   async getProjectAssets(projectId: string): Promise<StorageResult<StoredAsset[]>> {
-    // First try v1 assets store
+    // Both stores: v1 (imports, older versions) and v2 (HybridStorageAdapter
+    // — everything added in the Asset Manager, large files cached on disk).
+    // Returning v1 alone whenever it had anything dropped every newer asset
+    // from folder saves and exports: a 57 MB WAV added to a project with
+    // older pictures never reached the project folder or Git (2026-10-20).
     const v1Result = await this.listAssets({ projectId });
+    const v1Assets = v1Result.success && v1Result.data ? v1Result.data : [];
+    const withV1 = (v2: StoredAsset[]): StorageResult<StoredAsset[]> => {
+      const ids = new Set(v1Assets.map((a) => a.id));
+      return { success: true, data: [...v1Assets, ...v2.filter((a) => !ids.has(a.id))] };
+    };
 
-    // If v1 store has assets, return them
-    if (v1Result.success && v1Result.data && v1Result.data.length > 0) {
-      return v1Result;
-    }
-
-    // Fall back to v2 asset-metadata store (used by HybridStorageAdapter)
     try {
       const db = await this.getDb();
 
@@ -420,6 +423,7 @@ export class StorageManager {
       if (metadataList.length === 0) {
         return v1Result; // Return v1 result if no v2 assets either
       }
+      const v1Ids = new Set(v1Assets.map((a) => a.id));
 
       // Load assets from v2 storage
       const storedAssets: StoredAsset[] = [];
@@ -474,8 +478,8 @@ export class StorageManager {
         }
       }
 
-      this.log('Assets loaded from v2 store:', storedAssets.length);
-      return { success: true, data: storedAssets };
+      this.log('Assets loaded from v2 store:', storedAssets.length, '(v1:', v1Ids.size, ')');
+      return withV1(storedAssets);
     } catch (error) {
       this.logError('Failed to load assets from v2 store', error);
       return v1Result; // Return v1 result on error

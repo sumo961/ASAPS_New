@@ -426,12 +426,14 @@ export interface GeoPoint {
  *  - setCharacterVariant — switch the active persona variant
  *  - bookmarkAffectState — snapshot affect under a bookmark name (for baselines)
  *  - playSound — one-shot sound (asset id, preset or URL; value = volume)
+ *  - setVolume — music volume (target 'music' | 'all'; value = percent of the
+ *    project's own level, 0–100; fadeSeconds = how long the change takes)
  *  - castRole — fill a cast role (target = role id, character = who)
  */
 export const EFFECT_TYPES = [
   'setVariable', 'addInventory', 'removeInventory', 'incrementCounter', 'setCounter',
   'nudgeMood', 'addSentiment', 'fireEmotion', 'addReflection', 'setGoalStatus',
-  'setCharacterVariant', 'bookmarkAffectState', 'playSound', 'castRole',
+  'setCharacterVariant', 'bookmarkAffectState', 'playSound', 'setVolume', 'castRole',
 ] as const;
 export type EffectType = (typeof EFFECT_TYPES)[number];
 
@@ -455,6 +457,8 @@ export interface Effect {
    * beat already gives that item a picture. Editor-chosen; no runtime logic.
    */
   itemImage?: string;
+  /** setVolume: seconds the change takes (a fade); omitted or 0 = at once. */
+  fadeSeconds?: number;
   // Sentiment-effect parameters (used when type === 'addSentiment'). Kept
   // top-level rather than nested under `value` so the existing effect-editor
   // UI can wire them up like any other effect property.

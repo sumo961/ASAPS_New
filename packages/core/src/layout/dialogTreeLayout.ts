@@ -43,7 +43,7 @@ export interface DialogTreeLayoutInput {
   stageWidth: number;
   stageHeight: number;
   theme: DialogTreeLayoutTheme;
-  overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number; z?: number }>>;
+  overrides?: Record<string, Partial<{ x: number; y: number; width: number; height: number; z?: number; stackY?: number }>>;
   storedLocations?: Map<string, Location>;
 }
 
@@ -216,11 +216,11 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
   // left gaps, orphan slots and buttons that could not be moved or placed
   // (2026-09-25). The column comes from the first button that carries an
   // override (VE edit) or a stored location.
-  const existingButtons: Array<{ x: number; y: number; width: number; height: number }> = [];
+  const existingButtons: Array<{ x: number; y: number; width: number; height: number; stackY?: number }> = [];
   if (storedLocations && storedLocations.size > 0) {
     storedLocations.forEach((loc) => {
       if (loc.kind === 'button') {
-        existingButtons.push({ x: loc.x, y: loc.y, width: loc.width, height: loc.height });
+        existingButtons.push({ x: loc.x, y: loc.y, width: loc.width, height: loc.height, stackY: (loc as any).stackY });
       }
     });
   }
@@ -235,8 +235,14 @@ export function computeDialogTreeLayout(input: DialogTreeLayoutInput): DialogTre
   const columnWidth = columnSource?.width ?? uniformButtonWidth;
   const columnX = columnSource?.x ?? (stageWidth - columnWidth) / 2;
 
+  // The stack's top may be set by the author (the Y field / "stackY" on the
+  // buttons, user request 2026-10-20); otherwise it follows the text box.
+  const stackSource = [...overrideButtons, ...existingButtons].find(
+    (b) => b && typeof (b as any).stackY === 'number',
+  ) as { stackY?: number } | undefined;
+
   const buttons: DialogTreeLayoutElement[] = [];
-  let currentY = buttonStartY;
+  let currentY = stackSource?.stackY ?? buttonStartY;
 
   choices.forEach((choice, idx) => {
     const buttonHeight = calculateButtonHeightInColumn(choice.text || '', t.fontSize, t.fontFamily, columnWidth);
