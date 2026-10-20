@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.123** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.123 makes group work through Git
+Current release: **v0.9.124** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.124 keeps everyone's work when
+you pull**: when your beats and a teammate's clash, the new **Keep both**
+choice keeps them all (yours move to a new ID, and your links follow) instead
+of making you pick whose to lose; beats that share an ID in different files
+are separated automatically after a pull; and ASAPS gets you back onto your
+branch when Git says "You are not currently on a branch".
+
+**v0.9.123 made group work through Git
 work**: new beats and copies get unique short IDs, so people adding beats at
 the same time no longer create the same one (and copying a copy no longer
 grows an ID until Git can't push it); ASAPS no longer writes over files you

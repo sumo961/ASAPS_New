@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.123, 2026-10-20)
+## 2026-10-20: Merges that keep everyone's work (v0.9.124)
 
 ### Overview
-Git merges that keep everyone's work (NarrativDesign follow-up).
+A pull no longer makes anyone choose whose beats to lose: **Keep both** settles conflicting beats, beats that share an ID in different files are separated after every pull, and the "You are not currently on a branch" dead end is handled before pulling (NarrativDesign follow-up).
 - **Keep both (recommended)** in the merge-conflict dialog (`vcs/keepBoth.ts` `resolveKeepBoth`): a beat file in conflict keeps the incoming (pushed) beat under its id and moves the local beat to a fresh id in its own file; links on the local side follow (files only the local side changed, rewritten old → new id); a beat both edited is kept twice, the local copy named "(your version)"; project.json takes the incoming file with the newest modifiedAt; `clusters/_index.json` and `characters/_index.json` merge entry by entry; other conflicts stay for the author. Works for project folders inside a repository subfolder.
 - **Same id, different files** (e.g. `infoText_beat_42` vs `dialogTree_beat_42` — Git reports no conflict, the next save dropped one): every merging pull now checks and moves the local beat to a fresh id, then commits that (`fixDuplicateIdsAfterMerge`); the pull's message says so.
 - **"You are not currently on a branch"** (the group's 10:19 pull, six minutes before the conflict markers were committed): before pulling, a rebase stopped halfway opens the conflict dialog; a detached HEAD returns to the branch first, merging any commits made off it (`gitReturnToBranch`). Pulls use `--no-edit`.

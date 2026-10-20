@@ -467,7 +467,7 @@ async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitO
   // with Git's "You are not currently on a branch".
   const head = await gitHeadState(projectPath);
   if (head.rebasing) {
-    return { success: false, message: 'A pull with rebase stopped halfway because of a CONFLICT. Finish it (Keep both, or choose a side) or abort it before pulling again.' };
+    return { success: false, message: 'A pull with rebase stopped halfway because of a CONFLICT. Choose a side for it, or abort the rebase and pull again without rebase (that offers Keep both).' };
   }
   if (!head.branch) {
     const back = await gitReturnToBranch(projectPath);

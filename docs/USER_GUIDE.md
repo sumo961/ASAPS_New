@@ -3946,9 +3946,11 @@ So you can see at a glance which parts of your story have unsaved-to-Git changes
 
 When you and a collaborator change the same file in different ways, pulling produces a **merge conflict**. The conflicting beat shows a **red dot** on the canvas, and a dialog asks how to settle it:
 
-- **Keep both (recommended)** — nobody's work is thrown away. Where your beat and a teammate's ended up with the same ID (two people each made a new beat at the same moment), the teammate's keeps the ID and yours moves to a new one; your links follow it, so your part of the story stays connected. A beat you *both* edited is kept twice — the teammate's version, and yours marked **(your version)** — so you can compare, keep one, and delete the other. The small shared files (the project file, the cluster and character lists) are merged for you.
+- **Keep both (recommended)** — nobody's work is thrown away. Where your beat and a teammate's ended up with the same ID (this happens with beats made in earlier ASAPS versions, before new IDs got a random part), the teammate's keeps the ID and yours moves to a new one; your links follow it, so your part of the story stays connected. A beat you *both* edited is kept twice — the teammate's version, and yours marked **(your version)** — so you can compare, keep one, and delete the other. The small shared files (the project file, the cluster and character lists) are merged for you.
 - **Keep My Changes** / **Accept Remote Changes** — take one side for every conflicted file. The other side's changes in those files are lost, so use these only when you're sure.
-- **Abort** — undo the pull and go back to where you were.
+- **Abort Merge** (or **Abort Rebase**) — undo the pull and go back to where you were.
+
+After a **Pull (Rebase)** the dialog is called *Rebase Conflicts* and offers only **Keep My Changes**, **Accept Remote Changes** and **Abort Rebase** — Keep both works on a plain **Pull**.
 
 Keep both settles beats and the project's lists. If something else is in conflict too (settings, theme, a character), the dialog says which files are left, and you choose for those.
 
@@ -3956,7 +3958,7 @@ ASAPS also catches a clash that Git doesn't report: two beats with the same ID i
 
 Merge conflicts in beats happen less often than you'd think: each beat is its own file, and new beats get unique IDs, so two people can work on different beats freely.
 
-**"You are not currently on a branch."** Git says this when a pull with rebase stopped halfway, or when you're looking at a past version instead of your branch. ASAPS now handles both before it pulls: a rebase that stopped halfway opens the conflict dialog (finish or abort it), and otherwise ASAPS goes back to your branch first — keeping any commits you made in the meantime.
+**"You are not currently on a branch."** Git says this when a pull with rebase stopped halfway, or when you're looking at a past version instead of your branch. ASAPS now handles both before it pulls: a rebase that stopped halfway opens the conflict dialog (finish or abort it), and otherwise ASAPS goes back to your branch first — keeping any commits you made in the meantime. If your unsaved or uncommitted changes are in the way, ASAPS asks you to commit or discard them first; if the commits made off the branch clash with it, the conflict dialog opens.
 
 ## Advisory Editing Locks
 
@@ -3977,7 +3979,7 @@ Open the **Pending Changes** tab. If your changes are there but unstaged, click 
 
 ### "Push rejected — the remote has commits I don't"
 
-This means a collaborator pushed something while you were working. Switch to the **Incoming** tab, click **Pull** (or **Pull (Rebase)** if you prefer cleaner history), resolve any merge conflicts that pop up, and then come back and **Push** again.
+This means a collaborator pushed something while you were working. Switch to the **Incoming** tab, click **Pull** (or **Pull (Rebase)** if you prefer cleaner history), resolve any merge conflicts that pop up (a plain **Pull** offers **Keep both**, so nobody's work is lost), and then come back and **Push** again.
 
 ### "My project is in iCloud / Dropbox / OneDrive — is that OK?"
 
@@ -4011,7 +4013,7 @@ A few habits keep group work smooth — and ASAPS helps with each:
 
 When two people change the same file, Git marks the clash inside the file with lines like `<<<<<<< HEAD`, `=======` and `>>>>>>> …`, and waits for you to choose. If those lines get committed, the files can no longer be read. ASAPS then refuses to open the project and lists the files — on purpose: opening and saving it would lose beats.
 
-To fix it, open each listed file (the **Merge Conflicts** section of the VCS panel shows them, or use GitHub Desktop or a text editor). Between `<<<<<<<` and `=======` is one side, between `=======` and `>>>>>>>` the other: keep the side you want and delete the three marker lines. Commit, then open the project again. If you're unsure which side holds whose work, keep a copy of both texts first.
+To fix it, open each file the notice lists in GitHub Desktop or a text editor. Between `<<<<<<<` and `=======` is one side, between `=======` and `>>>>>>>` the other: keep the side you want and delete the three marker lines. Commit, then open the project again. If you're unsure which side holds whose work, keep a copy of both texts first.
 
 ### "I cloned a repo but the assets are missing"
 
