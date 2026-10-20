@@ -531,6 +531,9 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 
 **Layout on responsive stages.** In a responsive project the *Visual Editor's* left panel adds a **Layout Template** for dialog beats — *Stacked (Visual Novel)*, *Conversation (side-by-side)*, *Chat - Scrollable History*, *Chat - Single Bubble*, or *Custom (drag-place)*. Conversation puts the NPC text on one side and the choices on the other; it needs genuine side-by-side room, so below roughly 640 px of usable width (a phone held upright) the same beat quietly falls back to the stacked flow — nothing to configure, and your choices and effects are untouched. Long NPC speeches scroll inside their card instead of running off the bottom of the stage, and a narrow corner HUD indents the text beside it rather than pushing everything down.
 
+<a id="chat-window"></a>
+**Where the chat appears.** In the two chat layouts the conversation fills the whole stage unless you say otherwise. Open the beat in the Visual Editor: the NPC text box is now labelled **Chat window** (*The conversation appears here*). Move and resize it like any other element, on the canvas or with its X, Y, Width and Height fields, and the chat appears in exactly that area when the story plays — say, in a narrow column on the right, so the background stays visible beside it. It's one undo step, like any other move. For a messenger look, pick a **Chat frame picture** under **Show Advanced Options** — a phone, say. It covers the whole stage, with the chat running inside the Chat window; the Visual Editor shows it see-through so you can fit the Chat window into the picture's screen. In the story, the picture and the chat grow and shrink together with the stage.
+
 **Per-Node Speakers (Multi-Character Conversations):** Every NPC node in a Dialog Tree has its own **NPC Speaker** field — a [Character combobox](#character-combobox) that lets each line of dialog come from a different character. A wolf-and-grandmother scene can flow Granny → Wolf → Granny just by setting different linked characters per node. When a node's speaker is linked to a defined Character, the speaker label and portrait update everywhere automatically — no need to keep the names in sync by hand. If your project has [roles](#roles), they're pinned at the top of the list (*@ The confidant*): the line is then spoken by whoever plays that role. In the editor each speaker gets their own colour, in the order they first speak in the tree, so the lines of a scene are easy to tell apart.
 
 <a id="then-another-character-speaks"></a>
@@ -557,7 +560,7 @@ In the Visual Editor, with **Show as** on *All choices*, the amber banner above 
 <a id="link-dont-label"></a>
 **Link the speaker, then decide about the label.** The Dialog Tree's **Show Speaker Name** setting (in the Inspector's *Speaker* group: *Default (use global setting)*, *Always show* or *Always hide*) decides whether the per-node names appear as labels over the lines, and it is kept when you save and reopen the project. It only hides the *label* — the speaker link still does its work. So a good habit is *link, don't label*: always link each line to the character who is present, and set **Show Speaker Name** to *Always hide* when your prose already says who is talking (*Karin sits down. "I don't see why we're here."*). The link is what makes the character's [HUD appear](#hud-reveal) when they first show up and what gives the line their [TTS voice](#quoted-speech-voice).
 
-**Arranging the choice buttons.** On a fixed canvas, the Visual Editor treats a dialog's choice buttons as one stack you can reorder by dragging; in either layout mode its **Show as** picker shows which choices a player in a particular state would actually see — see [Dialog-tree choices in the Visual Editor](#dialog-choices-visual-editor).
+**Arranging the choice buttons.** On a fixed canvas, the Visual Editor treats a dialog's choice buttons as one stack you can reorder by dragging and move up or down with its **Y** field; in either layout mode its **Show as** picker shows which choices a player in a particular state would actually see — see [Dialog-tree choices in the Visual Editor](#dialog-choices-visual-editor).
 
 **NPC Auto-Exit:** Dialog nodes can have an **NPC Auto-Exit** target set. When a node has an auto-exit target, the NPC delivers their line and then automatically advances to the target beat without showing any choices. In the Dialog Tree Editor, nodes with an auto-exit show a green badge with the target beat name, and the choices list is hidden (since they are unreachable). Use this for NPC-initiated dismissals, forced exits, or transitions where the player has no say.
 
@@ -578,7 +581,16 @@ Leave both off and a choice is simply repeatable, effects and all — sometimes 
 
 **Seeing the depth from the flowchart:** A dialog with nested exchanges — choices that open deeper dialog nodes inside the same beat — used to look identical to a one-liner on the graph. Now a multi-phase Dialog Tree node draws with a **stacked-card edge** and a row of **green dots** (one per exchange, capped at six); hover the dots for the count. The same count appears as a green **N phases** chip on the Dialog Tree Editor's header in the Inspector, where the actual structure lives. The node itself stays the same size no matter how deep the dialog goes.
 
-**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, **append a reflection** to a Mode B character's memory, or **cast a role** (decide who plays a [role](#roles) from here on). Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
+**Choice Effects:** Each choice can trigger immediate side effects—set variables, modify counters, add/remove inventory, **nudge a character's mood**, **fire an emotion**, **add a sentiment**, **set a goal's status**, **switch a character's active variant**, **append a reflection** to a Mode B character's memory, **play a sound**, **set the music volume** (see below), or **cast a role** (decide who plays a [role](#roles) from here on). Open the **Effects** section on any choice and pick **+ Add Effect** (or **+ apply template…** for a preset bundle of affect-stack effects). The full list of affect-aware effects, the character-target dropdown that backs them, the inline labels and palette-backed comboboxes, the eight starter templates, and the live "what does this choice do?" summary are documented in [Affect-Aware Choice Effects](#choice-effects-affect) and [Easier authoring](#effects-easier-authoring).
+
+<a id="set-music-volume"></a>
+**Set Music Volume — let the soundtrack react.** Pick **Set Music Volume** in the effect dropdown and the row reads like a sentence: **Music** (or **All sound**) *to* **0** *% over* **2** *s*. The percentage is of the project's own level, so *0 %* is silent and *100 %* brings it back to normal; the seconds say how long the change takes (*0* = at once). The new level stays until another Set Music Volume changes it, also for music that starts later. A few ways to use it:
+
+- **Fade out before a quiet moment** — *Music to 0 % over 3 s* on the choice that leads into the confession.
+- **Duck it under a scene** — *Music to 30 %* while two characters talk, and *Music to 100 %* on the way out.
+- **Hush everything** — *All sound to 0 %* for a sudden silence, then bring it back the same way.
+
+Like every effect, it works on dialog lines, links and random branches as well as on choices.
 
 ---
 
@@ -2241,6 +2253,9 @@ Each character placement includes:
 - Which appearance to show
 - Layer order (z-index)
 
+<a id="partly-off-stage"></a>
+**Partly off the stage is fine.** A figure cropped by the edge of the frame, a branch that reaches in from the left, a prop peeking up from the bottom: you can drag an element (or nudge it with the arrow keys, Shift for 10 px steps) past any edge of the stage. ASAPS only stops it when about 24 px are left on the stage, so there is always a strip to grab and pull it back. The **X** and **Y** fields take negative numbers too, for example *X: −40*.
+
 ### Adding Text Elements
 
 1. Click **Add Text** in the toolbar
@@ -2281,12 +2296,13 @@ Useful for "click on the suspicious painting" interactions.
 
 When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into (click a choice on the canvas to step into the conversation behind it, or a crumb to step back out).
 
-**The buttons are a stack (fixed canvas).** A dialog's choice buttons always sit below the text, one after another, in the order of the choices. You decide two things:
+**The buttons are a stack (fixed canvas).** A dialog's choice buttons sit one after another, in the order of the choices, normally right below the text. You decide three things:
 
 - **The column** — drag a button sideways, or type its **X** and **Width** in the properties panel, and every button of the dialog moves to that column.
 - **The order** — drag a button up or down and drop it where it should go: the choices themselves are reordered in the Dialog Tree (the Inspector follows along). It's one undo step.
+- **The height** — by default the stack starts just below the **text box**, so moving or resizing the text box takes the buttons along. To put the buttons somewhere else (lower on the stage, say, with room for a picture in between), select any of them and type a **Y**: the whole stack moves there together, in the same order. A **Follow the text box** link then appears under the Y field; click it to put the stack back right below the text.
 
-The **Y** field is shown but read-only — the stack decides it. To move the whole stack up or down, move or resize the **text box**: the buttons always start just below it. When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
+When conditions hide some choices, the visible ones close ranks and fill the slots in order, so the player never sees gaps or leftover buttons.
 
 (Multi Choice buttons are different: each one goes wherever you put it, Y included.)
 
@@ -3927,7 +3943,10 @@ The full commit log for the project. Click any commit to see which files it touc
 
 ### Branches
 
-View the current branch and switch between any branches that already exist. Choosing a teammate's branch from GitHub (one that starts with `origin/`) gives you your own copy of it that follows theirs, so you can pull and push on it as usual. Note: ASAPS doesn't currently let you **create** new branches from inside the app — see [What's not (yet) supported](#vcs-not-supported) below.
+See which branch you're on (the green dot) and every other branch, local and on GitHub. Each branch you're not on has two buttons: **Switch** moves you to it, and **Merge** brings its work into the branch you're on. Choosing a teammate's branch from GitHub (one that starts with `origin/`) gives you your own copy of it that follows theirs, so you can pull and push on it as usual. **+ Branch** makes a new branch from where you are and switches to it, so you can try out an idea without touching the main story.
+
+<a id="branch-switch-refused"></a>
+**Switching does nothing, or a notice says you have changes?** When you have uncommitted changes, **Switch** first asks whether to go ahead (**Switch anyway**). Git itself won't switch, create or merge a branch when that would overwrite work you haven't committed, and ASAPS now tells you so instead of quietly staying put. The notice names the files. Commit them in **Pending Changes** (or discard them there if you don't need them), then try again. If the notice says *an earlier merge isn't finished*, click the red **MERGING** button in the VCS status bar and choose **Keep both** (see [Merge Conflicts](#merge-conflicts)), then try again.
 
 ## Beat-Level Status Indicators
 
@@ -3981,6 +4000,10 @@ Open the **Pending Changes** tab. If your changes are there but unstaged, click 
 
 This means a collaborator pushed something while you were working. Switch to the **Incoming** tab, click **Pull** (or **Pull (Rebase)** if you prefer cleaner history), resolve any merge conflicts that pop up (a plain **Pull** offers **Keep both**, so nobody's work is lost), and then come back and **Push** again.
 
+### "I can't switch to another branch"
+
+It usually means uncommitted changes are in the way, or an earlier merge isn't finished. The notice ASAPS shows says which; see [Switching does nothing](#branch-switch-refused) for what to do.
+
 ### "My project is in iCloud / Dropbox / OneDrive — is that OK?"
 
 It works, but synced folders sometimes interfere with Git in subtle ways (lock files, partial writes, two clients trying to apply the same changes). If you hit weird errors that don't make sense, try moving the project somewhere outside the synced folder — `~/Documents/GitHub/` is a popular choice. The version control history stays intact through GitHub, so moving the local copy is safe.
@@ -4025,7 +4048,6 @@ If the repo was created on a system with **Git LFS** enabled, the asset binaries
 A few Git features that authors sometimes look for and don't find:
 
 - **SSH-based remotes** — ASAPS uses HTTPS through `gh`'s credential helper. Repos with `git@github.com:...` URLs aren't directly supported; convert to the `https://github.com/...` form.
-- **Creating branches inside ASAPS** — you can switch between existing branches, but creating new ones currently requires using `git` or `gh` in a terminal. (Branch authoring inside the app is on the roadmap.)
 - **Multi-remote setups** — ASAPS assumes a single `origin`. If you've added other remotes manually, they won't appear in the UI but they won't break anything either.
 - **Git LFS** — explicitly disabled. Asset binaries are committed as plain Git blobs.
 - **GitLab, Bitbucket, self-hosted Git** — only GitHub is wired into the onboarding flow. You can manually `git init` and add a non-GitHub remote in a terminal, but the in-app authentication and "create repo" flows are GitHub-specific.
@@ -4131,7 +4153,7 @@ Quick reference for all beat types.
 | Title Screen | Story opening | title, subtitle, author, button text |
 | Info Text | Narration | text, button text, textVariations (optional array for random selection) |
 | Explanation | Label the on-screen HUDs | text, button text, per-HUD callout captions (timer, countdown, counters, inventory, mood — blank uses built-in wording); only draws callouts for HUDs actually on screen |
-| Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), per-line speakers, *Then another character speaks* (several characters before the player answers; each line can have conditions and effects, with alternatives checked in order), NPC auto-exit target (skippable Continue), players can skip ahead (on/off), presentation mode (follows the layout template), chat avatars and NPC response delay (chat layouts, 1.5 s by default), layout template (responsive), markVisited, effectsOncePerChoice |
+| Dialog Tree | Choices | prompt, choices (each with text, target, conditions, effects), per-line speakers, *Then another character speaks* (several characters before the player answers; each line can have conditions and effects, with alternatives checked in order), NPC auto-exit target (skippable Continue), players can skip ahead (on/off), presentation mode (follows the layout template), chat avatars and NPC response delay (chat layouts, 1.5 s by default), chat window (chat layouts: placed in the Visual Editor), layout template (responsive), markVisited, effectsOncePerChoice |
 | Multi Choice | One question, several buttons | question, speaker, choices (each with text, target, conditions, effects), choiceDelay, layout template and per-choice pins (responsive), markVisited, effectsOncePerChoice |
 | Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, picture, target, conditions, effects), show options as (buttons / pictures with names / pictures only), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |

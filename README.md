@@ -22,8 +22,17 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.124** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.124 keeps everyone's work when
+Current release: **v0.9.125** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.125 gives chats a messenger
+look and music a fade**: a Dialog Tree in a chat layout can show a frame
+picture (a phone, say) with the chat running inside a chat window you place
+in the Visual Editor; the new **Set Music Volume** effect fades music out,
+under a scene or back in; the Dialog Tree's response buttons can be moved up
+or down; elements can sit partly off the stage; large sounds now reach your
+teammates after a push; and a branch switch that Git refuses now tells you
+why.
+
+**v0.9.124 kept everyone's work when
 you pull**: when your beats and a teammate's clash, the new **Keep both**
 choice keeps them all (yours move to a new ID, and your links follow) instead
 of making you pick whose to lose; beats that share an ID in different files
