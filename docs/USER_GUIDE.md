@@ -3927,7 +3927,7 @@ The full commit log for the project. Click any commit to see which files it touc
 
 ### Branches
 
-View the current branch and switch between any branches that already exist. Note: ASAPS doesn't currently let you **create** new branches from inside the app — see [What's not (yet) supported](#vcs-not-supported) below.
+View the current branch and switch between any branches that already exist. Choosing a teammate's branch from GitHub (one that starts with `origin/`) gives you your own copy of it that follows theirs, so you can pull and push on it as usual. Note: ASAPS doesn't currently let you **create** new branches from inside the app — see [What's not (yet) supported](#vcs-not-supported) below.
 
 ## Beat-Level Status Indicators
 
@@ -3944,13 +3944,19 @@ So you can see at a glance which parts of your story have unsaved-to-Git changes
 
 ## Merge Conflicts
 
-When you and a collaborator edit the same beat in incompatible ways, pulling produces a **merge conflict**. ASAPS handles this gracefully:
+When you and a collaborator change the same file in different ways, pulling produces a **merge conflict**. The conflicting beat shows a **red dot** on the canvas, and a dialog asks how to settle it:
 
-1. The conflicting beat shows a **red dot** on the canvas.
-2. The VCS panel highlights the conflicting file and offers two buttons: **Keep Mine** or **Accept Theirs**.
-3. If a rebase is mid-flight with multiple conflicts, ASAPS walks you through them one at a time.
+- **Keep both (recommended)** — nobody's work is thrown away. Where your beat and a teammate's ended up with the same ID (two people each made a new beat at the same moment), the teammate's keeps the ID and yours moves to a new one; your links follow it, so your part of the story stays connected. A beat you *both* edited is kept twice — the teammate's version, and yours marked **(your version)** — so you can compare, keep one, and delete the other. The small shared files (the project file, the cluster and character lists) are merged for you.
+- **Keep My Changes** / **Accept Remote Changes** — take one side for every conflicted file. The other side's changes in those files are lost, so use these only when you're sure.
+- **Abort** — undo the pull and go back to where you were.
 
-Merge conflicts in beats happen less often than you'd think because each beat is its own JSON file in the directory format — two collaborators can edit different beats freely without ever conflicting.
+Keep both settles beats and the project's lists. If something else is in conflict too (settings, theme, a character), the dialog says which files are left, and you choose for those.
+
+ASAPS also catches a clash that Git doesn't report: two beats with the same ID in *different* files (for example your Dialog Tree `beat_42` and a teammate's Info Text `beat_42`). After a pull, ASAPS moves your one to a new ID, commits that, and tells you — before, the next save quietly dropped one of them.
+
+Merge conflicts in beats happen less often than you'd think: each beat is its own file, and new beats get unique IDs, so two people can work on different beats freely.
+
+**"You are not currently on a branch."** Git says this when a pull with rebase stopped halfway, or when you're looking at a past version instead of your branch. ASAPS now handles both before it pulls: a rebase that stopped halfway opens the conflict dialog (finish or abort it), and otherwise ASAPS goes back to your branch first — keeping any commits you made in the meantime.
 
 ## Advisory Editing Locks
 
