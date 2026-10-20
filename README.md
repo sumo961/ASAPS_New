@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.122** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.122 answers three questions from
+Current release: **v0.9.123** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.123 makes group work through Git
+work**: new beats and copies get unique short IDs, so people adding beats at
+the same time no longer create the same one (and copying a copy no longer
+grows an ID until Git can't push it); ASAPS no longer writes over files you
+pulled outside the app, won't open a project with unresolved merge
+conflicts, and warns when a project was saved by a newer ASAPS; opening an `.asaps` file that sits in a Git
+repository offers to turn it into a project folder Git can merge (one file
+per beat); and Merge Story can combine versions of one story that drifted
+apart — shared beats stay once, new ones come in, and beats changed in both
+are marked for you to decide.
+
+**v0.9.122 answered three questions from
 users**: each speaker's name can now appear in their character's own colour
 (Project Settings → Effects → Speaker Display), the name colour can be set
 for names shown above the text box too, and the little slide of the choice

@@ -1,15 +1,24 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.122, 2026-10-19)
+## 2026-10-20: Working on one story together (v0.9.123)
 
 ### Overview
+Groups can work on one story through Git without overwriting each other: new beats and copies get unique short IDs, ASAPS no longer writes over files pulled outside the app, refuses folders with unresolved merge conflicts, warns when a project was saved by a newer ASAPS, turns an `.asaps` file in a Git repository into a project folder Git can merge, and Merge Story can combine versions that drifted apart.
+
 Group work through Git (Birka groups, 2026-10-20): "we all have the latest commit, but our projects look different". Three causes: the repository held one `.asaps` file (a zip Git can't merge — last push wins); ASAPS opens an `.asaps` as a copy in its own project list, so pulls never reached what the app showed; and new beats were numbered per copy (`beat_45` created by three people at once).
 - **New beats get a random id** (`beat_` + 8 letters/digits, `utils/beatIds.ts`); default names keep a running number ("InfoText 12"). Existing ids never change.
 - **An `.asaps` inside a Git repository** (menu, double-click, or the start window's *Open a file*, which on desktop now uses the system dialog so the path is known): ASAPS explains and offers **Make a project folder** — written next to the file from the imported record (not the editor state) and opened; *Just open a copy* keeps the old behaviour.
 - **Merge Story → Another version of this story** (`computeMerge` mode `versions`; preselected when at least half the beat ids are shared): beats identical in both are kept once (layout ignored; both sides go through the same deserialize → `serializeBeatForStory` steps, or every beat looked changed), beats only the other version has come in, a beat changed in both comes in as a copy "(other version)" with the other version's links following it; shared characters and assets aren't added twice. Verified on a Red Riding Hood copy: 24 same, 1 new, 1 changed in both.
 - **User Guide:** *"We all have the latest commit, but our projects look different"* (why, the project-folder fix, combining drifted versions) and *Another version of the same story* under Merge Story; the menu is **Open → Merge Story**, not Import.
 
-**Files modified:** packages/builder/src/utils/beatIds.ts (new), packages/builder/src/hooks/useStoryBuilder.ts, packages/builder/src/App.tsx, packages/builder/src/utils/projectMerge.ts, packages/builder/src/components/MergeStoryDialog.tsx, docs/USER_GUIDE.md, tests (beatIds, useStoryBuilder, projectMerge)
+- **Copies get fresh short ids** (copy, paste, merge clashes): a copy kept the original's id plus `_copy<timestamp>`, so copying a copy stacked suffixes until Git could no longer push the files (user report). Copy names stay "Name (Copy)". **Runaway ids are shortened on open** (`shortenRunawayBeatIds`: over 32 characters or more than one `_copy`; every reference in story and settings rewritten, written back at once, with a notice) and on the way into a merge.
+- **Version stamp:** folder saves write `savedWith` (ASAPS version) into project.json, `.asaps` exports `metadata.appVersion`; opening something saved by a newer ASAPS warns (update first — an older app rewrites or drops what a newer one saved).
+- **Changes outside ASAPS no longer get overwritten.** A pull outside the app while the project was open left the old version on screen, and the next (auto)save wrote it back — deleting the beat files a teammate had just added. Now: nothing unsaved → the new files load at once; unsaved edits → auto-save pauses until *Reload from disk* or a manual *Save*.
+- **Folders with unresolved merge conflicts don't open** (`ConflictMarkersError`): ASAPS names the files and explains the fix; it no longer falls back to importing a broken project folder as a copy (which minted a new project id).
+- **NarrativDesign investigation** (the group's repository and three `.asaps` files): three people wrote three storylines under the same beat numbers (41–52); a merge was committed with conflict markers in project.json and four beats; ASAPS then imported the folder as copies (project id changed twice) and a save deleted one beat of each duplicate-id pair (N25555's father storyline). A trial *Merge Story → Another version* of the three files keeps all three storylines (47 beats).
+- **Merge Story UI:** "a beat that differs" (not "changed in both"), "VCS panel" (not "Git panel"); no character questions for characters the versions share.
+
+**Files modified:** packages/builder/src/utils/beatIds.ts (new), packages/builder/src/utils/appVersion.ts (new), packages/builder/src/utils/duplicateBeats.ts, packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/builder/src/storage/types.ts, packages/builder/src/contexts/PersistenceContext.tsx, packages/builder/src/utils/projectZipManager.ts, packages/core/src/persistence/DirectoryFormat.ts, packages/builder/src/hooks/useStoryBuilder.ts, packages/builder/src/App.tsx, packages/builder/src/utils/projectMerge.ts, packages/builder/src/components/MergeStoryDialog.tsx, docs/USER_GUIDE.md, tests (beatIds, useStoryBuilder, projectMerge)
 
 ---
 

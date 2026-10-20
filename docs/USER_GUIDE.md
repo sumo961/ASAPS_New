@@ -3309,8 +3309,8 @@ When you host an HTML export online (rather than just double-clicking a single-f
 Importing replaces what's open — **merging combines**. Merge Story pulls another exported story *into* your currently open project, so you can stitch two narratives together: a colleague's chapter, a reusable puzzle sequence, last semester's class project.
 
 1. Click **Open → Merge Story (.asaps)** in the header
-2. Select the exported story (`.asaps.zip` / `.zip`)
-3. Resolve any character collisions in the merge dialog (see below)
+2. Select the exported story (`.asaps` or `.zip`)
+3. Choose whether it is **A different story** or **Another version of this story** ([see below](#merge-versions)), and resolve any character collisions in the merge dialog
 4. Click through — the incoming beats arrive in your project
 
 **What lands where.** The incoming beats arrive as their own **cluster**, placed beside your existing graph as a disconnected group. Nothing is auto-wired into your flow — *you* connect the two stories afterwards, wherever the join makes narrative sense. Your project's settings and theme win; the incoming story adapts.
@@ -3325,14 +3325,15 @@ Undecided collisions default to keep-both — the merge never silently fuses two
 **Everything else is conflict-free by construction.** Beat, character, and asset IDs are remapped wherever they'd clash, and every reference inside the incoming content (connections, nested dialog trees, condition targets, asset references) is rewritten to match — your story prose is never touched. **Variables union by name**: if both stories use `trust`, they share it after the merge, which is often exactly what you want when the stories are meant to interlock.
 
 <a id="merge-versions"></a>
-**Another version of the same story.** When several people each worked on their own copy of one story, choose **Another version of this story** in the merge dialog (ASAPS picks it for you when most beats are shared). Then:
+**Another version of the same story.** When several people each worked on their own copy of one story, choose **Another version of this story** in the merge dialog (ASAPS picks it for you when at least half of the other file's beats are also in your story). Then:
 
 - Beats that are the same in both versions are kept once — only their place on the canvas may differ.
 - Beats that only the other version has come in.
-- A beat that both of you changed comes in as a copy marked **(other version)**, next to your own. Compare the two, keep the one you want (or combine their text), reconnect the links, and delete the other.
-- Characters and pictures the two versions share are not added twice.
+- A beat that differs between the two versions — whether one of you changed it or both did — comes in as a copy marked **(other version)**, next to your own. Compare the two, keep the one you want (or combine their text), reconnect the links, and delete the other.
+- Characters and pictures the two versions share are not added twice. If the other version replaced a picture or sound but kept its ID, your story's file is the one that stays — add the other one again if you need it.
+- Nothing of yours is removed: a beat you deleted that the other version still has comes back in, so delete it again if you meant to.
 
-Everything that came in sits in a cluster called *Other version: …*, and the closing notice lists the beats that were changed in both. Merge one version at a time, save, and then merge the next.
+Everything that came in sits in a cluster called *Other version: …*, and the closing notice lists the beats that differ between the two. Merge one version at a time, save, and then merge the next.
 
 ---
 
@@ -3888,6 +3889,8 @@ The everyday team workflow looks like this:
 2. **Author B** accepts the invite by email, copies the repository URL from GitHub, and uses *File → Open Project from GitHub…* in ASAPS. After cloning, the project opens and the VCS panel becomes available.
 3. From here, both authors edit, commit, and push. The VCS panel's **Incoming** tab shows when one author has pushed work the other hasn't pulled yet.
 
+If the repository holds the story as a single `.asaps` file rather than a project folder, turn it into a folder first — see ["We all have the latest commit, but our projects look different"](#group-asaps-file).
+
 The first time a collaborator joins, they go through the same install + auth onboarding as the project's creator did — install `git`/`gh`, sign in with GitHub, then clone.
 
 ## The VCS Panel
@@ -3977,20 +3980,32 @@ It works, but synced folders sometimes interfere with Git in subtle ways (lock f
 <a id="group-asaps-file"></a>
 ### "We all have the latest commit, but our projects look different"
 
-This happens when the repository holds the story as one **`.asaps` file**. Two things go wrong:
+The most common cause: the repository holds the story as one **`.asaps` file**. Two things go wrong:
 
 - **ASAPS works on a copy.** Opening an `.asaps` file adds a copy of it to your project list, and that copy is what the project card opens. Pulling updates the file in your repository folder, but not your copy, so you keep seeing your own version.
 - **Git can't merge an `.asaps` file.** It is a zip, so Git can only keep one whole version of it: whoever pushes last replaces everyone else's work.
 
 **The fix is a project folder** — one file per beat, which Git merges for you:
 
-1. One person opens the `.asaps` file from the repository folder. ASAPS notices the repository and offers **Make a project folder**; it creates the folder next to the file and opens it.
-2. In the Git panel, commit the new folder (and delete the old `.asaps` file from the repository), then push.
+1. One person opens the `.asaps` file from the repository folder in the desktop app — with **File → Open Project…**, **Open a file** in the start window, or a double-click (dragging it into the Project Browser skips this step). A dialog says *This file is in a Git repository*; choose **Make a project folder** (or **Just open a copy** to open it the old way). ASAPS creates the folder next to the file, named after the project, and opens it.
+2. In the VCS panel, commit the new folder (and delete the old `.asaps` file from the repository), then push.
 3. Everyone else pulls, then opens the **folder** with **File → Open Project Folder** — not the `.asaps` file. From now on: pull before you start, commit and push when you've done something.
 
-New beats get an ID with a random part (like `beat_k3f9x2a1`), so two people adding beats at the same time never create the same one.
+New beats get an ID with a random part (like `beat_k3f9x2a1`), so two people adding beats at the same time never create the same one. Copying a beat — even a copy of a copy — gives it a fresh short ID too. (Earlier versions added a suffix to the ID with every copy, `beat_20_copy…_copy…`, until the file names were too long for Git to push. When you open such a project, ASAPS shortens those IDs once and tells you; commit the renamed files.)
 
-**Already have several versions that drifted apart?** Pick the one with the most work and make it the project folder (steps above). Then open **Open → Merge Story (.asaps)** and bring in each other version as [another version of this story](#merge-versions): shared beats stay once, new beats come in, and beats changed in more than one version are marked for you to decide.
+A few habits keep group work smooth — and ASAPS helps with each:
+
+- **Pull inside ASAPS.** The VCS panel's **Incoming** tab pulls and reloads the project in one go. If you pull with GitHub Desktop or the command line while the project is open, ASAPS notices: with nothing unsaved it loads the new version at once; with unsaved changes it pauses auto-save and asks — **Reload from disk** takes the new version, **Save** keeps yours (and replaces the new files).
+- **Use the same ASAPS version.** Each save records which version of ASAPS made it. If you open a project last saved by a newer version than yours, ASAPS warns you: update first, because an older version can rewrite or drop what the newer one saved — in a group, that shows up as beats changed or deleted that nobody touched.
+- **Don't commit what you didn't change.** If the VCS panel lists beats as changed or deleted that you never touched, find out why (often one of the two points above) before you commit.
+
+**Already have several versions that drifted apart?** Pick the one with the most work and make it the project folder (steps above). Then open **Open → Merge Story (.asaps)** and bring in each other version as [another version of this story](#merge-versions): shared beats stay once, new beats come in, and beats that differ are marked for you to decide.
+
+### "ASAPS says the project has unresolved Git merge conflicts"
+
+When two people change the same file, Git marks the clash inside the file with lines like `<<<<<<< HEAD`, `=======` and `>>>>>>> …`, and waits for you to choose. If those lines get committed, the files can no longer be read. ASAPS then refuses to open the project and lists the files — on purpose: opening and saving it would lose beats.
+
+To fix it, open each listed file (the **Merge Conflicts** section of the VCS panel shows them, or use GitHub Desktop or a text editor). Between `<<<<<<<` and `=======` is one side, between `=======` and `>>>>>>>` the other: keep the side you want and delete the three marker lines. Commit, then open the project again. If you're unsure which side holds whose work, keep a copy of both texts first.
 
 ### "I cloned a repo but the assets are missing"
 
