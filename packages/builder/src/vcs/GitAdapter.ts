@@ -7,6 +7,7 @@
 
 import type { EditingLockFile } from './EditingLocks';
 import { mergeEditingLocks, parseLockFile, sameLockFile } from './editingLockMerge';
+import { resolveKeepBoth, fixDuplicateIdsAfterMerge, movedSummary, type KeepBothResult } from './keepBoth';
 
 export interface GitFileStatus {
   /** Relative file path */
@@ -406,12 +407,84 @@ export async function gitPull(projectPath: string, rebase = false): Promise<GitO
   return withEditingLocksSetAside(projectPath, () => pullUnguarded(projectPath, rebase));
 }
 
+/** Write a file through the Electron bridge (for the Keep-both resolution). */
+function getWriteFile(): (path: string, content: string) => Promise<void> {
+  const api = window.electronAPI;
+  if (!api?.fs?.writeFile) throw new Error('Git operations require the Electron filesystem API');
+  return async (path, content) => { await api.fs.writeFile(path, content); };
+}
+
+const sepOf = (projectPath: string) => (projectPath.includes('\\') ? '\\' : '/');
+
+/** Where HEAD is: on a branch, or not (detached) — and whether a rebase stopped halfway. */
+export async function gitHeadState(projectPath: string): Promise<{ branch: string | null; rebasing: boolean }> {
+  const run = getRunCommand();
+  const ref = await run('git', ['symbolic-ref', '-q', '--short', 'HEAD'], projectPath);
+  const state = await gitDetectMergeState(projectPath);
+  return { branch: ref.exitCode === 0 ? (ref.stdout.trim() || 'HEAD') : null, rebasing: state === 'rebase' };
+}
+
+/**
+ * Back onto a branch from a detached HEAD (a past commit, or a remote branch
+ * checked out directly), keeping any commits made there: they are merged
+ * into the branch. Git otherwise answers every pull with "You are not
+ * currently on a branch" (NarrativDesign, 2026-10-20).
+ */
+export async function gitReturnToBranch(projectPath: string): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  const git = (args: string[]) => run('git', args, projectPath);
+  const head = (await git(['rev-parse', 'HEAD'])).stdout.trim();
+  const containing = (await git(['branch', '--format=%(refname:short)', '--contains', 'HEAD'])).stdout
+    .split('\n').map((x) => x.trim()).filter((x) => x && !x.startsWith('('));
+  const locals = (await git(['branch', '--format=%(refname:short)'])).stdout
+    .split('\n').map((x) => x.trim()).filter((x) => x && !x.startsWith('('));
+  const target = containing[0] || (locals.includes('main') ? 'main' : locals.includes('master') ? 'master' : locals[0]);
+  if (!target) return { success: false, message: 'Git is not on a branch, and there is no branch to return to.' };
+  const keep = !containing.includes(target);
+  const rescue = `asaps-kept-${head.slice(0, 7)}`;
+  if (keep) await git(['branch', '-f', rescue, head]);
+  const checkout = await git(['checkout', target]);
+  if (checkout.exitCode !== 0) {
+    return { success: false, message: `Git is not on a branch, and could not go back to "${target}": ${checkout.stderr.trim()} Commit or discard your changes, then try again.` };
+  }
+  if (!keep) return { success: true, message: `Back on branch "${target}".` };
+  const merge = await git(['merge', '--no-edit', rescue]);
+  if (merge.exitCode !== 0) {
+    return { success: false, message: `Back on branch "${target}"; merging the commits made off the branch hit a CONFLICT. ${merge.stdout.trim()}` };
+  }
+  await git(['branch', '-d', rescue]);
+  return { success: true, message: `Back on branch "${target}", with the commits made off the branch merged in.` };
+}
+
+/** Resolve a pull's merge conflicts keeping everyone's beats (see keepBoth.ts). */
+export async function gitKeepBoth(projectPath: string): Promise<KeepBothResult> {
+  return resolveKeepBoth(projectPath, getRunCommand(), getWriteFile(), sepOf(projectPath));
+}
+
 async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitOperationResult> {
   const run = getRunCommand();
-  const args = rebase ? ['pull', '--rebase'] : ['pull'];
+  // A rebase that stopped halfway, or a detached HEAD, make every pull fail
+  // with Git's "You are not currently on a branch".
+  const head = await gitHeadState(projectPath);
+  if (head.rebasing) {
+    return { success: false, message: 'A pull with rebase stopped halfway because of a CONFLICT. Finish it (Keep both, or choose a side) or abort it before pulling again.' };
+  }
+  if (!head.branch) {
+    const back = await gitReturnToBranch(projectPath);
+    if (!back.success) return back;
+  }
+  const args = rebase ? ['pull', '--rebase'] : ['pull', '--no-edit'];
   const result = await run('git', args, projectPath);
   if (result.exitCode === 0) {
-    return { success: true, message: result.stdout.trim() || 'Already up to date' };
+    // Two people's beats under one id in DIFFERENT files: no conflict was
+    // reported, but the next save would drop one of them.
+    let extra = '';
+    try {
+      extra = movedSummary(await fixDuplicateIdsAfterMerge(projectPath, run, getWriteFile(), sepOf(projectPath)));
+    } catch (e) {
+      console.warn('[GitAdapter] duplicate-id check after pull failed:', e);
+    }
+    return { success: true, message: (result.stdout.trim() || 'Already up to date') + extra };
   }
 
   // If no upstream tracking is set, retry with explicit origin/<branch>
@@ -425,7 +498,7 @@ async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitO
 
     const retryArgs = rebase
       ? ['pull', '--rebase', 'origin', branch]
-      : ['pull', 'origin', branch];
+      : ['pull', '--no-edit', 'origin', branch];
     const retryResult = await run('git', retryArgs, projectPath);
     return {
       success: retryResult.exitCode === 0,
@@ -556,6 +629,19 @@ export async function gitListBranches(projectPath: string): Promise<GitBranch[]>
 export async function gitSwitchBranch(projectPath: string, branchName: string): Promise<GitOperationResult> {
   return withEditingLocksSetAside(projectPath, async () => {
     const run = getRunCommand();
+    // A remote branch ("origin/Pablo") checked out directly leaves Git on no
+    // branch: make (or reuse) a local branch that follows it instead.
+    const isLocal = (await run('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], projectPath)).exitCode === 0;
+    const isRemote = !isLocal && (await run('git', ['show-ref', '--verify', '--quiet', `refs/remotes/${branchName}`], projectPath)).exitCode === 0;
+    if (isRemote) {
+      const localName = branchName.replace(/^[^/]+\//, '');
+      const hasLocal = (await run('git', ['show-ref', '--verify', '--quiet', `refs/heads/${localName}`], projectPath)).exitCode === 0;
+      const r = await run('git', hasLocal ? ['checkout', localName] : ['checkout', '-b', localName, '--track', branchName], projectPath);
+      return {
+        success: r.exitCode === 0,
+        message: r.exitCode === 0 ? `Switched to ${localName} (following ${branchName})` : r.stderr.trim(),
+      };
+    }
     const result = await run('git', ['checkout', branchName], projectPath);
     return {
       success: result.exitCode === 0,

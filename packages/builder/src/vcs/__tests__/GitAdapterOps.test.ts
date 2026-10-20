@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { gitRouter } from './gitRouter';
 import {
   gitStage, gitUnstage, gitCommit, gitPush, gitPull, gitFetch,
   gitStash, gitStashPop, gitListStashes, gitLog, gitDiff,
@@ -134,24 +135,16 @@ describe('GitAdapter Operations', () => {
 
   describe('gitPull', () => {
     it('pulls without rebase', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: 'Updating abc..def\n 2 files changed',
-        stderr: '',
-        exitCode: 0,
-      });
+      const runCommand = gitRouter({ pull: { stdout: 'Updating abc..def\n 2 files changed', stderr: '', exitCode: 0 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPull('/project');
       expect(result.success).toBe(true);
-      expect(runCommand).toHaveBeenCalledWith('git', ['pull'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['pull', '--no-edit'], '/project');
     });
 
     it('pulls with rebase', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: 'Successfully rebased',
-        stderr: '',
-        exitCode: 0,
-      });
+      const runCommand = gitRouter({ pull: { stdout: 'Successfully rebased', stderr: '', exitCode: 0 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       await gitPull('/project', true);
@@ -316,11 +309,7 @@ describe('GitAdapter Operations', () => {
 
   describe('gitSwitchBranch', () => {
     it('switches to a branch', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '',
-        stderr: "Switched to branch 'feature'",
-        exitCode: 0,
-      });
+      const runCommand = gitRouter({ checkout: { stdout: '', stderr: "Switched to branch 'feature'", exitCode: 0 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitSwitchBranch('/project', 'feature');

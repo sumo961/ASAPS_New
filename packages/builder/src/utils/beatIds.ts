@@ -21,7 +21,7 @@ export function isRunawayBeatId(id: string): boolean {
 }
 
 /** Exact-value rewrite of every string in plain JSON data. */
-function rewriteValues(value: any, map: Map<string, string>): any {
+export function rewriteValues(value: any, map: Map<string, string>): any {
   if (typeof value === 'string') return map.get(value) ?? value;
   if (Array.isArray(value)) return value.map((v) => rewriteValues(v, map));
   if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {

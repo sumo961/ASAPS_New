@@ -2,7 +2,8 @@
  * MergeConflictDialog - Shown when a pull/merge creates conflicts, or when
  * the app detects the repo is in a mid-merge/rebase state.
  *
- * Offers three options:
+ * Offers:
+ * - Keep both (merges; recommended): every beat survives — see vcs/keepBoth.ts
  * - Keep My Changes: resolve all conflicts using local versions
  * - Accept Remote: resolve all conflicts using remote versions
  * - Abort: cancel the merge/rebase entirely
@@ -19,7 +20,9 @@ import {
   gitAbortMerge,
   gitAbortRebase,
   gitGetConflicts,
+  gitKeepBoth,
 } from '../../vcs/GitAdapter';
+import { notify } from '../../utils/notify';
 
 interface MergeConflictDialogProps {
   /** Raw error message from the failed operation (may be empty for proactive detection) */
@@ -102,6 +105,28 @@ export const MergeConflictDialog: React.FC<MergeConflictDialogProps> = ({
     } else {
       onClose();
     }
+  };
+
+  // Keep both: the incoming beats keep their ids, local ones that clash move
+  // to fresh ids, so nobody's work is thrown away.
+  const handleKeepBoth = async () => {
+    if (!projectPath || !vcs) return;
+    setError(null);
+    setPhase('resolving');
+    setProgressMessage('Keeping both versions...');
+    const result = await gitKeepBoth(projectPath);
+    await vcs.refresh();
+    setProgressMessage(null);
+    if (!result.success) {
+      setError(result.message);
+      setConflictCount(result.remaining.length || (await gitGetConflicts(projectPath)).length);
+      setPhase('idle');
+      return;
+    }
+    // Show the merged files (moved beats included) in the editor.
+    window.dispatchEvent(new CustomEvent('asaps:git-reset'));
+    notify.success(result.message);
+    if (onResolved) onResolved(); else onClose();
   };
 
   const handleAbort = async () => {
@@ -242,6 +267,29 @@ export const MergeConflictDialog: React.FC<MergeConflictDialogProps> = ({
           borderRadius: 6,
           border: '1px solid #1e293b',
         }}>
+          {!isRebase && (
+            <button
+              type="button"
+              onClick={handleKeepBoth}
+              disabled={loading}
+              style={{
+                padding: '8px 14px',
+                backgroundColor: '#16a34a',
+                border: 'none',
+                borderRadius: 4,
+                color: '#fff',
+                fontSize: 13,
+                cursor: loading ? 'wait' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                textAlign: 'left',
+              }}
+            >
+              <strong>Keep both (recommended)</strong>
+              <span style={{ display: 'block', fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                Every beat survives: where yours and a teammate&apos;s share an ID, yours moves to a new one. A beat you both edited is kept twice, yours marked “(your version)”.
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleResolve(true)}

@@ -11,6 +11,7 @@
  * - OS_IGNORED file filtering (.DS_Store)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { gitRouter } from './gitRouter';
 import {
   getGitStatus,
   gitStageAll,
@@ -675,36 +676,39 @@ describe('GitAdapter Advanced Operations', () => {
   // ==========================================================================
   describe('gitPull - upstream auto-setup', () => {
     it('auto-sets upstream on first pull (no tracking info)', async () => {
-      const runCommand = vi.fn()
-        // First pull fails
-        .mockResolvedValueOnce({ stdout: '', stderr: 'There is no tracking information for the current branch.', exitCode: 1 })
-        // Get current branch
-        .mockResolvedValueOnce({ stdout: 'feature\n', stderr: '', exitCode: 0 })
-        // Set upstream
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // Retry pull
-        .mockResolvedValueOnce({ stdout: 'Updating abc..def', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({
+        // First pull fails, the retry works
+        pull: [
+          { stdout: '', stderr: 'There is no tracking information for the current branch.', exitCode: 1 },
+          { stdout: 'Updating abc..def', stderr: '', exitCode: 0 },
+        ],
+        // Current branch (asked again by the upstream retry)
+        'rev-parse': { stdout: 'feature\n', stderr: '', exitCode: 0 },
+        'symbolic-ref': { stdout: 'feature\n', stderr: '', exitCode: 0 },
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPull('/project');
 
       expect(result.success).toBe(true);
-      expect(runCommand).toHaveBeenNthCalledWith(3, 'git', ['branch', '--set-upstream-to', 'origin/feature', 'feature'], '/project');
-      expect(runCommand).toHaveBeenNthCalledWith(4, 'git', ['pull', 'origin', 'feature'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['branch', '--set-upstream-to', 'origin/feature', 'feature'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['pull', '--no-edit', 'origin', 'feature'], '/project');
     });
 
     it('auto-sets upstream on first pull --rebase', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: 'There is no tracking information', stderr: '', exitCode: 1 })
-        .mockResolvedValueOnce({ stdout: 'main\n', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: 'Successfully rebased', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({
+        pull: [
+          { stdout: 'There is no tracking information', stderr: '', exitCode: 1 },
+          { stdout: 'Successfully rebased', stderr: '', exitCode: 0 },
+        ],
+        'rev-parse': { stdout: 'main\n', stderr: '', exitCode: 0 },
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPull('/project', true);
 
       expect(result.success).toBe(true);
-      expect(runCommand).toHaveBeenNthCalledWith(4, 'git', ['pull', '--rebase', 'origin', 'main'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['pull', '--rebase', 'origin', 'main'], '/project');
     });
   });
 
