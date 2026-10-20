@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import JSZip from 'jszip';
-import { analyzeMergeSource, computeMerge, type MergeSourceAnalysis } from '../projectMerge';
+import { analyzeMergeSource, computeMerge, sameBeatContent, sharedBeatShare, type MergeSourceAnalysis } from '../projectMerge';
 
 function makeSource(overrides: Partial<MergeSourceAnalysis> = {}): MergeSourceAnalysis {
   return {
@@ -289,5 +289,74 @@ describe('analyzeMergeSource', () => {
     zip.file('readme.txt', 'not a project');
     const blob = await zip.generateAsync({ type: 'blob' });
     await expect(analyzeMergeSource(blob, [])).rejects.toThrow(/project\.json/);
+  });
+});
+
+// Birka groups (2026-10-20): three copies of one story, edited in parallel.
+// Combining them must keep the shared beats once, bring in what only the
+// other version has, and surface beats both changed — not duplicate it all.
+describe('computeMerge — another version of this story', () => {
+  const intro = { id: 'beat_1', name: 'Intro', type: 'infoText', x: 0, y: 0, parameters: { text: 'Birka, 870.' }, connections: [{ targetId: 'beat_2' }] };
+  const harbour = { id: 'beat_2', name: 'Harbour', type: 'infoText', x: 300, y: 0, parameters: { text: 'Ships come in.' }, connections: [] };
+  const mine = [intro, harbour];
+
+  it('keeps identical beats once (positions aside), adds new ones, and copies beats changed in both', () => {
+    const theirs = [
+      { ...intro, x: 40, y: 90 }, // moved only: same beat
+      { ...harbour, parameters: { text: 'Ships come in at dawn.' }, connections: [{ targetId: 'beat_3' }] }, // changed
+      { id: 'beat_3', name: 'Market', type: 'infoText', parameters: { text: 'Furs and silver.' }, connections: [] }, // new
+    ];
+    const result = computeMerge({
+      ...baseInput,
+      mode: 'versions',
+      existingBeats: mine,
+      source: makeSource({ incomingBeats: theirs, storyTitle: 'Birka' }),
+    });
+    expect(result.summary.identical).toBe(1);
+    expect(result.beats.map((b) => b.id)).toEqual([expect.stringMatching(/^beat_2_m/), 'beat_3']);
+    const copy = result.beats[0];
+    expect(copy.name).toBe('Harbour (other version)');
+    expect(copy.connections).toEqual([{ targetId: 'beat_3' }]);
+    expect(result.summary.conflicts).toEqual([{ id: 'beat_2', name: 'Harbour', copyId: copy.id }]);
+    expect(result.summary.clusterName).toBe('Other version: Birka');
+  });
+
+  it('links from new beats to a beat changed in both follow the other version’s copy; to a shared beat, stay', () => {
+    const theirs = [
+      intro,
+      { ...harbour, parameters: { text: 'Changed.' } },
+      { id: 'beat_9', name: 'Back', type: 'infoText', parameters: {}, connections: [{ targetId: 'beat_2' }, { targetId: 'beat_1' }] },
+    ];
+    const result = computeMerge({ ...baseInput, mode: 'versions', existingBeats: mine, source: makeSource({ incomingBeats: theirs }) });
+    const back = result.beats.find((b) => b.id === 'beat_9');
+    const copyId = result.summary.conflicts![0].copyId;
+    expect(back.connections).toEqual([{ targetId: copyId }, { targetId: 'beat_1' }]);
+  });
+
+  it('does not add characters or assets this project already has under the same id', () => {
+    const result = computeMerge({
+      ...baseInput,
+      mode: 'versions',
+      existingBeats: mine,
+      existingCharacters: [{ id: 'char_bjorn', name: 'Björn' }],
+      existingAssetIds: ['asset_fish'],
+      source: makeSource({
+        incomingBeats: mine,
+        incomingCharacters: [{ id: 'char_bjorn', name: 'Björn' }, { id: 'char_sigrid', name: 'Sigrid' }],
+        parsedAssets: [
+          { id: 'asset_fish', asset: { id: 'asset_fish' } as any } as any,
+          { id: 'asset_axe', asset: { id: 'asset_axe' } as any } as any,
+        ],
+      }),
+    });
+    expect(result.characters.map((c) => c.id)).toEqual(['char_sigrid']);
+    expect(result.assets.map((a) => a.id)).toEqual(['asset_axe']);
+    expect(result.beats).toEqual([]);
+  });
+
+  it('recognises another version by shared beat ids, and compares beats without layout or empty fields', () => {
+    expect(sharedBeatShare([intro, harbour, { id: 'beat_7' }], ['beat_1', 'beat_2'])).toBeCloseTo(2 / 3);
+    expect(sameBeatContent({ ...intro, notes: '', cluster: 'c1' }, { ...intro, x: 999 })).toBe(true);
+    expect(sameBeatContent(intro, { ...intro, name: 'Opening' })).toBe(false);
   });
 });

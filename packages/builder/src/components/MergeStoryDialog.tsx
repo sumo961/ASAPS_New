@@ -8,6 +8,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { GitMerge, Upload, X, Users, AlertTriangle } from 'lucide-react';
 import {
   analyzeMergeSource,
+  sharedBeatShare,
   type MergeSourceAnalysis,
   type CharacterDecision,
 } from '../utils/projectMerge';
@@ -16,14 +17,17 @@ export interface MergeStoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
   existingCharacters: any[];
+  /** Ids of the open project's beats — to recognise another version of this story. */
+  existingBeatIds?: string[];
   /** Performs the merge; resolves with a human-readable summary line. */
-  onMerge: (analysis: MergeSourceAnalysis, decisions: CharacterDecision[]) => Promise<string>;
+  onMerge: (analysis: MergeSourceAnalysis, decisions: CharacterDecision[], mode: 'separate' | 'versions') => Promise<string>;
 }
 
 export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
   isOpen,
   onClose,
   existingCharacters,
+  existingBeatIds = [],
   onMerge,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +36,7 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [mode, setMode] = useState<'separate' | 'versions'>('separate');
 
   const reset = useCallback(() => {
     setAnalysis(null);
@@ -53,6 +58,8 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
     try {
       const result = await analyzeMergeSource(file, existingCharacters);
       setAnalysis(result);
+      // Mostly the same beat ids: another version of this story.
+      setMode(sharedBeatShare(result.incomingBeats, existingBeatIds) >= 0.5 ? 'versions' : 'separate');
       // Default every collision to keep-both (never silently fuse)
       setDecisions(new Map(result.characterCollisions.map(c => [c.incomingId, 'keep-both' as const])));
     } catch (e) {
@@ -60,7 +67,7 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
     } finally {
       setBusy(false);
     }
-  }, [existingCharacters]);
+  }, [existingCharacters, existingBeatIds]);
 
   const handleMerge = useCallback(async () => {
     if (!analysis) return;
@@ -70,6 +77,7 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
       const summary = await onMerge(
         analysis,
         [...decisions.entries()].map(([incomingId, action]) => ({ incomingId, action })),
+        mode,
       );
       setDone(summary);
     } catch (e) {
@@ -77,7 +85,7 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
     } finally {
       setBusy(false);
     }
-  }, [analysis, decisions, onMerge]);
+  }, [analysis, decisions, mode, onMerge]);
 
   if (!isOpen) return null;
 
@@ -102,9 +110,9 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
           ) : !analysis ? (
             <>
               <p className="text-sm text-gray-600 mb-4">
-                Pick an exported story file (<code>.asaps</code>). Its beats arrive as a
-                separate cluster beside your current story — nothing existing is changed.
-                You connect the two stories afterwards.
+                Pick an exported story file (<code>.asaps</code>): a different story to add
+                beside this one, or another version of this story that someone edited in
+                parallel. Nothing existing is changed.
               </p>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -133,6 +141,27 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
                   {analysis.incomingBeats.length} beats · {analysis.incomingCharacters.length} characters ·{' '}
                   {analysis.parsedAssets.length} assets
                 </div>
+              </div>
+
+              <div className="mb-4 space-y-2 text-sm">
+                <label className="flex items-start gap-2 text-gray-700">
+                  <input type="radio" name="merge-mode" className="mt-1" checked={mode === 'versions'} onChange={() => setMode('versions')} />
+                  <span>
+                    <span className="font-medium">Another version of this story</span>
+                    <span className="block text-gray-500">
+                      Beats both versions have unchanged are kept once. Beats only the other version
+                      has come in. A beat both changed comes in as a copy marked “(other version)”,
+                      for you to decide.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-gray-700">
+                  <input type="radio" name="merge-mode" className="mt-1" checked={mode === 'separate'} onChange={() => setMode('separate')} />
+                  <span>
+                    <span className="font-medium">A different story</span>
+                    <span className="block text-gray-500">All its beats arrive beside this story; you connect the two afterwards.</span>
+                  </span>
+                </label>
               </div>
 
               {analysis.characterCollisions.length > 0 && (

@@ -27,6 +27,7 @@ import {
 } from '../utils/asmlAssetImporter';
 import type { Asset } from '../components/assets/AssetManager';
 import type { Character } from '../types/character';
+import { newBeatId } from '../utils/beatIds';
 
 interface StoryBuilderState {
   title: string;
@@ -134,10 +135,9 @@ export function useStoryBuilder() {
     containerBeatPositions: [],
   });
 
-  // Generate unique beat ID
-  const generateBeatId = useCallback(() => {
-    return `beat_${beatCounter.current++}`;
-  }, []);
+  // Generate unique beat ID (random — see utils/beatIds). The counter
+  // only numbers default names now ("Info Text 12").
+  const generateBeatId = useCallback(() => newBeatId(), []);
 
   // Set story title
   const setTitle = useCallback((title: string) => {
@@ -157,7 +157,7 @@ export function useStoryBuilder() {
     options?: { id?: string; name?: string }
   ): Beat => {
     const id = options?.id || generateBeatId();
-    const name = options?.name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${id}`;
+    const name = options?.name || `${type.charAt(0).toUpperCase() + type.slice(1)} ${beatCounter.current++}`;
 
     const beatConfig = {
       id,

@@ -22,6 +22,14 @@
  *
  * Not merged in v1 (documented): translations, theme/global settings,
  * incoming clusters (all incoming beats land in ONE merged cluster).
+ *
+ * Mode 'versions' (2026-10-20, Birka groups): the other file is ANOTHER
+ * VERSION OF THIS STORY — copies that people edited in parallel. Beats
+ * whose id and content match the open project's are the shared part and
+ * are left out; beats only the other version has come in; a beat with the
+ * same id but different content comes in as a marked copy (new id; the
+ * incoming links follow it) for the author to decide. Characters and
+ * assets with the same id are the same ones and are not added twice.
  */
 
 import JSZip from 'jszip';
@@ -156,6 +164,20 @@ export interface MergeInput {
    *  default to 'keep-both' (never silently fuse two characters). */
   decisions: CharacterDecision[];
   targetProjectId: string;
+  /** 'separate' (default): a different story, added alongside.
+   *  'versions': another version of this story — see the header. */
+  mode?: 'separate' | 'versions';
+  /** 'versions': the incoming beats in the same stored form as
+   *  existingBeats (by id), for the content comparison. */
+  comparableIncoming?: Map<string, any>;
+}
+
+/** A beat both versions have, with different content. */
+export interface VersionConflict {
+  id: string;
+  name: string;
+  /** The id the other version's beat came in under. */
+  copyId: string;
 }
 
 export interface MergeResult {
@@ -176,7 +198,45 @@ export interface MergeResult {
     assets: number;
     variablesAdded: number;
     clusterName: string;
+    /** 'versions' mode: beats both versions have unchanged (left out). */
+    identical?: number;
+    /** 'versions' mode: beats both have, changed differently. */
+    conflicts?: VersionConflict[];
   };
+}
+
+/** Keys that don't make two versions of a beat different. */
+const LAYOUT_KEYS = new Set(['x', 'y', 'cluster', 'node', '_version']);
+
+/** A comparable form of a beat: no layout fields, no empty values, sorted keys. */
+function canonicalBeat(value: any, top = true): any {
+  if (Array.isArray(value)) {
+    const items = value.map((v) => canonicalBeat(v, false)).filter((v) => v !== undefined);
+    return items.length ? items : undefined;
+  }
+  if (value && typeof value === 'object') {
+    const out: any = {};
+    for (const key of Object.keys(value).sort()) {
+      if (top && LAYOUT_KEYS.has(key)) continue;
+      const v = canonicalBeat(value[key], false);
+      if (v !== undefined) out[key] = v;
+    }
+    return Object.keys(out).length ? out : undefined;
+  }
+  if (value === null || value === undefined || value === '') return undefined;
+  return value;
+}
+
+/** Same beat in both versions (layout aside)? */
+export function sameBeatContent(a: any, b: any): boolean {
+  return JSON.stringify(canonicalBeat(a)) === JSON.stringify(canonicalBeat(b));
+}
+
+/** Share of the incoming beats whose id the open project also has — high means "another version of this story". */
+export function sharedBeatShare(incomingBeats: any[], existingBeatIds: Iterable<string>): number {
+  if (!incomingBeats.length) return 0;
+  const ids = new Set(existingBeatIds);
+  return incomingBeats.filter((b) => ids.has(String(b?.id))).length / incomingBeats.length;
 }
 
 /** Suffix helper: "Elena" → "Elena 2" (first free numeric suffix). */
@@ -247,6 +307,7 @@ function rewriteNameFields(obj: any, nameMap: Map<string, string>): any {
 
 export function computeMerge(input: MergeInput): MergeResult {
   const { source, decisions, targetProjectId } = input;
+  const versions = input.mode === 'versions';
   const tag = 'm' + Date.now().toString(36);
 
   const decisionByIncoming = new Map(decisions.map(d => [d.incomingId, d.action]));
@@ -267,6 +328,8 @@ export function computeMerge(input: MergeInput): MergeResult {
   // Assets: keep id unless it collides
   const assets: StoredAsset[] = [];
   for (const parsed of source.parsedAssets) {
+    // Another version of this story: an asset with an id we have is ours.
+    if (versions && parsed.id && takenAssetIds.has(parsed.id)) continue;
     const originalId = parsed.id || `asset_${Date.now()}_${assets.length}`;
     const newId = uniqueId(originalId, takenAssetIds, tag);
     takenAssetIds.add(newId);
@@ -279,6 +342,11 @@ export function computeMerge(input: MergeInput): MergeResult {
   let charactersReused = 0;
   for (const inc of source.incomingCharacters) {
     const incId = String(inc.id);
+    // Another version of this story: a character with an id we have is ours.
+    if (versions && takenCharIds.has(incId)) {
+      charactersReused++;
+      continue;
+    }
     const collision = collisionByIncoming.get(incId);
     if (collision) {
       const action = decisionByIncoming.get(incId) ?? 'keep-both';
@@ -327,11 +395,22 @@ export function computeMerge(input: MergeInput): MergeResult {
     characters.push(newId === incId ? inc : { ...inc, id: newId });
   }
 
-  // Beats: keep id unless it collides
+  // Beats: keep id unless it collides. Versions: a beat we have unchanged
+  // is shared and stays out; one we have changed differently comes in as
+  // a copy under a new id.
+  const existingById = new Map((input.existingBeats || []).map((b) => [String(b.id), b]));
+  const identicalIds = new Set<string>();
+  const conflicts: VersionConflict[] = [];
   const beatIdFinal = new Map<string, string>();
   for (const beat of source.incomingBeats) {
     const incId = String(beat.id);
+    if (versions && existingById.has(incId)
+        && sameBeatContent(existingById.get(incId), input.comparableIncoming?.get(incId) ?? beat)) {
+      identicalIds.add(incId);
+      continue;
+    }
     const newId = uniqueId(incId, takenBeatIds, tag);
+    if (versions && newId !== incId) conflicts.push({ id: incId, name: String(beat.name || incId), copyId: newId });
     takenBeatIds.add(newId);
     beatIdFinal.set(incId, newId);
     if (newId !== incId) valueMap.set(incId, newId);
@@ -357,7 +436,7 @@ export function computeMerge(input: MergeInput): MergeResult {
 
   // ---- cluster --------------------------------------------------------------
   const clusterId = `cluster_${tag}`;
-  const clusterName = `Merged: ${source.storyTitle}`;
+  const clusterName = versions ? `Other version: ${source.storyTitle}` : `Merged: ${source.storyTitle}`;
   const cluster = {
     id: clusterId,
     name: clusterName,
@@ -370,7 +449,8 @@ export function computeMerge(input: MergeInput): MergeResult {
   };
 
   // ---- rewrite + assemble beats ---------------------------------------------
-  const beats = source.incomingBeats.map(beat => {
+  const conflictIds = new Set(conflicts.map((c) => c.id));
+  const beats = source.incomingBeats.filter(beat => !identicalIds.has(String(beat.id))).map(beat => {
     // Deep rewrite ids first (connections, choice targets, nested dialog
     // trees, condition targets, asset refs, characterRef ids — everything,
     // because it's value-equality based).
@@ -382,6 +462,8 @@ export function computeMerge(input: MergeInput): MergeResult {
     return {
       ...rewritten,
       id: beatIdFinal.get(String(beat.id)),
+      // A beat both versions changed: mark the other version's copy.
+      ...(conflictIds.has(String(beat.id)) ? { name: `${rewritten.name || beat.id} (other version)` } : {}),
       x: (typeof beat.x === 'number' ? beat.x : 0) + offsetX,
       y: (typeof beat.y === 'number' ? beat.y : 0) + offsetY,
       // v1: all incoming beats land in the single merged cluster
@@ -414,6 +496,7 @@ export function computeMerge(input: MergeInput): MergeResult {
       assets: assets.length,
       variablesAdded: variables.length,
       clusterName,
+      ...(versions ? { identical: identicalIds.size, conflicts } : {}),
     },
   };
 }

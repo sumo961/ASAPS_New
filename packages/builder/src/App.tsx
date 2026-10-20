@@ -59,7 +59,8 @@ import { notifyIfCorrupted } from './utils/projectRepair';
 import { downloadProjectAsZip, importProjectFromZip, getProjectDataForExport } from './utils/projectZipManager';
 import { SaveUnsavedWorkDialog } from './components/SaveUnsavedWorkDialog';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
-import { isProjectNew } from './utils/newProjectRegistry';
+import { isProjectNew, sanitizeFolderName } from './utils/newProjectRegistry';
+import { detectVCS } from './vcs/VCSDetector';
 import { SaveProjectDialog } from './components/SaveProjectDialog';
 import { InputModal } from './components/InputModal';
 import { getStorageAdapter } from './storage/HybridStorageAdapter';
@@ -293,6 +294,54 @@ async function loadAssetsFromDirectory(dirPath: string): Promise<Asset[]> {
     console.error('[App] Failed to load directory assets:', err);
     return [];
   }
+}
+
+/** A beat as the project stores it (getSerializedStoryData, story merge). */
+function serializeBeatForStory(beat: Beat): any {
+  if (beat.type === 'panorama') {
+    const params = beat.getParameters?.() || {};
+    console.log(`[getSerializedStoryData] Panorama beat "${beat.id}" hotspots:`, params.hotspots?.length ?? 0, params.hotspots);
+  }
+  return {
+    id: beat.id,
+    name: beat.name,
+    type: beat.type,
+    x: beat.x,
+    y: beat.y,
+    cluster: beat.cluster,
+    node: beat.node,
+    transition: beat.transition,
+    sound: beat.sound,
+    defaultTarget: beat.defaultTarget,
+    defaultTargetDelay: beat.defaultTargetDelay,
+    showTimer: beat.showTimer,
+    notes: beat.notes,
+    speaker: beat.speaker,
+    showSpeaker: beat.showSpeaker,
+    timeDisplayMode: beat.timeDisplayMode,
+    timeDisplayText: beat.timeDisplayText,
+    overrideCountdownMeter: beat.overrideCountdownMeter,
+    explainHuds: (beat as any).explainHuds,
+    parameters: beat.getParameters?.() || {},
+    connections: beat.connections?.map(conn => ({
+      targetId: conn.targetId,
+      label: conn.label,
+      condition: conn.condition,
+      // Link effects (e.g. on an infoText's Continue) — dropped here, the
+      // Preview Window and exports never applied them.
+      ...(conn.effects?.length ? { effects: conn.effects } : {}),
+    })) || [],
+    locations: beat.locations ? Array.from(beat.locations.values()) : [],
+    animations: beat.animations || [],
+    // State requirements — preserved so the Preview Window and pop-out Debug
+    // window honour them (runtime gate + analyzer reachability).
+    ...((beat as any).requires && (beat as any).requires.length > 0
+      ? { requires: (beat as any).requires }
+      : {}),
+    ...((beat as any).requiresMode && (beat as any).requiresMode !== 'all'
+      ? { requiresMode: (beat as any).requiresMode }
+      : {}),
+  };
 }
 
 function App() {
@@ -589,6 +638,8 @@ function App() {
   /** Latest zip-import handler for effects that mount before it exists
    *  (the Electron menu listeners' unzipped-export fallback). */
   const handleImportZipFileRef = useRef<((file: File, options?: { newName?: string }) => Promise<void>) | null>(null);
+  // Desktop: open an .asaps by path (set up with the Electron menu listeners).
+  const openProjectPathRef = useRef<((path: string) => void) | null>(null);
 
   // Cluster naming modal state (replaces prompt() for Electron compatibility)
   const [showClusterNameModal, setShowClusterNameModal] = useState(false);
@@ -1042,6 +1093,26 @@ function App() {
 
     console.log('[Electron] Setting up menu event listeners');
 
+    // Write a just-imported project as a project folder in `dir` (named
+    // after the project, numbered if taken) and open that folder. Written
+    // from the stored import, not the editor state, which may still hold
+    // the previous project.
+    const makeProjectFolderFrom = async (projectId: string, dir: string) => {
+      const got = await storage.getProject(projectId);
+      if (!got.success || !got.data) throw new Error('The imported project could not be read back.');
+      const assetsResult = await storage.getProjectAssets(projectId);
+      const api = window.electronAPI!;
+      const base = sanitizeFolderName(got.data.name || 'ASAPS project');
+      let target = `${dir}/${base}`;
+      for (let i = 2; await api.fs.exists(target); i++) target = `${dir}/${base} ${i}`;
+      const adapter = new DirectoryAdapter();
+      adapter.setProjectPath(target);
+      await adapter.saveProject(got.data, assetsResult.success ? assetsResult.data : undefined);
+      await openFolderPath(target);
+      notify.success(`Made the project folder "${target.split('/').pop()}" next to the file. Commit it with the Git panel; from now on, open the folder instead of the .asaps file.`);
+    };
+    openProjectPathRef.current = (path: string) => { void handleProjectOpenPath(path); };
+
     // Handle opening a project from File menu / double-clicked file
     const handleProjectOpenPath = async (filePath: string) => {
       console.log('[Electron] Opening project:', filePath);
@@ -1052,6 +1123,25 @@ function App() {
         // filename must survive so the .asapst template detection sees it.
         const fileName = filePath.split(/[\\/]/).pop() || 'project.zip';
         const file = new File([blob], fileName, { type: 'application/zip' });
+
+        // An .asaps inside a Git repository: ASAPS works on a copy, and Git
+        // cannot merge two people's versions of one zip — whoever pushes
+        // last replaces the rest (Birka groups, 2026-10-20). Offer the
+        // project folder instead: one file per beat, which Git merges.
+        let makeFolderIn: string | null = null;
+        if (/\.asaps(\.zip)?$/i.test(fileName)) {
+          const fileDir = filePath.replace(/[\\/][^\\/]*$/, '');
+          const vcsInfo = await detectVCS(fileDir).catch(() => ({ type: 'none' as const }));
+          if (vcsInfo.type === 'git') {
+            const wantsFolder = await confirmAction({
+              title: 'This file is in a Git repository',
+              message: 'ASAPS opens a copy of an .asaps file, so your changes never go back into it — and Git cannot merge two people\'s versions of one .asaps file: whoever pushes last replaces everyone else\'s work.\n\nTo work on it together, make a project folder next to the file. Each beat becomes its own file, so Git merges what everyone did. Commit the folder with the Git panel, and from then on open the folder (File → Open Project Folder) instead of the .asaps file.',
+              confirmLabel: 'Make a project folder',
+              cancelLabel: 'Just open a copy',
+            });
+            if (wantsFolder) makeFolderIn = fileDir;
+          }
+        }
 
         // Helper function to handle import with conflict resolution
         const doImport = async (options: { overwrite?: boolean; generateNewId?: boolean; newName?: string } = {}): Promise<void> => {
@@ -1080,6 +1170,10 @@ function App() {
           }
 
           if (result.success && result.projectId) {
+            if (makeFolderIn) {
+              await makeProjectFolderFrom(result.projectId, makeFolderIn);
+              return;
+            }
             await loadProject(result.projectId);
             console.log('[Electron] Project loaded successfully');
           } else if (result.error) {
@@ -1174,7 +1268,7 @@ function App() {
     });
 
     // Handle Open Project Folder from File menu (directory format)
-    const unsubscribeOpenFolder = window.electronAPI.onProjectOpenFolder?.(async (folderPath: string) => {
+    const openFolderPath = async (folderPath: string) => {
       console.log('[Electron] Opening project folder:', folderPath);
       try {
         // Pause auto-save so stale in-memory state isn't written to disk
@@ -1233,7 +1327,8 @@ function App() {
         resumeAutoSave();
         notify.error('Could not open the project folder.', { detail: errorMessage(error) });
       }
-    });
+    };
+    const unsubscribeOpenFolder = window.electronAPI.onProjectOpenFolder?.(openFolderPath);
 
     // Handle Save As Folder from File menu (directory format)
     const unsubscribeSaveAsFolder = window.electronAPI.onProjectSaveAsFolder?.(async (folderPath: string) => {
@@ -4528,10 +4623,19 @@ function App() {
   const handleMergeStory = useCallback(async (
     analysis: MergeSourceAnalysis,
     decisions: CharacterDecision[],
+    mode: 'separate' | 'versions' = 'separate',
   ): Promise<string> => {
     const result = computeMerge({
       source: analysis,
-      existingBeats: state.beats.map(b => ({ id: b.id, x: (b as any).x ?? 0, y: (b as any).y ?? 0 })),
+      mode,
+      // Versions compare content: both sides through the same load-and-save
+      // steps, so defaults and field order can't make equal beats differ.
+      existingBeats: mode === 'versions'
+        ? state.beats.map(serializeBeatForStory)
+        : state.beats.map(b => ({ id: b.id, x: (b as any).x ?? 0, y: (b as any).y ?? 0 })),
+      comparableIncoming: mode === 'versions'
+        ? new Map(deserializeBeats(analysis.incomingBeats).map((b: Beat) => [b.id, serializeBeatForStory(b)]))
+        : undefined,
       existingCharacters: characters,
       existingClusters: state.clusters || [],
       existingVariables: (globalSettings as any)?.variables || [],
@@ -4586,6 +4690,17 @@ function App() {
     markChanged();
 
     const { summary } = result;
+    if (mode === 'versions') {
+      const conflicts = summary.conflicts || [];
+      const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+      return `Combined the other version of "${analysis.storyTitle}": ${n(summary.identical ?? 0, 'beat was', 'beats were')} the same in both, ` +
+        `${n(summary.beats - conflicts.length, 'new beat', 'new beats')} came in` +
+        (conflicts.length
+          ? `, and ${n(conflicts.length, 'beat was', 'beats were')} changed in both — the other version's copies are marked "(other version)": ` +
+            conflicts.map(c => `"${c.name}"`).join(', ') + '. Compare each with your own, keep one, and reconnect the links'
+          : '') +
+        `. They are in the cluster "${summary.clusterName}". Save to keep.`;
+    }
     return `Merged "${analysis.storyTitle}": ${summary.beats} beats, ` +
       `${summary.charactersAdded} new character(s)` +
       (summary.charactersReused ? ` (${summary.charactersReused} reused)` : '') +
@@ -4765,6 +4880,17 @@ function App() {
   handleImportZipFileRef.current = handleImportZipFile;
 
   const handleImportZip = useCallback(async () => {
+    // Desktop: the system dialog, so the open knows the file's path (an
+    // .asaps inside a Git repository gets the project-folder offer).
+    const api = (window as any).electronAPI;
+    if (api?.dialog?.open && openProjectPathRef.current) {
+      const res = await api.dialog.open({
+        properties: ['openFile'],
+        filters: [{ name: 'ASAPS Projects', extensions: ['asaps', 'asapst', 'zip', 'json'] }],
+      });
+      if (!res?.canceled && res?.filePaths?.[0]) openProjectPathRef.current(res.filePaths[0]);
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.zip,.asaps,.asaps.zip,.asapst,.json';
@@ -4781,51 +4907,7 @@ function App() {
   // Serialize story data for preview window
   const getSerializedStoryData = useCallback(() => {
     // Serialize beats with all their data
-    const serializedBeats = state.beats.map(beat => {
-      if (beat.type === 'panorama') {
-        const params = beat.getParameters?.() || {};
-        console.log(`[getSerializedStoryData] Panorama beat "${beat.id}" hotspots:`, params.hotspots?.length ?? 0, params.hotspots);
-      }
-      return {
-      id: beat.id,
-      name: beat.name,
-      type: beat.type,
-      x: beat.x,
-      y: beat.y,
-      cluster: beat.cluster,
-      node: beat.node,
-      transition: beat.transition,
-      sound: beat.sound,
-      defaultTarget: beat.defaultTarget,
-      defaultTargetDelay: beat.defaultTargetDelay,
-      showTimer: beat.showTimer,
-      notes: beat.notes,
-      speaker: beat.speaker,
-      showSpeaker: beat.showSpeaker,
-      timeDisplayMode: beat.timeDisplayMode,
-      timeDisplayText: beat.timeDisplayText,
-      overrideCountdownMeter: beat.overrideCountdownMeter,
-      explainHuds: (beat as any).explainHuds,
-      parameters: beat.getParameters?.() || {},
-      connections: beat.connections?.map(conn => ({
-        targetId: conn.targetId,
-        label: conn.label,
-        condition: conn.condition,
-        // Link effects (e.g. on an infoText's Continue) — dropped here, the
-        // Preview Window and exports never applied them.
-        ...(conn.effects?.length ? { effects: conn.effects } : {}),
-      })) || [],
-      locations: beat.locations ? Array.from(beat.locations.values()) : [],
-      animations: beat.animations || [],
-      // State requirements — preserved so the Preview Window and pop-out Debug
-      // window honour them (runtime gate + analyzer reachability).
-      ...((beat as any).requires && (beat as any).requires.length > 0
-        ? { requires: (beat as any).requires }
-        : {}),
-      ...((beat as any).requiresMode && (beat as any).requiresMode !== 'all'
-        ? { requiresMode: (beat as any).requiresMode }
-        : {}),
-    };});
+    const serializedBeats = state.beats.map(serializeBeatForStory);
 
     const storyData = {
       title: state.title,
@@ -7041,6 +7123,7 @@ function App() {
         isOpen={showMergeDialog}
         onClose={() => setShowMergeDialog(false)}
         existingCharacters={characters}
+        existingBeatIds={state.beats.map(b => b.id)}
         onMerge={handleMergeStory}
       />
 

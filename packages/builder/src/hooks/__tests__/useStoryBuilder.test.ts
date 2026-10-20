@@ -37,17 +37,21 @@ describe('title / author', () => {
 });
 
 describe('beat CRUD', () => {
-  it('addBeat appends a beat with sequential ids and a default position', () => {
+  // Random ids, not counted ones: parallel copies of a story each made
+  // their own beat_45 and git could not tell them apart (Birka groups).
+  it('addBeat appends beats with unique random ids, numbered names and a default position', () => {
     const { result } = setup();
     let a: any, b: any;
     act(() => { a = result.current.actions.addBeat('infoText'); });
     act(() => { b = result.current.actions.addBeat('infoText'); });
-    expect(a.id).toBe('beat_0');
-    expect(b.id).toBe('beat_1');
+    expect(a.id).toMatch(/^beat_[0-9a-z]{8}$/);
+    expect(b.id).toMatch(/^beat_[0-9a-z]{8}$/);
+    expect(a.id).not.toBe(b.id);
+    expect([a.name, b.name]).toEqual(['InfoText 0', 'InfoText 1']);
     expect(a.type).toBe('infoText');
     expect(a.x).toBe(200);
     expect(a.y).toBe(200);
-    expect(result.current.state.beats.map((x: any) => x.id)).toEqual(['beat_0', 'beat_1']);
+    expect(result.current.state.beats.map((x: any) => x.id)).toEqual([a.id, b.id]);
   });
 
   it('honors a custom position and id/name', () => {
@@ -291,10 +295,10 @@ describe('settings, import, clear', () => {
     act(() => result.current.actions.clearStory());
     expect(result.current.state.beats).toEqual([]);
     expect(result.current.state.title).toBe('My Interactive Story');
-    // counter reset → next beat is beat_0 again
+    // counter reset → the next default name starts at 0 again
     let next: any;
     act(() => { next = result.current.actions.addBeat('infoText'); });
-    expect(next.id).toBe('beat_0');
+    expect(next.name).toBe('InfoText 0');
   });
 });
 

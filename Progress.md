@@ -1,5 +1,18 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.122, 2026-10-19)
+
+### Overview
+Group work through Git (Birka groups, 2026-10-20): "we all have the latest commit, but our projects look different". Three causes: the repository held one `.asaps` file (a zip Git can't merge — last push wins); ASAPS opens an `.asaps` as a copy in its own project list, so pulls never reached what the app showed; and new beats were numbered per copy (`beat_45` created by three people at once).
+- **New beats get a random id** (`beat_` + 8 letters/digits, `utils/beatIds.ts`); default names keep a running number ("InfoText 12"). Existing ids never change.
+- **An `.asaps` inside a Git repository** (menu, double-click, or the start window's *Open a file*, which on desktop now uses the system dialog so the path is known): ASAPS explains and offers **Make a project folder** — written next to the file from the imported record (not the editor state) and opened; *Just open a copy* keeps the old behaviour.
+- **Merge Story → Another version of this story** (`computeMerge` mode `versions`; preselected when at least half the beat ids are shared): beats identical in both are kept once (layout ignored; both sides go through the same deserialize → `serializeBeatForStory` steps, or every beat looked changed), beats only the other version has come in, a beat changed in both comes in as a copy "(other version)" with the other version's links following it; shared characters and assets aren't added twice. Verified on a Red Riding Hood copy: 24 same, 1 new, 1 changed in both.
+- **User Guide:** *"We all have the latest commit, but our projects look different"* (why, the project-folder fix, combining drifted versions) and *Another version of the same story* under Merge Story; the menu is **Open → Merge Story**, not Import.
+
+**Files modified:** packages/builder/src/utils/beatIds.ts (new), packages/builder/src/hooks/useStoryBuilder.ts, packages/builder/src/App.tsx, packages/builder/src/utils/projectMerge.ts, packages/builder/src/components/MergeStoryDialog.tsx, docs/USER_GUIDE.md, tests (beatIds, useStoryBuilder, projectMerge)
+
+---
+
 ## 2026-10-19: Names in colour, buttons that stay put (v0.9.122)
 
 ### Overview
