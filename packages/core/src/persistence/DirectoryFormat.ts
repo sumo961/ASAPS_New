@@ -72,6 +72,9 @@ export interface DirectoryProjectMeta {
   createdAt: string;
   modifiedAt: string;
   version: string;
+  /** ASAPS version that last saved the folder (e.g. "0.9.123"): a group
+   *  sees when someone works with an older or newer app. */
+  savedWith?: string;
 }
 
 /** Result of serializing a project to directory format */
@@ -94,6 +97,8 @@ export interface SerializeInput {
     createdAt: Date | string;
     modifiedAt: Date | string;
     version: string;
+    /** ASAPS version doing the save (written to project.json). */
+    savedWith?: string;
     settings?: any;
     globalSettings?: any;
     themeId?: string;
@@ -201,6 +206,7 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
     createdAt: toISOString(input.project.createdAt),
     modifiedAt: toISOString(input.project.modifiedAt),
     version: input.project.version,
+    ...(input.project.savedWith ? { savedWith: input.project.savedWith } : {}),
   };
   files.push({
     path: 'project.json',

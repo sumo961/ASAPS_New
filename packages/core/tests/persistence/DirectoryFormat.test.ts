@@ -66,6 +66,17 @@ describe('DirectoryFormat', () => {
       expect(filePaths).toContain('.p4ignore');
     });
 
+    // Groups on different ASAPS versions rewrote each other's files unseen;
+    // project.json now says which version saved it.
+    it('records the ASAPS version that saved the folder in project.json', () => {
+      const input = createMinimalInput();
+      (input.project as any).savedWith = '0.9.123';
+      const project = JSON.parse(serializeToDirectory(input).files.find(f => f.path === 'project.json')!.content);
+      expect(project.savedWith).toBe('0.9.123');
+      const without = JSON.parse(serializeToDirectory(createMinimalInput()).files.find(f => f.path === 'project.json')!.content);
+      expect(without).not.toHaveProperty('savedWith');
+    });
+
     it('writes correct format.json', () => {
       const input = createMinimalInput();
       const result = serializeToDirectory(input);

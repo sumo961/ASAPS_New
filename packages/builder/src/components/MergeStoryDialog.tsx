@@ -87,6 +87,13 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
     }
   }, [analysis, decisions, mode, onMerge]);
 
+  // Another version: characters with an id this story has are the same
+  // character and are kept once — nothing to decide for them.
+  const existingCharIds = new Set((existingCharacters || []).map((c: any) => String(c.id)));
+  const visibleCollisions = (analysis?.characterCollisions || []).filter(
+    c => !(mode === 'versions' && existingCharIds.has(c.incomingId)),
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -149,9 +156,9 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
                   <span>
                     <span className="font-medium">Another version of this story</span>
                     <span className="block text-gray-500">
-                      Beats both versions have unchanged are kept once. Beats only the other version
-                      has come in. A beat both changed comes in as a copy marked “(other version)”,
-                      for you to decide.
+                      Beats that are the same in both are kept once. Beats only the other version
+                      has come in. A beat that differs between the two comes in as a copy marked
+                      “(other version)”, for you to decide.
                     </span>
                   </span>
                 </label>
@@ -164,14 +171,14 @@ export const MergeStoryDialog: React.FC<MergeStoryDialogProps> = ({
                 </label>
               </div>
 
-              {analysis.characterCollisions.length > 0 && (
+              {visibleCollisions.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                     <Users className="w-4 h-4" />
                     Both stories have these characters — same person?
                   </div>
                   <div className="space-y-2">
-                    {analysis.characterCollisions.map(c => (
+                    {visibleCollisions.map(c => (
                       <div key={c.incomingId} className="border rounded p-3 text-sm">
                         <div className="font-medium mb-2">{c.incomingName}</div>
                         <label className="flex items-center gap-2 text-gray-600">

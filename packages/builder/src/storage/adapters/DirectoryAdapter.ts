@@ -29,6 +29,7 @@ import {
   type AssetManifestEntry,
 } from '@asaps/core';
 import type { PersistenceAdapter, FileChangeEvent } from './PersistenceAdapter';
+import { APP_VERSION } from '../../utils/appVersion';
 
 /** Join path segments using the separator detected from the base path */
 function joinPath(base: string, ...parts: string[]): string {
@@ -46,6 +47,16 @@ function parentDir(filePath: string): string {
 /**
  * DirectoryAdapter implements PersistenceAdapter for filesystem-based projects.
  */
+/** Opening refused: files still carry Git merge-conflict markers. */
+export class ConflictMarkersError extends Error {
+  readonly files: string[];
+  constructor(files: string[]) {
+    super(`Unresolved Git merge conflicts in ${files.length} file${files.length === 1 ? '' : 's'}: ${files.slice(0, 5).join(', ')}${files.length > 5 ? ' …' : ''}`);
+    this.name = 'ConflictMarkersError';
+    this.files = files;
+  }
+}
+
 export class DirectoryAdapter implements PersistenceAdapter {
   readonly type = 'directory' as const;
 
@@ -98,6 +109,12 @@ export class DirectoryAdapter implements PersistenceAdapter {
       throw new Error(`Not a valid ASAPS directory project: ${dirPath}`);
     }
 
+    // A merge committed with its conflict markers still in leaves files no
+    // one can read; opening (and then saving) such a folder dropped beats
+    // and re-imported the project under a new id (NarrativDesign, 2026-10-20).
+    const conflicted = await this.findConflictMarkers(dirPath);
+    if (conflicted.length > 0) throw new ConflictMarkersError(conflicted);
+
     this.projectPath = dirPath;
 
     const result = await deserializeFromDirectory(dirPath, reader);
@@ -130,6 +147,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       createdAt: new Date(result.project.createdAt),
       modifiedAt: new Date(result.project.modifiedAt),
       version: result.project.version,
+      ...(result.project.savedWith ? { savedWith: result.project.savedWith } : {}),
       translations: result.translations.length > 0 ? result.translations : undefined,
       translationManifest: result.translationManifest,
       ...(result.generationReview ? { generationReview: result.generationReview } : {}),
@@ -442,6 +460,40 @@ export class DirectoryAdapter implements PersistenceAdapter {
     await api.writeFile(projectPath, deterministicStringify(updated));
   }
 
+  /**
+   * Project files (JSON) that still contain Git conflict markers
+   * (<<<<<<< / >>>>>>>), as paths relative to the folder. Assets are skipped.
+   */
+  async findConflictMarkers(dirPath: string): Promise<string[]> {
+    const reader = this.createReader();
+    const found: string[] = [];
+    const marker = /^(<{7}|>{7})(\s|$)/m;
+    const walk = async (rel: string, depth: number): Promise<void> => {
+      if (depth > 4) return;
+      let entries: Array<{ name: string; isDirectory: boolean }>;
+      try {
+        entries = await reader.listDir(rel ? joinPath(dirPath, ...rel.split('/')) : dirPath);
+      } catch {
+        return;
+      }
+      for (const e of entries) {
+        // Dot-files (.git, .asaps, the editing-lock file) are not story data.
+        if (e.name.startsWith('.')) continue;
+        const childRel = rel ? `${rel}/${e.name}` : e.name;
+        if (e.isDirectory) {
+          if (e.name === 'assets' || e.name === '.git' || e.name === 'node_modules') continue;
+          await walk(childRel, depth + 1);
+        } else if (e.name.endsWith('.json')) {
+          try {
+            if (marker.test(await reader.readText(joinPath(dirPath, ...childRel.split('/'))))) found.push(childRel);
+          } catch { /* unreadable: deserialization reports it */ }
+        }
+      }
+    };
+    await walk('', 0);
+    return found;
+  }
+
   /** The project id stored in a folder's project.json, or null if unreadable. */
   async readFolderProjectId(dirPath: string): Promise<string | null> {
     try {
@@ -651,6 +703,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
         createdAt: project.createdAt,
         modifiedAt: project.modifiedAt,
         version: project.version,
+        savedWith: APP_VERSION,
         settings: project.settings,
         globalSettings: project.globalSettings,
         themeId: project.themeId,

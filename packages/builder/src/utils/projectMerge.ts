@@ -33,6 +33,7 @@
  */
 
 import JSZip from 'jszip';
+import { newBeatId } from './beatIds';
 import type { StoredAsset } from '../storage/types';
 import { readAssetsFromZip, type ParsedZipAsset } from './projectZipManager';
 import { grownClusterBounds } from './clusterAutosize';
@@ -409,7 +410,11 @@ export function computeMerge(input: MergeInput): MergeResult {
       identicalIds.add(incId);
       continue;
     }
-    const newId = uniqueId(incId, takenBeatIds, tag);
+    // A clash gets a fresh id (not a suffix that grows with every merge).
+    let newId = incId;
+    if (takenBeatIds.has(incId)) {
+      do { newId = newBeatId(); } while (takenBeatIds.has(newId));
+    }
     if (versions && newId !== incId) conflicts.push({ id: incId, name: String(beat.name || incId), copyId: newId });
     takenBeatIds.add(newId);
     beatIdFinal.set(incId, newId);

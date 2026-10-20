@@ -370,3 +370,29 @@ describe('DirectoryAdapter — project id of a folder', () => {
     expect(JSON.parse(fakeFs.files.get('/copy/project.json') as string)).toMatchObject({ id: 'p-3', name: 'A 2' });
   });
 });
+
+// NarrativDesign (2026-10-20): a merge committed with its conflict markers
+// still in. Such a folder must not open (and then be saved over).
+describe('DirectoryAdapter — conflict markers', () => {
+  it('finds JSON files with Git conflict markers, skipping assets and dot-files', async () => {
+    const tree: Record<string, any[]> = {
+      '/p': [
+        { name: 'project.json', isDirectory: () => false },
+        { name: '.asaps-editing.json', isDirectory: () => false },
+        { name: 'clusters', isDirectory: () => true },
+        { name: 'assets', isDirectory: () => true },
+      ],
+      '/p/clusters': [{ name: '_unclustered', isDirectory: () => true }],
+      '/p/clusters/_unclustered': [
+        { name: 'infoText_beat_41.json', isDirectory: () => false },
+        { name: 'infoText_beat_42.json', isDirectory: () => false },
+      ],
+    };
+    fakeFs.setReadDir((p: string) => tree[p] || []);
+    fakeFs.files.set('/p/project.json', '{\n<<<<<<< HEAD\n  "a": 1,\n=======\n  "a": 2,\n>>>>>>> df0cea8\n}');
+    fakeFs.files.set('/p/.asaps-editing.json', '<<<<<<< HEAD\n{}\n=======\n{}\n>>>>>>> x');
+    fakeFs.files.set('/p/clusters/_unclustered/infoText_beat_41.json', '{"text": "<<<<<<< not at line start"}');
+    fakeFs.files.set('/p/clusters/_unclustered/infoText_beat_42.json', '{\n>>>>>>> theirs\n}');
+    expect(await new DirectoryAdapter().findConflictMarkers('/p')).toEqual(['project.json', 'clusters/_unclustered/infoText_beat_42.json']);
+  });
+});

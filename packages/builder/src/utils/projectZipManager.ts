@@ -7,6 +7,8 @@
 
 import JSZip from 'jszip';
 import { v4 as uuidv4 } from 'uuid';
+import { APP_VERSION, newerVersionWarning } from './appVersion';
+import { notify } from './notify';
 import { getStorageManager } from '../storage/StorageManager';
 import { markProjectNew } from './newProjectRegistry';
 import { findUniqueProjectName } from './uniqueProjectName';
@@ -104,6 +106,7 @@ export async function exportProjectAsZip(
       exportVersion: '1.1.0',  // Bumped version for settings support
       exportedAt: new Date().toISOString(),
       exportedBy: 'ASAPS Builder',
+      appVersion: APP_VERSION,
       projectId: project.id,
       projectName: project.name
     },
@@ -224,6 +227,7 @@ export async function getProjectDataForExport(projectId: string): Promise<any> {
       exportVersion: '1.1.0',
       exportedAt: new Date().toISOString(),
       exportedBy: 'ASAPS Builder',
+      appVersion: APP_VERSION,
       projectId: project.id,
       projectName: project.name,
     },
@@ -437,6 +441,8 @@ export async function importProjectFromZip(
     if (!projectData.project || !projectData.metadata) {
       throw new Error('Invalid project.json structure');
     }
+    const versionWarning = newerVersionWarning(projectData.metadata.appVersion);
+    if (versionWarning) notify.warning(versionWarning, { sticky: true });
 
     console.log('[importProjectFromZip] Project data loaded:', {
       name: projectData.project.name,

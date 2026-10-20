@@ -13,9 +13,21 @@ import { getStorageManager, getStorageAdapter, type Project, type StorageManager
 import { CommandManager, type Command } from '../commands';
 import { useAutoSave, type SaveStatus } from '../hooks/useAutoSave';
 import type { ProjectFormat } from '../storage/adapters/PersistenceAdapter';
-import { DirectoryAdapter, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
+import { DirectoryAdapter, ConflictMarkersError, isElectronWithFS } from '../storage/adapters/DirectoryAdapter';
+
+/** Say why a folder with unresolved merge conflicts doesn't open, and what to do. */
+function notifyConflictMarkers(e: ConflictMarkersError): void {
+  notify.error(
+    `This project has unresolved Git merge conflicts in ${e.files.length} file${e.files.length === 1 ? '' : 's'}, so ASAPS won't open it — `
+    + 'opening and saving it now would lose beats. Resolve the conflicts first (the VCS panel lists them; or in GitHub Desktop / Git: keep one side of each '
+    + '<<<<<<< … >>>>>>> block and delete the marker lines), commit, then open the project again.',
+    { sticky: true, detail: e.files.join(', ') },
+  );
+}
 import { markProjectNew, consumeProjectNew, sanitizeFolderName } from '../utils/newProjectRegistry';
 import { findUniqueProjectName } from '../utils/uniqueProjectName';
+import { shortenRunawayBeatIds } from '../utils/beatIds';
+import { newerVersionWarning } from '../utils/appVersion';
 import { notify } from '../utils/notify';
 
 // ============================================================================
@@ -213,6 +225,11 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    *  within the suppression window after it are our own saves echoing back,
    *  not an external edit. */
   const lastOwnWriteRef = useRef<number>(0);
+  // Auto-save controls for the external-change watcher (declared before the
+  // auto-save hook, so it reads them through a ref).
+  const autoSaveCtlRef = useRef<{ pause: () => void; resume: () => void; status: SaveStatus } | null>(null);
+  /** Auto-save paused because the folder changed outside ASAPS while there were unsaved edits. */
+  const pausedForExternalRef = useRef(false);
   /** One external-change warning per project per session — the point is
    *  awareness, not a nag on every sync-daemon touch. */
   const externalWarnedRef = useRef<Set<string>>(new Set());
@@ -313,6 +330,32 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    * nothing ever called it. Events within the suppression window after our
    * own writes are our own saves echoing back and are ignored.
    */
+  /**
+   * Beats copied from copies carried ever-longer ids (beat_20_copy…_copy…)
+   * until Git could not push the project's files. On open, give them short
+   * ids (references rewritten), write that back at once, and say so.
+   * Updates `project` in place.
+   */
+  const repairRunawayBeatIds = useCallback(async (project: Project, adapter: DirectoryAdapter | null): Promise<void> => {
+    const { project: fixed, renamed } = shortenRunawayBeatIds(project as any);
+    if (!renamed) return;
+    project.story = (fixed as any).story;
+    if ((fixed as any).globalSettings) project.globalSettings = (fixed as any).globalSettings;
+    if ((fixed as any).settings) project.settings = (fixed as any).settings;
+    try {
+      lastOwnWriteRef.current = Date.now();
+      if (adapter) await adapter.saveProject(project);
+      else await storage.updateProject(project);
+      lastOwnWriteRef.current = Date.now();
+    } catch (e) {
+      console.warn('[PersistenceProvider] Could not write the shortened beat ids:', e);
+    }
+    notify.info(
+      `Shortened the IDs of ${renamed} copied beat${renamed === 1 ? '' : 's'}. Copying a copy made an ID longer every time, until Git could no longer push the project. Nothing else changed`
+      + (adapter ? ' — commit the renamed files with the VCS panel.' : '.'),
+    );
+  }, [storage]);
+
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
     // A passive instance (Preview Window) never watches: with two windows
     // armed, the main window's own autosave read as an "external" change
@@ -330,11 +373,29 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         window.dispatchEvent(new CustomEvent('asaps:externalProjectChange', {
           detail: { projectId, files: events.map((e) => e.path) },
         }));
+        // The next save used to write the version on screen back over the
+        // changed files — and delete beat files it didn't know, i.e. the
+        // beats a teammate just pulled in (group report, 2026-10-20).
+        // Nothing unsaved: take the new files at once. Unsaved edits: pause
+        // auto-save until the author decides (Reload, or Save to keep theirs).
+        const ctl = autoSaveCtlRef.current;
+        const unsaved = ctl?.status === 'pending' || ctl?.status === 'saving';
+        if (!unsaved) {
+          externalWarnedRef.current.delete(projectId);
+          window.dispatchEvent(new CustomEvent('asaps:reloadFromDisk'));
+          notify.info('This project\u2019s files changed outside ASAPS (a pull, sync, or another editor) \u2014 loaded the new version.', {
+            detail: `Changed: ${files}${events.length > 3 ? ` and ${events.length - 3} more` : ''}`,
+          });
+          return;
+        }
+        ctl?.pause();
+        pausedForExternalRef.current = true;
         // Non-blocking banner-style notice with the fix one click away
         // (UX-Eval B4, §3.6) — was a modal alert.
         notify.warning(
-          'This project\u2019s files changed outside ASAPS (sync, git, or another editor). '
-          + 'You are still looking at the version from before the change \u2014 saving now would overwrite it.',
+          'This project\u2019s files changed outside ASAPS (a pull, sync, or another editor) while you had unsaved changes. '
+          + 'Auto-save is paused so nothing overwrites the new files. Reload from disk to take the new version (your unsaved changes are lost), '
+          + 'or press Save to keep yours (it replaces the new files).',
           {
             detail: `Changed: ${files}${events.length > 3 ? ` and ${events.length - 3} more` : ''}`,
             sticky: true,
@@ -342,6 +403,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
               label: 'Reload from disk',
               run: () => {
                 externalWarnedRef.current.delete(projectId);
+                pausedForExternalRef.current = false;
                 window.dispatchEvent(new CustomEvent('asaps:reloadFromDisk'));
               },
             },
@@ -473,6 +535,17 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     debug,
     onAfterSave: handleAfterSave,
   });
+  autoSaveCtlRef.current = { pause, resume, status: saveStatus };
+
+  /** A manual save after an outside change keeps the author's version — and ends the pause. */
+  const saveNowResuming = useCallback(async () => {
+    await saveNow();
+    if (pausedForExternalRef.current) {
+      pausedForExternalRef.current = false;
+      if (currentProjectRef.current) externalWarnedRef.current.delete(currentProjectRef.current.id);
+      resume();
+    }
+  }, [saveNow, resume]);
 
   // Expose pause/resume for auto-save
   const pauseAutoSave = pause;
@@ -620,6 +693,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
             const freshProject = await adapter.openProject(dirPath);
             // Merge all data from disk into the loaded project
             if (freshProject.story) loadedProject.story = freshProject.story;
+            const versionWarning = newerVersionWarning(freshProject.savedWith);
+            if (versionWarning) notify.warning(versionWarning, { sticky: true });
             if (freshProject.settings) loadedProject.settings = freshProject.settings;
             if (freshProject.translations && freshProject.translations.length > 0) {
               loadedProject.translations = freshProject.translations;
@@ -628,6 +703,15 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
             console.log('[PersistenceProvider] Restored directory project from disk:', dirPath);
           } catch (e) {
             console.warn('[PersistenceProvider] Failed to re-read project from disk:', e);
+            // Conflict markers: opening the older copy and saving it would
+            // write over (and delete) the pulled files. Don't open.
+            if (e instanceof ConflictMarkersError) {
+              notifyConflictMarkers(e);
+              directoryAdapterRef.current = null;
+              unwatchRef.current?.();
+              unwatchRef.current = null;
+              return false;
+            }
           }
         } else {
           // Directory no longer exists — fall back to IndexedDB mode
@@ -653,6 +737,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         directoryAdapterRef.current = null;
       }
 
+      await repairRunawayBeatIds(loadedProject, loadedProject.storageFormat === 'directory' ? directoryAdapterRef.current : null);
+
       // CRITICAL: Set currentProject ONCE with fully-prepared data (including translations)
       // This ensures App.tsx's load effect sees translations on the first render
       currentProjectRef.current = loadedProject;
@@ -667,7 +753,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, syncCallback]);
+  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds]);
 
   /**
    * Create a new project
@@ -1129,6 +1215,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         console.warn('[PersistenceProvider] Could not check the folder for a shared project id:', e);
       }
 
+      await repairRunawayBeatIds(project, adapter);
+      const versionWarning = newerVersionWarning(project.savedWith);
+      if (versionWarning) notify.warning(versionWarning, { sticky: true });
+
       // Stamp directory metadata on the project for session persistence
       project.directoryPath = dirPath;
       project.storageFormat = 'directory';
@@ -1178,9 +1268,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       return true;
     } catch (error) {
       console.error('[PersistenceProvider] Failed to open directory project:', error);
+      if (error instanceof ConflictMarkersError) notifyConflictMarkers(error);
       return false;
     }
-  }, [storage, commandManager, cancelPending]);
+  }, [storage, commandManager, cancelPending, repairRunawayBeatIds]);
 
   /**
    * Save the current project as a directory-format project (Electron only)
@@ -1355,7 +1446,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     saveStatus,
     lastSaved,
     saveError,
-    saveNow,
+    saveNow: saveNowResuming,
     markChanged,
     pauseAutoSave,
     resumeAutoSave,

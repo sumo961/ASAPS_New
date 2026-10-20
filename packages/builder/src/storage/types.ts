@@ -363,6 +363,9 @@ export interface Project {
   /** Unique project identifier (UUID) */
   id: string;
 
+  /** ASAPS version that last saved the project folder (project.json), if known. */
+  savedWith?: string;
+
   /** User-provided project name */
   name: string;
 

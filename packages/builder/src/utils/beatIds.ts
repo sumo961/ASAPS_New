@@ -14,3 +14,53 @@ export function newBeatId(): string {
   for (const b of bytes) suffix += ALPHABET[b % ALPHABET.length];
   return `beat_${suffix}`;
 }
+
+/** An id grown by copy-of-copy (or merge) suffixes: long, or more than one `_copy`. */
+export function isRunawayBeatId(id: string): boolean {
+  return id.length > 32 || (id.match(/_copy[0-9a-z]+/g) || []).length > 1;
+}
+
+/** Exact-value rewrite of every string in plain JSON data. */
+function rewriteValues(value: any, map: Map<string, string>): any {
+  if (typeof value === 'string') return map.get(value) ?? value;
+  if (Array.isArray(value)) return value.map((v) => rewriteValues(v, map));
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const out: any = {};
+    for (const [k, v] of Object.entries(value)) out[k] = rewriteValues(v, map);
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Give beats with runaway ids a short new one, and rewrite every reference
+ * to them in the story and project settings (links, choice targets,
+ * clusters, start beat …). Ids are unique strings, so an exact-value
+ * rewrite catches every reference without knowing each field. Returns the
+ * project unchanged (same object) when nothing needed shortening.
+ */
+export function shortenRunawayBeatIds<P extends { story?: any; globalSettings?: any; settings?: any }>(
+  project: P,
+): { project: P; renamed: number } {
+  const beats: any[] = Array.isArray(project.story?.beats) ? project.story.beats : [];
+  const taken = new Set(beats.map((b) => String(b?.id)));
+  const map = new Map<string, string>();
+  for (const b of beats) {
+    const id = String(b?.id ?? '');
+    if (!id || !isRunawayBeatId(id)) continue;
+    let fresh = newBeatId();
+    while (taken.has(fresh)) fresh = newBeatId();
+    taken.add(fresh);
+    map.set(id, fresh);
+  }
+  if (map.size === 0) return { project, renamed: 0 };
+  return {
+    project: {
+      ...project,
+      story: rewriteValues(project.story, map),
+      ...(project.globalSettings ? { globalSettings: rewriteValues(project.globalSettings, map) } : {}),
+      ...(project.settings ? { settings: rewriteValues(project.settings, map) } : {}),
+    },
+    renamed: map.size,
+  };
+}

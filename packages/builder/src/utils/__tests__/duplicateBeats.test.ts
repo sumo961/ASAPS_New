@@ -108,3 +108,22 @@ describe('cloneBeatsForPaste', () => {
     expect(clones[0].cluster).toBeUndefined();
   });
 });
+
+// User report 2026-10-20: copying a copy stacked id suffixes
+// (beat_20_copy…_copy…) until the file names were too long for Git.
+describe('copies of copies', () => {
+  it('get a fresh short id every time, and keep one "(Copy)" in the name', () => {
+    let beat: any = { id: 'beat_20', name: 'Harbour', type: 'infoText', x: 0, y: 0, parameters: {}, connections: [] };
+    const ids = ['beat_20'];
+    for (let i = 0; i < 6; i++) {
+      const { clones } = cloneBeatsForDuplicate([beat], ids);
+      beat = clones[0];
+      ids.push(beat.id);
+    }
+    expect(beat.id).toMatch(/^beat_[0-9a-z]{8}$/);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(beat.name).toBe('Harbour (Copy)');
+    const { clones } = cloneBeatsForPaste([beat], ids, { x: 0, y: 0 });
+    expect(clones[0].name).toBe('Harbour (Paste)');
+  });
+});

@@ -41,6 +41,7 @@ import { ImportTwineDialog } from './components/ImportTwineDialog';
 import { MergeStoryDialog } from './components/MergeStoryDialog';
 import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
 import { deserializeBeats } from './utils/projectDeserializer';
+import { shortenRunawayBeatIds } from './utils/beatIds';
 import { cloneBeatsForDuplicate, cloneBeatsForPaste } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
 import { v4 as uuidv4 } from 'uuid';
@@ -1109,7 +1110,7 @@ function App() {
       adapter.setProjectPath(target);
       await adapter.saveProject(got.data, assetsResult.success ? assetsResult.data : undefined);
       await openFolderPath(target);
-      notify.success(`Made the project folder "${target.split('/').pop()}" next to the file. Commit it with the Git panel; from now on, open the folder instead of the .asaps file.`);
+      notify.success(`Made the project folder "${target.split('/').pop()}" next to the file. Commit it with the VCS panel; from now on, open the folder instead of the .asaps file.`);
     };
     openProjectPathRef.current = (path: string) => { void handleProjectOpenPath(path); };
 
@@ -1135,7 +1136,7 @@ function App() {
           if (vcsInfo.type === 'git') {
             const wantsFolder = await confirmAction({
               title: 'This file is in a Git repository',
-              message: 'ASAPS opens a copy of an .asaps file, so your changes never go back into it — and Git cannot merge two people\'s versions of one .asaps file: whoever pushes last replaces everyone else\'s work.\n\nTo work on it together, make a project folder next to the file. Each beat becomes its own file, so Git merges what everyone did. Commit the folder with the Git panel, and from then on open the folder (File → Open Project Folder) instead of the .asaps file.',
+              message: 'ASAPS opens a copy of an .asaps file, so your changes never go back into it — and Git cannot merge two people\'s versions of one .asaps file: whoever pushes last replaces everyone else\'s work.\n\nTo work on it together, make a project folder next to the file. Each beat becomes its own file, so Git merges what everyone did. Commit the folder with the VCS panel, and from then on open the folder (File → Open Project Folder) instead of the .asaps file.',
               confirmLabel: 'Make a project folder',
               cancelLabel: 'Just open a copy',
             });
@@ -1297,6 +1298,12 @@ function App() {
           if (vcs) {
             await vcs.initialize(folderPath);
           }
+        } else if (await window.electronAPI!.fs.exists(`${folderPath}/.asaps/format.json`)) {
+          // A project folder that failed to open (e.g. unresolved merge
+          // conflicts — PersistenceContext already said why). Never fall
+          // back to importing it as a copy: that minted a new project id.
+          resumeAutoSaveAfterLoadRef.current = false;
+          resumeAutoSave();
         } else {
           // Not directory-format — but it may be an UNZIPPED EXPORT (macOS
           // Safari auto-extracts downloaded .asaps.zip files, leaving a
@@ -4625,6 +4632,10 @@ function App() {
     decisions: CharacterDecision[],
     mode: 'separate' | 'versions' = 'separate',
   ): Promise<string> => {
+    // Runaway copy-of-copy ids in the incoming story get short ones on the
+    // way in (links among the incoming beats follow).
+    const shortened = shortenRunawayBeatIds({ story: { beats: analysis.incomingBeats } }).project.story.beats;
+    if (shortened !== analysis.incomingBeats) analysis = { ...analysis, incomingBeats: shortened };
     const result = computeMerge({
       source: analysis,
       mode,
@@ -4696,7 +4707,7 @@ function App() {
       return `Combined the other version of "${analysis.storyTitle}": ${n(summary.identical ?? 0, 'beat was', 'beats were')} the same in both, ` +
         `${n(summary.beats - conflicts.length, 'new beat', 'new beats')} came in` +
         (conflicts.length
-          ? `, and ${n(conflicts.length, 'beat was', 'beats were')} changed in both — the other version's copies are marked "(other version)": ` +
+          ? `, and ${n(conflicts.length, 'beat differs', 'beats differ')} between the two — the other version's copies are marked "(other version)": ` +
             conflicts.map(c => `"${c.name}"`).join(', ') + '. Compare each with your own, keep one, and reconnect the links'
           : '') +
         `. They are in the cluster "${summary.clusterName}". Save to keep.`;

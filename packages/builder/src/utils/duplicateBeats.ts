@@ -16,9 +16,15 @@
  * Returns plain serialized beat data; run it through deserializeBeats() to
  * get real Beat instances.
  */
-import { deepRewrite, uniqueId } from './projectMerge';
+import { deepRewrite } from './projectMerge';
+import { newBeatId } from './beatIds';
 
 const DUPLICATE_OFFSET = 40;
+
+/** A copy of a copy is still "Name (Copy)", not "Name (Copy) (Copy)". */
+function baseName(name: string): string {
+  return String(name).replace(/(\s\((Copy|Paste)\))+$/, '');
+}
 
 export interface DuplicateResult {
   /** serialized clones, ready for deserializeBeats() */
@@ -31,12 +37,15 @@ export function cloneBeatsForDuplicate(
   selected: ReadonlyArray<any>,
   allBeatIds: Iterable<string>
 ): DuplicateResult {
-  const tag = 'copy' + Date.now().toString(36);
   const taken = new Set<string>(Array.from(allBeatIds, id => String(id)));
   const idMap = new Map<string, string>();
 
   for (const beat of selected) {
-    const newId = uniqueId(String(beat.id), taken, tag);
+    // A fresh id, not the original's id plus a suffix: copying a copy
+    // stacked suffixes (beat_20_copy…_copy…) until the file names grew too
+    // long for Git to push (user report, 2026-10-20).
+    let newId = newBeatId();
+    while (taken.has(newId)) newId = newBeatId();
     taken.add(newId);
     idMap.set(String(beat.id), newId);
   }
@@ -48,7 +57,7 @@ export function cloneBeatsForDuplicate(
     return {
       ...rewritten,
       id: idMap.get(String(beat.id)),
-      name: `${data.name || beat.id} (Copy)`,
+      name: `${baseName(data.name || beat.id)} (Copy)`,
       x: (typeof data.x === 'number' ? data.x : 0) + DUPLICATE_OFFSET,
       y: (typeof data.y === 'number' ? data.y : 0) + DUPLICATE_OFFSET,
     };
@@ -77,7 +86,7 @@ export function cloneBeatsForPaste(
     const { cluster: _cluster, ...rest } = clone;
     return {
       ...rest,
-      name: `${src.name || src.id} (Paste)`,
+      name: `${baseName(src.name || src.id)} (Paste)`,
       x: position.x + ((typeof src.x === 'number' ? src.x : 0) - minX),
       y: position.y + ((typeof src.y === 'number' ? src.y : 0) - minY),
     };

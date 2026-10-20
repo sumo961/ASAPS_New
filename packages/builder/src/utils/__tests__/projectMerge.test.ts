@@ -313,7 +313,7 @@ describe('computeMerge — another version of this story', () => {
       source: makeSource({ incomingBeats: theirs, storyTitle: 'Birka' }),
     });
     expect(result.summary.identical).toBe(1);
-    expect(result.beats.map((b) => b.id)).toEqual([expect.stringMatching(/^beat_2_m/), 'beat_3']);
+    expect(result.beats.map((b) => b.id)).toEqual([expect.stringMatching(/^beat_[0-9a-z]{8}$/), 'beat_3']);
     const copy = result.beats[0];
     expect(copy.name).toBe('Harbour (other version)');
     expect(copy.connections).toEqual([{ targetId: 'beat_3' }]);
