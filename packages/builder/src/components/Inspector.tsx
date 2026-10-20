@@ -7,6 +7,7 @@ import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
 import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
+import { ImageAssetField } from './assets/ImageAssetField';
 import { SchemaFormGenerator } from './SchemaFormGenerator';
 import { BeatSuggestions } from './ai/BeatSuggestions';
 import type { BeatDefinition } from './SchemaFormGenerator';
@@ -3887,6 +3888,21 @@ export const Inspector: React.FC<InspectorProps> = ({
                               <label htmlFor="showAvatars-dialog" className="text-sm text-gray-700">
                                 Show character avatars
                               </label>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Chat frame picture
+                                <span className="text-xs text-gray-500 block font-normal">
+                                  A picture behind the chat, like a phone or messenger screen. Move and resize the Chat window in the Visual Editor so it sits inside the picture's screen.
+                                </span>
+                              </label>
+                              <ImageAssetField
+                                value={typeof localBeat.parameters?.chatFrameImage === 'string' && localBeat.parameters.chatFrameImage ? localBeat.parameters.chatFrameImage : undefined}
+                                onChange={(assetId) => handleParameterChange('chatFrameImage', assetId ?? '')}
+                                modalTitle="Chat frame picture"
+                                testId="dialog-chat-frame-image"
+                                assetSubType={null}
+                              />
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">

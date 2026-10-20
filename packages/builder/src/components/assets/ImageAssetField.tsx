@@ -18,6 +18,8 @@ interface ImageAssetFieldProps {
   title?: string;
   compact?: boolean;
   testId?: string;
+  /** Which pictures the chooser lists ('prop' by default; null = every image). */
+  assetSubType?: string | null;
 }
 
 export const ImageAssetField: React.FC<ImageAssetFieldProps> = ({
@@ -28,6 +30,7 @@ export const ImageAssetField: React.FC<ImageAssetFieldProps> = ({
   title,
   compact = false,
   testId,
+  assetSubType = 'prop',
 }) => {
   const { assets, onAssetAdd } = useProjectAssets();
   const [open, setOpen] = useState(false);
@@ -75,7 +78,7 @@ export const ImageAssetField: React.FC<ImageAssetFieldProps> = ({
           assets={assets}
           onAssetAdd={onAssetAdd ?? (async () => false)}
           assetType="image"
-          assetSubType="prop"
+          assetSubType={assetSubType ?? undefined}
           title={modalTitle}
         />
       )}

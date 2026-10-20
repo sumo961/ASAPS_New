@@ -59,6 +59,33 @@ interface ScaledStageProps {
   backgroundColor?: string;
 }
 
+/**
+ * A framed chat's window: laid out at its size on the stage and scaled with
+ * the frame, like everything else on a fixed canvas. Unscaled, a phone held
+ * upright shrank the window to a sliver and its text no longer fit.
+ */
+const ScaledChatWindow: React.FC<{ width: number; height: number; style: React.CSSProperties; children: React.ReactNode }> = ({ width, height, style, children }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const [scale, setScale] = React.useState(1);
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => { if (el.clientWidth > 0) setScale(el.clientWidth / width); };
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [width]);
+  return (
+    <div ref={ref} data-testid="chat-window" style={{ ...style, overflow: 'hidden' }}>
+      <div style={{ width, height, display: 'flex', transform: `scale(${scale})`, transformOrigin: '0 0' }}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const ScaledStage: React.FC<ScaledStageProps> = ({
   children,
   width,
@@ -3227,14 +3254,15 @@ export class ReactRenderer extends BaseRenderer {
             {frameUrl && (
               <img src={frameUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill', pointerEvents: 'none' }} />
             )}
-            <div
-              data-testid="chat-window"
+            <ScaledChatWindow
+              width={chatWindow ? chatWindow.width : stageW}
+              height={chatWindow ? chatWindow.height : stageH}
               style={chatWindow
-                ? { position: 'absolute', left: pct(chatWindow.x, stageW), top: pct(chatWindow.y, stageH), width: pct(chatWindow.width, stageW), height: pct(chatWindow.height, stageH), display: 'flex', overflow: 'hidden' }
-                : { position: 'absolute', inset: 0, display: 'flex', overflow: 'hidden' }}
+                ? { position: 'absolute', left: pct(chatWindow.x, stageW), top: pct(chatWindow.y, stageH), width: pct(chatWindow.width, stageW), height: pct(chatWindow.height, stageH) }
+                : { position: 'absolute', inset: 0 }}
             >
               {chatView}
-            </div>
+            </ScaledChatWindow>
           </div>
         ) : chatView}
       </div>
