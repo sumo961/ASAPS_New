@@ -48,7 +48,7 @@ interface ChoiceConditionsEditorProps {
   label?: string;
   /** Tooltip on the Add button. */
   addTitle?: string;
-  /** Show the "On the flowchart edge" line; off where the conditions have no edge of their own. */
+  /** Show the choice hints ("all must hold", "On the flowchart edge"); off where the caller combines the conditions itself. */
   edgeSummary?: boolean;
 }
 
@@ -127,7 +127,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium text-violet-700 flex items-center gap-1">
           <span aria-hidden>◇</span> {label}
-          {conditions.length > 1 && <span className="text-[10px] text-gray-500">(all must hold)</span>}
+          {edgeSummary && conditions.length > 1 && <span className="text-[10px] text-gray-500">(all must hold)</span>}
         </div>
         <button
           onClick={add}
@@ -155,7 +155,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
 
             {gate === 'inventory' && (
               <>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-[8rem]">
                   <SmartNameDropdown
                     value={(cond as any).item ?? ''}
                     onChange={v => update(i, { item: v ?? '' } as Partial<Condition>)}
@@ -177,7 +177,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
 
             {(gate === 'variable' || gate === 'counter') && (
               <>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-[8rem]">
                   <SmartNameDropdown
                     value={cond.variableName ?? ''}
                     onChange={v => {
