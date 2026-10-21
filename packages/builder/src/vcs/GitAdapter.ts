@@ -7,6 +7,7 @@
 
 import type { EditingLockFile } from './EditingLocks';
 import { mergeEditingLocks, parseLockFile, sameLockFile } from './editingLockMerge';
+import { onlyStampsDiffer } from '../utils/projectMetaStamps';
 import { resolveKeepBoth, fixDuplicateIdsAfterMerge, movedSummary, type KeepBothResult } from './keepBoth';
 
 export interface GitFileStatus {
@@ -461,8 +462,33 @@ export async function gitKeepBoth(projectPath: string): Promise<KeepBothResult> 
   return resolveKeepBoth(projectPath, getRunCommand(), getWriteFile(), sepOf(projectPath));
 }
 
+/**
+ * A project.json that differs from the last commit only in its stamps
+ * (modifiedAt, savedWith) is put back before pulling. Older versions
+ * rewrote the stamps on every save, and Git refused the pull: "Your local
+ * changes … would be overwritten by merge: project.json".
+ */
+async function restoreStampOnlyProjectJson(projectPath: string): Promise<void> {
+  const api = window.electronAPI;
+  if (!api?.fs) return;
+  const run = getRunCommand();
+  const status = await run('git', ['status', '--porcelain', '--', 'project.json'], projectPath);
+  if (status.exitCode !== 0 || !/^.M /m.test(status.stdout) && !/^M. /m.test(status.stdout)) return;
+  const committed = await run('git', ['show', 'HEAD:./project.json'], projectPath);
+  if (committed.exitCode !== 0) return;
+  const local = new TextDecoder().decode(await api.fs.readFile(`${projectPath}${sepOf(projectPath)}project.json`));
+  if (onlyStampsDiffer(committed.stdout, local)) {
+    await run('git', ['checkout', 'HEAD', '--', 'project.json'], projectPath);
+  }
+}
+
 async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitOperationResult> {
   const run = getRunCommand();
+  try {
+    await restoreStampOnlyProjectJson(projectPath);
+  } catch (e) {
+    console.warn('[GitAdapter] Could not check project.json before pulling:', e);
+  }
   // A rebase that stopped halfway, or a detached HEAD, make every pull fail
   // with Git's "You are not currently on a branch".
   const head = await gitHeadState(projectPath);

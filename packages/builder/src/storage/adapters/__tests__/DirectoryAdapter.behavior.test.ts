@@ -35,6 +35,7 @@ vi.mock('@asaps/core', () => ({
 }));
 
 import { DirectoryAdapter, isElectronWithFS } from '../DirectoryAdapter';
+import { serializeToDirectory } from '@asaps/core';
 
 // ---- in-memory filesystem fake -------------------------------------------
 function makeFakeFs() {
@@ -239,6 +240,37 @@ describe('saveProjectMeta', () => {
     expect(written.description).toBe('keep'); // untouched
     expect(written.other).toBe('x'); // preserved
     expect(typeof written.modifiedAt).toBe('string');
+  });
+});
+
+describe('project.json stamps (group report 2026-10-21)', () => {
+  const project = (modifiedAt: string, name = 'Story') => ({
+    id: 'p1', name, createdAt: new Date('2026-10-01'), modifiedAt: new Date(modifiedAt), version: '1.0.0',
+    settings: {}, assetIds: [],
+    story: { metadata: { firstBeatId: 'b1' }, beats: [{ id: 'b1', type: 'infoText', name: 'B', parameters: {}, connections: [] }], clusters: [], containerBeatPositions: [] },
+  }) as any;
+
+  it('saveProject leaves project.json alone when only its stamps would change', async () => {
+    const a = adapterAt('/proj');
+    const meta = (over: any) => ({ files: [{ path: 'project.json', content: JSON.stringify({ _format: '1.0', id: 'p1', name: 'Story', modifiedAt: '2026-10-20T10:00:00Z', savedWith: '0.9.125', ...over }) }], assetFiles: [] });
+    const serialize = vi.mocked(serializeToDirectory);
+    serialize.mockReturnValueOnce(meta({}) as any);
+    await a.saveProject(project('2026-10-20T10:00:00Z'));
+    const first = fakeFs.files.get('/proj/project.json');
+    serialize.mockReturnValueOnce(meta({ modifiedAt: '2026-10-21T10:00:00Z', savedWith: '0.9.127' }) as any);
+    await a.saveProject(project('2026-10-21T10:00:00Z'));
+    expect(fakeFs.files.get('/proj/project.json')).toBe(first);
+    serialize.mockReturnValueOnce(meta({ name: 'Renamed', modifiedAt: '2026-10-21T11:00:00Z' }) as any);
+    await a.saveProject(project('2026-10-21T11:00:00Z', 'Renamed'));
+    expect(JSON.parse(fakeFs.files.get('/proj/project.json') as string).name).toBe('Renamed');
+  });
+
+  it('saveProjectMeta writes nothing when nothing but the stamp would change', async () => {
+    const a = adapterAt('/proj');
+    const before = JSON.stringify({ _format: '1.0', name: 'Same', modifiedAt: '2026-10-20T10:00:00.000Z' });
+    fakeFs.files.set('/proj/project.json', before);
+    await a.saveProjectMeta({ name: 'Same' });
+    expect(fakeFs.files.get('/proj/project.json')).toBe(before);
   });
 });
 

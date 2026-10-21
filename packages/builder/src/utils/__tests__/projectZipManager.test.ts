@@ -771,6 +771,34 @@ describe('projectZipManager', () => {
       expect(projectCall.story.beats[0].node).not.toBe('old_asset_id');
     });
 
+    it('remaps a cluster ambient sound stored in sound.file', async () => {
+      const zip = new JSZip();
+      zip.file('project.json', JSON.stringify({
+        metadata: { exportVersion: '1.0.0', projectId: 'test-id', projectName: 'Test' },
+        project: {
+          id: 'test-id', name: 'Test', settings: {},
+          story: {
+            beats: [{ id: 'beat_1', type: 'infoText', cluster: 'c1', parameters: { text: 'Hi' } }],
+            clusters: [{ id: 'c1', name: 'cafeteria', sound: { file: 'old_rain', loop: true, volume: 0.5 } }],
+          },
+        },
+      }));
+      zip.file('sounds/rain.mp3', new Blob(['data']));
+      zip.file('sounds/old_rain.json', JSON.stringify({ id: 'old_rain', filename: 'rain.mp3', type: 'audio' }));
+      const zipFile = new File([await zip.generateAsync({ type: 'blob' })], 'test.zip');
+
+      mockStorage.projectExists.mockResolvedValue(false);
+      mockStorage.createProject.mockResolvedValue({ success: true });
+      mockStorage.createAsset.mockResolvedValue({ success: true });
+
+      const result = await importProjectFromZip(zipFile, { generateNewId: true });
+      expect(result.success).toBe(true);
+      const story = mockStorage.createProject.mock.calls[0][0].story;
+      const sound = (story.clusters ?? story.metadata?.clusters)[0].sound;
+      expect(sound.file).not.toBe('old_rain');
+      expect(mockStorage.createAsset.mock.calls.map((c: any[]) => c[0].id ?? c[0]?.metadata?.id)).toContain(sound.file);
+    });
+
     it('remaps a Dialog Tree chat frame picture with its asset', async () => {
       const zip = new JSZip();
       zip.file('project.json', JSON.stringify({

@@ -246,13 +246,16 @@ export abstract class BaseRenderer implements IRenderer {
     try {
       const audioManager = getAudioManager();
 
-      // Try to resolve sound via assetId first
+      // The asset: `assetId`, or — as the cluster's sound button stores it —
+      // an asset id in `file`. Only assetId was resolved, so ambient sounds
+      // picked in the editor never played (user report, 2026-10-21).
+      const assetId = sound?.assetId || (sound?.file && !/[/:]/.test(sound.file) ? sound.file : undefined);
       let soundSource: string | Blob | null = null;
-      if (sound?.assetId && this.soundBlobResolver) {
-        soundSource = await this.soundBlobResolver(sound.assetId);
+      if (assetId && this.soundBlobResolver) {
+        soundSource = await this.soundBlobResolver(assetId);
       }
-      // Fallback to file URL if no blob resolved
-      if (!soundSource && sound?.file && sound.file.startsWith('http')) {
+      // Fallback to a URL in file if no blob resolved
+      if (!soundSource && sound?.file && /^(https?:|blob:|data:)/.test(sound.file)) {
         soundSource = sound.file;
       }
 

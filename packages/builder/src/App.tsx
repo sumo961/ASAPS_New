@@ -4925,6 +4925,9 @@ function App() {
       author: state.author,
       firstBeatId: getStoryForPreview().getFirstBeatId(),
       beats: serializedBeats,
+      // Clusters carry their ambient sounds; without them Preview never
+      // played one (user report, 2026-10-21).
+      clusters: state.clusters,
     };
 
     // Apply translations if a language is active
@@ -4941,7 +4944,7 @@ function App() {
     }
 
     return storyData;
-  }, [state.beats, state.title, state.author, state.story, translationState.activeLanguage, translationState.translations]);
+  }, [state.beats, state.clusters, state.title, state.author, state.story, translationState.activeLanguage, translationState.translations]);
 
   // Toggle preview window (separate window mode)
   const handleTogglePreviewWindow = useCallback(() => {

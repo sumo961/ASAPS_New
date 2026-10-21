@@ -7,6 +7,7 @@
  * Electron-only: requires window.electronAPI.fs
  */
 
+import { onlyStampsDiffer } from '../../utils/projectMetaStamps';
 import type { Project, GlobalSettings, StoredAsset } from '../types';
 import type { Beat, Cluster } from '@asaps/core';
 import {
@@ -241,6 +242,17 @@ export class DirectoryAdapter implements PersistenceAdapter {
         }
       }
 
+      // project.json: leave it alone when only its stamps (modifiedAt,
+      // savedWith) would change — otherwise opening a project made it
+      // "modified" and Git refused teammates' pulls.
+      if (file.path === 'project.json' && await api.fs.exists(fullPath)) {
+        try {
+          if (onlyStampsDiffer(await reader.readText(fullPath), file.content)) continue;
+        } catch {
+          // unreadable — write it fresh below
+        }
+      }
+
       // Ensure parent directory exists
       await api.fs.mkdir(parentDir(fullPath));
       await api.fs.writeFile(fullPath, file.content);
@@ -465,7 +477,9 @@ export class DirectoryAdapter implements PersistenceAdapter {
       modifiedAt: new Date().toISOString(),
     };
 
-    await api.writeFile(projectPath, deterministicStringify(updated));
+    const text = deterministicStringify(updated);
+    if (Object.keys(existing).length > 0 && onlyStampsDiffer(deterministicStringify(existing), text)) return;
+    await api.writeFile(projectPath, text);
   }
 
   /**

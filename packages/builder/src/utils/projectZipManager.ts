@@ -1140,11 +1140,13 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
     }
   }
 
-  // Update cluster sound references
-  if (updated.metadata?.clusters && Array.isArray(updated.metadata.clusters)) {
-    for (const cluster of updated.metadata.clusters) {
-      if (cluster.sound?.assetId && assetIdMap.has(cluster.sound.assetId)) {
-        cluster.sound.assetId = assetIdMap.get(cluster.sound.assetId);
+  // Update cluster sound references — clusters live in story.clusters (and
+  // older stories' metadata.clusters); the editor stores the id in sound.file.
+  for (const list of [updated.clusters, updated.metadata?.clusters]) {
+    for (const cluster of Array.isArray(list) ? list : []) {
+      for (const key of ['assetId', 'file'] as const) {
+        const id = cluster?.sound?.[key];
+        if (typeof id === 'string' && assetIdMap.has(id)) cluster.sound[key] = assetIdMap.get(id);
       }
     }
   }
@@ -1277,10 +1279,11 @@ function extractAssetIdsFromStory(story: any): string[] {
     }
   }
 
-  // Scan clusters
-  if (story.metadata?.clusters && Array.isArray(story.metadata.clusters)) {
-    for (const cluster of story.metadata.clusters) {
-      if (cluster.sound?.assetId) addIfUuid(cluster.sound.assetId);
+  // Scan clusters (story.clusters, and older stories' metadata.clusters)
+  for (const list of [story.clusters, story.metadata?.clusters]) {
+    for (const cluster of Array.isArray(list) ? list : []) {
+      addIfUuid(cluster?.sound?.assetId);
+      addIfUuid(cluster?.sound?.file);
     }
   }
 

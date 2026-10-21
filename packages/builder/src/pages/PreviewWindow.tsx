@@ -932,6 +932,13 @@ export const PreviewWindow: React.FC = () => {
         newStory.setSettings(previewData.settings);
       }
 
+      // Clusters, for their ambient sounds: a beat looks up its cluster's
+      // sound on the story, and Preview never set them, so ambient sounds
+      // stayed silent here (user report, 2026-10-21).
+      if (Array.isArray((storyData as any).clusters)) {
+        newStory.setClusters((storyData as any).clusters);
+      }
+
       // Reconstruct beats from serialized data
       for (const beatData of storyData.beats) {
         if (beatData.type === 'panorama') {
