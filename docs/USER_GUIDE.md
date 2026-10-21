@@ -3378,8 +3378,26 @@ As stories grow, organization becomes crucial.
 
 - Expand/collapse in the Beat List
 - Show as containers in Flowchart view
-- Can have cluster-level background music
+- Can have an [ambient sound](#cluster-ambient-sound) that plays while the player is inside
 - Beats inherit cluster settings unless overridden
+
+<a id="cluster-ambient-sound"></a>
+### Ambient Sound for a Cluster
+
+Give a place its own soundscape — rain on the harbour, the hum of the lab, birdsong in the forest — and let it follow the player from beat to beat.
+
+1. In the **Flowchart**, find the cluster and click its speaker button (🔊) in the cluster's title bar. The popover says **Ambient Sound — Plays while in this cluster**.
+2. Under **Select a sound:**, click one of your project's audio files. (No list? Add audio in the [Asset Manager](#assets) first.) The speaker button turns purple, so you can spot clusters with a sound at a glance.
+3. Open the popover again to set the **Volume** (shown as a percentage, 10–100 %; new sounds start at 50 %) or to take the sound off with **Remove Sound**. To use a different sound, remove the old one and pick again.
+
+What the player hears:
+
+- The sound **starts when the player enters any beat in the cluster** and **loops** for as long as they stay.
+- Moving between beats of the **same cluster** doesn't restart it — the soundscape carries on seamlessly.
+- Entering **another cluster with its own sound** fades the old one out and the new one in.
+- Entering a **cluster without a sound**, or a beat **outside any cluster**, fades the ambient sound out.
+
+It plays in the Preview Window and in exported stories. Ambient sounds run on the music channel, so a [Set Music Volume](#set-music-volume) effect fades them too — handy for hushing the forest just before something steps out of it.
 
 ## Condition Beats
 
@@ -4002,6 +4020,10 @@ Open the **Pending Changes** tab. If your changes are there but unstaged, click 
 ### "Push rejected — the remote has commits I don't"
 
 This means a collaborator pushed something while you were working. Switch to the **Incoming** tab, click **Pull** (or **Pull (Rebase)** if you prefer cleaner history), resolve any merge conflicts that pop up (a plain **Pull** offers **Keep both**, so nobody's work is lost), and then come back and **Push** again.
+
+### "Pull refused: project.json would be overwritten by merge"
+
+Older ASAPS versions rewrote `project.json` every time you opened or saved a project, just to update its timestamps — so Git saw a change on your computer and refused to pull over it. ASAPS no longer marks `project.json` as changed for that alone, and if an older version left such a timestamp-only change behind, the next **Pull** puts the file back automatically before pulling. Real changes to the project file (a new title, settings, clusters) are still yours to commit.
 
 ### "I can't switch to another branch"
 

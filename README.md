@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.126** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.126 makes updates finish**:
+Current release: **v0.9.127** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.127 lets pulls through and
+clusters sound**: opening or saving a project no longer marks `project.json`
+as changed, so Git stops refusing teammates' pulls with "would be overwritten
+by merge" (copies an older version marked are put back automatically), and a
+cluster's ambient sound now actually plays — in Preview and in exported
+stories — while the player is in that cluster.
+
+**v0.9.126 made updates finish**:
 **Restart Now** no longer hangs until you force-quit (on macOS an open
 project folder kept the app from closing, and unsaved work could hold the
 quit — ASAPS now saves first and asks only when something can't be saved);

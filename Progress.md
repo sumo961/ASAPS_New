@@ -1,5 +1,15 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Pulls that go through, clusters that sound (v0.9.127)
+
+### Overview
+- **project.json no longer blocks teammates' pulls** (group report: "it tells us that we will overwrite some other files we haven't changed … the first time we had to create a whole new GitHub repository"). Every save rewrote project.json's `modifiedAt` (and `savedWith`), so it showed as changed right after opening a project, and Git refused the next pull ("Your local changes to the following files would be overwritten by merge: project.json"). Now saving leaves project.json alone when only those stamps would change (`onlyStampsDiffer`, `utils/projectMetaStamps.ts`; full save and `saveProjectMeta`), and before a pull a project.json whose only local change is its stamps is put back, so copies made dirty by older versions pull cleanly too. A real local change to project.json still stops the pull as before. Tests: real-git pull (`gitPullProjectStamps.realgit.test.ts`), adapter save, helper.
+- **Cluster ambient sounds play** (user report: "ambient sounds for clusters do not seem to be playing"; the bullying-IDN group's commit said the same). Three breaks, all fixed: the story data sent to Preview had no clusters (`getSerializedStoryData`), and Preview never set them on its story; the cluster's sound button stores the asset id in `sound.file`, but playback resolved only `sound.assetId` — so the exported player was silent too (`BaseRenderer.playClusterSound` now resolves either); and importing a project as a copy didn't rewrite cluster sound ids (it looked only at `metadata.clusters` / `assetId`). Verified with the group's project and its real `schoolyard_2.mp3`: entering the schoolyard cluster starts the sound in Preview and in an HTML export.
+
+**Files modified:** packages/builder/src/App.tsx, packages/builder/src/pages/PreviewWindow.tsx, packages/renderer/src/renderers/BaseRenderer.ts, packages/builder/src/utils/projectZipManager.ts, packages/builder/src/utils/projectMetaStamps.ts (new), packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/builder/src/vcs/GitAdapter.ts, tests (gitPullProjectStamps.realgit, DirectoryAdapter.behavior, projectMetaStamps, clusterSound, projectZipManager)
+
+---
+
 ## 2026-10-20: Updates that finish, IDs that agree (v0.9.126)
 
 ### Overview
