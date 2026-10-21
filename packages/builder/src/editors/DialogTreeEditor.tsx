@@ -548,6 +548,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     }
   };
 
+  /** Branching levels that indent; deeper ones keep the indent and say their level. */
+  const MAX_INDENT = 4;
+
   // Render dialog node recursively with unlimited depth
   const renderDialogNode = (
     node: DialogNode,
@@ -560,6 +563,13 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     /** The next line of a scene (reached through a continue step): drawn
      *  under the previous line at the same indent, not as a nested reply. */
     chained: boolean = false,
+    /** How many branching levels deep this line is drawn. Indentation shows
+     *  where the conversation BRANCHES: a line with a single reply keeps the
+     *  indent, so a long back-and-forth runs straight down instead of being
+     *  pushed right until its boxes are squeezed (student report, 2026-10-21:
+     *  ~40 exchanges deep). Past MAX_INDENT a line shows its level instead. */
+    indentLevel: number = 0,
+    indented: boolean = depth > 0,
   ): JSX.Element => {
     const nodeId = path.join('.');
     const isExpanded = expandedNodes.has(nodeId);
@@ -583,8 +593,11 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const speakerColor = isNPC ? getSpeakerColor(node.speaker) : null;
 
     const isCanvasFocused = nodeId === canvasFocusedNodeId;
+    // The player's replies indent only where the conversation branches.
+    const branches = replyChoices.length > 1 && indentLevel < MAX_INDENT;
+    const deepLevel = indentLevel >= MAX_INDENT && replyChoices.length > 1 ? Math.floor(depth / 2) + 1 : null;
     return (
-      <div key={nodeId} className={`${depth > 0 && !chained ? (expanded ? 'ml-8' : 'ml-4') : ''}`}>
+      <div key={nodeId} className={`${depth > 0 && !chained && indented ? (expanded ? 'ml-4' : 'ml-2') : ''}`}>
         {/* Node Header */}
         <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
@@ -761,7 +774,14 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
         {/* Choices (Player responses) - show if expanded OR if it's an NPC without choices */}
         {/* Hide choices when NPC auto-exit is set (they are unreachable) */}
         {(shouldShowContent) && !node.target && (repliesReachable || hasChoices) && (
-          <div className={`${expanded ? 'ml-10 pl-3' : 'ml-6 pl-2'} border-l-2 border-gray-200`}>
+          <div className={branches
+            ? `${expanded ? 'ml-4 pl-3' : 'ml-3 pl-2'} border-l-2 border-gray-200`
+            : deepLevel ? 'pl-1 border-l-2 border-violet-300' : ''}>
+            {deepLevel && (
+              <p className="text-[10px] text-violet-600 mb-1" data-testid="dialog-deep-level">
+                Level {deepLevel} — deeper levels keep this indent so the boxes stay readable
+              </p>
+            )}
             {isNPC && continueSteps.length > 0 && (
               <p className="text-xs text-gray-500 mb-1" data-testid="dialog-replies-otherwise">
                 {repliesReachable
@@ -803,7 +823,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               const nestedSpeakerColor = choice.dialogNode ? getSpeakerColor(choice.dialogNode.speaker || 'NPC') : null;
 
               return (
-                <div key={choice.id} className="mb-2">
+                <div key={choice.id} className="mb-2 min-w-[16rem]">
                   {/* For collapsible patterns, show the NPC response above the player's exit choice */}
                   {isCollapsible && choice.dialogNode && nestedSpeakerColor && (
                     <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden relative`}>
@@ -1067,6 +1087,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                         [...path, `choice_${index}`],
                         depth + 2,
                         () => removeNestedDialogAtPath(path, index),
+                        false,
+                        indentLevel + (branches ? 1 : 0),
+                        branches,
                       )}
                     </div>
                   )}
@@ -1179,6 +1202,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                     depth + 2,
                     () => removeChoiceAtPath(path, stepIndex),
                     true,
+                    indentLevel,
                   ) : step.target ? (
                     <div className="ml-3 text-xs text-green-700 flex items-center gap-1">
                       <ArrowRight className="w-3 h-3" />
@@ -1375,7 +1399,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       
       {/* Dialog Tree — in expanded (modal) mode the box grows to the modal
           body instead of the inspector's 500px cap (finding 10) */}
-      <div className={`border rounded-lg p-3 bg-gray-50 overflow-y-auto ${expanded ? 'max-h-[calc(83vh-140px)]' : 'max-h-[500px]'}`}>
+      <div className={`border rounded-lg p-3 bg-gray-50 overflow-auto ${expanded ? 'max-h-[calc(83vh-140px)]' : 'max-h-[500px]'}`}>
         {renderDialogNode(dialogTree)}
       </div>
       
