@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.129** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.129 lets merges finish**: when two
+Current release: **v0.9.130** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.130 keeps long conversations
+readable** in the Dialog Editor: it indents only where a conversation
+branches, so a long back-and-forth runs straight down at full width instead
+of being squeezed into ever narrower boxes, and very deep branches show
+their level rather than indenting further.
+
+**v0.9.129 let merges finish**: when two
 teammates' ASAPS shortened the same copied beat's ID differently, every pull
 ended in a conflict that neither **Keep both** nor **Accept Remote Changes**
 could settle. Now Keep both keeps one beat (the incoming ID, with your links

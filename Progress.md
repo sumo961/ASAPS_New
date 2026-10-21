@@ -1,5 +1,14 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Long conversations that stay readable (v0.9.130)
+
+### Overview
+- **Long Dialog Tree conversations stay readable** (student report: "it becomes pretty hard to make long back and forth dialogues … the boxes becoming more and more squished", ~40 exchanges deep in the big Dialog Editor). Every exchange indented by ~5rem, so deep lines were pushed right until their boxes were a few words wide. Indentation now shows where the conversation *branches*: a line with a single reply keeps the indent (a long back-and-forth runs straight down), a line with several replies indents them — for 4 branching levels; deeper ones keep the indent and say "Level N" (`MAX_INDENT`, `indentLevel` in `DialogTreeEditor.renderDialogNode`). Reply boxes have a minimum width and the tree scrolls sideways rather than squeeze. Verified with a generated 20-exchange tree (two replies each): narrowest reply box 736 px (was squeezed toward nothing), deepest text starts 356 px from the left.
+
+**Files modified:** packages/builder/src/editors/DialogTreeEditor.tsx, docs/USER_GUIDE.md (*Long conversations stay readable*)
+
+---
+
 ## 2026-10-21: Merges that finish (v0.9.129)
 
 ### Overview
