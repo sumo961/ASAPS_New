@@ -403,18 +403,11 @@ describe('GitAdapter Advanced Operations', () => {
   // gitResolveAllConflicts
   // ==========================================================================
   describe('gitResolveAllConflicts', () => {
+    const ok = (stdout = '') => ({ stdout, stderr: '', exitCode: 0 });
+    const side = ok('{"id":"b1"}\n'); // the chosen side has the file, no markers
+
     it('resolves all conflicts keeping local (merge)', async () => {
-      const runCommand = vi.fn()
-        // gitGetConflicts: status --porcelain
-        .mockResolvedValueOnce({ stdout: 'UU file1.json\nUU file2.json\n', stderr: '', exitCode: 0 })
-        // checkout --ours file1.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // add file1.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // checkout --ours file2.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // add file2.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({ status: ok('UU file1.json\nUU file2.json\n'), show: side });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveAllConflicts('/project', true, false);
@@ -422,15 +415,13 @@ describe('GitAdapter Advanced Operations', () => {
       expect(result.success).toBe(true);
       expect(result.message).toContain('local');
       expect(result.message).toContain('2 conflict');
-      // In merge: keepMine=true → --ours
-      expect(runCommand).toHaveBeenNthCalledWith(2, 'git', ['checkout', '--ours', '--', 'file1.json'], '/project');
+      // In merge: keepMine=true → --ours (paths from the repository root)
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', '--ours', '--', ':/file1.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['add', '--', ':/file2.json'], '/project');
     });
 
     it('resolves all conflicts keeping remote (merge)', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: 'UU file1.json\n', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({ status: ok('UU file1.json\n'), show: side });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveAllConflicts('/project', false, false);
@@ -438,19 +429,26 @@ describe('GitAdapter Advanced Operations', () => {
       expect(result.success).toBe(true);
       expect(result.message).toContain('remote');
       // In merge: keepMine=false → --theirs
-      expect(runCommand).toHaveBeenNthCalledWith(2, 'git', ['checkout', '--theirs', '--', 'file1.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', '--theirs', '--', ':/file1.json'], '/project');
     });
 
     it('swaps ours/theirs in rebase mode', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: 'UU file1.json\n', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({ status: ok('UU file1.json\n'), show: side });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       // keepMine=true + isRebase=true → --theirs (swapped!)
       await gitResolveAllConflicts('/project', true, true);
-      expect(runCommand).toHaveBeenNthCalledWith(2, 'git', ['checkout', '--theirs', '--', 'file1.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', '--theirs', '--', ':/file1.json'], '/project');
+    });
+
+    it('removes a file the chosen side does not have instead of failing', async () => {
+      const runCommand = gitRouter({ status: ok('DD old.json\nAU mine.json\n'), show: { stdout: '', stderr: 'fatal: not in index', exitCode: 128 } });
+      (window as any).electronAPI = createMockElectronAPI(runCommand);
+
+      const result = await gitResolveAllConflicts('/project', false, false);
+      expect(result.success).toBe(true);
+      expect(runCommand).toHaveBeenCalledWith('git', ['rm', '-q', '-f', '--', ':/old.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['rm', '-q', '-f', '--', ':/mine.json'], '/project');
     });
 
     it('returns success when no conflicts exist', async () => {
@@ -464,9 +462,11 @@ describe('GitAdapter Advanced Operations', () => {
     });
 
     it('returns error when checkout fails', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: 'UU broken.json\n', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: 'error: path broken.json is unmerged', exitCode: 1 });
+      const runCommand = gitRouter({
+        status: ok('UU broken.json\n'),
+        show: side,
+        checkout: { stdout: '', stderr: 'error: path broken.json is unmerged', exitCode: 1 },
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveAllConflicts('/project', true, false);
@@ -524,32 +524,15 @@ describe('GitAdapter Advanced Operations', () => {
   // gitResolveAllAndComplete
   // ==========================================================================
   describe('gitResolveAllAndComplete', () => {
+    const ok = (stdout = '') => ({ stdout, stderr: '', exitCode: 0 });
+
     it('resolves and completes a simple merge', async () => {
-      // Trace through gitResolveAllAndComplete for a merge with 1 conflict:
-      // 1. gitGetConflicts → runCommand('git', ['status', '--porcelain'])
-      // 2. gitResolveAllConflicts:
-      //    a. gitGetConflicts → runCommand('git', ['status', '--porcelain'])
-      //    b. checkout --ours file.json → runCommand
-      //    c. add file.json → runCommand
-      // 3. gitContinueMergeOrRebase (merge) → runCommand('git', ['commit', '--no-edit'])
-      // 4. gitDetectMergeState:
-      //    a. runCommand('git', ['status'])
-      //    b. runCommand('git', ['rev-parse', '--verify', 'MERGE_HEAD'])
-      const runCommand = vi.fn()
-        // (1) gitGetConflicts in main loop
-        .mockResolvedValueOnce({ stdout: 'UU file.json\n', stderr: '', exitCode: 0 })
-        // (2a) gitGetConflicts inside gitResolveAllConflicts
-        .mockResolvedValueOnce({ stdout: 'UU file.json\n', stderr: '', exitCode: 0 })
-        // (2b) checkout --ours file.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // (2c) add file.json
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // (3) git commit --no-edit
-        .mockResolvedValueOnce({ stdout: 'Merge committed', stderr: '', exitCode: 0 })
-        // (4a) git status (detect merge state)
-        .mockResolvedValueOnce({ stdout: 'On branch main\nnothing to commit', stderr: '', exitCode: 0 })
-        // (4b) rev-parse MERGE_HEAD (no merge)
-        .mockResolvedValueOnce({ stdout: '', stderr: 'fatal', exitCode: 128 });
+      const runCommand = gitRouter({
+        // loop check, inside resolve, then the merge-state check: nothing left
+        status: [ok('UU file.json\n'), ok('UU file.json\n'), ok('On branch main\nnothing to commit')],
+        show: ok('{"id":"b1"}\n'),
+        commit: ok('Merge committed'),
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const onProgress = vi.fn();
@@ -562,35 +545,16 @@ describe('GitAdapter Advanced Operations', () => {
     });
 
     it('loops through multiple rebase steps', async () => {
-      // Step 1: resolve 1 conflict, continue rebase → fails with new conflict
-      // Step 2: resolve new conflict, continue rebase → success
-      const runCommand = vi.fn()
-        // Step 1: (1) gitGetConflicts in loop
-        .mockResolvedValueOnce({ stdout: 'UU file.json\n', stderr: '', exitCode: 0 })
-        // Step 1: (2a) gitGetConflicts in gitResolveAllConflicts
-        .mockResolvedValueOnce({ stdout: 'UU file.json\n', stderr: '', exitCode: 0 })
-        // Step 1: (2b) checkout --theirs
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // Step 1: (2c) add
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // Step 1: (3) rebase --continue → fails
-        .mockResolvedValueOnce({ stdout: '', stderr: 'CONFLICT', exitCode: 1 })
-        // Step 1: (4) gitGetConflicts after failed continue
-        .mockResolvedValueOnce({ stdout: 'UU file2.json\n', stderr: '', exitCode: 0 })
-        // Step 2: (1) gitGetConflicts in loop
-        .mockResolvedValueOnce({ stdout: 'UU file2.json\n', stderr: '', exitCode: 0 })
-        // Step 2: (2a) gitGetConflicts in gitResolveAllConflicts
-        .mockResolvedValueOnce({ stdout: 'UU file2.json\n', stderr: '', exitCode: 0 })
-        // Step 2: (2b) checkout --theirs
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // Step 2: (2c) add
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        // Step 2: (3) rebase --continue → success
-        .mockResolvedValueOnce({ stdout: 'Successfully rebased', stderr: '', exitCode: 0 })
-        // Step 2: (4a) git status
-        .mockResolvedValueOnce({ stdout: 'On branch main\nnothing to commit', stderr: '', exitCode: 0 })
-        // Step 2: (4b) rev-parse MERGE_HEAD (no merge)
-        .mockResolvedValueOnce({ stdout: '', stderr: 'fatal', exitCode: 128 });
+      const runCommand = gitRouter({
+        status: [
+          ok('UU file.json\n'), ok('UU file.json\n'), // step 1: loop check, inside resolve
+          ok('UU file2.json\n'), // after the failed continue
+          ok('UU file2.json\n'), ok('UU file2.json\n'), // step 2
+          ok('On branch main\nnothing to commit'), // merge-state check
+        ],
+        show: ok('{"id":"b1"}\n'),
+        '-c': [{ stdout: '', stderr: 'CONFLICT', exitCode: 1 }, ok('Successfully rebased')], // git -c core.editor=true rebase --continue
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveAllAndComplete('/project', true, true);

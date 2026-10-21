@@ -778,8 +778,11 @@ export async function gitGetConflicts(projectPath: string): Promise<string[]> {
   const result = await run('git', ['status', '--porcelain'], projectPath);
   if (result.exitCode !== 0 || !result.stdout.trim()) return [];
 
+  // Every unmerged state: both changed (UU), both added (AA), both deleted
+  // (DD), and the one-sided ones a rename on each side produces (AU/UA, UD/DU).
+  // Listing only UU/AA/DD left those unresolvable (group report, 2026-10-21).
   return result.stdout.trim().split('\n')
-    .filter(line => line.startsWith('UU') || line.startsWith('AA') || line.startsWith('DD'))
+    .filter(line => /^(UU|AA|DD|AU|UA|UD|DU) /.test(line))
     .map(line => line.substring(3).trim());
 }
 
@@ -943,14 +946,8 @@ export async function gitResolveAllConflicts(
   const flag = useOurs ? '--ours' : '--theirs';
 
   for (const file of conflicts) {
-    const checkout = await run('git', ['checkout', flag, '--', file], projectPath);
-    if (checkout.exitCode !== 0) {
-      return { success: false, message: `Failed to resolve ${file}: ${checkout.stderr.trim()}` };
-    }
-    const add = await run('git', ['add', '--', file], projectPath);
-    if (add.exitCode !== 0) {
-      return { success: false, message: `Failed to stage ${file}: ${add.stderr.trim()}` };
-    }
+    const taken = await takeConflictSide(projectPath, file, useOurs ? 2 : 3);
+    if (!taken.success) return { success: false, message: `Failed to resolve ${file}: ${taken.message}` };
   }
 
   const label = keepMine ? 'local' : 'remote';
@@ -1077,24 +1074,43 @@ export async function gitClone(
   };
 }
 
+/**
+ * Settle one conflicted file with one side's version (2 = ours, 3 = theirs).
+ * When that side has no version — it deleted or renamed the file — taking
+ * its side means removing the file. `git checkout --theirs` failed there
+ * with "does not have their version" (group report, 2026-10-21).
+ */
+async function takeConflictSide(projectPath: string, filePath: string, stage: 2 | 3): Promise<GitOperationResult> {
+  const run = getRunCommand();
+  // Conflict paths come from the repository root; ":/" makes Git read them
+  // that way when the project is a subfolder of the repository.
+  const spec = `:/${filePath}`;
+  const staged = await run('git', ['show', `:${stage}:${filePath}`], projectPath);
+  if (staged.exitCode !== 0) {
+    const rm = await run('git', ['rm', '-q', '-f', '--', spec], projectPath);
+    return { success: rm.exitCode === 0, message: rm.exitCode === 0 ? `Removed ${filePath}` : rm.stderr.trim() };
+  }
+  // A file renamed differently on each side carries a merged copy WITH
+  // conflict markers in its one-sided stage — take the side's commit then.
+  const marked = /^(<{7}|>{7})/m.test(staged.stdout);
+  let source: string[] = ['--ours'];
+  if (stage === 3) source = ['--theirs'];
+  if (marked) {
+    const merging = (await run('git', ['rev-parse', '-q', '--verify', 'MERGE_HEAD'], projectPath)).exitCode === 0;
+    source = [stage === 2 ? 'HEAD' : (merging ? 'MERGE_HEAD' : 'REBASE_HEAD')];
+  }
+  const checkout = await run('git', ['checkout', ...source, '--', spec], projectPath);
+  if (checkout.exitCode !== 0) return { success: false, message: checkout.stderr.trim() };
+  const add = await run('git', ['add', '--', spec], projectPath);
+  return { success: add.exitCode === 0, message: add.exitCode === 0 ? `Resolved ${filePath}` : add.stderr.trim() };
+}
+
 /** Resolve a merge conflict by accepting ours or theirs */
 export async function gitResolveConflict(
   projectPath: string,
   filePath: string,
   resolution: 'ours' | 'theirs'
 ): Promise<GitOperationResult> {
-  const run = getRunCommand();
-  const checkoutResult = await run(
-    'git', ['checkout', `--${resolution}`, '--', filePath], projectPath
-  );
-  if (checkoutResult.exitCode !== 0) {
-    return { success: false, message: checkoutResult.stderr.trim() };
-  }
-  const addResult = await run('git', ['add', '--', filePath], projectPath);
-  return {
-    success: addResult.exitCode === 0,
-    message: addResult.exitCode === 0
-      ? `Resolved ${filePath} using ${resolution}`
-      : addResult.stderr.trim(),
-  };
+  const result = await takeConflictSide(projectPath, filePath, resolution === 'ours' ? 2 : 3);
+  return result.success ? { success: true, message: `Resolved ${filePath} using ${resolution}` } : result;
 }

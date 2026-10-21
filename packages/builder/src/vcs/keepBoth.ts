@@ -54,6 +54,12 @@ function unionBy(local: any[] = [], incoming: any[] = [], key: (x: any) => strin
   return out;
 }
 
+/** The same beat apart from its id (and where it sits): one beat renamed twice. */
+function sameBeatExceptId(a: any, b: any): boolean {
+  const strip = ({ id, x, y, cluster, position, ...rest }: any) => rest;
+  return stringify(strip(a ?? {})) === stringify(strip(b ?? {}));
+}
+
 export function movedSummary(moved: MovedBeat[]): string {
   if (moved.length === 0) return '';
   return ` ${moved.length} of your beat${moved.length === 1 ? '' : 's'} shared an ID with a teammate's and moved to a new one, so both survive: `
@@ -76,6 +82,16 @@ async function context(projectPath: string, run: Run, sep: string) {
     full: (rel: string) => [top, ...rel.split('/')].join(sep),
     /** Path inside the project folder, or null when outside it. */
     inProject: (rel: string) => (rel.startsWith(prefix) ? rel.slice(prefix.length) : null),
+    /**
+     * One side's version of a conflicted file (2 = ours, 3 = theirs). For a
+     * file renamed differently on each side Git stores a merged copy WITH
+     * conflict markers in the one-sided stage — take the side's commit then.
+     */
+    side: async (rel: string, stage: 2 | 3): Promise<string | null> => {
+      const staged = await show(`:${stage}:${rel}`);
+      if (staged === null || !/^(<{7}|>{7})/m.test(staged)) return staged;
+      return show(`${stage === 2 ? 'HEAD' : 'MERGE_HEAD'}:${rel}`);
+    },
     lines: (text: string) => text.split('\n').map((s) => s.trim()).filter(Boolean),
   };
 }
@@ -86,7 +102,7 @@ type Ctx = Awaited<ReturnType<typeof context>>;
  * so Git saw no conflict) to fresh ids. `incomingRev` holds the pushed side.
  */
 async function moveDuplicateIds(ctx: Ctx, incomingRev: string, write: Write, idMap: Map<string, string>, moved: MovedBeat[], movedFiles: string[]): Promise<void> {
-  const files = ctx.lines((await ctx.git(['ls-files', '--', `${ctx.prefix}clusters`])).stdout)
+  const files = ctx.lines((await ctx.git(['ls-files', '--full-name', '--', `:/${ctx.prefix}clusters`])).stdout)
     .concat(movedFiles)
     .filter((rel, i, all) => all.indexOf(rel) === i);
   const byId = new Map<string, string[]>();
@@ -111,8 +127,8 @@ async function moveDuplicateIds(ctx: Ctx, incomingRev: string, write: Write, idM
       const to = newBeatId();
       const copyRel = `${ctx.prefix}clusters/${cluster}/${type}_${to}.json`;
       await write(ctx.full(copyRel), stringify({ ...beat, id: to }));
-      await ctx.git(['rm', '-q', '-f', '--', rel]);
-      await ctx.git(['add', '--', copyRel]);
+      await ctx.git(['rm', '-q', '-f', '--', `:/${rel}`]);
+      await ctx.git(['add', '--', `:/${copyRel}`]);
       idMap.set(id, to);
       movedFiles.push(copyRel);
       moved.push({ from: id, to, name: String(beat.name ?? id), doubleEdit: false });
@@ -137,7 +153,7 @@ async function followMovedIds(ctx: Ctx, base: string, localRev: string, write: W
     const rewritten = rewriteValues(now, idMap);
     if (stringify(rewritten) !== stringify(now)) {
       await write(ctx.full(rel), stringify(rewritten));
-      await ctx.git(['add', '--', rel]);
+      await ctx.git(['add', '--', `:/${rel}`]);
     }
   }
 }
@@ -156,16 +172,46 @@ export async function resolveKeepBoth(projectPath: string, run: Run, write: Writ
   const resolved = new Set<string>();
   const movedFiles: string[] = [];
 
+  // 0. One beat renamed differently on each side (both shortened the same
+  //    runaway id — one with a random id, one with the derived one): Git
+  //    reports the old file deleted on both sides and each new file on one
+  //    side only. It is ONE beat: keep the incoming id, drop the local
+  //    file, and point the local side's links at the incoming id.
+  const oursOnly: Array<{ rel: string; beat: any }> = [];
+  const theirsOnly: Array<{ rel: string; beat: any; text: string }> = [];
+  for (const rel of conflicts) {
+    if (!BEAT_FILE.test(ctx.inProject(rel) ?? '')) continue;
+    const ours = json(await ctx.side(rel, 2));
+    const theirsText = await ctx.side(rel, 3);
+    const theirs = json(theirsText);
+    if (ours && !theirs) oursOnly.push({ rel, beat: ours });
+    if (theirs && !ours) theirsOnly.push({ rel, beat: theirs, text: theirsText! });
+  }
+  for (const mine of oursOnly) {
+    const match = theirsOnly.find((t) => !resolved.has(t.rel) && sameBeatExceptId(mine.beat, t.beat));
+    if (!match || mine.beat.id === match.beat.id) continue;
+    await write(ctx.full(match.rel), match.text);
+    await ctx.git(['add', '--', `:/${match.rel}`]);
+    await ctx.git(['rm', '-q', '-f', '--', `:/${mine.rel}`]);
+    resolved.add(match.rel);
+    resolved.add(mine.rel);
+    idMap.set(String(mine.beat.id), String(match.beat.id));
+  }
+
   // 1. Beat files in conflict: incoming keeps the id, the local beat moves.
   for (const rel of conflicts) {
+    if (resolved.has(rel)) continue;
     const m = BEAT_FILE.exec(ctx.inProject(rel) ?? '');
     if (!m || rel.endsWith('/cluster.json') || rel.endsWith('/_index.json')) continue;
     const [, cluster, type] = m;
-    const ours = json(await ctx.show(`:2:${rel}`));
-    const theirs = json(await ctx.show(`:3:${rel}`));
-    if (!ours || !theirs) continue;
-    await write(ctx.full(rel), stringify(theirs));
-    await ctx.git(['add', '--', rel]);
+    const oursRaw = json(await ctx.side(rel, 2));
+    const theirsText = await ctx.side(rel, 3);
+    const theirs = json(theirsText);
+    if (!oursRaw || !theirs) continue;
+    // Links to a beat settled in step 0 point at the incoming id now.
+    const ours = rewriteValues(oursRaw, idMap);
+    await write(ctx.full(rel), theirsText!);
+    await ctx.git(['add', '--', `:/${rel}`]);
     resolved.add(rel);
     if (stringify(ours) === stringify(theirs)) continue;
     const doubleEdit = (await ctx.show(`${base}:${rel}`)) !== null;
@@ -173,7 +219,7 @@ export async function resolveKeepBoth(projectPath: string, run: Run, write: Writ
     const name = String(ours.name ?? ours.id);
     const copyRel = `${ctx.prefix}clusters/${cluster}/${type}_${to}.json`;
     await write(ctx.full(copyRel), stringify({ ...ours, id: to, ...(doubleEdit ? { name: `${name} (your version)` } : {}) }));
-    await ctx.git(['add', '--', copyRel]);
+    await ctx.git(['add', '--', `:/${copyRel}`]);
     idMap.set(String(ours.id), to);
     movedFiles.push(copyRel);
     moved.push({ from: String(ours.id), to, name, doubleEdit });
@@ -208,9 +254,26 @@ export async function resolveKeepBoth(projectPath: string, run: Run, write: Writ
     }
     if (merged) {
       await write(ctx.full(rel), stringify(merged));
-      await ctx.git(['add', '--', rel]);
+      await ctx.git(['add', '--', `:/${rel}`]);
       resolved.add(rel);
     }
+  }
+
+  // 5. One-sided leftovers — keep whatever exists, so nobody's work is lost:
+  //    deleted on both sides → gone; on one side only (added, or changed
+  //    while the other side deleted it) → that side's version.
+  for (const rel of conflicts) {
+    if (resolved.has(rel)) continue;
+    const ours = await ctx.side(rel, 2);
+    const theirs = await ctx.side(rel, 3);
+    if (ours !== null && theirs !== null) continue;
+    if (ours === null && theirs === null) {
+      await ctx.git(['rm', '-q', '-f', '--', `:/${rel}`]);
+    } else {
+      await write(ctx.full(rel), (ours ?? theirs)!);
+      await ctx.git(['add', '--', `:/${rel}`]);
+    }
+    resolved.add(rel);
   }
 
   const remaining = conflicts.filter((rel) => !resolved.has(rel));

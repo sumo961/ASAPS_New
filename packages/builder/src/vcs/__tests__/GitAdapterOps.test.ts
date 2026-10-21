@@ -398,36 +398,42 @@ describe('GitAdapter Operations', () => {
   });
 
   describe('gitResolveConflict', () => {
+    const ok = (stdout = '') => ({ stdout, stderr: '', exitCode: 0 });
+
     it('resolves conflict using ours', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }) // checkout --ours
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // git add
+      const runCommand = gitRouter({ show: ok('{"id":"b1"}\n') });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveConflict('/project', 'file.json', 'ours');
       expect(result.success).toBe(true);
       expect(result.message).toContain('ours');
-      expect(runCommand).toHaveBeenNthCalledWith(1, 'git', ['checkout', '--ours', '--', 'file.json'], '/project');
-      expect(runCommand).toHaveBeenNthCalledWith(2, 'git', ['add', '--', 'file.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', '--ours', '--', ':/file.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['add', '--', ':/file.json'], '/project');
     });
 
     it('resolves conflict using theirs', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+      const runCommand = gitRouter({ show: ok('{"id":"b1"}\n') });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveConflict('/project', 'file.json', 'theirs');
       expect(result.success).toBe(true);
-      expect(runCommand).toHaveBeenNthCalledWith(1, 'git', ['checkout', '--theirs', '--', 'file.json'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', '--theirs', '--', ':/file.json'], '/project');
+    });
+
+    it('takes a side marked up by a rename/rename conflict from its commit', async () => {
+      const runCommand = gitRouter({
+        show: ok('{\n<<<<<<<< HEAD:a.json\n  "id": "x"\n========\n  "id": "y"\n>>>>>>>> MERGE_HEAD:b.json\n}\n'),
+        'rev-parse': ok('abc\n'), // MERGE_HEAD exists
+      });
+      (window as any).electronAPI = createMockElectronAPI(runCommand);
+
+      const result = await gitResolveConflict('/project', 'b.json', 'theirs');
+      expect(result.success).toBe(true);
+      expect(runCommand).toHaveBeenCalledWith('git', ['checkout', 'MERGE_HEAD', '--', ':/b.json'], '/project');
     });
 
     it('returns error when checkout fails', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '',
-        stderr: 'not a valid conflict path',
-        exitCode: 1,
-      });
+      const runCommand = gitRouter({ show: ok('{}'), checkout: { stdout: '', stderr: 'not a valid conflict path', exitCode: 1 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitResolveConflict('/project', 'file.json', 'ours');
