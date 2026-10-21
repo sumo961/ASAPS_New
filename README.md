@@ -22,9 +22,13 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.127** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.127 lets pulls through and
-clusters sound**: opening or saving a project no longer marks `project.json`
+Current release: **v0.9.128** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.128 fixes the volume slider of a
+cluster's ambient sound**, which snapped back to its old value instead of
+moving.
+
+**v0.9.127 let pulls through and
+made clusters sound**: opening or saving a project no longer marks `project.json`
 as changed, so Git stops refusing teammates' pulls with "would be overwritten
 by merge" (copies an older version marked are put back automatically), and a
 cluster's ambient sound now actually plays — in Preview and in exported

@@ -1,5 +1,14 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: A volume slider that moves (v0.9.128)
+
+### Overview
+- **Cluster ambient sound volume slider moves** (student report: "I seem unable to change the volume … the slider does not move"). The flowchart redraws a cluster frame only when its fingerprint changes, and the fingerprint had the sound file but not its volume: the new volume was stored, the frame never re-rendered, and the controlled slider snapped back. Volume added to the fingerprint (`GraphEditor.tsx`). Verified in the builder: 50 % → 80 % sticks; with the old line it stays at 50 %.
+
+**Files modified:** packages/builder/src/components/graph/GraphEditor.tsx
+
+---
+
 ## 2026-10-21: Pulls that go through, clusters that sound (v0.9.127)
 
 ### Overview
