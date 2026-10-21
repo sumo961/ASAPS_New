@@ -172,4 +172,48 @@ describe('null projectData (pristine-default skip)', () => {
     expect(result.current.error).toBeNull();
     expect(storage.updateProject).not.toHaveBeenCalled();
   });
+
+  describe('save before quit (desktop)', () => {
+    let handler: (() => Promise<boolean>) | null;
+    const unregister = vi.fn();
+    beforeEach(() => {
+      handler = null;
+      (window as any).electronAPI = { app: { onSaveBeforeQuit: (h: () => Promise<boolean>) => { handler = h; return unregister; } } };
+    });
+    afterEach(() => { delete (window as any).electronAPI; });
+
+    it('registers with the desktop app and unregisters on unmount', () => {
+      const { unmount } = renderHook(() => useAutoSave(projectData));
+      expect(handler).toBeTypeOf('function');
+      unmount();
+      expect(unregister).toHaveBeenCalled();
+    });
+
+    it('saves a pending change at once and reports saved', async () => {
+      const { result } = renderHook(() => useAutoSave(projectData, { delay: 99999 }));
+      act(() => result.current.markChanged());
+      let saved: boolean | undefined;
+      await act(async () => { saved = await handler!(); });
+      expect(storage.updateProject).toHaveBeenCalledTimes(1);
+      expect(saved).toBe(true);
+    });
+
+    it('reports nothing to do when nothing changed', async () => {
+      renderHook(() => useAutoSave(projectData));
+      let saved: boolean | undefined;
+      await act(async () => { saved = await handler!(); });
+      expect(saved).toBe(true);
+      expect(storage.updateProject).not.toHaveBeenCalled();
+    });
+
+    it('reports unsaved when the save fails', async () => {
+      storage.updateProject.mockResolvedValue({ success: false, error: new Error('disk full') });
+      const { result } = renderHook(() => useAutoSave(projectData, { delay: 99999 }));
+      act(() => result.current.markChanged());
+      let saved: boolean | undefined;
+      await act(async () => { saved = await handler!(); });
+      expect(saved).toBe(false);
+      expect(result.current.status).toBe('error');
+    });
+  });
 });

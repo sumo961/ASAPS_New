@@ -53,6 +53,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App operations
   app: {
     getPath: (name: string) => ipcRenderer.invoke('app:get-path', name),
+    // Before quitting (or restarting for an update) the main process asks
+    // the editor to finish saving and waits for the answer. A window that
+    // never registered is not asked, so nothing waits on a missing reply.
+    onSaveBeforeQuit: (handler: () => Promise<boolean>) => {
+      const listener = (_: unknown, id: number) => {
+        Promise.resolve()
+          .then(handler)
+          .then((saved) => ipcRenderer.send('app:save-before-quit:done', id, saved === true))
+          .catch(() => ipcRenderer.send('app:save-before-quit:done', id, false));
+      };
+      ipcRenderer.on('app:save-before-quit', listener);
+      ipcRenderer.send('app:save-before-quit:ready', true);
+      return () => {
+        ipcRenderer.removeListener('app:save-before-quit', listener);
+        ipcRenderer.send('app:save-before-quit:ready', false);
+      };
+    },
   },
 
   // Machine store (UX-Eval B3): API keys and provider configs, encrypted at

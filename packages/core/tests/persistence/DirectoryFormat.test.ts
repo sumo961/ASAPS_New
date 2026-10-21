@@ -197,6 +197,14 @@ describe('DirectoryFormat', () => {
       expect(result.assetFiles[0].path).toBe('assets/backgrounds/forest.jpg');
     });
 
+    it('leaves empty asset metadata out of the manifest, so every computer writes the same file', () => {
+      const asset = { id: 'a', filename: 'x.jpg', type: 'image', mimeType: 'image/jpeg', size: 1, context: 'background' } as any;
+      const manifestOf = (assets: any[]) => result(assets).files.find(f => f.path === 'assets/_manifest.json')!.content;
+      const result = (assets: any[]) => serializeToDirectory(createMinimalInput({ assets }));
+      expect(manifestOf([{ ...asset, metadata: {} }])).toBe(manifestOf([asset]));
+      expect(JSON.parse(manifestOf([{ ...asset, metadata: { alt: 'Forest' } }])).assets.a.metadata).toEqual({ alt: 'Forest' });
+    });
+
     it('generates deterministic JSON output', () => {
       const input = createMinimalInput();
       const result1 = serializeToDirectory(input);

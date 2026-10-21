@@ -124,7 +124,14 @@ export function useAutoSave(
     onAfterSave,
   } = options;
 
-  const [status, setStatus] = useState<SaveStatus>('idle');
+  const [status, setStatusState] = useState<SaveStatus>('idle');
+  // Mirrors `status` for code that reads it after an await (saveBeforeQuit).
+  const statusRef = useRef<SaveStatus>('idle');
+  const setStatus = useCallback((next: SaveStatus) => {
+    statusRef.current = next;
+    setStatusState(next);
+  }, []);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -155,6 +162,8 @@ export function useAutoSave(
       return;
     }
 
+    let finish: () => void = () => {};
+    savePromiseRef.current = new Promise<void>((resolve) => { finish = resolve; });
     isSavingRef.current = true;
     setStatus('saving');
     setError(null);
@@ -267,8 +276,10 @@ export function useAutoSave(
       setStatus('error');
     } finally {
       isSavingRef.current = false;
+      savePromiseRef.current = null;
+      finish();
     }
-  }, [projectData, saveDrafts, maxDrafts, log]);
+  }, [projectData, saveDrafts, maxDrafts, log, setStatus]);
 
   /**
    * Mark data as changed (triggers debounced save)
@@ -391,6 +402,32 @@ export function useAutoSave(
   }, []);
 
   /**
+   * Finish saving before the app quits or restarts for an update. Resolves
+   * true when nothing is left unsaved. Without this, a pending auto-save
+   * made the beforeunload guard below cancel the quit, and Electron cancels
+   * silently: "Restart Now" for an update stopped halfway.
+   */
+  const saveBeforeQuit = useCallback(async (): Promise<boolean> => {
+    if (saveTimeoutRef.current !== null) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    if (savePromiseRef.current) await savePromiseRef.current;
+    if (statusRef.current === 'pending' || statusRef.current === 'error' || pendingChangesDuringSavedRef.current) {
+      pendingChangesDuringSavedRef.current = false;
+      await performSave(false);
+    }
+    return statusRef.current !== 'pending' && statusRef.current !== 'saving' && statusRef.current !== 'error';
+  }, [performSave]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const desktop = (window as any).electronAPI?.app;
+    if (typeof desktop?.onSaveBeforeQuit !== 'function') return;
+    return desktop.onSaveBeforeQuit(saveBeforeQuit);
+  }, [enabled, saveBeforeQuit]);
+
+  /**
    * Save before unload (browser close/refresh)
    */
   useEffect(() => {
@@ -399,8 +436,11 @@ export function useAutoSave(
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // 'error' counts as unsaved: an untitled project's autosave lands here
       // (it always throws), and closing without a warning loses the session.
-      if (status === 'pending' || status === 'saving' || status === 'error') {
-        if (status !== 'error') {
+      // Read the live status: a quit right after saveBeforeQuit came before
+      // React re-registered this handler, and the stale 'saving' held it.
+      const current = statusRef.current;
+      if (current === 'pending' || current === 'saving' || current === 'error') {
+        if (current !== 'error') {
           // Attempt synchronous save (best effort)
           performSave(false);
         }
@@ -417,7 +457,7 @@ export function useAutoSave(
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [enabled, status, performSave]);
+  }, [enabled, performSave]);
 
   return {
     status,

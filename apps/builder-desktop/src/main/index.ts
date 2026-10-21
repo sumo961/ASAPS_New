@@ -4,11 +4,12 @@ import { join, win32 as winPath } from 'path';
 import * as fs from 'fs/promises';
 import { getEmbeddedAPIServer, setStoryInjectionCallback } from './api-server';
 import { autoUpdater, type UpdateInfo } from 'electron-updater';
-import { startWatching, stopWatching } from './fileWatcher';
+import { startWatching, stopWatching, stopWatchingBeforeExit } from './fileWatcher';
 import { execFile, spawn } from 'child_process';
 import { release as osRelease } from 'os';
 import { buildBugReportUrl, ISSUES_REPO_URL } from './bugReport';
 import { MachineStore } from './machineStore';
+import { registerSaveBeforeQuit, saveEditorsBeforeQuit, editorCount, unsavedChangesDialog } from './saveBeforeQuit';
 import { windowsToolCandidates, windowsToolDirs, parseRegPath, mergePathEntries, toolNotFoundMessage } from './toolPaths';
 
 /** Injected by vite.config.ts from build-number.json (0 when absent). */
@@ -117,6 +118,36 @@ process.stderr?.on('error', (err: NodeJS.ErrnoException) => {
 
 // Track if we're in the process of installing an update
 let isUpdating = false;
+// True once the editors were asked to save for this quit (before-quit below).
+let savedForQuit = false;
+
+registerSaveBeforeQuit(ipcMain);
+
+/** Ask the editors to save; a window that hangs ends its request. */
+function saveBeforeQuitting(): Promise<boolean> {
+  return saveEditorsBeforeQuit((editor, end) => {
+    const win = BrowserWindow.fromWebContents(editor as Electron.WebContents);
+    win?.once('unresponsive', end);
+  });
+}
+
+// A page's beforeunload guard (unsaved changes) cancels a close, and
+// Electron cancels silently — quit, and "Restart Now" for an update, just
+// stopped. Ask instead; "Close anyway" lets the close go ahead.
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('will-prevent-unload', (event) => {
+    console.log('[Main] A window holds its close (unsaved changes); asking');
+    const win = BrowserWindow.fromWebContents(contents);
+    const options = unsavedChangesDialog(isUpdating);
+    const choice = win ? dialog.showMessageBoxSync(win, options) : dialog.showMessageBoxSync(options);
+    if (choice === 0) {
+      event.preventDefault();
+    } else {
+      isUpdating = false;
+      savedForQuit = false;
+    }
+  });
+});
 
 // Get the API server instance
 const apiServer = getEmbeddedAPIServer({ port: 3001, host: 'localhost' });
@@ -336,8 +367,16 @@ function setupAutoUpdater(): void {
     }).then((result) => {
       if (result.response === 0) {
         console.log('[AutoUpdater] User chose to restart now');
-        isUpdating = true;
-        autoUpdater.quitAndInstall(true, true);
+        // Finish saving first, or the editor's unsaved-changes guard holds
+        // the quit and the restart stops halfway.
+        void saveBeforeQuitting().then(async (saved) => {
+          console.log(`[AutoUpdater] Saved before restart: ${saved}`);
+          // An open folder watcher keeps the process from ending on macOS,
+          // and the installer waits for it to end.
+          await stopWatchingBeforeExit();
+          isUpdating = true;
+          autoUpdater.quitAndInstall(true, true);
+        });
       }
     });
   });
@@ -1790,6 +1829,19 @@ app.on('window-all-closed', () => {
 app.on('before-quit', (event) => {
   if (isUpdating) {
     console.log('[Main] Skipping API server cleanup during update');
+    return;
+  }
+
+  // Let the editors finish saving and the folder watcher close, then quit
+  // for real (the second before-quit comes through here with both done).
+  if (!savedForQuit) {
+    event.preventDefault();
+    savedForQuit = true;
+    void (editorCount() > 0 ? saveBeforeQuitting() : Promise.resolve(true)).then(async (saved) => {
+      console.log(`[Main] Saved before quit: ${saved}`);
+      await stopWatchingBeforeExit();
+      app.quit();
+    });
     return;
   }
 

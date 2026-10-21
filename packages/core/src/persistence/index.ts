@@ -5,6 +5,8 @@
  * organized by cluster, with deterministic JSON serialization.
  */
 
+export { derivedBeatId, resolveDuplicateBeatIds, type DuplicateBeatId } from './duplicateBeatIds';
+
 export {
   // DirectoryFormat
   serializeToDirectory,

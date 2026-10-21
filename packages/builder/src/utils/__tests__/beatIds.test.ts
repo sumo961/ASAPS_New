@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newBeatId, shortenRunawayBeatIds, isRunawayBeatId } from '../beatIds';
+import { newBeatId, shortenRunawayBeatIds, isRunawayBeatId, shortBeatIdFor } from '../beatIds';
 
 describe('newBeatId', () => {
   it('makes beat_ plus eight lowercase letters or digits, never twice in a large batch', () => {
@@ -43,5 +43,25 @@ describe('shortenRunawayBeatIds', () => {
     const p = { story: { beats: [{ id: 'beat_1' }, { id: 'beat_20_copymv8ch5921' }] } };
     expect(shortenRunawayBeatIds(p).project).toBe(p);
     expect(isRunawayBeatId('x'.repeat(33))).toBe(true);
+  });
+});
+
+describe('shortBeatIdFor', () => {
+  const old = 'beat_29_copymv54phfs1_copymv54po2v1';
+  it('derives the same short id every time, so repairs on different computers agree', () => {
+    expect(shortBeatIdFor(old)).toMatch(/^beat_[0-9a-z]{8}$/);
+    expect(shortBeatIdFor(old)).toBe(shortBeatIdFor(old));
+    expect(shortBeatIdFor(old)).not.toBe(shortBeatIdFor(old + 'x'));
+    const project = () => ({ story: { beats: [{ id: old, connections: [] }, { id: 'beat_19', connections: [{ targetId: old }] }] } });
+    const a = shortenRunawayBeatIds(project()).project.story.beats;
+    const b = shortenRunawayBeatIds(project()).project.story.beats;
+    expect(a[0].id).toBe(b[0].id);
+    expect(a[1].connections[0].targetId).toBe(a[0].id);
+  });
+
+  it('steps past an id that is already taken', () => {
+    const taken = shortBeatIdFor(old);
+    const { project } = shortenRunawayBeatIds({ story: { beats: [{ id: taken }, { id: old }] } });
+    expect(project.story.beats[1].id).toBe(shortBeatIdFor(old, 1));
   });
 });

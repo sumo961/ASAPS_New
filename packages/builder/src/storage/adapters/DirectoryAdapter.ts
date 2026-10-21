@@ -21,6 +21,7 @@ import {
   type DirectoryReader,
   type SerializeInput,
   type DirectoryAssetManifest,
+  type DuplicateBeatId,
   setManifestEntry,
   parseManifest,
   serializeManifest,
@@ -64,6 +65,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
   private unwatchFn: (() => void) | null = null;
   /** Asset manifest from last openProject() — used to register assets in storage */
   private lastManifest: DirectoryAssetManifest | null = null;
+  private lastDuplicateBeatIds: DuplicateBeatId[] = [];
 
   /**
    * Create an Electron IPC-based DirectoryReader
@@ -121,6 +123,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     // Save manifest for asset registration
     this.lastManifest = result.manifest;
+    this.lastDuplicateBeatIds = result.duplicateBeatIds ?? [];
     console.log('[DirectoryAdapter] Manifest loaded with', Object.keys(result.manifest.assets).length, 'assets');
 
     // Convert deserialized data back into a Project structure
@@ -157,6 +160,11 @@ export class DirectoryAdapter implements PersistenceAdapter {
     };
 
     return project;
+  }
+
+  /** Beat ids the last openProject() found in more than one file. */
+  getDuplicateBeatIds(): DuplicateBeatId[] {
+    return this.lastDuplicateBeatIds;
   }
 
   /** Get the asset manifest from the last openProject() call */

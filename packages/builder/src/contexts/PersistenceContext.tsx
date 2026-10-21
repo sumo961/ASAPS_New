@@ -356,6 +356,28 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     );
   }, [storage]);
 
+  /**
+   * A folder with the same beat id in two files: say what loading did, once
+   * per folder state (opening can pass through here twice).
+   */
+  const reportedDuplicatesRef = useRef('');
+  const reportDuplicateBeatIds = useCallback((adapter: DirectoryAdapter | null) => {
+    const dups = adapter?.getDuplicateBeatIds() ?? [];
+    const key = JSON.stringify(dups);
+    if (dups.length === 0 || key === reportedDuplicatesRef.current) return;
+    reportedDuplicatesRef.current = key;
+    const lines = dups.map((d) => {
+      const what = d.renamed.length > 0
+        ? `the other version is kept as a separate beat (${d.renamed.map((r) => r.to).join(', ')}) — keep one and delete the other`
+        : 'the copies were identical, so one is kept';
+      return `"${d.name}" is in ${d.files.length} files (${d.files.join(', ')}): ${what}.`;
+    });
+    notify.warning(
+      `This project had beats saved twice under the same ID, usually from a merge or a move that was committed without its deletion. ${lines.join(' ')} Your next save tidies the files; commit that with the VCS panel.`,
+      { sticky: true },
+    );
+  }, []);
+
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
     // A passive instance (Preview Window) never watches: with two windows
     // armed, the main window's own autosave read as an "external" change
@@ -738,6 +760,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       }
 
       await repairRunawayBeatIds(loadedProject, loadedProject.storageFormat === 'directory' ? directoryAdapterRef.current : null);
+      if (loadedProject.storageFormat === 'directory') reportDuplicateBeatIds(directoryAdapterRef.current);
 
       // CRITICAL: Set currentProject ONCE with fully-prepared data (including translations)
       // This ensures App.tsx's load effect sees translations on the first render
@@ -753,7 +776,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds]);
+  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds]);
 
   /**
    * Create a new project
@@ -1216,6 +1239,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       }
 
       await repairRunawayBeatIds(project, adapter);
+      reportDuplicateBeatIds(adapter);
       const versionWarning = newerVersionWarning(project.savedWith);
       if (versionWarning) notify.warning(versionWarning, { sticky: true });
 
@@ -1271,7 +1295,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       if (error instanceof ConflictMarkersError) notifyConflictMarkers(error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, repairRunawayBeatIds]);
+  }, [storage, commandManager, cancelPending, repairRunawayBeatIds, reportDuplicateBeatIds]);
 
   /**
    * Save the current project as a directory-format project (Electron only)

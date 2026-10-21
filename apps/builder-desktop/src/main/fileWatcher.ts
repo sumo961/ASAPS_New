@@ -82,21 +82,20 @@ export class FileWatcher {
   /**
    * Stop watching and clean up
    */
-  stop(): void {
+  stop(): Promise<void> {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
 
-    if (this.watcher) {
-      this.watcher.close();
-      this.watcher = null;
-    }
+    const closed = this.watcher ? this.watcher.close() : Promise.resolve();
+    this.watcher = null;
 
     this.pendingChanges.clear();
     this.onChanges = null;
 
     console.log(`[FileWatcher] Stopped watching: ${this.projectPath}`);
+    return closed;
   }
 
   /**
@@ -191,9 +190,21 @@ export function startWatching(
 /**
  * Stop the active file watcher
  */
-export function stopWatching(): void {
-  if (activeWatcher) {
-    activeWatcher.stop();
-    activeWatcher = null;
-  }
+export function stopWatching(): Promise<void> {
+  const closed = activeWatcher ? activeWatcher.stop() : Promise.resolve();
+  activeWatcher = null;
+  return closed;
+}
+
+/**
+ * Close the watcher before the app exits — and wait for it. On macOS a
+ * chokidar/fsevents watcher still open at exit deadlocks Node's shutdown
+ * (fse_instance_destroy waits on a mutex forever): the windows are gone
+ * but the process never ends, so an update waiting for it to end
+ * ("Restart Now") hangs until the app is killed.
+ */
+export function stopWatchingBeforeExit(): Promise<void> {
+  return stopWatching().catch((error) => {
+    console.error('[FileWatcher] Closing before exit failed:', error);
+  });
 }

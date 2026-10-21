@@ -5,6 +5,8 @@
  * groups, 2026-10-20). A random part makes an id unique without any
  * coordination. Existing ids are never changed.
  */
+import { derivedBeatId } from '@asaps/core';
+
 const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
 
 export function newBeatId(): string {
@@ -13,6 +15,18 @@ export function newBeatId(): string {
   let suffix = '';
   for (const b of bytes) suffix += ALPHABET[b % ALPHABET.length];
   return `beat_${suffix}`;
+}
+
+/**
+ * The short id a runaway id becomes: derived from the old id, not random.
+ * With random ids every repair invented different ones — two teammates
+ * opening the same old project each renamed the beat differently (their
+ * pulls then conflicted), and two repairs in one session left links and the
+ * beat file disagreeing: a choice pointed at an id no beat had
+ * (bullying-IDN, 2026-10-20). Derived, every repair anywhere agrees.
+ */
+export function shortBeatIdFor(oldId: string, attempt = 0): string {
+  return derivedBeatId(attempt ? `${oldId}#${attempt}` : oldId);
 }
 
 /** An id grown by copy-of-copy (or merge) suffixes: long, or more than one `_copy`. */
@@ -48,8 +62,9 @@ export function shortenRunawayBeatIds<P extends { story?: any; globalSettings?: 
   for (const b of beats) {
     const id = String(b?.id ?? '');
     if (!id || !isRunawayBeatId(id)) continue;
-    let fresh = newBeatId();
-    while (taken.has(fresh)) fresh = newBeatId();
+    let attempt = 0;
+    let fresh = shortBeatIdFor(id);
+    while (taken.has(fresh)) fresh = shortBeatIdFor(id, ++attempt);
     taken.add(fresh);
     map.set(id, fresh);
   }

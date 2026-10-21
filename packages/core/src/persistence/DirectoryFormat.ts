@@ -15,6 +15,7 @@
  *   assets/_manifest.json + subfolders
  */
 
+import { resolveDuplicateBeatIds, type DuplicateBeatId } from './duplicateBeatIds';
 import {
   serializeBeat,
   serializeBeatFromJSON,
@@ -169,6 +170,8 @@ export interface DeserializeResult {
   aiEdits?: any;
   ideatorSessions?: any[];
   coDesignerSessions?: any[];
+  /** Beat ids found in more than one file, and how loading settled them. */
+  duplicateBeatIds?: DuplicateBeatId[];
 }
 
 // ============================================================================
@@ -362,7 +365,9 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
         size: asset.size,
         folder,
         ...(asset.uploadedAt ? { uploadedAt: toISOString(asset.uploadedAt) } : {}),
-        ...(asset.metadata ? { metadata: asset.metadata } : {}),
+        // Empty metadata depended on which local store the asset came from, so
+        // each computer rewrote the manifest a little differently.
+        ...(asset.metadata && Object.keys(asset.metadata).length > 0 ? { metadata: asset.metadata } : {}),
       };
 
       setManifestEntry(manifest, entry);
@@ -570,7 +575,8 @@ export async function deserializeFromDirectory(
 
   // 7. Read clusters and beats
   const clusters: Cluster[] = [];
-  const beats: SerializedBeat[] = [];
+  let beats: SerializedBeat[] = [];
+  const beatFiles: string[] = [];
   let containerBeatPositions: ContainerBeatPosition[] = [];
 
   const clustersPath = join(rootPath, 'clusters');
@@ -608,6 +614,7 @@ export async function deserializeFromDirectory(
               const beatData = JSON.parse(beatJson);
               const { _format, ...beatContent } = beatData;
               beats.push(beatContent as SerializedBeat);
+              beatFiles.push(`clusters/${slug}/${file.name}`);
             }
           }
         }
@@ -624,9 +631,20 @@ export async function deserializeFromDirectory(
           const beatData = JSON.parse(beatJson);
           const { _format, ...beatContent } = beatData;
           beats.push(beatContent as SerializedBeat);
+          beatFiles.push(`clusters/_unclustered/${file.name}`);
         }
       }
     }
+  }
+
+  // The same beat id in two files (a merge, or a move committed without
+  // its deletion): drop identical extras, keep differing ones under their
+  // own id, and report it — the next save used to delete one silently.
+  const resolved = resolveDuplicateBeatIds(beats, beatFiles);
+  beats = resolved.beats;
+  const duplicateBeatIds = resolved.duplicates;
+  if (duplicateBeatIds.length > 0) {
+    console.warn('[DirectoryFormat] Beat ids in more than one file:', duplicateBeatIds);
   }
 
   // Sort beats by numeric ID for consistent ordering across platforms.
@@ -733,6 +751,7 @@ export async function deserializeFromDirectory(
     aiEdits,
     ideatorSessions,
     coDesignerSessions,
+    duplicateBeatIds,
   };
 }
 
