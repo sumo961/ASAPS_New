@@ -352,9 +352,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     // sound, shared visuals, size): the frame renders straight from
     // data.cluster, so a map assigned in the popover was otherwise applied
     // to state but never re-synced to the node — the picker looked dead.
+    // (The ambient sound's volume too: its slider snapped back.)
     const fingerprint = nodes.map(n => {
       const clusterExtra = n.type === 'cluster'
-        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.mapAssetUrl || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
+        ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.mapAssetUrl || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sound?.volume ?? ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
         : '';
       return `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
     }).join('|');
