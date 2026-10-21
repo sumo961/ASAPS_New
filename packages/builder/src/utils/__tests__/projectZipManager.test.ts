@@ -794,7 +794,7 @@ describe('projectZipManager', () => {
       const result = await importProjectFromZip(zipFile, { generateNewId: true });
       expect(result.success).toBe(true);
       const story = mockStorage.createProject.mock.calls[0][0].story;
-      const sound = (story.clusters ?? story.metadata?.clusters)[0].sound;
+      const sound = (story.clusters ?? story.metadata.clusters)[0].sound;
       expect(sound.file).not.toBe('old_rain');
       expect(mockStorage.createAsset.mock.calls.map((c: any[]) => c[0].id ?? c[0]?.metadata?.id)).toContain(sound.file);
     });
