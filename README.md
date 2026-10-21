@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.132** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.132 puts dialogs into text**: the
+Current release: **v0.9.133** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.133 protects newer work from
+older copies of ASAPS**: dialog lines and replies now keep anything a newer
+version added (a teammate's outdated copy had turned every "then" line of a
+group's dialogs into an empty player reply), and an older ASAPS opening a
+project saved by a newer one pauses auto-save and asks before saving.
+
+**v0.9.132 put dialogs into text**: the
 Dialog Editor's **Export text** saves a whole conversation as a readable
 script (characters' lines, player replies, conditions, effects and where each
 reply leads), and **Import text** turns such a script — exported, or written

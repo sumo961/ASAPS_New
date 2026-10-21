@@ -1,5 +1,18 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Newer work survives older copies (v0.9.133)
+
+### Overview
+Investigation of a group's "destroyed" dialog trees (bullying-IDN): a teammate's push of 20 October 13:03 (`527737c`, "he didn't edit the dialog trees") removed all 62 `"continue": true` steps and the speaker looks (`speakerState`) from five dialog trees — every "then" line became an empty **Player says** reply and the scenes stopped playing through. No text changed. Cause: an outdated ASAPS (both fields are from v0.9.112 / v0.9.118); its dialog migration rebuilt each line and reply from a list of known fields and dropped the rest. **Today's core did the same** with any field it doesn't know, so the next new dialog feature would have been stripped by the next teammate who hadn't updated.
+- **Dialog lines and replies keep fields this version doesn't know** (`DialogTreeBeat.migrateDialogTree` spreads the node / choice and reworks only `next`, `choices`, `target`, `dialogNode`). Test: unknown fields survive a load and save; the old formats still migrate.
+- **A project saved by a newer ASAPS holds auto-save** in an older one (`guardNewerVersion`): the warning says so, and a manual Save asks first ("Save with this older ASAPS?" → **Save anyway**). Opening another project lifts it. Before, it only warned while auto-save went on stripping.
+- **The version stamp stays reliable**: since v0.9.127 project.json isn't rewritten for a timestamp alone; that also froze `savedWith`. Now a newer ASAPS still stamps it once (per version), an older one writing a real change keeps the higher stamp (`keepNewestSavedWith`), and a pull still puts back a stamp-only project.json (version bumps included; the next save stamps it again).
+- For the group: repaired copies of the three damaged trees (current versions with the 61 "then" steps and 4 looks put back; *Vic & Parents* identical to its last good version) and a note.
+
+**Files modified:** packages/core/src/beats/DialogTreeBeat.ts, packages/builder/src/contexts/PersistenceContext.tsx, packages/builder/src/utils/projectMetaStamps.ts, packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/builder/src/vcs/GitAdapter.ts, docs/USER_GUIDE.md (*Use the same ASAPS version*), tests (DialogTreeUnknownFields, projectMetaStamps, DirectoryAdapter.behavior)
+
+---
+
 ## 2026-10-21: Dialogs as text (v0.9.132)
 
 ### Overview
