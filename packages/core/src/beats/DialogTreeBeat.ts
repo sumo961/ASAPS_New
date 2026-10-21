@@ -194,7 +194,14 @@ export class DialogTreeBeat extends Beat {
   private migrateDialogTree(node: any): DialogNode {
     if (!node) return { id: 'root', speaker: '', text: '', choices: [] };
 
+    // Keep every field this version doesn't know about. Rebuilding a line
+    // from a list of known fields made an older ASAPS strip what a newer one
+    // added: one teammate's save on an outdated version removed every
+    // "continue" step and speaker look from a project's dialogs
+    // (bullying-IDN, 2026-10-20). Only `next` and `choices` are reworked.
+    const { next: _legacyNext, choices: _choices, ...nodeRest } = node;
     const migrated: DialogNode = {
+      ...nodeRest,
       id: node.id || 'root',
       speaker: node.speaker || '',
       // Preserve characterRef across migrations and nested-node deep walks so
@@ -213,7 +220,11 @@ export class DialogTreeBeat extends Beat {
     // Migrate choices
     if (node.choices && Array.isArray(node.choices)) {
       migrated.choices = node.choices.map((choice: any) => {
+        // Unknown fields pass through (see above); `target` and `dialogNode`
+        // are rebuilt below.
+        const { target: _target, dialogNode: _dialogNode, ...choiceRest } = choice;
         const migratedChoice: DialogChoice = {
+          ...choiceRest,
           id: choice.id,
           text: choice.text,
           conditions: choice.conditions,

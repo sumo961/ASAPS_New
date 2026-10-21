@@ -477,7 +477,8 @@ async function restoreStampOnlyProjectJson(projectPath: string): Promise<void> {
   const committed = await run('git', ['show', 'HEAD:./project.json'], projectPath);
   if (committed.exitCode !== 0) return;
   const local = new TextDecoder().decode(await api.fs.readFile(`${projectPath}${sepOf(projectPath)}project.json`));
-  if (onlyStampsDiffer(committed.stdout, local)) {
+  // A version bump alone is put back too; the next save stamps it again.
+  if (onlyStampsDiffer(committed.stdout, local, { ignoreVersionBump: true })) {
     await run('git', ['checkout', 'HEAD', '--', 'project.json'], projectPath);
   }
 }

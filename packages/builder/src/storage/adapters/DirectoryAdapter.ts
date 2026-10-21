@@ -7,7 +7,7 @@
  * Electron-only: requires window.electronAPI.fs
  */
 
-import { onlyStampsDiffer } from '../../utils/projectMetaStamps';
+import { onlyStampsDiffer, keepNewestSavedWith } from '../../utils/projectMetaStamps';
 import type { Project, GlobalSettings, StoredAsset } from '../types';
 import type { Beat, Cluster } from '@asaps/core';
 import {
@@ -245,9 +245,12 @@ export class DirectoryAdapter implements PersistenceAdapter {
       // project.json: leave it alone when only its stamps (modifiedAt,
       // savedWith) would change — otherwise opening a project made it
       // "modified" and Git refused teammates' pulls.
+      let content = file.content;
       if (file.path === 'project.json' && await api.fs.exists(fullPath)) {
         try {
-          if (onlyStampsDiffer(await reader.readText(fullPath), file.content)) continue;
+          const existing = await reader.readText(fullPath);
+          content = keepNewestSavedWith(existing, content);
+          if (onlyStampsDiffer(existing, content)) continue;
         } catch {
           // unreadable — write it fresh below
         }
@@ -255,7 +258,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
       // Ensure parent directory exists
       await api.fs.mkdir(parentDir(fullPath));
-      await api.fs.writeFile(fullPath, file.content);
+      await api.fs.writeFile(fullPath, content);
     }
 
     // Clean up orphaned beat files (beats deleted from the project)

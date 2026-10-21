@@ -257,9 +257,22 @@ describe('project.json stamps (group report 2026-10-21)', () => {
     serialize.mockReturnValueOnce(meta({}) as any);
     await a.saveProject(project('2026-10-20T10:00:00Z'));
     const first = fakeFs.files.get('/proj/project.json');
-    serialize.mockReturnValueOnce(meta({ modifiedAt: '2026-10-21T10:00:00Z', savedWith: '0.9.127' }) as any);
+    serialize.mockReturnValueOnce(meta({ modifiedAt: '2026-10-21T10:00:00Z' }) as any);
     await a.saveProject(project('2026-10-21T10:00:00Z'));
     expect(fakeFs.files.get('/proj/project.json')).toBe(first);
+    // A newer ASAPS stamps the project once (an older copy can then warn) …
+    serialize.mockReturnValueOnce(meta({ modifiedAt: '2026-10-21T10:30:00Z', savedWith: '0.9.127' }) as any);
+    await a.saveProject(project('2026-10-21T10:30:00Z'));
+    const stamped = fakeFs.files.get('/proj/project.json');
+    expect(JSON.parse(stamped as string).savedWith).toBe('0.9.127');
+    // … and then leaves it alone again.
+    serialize.mockReturnValueOnce(meta({ modifiedAt: '2026-10-21T10:40:00Z', savedWith: '0.9.127' }) as any);
+    await a.saveProject(project('2026-10-21T10:40:00Z'));
+    expect(fakeFs.files.get('/proj/project.json')).toBe(stamped);
+    // An older ASAPS writing a real change keeps the newer stamp.
+    serialize.mockReturnValueOnce(meta({ name: 'Older rename', modifiedAt: '2026-10-21T10:50:00Z', savedWith: '0.9.120' }) as any);
+    await a.saveProject(project('2026-10-21T10:50:00Z', 'Older rename'));
+    expect(JSON.parse(fakeFs.files.get('/proj/project.json') as string)).toMatchObject({ name: 'Older rename', savedWith: '0.9.127' });
     serialize.mockReturnValueOnce(meta({ name: 'Renamed', modifiedAt: '2026-10-21T11:00:00Z' }) as any);
     await a.saveProject(project('2026-10-21T11:00:00Z', 'Renamed'));
     expect(JSON.parse(fakeFs.files.get('/proj/project.json') as string).name).toBe('Renamed');

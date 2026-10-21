@@ -28,7 +28,7 @@ import { markProjectNew, consumeProjectNew, sanitizeFolderName } from '../utils/
 import { findUniqueProjectName } from '../utils/uniqueProjectName';
 import { shortenRunawayBeatIds } from '../utils/beatIds';
 import { newerVersionWarning } from '../utils/appVersion';
-import { notify } from '../utils/notify';
+import { notify, confirmAction } from '../utils/notify';
 
 // ============================================================================
 // Context Types
@@ -230,6 +230,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   const autoSaveCtlRef = useRef<{ pause: () => void; resume: () => void; status: SaveStatus } | null>(null);
   /** Auto-save paused because the folder changed outside ASAPS while there were unsaved edits. */
   const pausedForExternalRef = useRef(false);
+  /** Auto-save held: the open project was saved by a newer ASAPS. */
+  const pausedForNewerRef = useRef(false);
   /** One external-change warning per project per session — the point is
    *  awareness, not a nag on every sync-daemon touch. */
   const externalWarnedRef = useRef<Set<string>>(new Set());
@@ -376,6 +378,25 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       `This project had beats saved twice under the same ID, usually from a merge or a move that was committed without its deletion. ${lines.join(' ')} Your next save tidies the files; commit that with the VCS panel.`,
       { sticky: true },
     );
+  }, []);
+
+  /**
+   * A project saved by a newer ASAPS: warn AND hold auto-save. An older
+   * version's save drops what the newer one added — one teammate's outdated
+   * copy removed every "continue" step and speaker look from a group's
+   * dialogs while they "didn't edit the dialog trees" (bullying-IDN,
+   * 2026-10-20). A manual Save asks first; opening another project lifts it.
+   */
+  const guardNewerVersion = useCallback((savedWith: string | undefined) => {
+    const warning = newerVersionWarning(savedWith);
+    const ctl = autoSaveCtlRef.current;
+    if (!warning) {
+      if (pausedForNewerRef.current) { pausedForNewerRef.current = false; ctl?.resume(); }
+      return;
+    }
+    ctl?.pause();
+    pausedForNewerRef.current = true;
+    notify.warning(`${warning} Auto-save is paused so nothing that version added gets lost; Save asks before writing.`, { sticky: true });
   }, []);
 
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
@@ -561,6 +582,16 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
   /** A manual save after an outside change keeps the author's version — and ends the pause. */
   const saveNowResuming = useCallback(async () => {
+    if (pausedForNewerRef.current) {
+      const go = await confirmAction({
+        title: 'Save with this older ASAPS?',
+        message: `${newerVersionWarning(currentProjectRef.current?.savedWith) ?? 'This project was saved by a newer ASAPS.'} Saving now can remove what the newer version added (for example new dialog features) — for everyone who pulls it.`,
+        confirmLabel: 'Save anyway',
+      });
+      if (!go) return;
+      pausedForNewerRef.current = false;
+      resume();
+    }
     await saveNow();
     if (pausedForExternalRef.current) {
       pausedForExternalRef.current = false;
@@ -715,8 +746,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
             const freshProject = await adapter.openProject(dirPath);
             // Merge all data from disk into the loaded project
             if (freshProject.story) loadedProject.story = freshProject.story;
-            const versionWarning = newerVersionWarning(freshProject.savedWith);
-            if (versionWarning) notify.warning(versionWarning, { sticky: true });
+            guardNewerVersion(freshProject.savedWith);
             if (freshProject.settings) loadedProject.settings = freshProject.settings;
             if (freshProject.translations && freshProject.translations.length > 0) {
               loadedProject.translations = freshProject.translations;
@@ -776,7 +806,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       console.error('[PersistenceProvider] Failed to load project:', error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds]);
+  }, [storage, commandManager, cancelPending, syncCallback, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion]);
 
   /**
    * Create a new project
@@ -1240,8 +1270,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
       await repairRunawayBeatIds(project, adapter);
       reportDuplicateBeatIds(adapter);
-      const versionWarning = newerVersionWarning(project.savedWith);
-      if (versionWarning) notify.warning(versionWarning, { sticky: true });
+      guardNewerVersion(project.savedWith);
 
       // Stamp directory metadata on the project for session persistence
       project.directoryPath = dirPath;
@@ -1295,7 +1324,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       if (error instanceof ConflictMarkersError) notifyConflictMarkers(error);
       return false;
     }
-  }, [storage, commandManager, cancelPending, repairRunawayBeatIds, reportDuplicateBeatIds]);
+  }, [storage, commandManager, cancelPending, repairRunawayBeatIds, reportDuplicateBeatIds, guardNewerVersion]);
 
   /**
    * Save the current project as a directory-format project (Electron only)
