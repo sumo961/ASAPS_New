@@ -1,5 +1,15 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Straight to the last reply (v0.9.131)
+
+### Overview
+- **Dialog Editor: "Last reply"** (student report: "is there a way to go to the last player response without going through previous ones? Especially when changing the connection, I need to go through the whole dialogue"). A new **Last reply** button opens the path to the deepest line of the conversation, scrolls to its last player reply and puts the cursor in it (`goToLastReply`; anchors `data-dialog-anchor`; the scroll runs in an effect after the expanded path renders, no timers). **Expand all / Collapse all** now has a label (it was an unlabeled icon) and follows what is actually open — the old flag started as "expanded", so the first click only collapsed. The student's other point ("after a while the text box for player response is not visible") was the squeezed reply cards fixed in v0.9.130: the text box sat in a column that clips, and a squeezed card clipped it away.
+  Verified on a 20-exchange tree: from a collapsed tree (3 text boxes), Last reply shows the whole path (59) with the last reply ("Bye") focused and in view; Expand all → 59, Collapse all → 3.
+
+**Files modified:** packages/builder/src/editors/DialogTreeEditor.tsx, docs/USER_GUIDE.md
+
+---
+
 ## 2026-10-21: Long conversations that stay readable (v0.9.130)
 
 ### Overview

@@ -523,6 +523,10 @@ Presentation Mode and the pacing settings below sit under **Show Advanced Option
 
 **Long conversations stay readable.** For a long scene, open the editor in a large window with the ⤢ button. The editor indents a conversation only where it branches: a line with a single reply continues straight down, so even a long back-and-forth stays full width. Lines with several replies indent their answers for the first few branching levels. Deeper ones keep that indent and show **Level N** with a violet line, so you can still tell where you are.
 
+Two buttons at the top of the editor, next to **AI Generate**, save you the clicking:
+- **Last reply** opens the conversation down to its deepest line and puts the cursor in the last player reply, so you can change where a long scene ends without opening every exchange.
+- **Expand all** / **Collapse all** opens or closes every exchange at once.
+
 <a id="conditional-choices"></a>
 **Earned options — choices that appear only when they've been earned.** Directly under a choice's **Target** in the Inspector sits a small **Show only if…** editor (the same one Movement Choice destinations, Pick Prop props, and hotspots carry). Add a condition there and the choice is *hidden* until every condition holds — an inventory **item** the player has (or lacks), a **variable** value, a **counter** comparison, a **visited beat** (visited or not yet visited), a **role** (who plays a [role](#roles) — offered once your project has roles), or a **feeling** — how a character feels toward the player (or another character): pick who feels it, the emotion (*trust*, *fear*, any name from your emotion palette; leave it empty to sum all feelings), whom it is toward, and a strength between −1 and 1 (0.3 is mild, 0.6 strong). Tick *since start* to test how much the feeling has *changed* rather than where it stands. This is the tool for the "Ask about the mysterious symbol" option that should only exist once the player has actually found the note. Two habits make it pay off:
 

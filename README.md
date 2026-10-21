@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.130** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.130 keeps long conversations
+Current release: **v0.9.131** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.131 takes you straight to the last
+reply**: a **Last reply** button in the Dialog Editor opens a long
+conversation down to its deepest line and puts the cursor in the last player
+reply, and **Expand all / Collapse all** is now labelled and always does what
+it says.
+
+**v0.9.130 kept long conversations
 readable** in the Dialog Editor: it indents only where a conversation
 branches, so a long back-and-forth runs straight down at full width instead
 of being squeezed into ever narrower boxes, and very deep branches show
