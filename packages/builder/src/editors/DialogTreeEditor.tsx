@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   MessageSquare,
+  ArrowDown,
   Plus,
   Trash2,
   ChevronRight,
@@ -177,6 +178,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     return new Set(['root']);
   });
   const [expandedChoices, setExpandedChoices] = useState<Set<string>>(new Set());
+  /** A reply to scroll to and focus once its path is expanded (Last reply). */
+  const [scrollToChoice, setScrollToChoice] = useState<string | null>(null);
   // Continue steps whose conditions & effects panel is open (by choice id).
   const [openStepSettings, setOpenStepSettings] = useState<Set<string>>(new Set());
 
@@ -187,7 +190,6 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   // can see where the canvas is at a glance.
   const [canvasFocusedNodeId, setCanvasFocusedNodeId] = useState<string>('root');
   const [editingNode, setEditingNode] = useState<{node: DialogNode, path: string[]} | null>(null);
-  const [globalExpanded, setGlobalExpanded] = useState(true);
   const [showAIDialog, setShowAIDialog] = useState(false);
   const [aiScene, setAiScene] = useState('');
   const [aiCharacter, setAiCharacter] = useState('');
@@ -484,9 +486,57 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     setExpandedChoices(newExpanded);
   };
 
+  /**
+   * Open the path to the deepest line of the conversation and go to its last
+   * player reply — so changing where a long scene ends doesn't mean opening
+   * every exchange on the way (student report, 2026-10-21).
+   */
+  const goToLastReply = () => {
+    let deepest: string[] = ['root'];
+    let deepestNode: DialogNode = dialogTree;
+    const walk = (node: DialogNode, path: string[]) => {
+      if (path.length > deepest.length) { deepest = path; deepestNode = node; }
+      (node.choices || []).forEach((choice, index) => {
+        if (choice.dialogNode) walk(choice.dialogNode, [...path, `choice_${index}`]);
+      });
+    };
+    walk(dialogTree, ['root']);
+    const partials: string[] = [];
+    for (let i = 1; i <= deepest.length; i++) partials.push(deepest.slice(0, i).join('.'));
+    setExpandedNodes(prev => new Set([...prev, ...partials]));
+    setExpandedChoices(prev => new Set([...prev, ...partials.slice(1)]));
+    const replies = (deepestNode.choices || []).map((c, i) => ({ c, i })).filter(({ c }) => !c.continue);
+    const last = replies[replies.length - 1];
+    setScrollToChoice(last ? `${deepest.join('.')}.choice_${last.i}` : deepest.join('.'));
+  };
+
+  // Scroll once the expanded path has rendered (no timers: runs after commit).
+  useEffect(() => {
+    if (!scrollToChoice) return;
+    const el = document.querySelector(`[data-dialog-anchor="${CSS.escape(scrollToChoice)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    (el.querySelector('textarea, input') as HTMLElement | null)?.focus({ preventScroll: true });
+    setScrollToChoice(null);
+  }, [scrollToChoice, expandedNodes, expandedChoices]);
+
+  // Every reply that opens a nested line — open them all and the tree is expanded.
+  const expandableChoiceIds: string[] = [];
+  const collectExpandable = (node: DialogNode, path: string[]) => {
+    (node.choices || []).forEach((choice, index) => {
+      if (!choice.dialogNode) return;
+      expandableChoiceIds.push(`${path.join('.')}.choice_${index}`);
+      collectExpandable(choice.dialogNode, [...path, `choice_${index}`]);
+    });
+  };
+  collectExpandable(dialogTree, ['root']);
+  // Derived from what is actually open: the stored flag started as
+  // "expanded" whatever the tree showed, so the first click only collapsed.
+  const allExpanded = expandableChoiceIds.length > 0 && expandableChoiceIds.every((id) => expandedChoices.has(id));
+
   // Expand/Collapse all
   const toggleAllExpanded = () => {
-    if (globalExpanded) {
+    if (allExpanded) {
       // Collapse all (but keep root expanded to show "Add Player Response")
       setExpandedNodes(new Set(['root']));
       setExpandedChoices(new Set());
@@ -515,7 +565,6 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       setExpandedNodes(allNodeIds);
       setExpandedChoices(allChoiceIds);
     }
-    setGlobalExpanded(!globalExpanded);
   };
 
   // Handle AI dialog generation
@@ -597,7 +646,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const branches = replyChoices.length > 1 && indentLevel < MAX_INDENT;
     const deepLevel = indentLevel >= MAX_INDENT && replyChoices.length > 1 ? Math.floor(depth / 2) + 1 : null;
     return (
-      <div key={nodeId} className={`${depth > 0 && !chained && indented ? (expanded ? 'ml-4' : 'ml-2') : ''}`}>
+      <div key={nodeId} data-dialog-anchor={nodeId} className={`${depth > 0 && !chained && indented ? (expanded ? 'ml-4' : 'ml-2') : ''}`}>
         {/* Node Header */}
         <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
@@ -823,7 +872,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               const nestedSpeakerColor = choice.dialogNode ? getSpeakerColor(choice.dialogNode.speaker || 'NPC') : null;
 
               return (
-                <div key={choice.id} className="mb-2 min-w-[16rem]">
+                <div key={choice.id} data-dialog-anchor={choiceId} className="mb-2 min-w-[16rem]">
                   {/* For collapsible patterns, show the NPC response above the player's exit choice */}
                   {isCollapsible && choice.dialogNode && nestedSpeakerColor && (
                     <div className={`mb-1 p-2 ${nestedSpeakerColor.bg} border ${nestedSpeakerColor.border} rounded-lg overflow-hidden relative`}>
@@ -1380,14 +1429,24 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             AI Generate
           </button>
           <button
-            onClick={toggleAllExpanded}
-            className="p-1 hover:bg-gray-100 rounded"
-            title={globalExpanded ? "Collapse all" : "Expand all"}
+            onClick={goToLastReply}
+            className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"
+            title="Open the conversation to its deepest line and go to the last player reply"
+            data-testid="dialog-go-to-last-reply"
           >
-            {globalExpanded ?
-              <Minimize2 className="w-4 h-4" /> :
-              <Maximize2 className="w-4 h-4" />
+            <ArrowDown className="w-3.5 h-3.5" />
+            Last reply
+          </button>
+          <button
+            onClick={toggleAllExpanded}
+            className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"
+            title={allExpanded ? "Close every exchange" : "Open every exchange of the conversation"}
+          >
+            {allExpanded ?
+              <Minimize2 className="w-3.5 h-3.5" /> :
+              <Maximize2 className="w-3.5 h-3.5" />
             }
+            {allExpanded ? 'Collapse all' : 'Expand all'}
           </button>
           {/* The Conditions/Effects toggle buttons that used to live here
               gated NOTHING — their state was read only to colour the button.
