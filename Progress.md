@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Merges that finish (v0.9.129)
+
+### Overview
+- **Pulls finish when a beat was renamed on both sides** (bullying-IDN report: after ASAPS shortened copied-beat IDs, every pull ended in a conflict that neither **Accept Remote Changes** — "path … does not have their version" — nor **Keep both** — "Still to decide: …" — could settle). A teammate's older ASAPS had shortened `beat_29_copy…_copy…` to a random ID and pushed; this computer's 0.9.126+ shortened it to the derived one. Git reports that as a rename/rename conflict: the old file deleted on both sides (DD), each new file on one side only (AU/UA), and Git's one-sided stages hold a merged copy *with conflict markers*.
+  - The conflict list now includes every unmerged state (it knew only UU/AA/DD, so AU/UA/UD/DU could never be resolved).
+  - **Keep My Changes / Accept Remote Changes** remove a file the chosen side doesn't have instead of failing, and take a marked-up one-sided file from that side's commit (`takeConflictSide`).
+  - **Keep both** recognises one beat renamed differently on each side, keeps the incoming ID, drops the local file and points local links at the incoming ID; keeps any other one-sided file (nobody's work is lost) and removes files deleted on both sides; reads one-sided and add/add files from their commits; writes incoming files exactly as they came (no formatting noise).
+  - Conflict paths are now given to Git from the repository root (`:/path`), so all of this — and Keep both generally — also works for a project folder inside a repository subfolder.
+  - Replayed on the group's real repository (the student's state before the random repair, the derived repair, then their current main): Keep both commits the merge, no conflict markers anywhere, the result equals main plus the student's own work (their new beat and two "(your version)" copies of beats both sides edited). Real-git tests for repo root and subfolder (`keepBothRenames.git.test.ts`); the order-based mocks of the resolve functions moved to `gitRouter`.
+
+**Files modified:** packages/builder/src/vcs/GitAdapter.ts, packages/builder/src/vcs/keepBoth.ts, tests (keepBothRenames.git, GitAdapterAdvanced, GitAdapterOps)
+
+---
+
 ## 2026-10-21: A volume slider that moves (v0.9.128)
 
 ### Overview

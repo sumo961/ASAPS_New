@@ -22,8 +22,16 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.128** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.128 fixes the volume slider of a
+Current release: **v0.9.129** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.129 lets merges finish**: when two
+teammates' ASAPS shortened the same copied beat's ID differently, every pull
+ended in a conflict that neither **Keep both** nor **Accept Remote Changes**
+could settle. Now Keep both keeps one beat (the incoming ID, with your links
+following it) and every other file someone still has, Keep My Changes and
+Accept Remote Changes no longer fail on files one side doesn't have, and all
+of it also works for a project folder inside a repository subfolder.
+
+**v0.9.128 fixed the volume slider of a
 cluster's ambient sound**, which snapped back to its old value instead of
 moving.
 
