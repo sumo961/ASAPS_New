@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.131** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.131 takes you straight to the last
+Current release: **v0.9.132** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.132 puts dialogs into text**: the
+Dialog Editor's **Export text** saves a whole conversation as a readable
+script (characters' lines, player replies, conditions, effects and where each
+reply leads), and **Import text** turns such a script — exported, or written
+by hand — into a new Dialog Tree beat, so a conversation can be kept, shared
+and rebuilt.
+
+**v0.9.131 took you straight to the last
 reply**: a **Last reply** button in the Dialog Editor opens a long
 conversation down to its deepest line and puts the cursor in the last player
 reply, and **Expand all / Collapse all** is now labelled and always does what

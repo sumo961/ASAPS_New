@@ -527,6 +527,27 @@ Two buttons at the top of the editor, next to **AI Generate**, save you the clic
 - **Last reply** opens the conversation down to its deepest line and puts the cursor in the last player reply, so you can change where a long scene ends without opening every exchange.
 - **Expand all** / **Collapse all** opens or closes every exchange at once.
 
+<a id="dialog-as-text"></a>
+**A conversation as text.** **Export text** (next to **Last reply**) saves the whole conversation as a `.txt` file named after the beat — readable on its own, handy for checking a scene, sharing it, or keeping a copy. **Import text** turns such a text back into a Dialog Tree: paste it or choose the file, check what ASAPS found (lines, replies, anything it couldn't place), name the beat and choose **Create beat**. It always becomes a **new** beat with the open beat's settings; the beat you imported into stays exactly as it was, so you can compare and keep the one you want.
+
+The text looks like a script, two spaces per level:
+
+```
+Friend: I saw what happened at lunch.
+  > Me too. I should have done something.  {courage +1}
+    Friend: Then let's talk to Vic together.  -> Talk to Vic
+  > It's none of my business.  {if courage < 2}
+    Friend: Or would that just make things worse?
+    then Teacher: Everything all right here?
+```
+
+- `Name: line` — a character speaks; `> reply` — the player answers, with the answer indented under it; `then Name: line` — the next line follows without a reply.
+- `-> Beat name` — where it leads (`-> (start)` goes back to the start of this dialog).
+- `{if …}` — a condition, e.g. `{if courage < 2}`, `{if var met_vic == true}`, `{if has key}`, `{if not visited Talk to Vic}`.
+- `{…}` — an effect, e.g. `{courage +1}`, `{courage = 3}`, `{set met_vic = true}`, `{give key}`, `{take key (Billie)}`. Other conditions and effects are written in their stored form, `{if {…}}` and `{effect {…}}` — leave those as they are.
+
+Speaker looks, emotions, reply sounds and visibility aren't part of the text (the file says so at the top); add them again after importing.
+
 <a id="conditional-choices"></a>
 **Earned options — choices that appear only when they've been earned.** Directly under a choice's **Target** in the Inspector sits a small **Show only if…** editor (the same one Movement Choice destinations, Pick Prop props, and hotspots carry). Add a condition there and the choice is *hidden* until every condition holds — an inventory **item** the player has (or lacks), a **variable** value, a **counter** comparison, a **visited beat** (visited or not yet visited), a **role** (who plays a [role](#roles) — offered once your project has roles), or a **feeling** — how a character feels toward the player (or another character): pick who feels it, the emotion (*trust*, *fear*, any name from your emotion palette; leave it empty to sum all feelings), whom it is toward, and a strength between −1 and 1 (0.3 is mild, 0.6 strong). Tick *since start* to test how much the feeling has *changed* rather than where it stands. This is the tool for the "Ask about the mysterious symbol" option that should only exist once the player has actually found the note. Two habits make it pay off:
 

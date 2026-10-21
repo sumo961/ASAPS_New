@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Dialogs as text (v0.9.132)
+
+### Overview
+- **Dialog Tree as text: Export text / Import text** (student request after a dialog tree and a day's edits were lost: "it would be nice to have a text version of the dialogue instead of copy-paste from each response"). In the Dialog Editor, **Export text** saves the conversation as a readable `.txt` script; **Import text** (paste, or choose a file) creates a NEW Dialog Tree beat from such a text — a copy of the open beat with the imported conversation, one undo step — and never replaces the beat it came from.
+  - Format (`utils/dialogTreeText.ts`): `Name: line`, `> reply` with its answer indented under it, `then Name: line` (next line without a reply), `-> Beat name` (by name when unique, else id; `(start)` = loop to the start), `{if …}` conditions and `{…}` effects — readable for counters, variables, items and visited beats (`{if courage < 2}`, `{courage +1}`, `{give note (Billie)}`, `{if not visited Talk to Vic}`), any other kept in its stored form (`{if {…}}`, `{effect {…}}`) so nothing is lost. Special characters in lines are escaped. Left out, and said so in the file's header: speaker looks, emotions, reply sounds and visibility.
+  - The import window shows what it found ("20 lines and 39 replies") and what it couldn't place (unknown beat names, unreadable lines) before creating the beat.
+  - Verified: round-trip tests (nested replies, then-lines, conditions, effects, special characters, ambiguous beat names, loops); in the builder, a 20-exchange tree exported, imported as a new beat and exported again gives the identical text (apart from the title).
+
+**Files modified:** packages/builder/src/utils/dialogTreeText.ts (new), packages/builder/src/editors/DialogTreeEditor.tsx, packages/builder/src/components/Inspector.tsx, packages/builder/src/App.tsx, docs/USER_GUIDE.md (*A conversation as text*), tests (dialogTreeText)
+
+---
+
 ## 2026-10-21: Straight to the last reply (v0.9.131)
 
 ### Overview
