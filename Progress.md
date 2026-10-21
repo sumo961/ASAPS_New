@@ -1,5 +1,20 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-20: Updates that finish, IDs that agree (v0.9.126)
+
+### Overview
+Why an update sometimes stuck after **Restart Now** until the app was killed — two causes, both fixed. Like every updater fix this helps from the update *after* the release that ships it: the restart into that release still runs the old code.
+- **The process never ended (macOS):** a project folder's file watcher (chokidar → fsevents) still open at exit deadlocks Node's shutdown — the windows close, but the main thread waits forever in `fse_instance_destroy` (stack sample of a stuck dev instance), and the installer waits for the app to end. The watcher is now closed, and waited for, before quitting and before `quitAndInstall` (`stopWatchingBeforeExit`). Verified: a dev instance with a watched folder project now exits about 2 s after quit; before, it hung.
+- **Unsaved changes held the close:** the editor's unsaved-changes guard (beforeunload) cancels a window close, and Electron cancels silently, so a quit or update restart with an auto-save waiting (or a failed save) just stopped. Now the main process asks every editor to finish saving and waits for the answers (`saveBeforeQuit.ts`, preload `app.onSaveBeforeQuit`, `useAutoSave.saveBeforeQuit`; signal-based — a request ends with its answer or the window going away/hanging). The guard reads the live save status (a stale copy held the close right after saving). Whatever still can't be saved gets a real dialog — **Restart and install** / **Close anyway** or **Cancel** (`will-prevent-unload`). Verified: an edit made just before quitting is on disk after the quit.
+
+- **Repaired beat ids are derived, not random** (bullying-IDN, 2026-10-20): the v0.9.123 runaway-id repair gave each long id a random short one. Every teammate's ASAPS repaired the same old project differently, so their pulls conflicted in the files linking to those beats ("won't open: merge conflicts in 3 files"), and two repairs in one session left a choice pointing at an id no beat had (their "trip Vic" choice → `beat_mu0x9q3u`, beat saved as `beat_na22e6b5`). `shortBeatIdFor` derives the id from the old one (cyrb53), so every repair anywhere agrees.
+- **One beat id in two files** (the same project: "cafeteria, ignore" committed both inside its cluster and outside it): loading read both, and the next save kept one and silently deleted the other file — which then showed up as an unexplained deletion in everyone's Pending Changes. Now the folder loader settles it (`resolveDuplicateBeatIds`): an identical extra copy is dropped (the one in its cluster wins), a differing copy is kept as its own beat under a derived id, and a notice names the files and says to commit the tidy-up. Verified against their repository: 83 beats, the cluster copy kept.
+- **Asset manifest without empty metadata:** `"metadata": {}` was written or not depending on which local store an asset came from, so each computer rewrote `assets/_manifest.json` slightly differently (noise in every commit).
+
+**Files modified:** packages/builder/src/utils/beatIds.ts, packages/core/src/persistence/DirectoryFormat.ts, packages/core/src/persistence/duplicateBeatIds.ts (new), packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/builder/src/contexts/PersistenceContext.tsx, apps/builder-desktop/src/main/index.ts, apps/builder-desktop/src/main/saveBeforeQuit.ts (new), apps/builder-desktop/src/main/fileWatcher.ts, apps/builder-desktop/src/preload/index.ts, packages/builder/src/hooks/useAutoSave.ts, tests (saveBeforeQuit, useAutoSave, beatIds, DirectoryFormat, duplicateBeatIds)
+
+---
+
 ## 2026-10-20: Messenger chats and music fades (v0.9.125)
 
 ### Overview

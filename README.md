@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.125** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.125 gives chats a messenger
+Current release: **v0.9.126** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.126 makes updates finish**:
+**Restart Now** no longer hangs until you force-quit (on macOS an open
+project folder kept the app from closing, and unsaved work could hold the
+quit — ASAPS now saves first and asks only when something can't be saved);
+because the restart into a new version still runs the old one, this helps
+from the update *after* 0.9.126. Teammates opening the same old project now
+shorten long copied-beat IDs the same way instead of conflicting, a beat
+saved twice under one ID is settled and reported instead of one copy
+silently disappearing, and the asset list no longer changes a little on
+every computer.
+
+**v0.9.125 gave chats a messenger
 look and music a fade**: a Dialog Tree in a chat layout can show a frame
 picture (a phone, say) with the chat running inside a chat window you place
 in the Visual Editor; the new **Set Music Volume** effect fades music out,
