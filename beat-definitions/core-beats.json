@@ -892,14 +892,22 @@
             "accept": "image/*",
             "label": "Chat frame picture",
             "help": "A picture behind the chat, like a phone or messenger screen. Move and resize the chat window on the canvas so it sits inside the picture's screen.",
-            "dependsOn": { "field": "layoutTemplate", "value": ["chat-scroll", "chat-bubble"] }
+            "dependsOn": {
+              "field": "layoutTemplate",
+              "value": [
+                "chat-scroll",
+                "chat-bubble"
+              ]
+            }
           }
         },
         "chatWindow": {
           "type": "object",
           "required": false,
           "description": "Chat layouts: where the conversation sits on the stage, {x, y, width, height} in stage pixels. Unset: the whole stage. Leave room around it for a frame picture (chatFrameImage) or the background.",
-          "ui": { "hidden": true }
+          "ui": {
+            "hidden": true
+          }
         },
         "responseDelay": {
           "type": "number",
@@ -2626,6 +2634,17 @@
           "aliases": [
             "falseTarget"
           ]
+        },
+        "moreConditions": {
+          "type": "array<object>",
+          "required": false,
+          "description": "Further conditions checked together with `condition`, each in the same shape (e.g. {\"type\":\"variable\",\"variableName\":\"attachedOldChat\",\"operator\":\"==\",\"value\":true}). With conditionsMatch 'any' the beat takes trueConnection when AT LEAST ONE condition holds (OR); with 'all' (default) only when EVERY condition holds (AND). Use this instead of chaining several Condition Check beats for one decision."
+        },
+        "conditionsMatch": {
+          "type": "string",
+          "required": false,
+          "default": "all",
+          "description": "How `condition` and `moreConditions` combine: 'all' = every one must hold (AND), 'any' = at least one (OR). Only matters when moreConditions has entries."
         }
       },
       "nested": {

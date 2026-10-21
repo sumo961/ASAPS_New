@@ -547,7 +547,7 @@ function effectTouchesName(e: any, nameSet: Set<string>): boolean {
 function formatConditionSummary(c: any): string {
   if (!c || typeof c !== 'object') return 'condition';
   const t = c.type;
-  if (t === 'inventory') return `has ${c.item || '?'}`;
+  if (t === 'inventory') return `${c.checkType === 'notHas' || c.operator === 'not' || c.operator === '!=' ? 'lacks' : 'has'} ${c.item || '?'}`;
   if (t === 'counter') return `${c.variableName || c.variable || '?'} ${c.operator || ''} ${c.value ?? ''}`.trim();
   if (t === 'variable') return `${c.variableName || c.variable || '?'} ${c.operator || ''} ${c.value ?? ''}`.trim();
   if (t === 'visitedBeat') return `visited ${c.beatId || '?'}`;
@@ -575,7 +575,7 @@ function evaluateCondition(condition: Condition, state: SimulationState): boolea
       const item = (condition as any).item || value;
       const char = (condition as any).character || 'player';
       const has = state.inventory.get(char)?.has(item) ?? false;
-      return operator === '!=' || operator === 'not' ? !has : has;
+      return operator === '!=' || operator === 'not' || (condition as any).checkType === 'notHas' ? !has : has;
     }
     case 'visitedBeat': {
       const id = (condition as any).beatId || varName;

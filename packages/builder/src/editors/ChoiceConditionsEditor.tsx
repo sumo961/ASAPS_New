@@ -48,6 +48,8 @@ interface ChoiceConditionsEditorProps {
   label?: string;
   /** Tooltip on the Add button. */
   addTitle?: string;
+  /** Show the "On the flowchart edge" line; off where the conditions have no edge of their own. */
+  edgeSummary?: boolean;
 }
 
 type GateType = 'inventory' | 'variable' | 'counter' | 'visitedBeat' | 'sentiment' | 'roleHolder';
@@ -94,6 +96,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
   characters,
   label = 'Show only if…',
   addTitle = "Add a condition — the choice is shown only when every condition holds. The guard appears on this choice's edge in the flowchart.",
+  edgeSummary = true,
 }) => {
   const conditions = value ?? [];
   const roles = useProjectRoles();
@@ -364,7 +367,7 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
         );
       })}
 
-      {summary && (
+      {edgeSummary && summary && (
         <div className="text-[10px] text-violet-600">
           On the flowchart edge: <span className="font-mono">◇ {summary}</span>
         </div>

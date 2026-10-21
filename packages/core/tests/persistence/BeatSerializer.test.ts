@@ -90,6 +90,19 @@ describe('BeatSerializer', () => {
       expect(result).not.toHaveProperty('notes');
     });
 
+    it('keeps the other fields Beat.toJSON writes (they were lost in folder projects)', () => {
+      const result: any = serializeBeatFromJSON({
+        id: 'beat_5', type: 'infoText', name: 'Info', parameters: {}, connections: [],
+        timeDisplayMode: 'manual', timeDisplayText: 'Day 2', overrideCountdownMeter: true,
+        explainHuds: true, characterRef: 'char_vic', unsetField: undefined,
+      });
+      expect(result).toMatchObject({
+        timeDisplayMode: 'manual', timeDisplayText: 'Day 2', overrideCountdownMeter: true,
+        explainHuds: true, characterRef: 'char_vic',
+      });
+      expect(result).not.toHaveProperty('unsetField');
+    });
+
     it('strips condition from connections when not present', () => {
       const raw = {
         id: 'beat_4',

@@ -8,6 +8,7 @@
 import type { EditingLockFile } from './EditingLocks';
 import { mergeEditingLocks, parseLockFile, sameLockFile } from './editingLockMerge';
 import { onlyStampsDiffer } from '../utils/projectMetaStamps';
+import { APP_VERSION, isNewerVersion, newerVersionWarning } from '../utils/appVersion';
 import { resolveKeepBoth, fixDuplicateIdsAfterMerge, movedSummary, type KeepBothResult } from './keepBoth';
 
 export interface GitFileStatus {
@@ -327,8 +328,38 @@ export async function gitUnstage(projectPath: string, filePaths: string[]): Prom
   };
 }
 
+/**
+ * The newest ASAPS version recorded for this project — in project.json on
+ * disk, in the last commit, and on the remote branch. An older ASAPS doesn't
+ * commit or push a project a newer one saved (2026-10-21, strict on purpose:
+ * an outdated copy stripped a group's dialogs on save and the push spread it).
+ */
+async function refuseIfNewerProject(projectPath: string): Promise<GitOperationResult | null> {
+  const run = getRunCommand();
+  const versions: string[] = [];
+  const api = window.electronAPI;
+  try {
+    const file = `${projectPath}${sepOf(projectPath)}project.json`;
+    if (api?.fs && await api.fs.exists(file)) {
+      versions.push(String(JSON.parse(new TextDecoder().decode(await api.fs.readFile(file)))?.savedWith ?? ''));
+    }
+  } catch { /* unreadable — the commits below still count */ }
+  for (const rev of ['HEAD', '@{u}']) {
+    const r = await run('git', ['show', `${rev}:./project.json`], projectPath);
+    if (r.exitCode !== 0) continue;
+    try { versions.push(String(JSON.parse(r.stdout)?.savedWith ?? '')); } catch { /* skip */ }
+  }
+  const newest = versions.filter(Boolean).reduce((a, b) => (isNewerVersion(b, a) ? b : a), '');
+  if (newest && isNewerVersion(newest, APP_VERSION)) {
+    return { success: false, message: newerVersionWarning(newest) ?? `Update ASAPS to v${newest} first.` };
+  }
+  return null;
+}
+
 /** Commit staged changes */
 export async function gitCommit(projectPath: string, message: string): Promise<GitOperationResult> {
+  const refused = await refuseIfNewerProject(projectPath);
+  if (refused) return refused;
   const run = getRunCommand();
   console.log('[GitAdapter] Committing:', message, 'in', projectPath);
   const result = await run('git', ['commit', '-m', message], projectPath);
@@ -351,6 +382,8 @@ function isNoRemoteError(stderr: string): boolean {
 
 /** Push to remote. Automatically sets upstream on first push. */
 export async function gitPush(projectPath: string): Promise<GitOperationResult> {
+  const refused = await refuseIfNewerProject(projectPath);
+  if (refused) return refused;
   const run = getRunCommand();
   // Try normal push first
   const result = await run('git', ['push'], projectPath);

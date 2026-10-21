@@ -24,6 +24,19 @@ export function isNewerVersion(a: string, b: string): boolean {
 export function newerVersionWarning(savedWith: string | undefined, current: string = APP_VERSION): string | null {
   if (!savedWith || !isNewerVersion(savedWith, current)) return null;
   return `This project was last saved with ASAPS v${savedWith}, a newer version than yours (v${current}). `
-    + 'Update ASAPS before you edit it: an older version can drop or rewrite what the newer one saved, '
-    + 'and in a group that shows up as beats changed or deleted. Everyone working on the project should use the same version.';
+    + 'This ASAPS will not save it, commit or push it: an older version drops or rewrites what the newer one saved, '
+    + 'and in a group that shows up as beats changed or deleted. Update with Help ▸ Check for Updates…, then open the project again.';
+}
+
+/**
+ * Thrown when an older ASAPS would write a project a newer one saved. Strict
+ * on purpose (2026-10-21): a teammate's outdated copy removed every "then"
+ * line and speaker look from a group's dialogs on save — refusing the write
+ * is simpler and safer than teaching every version to keep what it doesn't know.
+ */
+export class NewerProjectError extends Error {
+  constructor(public readonly savedWith: string) {
+    super(newerVersionWarning(savedWith) ?? `This project was saved with ASAPS v${savedWith}; update ASAPS first.`);
+    this.name = 'NewerProjectError';
+  }
 }

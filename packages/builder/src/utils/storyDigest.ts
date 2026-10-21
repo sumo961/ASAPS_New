@@ -144,7 +144,10 @@ function storyStateInUse(beats: DigestBeat[], characters: DigestCharacter[] = []
       if (p.type === 'counter' && !p.character) counters.add(p.name);
       else if (p.type !== 'fictionalTime' && p.type !== 'counter') variables.add(p.name);
     }
-    if (b.type === 'conditionBeat') condition(p.condition ?? p);
+    if (b.type === 'conditionBeat') {
+      condition(p.condition ?? p);
+      if (Array.isArray(p.moreConditions)) p.moreConditions.forEach(condition);
+    }
   }
   for (const n of charCounters) counters.delete(n);
   return { counters: [...counters].sort(), variables: [...variables].sort() };
@@ -166,6 +169,12 @@ function wiringLines(beat: DigestBeat): string[] {
   if (req.length > 0) {
     const joiner = beat.requiresMode === 'any' ? ' OR ' : ' AND ';
     out.push(`    requires: ${req.map((r) => describeCondition((r.condition || {}) as any) + (r.fallbackTarget ? ` (else → ${r.fallbackTarget})` : '')).join(joiner)}`);
+  }
+  if (beat.type === 'conditionBeat') {
+    const p = beatParams(beat) as any;
+    const first = p.condition && typeof p.condition === 'object' ? p.condition : { ...p, type: p.conditionType };
+    const all = [first, ...(Array.isArray(p.moreConditions) ? p.moreConditions : [])];
+    out.push(`    checks: ${all.map((c) => describeCondition(c)).join(p.conditionsMatch === 'any' ? ' OR ' : ' AND ')}`);
   }
   // Effects on the beat's own links (e.g. an infoText's Continue).
   try {

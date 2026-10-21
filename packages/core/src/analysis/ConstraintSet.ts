@@ -183,7 +183,8 @@ export function addConditionConstraint(
     const item = condition.variableName || (condition as any).item || (condition as any).left;
     if (!item) return result;
 
-    const checkHas = condition.operator === '==' || condition.operator === 'contains' || condition.operator === 'has' as any;
+    const checkHas = (condition as any).checkType !== 'notHas'
+      && (condition.operator === '==' || condition.operator === 'contains' || condition.operator === 'has' as any);
     const mustHaveItem = branchTaken === checkHas;
 
     if (!result.inventory.has(character)) {

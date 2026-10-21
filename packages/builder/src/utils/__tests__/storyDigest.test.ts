@@ -157,4 +157,20 @@ describe('digest reports enough to preserve a counter', () => {
     expect(digest).toContain('-100..100');
     expect(digest).toContain('2 bands');
   });
+
+  it('shows what a Condition Check tests, with AND/OR across its conditions', () => {
+    const digest = buildStoryDigest({
+      beats: [beat({
+        type: 'conditionBeat',
+        name: 'Gate',
+        parameters: {
+          condition: { type: 'inventory', item: 'key', checkType: 'notHas' },
+          moreConditions: [{ type: 'variable', variableName: 'metBefore', operator: '==', value: true }],
+          conditionsMatch: 'any',
+        },
+      })],
+    } as any);
+    expect(digest).toContain('    checks: lacks key OR metBefore == true');
+    expect(digest).toContain('metBefore');
+  });
 });

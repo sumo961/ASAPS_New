@@ -55,7 +55,7 @@ Respond with JSON in this structure:
 - After pickProp → infoText describing the item (MANDATORY - player needs narrative payoff)
 - Before endScreen → conditionBeat checking accumulated state (counters, variables, inventory)
 - Use setVariable before conditional branches
-- Use conditionBeat to create branching based on variables, counters, inventory, or fictional time
+- Use conditionBeat to create branching based on variables, counters, inventory, or fictional time (several checks in one beat: "moreConditions" + "conditionsMatch" "all" = AND, "any" = OR)
 - Use addRemoveInventory to REMOVE items or add from non-pickProp sources (pickProp auto-adds!)
 
 ## Timing and Pressure Features

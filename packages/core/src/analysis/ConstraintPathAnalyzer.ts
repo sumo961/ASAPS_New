@@ -243,10 +243,14 @@ export class ConstraintPathAnalyzer {
     const trueTarget = params.trueTarget || connections.find(c => c.label === 'true')?.targetId;
     const falseTarget = params.falseTarget || connections.find(c => c.label === 'false')?.targetId;
 
+    // Several conditions (AND/OR): each branch can be reached in one or more ways.
+    const conditions: Condition[] = [condition, ...(Array.isArray(params.moreConditions) ? params.moreConditions : [])];
+    const match: 'all' | 'any' = params.conditionsMatch === 'any' ? 'any' : 'all';
+    const waysTo = (wanted: boolean) => conditionBranchConstraints(state.constraints, conditions, match, wanted);
+
     // Try TRUE branch
     if (trueTarget) {
-      const constraintsIfTrue = addConditionConstraint(state.constraints, condition, true);
-      if (constraintsIfTrue !== null) {
+      for (const constraintsIfTrue of waysTo(true)) {
         const targetBeat = this.story.getBeat(trueTarget);
         if (targetBeat) {
           // Create a new path with the condition result recorded (don't mutate shared path)
@@ -265,8 +269,7 @@ export class ConstraintPathAnalyzer {
 
     // Try FALSE branch
     if (falseTarget) {
-      const constraintsIfFalse = addConditionConstraint(state.constraints, condition, false);
-      if (constraintsIfFalse !== null) {
+      for (const constraintsIfFalse of waysTo(false)) {
         const targetBeat = this.story.getBeat(falseTarget);
         if (targetBeat) {
           // Create a new path with the condition result recorded (don't mutate shared path)
@@ -612,4 +615,29 @@ export class ConstraintPathAnalyzer {
       analysisTime: performance.now() - startTime,
     };
   }
+}
+
+/**
+ * The constraint sets under which a Condition Check takes its true (`wanted`)
+ * or false branch. One condition: as before. Several: "every one" outcomes
+ * (AND true, OR false) are one set with all of them; "at least one" outcomes
+ * (AND false, OR true) are one set per condition. Impossible sets are left out.
+ */
+function conditionBranchConstraints(
+  base: Parameters<typeof addConditionConstraint>[0],
+  conditions: Condition[],
+  match: 'all' | 'any',
+  wanted: boolean,
+): NonNullable<ReturnType<typeof addConditionConstraint>>[] {
+  const everyOne = (match === 'all') === wanted;
+  if (everyOne) {
+    let constraints: ReturnType<typeof addConditionConstraint> = base;
+    for (const c of conditions) {
+      constraints = constraints === null ? null : addConditionConstraint(constraints, c, wanted);
+    }
+    return constraints === null ? [] : [constraints];
+  }
+  return conditions
+    .map((c) => addConditionConstraint(base, c, wanted))
+    .filter((c): c is NonNullable<typeof c> => c !== null);
 }

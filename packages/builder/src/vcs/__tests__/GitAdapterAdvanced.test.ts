@@ -608,26 +608,32 @@ describe('GitAdapter Advanced Operations', () => {
   // ==========================================================================
   describe('gitPush - upstream auto-setup', () => {
     it('auto-sets upstream on first push (no tracking info)', async () => {
-      const runCommand = vi.fn()
-        // First push fails — no upstream
-        .mockResolvedValueOnce({ stdout: '', stderr: 'fatal: The current branch feature has no upstream branch.', exitCode: 1 })
-        // Get current branch
-        .mockResolvedValueOnce({ stdout: 'feature\n', stderr: '', exitCode: 0 })
-        // Retry with -u
-        .mockResolvedValueOnce({ stdout: '', stderr: 'Branch feature set up to track remote branch', exitCode: 0 });
+      const noFile = { stdout: '', stderr: 'fatal: path does not exist', exitCode: 128 };
+      const runCommand = gitRouter({
+        show: noFile,
+        push: [
+          { stdout: '', stderr: 'fatal: The current branch feature has no upstream branch.', exitCode: 1 },
+          { stdout: '', stderr: 'Branch feature set up to track remote branch', exitCode: 0 },
+        ],
+        'rev-parse': { stdout: 'feature\n', stderr: '', exitCode: 0 },
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPush('/project');
 
       expect(result.success).toBe(true);
-      expect(runCommand).toHaveBeenNthCalledWith(3, 'git', ['push', '-u', 'origin', 'feature'], '/project');
+      expect(runCommand).toHaveBeenCalledWith('git', ['push', '-u', 'origin', 'feature'], '/project');
     });
 
     it('handles push -u failure', async () => {
-      const runCommand = vi.fn()
-        .mockResolvedValueOnce({ stdout: '', stderr: 'fatal: has no upstream branch', exitCode: 1 })
-        .mockResolvedValueOnce({ stdout: 'main\n', stderr: '', exitCode: 0 })
-        .mockResolvedValueOnce({ stdout: '', stderr: 'fatal: remote origin not configured', exitCode: 1 });
+      const runCommand = gitRouter({
+        show: { stdout: '', stderr: 'fatal: path does not exist', exitCode: 128 },
+        push: [
+          { stdout: '', stderr: 'fatal: has no upstream branch', exitCode: 1 },
+          { stdout: '', stderr: 'fatal: remote origin not configured', exitCode: 1 },
+        ],
+        'rev-parse': { stdout: 'main\n', stderr: '', exitCode: 0 },
+      });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPush('/project');

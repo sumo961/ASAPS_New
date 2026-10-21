@@ -34,6 +34,13 @@ vi.mock('@asaps/core', () => ({
   generateUniqueFilename: vi.fn((name: string) => name),
 }));
 
+// A realistic app version (tests otherwise run as 0.0.0, older than any project).
+vi.mock('../../../utils/appVersion', async (importOriginal) => {
+  const real: any = await importOriginal();
+  class NewerProjectError extends Error { constructor(public savedWith: string) { super(`saved with v${savedWith}`); this.name = 'NewerProjectError'; } }
+  return { ...real, APP_VERSION: '0.9.130', NewerProjectError };
+});
+
 import { DirectoryAdapter, isElectronWithFS } from '../DirectoryAdapter';
 import { serializeToDirectory } from '@asaps/core';
 
@@ -276,6 +283,16 @@ describe('project.json stamps (group report 2026-10-21)', () => {
     serialize.mockReturnValueOnce(meta({ name: 'Renamed', modifiedAt: '2026-10-21T11:00:00Z' }) as any);
     await a.saveProject(project('2026-10-21T11:00:00Z', 'Renamed'));
     expect(JSON.parse(fakeFs.files.get('/proj/project.json') as string).name).toBe('Renamed');
+  });
+
+  it('refuses to write a project a newer ASAPS saved (strict, 2026-10-21)', async () => {
+    const a = adapterAt('/proj');
+    const before = JSON.stringify({ _format: '1.0', id: 'p1', name: 'Story', savedWith: '0.9.200' });
+    fakeFs.files.set('/proj/project.json', before);
+    await expect(a.saveProject(project('2026-10-21T12:00:00Z'))).rejects.toThrow(/0\.9\.200/);
+    await expect(a.saveProjectMeta({ name: 'X' })).rejects.toThrow(/0\.9\.200/);
+    await expect(a.saveBeat({ id: 'b', type: 'infoText' } as any)).rejects.toThrow(/0\.9\.200/);
+    expect(fakeFs.files.get('/proj/project.json')).toBe(before);
   });
 
   it('saveProjectMeta writes nothing when nothing but the stamp would change', async () => {

@@ -1513,10 +1513,10 @@ export class StateSimulationAnalyzer {
         const inv = state.inventory.get(character);
         const hasItem = inv?.has(item as string) ?? false;
 
-        if (operator === 'contains' || operator === '==') {
-          return hasItem;
-        } else if (operator === 'not' || operator === '!=') {
+        if ((condition as any).checkType === 'notHas' || operator === 'not' || operator === '!=') {
           return !hasItem;
+        } else if (operator === 'contains' || operator === '==') {
+          return hasItem;
         }
         return false;
       }

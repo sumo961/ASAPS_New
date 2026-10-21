@@ -1001,7 +1001,7 @@ function buildConditionAnnotation(condition: any, params: any): ConditionAnnotat
       conditionText = `${variable} ${operator} ${JSON.stringify(value)}`;
       break;
     case 'inventory':
-      conditionText = `has ${item || variable}`;
+      conditionText = `${(condition?.checkType ?? params?.checkType) === 'notHas' || operator === 'not' || operator === '!=' ? 'lacks' : 'has'} ${item || variable}`;
       break;
     case 'visitedBeat':
       conditionText = `visited ${condition?.beatId || variable}`;
@@ -1014,6 +1014,16 @@ function buildConditionAnnotation(condition: any, params: any): ConditionAnnotat
       break;
     default:
       conditionText = `${type}: ${variable} ${operator} ${value}`;
+  }
+
+  // More conditions (AND / OR): "a == true OR b == true".
+  const more = Array.isArray(params?.moreConditions) ? params.moreConditions : [];
+  if (more.length > 0) {
+    const joiner = params?.conditionsMatch === 'any' ? ' OR ' : ' AND ';
+    const rest = more
+      .map((c: any) => buildConditionAnnotation(c, {})?.conditionText)
+      .filter(Boolean);
+    conditionText = [conditionText, ...rest].join(joiner);
   }
 
   return { conditionText, conditionType: type, variable, operator, value };

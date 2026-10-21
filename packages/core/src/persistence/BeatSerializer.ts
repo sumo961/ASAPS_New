@@ -121,6 +121,28 @@ export interface SerializedBeat {
   _format: string;
 }
 
+/** Fields the serializers below write themselves (normalized or skipped). */
+const HANDLED_FIELDS = new Set([
+  'id', 'type', 'name', 'x', 'y', 'parameters', 'locations', 'connections', 'cluster', 'node',
+  'transition', 'sound', 'defaultTarget', 'defaultTargetDelay', 'showTimer', 'notes', 'speaker',
+  'showSpeaker', 'requires', 'requiresMode', '_format',
+]);
+
+/**
+ * Every other field the beat wrote, unchanged. A fixed list here dropped
+ * fields Beat.toJSON writes — timeDisplayMode, timeDisplayText,
+ * overrideCountdownMeter, explainHuds, characterRef — from every beat of a
+ * folder project on save (2026-10-21).
+ */
+function otherFields(raw: any): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw ?? {})) {
+    if (HANDLED_FIELDS.has(key) || value === undefined || value === null) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
 /**
  * Serialize a beat to a deterministic JSON object ready for file output.
  * Uses Beat.toJSON() as the source and normalizes for VCS-friendly output.
@@ -131,6 +153,7 @@ export function serializeBeat(beat: Beat): SerializedBeat {
   const sanitizedSound = sanitizeSound(raw.sound);
 
   const result: SerializedBeat = {
+    ...otherFields(raw),
     id: raw.id,
     type: raw.type,
     name: raw.name,
@@ -176,6 +199,7 @@ export function serializeBeatFromJSON(raw: any): SerializedBeat {
   const sanitizedSound = sanitizeSound(raw.sound);
 
   const result: SerializedBeat = {
+    ...otherFields(raw),
     id: raw.id,
     type: raw.type,
     name: raw.name,

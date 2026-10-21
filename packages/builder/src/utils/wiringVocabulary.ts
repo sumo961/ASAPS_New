@@ -213,7 +213,7 @@ export function describeCondition(c: Json): string {
       return `${name}${c.character ? ` (${String(c.character)})` : ''}${op}${val}`;
     }
     case 'counterCompare': return `${String(c.counter1)}${op} ${String(c.counter2)}`;
-    case 'inventory': return `${c.checkType === 'lacks' ? 'lacks' : 'has'} ${String(c.item)}${c.character ? ` (${String(c.character)})` : ''}`;
+    case 'inventory': return `${c.checkType === 'notHas' || c.operator === 'not' || c.operator === '!=' ? 'lacks' : 'has'} ${String(c.item)}${c.character ? ` (${String(c.character)})` : ''}`;
     case 'visitedBeat': return `${c.operator === 'not' || c.operator === '!=' ? 'not visited' : 'visited'} ${String(c.beatId)}`;
     case 'sentiment': return `${String(c.character)} ${String(c.sentimentEmotion ?? 'sentiment')} toward ${String(c.sentimentTarget)}${op}${val}`;
     case 'emotion': return `${String(c.character)} ${String(c.emotionName)}${op}${val}`;

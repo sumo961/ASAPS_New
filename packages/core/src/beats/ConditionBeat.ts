@@ -58,6 +58,14 @@ export class ConditionBeat extends Beat {
   // value (string) for back-compat.
   public goalId?: string;
   public goalStatus?: 'open' | 'met' | 'failed' | 'abandoned';
+  /**
+   * More conditions checked together with the first one (student request,
+   * 2026-10-21: "if attachedGamingChat == true OR attachedOldChat == true
+   * this happens, if not that happens" — took two chained beats before).
+   * `conditionsMatch` 'all' = every condition (AND), 'any' = at least one (OR).
+   */
+  public moreConditions: Condition[] = [];
+  public conditionsMatch: 'all' | 'any' = 'all';
   // characterVariant-specific parameter — the variant id under test.
   public variantId?: string;
   // roleHolder: the cast role under test (character = who should hold it).
@@ -158,8 +166,20 @@ export class ConditionBeat extends Beat {
     this.permission = conditionObj.permission || (params as any).permission || (config as any).permission;
     this.proximityMode = conditionObj.proximityMode || (params as any).proximityMode || (config as any).proximityMode;
 
+    this.moreConditions = ConditionBeat.readMoreConditions((params as any).moreConditions ?? (config as any).moreConditions);
+    this.conditionsMatch = ((params as any).conditionsMatch ?? (config as any).conditionsMatch) === 'any' ? 'any' : 'all';
+
     // Build condition object based on type
     this.condition = this.buildCondition();
+  }
+
+  private static readMoreConditions(raw: unknown): Condition[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((c) => c && typeof c === 'object' && typeof (c as any).type === 'string')
+      .map((c: any) => (c.type === 'inventory' && c.checkType === 'notHas' && c.operator !== 'not' && c.operator !== '!='
+        ? { ...c, operator: 'not' }
+        : c)) as Condition[];
   }
   
   private buildCondition(): Condition {
@@ -309,6 +329,7 @@ export class ConditionBeat extends Beat {
 
   getParameters(): Record<string, any> {
     return {
+      ...(this.moreConditions.length > 0 ? { moreConditions: this.moreConditions, conditionsMatch: this.conditionsMatch } : {}),
       conditionType: this.conditionType,
       condition: this.condition,
       trueTarget: this.trueTarget,
@@ -653,9 +674,18 @@ export class ConditionBeat extends Beat {
       this.proximityMode = conditionObj.proximityMode;
     }
 
+    // `in`, not `!== undefined`: removing the last extra condition sends undefined.
+    if ('moreConditions' in params) this.moreConditions = ConditionBeat.readMoreConditions(params.moreConditions);
+    if ('conditionsMatch' in params) this.conditionsMatch = params.conditionsMatch === 'any' ? 'any' : 'all';
+
     // Rebuild condition object from extracted canonical values
     // This ensures the condition object always reflects the extracted fields
     this.condition = this.buildCondition();
+  }
+
+  /** Every condition this beat checks: the first one, then the others. */
+  getAllConditions(): Condition[] {
+    return [this.condition, ...this.moreConditions];
   }
 
   protected async performAction(
@@ -721,7 +751,13 @@ export class ConditionBeat extends Beat {
     }
 
     try {
-      const conditionResult = context.checkCondition(this.condition);
+      const firstResult = context.checkCondition(this.condition);
+      const moreResults = this.moreConditions.map((c) => context.checkCondition(c));
+      const conditionResult = moreResults.length === 0
+        ? firstResult
+        : this.conditionsMatch === 'any'
+          ? firstResult || moreResults.some(Boolean)
+          : firstResult && moreResults.every(Boolean);
       
       // Build a human-readable reason for the branch decision
       const varName = this.variableName || this.variable;
@@ -760,6 +796,11 @@ export class ConditionBeat extends Beat {
           : context.getVariable(varName || '');
         const ownerTag = this.conditionType === 'counter' && this.character ? `@${this.character}` : '';
         reason = `${varName}${ownerTag} (${JSON.stringify(currentValue)}) ${this.operator} ${JSON.stringify(compareValue)} = ${conditionResult}`;
+      }
+
+      if (moreResults.length > 0) {
+        const parts = this.moreConditions.map((c, i) => `${(c as any).variableName ?? (c as any).item ?? (c as any).beatId ?? c.type} = ${moreResults[i]}`);
+        reason = `${reason.replace(/ = (true|false)$/, ` = ${firstResult}`)} ${this.conditionsMatch === 'any' ? 'OR' : 'AND'} ${parts.join(this.conditionsMatch === 'any' ? ' OR ' : ' AND ')} → ${conditionResult}`;
       }
 
       console.log(`ConditionBeat ${this.id}: ${reason}`);

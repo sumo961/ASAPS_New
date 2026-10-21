@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-20T15:42:04.949Z
+ * Generated: 2026-10-21T21:51:21.706Z
  */
 
 // ============================================
@@ -604,6 +604,10 @@ export interface ConditionBeatParameters {
   trueConnection: Connection;
   /** Target if condition is false */
   falseConnection?: Connection | undefined;
+  /** Further conditions checked together with `condition`, each in the same shape (e.g. {"type":"variable","variableName":"attachedOldChat","operator":"==","value":true}). With conditionsMatch 'any' the beat takes trueConnection when AT LEAST ONE condition holds (OR); with 'all' (default) only when EVERY condition holds (AND). Use this instead of chaining several Condition Check beats for one decision. */
+  moreConditions?: Object[] | undefined;
+  /** How `condition` and `moreConditions` combine: 'all' = every one must hold (AND), 'any' = at least one (OR). Only matters when moreConditions has entries. */
+  conditionsMatch?: string | undefined;
 }
 
 /**

@@ -609,10 +609,11 @@ If the author's brief clearly calls for a location-based or AR experience, say s
 
 **conditionBeat** - State-based branching
 - Use: Check variables, counters, inventory, create conditional paths
-- ⚠️ CRITICAL: Use ONLY these 3 parameters - NO extras!
+- ⚠️ CRITICAL: Use ONLY these 3 parameters (plus the optional pair below) - NO extras!
   - condition: { type, variable/item/timer, operator, value, ... }
   - trueConnection: { target: "beat_id", label: "optional" }
   - falseConnection: { target: "beat_id", label: "optional" }
+- Several conditions in ONE check (AND / OR): add "moreConditions": [ ... ] (each in the same shape as "condition") and "conditionsMatch": "all" (AND, default) or "any" (OR). Use this instead of chaining Condition Check beats for one decision.
 - ❌ NEVER use these flat parameters (they will be rejected):
   - conditionType ❌
   - variableName ❌
@@ -666,6 +667,15 @@ Inventory condition example - quantity check (CORRECT format):
     "character": "player",   // ❌ DELETE - already in condition!
     "checkType": "has"       // ❌ DELETE - already in condition!
   }
+AND / OR example — true when the player has the key OR earned enough trust (CORRECT format):
+  {
+    "condition": { "type": "inventory", "item": "key", "character": "player", "checkType": "has" },
+    "moreConditions": [ { "type": "counter", "variable": "trust", "operator": ">=", "value": 3 } ],
+    "conditionsMatch": "any",
+    "trueConnection": { "target": "beat_inside", "label": "Gets in" },
+    "falseConnection": { "target": "beat_locked_out", "label": "Stays outside" }
+  }
+
 Fictional time condition example (CORRECT format):
   {
     "condition": { "type": "fictionalTime", "operator": ">", "compareTime": { "year": 1969, "month": 1, "day": 1, "hour": 0, "minute": 0 } },
@@ -1919,10 +1929,11 @@ These beat types define targets in their choices/props/hyperlinks - NEVER add a 
 ### 4. conditionBeat - ONLY 3 parameters allowed
 ⚠️ VALIDATION ERROR: Any extra parameters trigger warnings and may break functionality!
 
-conditionBeat parameters MUST contain EXACTLY these 3 fields (no more, no less):
+conditionBeat parameters MUST contain EXACTLY these 3 fields (no more, no less), except the optional AND/OR pair:
 1. "condition" - the condition object (contains type, variable, operator, value INSIDE it)
 2. "trueConnection" - where to go if true
 3. "falseConnection" - where to go if false
+Optional: "moreConditions" (array of further condition objects, same shape) + "conditionsMatch" ("all" = AND, "any" = OR).
 
 🚫 FORBIDDEN parameters (will cause validation errors) - NEVER ADD THESE:
 - "connection" ❌

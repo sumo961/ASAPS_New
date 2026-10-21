@@ -968,7 +968,31 @@ export class ReachabilityAnalyzer {
       };
 
       // Analyze if the condition can ever be true
-      const analysis = this.analyzeCondition(normalizedCondition);
+      let analysis = this.analyzeCondition(normalizedCondition);
+      // More conditions (AND / OR): combine, each judged on its own.
+      const more = (Array.isArray(params.moreConditions) ? params.moreConditions : []) as any[];
+      let combinedAlwaysTrue: boolean | null = null;
+      if (more.length > 0) {
+        const all = [normalizedCondition, ...more.map((c) => ({
+          type: c.type || 'counter',
+          operator: c.operator || '==',
+          left: c.variableName || c.variable || c.left,
+          right: c.value ?? c.right,
+          counter1: c.counter1,
+          counter2: c.counter2,
+          beatId: c.beatId,
+        }) as Condition)];
+        const results = all.map((c) => {
+          const a = this.analyzeCondition(c);
+          return { a, always: a.isSatisfiable && this.isConditionAlwaysTrue(c) };
+        });
+        const any = params.conditionsMatch === 'any';
+        const satisfiable = any ? results.some((r) => r.a.isSatisfiable) : results.every((r) => r.a.isSatisfiable);
+        combinedAlwaysTrue = any ? results.some((r) => r.always) : results.every((r) => r.always);
+        analysis = satisfiable
+          ? { condition: normalizedCondition, isSatisfiable: true }
+          : { condition: normalizedCondition, isSatisfiable: false, reason: (results.find((r) => !r.a.isSatisfiable)?.a.reason ?? 'No combination of the conditions can hold') };
+      }
 
       // If the condition can NEVER be satisfied, the trueTarget is unreachable
       if (!analysis.isSatisfiable && trueTarget) {
@@ -990,7 +1014,7 @@ export class ReachabilityAnalyzer {
       // Check if the condition is ALWAYS true (false branch unreachable)
       // This is harder to detect - we need to check if the condition is always satisfied
       if (analysis.isSatisfiable && falseTarget) {
-        const alwaysTrue = this.isConditionAlwaysTrue(normalizedCondition);
+        const alwaysTrue = combinedAlwaysTrue ?? this.isConditionAlwaysTrue(normalizedCondition);
         if (alwaysTrue) {
           this.conditionBeatWarnings.push({
             conditionBeatId: beat.id,

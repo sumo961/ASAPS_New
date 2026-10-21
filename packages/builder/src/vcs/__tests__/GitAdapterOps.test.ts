@@ -64,12 +64,11 @@ describe('GitAdapter Operations', () => {
   });
 
   describe('gitCommit', () => {
+    const ok = (stdout = '') => ({ stdout, stderr: '', exitCode: 0 });
+    const noFile = { stdout: '', stderr: 'fatal: path does not exist', exitCode: 128 };
+
     it('commits with message', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '[main abc1234] My commit message\n 1 file changed',
-        stderr: '',
-        exitCode: 0,
-      });
+      const runCommand = gitRouter({ show: noFile, commit: ok('[main abc1234] My commit message\n 1 file changed') });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitCommit('/project', 'My commit message');
@@ -80,26 +79,39 @@ describe('GitAdapter Operations', () => {
     });
 
     it('returns error when nothing staged', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '',
-        stderr: 'nothing to commit',
-        exitCode: 1,
-      });
+      const runCommand = gitRouter({ show: noFile, commit: { stdout: '', stderr: 'nothing to commit', exitCode: 1 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitCommit('/project', 'test');
       expect(result.success).toBe(false);
       expect(result.message).toContain('nothing to commit');
     });
+
+    it('refuses when the project was saved by a newer ASAPS (strict, 2026-10-21)', async () => {
+      const runCommand = gitRouter({ show: ok(JSON.stringify({ id: 'p', savedWith: '99.0.0' })) });
+      (window as any).electronAPI = createMockElectronAPI(runCommand);
+
+      const commit = await gitCommit('/project', 'test');
+      expect(commit.success).toBe(false);
+      expect(commit.message).toMatch(/v99\.0\.0/);
+      expect(commit.message).toMatch(/Check for Updates/);
+      expect(runCommand).not.toHaveBeenCalledWith('git', ['commit', '-m', 'test'], '/project');
+
+      const push = await gitPush('/project');
+      expect(push.success).toBe(false);
+      expect(runCommand).not.toHaveBeenCalledWith('git', ['push'], '/project');
+    });
   });
 
   describe('gitPush', () => {
+    const noFile = { stdout: '', stderr: 'fatal: path does not exist', exitCode: 128 };
+
     it('explains a local-only repo in plain language instead of leaking git stderr', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
+      const runCommand = gitRouter({ show: noFile, push: {
         stdout: '',
         stderr: 'fatal: No configured push destination.\nEither specify the URL from the command-line or\nconfigure a remote repository using\n\n    git remote add <name> <url>',
         exitCode: 128,
-      });
+      } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
       const result = await gitPush('/project');
       expect(result.success).toBe(false);
@@ -108,11 +120,7 @@ describe('GitAdapter Operations', () => {
     });
 
     it('pushes successfully', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '',
-        stderr: 'To origin\n abc..def main -> main',
-        exitCode: 0,
-      });
+      const runCommand = gitRouter({ show: noFile, push: { stdout: '', stderr: 'To origin\n abc..def main -> main', exitCode: 0 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPush('/project');
@@ -120,11 +128,7 @@ describe('GitAdapter Operations', () => {
     });
 
     it('returns error on rejection', async () => {
-      const runCommand = vi.fn().mockResolvedValueOnce({
-        stdout: '',
-        stderr: 'rejected: non-fast-forward',
-        exitCode: 1,
-      });
+      const runCommand = gitRouter({ show: noFile, push: { stdout: '', stderr: 'rejected: non-fast-forward', exitCode: 1 } });
       (window as any).electronAPI = createMockElectronAPI(runCommand);
 
       const result = await gitPush('/project');

@@ -3290,6 +3290,41 @@ export const Inspector: React.FC<InspectorProps> = ({
                         </div>
                       </div>
                     )}
+
+                    {/* More conditions + AND/OR (student request, 2026-10-21:
+                        "if A OR B this happens, if not that happens" took
+                        two chained Condition Checks). */}
+                    <div className="p-2 bg-violet-50/60 rounded space-y-2" data-testid="condition-more">
+                      <ChoiceConditionsEditor
+                        label="More conditions"
+                        addTitle="Add a condition checked together with the one above — choose below whether all must hold (AND) or any one (OR)."
+                        edgeSummary={false}
+                        value={localBeat.parameters?.moreConditions}
+                        onChange={(conds) => handleParametersChange({
+                          moreConditions: conds && conds.length ? conds : undefined,
+                          conditionsMatch: conds && conds.length ? (localBeat.parameters?.conditionsMatch === 'any' ? 'any' : 'all') : undefined,
+                        })}
+                        allBeats={allBeats}
+                        availableCounters={availableCounters}
+                        availableVariables={availableVariables}
+                        availableInventoryItems={availableInventoryItems}
+                        characters={characters}
+                      />
+                      {(localBeat.parameters?.moreConditions?.length ?? 0) > 0 && (
+                        <label className="flex items-center gap-2 text-xs text-gray-700">
+                          <span>Go to “true” when</span>
+                          <select
+                            data-testid="condition-match"
+                            value={localBeat.parameters?.conditionsMatch === 'any' ? 'any' : 'all'}
+                            onChange={(e) => handleParameterChange('conditionsMatch', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded text-xs"
+                          >
+                            <option value="all">all conditions hold (AND)</option>
+                            <option value="any">any condition holds (OR)</option>
+                          </select>
+                        </label>
+                      )}
+                    </div>
                   </>
                 )}
 

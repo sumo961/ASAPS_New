@@ -2064,7 +2064,7 @@ export class StoryContext extends EventEmitter {
       const itemNames = this.state.inventory.map(e => `${e.name}(x${e.quantity})`);
 
       // Check if this is a quantity comparison (vs just existence check)
-      if (condition.quantityCheck && condition.quantityOperator) {
+      if ((condition.quantityCheck || condition.checkType === 'quantity') && condition.quantityOperator) {
         // Determine the left side of the comparison
         let leftValue: number;
         const compareSource = (condition as any).compareSource || 'inventory';
@@ -2112,8 +2112,9 @@ export class StoryContext extends EventEmitter {
 
       console.log(`[StoryContext] Inventory check: "${itemToCheck}" in [${itemNames.join(', ')}] = ${hasItem}`);
 
-      // Support negation operators
-      if (condition.operator === '!=' || condition.operator === 'not') {
+      // Support negation operators, and Condition Check's "Does Not Have
+      // Item" (checkType notHas, also what generated stories write)
+      if (condition.operator === '!=' || condition.operator === 'not' || condition.checkType === 'notHas') {
         return !hasItem;
       }
       return hasItem;

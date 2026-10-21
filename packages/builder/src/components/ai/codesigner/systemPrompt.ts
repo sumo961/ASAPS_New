@@ -267,6 +267,11 @@ Rules for proposals:
     fails; without one the gate only annotates (the story analyzer flags
     paths that can't satisfy it). "requiresMode": "any" = one requirement
     suffices (default "all"). [] removes the gate.
+  - A Condition Check (conditionBeat) tests its "condition" plus any
+    "moreConditions" (same shape), combined by "conditionsMatch": "all"
+    (AND, default) or "any" (OR); the digest shows them as "checks:".
+    Change them with 'updateParams' — one check with several conditions
+    beats a chain of Condition Checks.
   - Characters, items and beats must exist in the digest. Story counters are
     created by their first effect (see STORY STATE); counters owned by a
     character need "character" on the effect.

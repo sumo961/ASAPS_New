@@ -8,6 +8,7 @@
  */
 
 import { onlyStampsDiffer, keepNewestSavedWith } from '../../utils/projectMetaStamps';
+import { isNewerVersion, NewerProjectError } from '../../utils/appVersion';
 import type { Project, GlobalSettings, StoredAsset } from '../types';
 import type { Beat, Cluster } from '@asaps/core';
 import {
@@ -179,10 +180,28 @@ export class DirectoryAdapter implements PersistenceAdapter {
    * manifest is populated correctly in a single pass (no need for separate
    * saveAsset() calls).
    */
+  /**
+   * Refuse to write a folder a NEWER ASAPS saved (project.json savedWith) —
+   * the backstop for every save path: auto-save, Save, repairs, assets.
+   */
+  private async refuseIfNewer(): Promise<void> {
+    if (!this.projectPath) return;
+    const reader = this.createReader();
+    const path = joinPath(this.projectPath, 'project.json');
+    let savedWith: string | undefined;
+    try {
+      if (await reader.exists(path)) savedWith = JSON.parse(await reader.readText(path))?.savedWith;
+    } catch {
+      return; // unreadable project.json is someone else's problem to report
+    }
+    if (savedWith && isNewerVersion(savedWith, APP_VERSION)) throw new NewerProjectError(savedWith);
+  }
+
   async saveProject(project: Project, assets?: StoredAsset[]): Promise<void> {
     if (!this.projectPath) {
       throw new Error('No project path set. Open a project first or set projectPath.');
     }
+    await this.refuseIfNewer();
 
     const api = window.electronAPI;
     if (!api?.fs) {
@@ -293,6 +312,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async deleteAsset(assetId: string): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI;
     if (!api?.fs) throw new Error('Requires Electron filesystem API');
 
@@ -340,6 +360,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async saveBeat(beat: Beat, clusterId?: string): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI?.fs;
     if (!api) throw new Error('Requires Electron filesystem API');
 
@@ -363,6 +384,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async deleteBeat(beatId: string, beatType: string, clusterId?: string): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI?.fs;
     if (!api) throw new Error('Requires Electron filesystem API');
 
@@ -432,6 +454,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async saveSettings(settings: GlobalSettings): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI?.fs;
     if (!api) throw new Error('Requires Electron filesystem API');
 
@@ -461,6 +484,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async saveProjectMeta(project: Partial<Project>): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI?.fs;
     if (!api) throw new Error('Requires Electron filesystem API');
 
@@ -617,6 +641,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
    */
   async saveAsset(asset: StoredAsset, context?: string): Promise<void> {
     if (!this.projectPath) throw new Error('No project path set');
+    await this.refuseIfNewer();
     const api = window.electronAPI?.fs;
     if (!api) throw new Error('Requires Electron filesystem API');
 

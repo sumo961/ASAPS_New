@@ -28,7 +28,7 @@ import { markProjectNew, consumeProjectNew, sanitizeFolderName } from '../utils/
 import { findUniqueProjectName } from '../utils/uniqueProjectName';
 import { shortenRunawayBeatIds } from '../utils/beatIds';
 import { newerVersionWarning } from '../utils/appVersion';
-import { notify, confirmAction } from '../utils/notify';
+import { notify } from '../utils/notify';
 
 // ============================================================================
 // Context Types
@@ -381,11 +381,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   }, []);
 
   /**
-   * A project saved by a newer ASAPS: warn AND hold auto-save. An older
+   * A project saved by a newer ASAPS: this one doesn't write it — auto-save
+   * stops and Save refuses (the folder adapter refuses too). An older
    * version's save drops what the newer one added — one teammate's outdated
    * copy removed every "continue" step and speaker look from a group's
    * dialogs while they "didn't edit the dialog trees" (bullying-IDN,
-   * 2026-10-20). A manual Save asks first; opening another project lifts it.
+   * 2026-10-20). Opening another project lifts it.
    */
   const guardNewerVersion = useCallback((savedWith: string | undefined) => {
     const warning = newerVersionWarning(savedWith);
@@ -396,7 +397,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     }
     ctl?.pause();
     pausedForNewerRef.current = true;
-    notify.warning(`${warning} Auto-save is paused so nothing that version added gets lost; Save asks before writing.`, { sticky: true });
+    notify.warning(warning, { sticky: true });
   }, []);
 
   const startExternalWatch = useCallback((adapter: DirectoryAdapter, projectId: string) => {
@@ -582,15 +583,10 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
 
   /** A manual save after an outside change keeps the author's version — and ends the pause. */
   const saveNowResuming = useCallback(async () => {
+    // Strict: an older ASAPS doesn't write a project a newer one saved.
     if (pausedForNewerRef.current) {
-      const go = await confirmAction({
-        title: 'Save with this older ASAPS?',
-        message: `${newerVersionWarning(currentProjectRef.current?.savedWith) ?? 'This project was saved by a newer ASAPS.'} Saving now can remove what the newer version added (for example new dialog features) — for everyone who pulls it.`,
-        confirmLabel: 'Save anyway',
-      });
-      if (!go) return;
-      pausedForNewerRef.current = false;
-      resume();
+      notify.error(newerVersionWarning(currentProjectRef.current?.savedWith) ?? 'This project was saved by a newer ASAPS. Update ASAPS first.');
+      return;
     }
     await saveNow();
     if (pausedForExternalRef.current) {
