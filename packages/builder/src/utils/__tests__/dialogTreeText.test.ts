@@ -107,4 +107,45 @@ describe('dialog tree as text', () => {
   it('reports text with no character line', () => {
     expect(textToDialogTree('# only a comment').warnings[0]).toMatch(/No character line/);
   });
+
+  it('reads "then" written at the same level as the line it follows (as people write it)', () => {
+    const r = textToDialogTree([
+      'Friend: I saw what happened at lunch.',
+      '  > Me too.  {courage +1}',
+      '    Friend: Then let\'s talk to Vic together.  -> Talk to Vic',
+      '  > It\'s none of my business.  {if courage < 2}',
+      '    Friend: Or would that just make things worse?',
+      '    then Teacher: Everything all right here?',
+      '    then Friend: ...',
+      '      > Yes.  {if var met_vic == true} {if has key} {courage = 3} {set met_vic = true} {give key} {take key (Billie)}  -> End of day',
+    ].join('\n'), { beats });
+    expect(r.warnings).toEqual([]);
+    const worse = r.tree.choices[1].dialogNode;
+    expect(worse.text).toBe('Or would that just make things worse?');
+    const teacher = worse.choices[0];
+    expect(teacher).toMatchObject({ continue: true, dialogNode: { speaker: 'Teacher' } });
+    const friend = teacher.dialogNode.choices[0];
+    expect(friend).toMatchObject({ continue: true, dialogNode: { speaker: 'Friend', text: '...' } });
+    const yes = friend.dialogNode.choices[0];
+    expect(yes.target).toBe('beat_end');
+    expect(yes.conditions).toEqual([
+      { type: 'variable', variableName: 'met_vic', operator: '==', value: true },
+      { type: 'inventory', item: 'key', checkType: 'has' },
+    ]);
+    expect(yes.effects).toEqual([
+      { type: 'setCounter', target: 'courage', value: 3 },
+      { type: 'setVariable', target: 'met_vic', value: true },
+      { type: 'addInventory', target: 'key' },
+      { type: 'removeInventory', target: 'key', character: 'Billie' },
+    ]);
+  });
+
+  it('keeps several exported "then" steps as alternatives for one line', () => {
+    const t = { speaker: 'A', text: 'Hi', choices: [
+      { text: '', continue: true, conditions: [{ type: 'counter', variableName: 'x', operator: '>', value: 1 }], dialogNode: { speaker: 'B', text: 'One', choices: [] } },
+      { text: '', continue: true, dialogNode: { speaker: 'C', text: 'Two', choices: [] } },
+    ] };
+    const back = textToDialogTree(dialogTreeToText(t));
+    expect(back.tree.choices.map((c: any) => c.dialogNode.text)).toEqual(['One', 'Two']);
+  });
 });

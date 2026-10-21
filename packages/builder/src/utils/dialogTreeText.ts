@@ -280,7 +280,7 @@ export function textToDialogTree(text: string, opts: { beats?: DialogTextBeat[] 
     return id ?? undefined;
   };
 
-  type Frame = { level: number; node: Json };
+  type Frame = { level: number; node: Json; isThen?: boolean; sameLevel?: boolean };
   let root: Json | null = null;
   const stack: Frame[] = []; // nodes by indentation
   let lastReply: { level: number; choice: Json } | null = null;
@@ -349,8 +349,15 @@ export function textToDialogTree(text: string, opts: { beats?: DialogTextBeat[] 
       return;
     }
     if (isThen) {
-      // The next line after the line one level up.
-      while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
+      // The next line after the line one level up (as exported). Written by
+      // hand it often sits at the SAME level as the line it follows — accept
+      // that too, unless that line is itself a "then" step (several steps at
+      // one level are alternatives for the line above them).
+      while (stack.length && stack[stack.length - 1].level > level) stack.pop();
+      const top = stack[stack.length - 1];
+      // Exported form: a step at this level is an alternative for the line
+      // one level up, not a follow-up of the step before it.
+      if (top && top.level === level && top.isThen && !top.sameLevel) stack.pop();
       const parent = stack[stack.length - 1];
       if (!parent) { warn(`Line ${lineNo}: "then" without a line before it was skipped`); return; }
       parent.node.choices.push({
@@ -358,7 +365,9 @@ export function textToDialogTree(text: string, opts: { beats?: DialogTextBeat[] 
         ...(stepConditions.length ? { conditions: stepConditions } : {}),
         ...(stepEffects.length ? { effects: stepEffects } : {}),
       });
-      stack.push({ level, node });
+      // Same-level form (hand-written): the next "then" at this level follows
+      // THIS line — a sequence, as written.
+      stack.push({ level, node, isThen: true, sameLevel: parent.level === level });
       return;
     }
     // A character's answer to the reply one level up.
