@@ -138,6 +138,8 @@ interface InspectorProps {
   onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onBeatAdd?: (type: string, position?: { x: number; y: number }) => Beat;
+  /** Create a new Dialog Tree beat from an imported conversation (a copy of `fromBeatId`). */
+  onImportDialogTree?: (fromBeatId: string, tree: any, name: string) => void;
   expanded?: boolean;
   assets?: Asset[];
   onAssetAdd?: (asset: Asset) => Promise<boolean>;
@@ -200,6 +202,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onConnect,
   onDisconnect,
   onBeatAdd,
+  onImportDialogTree,
   expanded = false,
   assets = [],
   onAssetAdd,
@@ -1796,6 +1799,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       availableInventoryItems={availableInventoryItems}
       onDefineAsCharacter={onDefineAsCharacter}
       emotionPalette={emotionPalette}
+      beatName={localBeat.name || beat?.name}
+      onImportAsNewBeat={onImportDialogTree && beat ? (tree, name) => onImportDialogTree(beat.id, tree, name) : undefined}
     />
   );
 

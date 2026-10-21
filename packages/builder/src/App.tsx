@@ -41,6 +41,7 @@ import { ImportTwineDialog } from './components/ImportTwineDialog';
 import { MergeStoryDialog } from './components/MergeStoryDialog';
 import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
 import { deserializeBeats } from './utils/projectDeserializer';
+import { ensureDialogIds } from './utils/choiceWiring';
 import { shortenRunawayBeatIds } from './utils/beatIds';
 import { cloneBeatsForDuplicate, cloneBeatsForPaste } from './utils/duplicateBeats';
 import { getStorageManager } from './storage/StorageManager';
@@ -3468,6 +3469,29 @@ function App() {
     getCommandManager().pushWithoutExecute(new AddBeatCommand(newBeats[0], stableMutations.current));
     setSelectedBeat(newBeats[0]);
     markChanged();
+  }, [actions, state.beats, markChanged]);
+
+  /** A conversation imported as text becomes a NEW Dialog Tree beat — a copy
+   *  of the beat it was imported from (layout and settings), never replacing
+   *  it, so recovering a lost version can't lose another. One undo step. */
+  const handleImportDialogTree = useCallback((fromBeatId: string, tree: any, name: string) => {
+    const beat = state.beats.find(b => b.id === fromBeatId);
+    if (!beat) return;
+    const { clones } = cloneBeatsForDuplicate([beat], state.beats.map(b => b.id));
+    if (clones.length === 0) return;
+    const clone: any = clones[0];
+    clone.name = name;
+    clone.parameters = { ...(clone.parameters ?? {}), dialogTree: ensureDialogIds(tree) };
+    // The links come from the conversation; the original's would be stale.
+    clone.connections = [];
+    delete clone.defaultTarget;
+    const newBeats = deserializeBeats([clone]);
+    if (newBeats.length === 0) return;
+    actions.mergeBeats(newBeats);
+    getCommandManager().pushWithoutExecute(new AddBeatCommand(newBeats[0], stableMutations.current));
+    setSelectedBeat(newBeats[0]);
+    markChanged();
+    notify.success(`Imported the conversation as a new beat, "${name}". The beat it came from is unchanged.`);
   }, [actions, state.beats, markChanged]);
 
   /** Multi-beat duplicate: clones the whole selection, keeping the
@@ -7019,6 +7043,7 @@ function App() {
               onConnect={actions.connectBeats}
               onDisconnect={actions.disconnectBeats}
               onBeatAdd={actions.addBeat}
+              onImportDialogTree={handleImportDialogTree}
               assets={assets}
               onAssetSelect={handleAssetSelect}
               onAssetAdd={handleAssetAdd}

@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   MessageSquare,
   ArrowDown,
+  Download,
+  Upload,
   Plus,
   Trash2,
   ChevronRight,
@@ -23,6 +25,8 @@ import {
   Loader2,
   SlidersHorizontal
 } from 'lucide-react';
+import { dialogTreeToText, textToDialogTree } from '../utils/dialogTreeText';
+import { APP_VERSION } from '../utils/appVersion';
 import type { Beat, Effect } from '@asaps/core';
 import { useAI } from '../hooks/useAI';
 import { CharacterRefField } from '../components/characters/CharacterRefField';
@@ -110,6 +114,10 @@ interface DialogTreeEditorProps {
    * the "Inactive — clear baked positions" advisory because spatial fires
    * regardless of baked positions in responsive projects. */
   projectIsResponsive?: boolean;
+  /** The beat's name — the title of an exported text. */
+  beatName?: string;
+  /** Create a new Dialog Tree beat from an imported conversation. */
+  onImportAsNewBeat?: (tree: DialogNode, name: string) => void;
 }
 
 // Speaker color palette - consistent colors for each speaker
@@ -159,6 +167,8 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   onDefineAsCharacter,
   emotionPalette,
   beatHasAuthorLocations = false,
+  beatName,
+  onImportAsNewBeat,
 }) => {
   const projectRoles = useProjectRoles();
   // Speakers keep a colour in the order they first speak in this tree.
@@ -180,6 +190,9 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const [expandedChoices, setExpandedChoices] = useState<Set<string>>(new Set());
   /** A reply to scroll to and focus once its path is expanded (Last reply). */
   const [scrollToChoice, setScrollToChoice] = useState<string | null>(null);
+  /** The text being imported (null = import window closed). */
+  const [importText, setImportText] = useState<string | null>(null);
+  const [importName, setImportName] = useState('');
   // Continue steps whose conditions & effects panel is open (by choice id).
   const [openStepSettings, setOpenStepSettings] = useState<Set<string>>(new Set());
 
@@ -508,6 +521,36 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const replies = (deepestNode.choices || []).map((c, i) => ({ c, i })).filter(({ c }) => !c.continue);
     const last = replies[replies.length - 1];
     setScrollToChoice(last ? `${deepest.join('.')}.choice_${last.i}` : deepest.join('.'));
+  };
+
+  /** The conversation as a plain-text script, downloaded as a .txt file. */
+  const exportAsText = () => {
+    const text = dialogTreeToText(dialogTree as any, {
+      title: beatName,
+      beats: (allBeats || []).map(b => ({ id: b.id, name: b.name || b.id })),
+      appVersion: APP_VERSION,
+    });
+    const file = `${(beatName || 'dialog').replace(/[^\w -]+/g, '').trim().replace(/\s+/g, '-') || 'dialog'}.txt`;
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importPreview = importText === null ? null
+    : textToDialogTree(importText, { beats: (allBeats || []).map(b => ({ id: b.id, name: b.name || b.id })) });
+  const countLines = (node: any): { lines: number; replies: number } => {
+    let lines = 1;
+    let replies = 0;
+    for (const c of node?.choices ?? []) {
+      if (!c.continue) replies++;
+      if (c.dialogNode) { const sub = countLines(c.dialogNode); lines += sub.lines; replies += sub.replies; }
+    }
+    return { lines, replies };
   };
 
   // Scroll once the expanded path has rendered (no timers: runs after commit).
@@ -1429,6 +1472,26 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
             AI Generate
           </button>
           <button
+            onClick={exportAsText}
+            className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"
+            title="Save the conversation as a text file — readable on its own, and importable again"
+            data-testid="dialog-export-text"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export text
+          </button>
+          {onImportAsNewBeat && (
+            <button
+              onClick={() => { setImportText(''); setImportName(`${beatName || 'Dialog'} (imported)`); }}
+              className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"
+              title="Create a new Dialog Tree beat from a conversation as text"
+              data-testid="dialog-import-text"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Import text
+            </button>
+          )}
+          <button
             onClick={goToLastReply}
             className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"
             title="Open the conversation to its deepest line and go to the last player reply"
@@ -1464,6 +1527,73 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
       
       {/* Edit Modal */}
       {renderEditModal()}
+
+      {/* Import a conversation as text → a new Dialog Tree beat */}
+      {importText !== null && onImportAsNewBeat && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[10001]" onClick={() => setImportText(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-[min(42rem,92vw)] max-h-[88vh] flex flex-col p-4 gap-3" onClick={(e) => e.stopPropagation()} data-testid="dialog-import-window">
+            <div>
+              <h3 className="text-base font-semibold text-gray-800">Import a conversation as text</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Paste a conversation, or choose a .txt file saved with <strong>Export text</strong>. It becomes a new Dialog Tree beat; this one stays as it is.
+                {' '}<code className="text-[11px]">Name: line</code>, <code className="text-[11px]">&gt; reply</code> (its answer indented under it), <code className="text-[11px]">then Name: line</code>, <code className="text-[11px]">-&gt; Beat</code>.
+              </p>
+            </div>
+            <label className="text-xs text-gray-700 flex items-center gap-2">
+              <span>Choose a file:</span>
+              <input
+                type="file"
+                accept=".txt,text/plain"
+                data-testid="dialog-import-file"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setImportText(await f.text());
+                }}
+                className="text-xs"
+              />
+            </label>
+            <textarea
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={'Friend: I saw what happened at lunch.\n  > Me too.\n    Friend: Then let\'s talk to Vic.  -> Talk to Vic'}
+              className="w-full flex-1 min-h-[12rem] font-mono text-xs border border-gray-300 rounded p-2"
+              data-testid="dialog-import-textarea"
+            />
+            {importText.trim() && importPreview && (
+              <div className="text-xs space-y-1" data-testid="dialog-import-summary">
+                {(() => { const n = countLines(importPreview.tree); return (
+                  <p className="text-gray-700">Found {n.lines} line{n.lines === 1 ? '' : 's'} and {n.replies} repl{n.replies === 1 ? 'y' : 'ies'}, starting with {importPreview.tree.speaker}: “{String(importPreview.tree.text).slice(0, 60)}”</p>
+                ); })()}
+                {importPreview.warnings.length > 0 && (
+                  <ul className="text-amber-700 list-disc pl-5" data-testid="dialog-import-warnings">
+                    {importPreview.warnings.slice(0, 8).map((w) => <li key={w}>{w}</li>)}
+                    {importPreview.warnings.length > 8 && <li>… and {importPreview.warnings.length - 8} more</li>}
+                  </ul>
+                )}
+              </div>
+            )}
+            <label className="text-xs text-gray-700 flex items-center gap-2">
+              <span className="whitespace-nowrap">Name of the new beat:</span>
+              <input value={importName} onChange={(e) => setImportName(e.target.value)} className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs" />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setImportText(null)} className="px-3 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+              <button
+                disabled={!importText.trim() || !importPreview || !importPreview.tree.text && !(importPreview.tree.choices?.length)}
+                onClick={() => {
+                  if (!importPreview) return;
+                  onImportAsNewBeat(importPreview.tree as DialogNode, importName.trim() || `${beatName || 'Dialog'} (imported)`);
+                  setImportText(null);
+                }}
+                className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40"
+                data-testid="dialog-import-create"
+              >
+                Create beat
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Dialog Generation Modal */}
       {showAIDialog && (
