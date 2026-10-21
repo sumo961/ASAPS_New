@@ -1148,9 +1148,11 @@ ELSE
   → Go to "Locked Door"
 ```
 
+**Several checks in one beat:** add them under **More conditions** and choose whether **all** must hold (AND) or **any** one is enough (OR) — see [Compound Conditions](#compound-conditions).
+
 The full set of checks and their per-form fields is documented in [Condition Beats](#condition-beats) further down.
 
-> **Looking for "has the player visited beat X?"** That check lives on a beat's [Requirements section](#condition-beats), not in the standalone Condition Beat dropdown. Open the Requirements panel, click **Add requirement**, and pick *Visited beat*.
+> **Looking for "has the player visited beat X?"** It isn't in the Condition Type dropdown. Add it under **More conditions** (pick *visited beat*), or on a beat's [Requirements section](#condition-beats): open the Requirements panel, click **Add requirement**, and pick *Visited beat*.
 
 ---
 
@@ -3455,6 +3457,8 @@ The Condition Type dropdown groups the available checks into two families:
 - **Indoor proximity (beacon RSSI)** — is the player near a configured venue beacon?
 - **Permission granted** — has the player granted a device permission (location, camera, …)? Useful for routing around denied sensors gracefully.
 
+Need two checks in one decision (*has the key OR trusts the player*)? Add them under **More conditions** — see [Compound Conditions](#compound-conditions).
+
 ![Condition Type dropdown showing the Character affect group](images/26-condition-type-dropdown-affect.png)
 *The Condition Type dropdown. Classic checks at the top, the new Character affect group at the bottom. The runtime evaluates these the same way it evaluates "player has lantern" — it just checks a different slice of state.*
 
@@ -3554,9 +3558,20 @@ The live "what does this choice do?" summary (the italic blue-tinted block under
 
 > **A worked rhythm.** Place a *Bookmark Affect State* effect on the choice that ends an act — *act-one-end*, scope: all characters. In the act-two beat that immediately follows, place a Condition Beat (or per-beat requirement) that asks *"Sentiment — trust toward player has grown since start"*, then switch its **Compared to** picker to *delta from a named bookmark* and type `act-one-end`. Now the condition reads "trust has grown since the act-one ending" rather than "since the very beginning of the story" — exactly what an act break usually means dramatically.
 
+<a id="compound-conditions"></a>
 ### Compound Conditions
 
-For complex logic requiring multiple checks, chain Condition Beats together — each beat handles one comparison, and you wire them into a decision tree:
+**One Condition Check can test several things at once.** Under the first condition, **More conditions** ▸ **+ Add** adds another check — an item, a variable, a counter, a visited beat, a feeling, or (when your story has [roles](#roles)) a role. As soon as there is one, a switch appears: **Go to “true” when…**
+
+- **all conditions hold (AND)** — *the player has the key AND gold is over 50*. This is the default.
+- **any condition holds (OR)** — *the player has the key OR Ingrid trusts them*. One is enough.
+
+Otherwise the beat goes to its *false* target. Remove the extra conditions (the bin icon on each row) and the beat is back to a single check.
+
+![The Condition Check Inspector with a counter condition, one item under More conditions, and the switch set to any condition holds (OR)](images/93-condition-more-conditions-or.png)
+*"Trust is at least 3 **OR** the player has the key": the first condition (Counter *trust* ≥ 3) sits at the top, the item check under **More conditions**, and **Go to “true” when** is set to *any condition holds (OR)*.*
+
+When the answer needs more than one split — *no key: "Find the key first"; key but too little gold: "Need more gold"* — chain Condition Checks instead, each one handling one question:
 
 ```
 [Check hasKey]
@@ -3566,13 +3581,15 @@ For complex logic requiring multiple checks, chain Condition Beats together — 
   → false: [Need the key first]
 ```
 
-You can mix and match families freely: *"if Alex's mood is recovering AND the player has the journal, route to the reconciliation scene; otherwise route to the missed-opportunity scene."*
+You can mix and match families freely: *"if Alex's mood is recovering AND the player has the journal, route to the reconciliation scene; otherwise route to the missed-opportunity scene."* The extra conditions offer the six checks listed above; to combine, say, a mood with an item, make the mood the first condition. A choice's or a reply's **Show only if…** conditions always all have to hold. For an OR there, work it out one step earlier: a Condition Check with **any condition holds (OR)** whose *true* path passes through a Set Variable beat (or choice effects that set the variable), then test that one variable.
 
 ### Inventory Checks
 
 You can check for item presence:
 - Player HAS "Silver Key" ✓
 - Player DOES NOT HAVE "Curse Mark" ✓
+
+> **Fixed in v0.9.134:** a Condition Check set to **Does Not Have Item** went to *true* when the player **had** the item. It now works as set up. If you swapped its targets to work around this, swap them back.
 
 For quantity-based checks (e.g., "Gold > 100"), the inventory condition's **Quantity** mode lets you compare counts directly. The **AI Condition** beat is also available for fuzzier reasoning that doesn't reduce to a single numeric comparison.
 
@@ -4078,8 +4095,8 @@ New beats get an ID with a random part (like `beat_k3f9x2a1`), so two people add
 
 A few habits keep group work smooth — and ASAPS helps with each:
 
-- **Pull inside ASAPS.** The VCS panel's **Incoming** tab pulls and reloads the project in one go. If you pull with GitHub Desktop or the command line while the project is open, ASAPS notices: with nothing unsaved it loads the new version at once; with unsaved changes it pauses auto-save and asks — **Reload from disk** takes the new version, **Save** keeps yours (and replaces the new files).
-- **Use the same ASAPS version.** Each save records which version of ASAPS made it. If you open a project last saved by a newer version than yours, ASAPS warns you and **pauses auto-save**; **Save** asks before it writes. Update first: an older version can rewrite or drop what the newer one saved, and in a group that shows up as beats changed or deleted that nobody touched (for example "then" lines in a Dialog Tree turning into empty player replies). Dialog lines and replies keep anything a newer version added, but other parts of a project may not.
+- **Pull inside ASAPS.** The VCS panel's **Incoming** tab pulls and reloads the project in one go. If you pull with GitHub Desktop or the command line while the project is open, ASAPS notices: with nothing unsaved it loads the new version at once; with unsaved changes it pauses auto-save and asks — **Reload from disk** takes the new version, **Save** keeps yours (and replaces the new files) — unless the new version was saved by a newer ASAPS, see the next point.
+- **Use the same ASAPS version.** Each save records which version of ASAPS made it. An older ASAPS **won't save, commit or push** a project that a newer one saved: opening it shows a notice, auto-save stays off, and **Save**, **Commit** and **Push** refuse with the same message. Update with **Help ▸ Check for Updates…**, then open the project again and carry on. Commit and Push also look at the version in your last commit and on the shared branch (as of your last pull or fetch), so a teammate's newer push stops an outdated copy from overwriting their work. Without this, an older version could rewrite or drop what the newer one saved — in a group that showed up as beats changed or deleted that nobody touched (for example "then" lines in a Dialog Tree turning into empty player replies).
 - **Don't commit what you didn't change.** If the VCS panel lists beats as changed or deleted that you never touched, find out why (often one of the two points above) before you commit.
 
 **Already have several versions that drifted apart?** Pick the one with the most work and make it the project folder (steps above). Then open **Open → Merge Story (.asaps)** and bring in each other version as [another version of this story](#merge-versions): shared beats stay once, new beats come in, and beats that differ are marked for you to decide.
@@ -4232,7 +4249,7 @@ Quick reference for all beat types.
 |------|---------|--------------|
 | Set Variable/Counter | Change state | variable name, value (true/false, or `=`-prefixed arithmetic expression), counter operations, or fictional time |
 | Set GPS Location | Write a named GPS point set into story state | mode (capture / explicit / scatter / preset), point set name, point radius (m), lat/lng, fallback lat/lng, scatter: count + radius + center source + placement (uniform / walkable via OpenStreetMap), preset: map point curator |
-| Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant, gpsProximity, indoorProximity, permissionGranted), per-type fields, true target, false target. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
+| Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant, roleHolder, gpsProximity, indoorProximity, permissionGranted), per-type fields, true target, false target; optional **More conditions** with **all (AND)** / **any (OR)**. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
 | Random Target | Randomization | branches, each with target, weight (0 = never; % of playthroughs shown) and optional effects that run when that branch is drawn |
 | Set Timer | Timed events | timer name, duration, expiration target |
 | Inventory Management | Item management | action (add/remove/transfer), item, quantity, character, item picture |

@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.133** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.133 protects newer work from
+Current release: **v0.9.134** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.134 makes one version write a
+project**: an older ASAPS now refuses to save, commit or push a project a
+newer one saved, and tells you to update. A **Condition Check** can test
+several things at once — *has the key **or** is trusted* — with **More
+conditions** and an AND/OR switch, and *Does Not Have Item* checks, which
+branched as if the player had the item, now work.
+
+**v0.9.133 protected newer work from
 older copies of ASAPS**: dialog lines and replies now keep anything a newer
 version added (a teammate's outdated copy had turned every "then" line of a
 group's dialogs into an empty player reply), and an older ASAPS opening a

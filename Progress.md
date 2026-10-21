@@ -1,5 +1,21 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: One version writes, conditions that combine (v0.9.134)
+
+### Overview
+This release stops outdated copies from damaging group projects, lets one Condition Check test several things with AND or OR, and fixes *Does Not Have Item* checks that branched the wrong way.
+
+- **An older ASAPS no longer writes a project a newer one saved** (decided 2026-10-21: strict version matching instead of teaching every version to keep what it doesn't know). The folder adapter refuses every write when project.json's `savedWith` is newer than the app (`refuseIfNewer`, `NewerProjectError` — auto-save, Save, repairs, assets); opening such a project says so and stops auto-save, and Save refuses (it used to offer "Save anyway"); **Commit and Push** in the VCS panel refuse when the newest recorded version — project.json on disk, in the last commit, or on the remote branch — is newer (`refuseIfNewerProject`). The message names the fix: Help ▸ Check for Updates….
+- **Folder projects keep every field a beat writes.** The beat-file writer picked fields from a fixed list and dropped `timeDisplayMode`, `timeDisplayText`, `overrideCountdownMeter`, `explainHuds` and `characterRef` from every beat on save (`BeatSerializer.otherFields`).
+- A general carry-over of unknown fields (read-tracking in every beat, a stand-in for unknown beat types, project.json extras) was built and tested, then dropped in favour of the strict rule.
+- **Condition Check: several conditions with AND / OR** (student request: "if A or B, this happens; if not, that" took two chained checks). New parameters `moreConditions` (same shape as choice conditions) and `conditionsMatch` (`all` = AND, default; `any` = OR). Inspector: "More conditions" list under the first condition plus a "Go to “true” when…" switch. Path analysis (`conditionBranchConstraints`), reachability (combined always-true/satisfiable), the path tree's labels and the Co-Designer digest (`checks:` line) read all of them. Reply "Show only if…" conditions stay AND-only (a helper variable covers OR there). The condition editor's name pickers keep a minimum width and wrap instead of overlapping in the narrow Inspector, and its choice hints ("all must hold", flowchart-edge line) are off in the Condition Check.
+- **"Does Not Have Item" checks worked backwards.** A Condition Check set to *Does Not Have Item* (`checkType: 'notHas'`, also what generated stories and Dialog Tree text import write) went to "true" when the player **had** the item: the engine only knew `operator: 'not'`. The engine and the analyzers now read `notHas`; `checkType: 'quantity'` turns on quantity checks without `quantityCheck`.
+- AI guidance: schema descriptions, story-generation prompt (format rules + an AND/OR example), beat suggestions, Co-Designer prompt.
+
+**Files modified:** packages/builder/src/utils/appVersion.ts, packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/builder/src/contexts/PersistenceContext.tsx, packages/builder/src/vcs/GitAdapter.ts, packages/core/src/persistence/BeatSerializer.ts, packages/core/src/beats/ConditionBeat.ts, packages/core/src/engine/StoryContext.ts, packages/core/src/analysis/{ConstraintPathAnalyzer,ReachabilityAnalyzer,PathTree,ConstraintSet,StateSimulationAnalyzer,StoryWarnings}.ts, beat-definitions/core-beats.json, packages/builder/src/components/Inspector.tsx, packages/builder/src/editors/ChoiceConditionsEditor.tsx, packages/builder/src/utils/{storyDigest,wiringVocabulary}.ts, packages/builder/src/services/prompts/{storyGenerationEnhanced,beatSuggestions}.ts, packages/builder/src/components/ai/codesigner/systemPrompt.ts, tests (DirectoryAdapter.behavior, GitAdapterOps, GitAdapterAdvanced, BeatSerializer, ConditionBeatMatch, ConditionMatchAnalysis, storyDigest)
+
+---
+
 ## 2026-10-21: Newer work survives older copies (v0.9.133)
 
 ### Overview
