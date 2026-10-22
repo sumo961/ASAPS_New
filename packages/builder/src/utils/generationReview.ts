@@ -3,7 +3,7 @@
  * as the AI generator handed it over. Pure: no React, no schema, no model.
  * See types/generationReview.ts for the design rule.
  */
-import { BEAT_BASE_PARAMETERS } from '@asaps/core';
+import { BEAT_BASE_PARAMETERS, DEFAULT_TARGET_TIMEOUT_TYPES } from '@asaps/core';
 import { storyLinks, beatLinks, type StoryLink } from './storyLinks';
 import { findClockProseMismatches, showTimeOfDay } from './clockProseFindings';
 import {
@@ -123,9 +123,11 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
   for (const m of findClockProseMismatches(story, storyStartBeatId(story))) {
     const name = m.beatName || m.beatId;
     const shown = m.shown.map(showTimeOfDay).join(' or ');
+    // The Inspector's Time Display menu sits with the auto-advance settings.
+    const canHide = DEFAULT_TARGET_TIMEOUT_TYPES.has(beats.find((b: any) => b?.id === m.beatId)?.type);
     out.push({
       id: `clock-prose:${m.beatId}`, kind: 'clock-prose', beatId: m.beatId, beatName: m.beatName,
-      message: `"${name}" says it is ${showTimeOfDay(m.named)}, but the story clock can show ${shown} there. Set the clock just before this beat, or hide the clock on it (Time Display: None).`,
+      message: `"${name}" says it is ${showTimeOfDay(m.named)}, but the story clock can show ${shown} there. Set the clock just before this beat${canHide ? ', or hide the clock on it (Time Display: None)' : ''}.`,
     });
   }
   for (const line of findDialogLinesWithoutExit(beats)) {

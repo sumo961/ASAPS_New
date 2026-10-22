@@ -75,6 +75,9 @@ describe('findClockProseMismatches', () => {
     const findings = analyzeStoryFindings(story([set('clock', 1, 30, 'end'), ending('end', 'At 6:00 the alarm goes off.')]));
     const f = findings.find((x) => x.kind === 'clock-prose');
     expect(f?.message).toContain('says it is 6:00, but the story clock can show 1:30');
-    expect(f?.message).toContain('Time Display: None');
+    expect(f?.message).toContain('Set the clock just before this beat.');
+    // Info Text has the Time Display menu; an End Screen doesn't.
+    const onText = analyzeStoryFindings(story([set('clock', 1, 30, 'b'), text('b', 'At 6:00 the alarm goes off.')]));
+    expect(onText.find((x) => x.kind === 'clock-prose')?.message).toContain('Time Display: None');
   });
 });
