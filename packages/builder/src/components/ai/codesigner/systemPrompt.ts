@@ -292,10 +292,12 @@ ${wiringPromptReference().split('\n').map((l) => `  ${l}`).join('\n')}
     a node with neither ends the scene the moment its line appears. It may carry effects and conditions like any option. To have a
     second character speak before the player answers, add a continue step:
     "continue": true, empty "text", and a "dialogNode" with the other
-    speaker's line — the player sees no reply, the line follows by itself
-    (a Continue button lets them skip ahead; the beat parameter
-    "allowSkipAhead": false removes it, so the player sits through the
-    exchange until it is their turn). A continue step takes conditions and
+    speaker's line — the player sees no reply, only a Continue button.
+    The beat parameter "lineAdvance" sets the pacing: "click" waits for
+    Continue (default outside chat layouts), "auto" moves on after
+    reading time (default in chat layouts; there "allowSkipAhead": false
+    removes the button, so the player sits through the exchange until it
+    is their turn). A continue step takes conditions and
     effects like any option: conditional continue steps are checked in
     order, the first that matches plays, and with none matching the node's
     player replies show — so a bystander can step in only if the player

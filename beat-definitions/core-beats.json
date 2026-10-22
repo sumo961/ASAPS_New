@@ -921,11 +921,24 @@
             "label": "NPC Response Delay (seconds)"
           }
         },
+        "lineAdvance": {
+          "type": "string",
+          "required": false,
+          "description": "How a line a character says without the player answering (a 'Then another character speaks' handover, or a farewell line that ends the dialog) moves on. 'click': it waits until the player clicks Continue — right for reflective scenes, inner voices and anything the player should take in at their own pace. 'auto': it moves on by itself after reading time (with a Continue button to skip ahead, see allowSkipAhead) — right for messenger chats and group scenes with their own rhythm. Unset: 'auto' in chat layouts (chat-scroll, chat-bubble), 'click' in every other layout.",
+          "ui": {
+            "control": "select",
+            "label": "Lines without a reply move on",
+            "options": [
+              { "value": "click", "label": "when the player clicks Continue" },
+              { "value": "auto", "label": "by themselves after reading time" }
+            ]
+          }
+        },
         "allowSkipAhead": {
           "type": "boolean",
           "required": false,
           "default": true,
-          "description": "Whether the player can skip ahead while other characters speak. On (default): every line a character says without the player answering (a 'Then another character speaks' handover, or a farewell line that ends the dialog) shows a Continue button, and also moves on by itself after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace.",
+          "description": "Only when lines move on by themselves (lineAdvance 'auto', the default in chat layouts): whether the player can skip ahead while other characters speak. On (default): those lines show a Continue button and also move on after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace.",
           "ui": {
             "control": "checkbox",
             "label": "Players can skip ahead"

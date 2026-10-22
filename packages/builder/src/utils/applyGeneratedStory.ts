@@ -149,6 +149,7 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
   // Does the story ever move the time of day? If not, a clock time would
   // sit frozen next to an advancing date (Late Light: "9:00 AM" for months).
   let movesTimeOfDay = false;
+  const setTimesOfDay = new Set<string>();
 
   for (const b of story.beats) {
     const t = b?.type;
@@ -157,6 +158,8 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
       usesFictionalTime = true;
       const unit = String(p.timeUnit ?? p.unit ?? '').toLowerCase();
       if (p.operation !== 'set' && /^(minute|hour)s?$/.test(unit)) movesTimeOfDay = true;
+      // Setting the clock to different times of day moves it too (23:48, then 03:04).
+      if (p.operation === 'set') setTimesOfDay.add(`${Number(p.timeHour ?? 9)}:${Number(p.timeMinute ?? 0)}`);
       if (p.operation === 'set' && earliestSetTime == null) {
         earliestSetTime = {
           year: Number(p.timeYear ?? 2024),
@@ -173,15 +176,17 @@ export function withFictionalTimeHud(prev: GlobalSettings, story: any): GlobalSe
     }
   }
   if (!usesFictionalTime) return prev;
+  if (setTimesOfDay.size > 1) movesTimeOfDay = true;
   const hud: any = prev.hudOverlays || {};
   if (hud.fictionalTime?.enabled) return prev;
 
-  // Generators write the clock setting as globalSettings.fictionalTime (the
-  // app reads hudOverlays.fictionalTime); honour their displayFormat. Else
+  // Generators write the clock setting as globalSettings.hudOverlays.
+  // fictionalTime (where the prompt asks for it) or globalSettings.
+  // fictionalTime; honour their displayFormat. Else
   // pick one that fits how the story moves time: date only unless something
   // advances minutes or hours.
   const FORMATS = ['time-12h', 'time-24h', 'date', 'datetime-12h', 'datetime-24h', 'day-number', 'year'];
-  const stray = story?.globalSettings?.fictionalTime ?? (prev as any).fictionalTime;
+  const stray = story?.globalSettings?.hudOverlays?.fictionalTime ?? story?.globalSettings?.fictionalTime ?? (prev as any).fictionalTime;
   const displayFormat = FORMATS.includes(stray?.displayFormat) ? stray.displayFormat : (movesTimeOfDay ? 'datetime-12h' : 'date');
 
   const initialTime = earliestSetTime || { year: 2024, month: 1, day: 1, hour: 9, minute: 0 };
@@ -295,15 +300,18 @@ export async function applyGeneratedStory(
   //    Each step builds on the previous commit, so the theme sees the
   //    merged variables and the HUD sees the theme.
   // A generated story is a new project: the open project's story-specific
-  // settings (its declared variables, cast roles, start beat) must not carry
-  // over. (The theme step below used to rebuild the settings from scratch,
-  // which hid this — and also dropped the generated variables and roles.)
+  // settings (its declared variables, cast roles, start beat, story clock)
+  // must not carry over. (The theme step below used to rebuild the settings
+  // from scratch, which hid this — and also dropped the generated variables
+  // and roles.) The clock is set up from the story below.
   const current = deps.getGlobalSettings();
+  const { fictionalTime: _previousClock, ...otherHuds } = ((current as any).hudOverlays ?? {}) as Record<string, any>;
   let settings = {
     ...current,
     variables: [],
     roles: [],
     debug: { ...((current as any).debug ?? {}), firstbeat: '' },
+    hudOverlays: otherHuds,
   } as GlobalSettings;
   const mergedVars = mergeGeneratedVariables(settings, story.variables);
   if (mergedVars) {
@@ -391,6 +399,9 @@ export async function applyGeneratedStory(
         ? flattenConditionParams(beatData.parameters)
         : { ...beatData.parameters };
       beat.updateParameters(params);
+      // Settings every beat has (timeDisplayMode, spatialFit, requires …)
+      // are read only by the constructor; updateParameters drops them.
+      beat.adoptBaseParameters(params);
     }
     return beat;
   });

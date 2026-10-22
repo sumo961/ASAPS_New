@@ -26,6 +26,8 @@ function fakeBeat(type: string, position: any, options: any) {
     params: {} as any,
     connections: [] as any[],
     updateParameters(p: any) { this.params = { ...this.params, ...p }; },
+    adopted: undefined as any,
+    adoptBaseParameters(p: any) { this.adopted = p; },
     addConnection(c: any) { this.connections.push(c); },
     getConnections() { return this.connections; },
     getConnectionsForEdit() { return this.connections; },
@@ -105,6 +107,14 @@ describe('applyGeneratedStory', () => {
     const b1 = deps.loaded[0].beats[0];
     expect(b1.cluster).toBe('Act 1');
     expect(b1.notes).toBe('author note');
+  });
+
+  it('hands every beat its parameters for the settings all beats have (an ending hiding the clock)', async () => {
+    const deps = makeDeps();
+    const s = story();
+    (s.beats[0].parameters as any).timeDisplayMode = 'none';
+    await applyGeneratedStory(s, deps, { fallbackTitle: 'x' });
+    expect(deps.loaded[0].beats[0].adopted).toMatchObject({ timeDisplayMode: 'none' });
   });
 
   it('flattens nested conditionBeat params and extracts true/false targets', async () => {
@@ -262,6 +272,15 @@ describe('withFictionalTimeHud — display format (2026-09-26)', () => {
     const out: any = withFictionalTimeHud({} as any, { beats: [ft('set'), ft('advance', 'hours')], globalSettings: { fictionalTime: { displayFormat: 'day-number' } } });
     expect(out.hudOverlays.fictionalTime.displayFormat).toBe('day-number');
   });
+  it('reads the format where the prompt asks for it (globalSettings.hudOverlays.fictionalTime)', () => {
+    const out: any = withFictionalTimeHud({} as any, { beats: [ft('set')], globalSettings: { hudOverlays: { fictionalTime: { enabled: true, displayFormat: 'time-24h' } } } });
+    expect(out.hudOverlays.fictionalTime.displayFormat).toBe('time-24h');
+  });
+  it('setting the clock to different times of day counts as moving it (The Reliable One: 23:48 → 03:04)', () => {
+    const at = (h: number, m: number) => ({ type: 'setVariable', parameters: { type: 'fictionalTime', operation: 'set', timeYear: 2024, timeMonth: 5, timeDay: 13, timeHour: h, timeMinute: m } });
+    const out: any = withFictionalTimeHud({} as any, { beats: [at(23, 48), at(3, 4)] });
+    expect(out.hudOverlays.fictionalTime.displayFormat).toBe('datetime-12h');
+  });
 });
 
 describe('a generated story starts with its own story settings', () => {
@@ -276,6 +295,18 @@ describe('a generated story starts with its own story settings', () => {
     expect(committed.variables.map((v: any) => v.name)).toEqual(['trust']);
     expect(committed.roles.map((r: any) => r.id)).toEqual(['player']);
     expect(committed.debug.firstbeat).toBe('');
+  });
+
+  it("sets the clock up from the story, not from the open project's clock", async () => {
+    const at = (id: string, h: number) => ({ id, type: 'setVariable', name: id, parameters: { type: 'fictionalTime', operation: 'set', timeYear: 2024, timeMonth: 5, timeDay: 13, timeHour: h, timeMinute: 0 } });
+    const deps = makeDeps({
+      getGlobalSettings: () => ({ variables: [], hudOverlays: { fictionalTime: { enabled: true, displayFormat: 'date' }, timerHud: { enabled: true } } }) as any,
+    });
+    let committed: any = null;
+    (deps as any).commitGlobalSettings = vi.fn((next: any) => { committed = next; });
+    await applyGeneratedStory({ ...story(), beats: [at('t1', 23), at('t2', 3)] }, deps, { fallbackTitle: 'x' });
+    expect(committed.hudOverlays.fictionalTime.displayFormat).toBe('datetime-12h');
+    expect(committed.hudOverlays.timerHud.enabled).toBe(true);
   });
 });
 

@@ -148,6 +148,22 @@ describe('AIValidator', () => {
       expect(result.errors).toHaveLength(0);
     });
 
+    it('accepts settings every beat has, and still flags real unknowns', async () => {
+      const beat: GeneratedBeat = {
+        id: 'beat_1',
+        name: 'Opening Title',
+        type: 'titleScreen',
+        position: { x: 100, y: 100 },
+        parameters: { title: 'My Story', timeDisplayMode: 'none', explainHuds: true, madeUp: 1 },
+        connections: [],
+      };
+
+      const result = await validator.validateBeat(beat);
+
+      const unknown = (result.warnings ?? []).filter((w) => w.includes('not defined in schema'));
+      expect(unknown).toEqual([expect.stringContaining("'madeUp'")]);
+    });
+
     it('should reject unknown beat type', async () => {
       const beat: GeneratedBeat = {
         id: 'beat_1',

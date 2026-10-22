@@ -66,7 +66,7 @@ interface DialogChoice {
   visible?: boolean;
   soundEffect?: string;  // Sound to play when choice is selected
   /** Not a player reply: the scene moves on to dialogNode (usually another
-   *  character) after the reading time. */
+   *  character) — on Continue, or after the reading time (beat's lineAdvance). */
   continue?: boolean;
 }
 
@@ -1207,7 +1207,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                     className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 flex items-center gap-1"
                     title={hasChoices
                       ? 'Another character speaks instead of the player answering, when the conditions you set hold (for example, a bystander steps in if the player helped earlier).'
-                      : 'Another character speaks next, before the player answers. The story moves on to that line after the reading time.'}
+                      : 'Another character speaks next, before the player answers. The player moves on to that line with Continue (in chat layouts it follows by itself; see “Lines without a reply move on” under Show Advanced Options).'}
                   >
                     <Users className="w-3 h-3" />
                     {hasChoices ? 'Or another character speaks, if…' : 'Then another character speaks'}
@@ -1227,7 +1227,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               const effects = step.effects ?? [];
               const when = conds.map(c => describeCondition(c as any)).join(' and ');
               const label = k === 0
-                ? (conds.length ? `then, if ${when}` : 'then, after the reading time')
+                ? (conds.length ? `then, if ${when}` : 'then')
                 : (conds.length ? `otherwise, if ${when}` : 'otherwise');
               const isOpen = openStepSettings.has(step.id);
               const unreachable = alwaysStep >= 0 && k > alwaysStep;

@@ -3,7 +3,7 @@
  * answers (NPC 1 → NPC 2 → player choices), without a fake player reply.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { DialogTreeBeat } from '../../src/beats/DialogTreeBeat';
+import { DialogTreeBeat, linesMoveOnByThemselves } from '../../src/beats/DialogTreeBeat';
 import { StoryContext } from '../../src/engine/StoryContext';
 import type { IRenderer } from '../../src/types';
 
@@ -24,7 +24,8 @@ function mockRenderer(clicks: string[]) {
   return { renderer, dialogs, choiceCalls };
 }
 
-const scene = (extra: Record<string, unknown> = {}) => new DialogTreeBeat({
+// These scenes move on by themselves (as in a chat layout) unless a test says otherwise.
+const scene = (extra: Record<string, any> = {}) => new DialogTreeBeat({
   id: 'scene', name: 'Scene', type: 'dialogTree',
   dialogTree: {
     id: 'n0', speaker: 'Mara', text: "We can't stay here.",
@@ -41,6 +42,7 @@ const scene = (extra: Record<string, unknown> = {}) => new DialogTreeBeat({
     }],
   },
   ...extra,
+  parameters: { lineAdvance: 'auto', ...extra.parameters },
 } as any);
 
 describe('DialogTree continue step', () => {
@@ -102,7 +104,7 @@ describe('DialogTree continue step', () => {
     const beat = new DialogTreeBeat({
       id: 'bye', name: 'Bye', type: 'dialogTree',
       dialogTree: { id: 'n0', speaker: 'Guard', text: 'Go away!', choices: [], target: 'beat_out' },
-      parameters: { allowSkipAhead: false },
+      parameters: { allowSkipAhead: false, lineAdvance: 'auto' },
     } as any);
     const { renderer, choiceCalls } = mockRenderer([]);
     expect(await beat.execute(new StoryContext(), renderer)).toBe('beat_out');
@@ -129,6 +131,7 @@ describe('DialogTree continue step', () => {
             dialogNode: { id: 'b', speaker: 'Jonas', text: 'Fine by me.', choices: [], target: 'beat_b' } },
         ],
       },
+      parameters: { lineAdvance: 'auto' },
     } as any);
     const { renderer, dialogs } = mockRenderer([]);
     expect(await beat.execute(new StoryContext(), renderer)).toBe('beat_b');
@@ -148,6 +151,7 @@ describe('DialogTree continue step', () => {
           { id: 'r', text: 'Stop it.', target: 'beat_reply' },
         ],
       },
+      parameters: { lineAdvance: 'auto' },
     } as any);
 
     const plain = mockRenderer(['root_r']);
@@ -162,6 +166,47 @@ describe('DialogTree continue step', () => {
     expect(await make().execute(helped, step.renderer)).toBe('beat_zoe');
     expect(step.dialogs[1]).toBe('Zoe: Leave him alone.');
     expect(helped.getVariable('witnessed')).toBe(true);
+  });
+
+  describe('pacing (lineAdvance)', () => {
+    const plain = (parameters: Record<string, unknown> = {}) => scene({ parameters: { lineAdvance: undefined, ...parameters } });
+
+    it('outside chat layouts a line waits for Continue, however long the reading time', async () => {
+      const context = new StoryContext();
+      const { renderer, dialogs, choiceCalls } = mockRenderer([]);
+      const run = plain().execute(context, renderer);
+      // Far longer than any reading time: still on Mara's line, Continue showing.
+      await new Promise((r) => setTimeout(r, 300));
+      expect(dialogs).toEqual(["Mara: We can't stay here."]);
+      expect(choiceCalls).toHaveLength(1);
+      expect(choiceCalls[0][0]).toMatchObject({ isContinue: true });
+      void run;
+    });
+
+    it('a click moves on, even with skipping off (that setting only matters when lines move on by themselves)', async () => {
+      const { renderer, dialogs, choiceCalls } = mockRenderer(['root___continue', 'root.c_next_c1']);
+      expect(await plain({ allowSkipAhead: false }).execute(new StoryContext(), renderer)).toBe('beat_ferry');
+      expect(dialogs).toHaveLength(2);
+      expect(choiceCalls[0][0]).toMatchObject({ isContinue: true });
+    });
+
+    it('chat layouts move on by themselves unless set to click', () => {
+      expect(linesMoveOnByThemselves({ layoutTemplate: 'chat-scroll' })).toBe(true);
+      expect(linesMoveOnByThemselves({ layoutTemplate: 'chat-bubble' })).toBe(true);
+      expect(linesMoveOnByThemselves({ layoutTemplate: 'conversation' })).toBe(false);
+      expect(linesMoveOnByThemselves({})).toBe(false);
+      expect(linesMoveOnByThemselves({ layoutTemplate: 'chat-scroll', lineAdvance: 'click' })).toBe(false);
+      expect(linesMoveOnByThemselves({ layoutTemplate: 'stacked', lineAdvance: 'auto' })).toBe(true);
+    });
+
+    it('keeps the setting through getParameters and can clear it', () => {
+      const beat = plain({ lineAdvance: 'auto' });
+      expect(beat.getParameters().lineAdvance).toBe('auto');
+      beat.updateParameters({ lineAdvance: undefined });
+      expect(beat.getParameters().lineAdvance).toBeUndefined();
+      beat.updateParameters({ lineAdvance: 'nonsense' });
+      expect(beat.getParameters().lineAdvance).toBeUndefined();
+    });
   });
 
   it('keeps the continue flag through a parameter update', () => {

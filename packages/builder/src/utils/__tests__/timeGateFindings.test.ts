@@ -49,4 +49,12 @@ describe('describeIgnoredParameters', () => {
     expect(lines[0]).toContain('"Route: On Time?" (conditionBeat)');
     expect(lines[0]).toContain('"compareTime"');
   });
+
+  it('leaves out settings every beat has (older generator checks flagged them)', () => {
+    const story = {
+      beats: [...endings],
+      generationIssues: { warnings: ["beats[0]: Parameter 'timeDisplayMode' not defined in schema for beat type 'endScreen'"] },
+    };
+    expect(describeIgnoredParameters(story)).toEqual([]);
+  });
 });

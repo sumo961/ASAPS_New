@@ -1,4 +1,4 @@
-export { Beat, DEFAULT_TARGET_TIMEOUT_TYPES, defaultTargetIsLive } from './Beat';
+export { Beat, BEAT_BASE_PARAMETERS, DEFAULT_TARGET_TIMEOUT_TYPES, defaultTargetIsLive } from './Beat';
 export { InfoTextBeat } from './InfoTextBeat';
 export { ExplanationBeat } from './ExplanationBeat';
 export { TitleScreenBeat } from './TitleScreenBeat';
@@ -15,7 +15,7 @@ export { SetTimerBeat } from './SetTimerBeat';
 export { AddRemoveInventoryBeat } from './AddRemoveInventoryBeat';
 //export { DialogTreeBeat, DialogNode, DialogChoice } from './DialogTreeBeat';
 export type { DialogNode, DialogChoice } from '../generated/beat-types';
-export { DialogTreeBeat, type PhaseOverride, type DialogTreeLayoutTemplate, isChatLayoutTemplate, normalizeDialogTreeLayoutTemplate, DIALOG_CHAT_RESPONSE_DELAY } from './DialogTreeBeat';
+export { DialogTreeBeat, type PhaseOverride, type DialogTreeLayoutTemplate, isChatLayoutTemplate, linesMoveOnByThemselves, normalizeDialogTreeLayoutTemplate, DIALOG_CHAT_RESPONSE_DELAY } from './DialogTreeBeat';
 export { DurScreenBeat } from './DurScreenBeat';
 export { VideoBeat } from './VideoBeat';
 export { ConversationChoiceBeat } from './ConversationChoiceBeat';

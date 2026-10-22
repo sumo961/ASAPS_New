@@ -6318,7 +6318,10 @@ function App() {
           return;
         }
         const { parameters, ...rest } = updates as Record<string, any>;
-        if (parameters) fresh.updateParameters({ ...fresh.getParameters(), ...parameters });
+        if (parameters) {
+          fresh.updateParameters({ ...fresh.getParameters(), ...parameters });
+          fresh.adoptBaseParameters(parameters);
+        }
         Object.assign(fresh, rest);
         actions.updateBeat(beatId, {} as Partial<Beat>);
       },

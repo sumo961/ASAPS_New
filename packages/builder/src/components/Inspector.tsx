@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles } from '@asaps/core';
+import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles, linesMoveOnByThemselves, normalizeDialogTreeLayoutTemplate } from '@asaps/core';
 import { VariableValueInput } from '../editors/VariableValueInput';
 import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
@@ -3980,22 +3980,53 @@ export const Inspector: React.FC<InspectorProps> = ({
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           />
                         </div>
-                        <div className="flex items-start gap-2">
-                          <input
-                            type="checkbox"
-                            id="allowSkipAhead-dialog"
-                            data-testid="dialog-allow-skip-ahead"
-                            checked={localBeat.parameters?.allowSkipAhead ?? true}
-                            onChange={(e) => handleParameterChange('allowSkipAhead', e.target.checked)}
-                            className="rounded border-gray-300 mt-0.5"
-                          />
-                          <label htmlFor="allowSkipAhead-dialog" className="text-sm text-gray-700">
-                            Players can skip ahead
-                            <span className="text-xs text-gray-500 block font-normal">
-                              A Continue button while other characters speak. Off: the lines play at reading pace and the player waits for their turn.
-                            </span>
-                          </label>
-                        </div>
+                        {(() => {
+                          // Unset follows the layout: chats move on, conversations wait.
+                          const byThemselves = linesMoveOnByThemselves({
+                            lineAdvance: localBeat.parameters?.lineAdvance,
+                            layoutTemplate: normalizeDialogTreeLayoutTemplate(localBeat.parameters?.layoutTemplate ?? localBeat.parameters?.presentationMode),
+                          });
+                          return (
+                            <>
+                              <div>
+                                <label htmlFor="lineAdvance-dialog" className="block text-sm font-medium text-gray-700 mb-1">
+                                  Lines without a reply move on
+                                </label>
+                                <select
+                                  id="lineAdvance-dialog"
+                                  data-testid="dialog-line-advance"
+                                  value={byThemselves ? 'auto' : 'click'}
+                                  onChange={(e) => handleParameterChange('lineAdvance', e.target.value)}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                >
+                                  <option value="click">when the player clicks Continue</option>
+                                  <option value="auto">by themselves after reading time</option>
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Lines a character says before the player answers (“Then another character speaks”, a farewell). Chats move on by themselves unless you change it; every other layout waits.
+                                </p>
+                              </div>
+                              {byThemselves && (
+                                <div className="flex items-start gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id="allowSkipAhead-dialog"
+                                    data-testid="dialog-allow-skip-ahead"
+                                    checked={localBeat.parameters?.allowSkipAhead ?? true}
+                                    onChange={(e) => handleParameterChange('allowSkipAhead', e.target.checked)}
+                                    className="rounded border-gray-300 mt-0.5"
+                                  />
+                                  <label htmlFor="allowSkipAhead-dialog" className="text-sm text-gray-700">
+                                    Players can skip ahead
+                                    <span className="text-xs text-gray-500 block font-normal">
+                                      A Continue button while other characters speak. Off: the lines play at reading pace and the player waits for their turn.
+                                    </span>
+                                  </label>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"

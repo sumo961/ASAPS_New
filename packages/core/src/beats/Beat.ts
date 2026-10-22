@@ -22,6 +22,17 @@ export const DEFAULT_TARGET_TIMEOUT_TYPES: ReadonlySet<string> = new Set([
   'titleScreen', 'infoText', 'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'inputText', 'videoBeat',
 ]);
 
+/**
+ * Settings every beat type has, which the Beat constructor also reads from
+ * `parameters` (where generated stories put them). Not in any one beat
+ * type's schema, so checks against the schema must accept them.
+ */
+export const BEAT_BASE_PARAMETERS: ReadonlySet<string> = new Set([
+  'defaultTargetDelay', 'showTimer', 'node', 'slotIntent', 'spatialFit', 'slotAnimations', 'spatialAnimations',
+  'animations', 'notes', 'speaker', 'characterRef', 'showSpeaker', 'timeDisplayMode', 'timeDisplayText',
+  'overrideCountdownMeter', 'explainHuds', 'requires', 'requiresMode',
+]);
+
 /** Can this beat's defaultTarget ever fire? (on its timer, or as the only exit) */
 export function defaultTargetIsLive(beat: {
   type: string; defaultTarget?: string; defaultTargetDelay?: number; connections?: Array<{ targetId?: string }>;
@@ -124,6 +135,7 @@ export abstract class Beat {
     this.transition = config.transition;
     this.sound = config.sound;
     this.defaultTarget = config.defaultTarget;
+    // Keep BEAT_BASE_PARAMETERS in step with the parameters read here.
     this.defaultTargetDelay = (config as any).defaultTargetDelay || (config.parameters as any)?.defaultTargetDelay;
     this.showTimer = (config as any).showTimer || (config.parameters as any)?.showTimer;
     this.node = (config as any).node || (config.parameters as any)?.node;
@@ -169,6 +181,27 @@ export abstract class Beat {
       config.locations.forEach(loc => {
         this.locations.set(loc.name, loc);
       });
+    }
+  }
+
+  /**
+   * Take the settings every beat has (BEAT_BASE_PARAMETERS) from a
+   * parameters object, as the constructor does. For a beat created empty and
+   * then filled with updateParameters — a generated story's beats — where
+   * the subclass ignores them. Values already on the beat win.
+   */
+  adoptBaseParameters(params: Record<string, any> | undefined): void {
+    if (!params) return;
+    const self = this as any;
+    for (const key of BEAT_BASE_PARAMETERS) {
+      const value = params[key];
+      if (value === undefined || value === null) continue;
+      if (key === 'spatialFit' && value !== 'contain' && value !== 'cover') continue;
+      if (key === 'requiresMode') {
+        if (value === 'any' || value === 'all') this.requiresMode = value;
+        continue;
+      }
+      if (self[key] === undefined || (key === 'speaker' && self[key] === '')) self[key] = value;
     }
   }
 

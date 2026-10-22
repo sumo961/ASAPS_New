@@ -5,6 +5,7 @@
  */
 
 import type { GeneratedBeat, AIValidationResult, StoryGenerationResponse, DialogGenerationResponse } from '../types/ai';
+import { BEAT_BASE_PARAMETERS } from '@asaps/core';
 import { analyzeStoryFindings } from '../utils/generationReview';
 import type { GenerationFinding, UnreachableBeatFinding } from '../types/generationReview';
 
@@ -150,6 +151,8 @@ export class AIValidator {
     //    intentionally lifts them to top-level for the inspector.
     // 2. Aliases declared on a parameter spec (e.g. trueTarget on
     //    conditionBeat.trueConnection) are valid alternate names.
+    // 3. Settings every beat has (BEAT_BASE_PARAMETERS, e.g. timeDisplayMode):
+    //    the Beat constructor reads them from parameters.
     //
     // Without these passes, every post-pipeline conditionBeat would emit a
     // dozen false-positive warnings.
@@ -179,6 +182,7 @@ export class AIValidator {
       if (!paramDef) {
         if (conditionFieldsRegistry.has(paramName)) continue;
         if (allAliases.has(paramName)) continue;
+        if (BEAT_BASE_PARAMETERS.has(paramName)) continue;
         warnings.push(`Parameter '${paramName}' not defined in schema for beat type '${beat.type}'`);
         continue;
       }

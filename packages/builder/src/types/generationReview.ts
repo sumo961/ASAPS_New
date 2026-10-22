@@ -11,7 +11,7 @@
  * their own.
  */
 
-export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate' | 'line-without-exit';
+export type FindingKind = 'missing-target' | 'unreachable-beat' | 'unsatisfiable-threshold' | 'restart-without-target' | 'role' | 'time-gate' | 'line-without-exit' | 'clock-prose';
 
 interface FindingBase {
   /** Stable id: kind + beat + discriminator, so status survives re-analysis. */
@@ -98,7 +98,15 @@ export interface LineWithoutExitFinding extends FindingBase {
   nodeId?: string;
 }
 
-export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding | LineWithoutExitFinding;
+/**
+ * A beat whose text opens with a clock time ("At 6:00 …") while the story
+ * clock, visible on that beat, shows a different time on every way in.
+ */
+export interface ClockProseFinding extends FindingBase {
+  kind: 'clock-prose';
+}
+
+export type GenerationFinding = MissingTargetFinding | UnreachableBeatFinding | UnsatisfiableThresholdFinding | RestartWithoutTargetFinding | RoleFinding | TimeGateFinding | LineWithoutExitFinding | ClockProseFinding;
 
 export type ProposalKind = 'retarget' | 'clamp-threshold' | 'link-from-previous' | 'set-restart-target' | 'ai-edit';
 

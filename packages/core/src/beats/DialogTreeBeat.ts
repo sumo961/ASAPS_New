@@ -61,6 +61,20 @@ export function isChatLayoutTemplate(template: DialogTreeLayoutTemplate): boolea
   return template === 'chat-scroll' || template === 'chat-bubble';
 }
 
+function readLineAdvance(v: unknown): 'click' | 'auto' | undefined {
+  return v === 'click' || v === 'auto' ? v : undefined;
+}
+
+/**
+ * Whether lines a character says without the player answering (a "then"
+ * handover, a farewell) move on after reading time. Unset follows the
+ * layout: a messenger chat keeps its own rhythm, a conversation waits.
+ */
+export function linesMoveOnByThemselves(beat: { lineAdvance?: 'click' | 'auto'; layoutTemplate?: DialogTreeLayoutTemplate }): boolean {
+  if (beat.lineAdvance) return beat.lineAdvance === 'auto';
+  return !!beat.layoutTemplate && isChatLayoutTemplate(beat.layoutTemplate);
+}
+
 /** The typing pause before an NPC line in a chat layout when the beat sets
  *  no responseDelay. Editors show it as the field's value. */
 export const DIALOG_CHAT_RESPONSE_DELAY = 1.5;
@@ -89,6 +103,10 @@ export class DialogTreeBeat extends Beat {
   /** Whether a line a character says without the player answering
    *  (continue step, NPC farewell) shows a Continue button. Unset = true. */
   public allowSkipAhead?: boolean;
+  /** How a line a character says without the player answering moves on:
+   *  'click' waits for Continue, 'auto' after reading time. Unset: auto in
+   *  chat layouts, click otherwise (see linesMoveOnByThemselves). */
+  public lineAdvance?: 'click' | 'auto';
   public markVisited?: boolean; // Block and dim choices leading to previously visited beats
   // Opt-in: effects (counters/variables/inventory) fire only the FIRST
   // time a given choice is selected; the choice itself stays selectable.
@@ -130,6 +148,7 @@ export class DialogTreeBeat extends Beat {
     this.choiceDelay = config.choiceDelay || config.parameters?.choiceDelay;
     this.responseDelay = config.parameters?.responseDelay;
     this.allowSkipAhead = config.parameters?.allowSkipAhead;
+    this.lineAdvance = readLineAdvance((config.parameters as any)?.lineAdvance);
     this.markVisited = config.markVisited ?? config.parameters?.markVisited ?? false;
     this.effectsOncePerChoice = config.effectsOncePerChoice ?? config.parameters?.effectsOncePerChoice ?? false;
     this.phaseOverrides = config.parameters?.phaseOverrides as Record<string, Record<string, PhaseOverride>> | undefined;
@@ -397,22 +416,34 @@ export class DialogTreeBeat extends Beat {
    * promise is abandoned on timer win and the next render replaces it.
    * With skipping off, the line is drawn without a button (empty choice
    * list: slot layouts only paint the line in renderChoices) and the
-   * player waits for their turn.
+   * player waits for their turn. When lines don't move on by themselves
+   * (lineAdvance 'click', the default outside chat layouts) the Continue
+   * button is the only way on; the timer is kept only for a renderer that
+   * fails to draw it.
    */
   private async waitOnNpcLine(renderer: IRenderer, text: string, continueId: string, locations: Location[]): Promise<void> {
     const advanceTimer = (async () => {
       await waitForTTS(renderer);
       await waitForReadingTime(renderer, text);
     })();
-    const choices = this.allowSkipAhead === false
+    const byThemselves = linesMoveOnByThemselves(this);
+    const choices = byThemselves && this.allowSkipAhead === false
       ? []
       : [{ id: continueId, text: uiString('continue'), isExit: true, isContinue: true }];
     // A renderer that rejects or throws here must not break the scene —
     // degrade to the pure timer.
-    const continueClick: Promise<unknown> = Promise.resolve()
+    const clicked: Promise<boolean> = Promise.resolve()
       .then(() => renderer.renderChoices(choices, locations))
-      .catch(() => new Promise<never>(() => { /* never */ }));
-    await (choices.length ? Promise.race([advanceTimer, continueClick]) : advanceTimer);
+      .then(() => true, () => false);
+    if (!byThemselves) {
+      if (!(await clicked)) await advanceTimer;
+      return;
+    }
+    if (!choices.length) {
+      await advanceTimer;
+      return;
+    }
+    await Promise.race([advanceTimer, clicked.then((ok) => (ok ? undefined : new Promise<never>(() => { /* never */ })))]);
   }
 
   getParameters(): Record<string, any> {
@@ -431,6 +462,7 @@ export class DialogTreeBeat extends Beat {
       choiceDelay: this.choiceDelay,
       responseDelay: this.responseDelay,
       allowSkipAhead: this.allowSkipAhead,
+      lineAdvance: this.lineAdvance,
       markVisited: this.markVisited,
       effectsOncePerChoice: this.effectsOncePerChoice,
       backgroundUrl: this.backgroundUrl,
@@ -475,6 +507,7 @@ export class DialogTreeBeat extends Beat {
     if (params.choiceDelay !== undefined) this.choiceDelay = params.choiceDelay;
     if (params.responseDelay !== undefined) this.responseDelay = params.responseDelay;
     if (params.allowSkipAhead !== undefined) this.allowSkipAhead = params.allowSkipAhead;
+    if ('lineAdvance' in params) this.lineAdvance = readLineAdvance(params.lineAdvance);
     if (params.markVisited !== undefined) this.markVisited = params.markVisited;
     if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = params.effectsOncePerChoice;
     if (params.backgroundUrl !== undefined) this.backgroundUrl = params.backgroundUrl;

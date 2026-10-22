@@ -3,7 +3,9 @@
  * as the AI generator handed it over. Pure: no React, no schema, no model.
  * See types/generationReview.ts for the design rule.
  */
+import { BEAT_BASE_PARAMETERS } from '@asaps/core';
 import { storyLinks, beatLinks, type StoryLink } from './storyLinks';
+import { findClockProseMismatches, showTimeOfDay } from './clockProseFindings';
 import {
   analyzeCounterRanges, readCounterCondition, conditionCanBeTrue, conditionCanBeFalse,
 } from './counterRangeAnalysis';
@@ -118,6 +120,14 @@ export function analyzeStoryFindings(story: any): GenerationFinding[] {
     }
   }
   out.push(...analyzeTimeGates(story, beats));
+  for (const m of findClockProseMismatches(story, storyStartBeatId(story))) {
+    const name = m.beatName || m.beatId;
+    const shown = m.shown.map(showTimeOfDay).join(' or ');
+    out.push({
+      id: `clock-prose:${m.beatId}`, kind: 'clock-prose', beatId: m.beatId, beatName: m.beatName,
+      message: `"${name}" says it is ${showTimeOfDay(m.named)}, but the story clock can show ${shown} there. Set the clock just before this beat, or hide the clock on it (Time Display: None).`,
+    });
+  }
   for (const line of findDialogLinesWithoutExit(beats)) {
     out.push({
       id: `line-without-exit:${line.beatId}:${line.nodeId ?? ''}`, kind: 'line-without-exit',
@@ -494,7 +504,8 @@ export function describeIgnoredParameters(story: any): string[] {
   for (const w of warnings) {
     if (typeof w !== 'string') continue;
     const m = w.match(/beats\[(\d+)\][^']*Parameter '([^']+)' not defined in schema for beat type '([^']+)'/);
-    if (!m) continue;
+    // Settings every beat has were flagged by older generator checks.
+    if (!m || BEAT_BASE_PARAMETERS.has(m[2])) continue;
     const beat = beats[Number(m[1])];
     const key = beat?.id ?? m[1];
     const label = `"${beat?.name || beat?.id || `beat ${m[1]}`}" (${m[3]})`;

@@ -21,7 +21,7 @@ describe('DialogTreeEditor continue step', () => {
 
   it('shows the next line under the first, not as a player reply', () => {
     render(<DialogTreeEditor dialogTree={chained as any} onChange={vi.fn()} characters={['Mara', 'Jonas']} />);
-    expect(screen.getByText('then, after the reading time')).toBeTruthy();
+    expect(screen.getByText('then')).toBeTruthy();
     expect(screen.queryByText('Player says:')).toBeNull();
     expect(screen.getByDisplayValue('And go where?')).toBeTruthy();
     // Only the last line in the chain takes player responses.

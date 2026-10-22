@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-21T21:51:21.706Z
+ * Generated: 2026-10-22T00:36:17.333Z
  */
 
 // ============================================
@@ -260,7 +260,9 @@ export interface DialogTreeParameters {
   chatWindow?: Object | undefined;
   /** Delay in seconds before an NPC speaks in chat mode, with a typing indicator: after the player answers, and between two characters' lines (a 'Then another character speaks' handover). Unset: 1.5 seconds in chat layouts */
   responseDelay?: number | undefined;
-  /** Whether the player can skip ahead while other characters speak. On (default): every line a character says without the player answering (a 'Then another character speaks' handover, or a farewell line that ends the dialog) shows a Continue button, and also moves on by itself after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace. */
+  /** How a line a character says without the player answering (a 'Then another character speaks' handover, or a farewell line that ends the dialog) moves on. 'click': it waits until the player clicks Continue — right for reflective scenes, inner voices and anything the player should take in at their own pace. 'auto': it moves on by itself after reading time (with a Continue button to skip ahead, see allowSkipAhead) — right for messenger chats and group scenes with their own rhythm. Unset: 'auto' in chat layouts (chat-scroll, chat-bubble), 'click' in every other layout. */
+  lineAdvance?: string | undefined;
+  /** Only when lines move on by themselves (lineAdvance 'auto', the default in chat layouts): whether the player can skip ahead while other characters speak. On (default): those lines show a Continue button and also move on after reading time. Off: no Continue button; those lines play at reading pace (in chat layouts with the typing indicator before each next speaker) and the player waits until it is their turn to answer. Turn it off for group scenes that should unfold at their own pace. */
   allowSkipAhead?: boolean | undefined;
   /** Displays per-node speaker names as labels during dialog */
   showSpeaker?: boolean | undefined;
