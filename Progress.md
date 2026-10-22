@@ -1,5 +1,20 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-22: Inner voices, clocks on endings, copies on GitHub (v0.9.136)
+
+### Overview
+Characters can speak as inner voices that read as thoughts and stack under the line the player is answering; End Screens and Multiple Choice beats can hide the clock; and an existing folder project can be put on GitHub from the version-control panel.
+
+- **Time Display on End Screens and Multiple Choice beats.** The per-beat clock setting (*Fictional Time* / *Manual text* / *None*) sat only in the Auto-Advance Settings, so an ending set "the next morning" couldn't hide the night-time clock from the Inspector. End Screens and Multiple Choice beats now show it on its own under Show Advanced Options (`components/inspector/TimeDisplaySetting.tsx`, shared with the auto-advance section; `utils/timeDisplay.ts` says which beats offer it). The review banner's clock finding suggests hiding the clock wherever the setting exists, endings included.
+
+- **Inner voices** (Hartmut, after the workshop: the player couldn't tell The Old Story and The Quiet Voice from Danny, and replied to Danny while looking at an inner voice). New character setting **Speaks as an inner voice** (`innerVoice`). The Dialog Tree works out the exchange per line (`core/beats/dialogExchange.ts`, renderer state `dialogExchange`): lines since the last one spoken out loud, whether the current line is a thought, and whom the replies answer (also across beats: an inner voice opening the next Dialog Tree still answers the conversation just before; the answered line isn't repeated). Slot layouts (`SlotFlowView`) stack the exchange — out-loud line dimmed, inner voices as dashed, italic thought boxes in their Theme Color with an *inner voice* tag — show earlier lines smaller and capped at four lines (full text on hover), scroll only as far as the newest line needs (the line being answered stays in view when there is room), and put **Reply to Danny** above the replies (not above a lone Continue). Chat layouts: thought bubbles, always named and tagged. Fixed canvas: thought box + tag on the line. UI strings `innerVoiceTag`, `replyTo`. AI: generation prompt, Co-Designer prompt and the MCP tool schema teach `innerVoice` + `color`.
+
+- **Put an existing folder project on GitHub from the version-control panel** (a student asked how to start a GitHub project from a copy of a story; the guide promised "Create a new GitHub repo" for existing folders, but the guided setup was only reachable from New Project on GitHub / Open Project from GitHub). Folder projects without a server now show a bar — *This project's history is only on this computer* — with **Put it on GitHub…**, which opens the same guided setup (tools, sign-in, create or connect a repo; the folder name is the suggested repo name). "Connect to an existing empty repo" pushes the current branch instead of a hard-coded `main`. New guide section "Making Your Own Copy of a Story on GitHub".
+
+**Files modified:** packages/builder/src/components/vcs/{VCSPanel,VCSOnboardingPanel,IncomingChangesTab}.tsx, tests (VCSPanelGitHubSetup); packages/core/src/beats/{dialogExchange (new),DialogTreeBeat,index}.ts, packages/core/src/i18n/uiStrings.ts, packages/renderer/src/components/{SlotFlowView,ChatDialogView,PositionedBeatView}.tsx, packages/renderer/src/renderers/ReactRenderer.tsx, packages/renderer/src/utils/innerVoice.ts (new), packages/builder/src/types/character.ts, packages/builder/src/components/characters/CharacterEditor.tsx, packages/builder/src/services/prompts/storyGenerationEnhanced.ts, packages/builder/src/components/ai/codesigner/systemPrompt.ts, mcp-server-desktop/src/index.ts, tests (DialogTreeInnerVoices, SlotFlowViewInnerVoices, ChatDialogView); packages/builder/src/components/Inspector.tsx, packages/builder/src/components/inspector/TimeDisplaySetting.tsx (new), packages/builder/src/utils/timeDisplay.ts (new), packages/builder/src/utils/generationReview.ts, docs/USER_GUIDE.md, tests (clockProseFindings)
+
+---
+
 ## 2026-10-21: Clocks that match the story, lines that wait (v0.9.135)
 
 ### Overview

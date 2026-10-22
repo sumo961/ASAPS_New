@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.135** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.135 keeps generated stories in
+Current release: **v0.9.136** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.136 gives characters an inner
+voice**: tick *Speaks as an inner voice* and their lines read as thoughts —
+italic, in a dashed box in their colour — stacked under the line the player
+is answering, with "Reply to Danny" above the replies. End Screens and
+Multiple Choice beats can now hide the clock, and a story folder that isn't
+on GitHub yet gets **Put it on GitHub…** in the version-control panel.
+
+**v0.9.135 kept generated stories in
 step with their clock**: settings such as hiding the clock on an ending now
 survive the import, the story clock uses the format the story asks for, and
 the review banner flags text that names a time the clock doesn't show

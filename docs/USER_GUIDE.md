@@ -570,6 +570,12 @@ The flowchart draws a choice's conditions on its edge, so you can see at a glanc
 <a id="then-another-character-speaks"></a>
 **Several characters before the player answers.** Characters can also talk to each other: Granny speaks, the Wolf answers, and only then does the player choose. Under a line that has no player responses yet, click **Then another character speaks**. A new line appears directly below, marked *then*, already set to a different character (when your project has more than one), and you can chain as many lines as the scene needs. Only the last line of the chain takes player responses — add them there (a line followed only by [lines with conditions](#lines-that-depend) takes them too). While playing, the player moves from line to line with **Continue**, so an inner voice or a hard moment can be read at the player's own pace. In the two chat layouts the next speaker follows by itself after the reading time (plus any speech) instead: the lines appear as bubbles one after another, with no reply from the player in between, the typing indicator shows before each next speaker for the beat's **NPC Response Delay**, and a **Continue** button lets fast readers skip ahead. **Lines without a reply move on** under **Show Advanced Options** switches any Dialog Tree between the two. For a scene that moves on by itself and that the player should sit through until it is their turn (an argument they can only watch), also turn off **Players can skip ahead**: the Continue button goes away, also on a farewell line that ends the dialog, and the lines play at reading pace. To take a line out of the chain, use its ✕: everything after it goes with it, and if it was the only line that could follow, the line above waits for player responses again.
 
+<a id="inner-voices"></a>
+**Inner voices.** Some characters don't speak out loud: they are thoughts in the player's head — an old belief that says *"What if tonight's the night?"*, a quieter voice that says *"You could stay home and still care."* Tick **Speaks as an inner voice** for such a character in **Characters** and give each one its own **Theme Color**. Their lines then read as thoughts: italic, in a dashed, see-through box in their colour, with *inner voice* next to the name. In the Stacked, Conversation and Custom layouts, when they come right after a character who spoke out loud (*Then another character speaks*), that line stays on screen, dimmed, and the inner voices stack below it, so the player sees what they are answering and every voice that weighs in. Earlier lines in the stack are smaller and show at most four lines (the whole text on hover) — the player has read them already. If the stack still doesn't fit, it scrolls just far enough to show the newest line, and the player can scroll up to reread. Above the replies a small **Reply to Danny** names the last character who spoke out loud (a line answered only with **Continue** doesn't get it) — also when an inner voice opens the next Dialog Tree right after a conversation. The stack clears when someone speaks out loud again or the player answers. In chat layouts inner voices get a dashed thought bubble, always with their name and *inner voice*; on a fixed canvas the line gets the thought box and the tag, without the stack. AI story generation and the Co-Designer know about inner voices too, so you can ask for one.
+
+![A Dialog Tree in the Conversation layout during play: Danny's out-loud line, dimmed, on the left; below it two inner voices in dashed, italic boxes, "The Old Story · inner voice" in orange and "The Quiet Voice · inner voice" in blue; on the right "Reply to Danny" above the player's three replies.](images/95-inner-voices-stack.png)
+*Danny asks for help, and two inner voices weigh in before the player answers him.*
+
 <a id="lines-that-depend"></a>
 **Lines that depend on the story — and lines that change it.** Each *then…* connector has a **Conditions & effects** button (once something is set, it shows counts instead, such as ◇ 1 ⚡ 2). Its conditions decide when that line plays (*This line plays only if…*: an item, a variable, a counter, a visited beat, a feeling or a role — the same choices as on player responses); its effects happen when the line plays (*When this line plays:* set a variable, change a counter, give an item, shift a feeling). Effects are how a story remembers what the player **witnessed or learned** even though they chose nothing: the bully mocks Tim in front of the player → set *witnessed_bullying*; Jonas mentions the code → set *knows_code*. (With **Effects fire only on first pick** turned on, a line's effects count once, just like a choice's.) Conditions let a scene **react to earlier play**:
 
@@ -1449,6 +1455,7 @@ You can ignore all of this and ship a perfectly good story with just names and p
    - **Pronouns** - she/her, he/him, they/them or your own; used when the character plays a [role](#roles) and text says `${@role.they}`
    - **Description** - Notes for yourself
    - **Theme Color** - The character's colour: it marks them around the builder, and with [Use each character's Theme Color](#speaker-display) on, their name is drawn in it when they speak
+   - **Speaks as an inner voice** - For a voice in the player's head rather than someone in the room: an inner critic, an old belief, a quieter second thought. See [Inner voices](#inner-voices)
 
    The character's fixed **ID** is shown in small print at the bottom of the Basic tab; conditions and saved games refer to it, so it never changes.
 
@@ -3696,7 +3703,7 @@ Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual 
     - *Off* — Name hidden
   - **Name position** — Left or right alignment for the speaker name
   - **Name color** — Custom color for the speaker name, for both Label and Inline names
-  - **Use each character's Theme Color** — every speaker's name in their own color: the *Theme Color* you give a character in **Characters**. Speakers without one use the Name color. (Chat-style dialog layouts keep their own name styling.)
+  - **Use each character's Theme Color** — every speaker's name in their own color: the *Theme Color* you give a character in **Characters**. Speakers without one use the Name color. (Chat-style dialog layouts keep their own name styling.) [Inner voices](#inner-voices) use their Theme Color for their thought box either way.
   - **Portrait position** — Where the portrait image appears:
     - *Inside left / Inside right* — Small portrait inside the text box
     - *Above left / Above right* — Larger portrait above the text box
@@ -3840,7 +3847,7 @@ Fictional time tracks an in-story date and time that's independent of real-world
 **Displaying Fictional Time:** When the Timer HUD is enabled and fictional time is set, the HUD automatically displays the formatted time (e.g., "9:00 AM" or "Jan 31, 2025 9:00"). This appears even when no real-time countdown is active.
 
 <a id="per-beat-time-display"></a>
-**Changing the clock on one beat.** A beat can show something else in the Timer HUD, or nothing at all: open **Show Advanced Options** in the Inspector and pick its **Time Display** in the **Auto-Advance Settings** section — *Fictional Time (default)*, *Manual text* (for example *Meanwhile…* or *2h later*), or *None (hide on this beat)*. The section is there on the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video). Hiding the clock is handy for a flashback, a dream, or a line of text that names a different time than the clock would show.
+**Changing the clock on one beat.** A beat can show something else in the Timer HUD, or nothing at all: open **Show Advanced Options** in the Inspector and pick its **Time Display** — *Fictional Time (default)*, *Manual text* (for example *Meanwhile…* or *2h later*), or *None (hide on this beat)*. On the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video) it sits in the **Auto-Advance Settings** section; **End Screens** and **Multiple Choice** beats have it on its own. Hiding the clock is handy for a flashback, a dream, an ending set the next morning, or a line of text that names a different time than the clock would show.
 
 **Fictional-time HUD in the Visual Editor (v0.9.59).** When all three switches line up — **Settings → HUD → Timer / Time Display** *Enabled*, **Settings → HUD → Fictional Time** *Enabled*, and that section's **Show in Timer HUD** option turned on — the Visual Editor's slot/spatial preview now renders the chip too, in the configured corner and at the configured `displayFormat` (e.g., a green *"1 January 2024, 9:00 AM"* chip at top-right). So you can see WHERE the chip will sit and HOW the initial time renders without leaving the editor. The chip stays hidden in the VE when any of those switches is off.
 
@@ -3945,7 +3952,7 @@ The credentials live in `gh`'s system-wide credential store — ASAPS doesn't ke
 
 ### Step 3: Connect to a remote (or skip)
 
-If you're using **New Project on GitHub** or **Open Project from GitHub**, ASAPS handles this step automatically. If you've opened an existing project folder that isn't yet on GitHub, you can either:
+If you're using **New Project on GitHub** or **Open Project from GitHub**, ASAPS handles this step automatically. If you've opened an existing project folder that isn't yet on GitHub, the version-control panel shows a bar at the top — *This project's history is only on this computer* — with **Put it on GitHub…**. Click it (it walks you through steps 1 and 2 first if needed), then either:
 
 - **Create a new GitHub repo** — pick a name and visibility (private by default — going public→private *after* pushing is a bad time), and ASAPS runs `gh repo create … --source=. --remote=origin --push`.
 - **Connect to an existing empty repo** — paste a GitHub URL you've already created at `github.com/new` and ASAPS sets it as the remote and pushes.
@@ -3967,6 +3974,18 @@ ASAPS automatically handles a footgun that catches first-time users: if `git` do
 
 When that's done, ASAPS opens the project and you can start authoring. Every save is automatically tracked by Git, ready to be committed and pushed.
 
+<a id="copy-a-story-to-github"></a>
+## Making Your Own Copy of a Story on GitHub
+
+To start a new GitHub project from an existing story (your own version of a group story, a variant to try something out) — in the desktop app:
+
+1. Open the story and choose **File ▸ Save a Copy (.asaps)…**. Save it **outside** the story's own folder, for example on your Desktop.
+2. **File ▸ Open Project…** (or the toolbar's **Open ▸ Open Project File…**) and pick that file. ASAPS says *A project with this ID already exists* and suggests *… (Copy)*. Keep that or type a new name — **never type OVERWRITE**, which replaces the original. The copy gets its own project ID.
+3. **File ▸ Save As Folder…** and choose a **new, empty folder** — not inside the original story's folder.
+4. In the version-control panel, click **Put it on GitHub…** ▸ **Create a new GitHub repo**, pick a name and visibility, and **Create and push**.
+
+Don't copy the project folder in Finder or Explorer instead: the copy keeps the hidden link to the original repository, so its pushes would land there.
+
 ## Joining a Project Someone Else Created (Collaboration)
 
 The everyday team workflow looks like this:
@@ -3982,6 +4001,8 @@ The first time a collaborator joins, they go through the same install + auth onb
 ## The VCS Panel
 
 Once a project is under version control, the **VCS panel** lives at the bottom of the window. Toggle it with **Ctrl/Cmd+Shift+G** or via *Version Control → Toggle VCS Panel*. It has four tabs:
+
+While a project's history is only on your computer (no server yet), a bar above the tabs says so and offers **Put it on GitHub…**, the guided setup from [Step 3](#step-3-connect-to-a-remote-or-skip); **Back to changes** returns to the tabs.
 
 ### Pending Changes
 
