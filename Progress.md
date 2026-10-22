@@ -1,5 +1,26 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-21: Clocks that match the story, lines that wait (v0.9.135)
+
+### Overview
+From Hartmut's workshop with a generated story ("The Reliable One"): a false warning on opening, inner-voice lines that moved on by themselves, and a story clock out of step with the text (1:30 AM under "At 6:00 the alarm goes off", 1:30 before a reply that comes earlier).
+
+### Generated stories
+- **No more "came with a setting this kind of beat doesn't have (timeDisplayMode)" banner.** Settings every beat has (`BEAT_BASE_PARAMETERS` in core: clock display, `spatialFit`, `requires`, `explainHuds` …) are accepted by the generation checker and left out of the banner, also for stories generated before this fix.
+- **…and they now really apply.** Generated beats are created empty and filled with `updateParameters`, which ignores those settings, so they were dropped: an ending meant to hide the clock showed the night-time clock instead. `Beat.adoptBaseParameters` takes them on import and for beats the Co-Designer adds.
+- **The clock format the story asks for is used.** The importer looked for it at `globalSettings.fictionalTime`; the prompt puts it at `globalSettings.hudOverlays.fictionalTime`. Both are read now. When none is given, setting the clock to different times of day (23:48 … 03:04) counts as moving the time, so a time is shown, not only the date. A generated story no longer inherits the open project's clock settings (a second import kept the first one's).
+
+- **New review finding: text that names a time the clock doesn't show** (`utils/clockProseFindings.ts`, kind `clock-prose`). Follows the clock's time of day along the links (sets, minute/hour advances; longer advances keep the time of day) and flags a beat whose text opens with a time ("01:30.", "At 6:00 …") when the clock is visible there and some way in shows a time more than 30 minutes off. On The Reliable One it names exactly the three endings whose clock read 1:30 or 3:04 at "6:00" / "9:00". It suggests hiding the clock only on beat types whose Inspector offers Time Display (the auto-advance types).
+- **Prompt:** clock sets go immediately before the beat whose text names the time (not a scene earlier: the clock read 1:30 before Tess's reply); every path into a timed beat must bring the clock there; no choice may lead back into a beat the player just saw unless the scene is meant to repeat ("His Text at 1:30" → Tess → back to the same text).
+
+### Dialog pacing
+- **New Dialog Tree setting "Lines without a reply move on"** (`lineAdvance`: `click` | `auto`). Lines a character says before the player answers (a "then" line, a farewell) wait for **Continue** — the default in every layout except messenger chats, which keep moving on by themselves after reading time. "Players can skip ahead" applies to the moving-on mode only. Dialog Editor connectors read *then* instead of *then, after the reading time*.
+- AI guidance: schema description, story-generation and dialog prompts, Co-Designer prompt.
+
+**Files modified:** packages/core/src/beats/{Beat,DialogTreeBeat,index}.ts, beat-definitions/core-beats.json, packages/builder/src/services/AIValidator.ts, packages/builder/src/utils/{generationReview,applyGeneratedStory,clockProseFindings}.ts, packages/builder/src/types/generationReview.ts, packages/builder/src/App.tsx, packages/builder/src/components/Inspector.tsx, packages/builder/src/editors/DialogTreeEditor.tsx, packages/builder/src/services/prompts/{storyGenerationEnhanced,dialogGeneration}.ts, packages/builder/src/components/ai/codesigner/systemPrompt.ts, docs/USER_GUIDE.md, tests (DialogTreeContinueStep core + editor, BeatBaseParameters, AIValidator, timeGateFindings, applyGeneratedStory, clockProseFindings)
+
+---
+
 ## 2026-10-21: One version writes, conditions that combine (v0.9.134)
 
 ### Overview

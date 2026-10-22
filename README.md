@@ -22,8 +22,16 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.134** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.134 makes one version write a
+Current release: **v0.9.135** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.135 keeps generated stories in
+step with their clock**: settings such as hiding the clock on an ending now
+survive the import, the story clock uses the format the story asks for, and
+the review banner flags text that names a time the clock doesn't show
+("At 6:00 the alarm…" under 1:30 AM). Lines a character says before the
+player answers now wait for **Continue** — except in messenger chats — with
+a new **Lines without a reply move on** setting to choose.
+
+**v0.9.134 made one version write a
 project**: an older ASAPS now refuses to save, commit or push a project a
 newer one saved, and tells you to update. A **Condition Check** can test
 several things at once — *has the key **or** is trusted* — with **More
