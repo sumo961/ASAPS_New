@@ -333,6 +333,21 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
         </div>
       </div>
 
+      <label className="flex items-start gap-2 text-sm" data-testid="character-inner-voice">
+        <input
+          type="checkbox"
+          checked={editedCharacter.innerVoice === true}
+          onChange={(e) => setEditedCharacter({ ...editedCharacter, innerVoice: e.target.checked || undefined })}
+          className="mt-1 rounded border-gray-300"
+        />
+        <span>
+          <span className="font-medium">Speaks as an inner voice</span>
+          <span className="block text-xs text-gray-500">
+            For a voice in the player's head (an inner critic, a second thought). Its lines show as thoughts — dashed box in the Theme Color, italic, marked "inner voice" — and stay on screen below the line being answered until the player replies.
+          </span>
+        </span>
+      </label>
+
       <div>
         <label className="block text-sm font-medium mb-1">Tags</label>
         <input

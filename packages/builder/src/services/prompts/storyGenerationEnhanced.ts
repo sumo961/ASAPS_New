@@ -1003,6 +1003,8 @@ Include characters in the "characters" array of your output:
 }
 \`\`\`
 
+INNER VOICES: a character who speaks in the player character's head rather than out loud (an inner critic, a protective old belief, a quieter second thought, a conscience) gets \`"innerVoice": true\` and a distinct \`"color"\` (e.g. "#e0795b"; two inner voices get two clearly different colors). Their dialog lines then show as thoughts — italic, dashed box in their color, marked "inner voice" — and stack below the line the player is answering until the player replies, with "Reply to <name>" above the choices. Write their lines as "then" continue steps after the out-loud line they react to, and keep each thought short (one to three sentences) — several stack on screen together. Never mark a character who is physically present and talking out loud.
+
 Characters may also carry \`variants\` — alternate persona overlays of the SAME
 character (see the affect guidance for when they are required). Variant shape:
 \`\`\`json

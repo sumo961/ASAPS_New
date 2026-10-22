@@ -267,6 +267,10 @@ Rules for proposals:
     fails; without one the gate only annotates (the story analyzer flags
     paths that can't satisfy it). "requiresMode": "any" = one requirement
     suffices (default "all"). [] removes the gate.
+  - A character who speaks in the player's head (inner critic, second
+    thought) is marked with 'updateCharacter' { "innerVoice": true,
+    "color": "#…" }: their lines show as thoughts, stack under the line
+    being answered, and the replies say whom they answer.
   - A Condition Check (conditionBeat) tests its "condition" plus any
     "moreConditions" (same shape), combined by "conditionsMatch": "all"
     (AND, default) or "any" (OR); the digest shows them as "checks:".

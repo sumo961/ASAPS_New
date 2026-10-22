@@ -684,6 +684,14 @@ const injectStoryTool: Tool = {
             name: { type: 'string', description: 'Internal name' },
             displayName: { type: 'string', description: 'Display name shown in-game and used as speaker value on beats' },
             role: { type: 'string', description: 'Character role: "player", "npc", or "companion"' },
+            color: { type: 'string', description: 'Theme color, e.g. "#e0795b" (name color; an inner voice\'s thought box)' },
+            innerVoice: {
+              type: 'boolean',
+              description:
+                'true for a voice in the player character\'s head (an inner critic, an old belief, a second thought), not someone talking out loud. ' +
+                'Its dialog lines show as thoughts (italic, dashed box in its color, marked "inner voice") and stack under the line being answered until the player replies, with "Reply to <name>" above the choices. ' +
+                'Give each inner voice its own color; write their lines as continue steps after the out-loud line they react to.',
+            },
             counters: {
               type: 'array',
               description:

@@ -40,3 +40,4 @@ export { AIConversationBeat, type AIConversationBeatParams } from './AIConversat
 export { AISummaryBeat, type AISummaryBeatParams } from './AISummaryBeat';
 export { AIInfoTextBeat, type AIInfoTextBeatParams } from './AIInfoTextBeat';
 export { AIDurScreenBeat, type AIDurScreenBeatParams } from './AIDurScreenBeat';
+export { speakerVoice, exchangeFor, type DialogExchange, type DialogExchangeLine } from './dialogExchange';

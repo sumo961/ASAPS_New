@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
-import type { Location, AnimationPath, SlotIntent } from '@asaps/core';
+import type { Location, AnimationPath, SlotIntent, DialogExchange } from '@asaps/core';
 
 /** One piece of a line read aloud: whose voice reads it. */
 export interface TTSVoiceSegment { text: string; speaker?: string }
@@ -1633,6 +1633,18 @@ export class ReactRenderer extends BaseRenderer {
   }
 
   /**
+   * The Dialog Tree's exchange (inner voices, see core dialogExchange) for
+   * this render. "Reply to …" belongs above replies only, not above the
+   * Continue button of a line nobody answers.
+   */
+  protected exchangeForChoices(choices: Array<{ isContinue?: boolean }>): DialogExchange | undefined {
+    const exchange = this.getState('dialogExchange') as DialogExchange | undefined;
+    if (!exchange?.replyTo || choices.some(c => !c.isContinue)) return exchange;
+    const { replyTo: _replyTo, ...rest } = exchange;
+    return rest;
+  }
+
+  /**
    * The theme for what is on stage now: with "use character colors" on, the
    * current speaker's Theme Color becomes the name color (else the project's
    * Name Color stands). The same object comes back while nothing changed, so
@@ -2905,7 +2917,13 @@ export class ReactRenderer extends BaseRenderer {
                 const show = beatOverride === true ? true : beatOverride === false ? false : globalShowNames;
                 if (!show) return undefined;
                 const raw = (this.getState('beatSpeaker') as string) || undefined;
-                return raw && this.speakerNameResolver ? this.speakerNameResolver(raw) : raw;
+                const name = raw && this.speakerNameResolver ? this.speakerNameResolver(raw) : raw;
+                const inner = (this.getState('dialogExchange') as DialogExchange | undefined)?.inner;
+                return name && inner ? `${name} · ${uiString('innerVoiceTag')}` : name;
+              })()}
+              thought={(() => {
+                const exchange = this.getState('dialogExchange') as DialogExchange | undefined;
+                return exchange?.inner ? { color: exchange.color } : undefined;
               })()}
               speakerPortraitUrl={(() => {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
@@ -3047,6 +3065,7 @@ export class ReactRenderer extends BaseRenderer {
           || undefined;
       }
 
+      const exchange = this.getState('dialogExchange') as DialogExchange | undefined;
       const newMessage: ChatMessage = {
         id: messageId,
         speaker,
@@ -3054,6 +3073,7 @@ export class ReactRenderer extends BaseRenderer {
         emotion,
         isPlayer: false, // NPC message
         avatarUrl,
+        ...(exchange?.inner ? { inner: true, ...(exchange.color ? { color: exchange.color } : {}) } : {}),
       };
 
       this.chatMessages.push(newMessage);
@@ -3516,6 +3536,7 @@ export class ReactRenderer extends BaseRenderer {
               ...(c.description ? { description: c.description } : {}),
               ...(pictureStyle ? { imageUrl: this.resolveChoiceImage(c.image) } : {}),
             }))}
+            exchange={dialogTreeSlotTemplate ? this.exchangeForChoices(choices) : undefined}
             choiceStyle={pictureStyle ?? undefined}
             layoutTemplate={slotTemplate}
             onAction={this.handleAction}

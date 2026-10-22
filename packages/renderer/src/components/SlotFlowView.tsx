@@ -28,7 +28,8 @@
 import { readableLinkColor } from '../utils/linkColor';
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
-import { slotIntentFor, slotAnimationsFor, uiString } from '@asaps/core';
+import { slotIntentFor, slotAnimationsFor, uiString, formatUIString, type DialogExchange } from '@asaps/core';
+import { thoughtBoxStyle } from '../utils/innerVoice';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { DEFAULT_THEME, type RenderThemeSettings, type SpriteSheetData } from './PositionedBeatView';
@@ -256,6 +257,12 @@ interface SlotFlowViewProps {
    */
   dynamicChoices?: { id: string; text: string; description?: string; imageUrl?: string }[];
   /**
+   * Dialog Tree inner voices (core beats/dialogExchange): the lines of this
+   * exchange before the current one, whether the current line is an inner
+   * voice, and whom the replies answer.
+   */
+  exchange?: DialogExchange;
+  /**
    * Choose your character's picture cards: 'pictures' (picture + name) or
    * 'picturesOnly'. Anything else draws the usual text buttons.
    */
@@ -372,6 +379,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   timerState: initialTimerState,
   onSubscribeTimerState,
   dynamicChoices,
+  exchange,
   choiceStyle,
   markVisited = false,
   visitedChoiceIds = [],
@@ -781,6 +789,38 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // gate stays unearned until the player actually scrolls to the end.
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Inner voices stack under the line being answered; bring the newest line
+  // into view when it arrives (it is the one to read, the rest is context).
+  const exchangeDepth = exchange?.earlier.length ?? 0;
+  // The layout settles after the first paint (fonts, the choices joining,
+  // a resized window), so keep following it until the player scrolls.
+  useEffect(() => {
+    if (!exchangeDepth) return;
+    const scroller = rootRef.current?.querySelector('.slotflow-scroll') as HTMLElement | null;
+    if (!scroller) return;
+    let playerScrolled = false;
+    const showCurrent = () => {
+      const current = scroller.querySelector('[data-slotflow-current]') as HTMLElement | null;
+      if (playerScrolled || !current) return;
+      const offset = current.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
+      if (Math.abs(offset) > 1) scroller.scrollTop = Math.max(0, scroller.scrollTop + offset);
+    };
+    showCurrent();
+    const onPlayer = () => { playerScrolled = true; };
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(showCurrent) : null;
+    observer?.observe(scroller);
+    if (scroller.firstElementChild) observer?.observe(scroller.firstElementChild);
+    scroller.addEventListener('wheel', onPlayer, { passive: true });
+    scroller.addEventListener('touchmove', onPlayer, { passive: true });
+    scroller.addEventListener('keydown', onPlayer);
+    return () => {
+      observer?.disconnect();
+      scroller.removeEventListener('wheel', onPlayer);
+      scroller.removeEventListener('touchmove', onPlayer);
+      scroller.removeEventListener('keydown', onPlayer);
+    };
+  }, [exchangeDepth, content]);
   React.useEffect(() => {
     if (gateEarned) return;
     const root = rootRef.current;
@@ -1549,6 +1589,44 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
             justifyContent: 'flex-start',
           }}
         >
+          {exchange && exchange.earlier.length > 0 && (
+            <div data-slotflow-exchange="" style={{ ...CONTENT_ABOVE_SPRITES, display: 'flex', flexDirection: 'column', gap: `clamp(8px, ${vhU(1.5)}, 16px)`, marginBottom: `clamp(10px, ${vhU(2)}, 20px)`, alignSelf: isConversation ? 'flex-start' : 'center', width: '100%' }}>
+              {exchange.earlier.map((line, i) => {
+                const card = textBoxCardStyle(theme, { isTitle: false });
+                return (
+                  <div key={i} data-exchange-line={line.inner ? 'inner' : 'spoken'} style={{ display: 'flex', flexDirection: 'column', alignItems: isConversation ? 'flex-start' : 'center' }}>
+                    {speakerSlot && speakerText && (
+                      <div style={{
+                        fontFamily: theme.fonts.textFont || 'sans-serif',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                        color: (line.inner ? line.color : undefined) || theme.speakerDisplay?.nameColor || undefined,
+                        opacity: line.inner ? 0.85 : 0.55,
+                        marginBottom: 4,
+                        fontSize: `clamp(calc(var(--slotflow-body-floor) - 3px), calc(${bodyFluid} * 0.66), 18px)`,
+                      }}>
+                        {line.speaker}{line.inner ? ` · ${uiString('innerVoiceTag')}` : ''}
+                      </div>
+                    )}
+                    <div style={{
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.45,
+                      textAlign: isConversation ? 'left' : 'center',
+                      width: 'fit-content',
+                      maxWidth: '100%',
+                      // Earlier lines are context: smaller and tighter than the line being read.
+                      fontSize: `clamp(calc(var(--slotflow-body-floor) - 3px), calc(${bodyFluid} * 0.75), ${BODY_CEILING}px)`,
+                      ...card,
+                      ...(card.padding === 0 ? null : { padding: '8px 14px' }),
+                      ...(line.inner ? { ...thoughtBoxStyle(line.color, card), padding: '8px 14px', opacity: 0.85 } : { opacity: 0.55 }),
+                    }}>
+                      <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(line.text) }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {speakerSlot && speakerText && (() => {
             // Bug 19a — small label above the body. No card behind it
             // (it's an attribution, not a content card). Centered, slight
@@ -1559,6 +1637,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               <div
                 className={a.className}
                 data-slotflow-slot={speakerSlot.name}
+                {...(exchange?.earlier.length ? { 'data-slotflow-current': '' } : {})}
                 style={{
                   ...CONTENT_ABOVE_SPRITES,
                   fontFamily: theme.fonts.textFont || 'sans-serif',
@@ -1566,7 +1645,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   letterSpacing: '0.04em',
                   // Honor the speaker-display accent color (matches the
                   // fixed-mode label); unset falls through to inherited text.
-                  color: theme.speakerDisplay?.nameColor || undefined,
+                  color: (exchange?.inner ? exchange.color : undefined) || theme.speakerDisplay?.nameColor || undefined,
                   // Conversation: left-align the speaker label so it
                   // sits above the (left-aligned) body card. Stacked /
                   // custom keep the centered label above the centered
@@ -1580,7 +1659,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   ...a.style,
                 }}
               >
-                {speakerText}
+                {speakerText}{exchange?.inner ? ` · ${uiString('innerVoiceTag')}` : ''}
               </div>
             );
           })()}
@@ -1665,6 +1744,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
               <div
                 className={a.className}
                 data-slotflow-slot={bodySlot?.name}
+                {...(exchange?.earlier.length ? { 'data-slotflow-current': '' } : {})}
                 onClick={editorClick}
                 style={{
                   ...CONTENT_ABOVE_SPRITES,
@@ -1689,6 +1769,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   // visual-novel feel.
                   alignSelf: isConversation ? 'flex-start' : 'center',
                   ...textBoxCardStyle(theme, { isTitle: false }),
+                  ...(exchange?.inner ? thoughtBoxStyle(exchange.color, textBoxCardStyle(theme, { isTitle: false })) : null),
                   ...bodyReveal.fadeStyle,
                   ...a.style,
                   // Per-slot overrides win over theme + fluid defaults.
@@ -2422,6 +2503,19 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 ...a.style,
               }}
             >
+              {exchange?.replyTo && hasDynamicChoices && (
+                <div data-slotflow-reply-to="" style={{
+                  fontFamily: theme.fonts.textFont || 'sans-serif',
+                  fontSize: `clamp(calc(var(--slotflow-body-floor) - 3px), calc(${bodyFluid} * 0.7), 18px)`,
+                  letterSpacing: '0.04em',
+                  opacity: 0.75,
+                  color: theme.speakerDisplay?.nameColor || undefined,
+                  alignSelf: isConversation ? 'flex-end' : 'center',
+                  gridColumn: '1 / -1',
+                }}>
+                  {formatUIString('replyTo', { name: exchange.replyTo })}
+                </div>
+              )}
               {flowButtons.map(b => {
                 const actionSlotName = actionSlot?.name;
                 const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;

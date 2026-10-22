@@ -20,6 +20,13 @@ export interface Character {
    * back to they/them). Absent ⇒ they/them.
    */
   pronouns?: 'she' | 'he' | 'they' | Partial<Record<'they' | 'them' | 'their' | 'theirs' | 'themself' | 'is' | 'has' | 'was', string>>;
+  /**
+   * Speaks in the player's head, not out loud (an inner critic, a second
+   * thought). Dialog lines show as thoughts — dashed box, italic, "inner
+   * voice" tag — and stack under the line being answered until the player
+   * replies (core beats/dialogExchange).
+   */
+  innerVoice?: boolean;
   
   // Visual Configuration
   visual: {

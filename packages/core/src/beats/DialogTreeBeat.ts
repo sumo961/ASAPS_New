@@ -7,6 +7,7 @@ import { computeDialogTreeLayout, type DialogTreeLayoutTheme } from '../layout';
 import { migrateDialogTreeEffects } from '../migration/effectsMigration';
 import { waitForTTS, waitForReadingTime } from '../utils/ttsWait';
 import { uiString } from '../i18n/uiStrings';
+import { speakerVoice, lineCarriedOver, exchangeFor, type DialogExchangeLine } from './dialogExchange';
 
 /**
  * Phase layout override - stores position adjustments for elements that
@@ -631,6 +632,12 @@ export class DialogTreeBeat extends Beat {
     // causing false positives when checking visited choices.
     let nodePath = 'root';
 
+    // Lines since the last one spoken out loud (inner voices pile up below
+    // it until the player answers); see dialogExchange.
+    let exchange: DialogExchangeLine[] = [];
+    let carriedOver = false;
+    let addressee: string | undefined;
+
     while (this.currentNode) {
       // Build phase-specific locations by merging base locations with phaseOverrides
       // This ensures dialog/button positions from Visual Editor are respected
@@ -766,6 +773,22 @@ export class DialogTreeBeat extends Beat {
         && earlyVisibleChoices.length > 0
         && !continueStepOf(earlyVisibleChoices);
       renderer.setState('dialogNodeIsSpatial', nodeWillBeSpatial);
+
+      const voice = speakerVoice(context, (this.currentNode as any).characterRef || processedSpeaker);
+      if (!voice.inner) {
+        exchange = [];
+        addressee = processedSpeaker;
+      } else if (exchange.length === 0 && !carriedOver) {
+        // An inner voice opening the beat still answers the line before it.
+        const carried = lineCarriedOver(context, this.id);
+        if (carried) {
+          addressee = carried.line.speaker;
+          if (!carried.answered) exchange = [carried.line];
+        }
+      }
+      carriedOver = true;
+      renderer.setState('dialogExchange', exchangeFor(exchange.slice(), voice, addressee));
+      exchange.push({ speaker: processedSpeaker, text: processedText, ...(voice.inner ? { inner: true } : {}), ...(voice.color ? { color: voice.color } : {}) });
 
       // Render the NPC/system dialog
       await renderer.renderDialog(
@@ -950,6 +973,8 @@ export class DialogTreeBeat extends Beat {
         }
 
         if (selectedChoice) {
+          // The player has answered: the next line starts a new exchange.
+          exchange = [];
           // Record this choice for AI context
           context.recordChoice({
             beatId: this.id,
@@ -1019,6 +1044,8 @@ export class DialogTreeBeat extends Beat {
         break;
       }
     }
+
+    renderer.setState('dialogExchange', undefined);
 
     // Return exit target if captured, otherwise fall back to getNextBeat()
     if (exitTargetBeatId) {

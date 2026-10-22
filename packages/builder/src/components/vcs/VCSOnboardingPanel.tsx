@@ -363,8 +363,8 @@ const ConnectRepoForm: React.FC<{
       } else {
         await exec('git', ['remote', 'add', 'origin', url]);
       }
-      // Push (sets upstream)
-      const push = await exec('git', ['push', '-u', 'origin', 'main']);
+      // Push the current branch (sets upstream) — not every folder's is "main".
+      const push = await exec('git', ['push', '-u', 'origin', 'HEAD']);
       if (push.exitCode !== 0) throw new Error('git push failed — is the remote repo empty? Check the log above.');
       append(`\n✓ Connected to ${url}\n`);
       onConfigured(url);

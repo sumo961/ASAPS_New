@@ -68,7 +68,7 @@ export const IncomingChangesTab: React.FC = () => {
           This project's history is kept on this computer only.
         </p>
         <p style={{ margin: '8px 0 0', color: '#94a3b8', fontSize: 12 }}>
-          To back it up to a server or work with others, add a server under the Branches tab. Nothing is shared until you do.
+          To back it up or work with others, use <strong>Put it on GitHub…</strong> above (or add a server under the Branches tab). Nothing is shared until you do.
         </p>
       </div>
     );

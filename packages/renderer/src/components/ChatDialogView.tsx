@@ -12,6 +12,8 @@ function prefersReducedMotion(): boolean {
 }
 import { useReservedHudRects } from '../utils/useReservedHudRects';
 import { renderMarkdownLite } from '../utils/markdownLite';
+import { thoughtBoxStyle } from '../utils/innerVoice';
+import { uiString } from '@asaps/core';
 
 /**
  * A single message in the chat dialog
@@ -23,6 +25,10 @@ export interface ChatMessage {
   emotion?: string;
   isPlayer?: boolean; // If true, message is from player (right side)
   avatarUrl?: string; // Optional avatar image
+  /** Spoken in the player's head (core dialogExchange): a thought bubble. */
+  inner?: boolean;
+  /** The speaker's Theme Color (inner voices' bubble border and name). */
+  color?: string;
 }
 
 /**
@@ -280,16 +286,18 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               the speaker, and a duplicate name above the bubble is
               visual noise. With showAvatars OFF, the text label is
               still essential so the player knows who's talking. */}
-          {!isPlayer && !showAvatars && (
+          {!isPlayer && (!showAvatars || message.inner) && (
             <div
               className="text-xs mb-1 px-2"
               style={{
-                color: colors.textColor,
-                opacity: 0.7,
+                color: (message.inner ? message.color : undefined) || colors.textColor,
+                opacity: message.inner ? 0.9 : 0.7,
                 fontFamily: fonts.textFont,
               }}
             >
-              {message.speaker}
+              {/* An inner voice is always named and marked: the avatar alone
+                  doesn't say "this is a thought". */}
+              {message.inner ? `${message.speaker} · ${uiString('innerVoiceTag')}` : message.speaker}
             </div>
           )}
 
@@ -308,6 +316,7 @@ export const ChatDialogView: React.FC<ChatDialogViewProps> = ({
               fontSize: Math.round(15 * fontScale),
               lineHeight: 1.5,
               boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+              ...(message.inner && !isPlayer ? thoughtBoxStyle(message.color, { padding: 1 }) : null),
             }}
           >
             {/* Markdown-lite in bubbles — *emphasis* is native to texting;

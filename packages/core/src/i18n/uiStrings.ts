@@ -36,6 +36,10 @@ export const UI_STRING_DEFAULTS = {
   messagesBack: 'Back',
   messagesClose: 'Close',
 
+  // Inner voices in a conversation (see beats/dialogExchange)
+  innerVoiceTag: 'inner voice',
+  replyTo: 'Reply to {name}',
+
   // Inventory HUD chrome
   inventoryTitle: 'Inventory',
   inventoryExpandHint: '{title} ({count} items) - click to expand',

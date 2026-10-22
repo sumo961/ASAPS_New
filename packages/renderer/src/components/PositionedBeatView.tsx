@@ -22,6 +22,7 @@ import { ScrollIndicator, ScrollBadge } from './ScrollIndicator';
 import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePictureStyle } from './ChoicePicture';
 import { revealBoundary } from '../utils/typewriterGranularity';
+import { thoughtBoxStyle } from '../utils/innerVoice';
 
 // Default stage dimensions (can be overridden by project settings)
 const DEFAULT_STAGE_WIDTH = 1024;
@@ -700,6 +701,8 @@ export interface PositionedBeatViewProps {
   speakerName?: string;
   /** Speaker portrait image URL (resolved from character portrait) */
   speakerPortraitUrl?: string;
+  /** The current line is an inner voice (core dialogExchange): its box is drawn as a thought. */
+  thought?: { color?: string };
 }
 
 /**
@@ -1398,6 +1401,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   mobileFontScale = 1.0,
   speakerName,
   speakerPortraitUrl,
+  thought,
 }) => {
   // State to manage input text value (for InputText beats)
   const [inputValue, setInputValue] = React.useState('');
@@ -2030,6 +2034,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
                 mobileFontScale={mobileFontScale}
                 speakerName={index === 0 ? speakerName : undefined}
                 speakerPortraitUrl={index === 0 ? speakerPortraitUrl : undefined}
+                thought={index === 0 ? thought : undefined}
               />
             </div>
             );
@@ -2399,6 +2404,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             mobileFontScale={mobileFontScale}
             speakerName={isFirstText ? speakerName : undefined}
             speakerPortraitUrl={isFirstText ? speakerPortraitUrl : undefined}
+            thought={isFirstText ? thought : undefined}
           />
           );
         });
@@ -2482,6 +2488,8 @@ interface PositionedElementProps {
   speakerName?: string;
   /** Speaker portrait URL for inside-text portrait (only passed to first text element) */
   speakerPortraitUrl?: string;
+  /** The line is an inner voice: draw its box as a thought (first text element only). */
+  thought?: { color?: string };
 }
 
 const PositionedElement: React.FC<PositionedElementProps> = ({
@@ -2521,6 +2529,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   mobileFontScale = 1.0,
   speakerName,
   speakerPortraitUrl,
+  thought,
 }) => {
   const { location, content, assetUrl, hyperlinks, description } = element;
 
@@ -2657,6 +2666,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           mobileFontScale={mobileFontScale}
           speakerName={speakerName}
           speakerPortraitUrl={speakerPortraitUrl}
+          thought={thought}
         />
       );
     }
@@ -2898,6 +2908,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
           mobileFontScale={mobileFontScale}
           speakerName={speakerName}
           speakerPortraitUrl={speakerPortraitUrl}
+          thought={thought}
         />
       );
     }
@@ -3187,7 +3198,8 @@ const TextElement: React.FC<{
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
   speakerName?: string;  // Speaker name for inline display
   speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
+  thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const [animationStarted, setAnimationStarted] = React.useState(false);
@@ -3541,6 +3553,7 @@ const TextElement: React.FC<{
           alignItems: needsScroll || hasOverflow ? undefined : 'center',
           justifyContent: needsScroll || hasOverflow ? undefined : 'center',
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
+          ...(thought ? thoughtBoxStyle(thought.color, { padding: shouldHideTextBox ? 0 : padding }) : null),
         }}
       >
         {/* Inner wrapper for scroll indicator positioning */}
@@ -4195,7 +4208,8 @@ const DialogElement: React.FC<{
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
   speakerName?: string;
   speakerPortraitUrl?: string;
-}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
+  thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
+}> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const hasCalledCompleteRef = React.useRef(false);
@@ -4481,6 +4495,7 @@ const DialogElement: React.FC<{
         // This ensures consistency between editor and preview for multi-line content
         display: 'block',
         lineHeight: '1.5',
+        ...(thought ? thoughtBoxStyle(thought.color, { padding: hideTextBox ? 0 : paddingVertical }) : null),
       }}
     >
       {/* Inner wrapper for scroll indicator positioning */}
@@ -6014,7 +6029,8 @@ const FlexTextElement: React.FC<{
   mobileFontScale?: number;  // Mobile font scale multiplier (1.0 = normal)
   speakerName?: string;  // Speaker name for inline display
   speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
-}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0, speakerName, speakerPortraitUrl }) => {
+  thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
   const { location, content, hyperlinks } = element;
 
   // Typewriter animation state
@@ -6205,6 +6221,7 @@ const FlexTextElement: React.FC<{
           minHeight: '1.4em', // Prevent layout shift during typewriter
           overflow: 'auto', // Always allow scrolling for content that exceeds element bounds
           whiteSpace: 'pre-wrap', // Preserve line breaks in imported content
+          ...(thought ? thoughtBoxStyle(thought.color, { padding: hideTextBox ? 0 : 1 }) : null),
         }}
       >
         {/* Speaker portrait inside text box (floated) */}

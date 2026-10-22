@@ -11,6 +11,7 @@ import { PendingChangesTab } from './PendingChangesTab';
 import { IncomingChangesTab } from './IncomingChangesTab';
 import { HistoryTab } from './HistoryTab';
 import { BranchesTab } from './BranchesTab';
+import { VCSOnboardingPanel } from './VCSOnboardingPanel';
 
 type TabId = 'pending' | 'incoming' | 'history' | 'branches';
 
@@ -63,6 +64,11 @@ const dotColors: Record<VCSLogEntry['type'], string> = {
 export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff, onViewFileHistory }) => {
   const vcs = useVCSStatus();
   const [activeTab, setActiveTab] = useState<TabId>(() => loadPersistedState().activeTab);
+  // A folder project with no server yet: the guided GitHub setup (tools,
+  // sign-in, create or connect a repo) — the same one New Project on GitHub
+  // uses. Desktop only: it runs git/gh through the app.
+  const [showGitHubSetup, setShowGitHubSetup] = useState(false);
+  const canSetUpGitHub = !!(window as unknown as { electronAPI?: { fs?: { runCommand?: unknown } } }).electronAPI?.fs?.runCommand;
   const [height, setHeight] = useState(() => loadPersistedState().height);
   const [logOpen, setLogOpen] = useState(false);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
@@ -232,14 +238,38 @@ export const VCSPanel: React.FC<VCSPanelProps> = ({ isOpen, onToggle, onViewDiff
         </button>
       </div>
 
+      {!vcs.hasRemote && vcs.projectPath && canSetUpGitHub && (
+        <div
+          data-testid="vcs-github-setup-bar"
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px', backgroundColor: '#172036', borderBottom: '1px solid #334155', fontSize: 12, color: '#94a3b8', flexShrink: 0 }}
+        >
+          <span style={{ flex: 1 }}>This project's history is only on this computer.</span>
+          <button
+            onClick={() => setShowGitHubSetup(v => !v)}
+            style={{ padding: '3px 10px', fontSize: 12, background: showGitHubSetup ? '#334155' : '#15803d', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+          >
+            {showGitHubSetup ? 'Back to changes' : 'Put it on GitHub…'}
+          </button>
+        </div>
+      )}
+
       {/* Tab content + optional log */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Tab content */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {showGitHubSetup && !vcs.hasRemote && vcs.projectPath ? (
+            <VCSOnboardingPanel
+              vcsRemoteUrl={null}
+              defaultRepoName={vcs.projectPath.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'asaps-project'}
+              projectPath={vcs.projectPath}
+              onRemoteConfigured={() => { setShowGitHubSetup(false); void vcs.refresh(); }}
+            />
+          ) : (<>
           {activeTab === 'pending' && <PendingChangesTab onViewDiff={onViewDiff} />}
           {activeTab === 'incoming' && <IncomingChangesTab />}
           {activeTab === 'history' && <HistoryTab onViewDiff={onViewDiff} filterFile={undefined} />}
           {activeTab === 'branches' && <BranchesTab />}
+          </>)}
         </div>
 
         {/* Activity Log (collapsible) */}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { findClockProseMismatches, namedTimeOfDay } from '../clockProseFindings';
 import { analyzeStoryFindings } from '../generationReview';
+import { offersTimeDisplay } from '../timeDisplay';
 
 const set = (id: string, h: number, m: number, to: string) => ({ id, name: id, type: 'setVariable', parameters: { type: 'fictionalTime', operation: 'set', timeYear: 2024, timeMonth: 5, timeDay: 13, timeHour: h, timeMinute: m, connection: { target: to } } });
 const advance = (id: string, value: number, timeUnit: string, to: string) => ({ id, name: id, type: 'setVariable', parameters: { type: 'fictionalTime', operation: 'advance', value, timeUnit, connection: { target: to } } });
@@ -75,9 +76,14 @@ describe('findClockProseMismatches', () => {
     const findings = analyzeStoryFindings(story([set('clock', 1, 30, 'end'), ending('end', 'At 6:00 the alarm goes off.')]));
     const f = findings.find((x) => x.kind === 'clock-prose');
     expect(f?.message).toContain('says it is 6:00, but the story clock can show 1:30');
-    expect(f?.message).toContain('Set the clock just before this beat.');
-    // Info Text has the Time Display menu; an End Screen doesn't.
-    const onText = analyzeStoryFindings(story([set('clock', 1, 30, 'b'), text('b', 'At 6:00 the alarm goes off.')]));
-    expect(onText.find((x) => x.kind === 'clock-prose')?.message).toContain('Time Display: None');
+    expect(f?.message).toContain('Time Display: None');
+    // A beat type without the Time Display setting gets only the clock advice.
+    const onPanorama = analyzeStoryFindings(story([set('clock', 1, 30, 'b'), { id: 'b', name: 'b', type: 'panorama', parameters: { text: 'At 6:00 the sun rises.' } }]));
+    expect(onPanorama.find((x) => x.kind === 'clock-prose')?.message).toMatch(/Set the clock just before this beat\.$/);
+  });
+
+  it('offers the Time Display setting on auto-advance types, End Screens and Multiple Choice', () => {
+    for (const t of ['infoText', 'dialogTree', 'endScreen', 'multiChoice']) expect(offersTimeDisplay(t)).toBe(true);
+    for (const t of ['panorama', 'setVariable', undefined]) expect(offersTimeDisplay(t)).toBe(false);
   });
 });

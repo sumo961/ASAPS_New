@@ -172,3 +172,22 @@ describe('themed player bubbles (v0.9.87 — no more hardcoded #0a66c2)', () => 
     expect(bubble.style.backgroundColor).toBe('rgb(217, 164, 65)'); // brass fallback
   });
 });
+
+describe('ChatDialogView — inner voices', () => {
+  it('names and marks an inner voice even with avatars, and draws a thought bubble', () => {
+    const { container } = render(
+      <ChatDialogView
+        mode="chat-scroll"
+        showAvatars
+        messages={[
+          { id: 'm1', speaker: 'Danny', text: 'Can you come over?' },
+          { id: 'm2', speaker: 'The Old Story', text: "What if tonight's the night?", inner: true, color: '#e0795b' },
+        ]}
+      />,
+    );
+    expect(container.textContent).toContain('The Old Story · inner voice');
+    expect(container.textContent).not.toContain('Danny · inner voice');
+    const bubbles = Array.from(container.querySelectorAll<HTMLElement>('div')).filter((d) => d.textContent === "What if tonight's the night?" && d.style.border);
+    expect(bubbles[0]?.style.border).toContain('dashed');
+  });
+});

@@ -9,6 +9,8 @@ import { VisualBeatEditor, VisualElement } from './visual/VisualBeatEditor';
 import { AssetSelectionModal } from './assets/AssetSelectionModal';
 import { ImageAssetField } from './assets/ImageAssetField';
 import { SchemaFormGenerator } from './SchemaFormGenerator';
+import { TimeDisplaySetting } from './inspector/TimeDisplaySetting';
+import { offersTimeDisplayOnItsOwn } from '../utils/timeDisplay';
 import { BeatSuggestions } from './ai/BeatSuggestions';
 import type { BeatDefinition } from './SchemaFormGenerator';
 import type { Asset } from './assets/AssetManager';
@@ -5552,6 +5554,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                 )}
 
                 {/* Auto-Advance / Timer Settings - shown when advanced is toggled, only for visible beats */}
+                {/* End Screens and Multiple Choice beats have no auto-advance
+                    settings to sit with, but often jump in time (an ending the
+                    next morning): the clock setting on its own. */}
+                {showAdvanced && offersTimeDisplayOnItsOwn(getCanonicalBeatType(beat.type)) && !localBeat.defaultTarget && (
+                  <TimeDisplaySetting
+                    mode={localBeat.timeDisplayMode}
+                    text={localBeat.timeDisplayText}
+                    onChange={(field, value) => handleChange(field, value)}
+                  />
+                )}
+
                 {/* Timed auto-advance runs only for DEFAULT_TARGET_TIMEOUT_TYPES; on
                     other beats an existing default target is shown with what
                     it actually does (the exit when the beat has no links). */}
@@ -5633,37 +5646,11 @@ export const Inspector: React.FC<InspectorProps> = ({
                     )}
 
                     {/* Time Display Override (for Timer HUD) */}
-                    <div className="border-t pt-3 mt-3">
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">Time Display</h4>
-                      <select
-                        value={localBeat.timeDisplayMode || 'fictionalTime'}
-                        onChange={(e) => {
-                          const mode = e.target.value;
-                          handleChange('timeDisplayMode', mode);
-                          // Clear manual text when switching away from manual
-                          if (mode !== 'manual') {
-                            handleChange('timeDisplayText', '');
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-                        <option value="fictionalTime">Fictional Time (default)</option>
-                        <option value="manual">Manual text</option>
-                        <option value="none">None (hide on this beat)</option>
-                      </select>
-                      {localBeat.timeDisplayMode === 'manual' && (
-                        <input
-                          type="text"
-                          value={localBeat.timeDisplayText || ''}
-                          onChange={(e) => handleChange('timeDisplayText', e.target.value)}
-                          placeholder="e.g. Meanwhile..., 2h later"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mt-2"
-                        />
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        Controls what the Timer HUD shows on this beat.
-                      </p>
-                    </div>
+                    <TimeDisplaySetting
+                      mode={localBeat.timeDisplayMode}
+                      text={localBeat.timeDisplayText}
+                      onChange={(field, value) => handleChange(field, value)}
+                    />
 
                     {/* Override Countdown Meter Visibility */}
                     <div className="border-t pt-3 mt-3">
