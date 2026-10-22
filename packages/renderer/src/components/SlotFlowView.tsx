@@ -800,11 +800,18 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
     const scroller = rootRef.current?.querySelector('.slotflow-scroll') as HTMLElement | null;
     if (!scroller) return;
     let playerScrolled = false;
+    // Scroll only as far as the newest line needs to be seen whole: the
+    // line being answered stays in view whenever there is room for both.
     const showCurrent = () => {
-      const current = scroller.querySelector('[data-slotflow-current]') as HTMLElement | null;
-      if (playerScrolled || !current) return;
-      const offset = current.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
-      if (Math.abs(offset) > 1) scroller.scrollTop = Math.max(0, scroller.scrollTop + offset);
+      const parts = Array.from(scroller.querySelectorAll<HTMLElement>('[data-slotflow-current]'));
+      if (playerScrolled || parts.length === 0) return;
+      const box = scroller.getBoundingClientRect();
+      const top = parts[0].getBoundingClientRect().top;
+      const bottom = parts[parts.length - 1].getBoundingClientRect().bottom;
+      const below = bottom + 12 - box.bottom;
+      // Never past the newest line's own top (a line taller than the view starts at its beginning).
+      const offset = Math.min(below, top - 12 - box.top);
+      if (offset > 1) scroller.scrollTop += offset;
     };
     showCurrent();
     const onPlayer = () => { playerScrolled = true; };
@@ -1595,6 +1602,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 const card = textBoxCardStyle(theme, { isTitle: false });
                 return (
                   <div key={i} data-exchange-line={line.inner ? 'inner' : 'spoken'} style={{ display: 'flex', flexDirection: 'column', alignItems: isConversation ? 'flex-start' : 'center' }}>
+                    {/* Same alignment as the current line's card (centred text). */}
                     {speakerSlot && speakerText && (
                       <div style={{
                         fontFamily: theme.fonts.textFont || 'sans-serif',
@@ -1611,7 +1619,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                     <div style={{
                       whiteSpace: 'pre-wrap',
                       lineHeight: 1.45,
-                      textAlign: isConversation ? 'left' : 'center',
+                      textAlign: 'center',
                       width: 'fit-content',
                       maxWidth: '100%',
                       // Earlier lines are context: smaller and tighter than the line being read.
@@ -1620,7 +1628,12 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       ...(card.padding === 0 ? null : { padding: '8px 14px' }),
                       ...(line.inner ? { ...thoughtBoxStyle(line.color, card), padding: '8px 14px', opacity: 0.85 } : { opacity: 0.55 }),
                     }}>
-                      <span dangerouslySetInnerHTML={{ __html: renderMarkdownLite(line.text) }} />
+                      {/* Already read: a reminder, capped at four lines (all of it on hover). */}
+                      <span
+                        title={line.text}
+                        style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 4, overflow: 'hidden' }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdownLite(line.text) }}
+                      />
                     </div>
                   </div>
                 );
