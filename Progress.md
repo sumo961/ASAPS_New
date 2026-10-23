@@ -1,5 +1,16 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-23: Off the edge in responsive projects (v0.9.137)
+
+### Overview
+Characters and props in responsive projects can be placed partly off the stage, and the Visual Editor's number fields accept negative numbers.
+
+- **Graphics can go off the left / top edge in responsive projects too.** Responsive beats place characters and props with **X %** / **Y %** in the Properties panel, and those stopped at 0–100 (v0.9.125 had only freed the fixed canvas's drag). They now follow the same rule as dragging: partly off stage is fine as long as a 24px strip stays on it (`clampOnStage`, scaled box). Separately, none of the Visual Editor's number fields could take a negative number: a lone "-" reads as empty, which became 0. The position fields (X %, Y %, X, Y) and the panorama pitch/yaw fields now use `DraftNumberInput`, a text field that keeps what you type, applies it once it is a number, steps with the arrow keys and accepts a decimal comma.
+
+**Files modified:** packages/builder/src/components/visual/VisualPropertiesPanel.tsx, packages/builder/src/components/common/DraftNumberInput.tsx (new), tests (DraftNumberInput, VisualPropertiesPanelPosition)
+
+---
+
 ## 2026-10-22: Inner voices, clocks on endings, copies on GitHub (v0.9.136)
 
 ### Overview

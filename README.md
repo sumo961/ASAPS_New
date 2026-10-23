@@ -22,8 +22,13 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.136** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.136 gives characters an inner
+Current release: **v0.9.137** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.137 lets graphics go off the
+edge in responsive projects**: characters and props can be placed partly
+off the stage with X % / Y %, and the Visual Editor's number fields now
+take negative numbers (typing "-" used to snap them back to 0).
+
+**v0.9.136 gave characters an inner
 voice**: tick *Speaks as an inner voice* and their lines read as thoughts —
 italic, in a dashed box in their colour — stacked under the line the player
 is answering, with "Reply to Danny" above the replies. End Screens and

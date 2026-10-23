@@ -2294,7 +2294,7 @@ Each character placement includes:
 - Layer order (z-index)
 
 <a id="partly-off-stage"></a>
-**Partly off the stage is fine.** A figure cropped by the edge of the frame, a branch that reaches in from the left, a prop peeking up from the bottom: you can drag an element (or nudge it with the arrow keys, Shift for 10 px steps) past any edge of the stage. ASAPS only stops it when about 24 px are left on the stage, so there is always a strip to grab and pull it back. The **X** and **Y** fields take negative numbers too, for example *X: −40*.
+**Partly off the stage is fine.** A figure cropped by the edge of the frame, a branch that reaches in from the left, a prop peeking up from the bottom: you can drag an element (or nudge it with the arrow keys, Shift for 10 px steps) past any edge of the stage. ASAPS only stops it when about 24 px are left on the stage, so there is always a strip to grab and pull it back. The **X** and **Y** fields take negative numbers too, for example *X: −40*. In a responsive project, where characters and props are placed by **X %** and **Y %** of the stage, the same holds: type *−15* or pull the slider past 0, down to where about 24 px are left on stage.
 
 ### Adding Text Elements
 
