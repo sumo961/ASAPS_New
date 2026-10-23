@@ -27,7 +27,8 @@ import {
 import { getAllPresetSounds, isPresetSound, getPresetSound, type PresetSound } from '@asaps/core';
 import { getSlotSpec, getSpatialSpec } from '@asaps/renderer';
 import type { Asset } from '../assets/AssetManager';
-import type { VisualElement } from './VisualBeatEditor';
+import { clampOnStage, type VisualElement } from './VisualBeatEditor';
+import { DraftNumberInput } from '../common/DraftNumberInput';
 import type { Character, CharacterState } from '../../types/character';
 import type { GlobalSettings } from '../../storage/types';
 import { useFonts } from '../../hooks/useFonts';
@@ -815,13 +816,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       <label className="block">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Initial Pitch</span>
-                          <input
-                            type="number"
-                            value={parseFloat(panoramaSettings.initialPitch.toFixed(1))}
-                            onChange={(e) => {
-                              const v = Math.max(-90, Math.min(90, parseFloat(e.target.value) || 0));
-                              onPanoramaCameraChange({ initialPitch: v });
-                            }}
+                          <DraftNumberInput
+                            value={panoramaSettings.initialPitch}
+                            precision={1}
+                            onCommit={(v) => onPanoramaCameraChange({ initialPitch: v })}
                             min={-90} max={90} step={0.1}
                             className="w-16 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
                           />
@@ -841,13 +839,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       <label className="block">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500">Initial Yaw</span>
-                          <input
-                            type="number"
-                            value={parseFloat(panoramaSettings.initialYaw.toFixed(1))}
-                            onChange={(e) => {
-                              const v = Math.max(-180, Math.min(180, parseFloat(e.target.value) || 0));
-                              onPanoramaCameraChange({ initialYaw: v });
-                            }}
+                          <DraftNumberInput
+                            value={panoramaSettings.initialYaw}
+                            precision={1}
+                            onCommit={(v) => onPanoramaCameraChange({ initialYaw: v })}
                             min={-180} max={180} step={0.1}
                             className="w-16 text-right text-xs text-gray-400 border border-gray-200 rounded px-1 py-0.5"
                           />
@@ -2369,9 +2364,21 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             const yPct = typeof (selected as any).yPercent === 'number'
                               ? (selected as any).yPercent as number
                               : (selected.y / stageH) * 100;
+                            // Same limits as dragging on the fixed canvas: partly
+                            // off the stage is fine (a figure walking in from the
+                            // left edge), as long as a strip of it stays on stage.
+                            // The visible box is the scaled one, centred on the base.
+                            const pctLimits = (base: number, eff: number, stage: number) => {
+                              const shift = (base - eff) / 2;
+                              const lo = clampOnStage(-Infinity, eff, stage) - shift;
+                              const hi = clampOnStage(Infinity, eff, stage) - shift;
+                              return { min: (lo / stage) * 100, max: (hi / stage) * 100 };
+                            };
+                            const xLim = pctLimits(selected.width, effectiveWidth, stageW);
+                            const yLim = pctLimits(selected.height, effectiveHeight, stageH);
                             const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
                             const updateXPct = (v: number) => {
-                              const next = clamp(v, 0, 100);
+                              const next = clamp(v, xLim.min, xLim.max);
                               onElementUpdate(selected.id, {
                                 xPercent: next,
                                 // Keep pixel x in sync as a fallback.
@@ -2379,7 +2386,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                               } as any);
                             };
                             const updateYPct = (v: number) => {
-                              const next = clamp(v, 0, 100);
+                              const next = clamp(v, yLim.min, yLim.max);
                               onElementUpdate(selected.id, {
                                 yPercent: next,
                                 y: Math.round((next / 100) * stageH),
@@ -2392,20 +2399,20 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                   <div className="flex items-center gap-1">
                                     <input
                                       type="range"
-                                      min={0}
-                                      max={100}
+                                      min={Math.floor(xLim.min)}
+                                      max={Math.ceil(xLim.max)}
                                       step={0.5}
                                       value={xPct}
                                       onChange={(e) => updateXPct(parseFloat(e.target.value))}
                                       className="flex-1"
                                     />
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={100}
+                                    <DraftNumberInput
+                                      min={xLim.min}
+                                      max={xLim.max}
                                       step={0.5}
-                                      value={Math.round(xPct * 10) / 10}
-                                      onChange={(e) => updateXPct(parseFloat(e.target.value) || 0)}
+                                      precision={1}
+                                      value={xPct}
+                                      onCommit={updateXPct}
                                       className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
                                     />
                                   </div>
@@ -2415,20 +2422,20 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                   <div className="flex items-center gap-1">
                                     <input
                                       type="range"
-                                      min={0}
-                                      max={100}
+                                      min={Math.floor(yLim.min)}
+                                      max={Math.ceil(yLim.max)}
                                       step={0.5}
                                       value={yPct}
                                       onChange={(e) => updateYPct(parseFloat(e.target.value))}
                                       className="flex-1"
                                     />
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={100}
+                                    <DraftNumberInput
+                                      min={yLim.min}
+                                      max={yLim.max}
                                       step={0.5}
-                                      value={Math.round(yPct * 10) / 10}
-                                      onChange={(e) => updateYPct(parseFloat(e.target.value) || 0)}
+                                      precision={1}
+                                      value={yPct}
+                                      onCommit={updateYPct}
                                       className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
                                     />
                                   </div>
@@ -2445,11 +2452,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-xs text-gray-600">X</label>
-                              <input
-                                type="number"
-                                value={Math.round(effectiveX)}
-                                onChange={(e) => {
-                                  const newEffectiveX = parseInt(e.target.value) || 0;
+                              <DraftNumberInput
+                                value={effectiveX}
+                                onCommit={(newEffectiveX) => {
                                   const baseX = newEffectiveX - (selected.width - effectiveWidth) / 2;
                                   onElementUpdate(selected.id, { x: Math.round(baseX) });
                                 }}
@@ -2483,11 +2488,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                   )}
                                 </>
                               ) : (
-                              <input
-                                type="number"
-                                value={Math.round(effectiveY)}
-                                onChange={(e) => {
-                                  const newEffectiveY = parseInt(e.target.value) || 0;
+                              <DraftNumberInput
+                                value={effectiveY}
+                                onCommit={(newEffectiveY) => {
                                   const baseY = newEffectiveY - (selected.height - effectiveHeight) / 2;
                                   onElementUpdate(selected.id, { y: Math.round(baseY) });
                                 }}
@@ -3024,13 +3027,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-xs text-gray-500">Pitch</label>
-                          <input
-                            type="number"
-                            value={parseFloat(hs.pitch.toFixed(1))}
-                            onChange={(e) => {
-                              const newPitch = parseFloat(e.target.value) || 0;
-                              onPanoramaHotspotUpdate(hs.id, { pitch: Math.round(newPitch * 10) / 10 });
-                            }}
+                          <DraftNumberInput
+                            value={hs.pitch}
+                            precision={1}
+                            onCommit={(v) => onPanoramaHotspotUpdate(hs.id, { pitch: Math.round(v * 10) / 10 })}
                             step={0.5}
                             min={-90}
                             max={90}
@@ -3039,13 +3039,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                         </div>
                         <div>
                           <label className="text-xs text-gray-500">Yaw</label>
-                          <input
-                            type="number"
-                            value={parseFloat(hs.yaw.toFixed(1))}
-                            onChange={(e) => {
-                              const newYaw = parseFloat(e.target.value) || 0;
-                              onPanoramaHotspotUpdate(hs.id, { yaw: Math.round(newYaw * 10) / 10 });
-                            }}
+                          <DraftNumberInput
+                            value={hs.yaw}
+                            precision={1}
+                            onCommit={(v) => onPanoramaHotspotUpdate(hs.id, { yaw: Math.round(v * 10) / 10 })}
                             step={0.5}
                             min={-180}
                             max={180}
