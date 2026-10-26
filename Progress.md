@@ -1,5 +1,16 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-26: Text-box border per beat (v0.9.139)
+
+### Overview
+- **Text-box border per beat** (request): Inspector ▸ **Text Box Border** — *Project setting* / *Show on this beat* / *Hide on this beat*. New Beat base field `textBoxBorder` ('show' | 'hide'), in `BEAT_BASE_PARAMETERS`, persisted like `spatialFit` (toJSON parameters), published to the renderer on every beat (no leak to the next one). `applyTextBoxBorder` (renderer) applies it to the theme in `ReactRenderer.speakerTheme()` — every view gets its theme there — and in the Visual Editor (responsive `renderTheme`, fixed `VisualBeatEditor`). *Show* uses the project's width/colour, else 2px in the text colour.
+- **A beat's Background fit reaches the Preview Window and survives loading.** The Preview/export serializer (`serializeBeatForStory`) and the project loader didn't carry the base-class display settings: `spatialFit` (and now `textBoxBorder`) are passed through both, top-level or from parameters.
+- AI: story-generation prompt teaches `textBoxBorder` (sparingly).
+
+**Files modified:** packages/core/src/beats/Beat.ts, packages/renderer/src/utils/textBoxBorder.ts (new), packages/renderer/src/renderers/ReactRenderer.tsx, packages/renderer/src/index.ts, packages/builder/src/components/Inspector.tsx, packages/builder/src/components/visual/{VisualWorkspace,VisualBeatEditor}.tsx, packages/builder/src/App.tsx, packages/builder/src/utils/projectDeserializer.ts, packages/builder/src/services/prompts/storyGenerationEnhanced.ts, docs/USER_GUIDE.md, tests (BeatTextBoxBorder, textBoxBorder, deserializeBaseDisplaySettings)
+
+---
+
 ## 2026-10-26: Stepping through dialogs in the Visual Editor (v0.9.138)
 
 ### Overview

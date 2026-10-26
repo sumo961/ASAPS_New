@@ -22,8 +22,13 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.138** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.138 fixes stepping through a
+Current release: **v0.9.139** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.139 adds a text-box border per
+beat**: show or hide the border around a single beat's text, whatever the
+project's Text Box settings say. A beat's background fit now also reaches
+the Preview Window and exported stories.
+
+**v0.9.138 fixed stepping through a
 Dialog Tree in the Visual Editor**: clicking a choice on the canvas or a line
 in the Inspector's tree moves the canvas there again, "then" steps read
 "Continue → Billie" instead of an internal id, and each line's look switches

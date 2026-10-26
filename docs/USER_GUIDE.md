@@ -3690,6 +3690,9 @@ Your own fonts (TrueType `.ttf`, OpenType `.otf`, `.woff` or `.woff2`) go into t
 
 Since v0.9.71, both Box Visibility and opacity apply **everywhere**: the Visual Editor, the Preview Window, exported stories, and responsive (slot-mode) layouts all honor them consistently. What you set here is what your interactors get.
 
+<a id="per-beat-text-box-border"></a>
+**One beat with or without a border.** These settings apply to the whole story. To change the border on a single beat — no frame around the text for a quiet moment over a picture, or a frame on one beat in a story that otherwise has none — select the beat and pick its **Text Box Border** in the Inspector (below *Background Image*): *Project setting* (the default), *Show on this beat* or *Hide on this beat*. *Show* uses the border width and colour from Settings → Text Box, or a thin border in the text colour if the project has none. The next beat goes back to the project setting. The Visual Editor, the Preview Window and exported stories all show it.
+
 **Settings → Effects:**
 - Text animations (typewriter, fade)
 - **Choice Buttons** — in responsive layouts, choice and Continue buttons slide up into place when a beat starts (in chat layouts, the reply buttons rise in a little). Choose *Appear in place* to switch that off. Players whose device is set to reduce motion never see the slide either way.
