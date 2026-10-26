@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { applyTextBoxBorder } from '@asaps/renderer';
 import {
   Move,
   Square,
@@ -161,6 +162,8 @@ export interface VisualElement {
 }
 
 interface VisualBeatEditorProps {
+  /** This beat's text-box border choice ('show' | 'hide'; unset = project). */
+  textBoxBorder?: 'show' | 'hide';
   backgroundAssetId?: string;
   backgroundUrl?: string; // Direct URL from ASML import
   /** Chat layouts: the frame picture (asset id) the chat window sits in, shown see-through so the window can be lined up with it. */
@@ -231,6 +234,7 @@ interface VisualBeatEditorProps {
 }
 
 export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
+  textBoxBorder,
   backgroundAssetId,
   backgroundUrl: backgroundUrlProp,
   chatFrameImageAssetId,
@@ -1532,7 +1536,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                       })) || []}
                       mode={presentationMode as 'chat-scroll' | 'chat-bubble'}
                       theme={globalSettings ? (() => {
-                        const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                        const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
                         return {
                           ...baseTheme,
                           textEffects: {
@@ -1580,7 +1584,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                         speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                         speakerPortraitUrl={speakerPortraitUrl}
                         theme={globalSettings ? (() => {
-                          const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                          const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
                           return {
                             ...baseTheme,
                             textEffects: {
@@ -1611,7 +1615,7 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
                   speakerName={effectiveShowSpeaker && beatContent?.speaker ? resolvedSpeakerName : undefined}
                   speakerPortraitUrl={speakerPortraitUrl}
                   theme={globalSettings ? (() => {
-                    const baseTheme = convertGlobalSettingsToTheme(globalSettings);
+                    const baseTheme = applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), textBoxBorder);
                     return {
                       ...baseTheme,
                       // Disable text animations in visual editor

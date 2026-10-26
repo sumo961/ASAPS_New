@@ -1410,7 +1410,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setHasChanges(true);
 
     // For fields that affect graph visualization or need immediate persistence, update immediately
-    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'speaker' || field === 'showSpeaker' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter' || field === 'requires' || field === 'requiresMode') {
+    if (field === 'defaultTarget' || field === 'defaultTargetDelay' || field === 'showTimer' || field === 'name' || field === 'notes' || field === 'speaker' || field === 'showSpeaker' || field === 'timeDisplayMode' || field === 'timeDisplayText' || field === 'overrideCountdownMeter' || field === 'requires' || field === 'requiresMode' || field === 'textBoxBorder') {
       if (onUpdate && beat) {
         onUpdate(beat.id, { [field]: value });
       }
@@ -1663,6 +1663,9 @@ export const Inspector: React.FC<InspectorProps> = ({
       beat.notes = localBeat.notes;
       beat.speaker = localBeat.speaker || '';
       beat.showSpeaker = localBeat.showSpeaker ?? undefined;
+      beat.textBoxBorder = (localBeat as any).textBoxBorder === 'show' || (localBeat as any).textBoxBorder === 'hide'
+        ? (localBeat as any).textBoxBorder
+        : undefined;
       // Cross-cutting HUD-explanation flag. Like showSpeaker it lives on the
       // Beat base class rather than in each subclass's updateParameters, so
       // it's assigned here with the other shared fields.
@@ -2019,6 +2022,31 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
                   );
                 })()}
+
+                {/* Text box border for this beat only (Beat.textBoxBorder):
+                    follow the project's Text Box settings, or show / hide
+                    the border here. */}
+                {supportsBackgroundImage(beat.type) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="textBoxBorder-beat">
+                      Text Box Border
+                    </label>
+                    <select
+                      id="textBoxBorder-beat"
+                      data-testid="beat-textbox-border"
+                      value={(localBeat as any).textBoxBorder ?? ''}
+                      onChange={(e) => handleChange('textBoxBorder', e.target.value || undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Project setting</option>
+                      <option value="show">Show on this beat</option>
+                      <option value="hide">Hide on this beat</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      The border around this beat's text boxes. Width and colour come from Project Settings → Text Box.
+                    </p>
+                  </div>
+                )}
 
                 {/* BEAT-SPECIFIC PARAMETERS - SCHEMA DRIVEN */}
 

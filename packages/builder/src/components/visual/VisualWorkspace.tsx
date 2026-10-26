@@ -27,7 +27,7 @@ import type { DialogNode, DialogChoice } from '@asaps/core';
 import type { SlotIntentResolution, SlotIntentEntry, SlotAnimations, SpatialAnimations } from '@asaps/core';
 import { mergeSlotIntent } from '../../utils/slotIntentEdit';
 import { resolveLayoutMode } from '../../utils/projectLayoutMode';
-import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME } from '@asaps/renderer';
+import { SlotFlowView, SpatialFlowView, ChatDialogView, isSlotModeBeatType, isSpatialModeBeatType, getSlotSpec, getSpatialSpec, TimerHudDisplay, ScreenHudLayer, buildScreenHudLayout, resolveMeterFrame, toMeterCounterData, type TimerHudConfig, type ScreenHudCharacter , LEGACY_TEXT_LOCATION_NAME, applyTextBoxBorder } from '@asaps/renderer';
 import { hudStackWarnings, describeHudStackWarning } from '../../utils/hudStackWarning';
 import { HotspotEditOverlay } from './HotspotEditOverlay';
 import type { Hotspot } from '@asaps/core';
@@ -1474,10 +1474,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   }, [characters]);
 
   // Memoized render theme for smart sizing - converts GlobalSettings to RenderThemeSettings
+  // The beat's own text-box border choice applies on the canvas too.
+  const beatTextBoxBorder = (beat as any)?.textBoxBorder as 'show' | 'hide' | undefined;
   const renderTheme = useMemo(() => {
     if (!globalSettings) return null;
-    return convertGlobalSettingsToTheme(globalSettings);
-  }, [globalSettings]);
+    return applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), beatTextBoxBorder);
+  }, [globalSettings, beatTextBoxBorder]);
 
   // ---- Undo/Redo snapshot tracking for visual element changes ----
   const snapshotRef = useRef<VisualElement[] | null>(null);
@@ -7131,6 +7133,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         ) : (
           /* Layout Mode: Standard Visual Beat Editor (with viewport rect for panorama) */
           <VisualBeatEditor
+            textBoxBorder={beatTextBoxBorder}
             backgroundAssetId={backgroundAssetId}
             backgroundUrl={backgroundUrl}
             chatFrameImageAssetId={beat?.type === 'dialogTree' && /^chat-/.test(String((beat.getParameters?.() as any)?.layoutTemplate || '')) ? (beat.getParameters?.() as any)?.chatFrameImage : undefined}

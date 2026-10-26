@@ -553,6 +553,9 @@ export function deserializeBeats(beatsData: any[]): Beat[] {
         // persists it) and nested-in-parameters (how the inspector's schema
         // form writes it) so it survives the save → load round-trip.
         explainHuds: beatData.explainHuds ?? beatData.parameters?.explainHuds,
+        // Base-class display settings, stored top-level or in parameters.
+        spatialFit: beatData.spatialFit ?? beatData.parameters?.spatialFit,
+        textBoxBorder: beatData.textBoxBorder ?? beatData.parameters?.textBoxBorder,
         // State requirements (Level-2 authoring). Accept both top-level and
         // nested-in-parameters placements for forward/backwards compatibility.
         requires: beatData.requires ?? beatData.parameters?.requires,

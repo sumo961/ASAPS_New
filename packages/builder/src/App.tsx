@@ -324,6 +324,11 @@ function serializeBeatForStory(beat: Beat): any {
     timeDisplayText: beat.timeDisplayText,
     overrideCountdownMeter: beat.overrideCountdownMeter,
     explainHuds: (beat as any).explainHuds,
+    // Base-class display settings the subclasses' getParameters don't know:
+    // without them the Preview Window and exports lost a beat's background
+    // fit and text-box border.
+    ...(beat.spatialFit ? { spatialFit: beat.spatialFit } : {}),
+    ...(beat.textBoxBorder ? { textBoxBorder: beat.textBoxBorder } : {}),
     parameters: beat.getParameters?.() || {},
     connections: beat.connections?.map(conn => ({
       targetId: conn.targetId,

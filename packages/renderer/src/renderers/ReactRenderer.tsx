@@ -7,6 +7,7 @@ import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
 import type { Location, AnimationPath, SlotIntent, DialogExchange } from '@asaps/core';
+import { applyTextBoxBorder } from '../utils/textBoxBorder';
 
 /** One piece of a line read aloud: whose voice reads it. */
 export interface TTSVoiceSegment { text: string; speaker?: string }
@@ -1091,7 +1092,7 @@ export class ReactRenderer extends BaseRenderer {
   private characterPortraitResolver: ((speakerName: string) => string | undefined) | null = null;  // Speaker portrait resolver
   /** A speaker's character Theme Color (speakerDisplay.useCharacterColors). */
   private speakerColorResolver: ((speakerName: string) => string | undefined) | null = null;
-  private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; theme: RenderThemeSettings } | null = null;
+  private speakerThemeCache: { base: RenderThemeSettings | undefined; color: string; border: string; theme: RenderThemeSettings } | null = null;
   protected timerState: { totalTime: number; remainingTime: number; visible: boolean; label?: string } | undefined;  // NEW: Timer state for progress bar
   private timerStateListeners: Set<(state: typeof this.timerState) => void> = new Set();  // Listeners for timer state changes
   protected timerHudConfig: import('../components/TimerHudDisplay').TimerHudConfig | undefined;  // Timer HUD config from global settings
@@ -1652,14 +1653,23 @@ export class ReactRenderer extends BaseRenderer {
    */
   protected speakerTheme(): RenderThemeSettings | undefined {
     const base = this.theme;
-    if (!base?.speakerDisplay?.useCharacterColors || !this.speakerColorResolver) return base;
+    if (!base) return base;
     const speaker = this.getState('beatSpeaker') as string | undefined;
-    const color = speaker ? this.speakerColorResolver(speaker) : undefined;
-    if (!color) return base;
+    const color = base.speakerDisplay?.useCharacterColors && this.speakerColorResolver && speaker
+      ? this.speakerColorResolver(speaker) ?? ''
+      : '';
+    // A beat's own text-box border choice (Beat.textBoxBorder) overrides the
+    // project's: 'hide' drops the border, 'show' draws one even where the
+    // project has none.
+    const border = (this.getState('textBoxBorder') as string | undefined) ?? '';
+    if (!color && border !== 'show' && border !== 'hide') return base;
     const c = this.speakerThemeCache;
-    if (c && c.base === base && c.color === color) return c.theme;
-    const theme = { ...base, speakerDisplay: { ...base.speakerDisplay, nameColor: color } };
-    this.speakerThemeCache = { base, color, theme };
+    if (c && c.base === base && c.color === color && c.border === border) return c.theme;
+    const named: RenderThemeSettings = color
+      ? { ...base, speakerDisplay: { ...base.speakerDisplay, nameColor: color } } as RenderThemeSettings
+      : base;
+    const theme: RenderThemeSettings = applyTextBoxBorder(named, border);
+    this.speakerThemeCache = { base, color, border, theme };
     return theme;
   }
 

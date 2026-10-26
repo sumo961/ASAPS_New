@@ -951,6 +951,8 @@ Each beat can override the Timer HUD content via timeDisplayMode:
 
 - **spatialFit** — how a background image fits the stage. "contain" (default) shows the whole image with letterboxed bars; "cover" fills the stage and may crop the edges. Set "cover" for immersive establishing shots where losing the edges is fine; leave default when the image content matters to the edges (a map, a document, a group photo).
 
+- **textBoxBorder** ("show" | "hide"; omit to follow the theme) — draws or hides the border around this beat's text boxes only. Use "hide" sparingly for a quiet, image-first moment (a memory, a dream, a title card over a picture); never set it on most beats — the theme decides the normal look.
+
 - **explainHuds** (boolean, default false) — annotates the on-screen HUDs when this beat is entered, holding the beat until the player acknowledges. Set it TRUE on the FIRST beat after a HUD becomes meaningful — typically the first scene where a counter, timer or mood meter starts mattering. Do NOT set it on the title screen (screen HUDs are hidden there by default) and do NOT set it on more than one or two beats: it is a teaching moment, not decoration. If a story has no HUDs, omit it entirely.
   - There is also a dedicated **explanation** beat for when you want a deliberate standalone pause to label the readouts:
     - Parameters: text (intro line), buttonText (default "Got it"), and optional per-HUD captions — captionTimer, captionCountdown, captionMeter, captionInventory, captionMood. Leave a caption blank to use the built-in wording.
