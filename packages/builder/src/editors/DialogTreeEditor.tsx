@@ -690,8 +690,15 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
     const deepLevel = indentLevel >= MAX_INDENT && replyChoices.length > 1 ? Math.floor(depth / 2) + 1 : null;
     return (
       <div key={nodeId} data-dialog-anchor={nodeId} className={`${depth > 0 && !chained && indented ? (expanded ? 'ml-4' : 'ml-2') : ''}`}>
-        {/* Node Header */}
-        <div className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
+        {/* Node Header. Clicking a character's line (also into its text)
+            walks the Visual Editor's canvas to it, like the arrow button. */}
+        <div
+          onClick={isNPC && !isCanvasFocused ? () => {
+            window.dispatchEvent(new CustomEvent('asaps:dialogTreeWalkRequest', {
+              detail: { path: inspectorPathToCanvasPath(path) },
+            }));
+          } : undefined}
+          className={`flex items-start gap-2 p-2 rounded-lg mb-1 border ${
           isNPC && speakerColor
             ? `${speakerColor.bg} ${speakerColor.border}`
             : 'bg-gray-50 border-gray-200'

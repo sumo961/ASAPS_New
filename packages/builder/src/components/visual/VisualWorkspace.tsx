@@ -1749,6 +1749,49 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   const slotPreviewParams =
     isSlotPreview && beat ? previewRoles(beat.getParameters(), previewHolder) : undefined;
 
+  // A dialog line's look ("angry") switches its speaker's picture from that
+  // line on, as in play: walk the stepped-in path and apply the latest look
+  // per character to the canvas sprites.
+  const dialogLooks: Record<string, string> | null = (() => {
+    if (beat?.type !== 'dialogTree') return null;
+    const tree = (slotPreviewParams ?? (beat.getParameters?.() as any))?.dialogTree;
+    if (!tree) return null;
+    const looks: Record<string, string> = {};
+    const note = (node: any) => {
+      if (!node?.speakerState) return;
+      const name = String(node.speaker || '').trim().toLowerCase();
+      const ch = characters.find(c => c.id === node.characterRef)
+        ?? characters.find(c => !!name && (c.id.toLowerCase() === name || (c.name || '').toLowerCase() === name || (c.displayName || '').toLowerCase() === name));
+      if (ch) looks[ch.id] = node.speakerState;
+    };
+    let cur = tree;
+    note(cur);
+    for (const choiceId of dialogTreeNodePath) {
+      const choice = (cur?.choices ?? []).find((c: any) => c?.id === choiceId);
+      if (!choice?.dialogNode) break;
+      cur = choice.dialogNode;
+      note(cur);
+    }
+    return Object.keys(looks).length ? looks : null;
+  })();
+  const stageCharacterResolver = dialogLooks
+    ? (characterId: string, stateId?: string) => previewCharacterResolver(characterId, dialogLooks[characterId] ?? stateId)
+    : previewCharacterResolver;
+  // Fixed canvas: show the look on the character element, but never store
+  // it — an edit on the canvas writes the element's own state back.
+  const shownElements = dialogLooks
+    ? visualElements.map(el => (el.type === 'character' && el.characterId && dialogLooks[el.characterId]
+        ? { ...el, stateId: dialogLooks[el.characterId] }
+        : el))
+    : visualElements;
+  const withOwnStates = (elements: VisualElement[]): VisualElement[] => dialogLooks
+    ? elements.map(el => {
+        if (el.type !== 'character' || !el.characterId || !dialogLooks[el.characterId]) return el;
+        const own = visualElements.find(v => v.id === el.id);
+        return own ? { ...el, stateId: own.stateId } : el;
+      })
+    : elements;
+
   // Drag-to-snap: attach pointerdown handlers to body + action slot DOM
   // elements when slot preview is active and layoutTemplate is 'custom'.
   // Speaker is intentionally not draggable (rides along with body).
@@ -2017,7 +2060,9 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     beat.type !== 'endScreen' && beat.type !== 'titleScreen' && beat.type !== 'inputText' &&
     // Embedded-surface beats preview their real (possibly empty) prompt —
     // never the sample-body filler, so no misleading chip.
-    beat.type !== 'webView' && beat.type !== 'qrScan' && beat.type !== 'arBeat'
+    beat.type !== 'webView' && beat.type !== 'qrScan' && beat.type !== 'arBeat' &&
+    // Dialog Trees and choice beats show their own authored lines, never the sample.
+    beat.type !== 'dialogTree' && !isMultiChoiceLike(beat.type)
       ? !(
           (beat.type === 'aiSummary'
             ? (slotPreviewParams.summary ?? slotPreviewParams.fallbackText)
@@ -6075,7 +6120,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             const id = dialogTreeNodePath[i];
             const choice = (cur?.choices ?? []).find((c: any) => c?.id === id);
             if (!choice) break;
-            labels.push({ idx: i, label: choice.text || choice.id });
+            // A "then another character speaks" step has no text: name the next speaker.
+            labels.push({ idx: i, label: choice.text || (choice.continue ? `→ ${choice.dialogNode?.speaker || 'next line'}` : choice.id) });
             cur = choice.dialogNode;
           }
           // Wraps instead of scrolling: at 1280 with both sidebars open the
@@ -6498,7 +6544,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       // beat.locations is a Map<string, Location>, not an
                       // array — iterate values.
                       characterLocations={freePositionedLocations(beat)}
-                      characterResolver={previewCharacterResolver}
+                      characterResolver={stageCharacterResolver}
                       // Props (and characters without a resolvable state
                       // image) resolve their asset id to a fresh URL — the
                       // stored location.imageUrl is a stale blob: URL after
@@ -6728,7 +6774,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                             ) ?? (slotPreviewParams as any)?.dialogTree;
                             rawChoices = curNode?.choices;
                           }
-                          const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string; description?: string }> : [];
+                          const cs = Array.isArray(rawChoices) ? rawChoices as Array<{ id: string; text: string; description?: string; continue?: boolean; dialogNode?: { speaker?: string } }> : [];
                           if (beat!.type === 'chooseCharacter' && cs.length > 0) {
                             return cs.map((c) => ({
                               id: c.id,
@@ -6736,8 +6782,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                               ...(c.description ? { description: c.description } : {}),
                             }));
                           }
+                          // A "then another character speaks" step plays as a
+                          // Continue button; say whose line it leads to.
                           return cs.length > 0
-                            ? cs.map((c) => ({ id: c.id, text: c.text || c.id }))
+                            ? cs.map((c) => ({ id: c.id, text: c.text || (c.continue ? `Continue → ${c.dialogNode?.speaker || 'next line'}` : c.id) }))
                             : [{ id: '__preview_placeholder__', text: '(Add a choice to preview)' }];
                         })()
                       : undefined}
@@ -6761,7 +6809,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     // the panel and the Preview Window drew it, but the stage
                     // here stayed empty.
                     characterLocations={freePositionedLocations(beat)}
-                    characterResolver={previewCharacterResolver}
+                    characterResolver={stageCharacterResolver}
                     assetResolver={previewAssetResolver}
                     spriteDataResolver={previewSpriteDataResolver}
                     selectedElementName={(() => {
@@ -7087,7 +7135,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             backgroundUrl={backgroundUrl}
             chatFrameImageAssetId={beat?.type === 'dialogTree' && /^chat-/.test(String((beat.getParameters?.() as any)?.layoutTemplate || '')) ? (beat.getParameters?.() as any)?.chatFrameImage : undefined}
             backgroundSound={backgroundSound}
-            elements={visualElements}
+            elements={shownElements}
             onInteractionStart={() => {
               if (commitTimeoutRef.current) {
                 clearTimeout(commitTimeoutRef.current);
@@ -7116,7 +7164,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               }
               commitSnapshot('Move/resize element');
             }}
-            onElementsChange={(elements) => {
+            onElementsChange={(changed) => {
+              const elements = withOwnStates(changed);
               // Capture snapshot if not already in an interaction
               if (!snapshotRef.current) {
                 snapshotRef.current = visualElements.map(el => ({ ...el }));

@@ -2349,8 +2349,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   const editorSelected = !!editorMode && actionSlotName && selectedSlotKey === `slot:${actionSlotName}:${b.id}`;
                   const isVisited = !editorMode && markVisited && hasDynamicChoices
                     && visitedChoiceIds.includes(b.id);
+                  // Editor: select the button for styling AND tell the host which
+                  // one (the Visual Editor steps into a dialog choice). No exit
+                  // animation: nothing leaves the stage in the editor.
                   const handleClick = editorMode && onSlotSelect && actionSlotName
-                    ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
+                    ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); onAction(b.id); }
                     : (isVisited ? undefined : b.onClick);
                   return (
                     <button
@@ -2537,8 +2540,11 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                 // clickable: authors need to select the slot regardless.
                 const isVisited = !editorMode && markVisited && hasDynamicChoices
                   && visitedChoiceIds.includes(b.id);
+                // Editor: select the button for styling AND tell the host which
+                // one (the Visual Editor steps into a dialog choice). No exit
+                // animation: nothing leaves the stage in the editor.
                 const handleClick = editorMode && onSlotSelect && actionSlotName
-                  ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); }
+                  ? (e: React.MouseEvent) => { e.stopPropagation(); onSlotSelect(actionSlotName, b.id); onAction(b.id); }
                   : (isVisited ? undefined : b.onClick);
                 // Per-slot type/transform overrides apply to the whole
                 // action slot — all buttons inherit the same font,
