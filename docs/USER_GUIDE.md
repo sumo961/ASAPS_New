@@ -2334,7 +2334,7 @@ Useful for "click on the suspicious painting" interactions.
 <a id="dialog-choices-visual-editor"></a>
 ### Dialog-Tree Choices in the Visual Editor
 
-When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into (click a choice on the canvas to step into the conversation behind it, or a crumb to step back out).
+When a Dialog Tree is open in the Visual Editor, a **Dialog path** bar runs across the top of the canvas: **Root** plus one crumb per choice you've stepped into (click a choice on the canvas to step into the conversation behind it, or a crumb to step back out). Clicking a character's line in the Inspector's Dialog Tree editor takes the canvas to that line too. Where another character speaks next (*Then another character speaks*), the canvas shows a **Continue → Billie** button and the crumb reads **→ Billie**. As you step through, each line's **Look** shows on the stage: a line set to *angry* switches that character's picture from that line on, as in play. The look is only shown — moving or resizing the character there keeps their own picture.
 
 **The buttons are a stack (fixed canvas).** A dialog's choice buttons sit one after another, in the order of the choices, normally right below the text. You decide three things:
 

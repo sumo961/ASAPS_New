@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.137** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.137 lets graphics go off the
+Current release: **v0.9.138** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.138 fixes stepping through a
+Dialog Tree in the Visual Editor**: clicking a choice on the canvas or a line
+in the Inspector's tree moves the canvas there again, "then" steps read
+"Continue → Billie" instead of an internal id, and each line's look switches
+the character's picture on the stage as in play.
+
+**v0.9.137 let graphics go off the
 edge in responsive projects**: characters and props can be placed partly
 off the stage with X % / Y %, and the Visual Editor's number fields now
 take negative numbers (typing "-" used to snap them back to 0).

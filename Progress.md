@@ -1,5 +1,20 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-26: Stepping through dialogs in the Visual Editor (v0.9.138)
+
+### Overview
+Stepping through a Dialog Tree in the Visual Editor works again, and the canvas shows each line's look.
+
+- **Clicking a choice on the canvas steps in again.** Since click-to-select for stage content (June) a click only selected the button for styling and never reached the Visual Editor's step-in; now it does both (`SlotFlowView` editor click calls `onAction`, no exit animation).
+- **Readable "then" steps.** A "then another character speaks" step showed its internal id on the canvas button ("c_root_next", "continue_1792752913086") and in the Dialog path; it now reads **Continue → Billie** on the button and **→ Billie** in the path.
+- **Clicking a character's line in the Inspector tree walks the canvas to it** — anywhere on the line (also into its text), not only the small arrow.
+- **The canvas shows a line's look.** A line set to *angry* now switches its speaker's picture from that line on, as in play (latest look per character along the walked path) — on responsive and fixed stages. On the fixed canvas the look is display-only: editing an element there stores the element's own state, never the look.
+- No "Sample body — replaced by generated content at runtime" chip on ordinary Dialog Trees and choice beats (it is meant for AI beats).
+
+**Files modified:** packages/renderer/src/components/SlotFlowView.tsx, packages/builder/src/components/visual/VisualWorkspace.tsx, packages/builder/src/editors/DialogTreeEditor.tsx, tests (SlotFlowViewEditorClick)
+
+---
+
 ## 2026-10-23: Off the edge in responsive projects (v0.9.137)
 
 ### Overview
