@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.140** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.140 helps groups working with
+Current release: **v0.9.141** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.141 is a safety net for your
+beats**: deleted beats stay on your computer for 30 days and come back with
+**Tools → Recently deleted beats…**, whatever removed them; deleting three or
+more beats at once names them first, including the ones you can't see. Groups
+that passed .asaps copies around can bring the latest one back into their
+project folder and Git history with **Open → Update from a copy (.asaps)…**.
+
+**v0.9.140 helped groups working with
 Git**: when a teammate undid a merge, pressing Merge on that branch again now
 offers to bring its beats back, one by one, with the pictures, characters and
 clusters they need. ASAPS no longer warns that files "changed outside ASAPS"

@@ -341,9 +341,12 @@ The small count strip above the canvas (**Beats · Clusters · Connections**) co
 
 - **Copy and paste** — **Ctrl/Cmd + C** (or right-click a selected beat → **Copy**) copies every selected beat. **Ctrl/Cmd + V** pastes the group in the middle of the flowchart, or right-click empty canvas → **Paste Beat** to drop it right there. The copies keep their arrangement, and links between the copied beats point to the copies, so a little scene you copy arrives already wired.
 - **Duplicate** — **Ctrl/Cmd + D**, or right-click → **Duplicate N beats**.
-- **Delete** — **Delete** (or right-click → **Delete N beats**) removes them all. If that would break links from other beats, ASAPS asks first; otherwise it just happens, and **Undo** brings everything back.
+- **Delete** — **Delete** (or right-click → **Delete N beats**) removes them all. From three beats on, or when links from other beats would break, ASAPS asks first and names them, how many of each kind, and how many lie outside the part of the flowchart you can see, so a selection you forgot about can't go unnoticed. **Undo** brings everything back.
 
 A paste is a single Undo step, however many beats it brought in. Clicking beats in the flowchart doesn't move the view, so the next beat you meant to Ctrl/Cmd-click is still where you saw it.
+
+<a id="recently-deleted-beats"></a>
+**Recently deleted beats.** Beats you deleted stay on your computer for 30 days, whatever removed them: the Delete key, the Inspector's **Delete Beat**, an Undo, an AI change, or an [update from a copy](#update-from-copy). Even when Undo can no longer reach them, **Tools → Recently deleted beats…** lists them by when they went and what removed them (for example *Backspace key in the flowchart: 11 selected beats*). Tick the ones you want and click **Bring back**. They return as they were when last saved, under their own IDs, so links that still point at them work again. Bringing them back is one Undo step. The list belongs to this computer: a teammate's deletions are on theirs.
 
 ### Visual Editor (The Close-Up)
 
@@ -4141,6 +4144,17 @@ A few habits keep group work smooth — and ASAPS helps with each:
 - **Don't commit what you didn't change.** If the VCS panel lists beats as changed or deleted that you never touched, find out why (often one of the two points above) before you commit.
 
 **Already have several versions that drifted apart?** Pick the one with the most work and make it the project folder (steps above). Then open **Open → Merge Story (.asaps)** and bring in each other version as [another version of this story](#merge-versions): shared beats stay once, new beats come in, and beats that differ are marked for you to decide.
+
+<a id="update-from-copy"></a>
+**Left GitHub and passed copies around? Bring the latest copy back.** If your group stopped using GitHub and sent `.asaps` files to each other instead, you don't need a new repository to go back:
+
+1. Everyone updates to the same, newest ASAPS.
+2. One person opens the group's project **folder** (the one that is on GitHub) and pulls in the VCS panel.
+3. **Open → Update from a copy (.asaps)…** and choose the latest copy. The dialog lists the beats the copy adds, changes and removes, and how many pictures and sounds the folder already has (those aren't copied a second time). Read the list of removed beats carefully: a beat someone wrote only in *their* copy isn't in this one.
+4. **Update this folder.** The project keeps its name and its Git history; the copy's story is now in the folder.
+5. Look through **Pending Changes**, then commit ("Back from copies: V13") and push. It's an ordinary push: no new repository, no force push.
+
+From then on everyone pulls, works and pushes again. If a teammate has work in another copy, bring it in with **Open → Merge Story (.asaps)** as [another version of this story](#merge-versions) before you commit.
 
 ### "ASAPS says the project has unresolved Git merge conflicts"
 
