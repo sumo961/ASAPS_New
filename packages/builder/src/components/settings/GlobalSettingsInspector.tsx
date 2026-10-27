@@ -10,6 +10,7 @@ import { CultureSettingFields } from './CultureSettingFields';
 import { getThemeService } from '../../services/ThemeService';
 import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
 import { MissingAssetsDialog } from './MissingAssetsDialog';
+import { ImageAssetField } from '../assets/ImageAssetField';
 import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
@@ -307,6 +308,32 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     }
     setHasChanges(true);
   };
+
+  // The theme's pictures, kept in the project (utils/themeGraphics.ts). An
+  // edit here is the author's choice for the current theme: fromThemeId says
+  // so, so App's theme copy leaves it alone.
+  const themeGraphicsEdited = React.useRef(false);
+  const handleThemeGraphicsChange = (field: keyof NonNullable<GlobalSettings['themeGraphics']>, value: string | number | undefined) => {
+    themeGraphicsEdited.current = true;
+    setSettings(prev => {
+      const next: Record<string, any> = { ...(prev.themeGraphics ?? {}), [field]: value };
+      if (value === undefined) delete next[field];
+      const fromThemeId = selectedThemeId ?? initialThemeId ?? prev.themeGraphics?.fromThemeId;
+      if (fromThemeId) next.fromThemeId = fromThemeId;
+      return { ...prev, themeGraphics: next };
+    });
+    setHasChanges(true);
+  };
+  // Pictures copied in while this window is open (applying a Ren'Py theme
+  // here) arrive in the project's settings, not in this window's copy.
+  useEffect(() => {
+    if (themeGraphicsEdited.current) return;
+    setSettings(prev => (prev.themeGraphics === initialSettings.themeGraphics ? prev : { ...prev, themeGraphics: initialSettings.themeGraphics }));
+  }, [initialSettings.themeGraphics]);
+  const frameUrl = (() => {
+    const id = settings.themeGraphics?.textboxFrameAssetId;
+    return id ? assets.find(a => a.id === id)?.url : undefined;
+  })();
 
   const handleNestedChange = (category: keyof GlobalSettings, subCategory: string, field: string, value: any) => {
     setSettings(prev => ({
@@ -1703,12 +1730,68 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   </p>
                 </div>
 
+                {/* Frame and button pictures (from a Ren'Py theme, or chosen here) */}
+                <div className="pt-2 border-t">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Pictures</h4>
+                  <p className="text-xs text-gray-500 mb-3">
+                    A picture stretched over each text box, and pictures for the choice buttons, instead of the colours above. A Ren'Py theme brings its own; they are kept in the project's assets, so the editor, the Preview, exports and copies all show them.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3" data-testid="theme-frame-field">
+                      <span className="text-sm text-gray-600">Text box frame</span>
+                      <ImageAssetField
+                        value={settings.themeGraphics?.textboxFrameAssetId}
+                        onChange={(id) => handleThemeGraphicsChange('textboxFrameAssetId', id)}
+                        chooseLabel="Choose picture…"
+                        modalTitle="Choose the text box frame"
+                        assetSubType={null}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3" data-testid="theme-button-field">
+                      <span className="text-sm text-gray-600">Button</span>
+                      <ImageAssetField
+                        value={settings.themeGraphics?.buttonAssetId}
+                        onChange={(id) => handleThemeGraphicsChange('buttonAssetId', id)}
+                        chooseLabel="Choose picture…"
+                        modalTitle="Choose the button picture"
+                        assetSubType={null}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-3" data-testid="theme-button-hover-field">
+                      <span className="text-sm text-gray-600">Button under the pointer</span>
+                      <ImageAssetField
+                        value={settings.themeGraphics?.buttonHoverAssetId}
+                        onChange={(id) => handleThemeGraphicsChange('buttonHoverAssetId', id)}
+                        chooseLabel="Choose picture…"
+                        modalTitle="Choose the button picture under the pointer"
+                        assetSubType={null}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Button pictures show in fixed layouts; responsive layouts draw buttons from the colours.
+                    </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <label htmlFor="theme-button-spacing" className="text-sm text-gray-600">Space between buttons (px)</label>
+                      <input
+                        id="theme-button-spacing"
+                        type="number"
+                        min="0"
+                        max="200"
+                        placeholder="16"
+                        value={settings.themeGraphics?.buttonSpacing ?? ''}
+                        onChange={(e) => handleThemeGraphicsChange('buttonSpacing', e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="w-24 px-2 py-1 border rounded text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Enhanced Text Box Preview */}
                 <div className="mt-6 p-4 bg-gray-100 rounded">
                   <div className="text-sm font-medium text-gray-600 mb-2">
                     Preview
-                    {themeAssets?.textboxFrame && (
-                      <span className="text-xs text-purple-600 ml-2">(using theme frame)</span>
+                    {frameUrl && (
+                      <span className="text-xs text-purple-600 ml-2">(with the frame picture)</span>
                     )}
                   </div>
                   <div
@@ -1723,8 +1806,8 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   >
                     <div
                       style={{
-                        ...(themeAssets?.textboxFrame ? {
-                          backgroundImage: `url(${themeAssets.textboxFrame})`,
+                        ...(frameUrl ? {
+                          backgroundImage: `url(${frameUrl})`,
                           backgroundSize: '100% 100%',
                           backgroundRepeat: 'no-repeat',
                         } : {
@@ -1732,7 +1815,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                           backgroundColor: hexToRgba(settings.colors.nonpcolor, settings.colors.nonpalpha / 100),
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,
                         }),
-                        borderRadius: themeAssets?.textboxFrame ? 0 : `${settings.textbox.radius}px`,
+                        borderRadius: frameUrl ? 0 : `${settings.textbox.radius}px`,
                         padding: `${settings.textbox.padding}px`,
                         width: '100%',
                       }}
