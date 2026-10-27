@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.139** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.139 adds a text-box border per
+Current release: **v0.9.140** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.140 helps groups working with
+Git**: when a teammate undid a merge, pressing Merge on that branch again now
+offers to bring its beats back, one by one, with the pictures, characters and
+clusters they need. ASAPS no longer warns that files "changed outside ASAPS"
+after its own saves (seen on slow or OneDrive-synced Windows folders), and
+long notices stay inside the window with their close button.
+
+**v0.9.139 added a text-box border per
 beat**: show or hide the border around a single beat's text, whatever the
 project's Text Box settings say. A beat's background fit now also reaches
 the Preview Window and exported stories.

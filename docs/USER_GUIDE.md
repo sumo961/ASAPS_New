@@ -4042,6 +4042,15 @@ See which branch you're on (the green dot) and every other branch, local and on 
 <a id="branch-switch-refused"></a>
 **Switching does nothing, or a notice says you have changes?** When you have uncommitted changes, **Switch** first asks whether to go ahead (**Switch anyway**). Git itself won't switch, create or merge a branch when that would overwrite work you haven't committed, and ASAPS now tells you so instead of quietly staying put. The notice names the files. Commit them in **Pending Changes** (or discard them there if you don't need them), then try again. If the notice says *an earlier merge isn't finished*, click the red **MERGING** button in the VCS status bar and choose **Keep both** (see [Merge Conflicts](#merge-conflicts)), then try again.
 
+<a id="undone-merge"></a>
+**Merged work that someone undid.** Sometimes a teammate undoes a merge with Git's *Revert* (on GitHub or in another Git tool), for example because it seemed to break something. After that, merging the same branch again does nothing: Git counts its work as merged *and removed on purpose*. When you press **Merge** on such a branch, ASAPS notices and opens **Bring back beats from "…"**. It says who undid which merge and when, and lists the beats:
+
+- **New on the branch** and **Changed on the branch** (nobody changed them since) are ticked.
+- **Changed on both sides**, **Deleted here since** and **Removed on the branch** are not ticked. Tick one only if the branch's version should win.
+- Where a beat leads somewhere else on the branch than here, the list says so ("On the branch it leads to *InfoText 89*; here to *InfoText 75*"). That's how you see where the old work used to connect, so the group can decide where it fits now.
+
+**Bring back** puts the ticked beats back as the branch has them, together with the pictures, sounds, characters and clusters they need, and makes one commit. Your teammates' later work stays as it is. Look at the result in the flowchart, then push it.
+
 ## Beat-Level Status Indicators
 
 Each beat on the canvas shows a small coloured dot in the top corner that mirrors its Git status:
