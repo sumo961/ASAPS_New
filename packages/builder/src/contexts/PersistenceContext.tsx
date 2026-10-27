@@ -1290,6 +1290,25 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       project.directoryPath = dirPath;
       project.storageFormat = 'directory';
 
+      // Register the folder's assets before the project reaches the editor:
+      // its asset loading runs as soon as the project is set and found none
+      // on a computer that had never opened this folder — a fresh clone
+      // showed no pictures, sounds or fonts until it was opened again
+      // (2026-10-27, theme pictures through Git).
+      const manifest = adapter.getManifest();
+      if (manifest && Object.keys(manifest.assets).length > 0) {
+        try {
+          const hybridAdapter = getStorageAdapter();
+          await hybridAdapter.initialize();
+          const sep = dirPath.includes('\\') ? '\\' : '/';
+          const assetsDir = dirPath + sep + 'assets';
+          const count = await hybridAdapter.registerDirectoryAssets(project.id, assetsDir, manifest.assets);
+          console.log('[PersistenceProvider] Registered', count, 'directory assets');
+        } catch (e) {
+          console.warn('[PersistenceProvider] Failed to register directory assets:', e);
+        }
+      }
+
       directoryAdapterRef.current = adapter;
       startExternalWatch(adapter, project.id);
       savedAssetIdsRef.current = new Set(); // Reset saved asset tracking for new project
@@ -1312,21 +1331,6 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
         }
       } catch (e) {
         console.warn('[PersistenceProvider] Failed to sync directory project to IndexedDB:', e);
-      }
-
-      // Register directory assets in HybridStorageAdapter so the UI can find them
-      const manifest = adapter.getManifest();
-      if (manifest && Object.keys(manifest.assets).length > 0) {
-        try {
-          const hybridAdapter = getStorageAdapter();
-          await hybridAdapter.initialize();
-          const sep = dirPath.includes('\\') ? '\\' : '/';
-          const assetsDir = dirPath + sep + 'assets';
-          const count = await hybridAdapter.registerDirectoryAssets(project.id, assetsDir, manifest.assets);
-          console.log('[PersistenceProvider] Registered', count, 'directory assets');
-        } catch (e) {
-          console.warn('[PersistenceProvider] Failed to register directory assets:', e);
-        }
       }
 
       commandManager.setProjectId(project.id);
