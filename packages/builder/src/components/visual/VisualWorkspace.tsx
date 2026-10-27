@@ -1476,10 +1476,19 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // Memoized render theme for smart sizing - converts GlobalSettings to RenderThemeSettings
   // The beat's own text-box border choice applies on the canvas too.
   const beatTextBoxBorder = (beat as any)?.textBoxBorder as 'show' | 'hide' | undefined;
+  // The theme's frame and button pictures ride along, as in the fixed-layout
+  // editor and the Preview — without them the responsive canvas showed plain
+  // boxes where the Preview showed the theme's frame.
   const renderTheme = useMemo(() => {
     if (!globalSettings) return null;
-    return applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), beatTextBoxBorder);
-  }, [globalSettings, beatTextBoxBorder]);
+    return {
+      ...applyTextBoxBorder(convertGlobalSettingsToTheme(globalSettings), beatTextBoxBorder),
+      textboxFrameUrl: themeAssets?.textboxFrame,
+      buttonNormalUrl: themeAssets?.buttonNormal,
+      buttonHoverUrl: themeAssets?.buttonHover,
+      buttonLayout: themeAssets?.buttonLayout,
+    };
+  }, [globalSettings, beatTextBoxBorder, themeAssets]);
 
   // ---- Undo/Redo snapshot tracking for visual element changes ----
   const snapshotRef = useRef<VisualElement[] | null>(null);

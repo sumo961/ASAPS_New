@@ -1,5 +1,14 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.142, 2026-10-27)
+
+### Overview
+- **Ren'Py themes look the same everywhere.** An imported Ren'Py theme's text-box frame, button pictures and fonts lived only in this computer's theme library; the project kept just the theme's id. So the Preview drew the frame while the responsive Visual Editor showed plain boxes (its theme never got the pictures), the Preview window had no theme fonts (they were loaded into the main window only), and exports, `.asaps` copies, folder projects and other computers showed none of it. Two projects with the same responsive title beat looked different depending on which theme id each held (one pointed at a theme deleted from the library, Birka at an installed kit under unrelated settings). Now the pictures and fonts are copied into the project once — when a theme is applied, or when a project whose theme is installed opens without them — as ordinary project assets (fonts named after their family, e.g. `Queen Serif.otf`, so the existing custom-font path loads them in the Preview and exports), and `globalSettings.themeGraphics` names the pictures. The editor (both layouts), Preview and exported player read them from there; switching to a theme without pictures drops the link (the files stay in Assets). Picture choice is by name: `textbox.png`, `choice_idle_background`, `choice_hover_background` (the theme's own button setting pointed at a check-box picture). Importing a copy renames the picture ids. Verified headless: kit import → editor, Preview window and single-file HTML export show the same frame and fonts; `.asaps` round trip keeps them; switch to Ink & Brass removes the frame.
+
+**Files modified:** packages/builder/src/utils/themeGraphics.ts (new), packages/builder/src/App.tsx, packages/builder/src/components/visual/VisualWorkspace.tsx, packages/builder/src/storage/types.ts, packages/builder/src/utils/projectZipManager.ts, packages/player/src/PlayerEngine.ts, packages/builder/public/player-web.js, tests (themeGraphics)
+
+---
+
 ## 2026-10-27: Fast HTML exports (v0.9.142)
 
 ### Overview

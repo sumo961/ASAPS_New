@@ -775,6 +775,18 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
     if (this.globalSettings && 'setTheme' in renderer) {
       try {
         const theme = convertGlobalSettingsToTheme(this.globalSettings);
+        // The theme's frame and button pictures, kept as project assets
+        // (builder utils/themeGraphics.ts) — the Preview draws them too.
+        const tg = (this.globalSettings as any).themeGraphics;
+        if (tg) {
+          const url = (id?: string) => (id ? this.assetMap.get(id) : undefined);
+          Object.assign(theme as any, {
+            textboxFrameUrl: url(tg.textboxFrameAssetId),
+            buttonNormalUrl: url(tg.buttonAssetId),
+            buttonHoverUrl: url(tg.buttonHoverAssetId),
+            ...(tg.buttonSpacing !== undefined ? { buttonLayout: { spacing: tg.buttonSpacing } } : {}),
+          });
+        }
         renderer.setTheme(theme);
         console.log('[PlayerEngine] Applied theme with speakerDisplay:', JSON.stringify(theme.speakerDisplay));
         console.log('[PlayerEngine] globalSettings.speakerDisplay:', JSON.stringify(this.globalSettings.speakerDisplay));

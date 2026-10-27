@@ -109,6 +109,7 @@ import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
+import { planThemeCopy, themeGraphicUrls } from './utils/themeGraphics';
 import { applyGeneratedStory, type ApplyGeneratedStoryDeps } from './utils/applyGeneratedStory';
 import { BUILT_IN_THEMES, normalizeTranslationResources } from '@asaps/core';
 import { useVCSStatus } from './vcs/VCSStatusProvider';
@@ -722,6 +723,8 @@ function App() {
 
   // Asset and character state
   const [assets, setAssets] = useState<Asset[]>([]);
+  /** The project whose assets have finished loading (the theme copy waits for it). */
+  const [assetsLoadedFor, setAssetsLoadedFor] = useState<string | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   // AI "Develop character" helper dialog. Non-null = open. Sessions carry
   // their seed + accept callback, so both entry points (beat inspector,
@@ -744,7 +747,7 @@ function App() {
   const [currentThemeId, setCurrentThemeId] = useState<string | undefined>(undefined);
 
   // Theme management hook - provides theme assets (fonts, graphics)
-  const { loadThemeAssets, themeAssets } = useThemes(currentThemeId);
+  const { loadThemeAssets, themeAssets: libraryThemeAssets } = useThemes(currentThemeId);
 
   // Load theme assets when theme changes
   useEffect(() => {
@@ -1067,6 +1070,13 @@ function App() {
   useEffect(() => {
     globalSettingsRef.current = globalSettings;
   }, [globalSettings]);
+
+  // The theme's frame and button pictures as the project keeps them
+  // (utils/themeGraphics.ts); the theme library only until they are copied in.
+  const themeAssets = useMemo(
+    () => themeGraphicUrls(globalSettings, assets) ?? libraryThemeAssets,
+    [globalSettings, assets, libraryThemeAssets],
+  );
 
   // Sync the project's source language into the TranslationProvider (it
   // mounts above the App and can't read globalSettings itself). Drives the
@@ -2578,6 +2588,7 @@ function App() {
             }
 
             setAssets(uiAssets);
+            setAssetsLoadedFor(currentProject.id);
             console.log('[App] >>> Total assets loaded:', uiAssets.length);
           } catch (err) {
             console.error('[App] >>> Error loading assets from IndexedDB:', err);
@@ -2586,6 +2597,7 @@ function App() {
               console.log('[App] >>> Falling back to direct filesystem asset loading');
               const dirAssets = await loadAssetsFromDirectory(projectPath);
               setAssets(dirAssets);
+              setAssetsLoadedFor(currentProject.id);
             }
           }
         };
@@ -2712,6 +2724,7 @@ function App() {
         updateStory(storyData);
         translationActions.clearTranslations();
         loadedProjectIdRef.current = currentProject.id;
+        setAssetsLoadedFor(currentProject.id);
         setIsUntitledProject(true);
 
         console.log('[App] >>> SUCCESS: Saved beats to new untitled project');
@@ -2737,6 +2750,7 @@ function App() {
         initializeStory();
         translationActions.clearTranslations();
         loadedProjectIdRef.current = currentProject.id;
+        setAssetsLoadedFor(currentProject.id);
         console.log('[App] >>> Default story initialized for untitled project');
       } else if (!isNewUntitledProject) {
         // This is an existing saved project - load its data
@@ -2860,6 +2874,7 @@ function App() {
           }
 
           setAssets(uiAssets);
+          setAssetsLoadedFor(currentProject.id);
           console.log('[App] >>> Total assets loaded:', uiAssets.length);
 
           // CRITICAL: Reconstruct character image URLs from asset IDs
@@ -5387,6 +5402,44 @@ function App() {
   useEffect(() => {
     globalSettingsMutationsRef.current.setGlobalSettings = applyGlobalSettingsChange;
   }, [applyGlobalSettingsChange]);
+
+  // The theme's pictures and fonts go into the project once — when a theme
+  // is applied, or when a project whose theme is in this computer's library
+  // opens without them — so the editor, the Preview, exports and other
+  // computers all show the same thing (utils/themeGraphics.ts). A theme that
+  // isn't installed here leaves the project as it is.
+  const themeCopyKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const projectId = currentProject?.id;
+    if (!projectId || !currentThemeId || assetsLoadedFor !== projectId) return;
+    if (globalSettings.themeGraphics?.fromThemeId === currentThemeId) return;
+    const key = `${projectId}|${currentThemeId}`;
+    if (themeCopyKeyRef.current === key) return;
+    themeCopyKeyRef.current = key;
+    void (async () => {
+      try {
+        const service = getThemeService();
+        await service.initialize();
+        const plan = await planThemeCopy(currentThemeId, service, assetsRef.current);
+        if (!plan || currentProjectRef2.current?.id !== projectId) return;
+        const now = globalSettingsRef.current;
+        if (!now || (!plan.themeGraphics && !now.themeGraphics)) return;
+        for (const asset of plan.newAssets) await handleAssetAdd(asset);
+        const { themeGraphics: _old, ...rest } = now;
+        applyGlobalSettingsChange((plan.themeGraphics ? { ...rest, themeGraphics: plan.themeGraphics } : rest) as GlobalSettings);
+        if (plan.newAssets.length > 0) {
+          notify.info(`The theme's pictures and fonts are now part of this project (${plan.newAssets.map((a) => a.name).join(', ')}).`);
+        }
+      } catch (err) {
+        console.warn('[App] Could not copy the theme into the project:', err);
+      } finally {
+        // Only one copy at a time; a later save from the Settings window
+        // (its own copy of the settings, from before) may drop the link
+        // again — then it is made again from the pictures now in the project.
+        themeCopyKeyRef.current = null;
+      }
+    })();
+  }, [currentProject?.id, currentThemeId, assetsLoadedFor, globalSettings.themeGraphics?.fromThemeId, handleAssetAdd, applyGlobalSettingsChange]);
 
   // P2.5 — the Visual Editor's orientation indicator/setter writes
   // project.orientation through the app event bus (same pattern as other

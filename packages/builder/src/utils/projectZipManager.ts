@@ -1471,5 +1471,13 @@ function updateGlobalSettingsAssetReferences(globalSettings: any, assetIdMap: Ma
     }
   }
 
+  // The theme's pictures (utils/themeGraphics.ts)
+  if (updated.themeGraphics) {
+    for (const key of ['textboxFrameAssetId', 'buttonAssetId', 'buttonHoverAssetId']) {
+      const id = updated.themeGraphics[key];
+      if (id && assetIdMap.has(id)) updated.themeGraphics[key] = assetIdMap.get(id);
+    }
+  }
+
   return updated;
 }

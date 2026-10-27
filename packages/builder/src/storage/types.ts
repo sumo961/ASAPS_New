@@ -89,6 +89,20 @@ export interface GlobalSettings {
     boxVisibility: 'all' | 'hideText' | 'hideAll';  // Box visibility mode for editor
     hideTitleTextBox?: boolean;  // Hide text box background for title/author elements (VN style)
   };
+  /**
+   * A theme's pictures, copied into the project's assets (utils/themeGraphics.ts):
+   * every surface — editor, Preview, exports, other computers — reads them
+   * from here, not from this computer's theme library.
+   */
+  themeGraphics?: {
+    /** The theme they came from; a project switched to another theme drops them. */
+    fromThemeId?: string;
+    textboxFrameAssetId?: string;
+    buttonAssetId?: string;
+    buttonHoverAssetId?: string;
+    /** Space between choice buttons (px). */
+    buttonSpacing?: number;
+  };
   textEffects: {
     animation: 'none' | 'typewriter' | 'fade';
     typewriterSpeed: number; // Characters per second
