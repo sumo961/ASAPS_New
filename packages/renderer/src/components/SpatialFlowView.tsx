@@ -12,7 +12,7 @@ import { resolveHotspotRect, resolveAssetVariant, detectDeviceClass, detectOrien
 import type { AssetVariant } from '@asaps/core';
 import type { SpatialSpec } from '../utils/slotLayout';
 import type { RenderThemeSettings } from './PositionedBeatView';
-import { SlotFlowView, applyAlphaToHex } from './SlotFlowView';
+import { SlotFlowView, applyAlphaToHex, buttonPictureStyle } from './SlotFlowView';
 import { runSpatialPath } from '../utils/pathAnimation';
 import { ResponsiveCharacterLayer, type ResponsiveCharacterLayerHandle } from './ResponsiveCharacterLayer';
 import { TimerProgressBar } from './TimerProgressBar';
@@ -916,6 +916,7 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                     onClick={() => onAction(a.id)}
                     disabled={!gateEarned}
                     aria-disabled={!gateEarned}
+                    className="slotflow-btn"
                     style={{
                       width: '100%',
                       pointerEvents: gateEarned ? 'auto' : 'none',
@@ -923,9 +924,12 @@ export const SpatialFlowView: React.FC<SpatialFlowViewProps> = ({
                       fontSize: `clamp(13px, ${vwU(1.4)}, 18px)`,
                       fontWeight: 600,
                       color: theme?.button?.textColor || '#fff',
-                      background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
-                      border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
-                      borderRadius: pillSafeRadius(theme?.button?.borderRadius),
+                      // The theme's button pictures, as in the slot flow.
+                      ...(buttonPictureStyle(theme) ?? {
+                        background: theme?.button?.backgroundColor || 'rgba(255,255,255,0.12)',
+                        border: `${theme?.button?.borderWidth ?? 1}px solid ${theme?.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
+                        borderRadius: pillSafeRadius(theme?.button?.borderRadius),
+                      }),
                       padding: `10px clamp(14px, ${vwU(2.5)}, 24px)`,
                       minHeight: 44,
                       cursor: gateEarned ? 'pointer' : 'default',

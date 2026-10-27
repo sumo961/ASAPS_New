@@ -1383,6 +1383,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           background: rgba(255,255,255,0.25); border-radius: 4px;
         }
         .${scope} .slotflow-btn { transition: background-color 0.15s ease; }
+        ${BUTTON_PICTURE_CSS}
         .${scope} .slotflow-btn:hover { background: ${theme.button?.hoverBackgroundColor || theme.button?.backgroundColor || '#333'}; }
         /* P3-anim — enter preset palette. animationDuration / delay /
            easing come from the per-slot inline style merged at the
@@ -2365,7 +2366,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                       onClick={handleClick}
                       {...choiceA11y(b)}
                       style={{
-                        ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
+                        ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`, !pictureStyle),
                         maxWidth: '100%',
                         ...pictureButtonStyle,
                         ...a.style,
@@ -2565,7 +2566,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                     onClick={handleClick}
                     {...choiceA11y(b)}
                     style={{
-                      ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`),
+                      ...buttonStyle(theme, buttonFluid, `clamp(20px, ${vwU(3)}, 36px)`, !pictureStyle),
                       ...pictureButtonStyle,
                       ...(isVisited ? { opacity: 0.4, cursor: 'default' } : {}),
                       ...(editorMode ? { cursor: 'pointer' } : null),
@@ -2763,16 +2764,46 @@ function anchoredButtonPlacement(anchor: SlotAnchor): React.CSSProperties {
   return out;
 }
 
-function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string): React.CSSProperties {
+/**
+ * The theme's button pictures (a Ren'Py theme's choice buttons, or Project
+ * Settings ▸ Text Box ▸ Pictures), stretched over the button the way the
+ * fixed layout draws them. The picture under the pointer swaps in through
+ * BUTTON_PICTURE_CSS. Null without pictures, or when Box Visibility strips
+ * the button boxes.
+ */
+export function buttonPictureStyle(theme?: RenderThemeSettings): React.CSSProperties | null {
+  const url = theme?.buttonNormalUrl;
+  if (!url || theme?.textBox?.boxVisibility === 'hideAll') return null;
+  return {
+    backgroundColor: 'transparent',
+    backgroundImage: 'var(--asaps-btn-pic, var(--asaps-btn-pic-idle))',
+    backgroundSize: '100% 100%',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'center',
+    border: 'none',
+    borderRadius: 0,
+    boxShadow: 'none',
+    ['--asaps-btn-pic-idle' as any]: `url("${url}")`,
+    ['--asaps-btn-pic-hover' as any]: `url("${theme?.buttonHoverUrl || url}")`,
+  };
+}
+
+/** Swaps in the picture under the pointer (see buttonPictureStyle). */
+export const BUTTON_PICTURE_CSS = '.slotflow-btn:hover:not(:disabled) { --asaps-btn-pic: var(--asaps-btn-pic-hover); }';
+
+function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string, withPicture = true): React.CSSProperties {
   // 'hideAll' box visibility strips button boxes too — bare labels.
   const bare = theme.textBox?.boxVisibility === 'hideAll';
+  const picture = withPicture ? buttonPictureStyle(theme) : null;
   return {
     fontFamily: theme.fonts.buttonFont || theme.fonts.textFont || 'serif',
     fontSize: `clamp(var(--slotflow-btn-floor), ${fluid}, ${BUTTON_CEILING}px)`,
     color: theme.button?.textColor || '#fff',
-    background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
-    border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
-    borderRadius: pillSafeRadius(theme.button?.borderRadius),
+    ...(picture ?? {
+      background: bare ? 'transparent' : (theme.button?.backgroundColor || 'rgba(255,255,255,0.12)'),
+      border: bare ? 'none' : `${theme.button?.borderWidth ?? 1}px solid ${theme.button?.borderColor || 'rgba(255,255,255,0.4)'}`,
+      borderRadius: pillSafeRadius(theme.button?.borderRadius),
+    }),
     padding: `6px ${hPad ?? 'clamp(20px, 3vw, 36px)'}`,
     minHeight: 44, // Apple HIG minimum tap target
     minWidth: 120,

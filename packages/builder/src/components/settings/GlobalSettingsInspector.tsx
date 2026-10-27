@@ -1767,9 +1767,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         assetSubType={null}
                       />
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Button pictures show in fixed layouts; responsive layouts draw buttons from the colours.
-                    </p>
                     <div className="flex items-center justify-between gap-3">
                       <label htmlFor="theme-button-spacing" className="text-sm text-gray-600">Space between buttons (px)</label>
                       <input
