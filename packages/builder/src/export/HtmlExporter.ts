@@ -1204,7 +1204,7 @@ async function exportAsSingleFile(
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
-    .replace('{{PLAYER_SCRIPT}}', playerScript);
+    .replace('{{PLAYER_SCRIPT}}', () => playerScript);
 
   return { html, mode: 'single-file' };
 }
@@ -1259,7 +1259,7 @@ async function exportAsFolder(
     .replace('{{SHOW_SESSION_LOG}}', String(options.showSessionLog ?? false))
     .replace('{{MOBILE_SCALING_MODE}}', mobileScalingMode)
     .replace('{{MOBILE_FONT_SCALE}}', String(mobileFontScale))
-    .replace('{{PLAYER_SCRIPT}}', playerScript);
+    .replace('{{PLAYER_SCRIPT}}', () => playerScript);
 
   // Add files to ZIP
   zip.file('index.html', html);
@@ -1275,9 +1275,44 @@ async function exportAsFolder(
 }
 
 /**
+ * The player as an inline <script>. It used to go in as a 4 MB
+ * `data:text/javascript;base64,…` URL, and Chrome keeps that URL with every
+ * task the script schedules: an exported story with 75 pictures grew the
+ * tab to 7–9 GB while unpacking them and crashed it, or crawled on a
+ * student's laptop ("exporting to html makes everything go giga super
+ * slow", Narrative-bullying, 2026-10-27). Loaded from a normal or inline
+ * script, the same story starts in 2.5 s at 270 MB.
+ *
+ * What would end or derail the <script> element is escaped where it can
+ * only occur (string and regex literals: SVG comments, React's
+ * "<script><\/script>"), as \x3C — the same character there. If the result
+ * no longer parses, the old data URL is used.
+ */
+export function inlinePlayerScript(js: string): string | null {
+  const safe = js
+    .replace(/<\/(script)/gi, '<\\/$1')
+    .replace(/<!--/g, '\\x3C!--')
+    .replace(/<(script)/gi, '\\x3C$1');
+  try {
+    // Syntax check only; never run.
+    new Function(safe);
+  } catch (e) {
+    if (!(e instanceof EvalError)) {
+      console.warn('[HtmlExporter] Inlined player does not parse; using a data URL instead:', e);
+      return null;
+    }
+  }
+  return `<script data-cfasync="false">\n${safe}\n</script>`;
+}
+
+/** The player's CSS as an inline <style> (no data URL either). */
+export function inlinePlayerStyle(css: string): string {
+  return `<style>\n${css.replace(/<\/(style)/gi, '<\\/$1')}\n</style>`;
+}
+
+/**
  * Get the player script and CSS bundle
  * Loads the pre-built player-web bundle from public folder
- * Uses base64 data URL to avoid any HTML escaping issues
  */
 async function getPlayerScript(): Promise<string> {
   // Try multiple paths to load the player bundle
@@ -1309,9 +1344,8 @@ async function getPlayerScript(): Promise<string> {
         const script = await response.text();
         console.log('[HtmlExporter] Loaded player bundle from:', path, 'size:', script.length);
 
-        // Encode as base64 data URL to avoid any HTML escaping issues
-        const base64Script = btoa(unescape(encodeURIComponent(script)));
-        scriptTag = `<script data-cfasync="false" src="data:text/javascript;base64,${base64Script}"></script>`;
+        scriptTag = inlinePlayerScript(script)
+          ?? `<script data-cfasync="false" src="data:text/javascript;base64,${btoa(unescape(encodeURIComponent(script)))}"></script>`;
         break;
       }
     } catch (e) {
@@ -1327,9 +1361,7 @@ async function getPlayerScript(): Promise<string> {
         const css = await response.text();
         console.log('[HtmlExporter] Loaded player CSS from:', path, 'size:', css.length);
 
-        // Encode as base64 data URL to avoid any HTML escaping issues
-        const base64Css = btoa(unescape(encodeURIComponent(css)));
-        styleTag = `<link rel="stylesheet" href="data:text/css;base64,${base64Css}">`;
+        styleTag = inlinePlayerStyle(css);
         break;
       }
     } catch (e) {
@@ -1563,7 +1595,7 @@ export async function downloadHtmlExport(
     .replace('{{AI_TRANSLATION_SECTION}}', aiSectionHtml)
     .replace('{{TRANSLATIONS_MAP}}', translationsMapJs)
     .replace('{{RTL_LANGUAGES}}', JSON.stringify(RTL_LANGUAGE_CODES))
-    .replace('{{PLAYER_SCRIPT}}', playerScript);
+    .replace('{{PLAYER_SCRIPT}}', () => playerScript);
 
   console.log(`[HtmlExporter] Enhanced HTML size: ${html.length} bytes`);
 

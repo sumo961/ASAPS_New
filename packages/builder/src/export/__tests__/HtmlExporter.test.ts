@@ -25,6 +25,8 @@ vi.mock('../StoryTranslator', () => ({ applyTranslationResource: vi.fn((d) => d)
 vi.mock('../fontBundler', () => ({ downloadAndInlineFonts: vi.fn(async () => '') }));
 
 import {
+  inlinePlayerScript,
+  inlinePlayerStyle,
   exportAsHtml,
   previewStoryZip,
   downloadHtmlExport,
@@ -167,12 +169,42 @@ describe('exportAsHtml — single-file', () => {
     expect(res.html).toContain('Player Bundle Missing');
   });
 
-  it('inlines the player bundle as base64 when the fetch succeeds', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => 'PLAYER_BUNDLE' }));
+  // A 4 MB data: URL script made Chrome grow the tab to 7–9 GB while the
+  // story unpacked its pictures (Narrative-bullying, 2026-10-27).
+  it('inlines the player bundle as a plain <script>, not a data: URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => 'window.PLAYER_BUNDLE = 1;' }));
     const res = await exportAsHtml('p1', baseOpts({ precomputedStoryZip: sfZip() }));
-    expect(res.html).toContain('data:text/javascript;base64,');
-    expect(res.html).toContain('data:text/css;base64,');
+    expect(res.html).toContain('<script data-cfasync="false">\nwindow.PLAYER_BUNDLE = 1;\n</script>');
+    expect(res.html).not.toContain('data:text/javascript');
+    expect(res.html).not.toContain('data:text/css');
     expect(res.html).not.toContain('Player Bundle Missing');
+  });
+
+  it('keeps $-sequences of the player code as they are', async () => {
+    const code = 'var a = "x".replace(/x/, "$&$1$`$\'"); var $$ = 1;';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => code }));
+    const res = await exportAsHtml('p1', baseOpts({ precomputedStoryZip: sfZip() }));
+    expect(res.html).toContain(code);
+  });
+});
+
+describe('inlinePlayerScript', () => {
+  it('escapes what would end or derail the script element, keeping the same characters', () => {
+    const js = 'var svg = "<svg><!--Created by X--></svg>"; var t = "<script><\\/script>"; var e = "</script>";';
+    const tag = inlinePlayerScript(js)!;
+    const body = tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('</script>'));
+    expect(body).not.toMatch(/<!--|<script|<\/script/i);
+    // Same strings once run.
+    const run = new Function(`${body}; return [svg, t, e];`)();
+    expect(run).toEqual(['<svg><!--Created by X--></svg>', '<script><\/script>', '</script>']);
+  });
+
+  it('gives up (data URL fallback) when the escaped code would not parse', () => {
+    expect(inlinePlayerScript('var x = ;')).toBeNull();
+  });
+
+  it('inlinePlayerStyle keeps a </style> inside the CSS from closing the element', () => {
+    expect(inlinePlayerStyle('a{content:"</style>"}')).toBe('<style>\na{content:"<\\/style>"}\n</style>');
   });
 });
 
