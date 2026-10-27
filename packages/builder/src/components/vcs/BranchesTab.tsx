@@ -7,10 +7,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import {
   gitListBranches, gitSwitchBranch, gitCreateBranch, gitMerge,
-  gitListRemotes, gitAddRemote,
+  gitListRemotes, gitAddRemote, gitPlanUndoneMerge, gitRestoreUndoneMerge,
   type GitBranch,
 } from '../../vcs/GitAdapter';
+import type { RestorePlan } from '../../vcs/undoneMerge';
 import { confirmAction, notify } from '../../utils/notify';
+import { UndoneMergeDialog } from './UndoneMergeDialog';
 
 /** Git's refusal in words an author can act on (it used to vanish silently). */
 export function explainGitRefusal(what: string, message: string): string {
@@ -37,6 +39,7 @@ export const BranchesTab: React.FC = () => {
   const [newRemoteName, setNewRemoteName] = useState('origin');
   const [newRemoteUrl, setNewRemoteUrl] = useState('');
   const [filter, setFilter] = useState('');
+  const [undonePlan, setUndonePlan] = useState<RestorePlan | null>(null);
 
   const loadBranches = useCallback(async () => {
     if (!vcs?.projectPath) return;
@@ -102,12 +105,34 @@ export const BranchesTab: React.FC = () => {
     if (result.success) {
       await vcs.refresh();
       await loadBranches();
+      // Work from this branch that was merged before and then undone by a
+      // revert doesn't come back with a merge (NarrativDesign, 2026-10-23).
+      try {
+        const plan = await gitPlanUndoneMerge(vcs.projectPath, branchName);
+        if (plan) setUndonePlan(plan);
+      } catch (e) {
+        console.warn('[BranchesTab] Could not check for an undone merge:', e);
+      }
     } else {
       // A merge that stopped on conflicts shows in the status bar (Keep both).
       await vcs.refresh();
       reportFailure(`Couldn't merge ${branchName}`, result.message);
     }
   }, [vcs, loadBranches]);
+
+  const handleRestoreUndone = useCallback(async (chosen: Set<string>) => {
+    if (!vcs?.projectPath || !undonePlan) return;
+    await vcs.refresh(); // saves pending edits first
+    const result = await gitRestoreUndoneMerge(vcs.projectPath, undonePlan, chosen);
+    if (!result.success) {
+      notify.error(`Couldn't bring the beats back: ${result.message}`);
+      return;
+    }
+    setUndonePlan(null);
+    window.dispatchEvent(new CustomEvent('asaps:reloadFromDisk'));
+    await vcs.refresh();
+    notify.success(result.message);
+  }, [vcs, undonePlan]);
 
   const handleAddRemote = useCallback(async () => {
     if (!vcs?.projectPath || !newRemoteName.trim() || !newRemoteUrl.trim()) return;
@@ -299,6 +324,10 @@ export const BranchesTab: React.FC = () => {
         <div style={{ padding: 12, textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
           Loading...
         </div>
+      )}
+
+      {undonePlan && (
+        <UndoneMergeDialog plan={undonePlan} onCancel={() => setUndonePlan(null)} onRestore={handleRestoreUndone} />
       )}
     </div>
   );

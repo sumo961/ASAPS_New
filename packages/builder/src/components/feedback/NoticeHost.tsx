@@ -50,6 +50,10 @@ const NoticeItem: React.FC<{ notice: Notice; onClose: (id: number) => void }> = 
         lineHeight: 1.4,
         width: 380,
         maxWidth: 'calc(100vw - 40px)',
+        // A long notice scrolls inside; it never grows past the window and
+        // takes its close button with it (students, 2026-10-27).
+        maxHeight: 'calc(100vh - 40px)',
+        boxSizing: 'border-box',
         boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
         pointerEvents: 'auto',
         display: 'flex',
@@ -60,13 +64,15 @@ const NoticeItem: React.FC<{ notice: Notice; onClose: (id: number) => void }> = 
       <span aria-hidden style={{ fontWeight: 700, color: colors.border, minWidth: 12, textAlign: 'center' }}>
         {colors.icon}
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{notice.message}</div>
-        {notice.detail && (
-          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-            {notice.detail}
-          </div>
-        )}
+      <div style={{ flex: 1, minWidth: 0, maxHeight: 'calc(100vh - 62px)', display: 'flex', flexDirection: 'column' }}>
+        <div data-notice-text style={{ overflowY: 'auto', maxHeight: '45vh', minHeight: 0 }}>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{notice.message}</div>
+          {notice.detail && (
+            <div style={{ marginTop: 4, fontSize: 12, opacity: 0.8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {notice.detail}
+            </div>
+          )}
+        </div>
         {notice.action && (
           <button
             type="button"
@@ -81,6 +87,8 @@ const NoticeItem: React.FC<{ notice: Notice; onClose: (id: number) => void }> = 
             }}
             style={{
               marginTop: 8,
+              alignSelf: 'flex-start',
+              flexShrink: 0,
               background: 'rgba(255,255,255,0.12)',
               border: `1px solid ${colors.border}`,
               color: '#fff',
@@ -204,6 +212,7 @@ export const NoticeHost: React.FC = () => {
           style={{
             position: 'fixed', bottom: 20, right: 20, zIndex: 9999,
             display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none',
+            maxHeight: 'calc(100vh - 40px)', justifyContent: 'flex-end', overflow: 'hidden',
           }}
         >
           {notices.map((n) => <NoticeItem key={n.id} notice={n} onClose={close} />)}

@@ -47,6 +47,25 @@ function parentDir(filePath: string): string {
   return lastSep > 0 ? filePath.substring(0, lastSep) : filePath;
 }
 
+type KnownFile = { text: string } | { bytes: string } | { gone: true };
+
+/** Size + FNV-1a hash: enough to recognise our own asset write coming back. */
+function bytesPrint(data: Uint8Array): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < data.length; i++) {
+    h ^= data[i];
+    h = Math.imul(h, 0x01000193);
+  }
+  return `${data.length}:${(h >>> 0).toString(16)}`;
+}
+
+function toBytes(data: unknown): Uint8Array | null {
+  if (data instanceof Uint8Array) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (typeof data === 'string') return new TextEncoder().encode(data);
+  return null;
+}
+
 /**
  * DirectoryAdapter implements PersistenceAdapter for filesystem-based projects.
  */
@@ -68,6 +87,15 @@ export class DirectoryAdapter implements PersistenceAdapter {
   /** Asset manifest from last openProject() — used to register assets in storage */
   private lastManifest: DirectoryAssetManifest | null = null;
   private lastDuplicateBeatIds: DuplicateBeatId[] = [];
+  /**
+   * What this app last wrote (or read on open) at each project path, so the
+   * watcher can tell our own saves echoing back from changes made outside.
+   * A Windows student got "files changed outside ASAPS … and 70 more" over
+   * and over without touching anything (2026-10-27): every save rewrote every
+   * file and the echo was only ignored for 5 seconds — on a slow disk or a
+   * OneDrive-synced folder it arrives later.
+   */
+  private known = new Map<string, KnownFile>();
 
   /**
    * Create an Electron IPC-based DirectoryReader
@@ -120,8 +148,19 @@ export class DirectoryAdapter implements PersistenceAdapter {
     if (conflicted.length > 0) throw new ConflictMarkersError(conflicted);
 
     this.projectPath = dirPath;
+    this.known.clear();
 
-    const result = await deserializeFromDirectory(dirPath, reader);
+    // What we read now is the version on screen: the watcher compares against it.
+    const recording: DirectoryReader = {
+      ...reader,
+      readText: async (path: string) => {
+        const text = await reader.readText(path);
+        const rel = this.relPath(path);
+        if (rel) this.known.set(rel, { text });
+        return text;
+      },
+    };
+    const result = await deserializeFromDirectory(dirPath, recording);
 
     // Save manifest for asset registration
     this.lastManifest = result.manifest;
@@ -256,7 +295,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
             setManifestEntry(existingManifest, entry);
           }
           await api.fs.mkdir(parentDir(fullPath));
-          await api.fs.writeFile(fullPath, serializeManifest(existingManifest));
+          await this.writeText(fullPath, serializeManifest(existingManifest));
           continue;
         }
       }
@@ -277,7 +316,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
       // Ensure parent directory exists
       await api.fs.mkdir(parentDir(fullPath));
-      await api.fs.writeFile(fullPath, content);
+      await this.writeText(fullPath, content);
     }
 
     // Clean up orphaned beat files (beats deleted from the project)
@@ -298,7 +337,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
         const fullPath = joinPath(this.projectPath, ...af.path.split('/'));
         await api.fs.mkdir(parentDir(fullPath));
         const arrayBuffer = await blob.arrayBuffer();
-        await api.fs.writeFile(fullPath, new Uint8Array(arrayBuffer));
+        await this.writeBytes(fullPath, new Uint8Array(arrayBuffer));
       }
     }
   }
@@ -338,6 +377,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const filePath = joinPath(this.projectPath, 'assets', entry.folder, entry.filename);
     try {
       if (await reader.exists(filePath) && api.fs.unlink) {
+        this.remember(filePath, { gone: true });
         await api.fs.unlink(filePath);
       }
     } catch (err) {
@@ -346,7 +386,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     // Update manifest
     delete manifest.assets[assetId];
-    await api.fs.writeFile(manifestPath, serializeManifest(manifest));
+    await this.writeText(manifestPath, serializeManifest(manifest));
 
     // Drop from the in-memory cached manifest so subsequent saves don't
     // resurrect the entry via the merge-into-existing logic.
@@ -376,7 +416,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     const fullPath = joinPath(this.projectPath, ...clusterDir.split('/'), filename);
     await api.mkdir(parentDir(fullPath));
-    await api.writeFile(fullPath, deterministicStringify(serialized));
+    await this.writeText(fullPath, deterministicStringify(serialized));
   }
 
   /**
@@ -395,6 +435,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     const fullPath = joinPath(this.projectPath, ...clusterDir.split('/'), filename);
     if (await api.exists(fullPath)) {
+      this.remember(fullPath, { gone: true });
       await api.unlink(fullPath);
       console.log(`[DirectoryAdapter] Deleted beat file: ${fullPath}`);
     }
@@ -439,6 +480,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
           if (!writtenPaths.has(relativePath)) {
             // This beat file is on disk but not in the current project — delete it
             const fullPath = joinPath(dirPath, file.name);
+            this.remember(fullPath, { gone: true });
             await api.unlink(fullPath);
             console.log(`[DirectoryAdapter] Cleaned up orphaned beat file: ${relativePath}`);
           }
@@ -476,7 +518,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       globalSettings: settings,
     };
 
-    await api.writeFile(settingsPath, deterministicStringify(settingsData));
+    await this.writeText(settingsPath, deterministicStringify(settingsData));
   }
 
   /**
@@ -506,7 +548,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
 
     const text = deterministicStringify(updated);
     if (Object.keys(existing).length > 0 && onlyStampsDiffer(deterministicStringify(existing), text)) return;
-    await api.writeFile(projectPath, text);
+    await this.writeText(projectPath, text);
   }
 
   /**
@@ -562,7 +604,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const reader = this.createReader();
     const projectPath = joinPath(this.projectPath, 'project.json');
     const existing = JSON.parse(await reader.readText(projectPath));
-    await api.writeFile(projectPath, deterministicStringify({ ...existing, id, ...(name ? { name } : {}) }));
+    await this.writeText(projectPath, deterministicStringify({ ...existing, id, ...(name ? { name } : {}) }));
   }
 
   /**
@@ -577,15 +619,14 @@ export class DirectoryAdapter implements PersistenceAdapter {
       return () => {};
     }
 
-    // Use Electron IPC-based file watcher
+    // Use Electron IPC-based file watcher; our own writes coming back are dropped
     this.unwatchFn = api.fs.watchDir(
       this.projectPath,
       (changedFiles: string[]) => {
-        const events: FileChangeEvent[] = changedFiles.map(f => ({
-          path: f,
-          type: 'modified' as const,
-        }));
-        callback(events);
+        void this.changedOutside(changedFiles).then((paths) => {
+          if (paths.length === 0) return;
+          callback(paths.map((path): FileChangeEvent => ({ path, type: 'modified' })));
+        });
       }
     );
 
@@ -680,13 +721,10 @@ export class DirectoryAdapter implements PersistenceAdapter {
     const assetDir = joinPath(this.projectPath!, 'assets', folder);
     await api.mkdir(assetDir);
     const arrayBuffer = await asset.blob.arrayBuffer();
-    await api.writeFile(
-      joinPath(assetDir, uniqueFilename),
-      new Uint8Array(arrayBuffer)
-    );
+    await this.writeBytes(joinPath(assetDir, uniqueFilename), new Uint8Array(arrayBuffer));
 
     // Write updated manifest
-    await api.writeFile(manifestPath, serializeManifest(manifest));
+    await this.writeText(manifestPath, serializeManifest(manifest));
   }
 
   supportsGranularSave(): boolean {
@@ -696,6 +734,78 @@ export class DirectoryAdapter implements PersistenceAdapter {
   // =========================================================================
   // Helpers
   // =========================================================================
+
+  /** Path inside the project, with forward slashes; null if outside it. */
+  private relPath(fullPath: string): string | null {
+    if (!this.projectPath) return null;
+    const norm = (p: string) => p.replace(/\\/g, '/');
+    const base = norm(this.projectPath).replace(/\/+$/, '') + '/';
+    const path = norm(fullPath);
+    return path.startsWith(base) ? path.slice(base.length) : null;
+  }
+
+  private remember(fullPath: string, file: KnownFile): void {
+    const rel = this.relPath(fullPath);
+    if (rel) this.known.set(rel, file);
+  }
+
+  /**
+   * Write a text file — unless it already says exactly this: rewriting every
+   * file on every save made Git, sync clients and the watcher see 70 changes.
+   */
+  private async writeText(fullPath: string, content: string): Promise<void> {
+    const api = window.electronAPI!.fs;
+    this.remember(fullPath, { text: content });
+    try {
+      if (await api.exists(fullPath) && await this.createReader().readText(fullPath) === content) return;
+    } catch {
+      // unreadable — write it
+    }
+    await api.writeFile(fullPath, content);
+  }
+
+  private async writeBytes(fullPath: string, data: Uint8Array): Promise<void> {
+    const api = window.electronAPI!.fs;
+    const print = bytesPrint(data);
+    this.remember(fullPath, { bytes: print });
+    try {
+      const existing = await api.exists(fullPath) ? toBytes(await api.readFile(fullPath)) : null;
+      if (existing && bytesPrint(existing) === print) return;
+    } catch {
+      // unreadable — write it
+    }
+    await api.writeFile(fullPath, data);
+  }
+
+  /**
+   * The reported paths whose content is not what this app last wrote or
+   * read there. Paths we know nothing about count as changed.
+   */
+  private async changedOutside(changedFiles: string[]): Promise<string[]> {
+    const api = window.electronAPI?.fs;
+    const out: string[] = [];
+    for (const raw of changedFiles) {
+      const rel = raw.replace(/\\/g, '/');
+      const known = this.known.get(rel);
+      if (!known || !api || !this.projectPath) { out.push(rel); continue; }
+      const fullPath = joinPath(this.projectPath, ...rel.split('/'));
+      try {
+        if (!await api.exists(fullPath)) {
+          if (!('gone' in known)) out.push(rel);
+          continue;
+        }
+        if ('gone' in known) { out.push(rel); continue; }
+        const data = toBytes(await api.readFile(fullPath)) ?? new Uint8Array();
+        const same = 'text' in known
+          ? new TextDecoder().decode(data) === known.text
+          : bytesPrint(data) === known.bytes;
+        if (!same) out.push(rel);
+      } catch {
+        out.push(rel);
+      }
+    }
+    return out;
+  }
 
   /**
    * Convert a Project to SerializeInput for the directory format serializer.

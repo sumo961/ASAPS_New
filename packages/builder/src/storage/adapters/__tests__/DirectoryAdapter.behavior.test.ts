@@ -390,7 +390,7 @@ describe('watchForChanges', () => {
     expect(() => stop()).not.toThrow();
   });
 
-  it('maps changed file paths to "modified" events and the disposer unwatches', () => {
+  it('maps changed file paths to "modified" events and the disposer unwatches', async () => {
     const a = adapterAt('/proj');
     const unwatch = vi.fn();
     let captured: ((f: string[]) => void) | null = null;
@@ -403,6 +403,7 @@ describe('watchForChanges', () => {
     const stop = a.watchForChanges(onChange);
     captured!(['a.json', 'b.json']);
 
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(onChange).toHaveBeenCalledWith([
       { path: 'a.json', type: 'modified' },
       { path: 'b.json', type: 'modified' },
@@ -410,6 +411,63 @@ describe('watchForChanges', () => {
 
     stop();
     expect(unwatch).toHaveBeenCalledOnce();
+  });
+});
+
+// A Windows student got "files changed outside ASAPS … and 70 more" on
+// every save while nothing else touched the folder (2026-10-27).
+describe('own writes are not outside changes', () => {
+  const files = (content: Record<string, string>) => ({
+    files: Object.entries(content).map(([path, c]) => ({ path, content: c })), assetFiles: [],
+  });
+  const project = { id: 'p1', name: 'S', settings: {}, assetIds: [], story: { metadata: {}, beats: [] } } as any;
+
+  function watching(a: DirectoryAdapter) {
+    let report: (f: string[]) => void = () => {};
+    fakeFs.watchDir.mockImplementation((_p: string, cb: (f: string[]) => void) => { report = cb; return vi.fn(); });
+    const onChange = vi.fn();
+    a.watchForChanges(onChange);
+    return { onChange, report: (f: string[]) => report(f) };
+  }
+
+  it('a save leaves files that already say the same untouched', async () => {
+    const a = adapterAt('/proj');
+    fakeFs.files.set('/proj/settings.json', '{"a":1}');
+    vi.mocked(serializeToDirectory).mockReturnValueOnce(files({ 'settings.json': '{"a":1}', 'theme.json': '{"t":1}' }) as any);
+    await a.saveProject(project);
+    const written = fakeFs.writeFile.mock.calls.map((c) => c[0]);
+    expect(written).toEqual(['/proj/theme.json']);
+  });
+
+  it('the watcher drops our own writes, however late they come back, and reports real edits', async () => {
+    const a = adapterAt('C:\\Users\\s\\proj');
+    vi.mocked(serializeToDirectory).mockReturnValueOnce(files({ 'settings.json': '{"a":1}', 'characters/_index.json': '[]' }) as any);
+    await a.saveProject(project);
+    const { onChange, report } = watching(a);
+
+    report(['settings.json', 'characters\\_index.json']);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onChange).not.toHaveBeenCalled();
+
+    fakeFs.files.set('C:\\Users\\s\\proj\\characters\\_index.json', '[{"id":"c"}]');
+    report(['settings.json', 'characters\\_index.json', 'clusters/x/new.json']);
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange.mock.calls[0][0].map((e: any) => e.path)).toEqual(['characters/_index.json', 'clusters/x/new.json']);
+  });
+
+  it('a beat file we deleted is ours; one deleted by someone else is not', async () => {
+    const a = adapterAt('/proj');
+    fakeFs.files.set('/proj/clusters/_unclustered/b1.infoText.json', '{}');
+    fakeFs.files.set('/proj/settings.json', '{}');
+    await a.deleteBeat('b1', 'infoText');
+    await a.saveSettings({} as any);
+    const { onChange, report } = watching(a);
+    report(['clusters/_unclustered/b1.infoText.json']);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onChange).not.toHaveBeenCalled();
+    fakeFs.files.delete('/proj/settings.json');
+    report(['settings.json']);
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
   });
 });
 

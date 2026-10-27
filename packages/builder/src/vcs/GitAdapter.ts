@@ -10,6 +10,7 @@ import { mergeEditingLocks, parseLockFile, sameLockFile } from './editingLockMer
 import { onlyStampsDiffer } from '../utils/projectMetaStamps';
 import { APP_VERSION, isNewerVersion, newerVersionWarning } from '../utils/appVersion';
 import { resolveKeepBoth, fixDuplicateIdsAfterMerge, movedSummary, type KeepBothResult } from './keepBoth';
+import { findUndoneMerge, planRestore, applyRestore, type RestorePlan, type RestoreResult } from './undoneMerge';
 
 export interface GitFileStatus {
   /** Relative file path */
@@ -495,6 +496,20 @@ export async function gitKeepBoth(projectPath: string): Promise<KeepBothResult> 
   return resolveKeepBoth(projectPath, getRunCommand(), getWriteFile(), sepOf(projectPath));
 }
 
+/** The merge of `branch` someone undid, if any, and what it would take to bring its beats back. */
+export async function gitPlanUndoneMerge(projectPath: string, branch: string): Promise<RestorePlan | null> {
+  const run = getRunCommand();
+  const undone = await findUndoneMerge(projectPath, run, branch);
+  if (!undone) return null;
+  const plan = await planRestore(projectPath, run, sepOf(projectPath), branch, undone);
+  return plan.items.length > 0 ? plan : null;
+}
+
+/** Bring back the chosen beats of an undone merge, as one commit. */
+export async function gitRestoreUndoneMerge(projectPath: string, plan: RestorePlan, chosen: Set<string>): Promise<RestoreResult> {
+  return applyRestore(projectPath, getRunCommand(), getWriteFile(), sepOf(projectPath), plan, chosen);
+}
+
 /**
  * A project.json that differs from the last commit only in its stamps
  * (modifiedAt, savedWith) is put back before pulling. Older versions
@@ -544,7 +559,7 @@ async function pullUnguarded(projectPath: string, rebase: boolean): Promise<GitO
     } catch (e) {
       console.warn('[GitAdapter] duplicate-id check after pull failed:', e);
     }
-    return { success: true, message: (result.stdout.trim() || 'Already up to date') + extra };
+    return { success: true, message: (result.stdout.trim() || 'Already up to date') + (extra ? `\n${extra.trim()}` : '') };
   }
 
   // If no upstream tracking is set, retry with explicit origin/<branch>
