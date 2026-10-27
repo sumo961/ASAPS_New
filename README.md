@@ -22,8 +22,13 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.141** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.141 is a safety net for your
+Current release: **v0.9.142** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.142 makes exported stories fast
+again**: stories with many pictures used to make the browser run out of
+memory and crawl (or crash) while loading; they now start in a few seconds.
+Export again to get the fix.
+
+**v0.9.141 was a safety net for your
 beats**: deleted beats stay on your computer for 30 days and come back with
 **Tools → Recently deleted beats…**, whatever removed them; deleting three or
 more beats at once names them first, including the ones you can't see. Groups

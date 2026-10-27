@@ -1,5 +1,14 @@
 # ASAPS Modern - Progress Log
 
+## 2026-10-27: Fast HTML exports (v0.9.142)
+
+### Overview
+- **Exported stories with many pictures crawled or crashed** (Narrative-bullying group: "exporting to html makes everything go giga super slow"). Replayed with their GitHub project (250 beats, 77 pictures/fonts, 20 MB): the export itself took 1.8 s, but opening it grew the browser tab to 7–11 GB within seconds while the player unpacked the pictures, then the tab crashed (headless Chrome; on a laptop: swapping). Cause: the exporter embedded the player as a 4 MB `data:text/javascript;base64,…` script URL; Chrome keeps the script's URL with every task the script schedules (JSZip's setImmediate via postMessage, React's MessageChannel), so each of thousands of small tasks cost megabytes. The identical bundle from a normal URL or as an inline script: ~270 MB, story on screen in 2.5 s. Fix (`HtmlExporter`): the player goes in as an inline `<script>` (`inlinePlayerScript`: `</script`, `<!--`, `<script` escaped as `<\/` / `\x3C` — they only occur in string literals; syntax-checked, data URL as fallback), CSS as inline `<style>`; `{{PLAYER_SCRIPT}}` is substituted with a function so `$&`/`` $` `` in the player code survive. Re-exported their story: folder export 286 MB / 2.6 s, single file opened from disk 356 MB / 2.8 s (old: up to 10.9 GB / 8.5 s), plays through title → "How to play" with pictures and their custom font.
+
+**Files modified:** packages/builder/src/export/HtmlExporter.ts, tests (HtmlExporter)
+
+---
+
 ## 2026-10-27: Recently deleted beats, update from a copy (v0.9.141)
 
 ### Overview
