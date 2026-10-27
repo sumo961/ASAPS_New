@@ -180,6 +180,7 @@ import { RolePreviewBar } from './characters/RolePreviewBar';
 import { RoleHolderConditionFields } from '../editors/RoleHolderConditionFields';
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
+import { noteDeletion } from '../utils/deletedBeats';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
 
@@ -1754,6 +1755,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     // interruption.
     const impact = describeDeleteImpact?.([beat.id]);
     if (!impact || await confirmBeatDelete(`Delete "${beat.name}"?`, impact)) {
+      noteDeletion([beat.id], 'Inspector ▸ Delete Beat');
       onDelete(beat.id);
     }
   };

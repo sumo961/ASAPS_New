@@ -8,6 +8,7 @@
 import { Command, CommandRegistry } from './Command';
 import type { Beat, BeatConfig } from '@asaps/core';
 import type { SerializedCommand } from '../storage/types';
+import { noteDeletion } from '../utils/deletedBeats';
 
 // ============================================================================
 // State Mutation Callbacks
@@ -69,6 +70,7 @@ export class AddBeatCommand extends Command {
   }
 
   undo(): void {
+    noteDeletion([this.beat.id], 'Undo of adding it', true);
     this.mutations.deleteBeat(this.beat.id);
   }
 
@@ -108,6 +110,7 @@ export class DeleteBeatCommand extends Command {
   }
 
   execute(): void {
+    noteDeletion([this.beat.id], 'Deleted', true);
     this.mutations.deleteBeat(this.beat.id);
   }
 

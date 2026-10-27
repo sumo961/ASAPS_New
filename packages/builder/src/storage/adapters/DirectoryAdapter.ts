@@ -213,6 +213,27 @@ export class DirectoryAdapter implements PersistenceAdapter {
     return this.lastManifest;
   }
 
+  /** The folder's asset list as it is on disk now (empty when there is none). */
+  async readAssetManifest(): Promise<DirectoryAssetManifest> {
+    if (!this.projectPath) throw new Error('No project path set');
+    const reader = this.createReader();
+    const path = joinPath(this.projectPath, 'assets', '_manifest.json');
+    if (!await reader.exists(path)) return { _format: '1.0', assets: {} };
+    return parseManifest(await reader.readText(path));
+  }
+
+  /** The bytes of one asset file in the folder, or null when it can't be read. */
+  async readAssetBytes(entry: Pick<AssetManifestEntry, 'folder' | 'filename'>): Promise<Uint8Array | null> {
+    const api = window.electronAPI?.fs;
+    if (!this.projectPath || !api) return null;
+    try {
+      const data = await api.readFile(joinPath(this.projectPath, 'assets', ...(entry.folder ? [entry.folder] : []), entry.filename));
+      return toBytes(data);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Save the entire project to directory.
    * When `assets` are provided, their binaries are written to disk and the

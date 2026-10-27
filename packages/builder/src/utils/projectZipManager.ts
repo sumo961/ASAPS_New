@@ -676,6 +676,89 @@ export async function importProjectFromZip(
   }
 }
 
+/** A project file's content, read without adding it to the library. */
+export interface ProjectCopy {
+  name: string;
+  description?: string;
+  /** ASAPS version that exported it. */
+  appVersion?: string;
+  exportedAt?: string;
+  story: any;
+  settings: any;
+  globalSettings?: any;
+  themeId?: string;
+  themeOverrides?: any;
+  assets: ParsedZipAsset[];
+  translations?: any[];
+  translationManifest?: any;
+  generationReview?: any;
+  aiEdits?: any;
+  ideatorSessions?: any[];
+  coDesignerSessions?: any[];
+}
+
+/** Read a .asaps (zip) into memory — for "Update from a copy", which writes it into an open folder. */
+export async function readProjectCopy(file: File | Blob): Promise<ProjectCopy> {
+  const zip = await JSZip.loadAsync(file);
+  const projectJsonFile = zip.file('project.json');
+  if (!projectJsonFile) throw new Error('This is not an ASAPS project file (no project.json inside).');
+  const data = JSON.parse(await projectJsonFile.async('text'));
+  if (!data.project || !data.metadata) throw new Error('This is not an ASAPS project file (project.json has no project).');
+  const json = async (path: string): Promise<any> => {
+    const f = zip.file(path);
+    if (!f) return undefined;
+    try { return JSON.parse(await f.async('string')); } catch { return undefined; }
+  };
+  const translationFiles = Object.keys(zip.files).filter((path) => path.startsWith('translations/') && path.endsWith('.strings.json'));
+  const translations = (await Promise.all(translationFiles.map(json))).filter(Boolean);
+  const ideator = await json('generation/ideator-sessions.json');
+  const codesigner = await json('generation/codesigner-sessions.json');
+  const p = data.project;
+  return {
+    name: p.name,
+    description: p.description,
+    appVersion: data.metadata.appVersion,
+    exportedAt: data.metadata.exportedAt,
+    story: deserializeStory(p.story),
+    settings: p.settings || {},
+    globalSettings: p.globalSettings || undefined,
+    themeId: p.themeId,
+    themeOverrides: p.themeOverrides,
+    assets: await readAssetsFromZip(zip),
+    ...(translations.length ? { translations, translationManifest: await json('translations/_manifest.json') } : {}),
+    generationReview: await json('generation/review.json'),
+    aiEdits: await json('generation/ai-edits.json'),
+    ...(Array.isArray(ideator) && ideator.length ? { ideatorSessions: ideator } : {}),
+    ...(Array.isArray(codesigner) && codesigner.length ? { coDesignerSessions: codesigner } : {}),
+  };
+}
+
+/**
+ * The copy with its pictures and sounds under other ids (old id → new id).
+ * Every value that IS a mapped id is replaced, wherever it sits — the field
+ * list of updateAssetReferences misses some (parameters.backgroundAssetId),
+ * and asset ids are unique strings nothing else uses.
+ */
+export function remapProjectCopyAssets(copy: ProjectCopy, assetIdMap: Map<string, string>): ProjectCopy {
+  if (assetIdMap.size === 0) return copy;
+  const remap = (value: any): any => {
+    if (typeof value === 'string') return assetIdMap.get(value) ?? value;
+    if (Array.isArray(value)) return value.map(remap);
+    if (value && typeof value === 'object' && !(value instanceof Blob) && !(value instanceof Date)) {
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, remap(v)]));
+    }
+    return value;
+  };
+  return {
+    ...copy,
+    story: remap(copy.story),
+    settings: remap(copy.settings),
+    ...(copy.globalSettings ? { globalSettings: remap(copy.globalSettings) } : {}),
+    ...(copy.themeOverrides ? { themeOverrides: remap(copy.themeOverrides) } : {}),
+    assets: copy.assets.map((a) => (a.id && assetIdMap.has(a.id) ? { ...a, id: assetIdMap.get(a.id)! } : a)),
+  };
+}
+
 /**
  * Download project as ZIP file. With `asTemplate`, saves a `.asapst`
  * template instead — same zip, but project.json carries the template flag

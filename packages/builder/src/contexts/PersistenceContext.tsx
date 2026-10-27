@@ -29,6 +29,9 @@ import { findUniqueProjectName } from '../utils/uniqueProjectName';
 import { shortenRunawayBeatIds } from '../utils/beatIds';
 import { newerVersionWarning } from '../utils/appVersion';
 import { notify } from '../utils/notify';
+import { readProjectCopy } from '../utils/projectZipManager';
+import { planCopyUpdate, type CopyUpdatePlan } from '../utils/updateFromCopy';
+import { DeletionWatch, recordDeletedBeats, noteDeletion } from '../utils/deletedBeats';
 
 // ============================================================================
 // Context Types
@@ -90,6 +93,10 @@ export interface PersistenceContextValue {
   saveAsDirectory: (dirPath: string) => Promise<boolean>;
   /** Remove an asset from the active directory project (file + manifest entry). No-op for non-directory projects. */
   deleteAssetFromDirectory: (assetId: string) => Promise<void>;
+  /** Compare a copy (.asaps) with the open project folder (Update from a copy). */
+  planUpdateFromCopy: (file: File) => Promise<CopyUpdatePlan>;
+  /** Write a planned copy into the open project folder and reload it. */
+  applyUpdateFromCopy: (plan: CopyUpdatePlan) => Promise<void>;
 
   // Initialization
   initialized: boolean;
@@ -225,6 +232,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
    *  within the suppression window after it are our own saves echoing back,
    *  not an external edit. */
   const lastOwnWriteRef = useRef<number>(0);
+  /** Beats of the last save: a beat a save no longer has goes to Recently deleted beats. */
+  const deletionWatchRef = useRef(new DeletionWatch());
   // Auto-save controls for the external-change watcher (declared before the
   // auto-save hook, so it reads them through a ref).
   const autoSaveCtlRef = useRef<{ pause: () => void; resume: () => void; status: SaveStatus } | null>(null);
@@ -463,6 +472,12 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     // Passive instance: IndexedDB persistence may proceed upstream, but the
     // project FOLDER belongs to the main window — never write or adopt.
     if (passive) return;
+    // Beats this save no longer has are kept for 30 days (Birka group,
+    // 2026-10-27: ten dialog trees gone, the folder deleted their files).
+    const gone = deletionWatchRef.current.saved(project.id, project.story);
+    if (gone.length > 0) {
+      recordDeletedBeats(project, gone).catch((e) => console.warn('[PersistenceContext] Could not keep the deleted beats:', e));
+    }
     // ---- Default-location adoption (storage inversion, desktop only) ----
     // A project born this session (created / generated / injected / imported)
     // becomes folder-canonical at ~/Documents/ASAPS Projects/<name>/ on its
@@ -613,6 +628,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
           const result = await storage.getProject(initialProjectId);
           if (result.success && result.data) {
             currentProjectRef.current = result.data;
+            deletionWatchRef.current.reset(result.data.id, result.data.story);
             setCurrentProject(result.data);
             commandManager.setProjectId(initialProjectId);
             await commandManager.loadFromStorage();
@@ -791,6 +807,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       // CRITICAL: Set currentProject ONCE with fully-prepared data (including translations)
       // This ensures App.tsx's load effect sees translations on the first render
       currentProjectRef.current = loadedProject;
+      deletionWatchRef.current.reset(loadedProject.id, loadedProject.story);
       setCurrentProject(loadedProject);
 
       // Update command manager
@@ -883,6 +900,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       savedAssetIdsRef.current = new Set();
 
       currentProjectRef.current = newProject;
+      deletionWatchRef.current.reset(newProject.id, newProject.story);
       setCurrentProject(newProject);
       setProjectId(newProjectId);
       commandManager.setProjectId(newProjectId);
@@ -1276,6 +1294,7 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
       startExternalWatch(adapter, project.id);
       savedAssetIdsRef.current = new Set(); // Reset saved asset tracking for new project
       currentProjectRef.current = project;
+      deletionWatchRef.current.reset(project.id, project.story);
       setCurrentProject(project);
       setProjectId(project.id);
       setProjectFormat('directory');
@@ -1464,6 +1483,68 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
   // Asset deletion for directory projects: removes the binary on disk +
   // prunes the manifest entry. Wired through here (not directly from the
   // asset UI) so we can route through the active DirectoryAdapter.
+  /**
+   * Update from a copy (.asaps): the copy's story replaces the folder's, the
+   * folder keeps its id and name (and its Git history). Pictures and sounds
+   * the folder already has keep the folder's ids (utils/updateFromCopy.ts).
+   */
+  const planUpdateFromCopy = useCallback(async (file: File): Promise<CopyUpdatePlan> => {
+    const adapter = directoryAdapterRef.current;
+    if (!adapter?.getProjectPath()) throw new Error('Open the project folder first (the one that is on GitHub).');
+    const copy = await readProjectCopy(file);
+    const tooNew = newerVersionWarning(copy.appVersion);
+    if (tooNew) throw new Error(tooNew);
+    const manifest = await adapter.readAssetManifest();
+    const folderAssets = Object.values(manifest.assets).map((e) => ({ id: e.id, filename: e.filename, folder: e.folder, size: e.size }));
+    return planCopyUpdate(copy, currentProjectRef.current?.story, folderAssets, (a) => adapter.readAssetBytes(a));
+  }, []);
+
+  const applyUpdateFromCopy = useCallback(async (plan: CopyUpdatePlan): Promise<void> => {
+    const adapter = directoryAdapterRef.current;
+    const current = currentProjectRef.current;
+    if (!adapter?.getProjectPath() || !current) throw new Error('Open the project folder first.');
+    // Nothing on screen may be written over the copy while it goes in.
+    cancelPending();
+    pause();
+    const { copy } = plan;
+    const project: Project = {
+      ...current,
+      description: copy.description ?? current.description,
+      story: copy.story,
+      settings: copy.settings,
+      globalSettings: copy.globalSettings,
+      themeId: copy.themeId,
+      themeOverrides: copy.themeOverrides,
+      translations: copy.translations,
+      translationManifest: copy.translationManifest,
+      generationReview: copy.generationReview,
+      aiEdits: copy.aiEdits,
+      ideatorSessions: copy.ideatorSessions,
+      coDesignerSessions: copy.coDesignerSessions,
+      modifiedAt: new Date(),
+    } as Project;
+    const assets = plan.newAssets.map((a) => ({ ...a.asset, id: a.id, projectId: current.id }));
+    // Beats the copy doesn't have go to Recently deleted beats (the reload resets the watch).
+    const keep = new Set(((copy.story?.beats ?? []) as any[]).map((b) => b?.id));
+    const before = ((current.story as any)?.beats ?? []) as any[];
+    const removed = before.map((b) => (typeof b?.toJSON === 'function' ? b.toJSON() : b)).filter((b) => b?.id && !keep.has(b.id));
+    if (removed.length > 0) {
+      noteDeletion(removed.map((b) => b.id), `Update from a copy (${copy.name})`);
+      await recordDeletedBeats(current, removed).catch((e) => console.warn('[PersistenceContext] Could not keep the removed beats:', e));
+    }
+    lastOwnWriteRef.current = Date.now();
+    try {
+      await adapter.saveProject(project, assets.length > 0 ? assets : undefined);
+    } catch (e) {
+      resume();
+      throw e;
+    } finally {
+      lastOwnWriteRef.current = Date.now();
+    }
+    // The reload resumes auto-save once the folder's new content is on screen.
+    window.dispatchEvent(new CustomEvent('asaps:reloadFromDisk'));
+  }, [cancelPending, pause, resume]);
+
   const deleteAssetFromDirectory = useCallback(async (assetId: string): Promise<void> => {
     const adapter = directoryAdapterRef.current;
     if (!adapter || !adapter.getProjectPath()) return;
@@ -1517,6 +1598,8 @@ export const PersistenceProvider: React.FC<PersistenceProviderProps> = ({
     openDirectoryProject,
     saveAsDirectory,
     deleteAssetFromDirectory,
+    planUpdateFromCopy,
+    applyUpdateFromCopy,
     initialized,
     initError,
   };

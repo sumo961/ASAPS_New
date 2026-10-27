@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Github, Compass, GitMerge, FileText, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
+import { Github, Compass, GitMerge, FileInput, FileText, Trash2, Download, Upload, Play, Settings, Image, Users, Save, Check, Sparkles, ChevronDown, Bug, Wrench, MessageSquare, Wand2, Globe, Volume2, VolumeX, Mic, MicOff, Search, Plus, History } from 'lucide-react';
 import { AIEditsLogDialog } from './ai/AIEditsLogDialog';
 import type { AIEditLedger } from '../types/aiEdits';
 import { ProjectSelector } from './ProjectSelector';
@@ -62,6 +62,8 @@ interface HeaderProps {
   onImportZip?: () => void;
   /** Merge another story (.asaps) into the open project. */
   onMergeStory?: () => void;
+  /** Folder projects: write a .asaps copy's story into this folder (Update from a copy). */
+  onUpdateFromCopy?: () => void;
   /** Drag-drop variant of import — takes a pre-selected File. The
    *  Project Browser's dropzone uses this so authors can drag a
    *  .asaps zip directly onto the modal without going through the
@@ -92,6 +94,8 @@ interface HeaderProps {
   hasUnsavedChanges?: boolean;
   currentProjectId?: string;
   onMergeDialogTrees?: () => void;
+  /** Tools ▸ Recently deleted beats… */
+  onRecentlyDeletedBeats?: () => void;
   onHelperCommands?: () => void;
   onExportHtml?: () => void;
   previewWindowOpen?: boolean;
@@ -132,6 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExportAsmlWithAssets,
   onImportZip,
   onMergeStory,
+  onUpdateFromCopy,
   onImportZipFile,
   onImportTwine,
   onPreview,
@@ -156,6 +161,7 @@ export const Header: React.FC<HeaderProps> = ({
   hasUnsavedChanges,
   currentProjectId,
   onMergeDialogTrees,
+  onRecentlyDeletedBeats,
   onHelperCommands,
   onExportHtml,
   previewWindowOpen,
@@ -488,6 +494,19 @@ export const Header: React.FC<HeaderProps> = ({
                       Merge Story (.asaps)
                     </button>
                   )}
+                  {onUpdateFromCopy && (
+                    <button
+                      onClick={() => {
+                        onUpdateFromCopy();
+                        setShowImportMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                      title="Replace this folder's story with a copy (.asaps) that was passed around — the folder keeps its name and Git history"
+                    >
+                      <FileInput className="w-4 h-4" />
+                      Update from a copy (.asaps)…
+                    </button>
+                  )}
                   <div className="my-1 border-t border-gray-100" />
                   <div className="px-4 pt-1 pb-0.5 text-[10px] font-semibold tracking-wide text-gray-400">
                     IMPORT FROM OTHER FORMATS
@@ -720,6 +739,22 @@ export const Header: React.FC<HeaderProps> = ({
                         <MessageSquare className="w-4 h-4" />
                         Merge DialogTrees
                       </button>
+                    )}
+                    {onRecentlyDeletedBeats && (
+                      <>
+                        <div className="my-1 border-t border-gray-100" />
+                        <button
+                          onClick={() => {
+                            onRecentlyDeletedBeats();
+                            setShowToolsMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                          title="Beats deleted from this project in the last 30 days, kept on this computer — bring them back"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Recently deleted beats…
+                        </button>
+                      </>
                     )}
                   </div>
                 </>

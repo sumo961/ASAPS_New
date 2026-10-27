@@ -24,7 +24,8 @@ import { useVCSStatus } from '../../vcs/VCSStatusProvider';
 import { buildGraphNodes, buildGraphEdges } from './graphBuild';
 import { CLUSTER_HEADER_H } from './graphStyle';
 import { resolveBeatDrop, toContentRelative, clusterAt } from './clusterDrop';
-import { confirmBeatDelete } from '../../utils/confirmBeatDelete';
+import { confirmBeatDelete, confirmBeatsDelete, describeManyBeatsDelete, MANY_BEATS } from '../../utils/confirmBeatDelete';
+import { noteDeletion } from '../../utils/deletedBeats';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -194,6 +195,29 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     };
   }, []);
   const graphRootRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Delete a group of selected beats: from MANY_BEATS on, or when links
+   * break, name them first (and how many are out of view). `how` goes with
+   * them to Recently deleted beats.
+   */
+  const deleteSelected = useCallback(async (ids: string[], how: string) => {
+    if (!onBeatsDelete) return;
+    const impact = describeDeleteImpact?.(ids) ?? null;
+    if (ids.length >= MANY_BEATS || impact) {
+      const pane = graphRootRef.current?.getBoundingClientRect();
+      const outOfView = pane ? ids.filter((id) => {
+        const el = graphRootRef.current?.querySelector(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+        if (!el) return true;
+        const r = el.getBoundingClientRect();
+        return r.right < pane.left || r.left > pane.right || r.bottom < pane.top || r.top > pane.bottom;
+      }).length : 0;
+      const doomed = ids.map((id) => beats.find((b) => b.id === id)).filter(Boolean) as Beat[];
+      if (!await confirmBeatsDelete(ids.length, describeManyBeatsDelete(doomed, outOfView, impact))) return;
+    }
+    noteDeletion(ids, `${how}: ${ids.length} selected beats`);
+    onBeatsDelete(ids);
+  }, [onBeatsDelete, describeDeleteImpact, beats]);
 
   // B1b — dialogTree disclosure expansion (session-scoped). Expanded beats
   // render their internal tree inside the node; their outgoing edges leave
@@ -651,18 +675,14 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
           // Confirm ONLY when the delete breaks links elsewhere — a clean
           // delete is undoable (⌘Z) and needs no interruption.
           if (multiTarget && onBeatsDelete) {
-            const impact = describeDeleteImpact?.(multiTarget);
-            void (async () => {
-              if (!impact || await confirmBeatDelete(`Delete ${multiTarget.length} selected beats?`, impact)) {
-                onBeatsDelete(multiTarget);
-              }
-            })();
+            void deleteSelected(multiTarget, 'Flowchart right-click ▸ Delete');
           } else if (contextMenu.beatId && onBeatDelete) {
             const beat = beats.find(b => b.id === contextMenu.beatId);
             const impact = describeDeleteImpact?.([contextMenu.beatId]);
             const targetId = contextMenu.beatId;
             void (async () => {
               if (!impact || await confirmBeatDelete(`Delete beat "${beat?.name || targetId}"?`, impact)) {
+                noteDeletion([targetId], 'Flowchart right-click ▸ Delete');
                 onBeatDelete(targetId);
               }
             })();
@@ -671,7 +691,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       }
       closeContextMenu();
     },
-    [contextMenu, beats, multiSelectedIds, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, onBeatsDelete, describeDeleteImpact, closeContextMenu]
+    [contextMenu, beats, multiSelectedIds, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, onBeatDelete, onBeatsDelete, describeDeleteImpact, closeContextMenu, deleteSelected]
   );
 
   // Handle node drag. With a multi-selection ReactFlow drags the whole
@@ -883,24 +903,20 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
     } else if ((event.key === 'Backspace' || event.key === 'Delete') && !mod) {
       if (multi && onBeatsDelete) {
         event.preventDefault();
-        const impact = describeDeleteImpact?.(multi);
-        void (async () => {
-          if (!impact || await confirmBeatDelete(`Delete ${multi.length} selected beats?`, impact)) {
-            onBeatsDelete(multi);
-          }
-        })();
+        void deleteSelected(multi, `${event.key} key in the flowchart`);
       } else if (singleId && onBeatDelete) {
         event.preventDefault();
         const beat = beats.find(b => b.id === singleId);
         const impact = describeDeleteImpact?.([singleId]);
         void (async () => {
           if (!impact || await confirmBeatDelete(`Delete beat "${beat?.name || singleId}"?`, impact)) {
+            noteDeletion([singleId], `${event.key} key in the flowchart`);
             onBeatDelete(singleId);
           }
         })();
       }
     }
-  }, [multiSelectedIds, selectedBeat, beats, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, hasBeatClipboard, onBeatDelete, onBeatsDelete, describeDeleteImpact, reactFlowInstance]);
+  }, [multiSelectedIds, selectedBeat, beats, onBeatDuplicate, onBeatsDuplicate, onBeatCopy, onBeatPaste, hasBeatClipboard, onBeatDelete, onBeatsDelete, describeDeleteImpact, reactFlowInstance, deleteSelected]);
 
   return (
     <div

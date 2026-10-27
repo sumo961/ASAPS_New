@@ -39,6 +39,9 @@ import { AssetManager } from './components/assets/AssetManager';
 import { ImportAsmlDialog } from './components/ImportAsmlDialog';
 import { ImportTwineDialog } from './components/ImportTwineDialog';
 import { MergeStoryDialog } from './components/MergeStoryDialog';
+import { UpdateFromCopyDialog } from './components/UpdateFromCopyDialog';
+import { noteDeletion, forgetDeletedBeats, type DeletedBeat } from './utils/deletedBeats';
+import { RecentlyDeletedBeatsDialog } from './components/RecentlyDeletedBeatsDialog';
 import { computeMerge, type MergeSourceAnalysis, type CharacterDecision } from './utils/projectMerge';
 import { deserializeBeats } from './utils/projectDeserializer';
 import { ensureDialogIds } from './utils/choiceWiring';
@@ -682,6 +685,8 @@ function App() {
   // Import Twine dialog state
   const [showImportTwineDialog, setShowImportTwineDialog] = useState(false);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [showUpdateFromCopy, setShowUpdateFromCopy] = useState(false);
+  const [showDeletedBeats, setShowDeletedBeats] = useState(false);
 
   // VCS Panel state
   const [vcsPanelOpen, setVcsPanelOpen] = useState(false);
@@ -3584,6 +3589,26 @@ function App() {
     setSelectedBeat(newBeats[0]);
     markChanged();
   }, [actions, beatClipboard, state.beats, markChanged]);
+
+  /** Tools ▸ Recently deleted beats: back under their own ids (links into
+   *  them work again), one undoable step. */
+  const handleRestoreDeletedBeats = useCallback(async (rows: DeletedBeat[]) => {
+    const have = new Set(state.beats.map(b => b.id));
+    const back = rows.filter(r => !have.has(r.beatId));
+    const newBeats = deserializeBeats(back.map(r => JSON.parse(JSON.stringify(r.beat))));
+    if (newBeats.length === 0) return;
+    actions.mergeBeats(newBeats);
+    const addCommands = newBeats.map(b => new AddBeatCommand(b, stableMutations.current));
+    getCommandManager().pushWithoutExecute(
+      addCommands.length === 1 ? addCommands[0] : new BatchCommand(addCommands, `Bring back ${newBeats.length} beats`)
+    );
+    setSelectedBeat(newBeats[0]);
+    markChanged();
+    // Links into them work again: the broken-links notice keeps only what is still broken.
+    reportBrokenLinksAfterDelete([...state.beats, ...newBeats]);
+    await forgetDeletedBeats(back.map(r => r.key!).filter(k => k !== undefined));
+    notify.success(`Brought back ${newBeats.length} beat${newBeats.length === 1 ? '' : 's'}.`);
+  }, [actions, state.beats, markChanged, reportBrokenLinksAfterDelete]);
 
   // VCS context menu handlers
   const vcsCtx = useVCSStatus();
@@ -6738,6 +6763,7 @@ function App() {
         onExportAsmlWithAssets={handleExportAsmlWithAssets}
         onImportZip={handleImportZip}
         onMergeStory={() => setShowMergeDialog(true)}
+        onUpdateFromCopy={projectFormat === 'directory' ? () => setShowUpdateFromCopy(true) : undefined}
         onImportZipFile={handleImportZipFile}
         onImportTwine={handleImportTwine}
         onPreview={handleTogglePreviewWindow}
@@ -6763,6 +6789,7 @@ function App() {
         hasUnsavedChanges={hasUnsavedChanges}
         currentProjectId={currentProject?.id}
         onMergeDialogTrees={() => setShowMergeDialogTrees(true)}
+        onRecentlyDeletedBeats={currentProject?.id ? () => setShowDeletedBeats(true) : undefined}
         onHelperCommands={() => setFindChange('change')}
         onExportHtml={() => setShowHtmlExportDialog(true)}
         vcsPanelOpen={vcsPanelOpen}
@@ -7174,6 +7201,16 @@ function App() {
         onMerge={handleMergeStory}
       />
 
+      <UpdateFromCopyDialog isOpen={showUpdateFromCopy} onClose={() => setShowUpdateFromCopy(false)} />
+
+      <RecentlyDeletedBeatsDialog
+        isOpen={showDeletedBeats}
+        projectId={currentProject?.id ?? null}
+        existingBeatIds={state.beats.map(b => b.id)}
+        onClose={() => setShowDeletedBeats(false)}
+        onRestore={handleRestoreDeletedBeats}
+      />
+
       {/* Settings Modal */}
       {showSettings && (
         <GlobalSettingsInspector
@@ -7287,7 +7324,7 @@ function App() {
             assets={assets.map(a => ({ id: a.id, name: a.name, type: a.type }))}
             characterNames={characters.map(c => c.name)}
             onUpdateBeat={actions.updateBeat}
-            onDeleteBeat={actions.deleteBeat}
+            onDeleteBeat={(beatId: string) => { noteDeletion([beatId], 'Change with AI'); actions.deleteBeat(beatId); }}
             onChangesApplied={handleTransformationChangesApplied}
           />
         }
