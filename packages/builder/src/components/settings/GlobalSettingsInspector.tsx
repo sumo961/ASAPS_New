@@ -11,6 +11,7 @@ import { getThemeService } from '../../services/ThemeService';
 import { validateProjectAssets, type AssetValidationResult } from '../../utils/assetValidator';
 import { MissingAssetsDialog } from './MissingAssetsDialog';
 import { ImageAssetField } from '../assets/ImageAssetField';
+import { framePictureStyle, usePictureSize } from '@asaps/renderer';
 import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
@@ -334,6 +335,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     const id = settings.themeGraphics?.textboxFrameAssetId;
     return id ? assets.find(a => a.id === id)?.url : undefined;
   })();
+  const frameSize = usePictureSize(frameUrl);
 
   const handleNestedChange = (category: keyof GlobalSettings, subCategory: string, field: string, value: any) => {
     setSettings(prev => ({
@@ -1803,11 +1805,9 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   >
                     <div
                       style={{
-                        ...(frameUrl ? {
-                          backgroundImage: `url(${frameUrl})`,
-                          backgroundSize: '100% 100%',
-                          backgroundRepeat: 'no-repeat',
-                        } : {
+                        // Drawn as the story draws it (renderer utils/framePicture.ts),
+                        // on a stage as wide as this preview (~760 px).
+                        ...(frameUrl ? framePictureStyle(frameUrl, frameSize, (f, naturalPx) => `${Math.round(Math.max(8, Math.min(naturalPx, f * 760)))}px`) : {
                           // Use rgba for background so opacity doesn't affect text
                           backgroundColor: hexToRgba(settings.colors.nonpcolor, settings.colors.nonpalpha / 100),
                           border: `${settings.textbox.borderWidth}px solid ${settings.colors.textBoxBorder}`,

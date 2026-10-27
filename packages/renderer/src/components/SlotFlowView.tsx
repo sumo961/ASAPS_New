@@ -25,6 +25,7 @@
  * See project_responsive_layout_system memory for the full rationale.
  */
 
+import { framePictureStyle, usePictureSize, type PictureSize } from '../utils/framePicture';
 import { readableLinkColor } from '../utils/linkColor';
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
@@ -452,6 +453,14 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   // them overflow the emulated frame. These helpers substitute emulated
   // dimensions when provided (the real player passes nothing → true units).
   const vwU = (n: number): string => previewWidth ? `${((n * previewWidth) / 100).toFixed(1)}px` : `${n}vw`;
+  // The text-box frame picture's decorated bands keep the picture's
+  // proportions against the stage width (utils/framePicture.ts), never
+  // taller than in the picture itself.
+  const frameSize = usePictureSize(theme.textboxFrameUrl);
+  const frameOpts = {
+    frameSize,
+    frameBand: (f: number, naturalPx: number) => `max(8px, min(${vwU(f * 100)}, ${naturalPx}px))`,
+  };
   const vhU = (n: number): string => previewHeight ? `${((n * previewHeight) / 100).toFixed(1)}px` : `${n}vh`;
   const grow = (k: number) => `max(0px, (${vwTerm} - ${DESIGN_WIDTH}px)) * ${k}`;
   const bodyFluid = `calc(${authoredBody}px + ${grow(0.012)})`;
@@ -1600,7 +1609,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
           {exchange && exchange.earlier.length > 0 && (
             <div data-slotflow-exchange="" style={{ ...CONTENT_ABOVE_SPRITES, display: 'flex', flexDirection: 'column', gap: `clamp(8px, ${vhU(1.5)}, 16px)`, marginBottom: `clamp(10px, ${vhU(2)}, 20px)`, alignSelf: isConversation ? 'flex-start' : 'center', width: '100%' }}>
               {exchange.earlier.map((line, i) => {
-                const card = textBoxCardStyle(theme, { isTitle: false });
+                const card = textBoxCardStyle(theme, { isTitle: false, ...frameOpts });
                 return (
                   <div key={i} data-exchange-line={line.inner ? 'inner' : 'spoken'} style={{ display: 'flex', flexDirection: 'column', alignItems: isConversation ? 'flex-start' : 'center' }}>
                     {/* Same alignment as the current line's card (centred text). */}
@@ -1712,7 +1721,7 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   // path's card styling (background, border, radius, padding,
                   // opacity). Skipped when hideTitleTextBox is true (VN-style
                   // splash titles float on the spatial image).
-                  ...textBoxCardStyle(theme, { isTitle: true }),
+                  ...textBoxCardStyle(theme, { isTitle: true, ...frameOpts }),
                   // preferredLines bias: a measured max-width that coaxes the
                   // title toward the author's target line count. Stays
                   // centered; never exceeds the readable column. Sized
@@ -1782,8 +1791,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
                   // mid-scroller. Stacked / custom keep the centered
                   // visual-novel feel.
                   alignSelf: isConversation ? 'flex-start' : 'center',
-                  ...textBoxCardStyle(theme, { isTitle: false }),
-                  ...(exchange?.inner ? thoughtBoxStyle(exchange.color, textBoxCardStyle(theme, { isTitle: false })) : null),
+                  ...textBoxCardStyle(theme, { isTitle: false, ...frameOpts }),
+                  ...(exchange?.inner ? thoughtBoxStyle(exchange.color, textBoxCardStyle(theme, { isTitle: false, ...frameOpts })) : null),
                   ...bodyReveal.fadeStyle,
                   ...a.style,
                   // Per-slot overrides win over theme + fluid defaults.
@@ -2839,7 +2848,7 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string, w
  */
 function textBoxCardStyle(
   theme: RenderThemeSettings,
-  opts: { isTitle: boolean }
+  opts: { isTitle: boolean; frameSize?: PictureSize; frameBand?: (fractionOfStageWidth: number, naturalPx: number) => string }
 ): React.CSSProperties {
   const tb = theme.textBox;
   // Title slot honours `hideTitleTextBox` (VN splash style — title text
@@ -2858,11 +2867,7 @@ function textBoxCardStyle(
   // the card so its safe area must match the inner padding.
   if (theme.textboxFrameUrl) {
     return {
-      backgroundImage: `url(${theme.textboxFrameUrl})`,
-      backgroundSize: '100% 100%',
-      backgroundRepeat: 'no-repeat',
-      backgroundColor: 'transparent',
-      border: 'none',
+      ...framePictureStyle(theme.textboxFrameUrl, opts.frameSize, opts.frameBand ?? ((f) => `${(f * 100).toFixed(2)}vw`)),
       borderRadius: 0,
       padding: `${tb.padding ?? 16}px`,
     };

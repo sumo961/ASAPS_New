@@ -1,3 +1,4 @@
+import { framePictureStyle, usePictureSize } from '../utils/framePicture';
 import React from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
 import ReactDOM from 'react-dom';
@@ -2025,6 +2026,7 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
             >
               <FlexTextElement
                 element={element}
+                stageWidth={stageWidth}
                 hideTextBox={hideTextBoxes}
                 theme={theme}
                 onAction={handleAction}
@@ -4210,6 +4212,7 @@ const DialogElement: React.FC<{
   speakerPortraitUrl?: string;
   thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
 }> = ({ style, content, location, hideTextBox = false, theme, previewMode = false, hyperlinks, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, beatType, stageWidth = DEFAULT_STAGE_WIDTH, stageHeight = DEFAULT_STAGE_HEIGHT, calculatedButtonHeight = 0, editorMode = false, onScrolledToBottom, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
+  const frameSize = usePictureSize(theme.textboxFrameUrl);
   const [displayedText, setDisplayedText] = React.useState('');
   const [isAnimating, setIsAnimating] = React.useState(true);
   const hasCalledCompleteRef = React.useRef(false);
@@ -4472,21 +4475,16 @@ const DialogElement: React.FC<{
         ...dimensionStyle,
         // Keep position from style (absolute) - scroll indicator is positioned within inner wrapper
         // Use frame image if available, otherwise use solid background
-        ...(hasFrameImage ? {
-          backgroundImage: `url(${theme.textboxFrameUrl})`,
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-          backgroundColor: 'transparent',
-        } : {
+        ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, (f, naturalPx) => `${Math.round(Math.max(8, Math.min(naturalPx, f * stageWidth)))}px`) : {
           backgroundColor: bgColorWithOpacity,
+          border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
         }),
-        border: hideTextBox || hasFrameImage ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
         borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
         padding: hideTextBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
         color: theme.colors.textColor,
-        boxShadow: hideTextBox ? 'none' : '0 4px 12px rgba(0,0,0,0.15)',
+        boxShadow: hideTextBox || hasFrameImage ? 'none' : '0 4px 12px rgba(0,0,0,0.15)',
         textAlign: computedTextAlign,
         wordWrap: 'break-word',
         overflowWrap: 'break-word',
@@ -6030,8 +6028,10 @@ const FlexTextElement: React.FC<{
   speakerName?: string;  // Speaker name for inline display
   speakerPortraitUrl?: string;  // Speaker portrait URL for inside-text display
   thought?: { color?: string };  // Inner voice: dashed, see-through, italic box
-}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought }) => {
+  stageWidth?: number;  // Sizes the text-box frame picture's bands
+}> = ({ element, hideTextBox = false, theme, onAction, animationDelay = 0, onAnimationComplete, skipAnimation = false, mobileFontScale = 1.0, speakerName, speakerPortraitUrl, thought, stageWidth = DEFAULT_STAGE_WIDTH }) => {
   const { location, content, hyperlinks } = element;
+  const frameSize = usePictureSize(theme.textboxFrameUrl);
 
   // Typewriter animation state
   const [displayedText, setDisplayedText] = React.useState('');
@@ -6196,23 +6196,18 @@ const FlexTextElement: React.FC<{
         style={{
           ...animationStyle,
           // Use frame image if available, otherwise use solid background
-          ...(hasFrameImage ? {
-            backgroundImage: `url(${theme.textboxFrameUrl})`,
-            backgroundSize: '100% 100%',
-            backgroundRepeat: 'no-repeat',
-            backgroundColor: 'transparent',
-          } : {
+          ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, (f, naturalPx) => `${Math.round(Math.max(8, Math.min(naturalPx, f * stageWidth)))}px`) : {
             backgroundColor: bgWithOpacity,
+            border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
           }),
           padding: hideTextBox ? '0' : `${padding}px`,
-          border: hideTextBox || hasFrameImage ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
           borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,
           fontWeight: isTitleElement ? 700 : (isLongContent ? 400 : 500),
           color: textColor,
           opacity: animation === 'fade' ? undefined : textAlpha,
-          boxShadow: hideTextBox ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
+          boxShadow: hideTextBox || hasFrameImage ? 'none' : '0 2px 8px rgba(0,0,0,0.1)',
           textAlign: computedTextAlign,
           wordWrap: 'break-word',
           overflowWrap: 'break-word',
