@@ -35,6 +35,11 @@ export async function exportProjectAsZip(
      * distributed template master can't be edited by accident.
      */
     asTemplate?: boolean;
+    /**
+     * HTML exports: leave out the files the story never uses (see
+     * assetsUsedByProject). A project copy (.asaps) keeps them all.
+     */
+    onlyUsedAssets?: boolean;
   },
 ): Promise<Blob> {
   const storage = getStorageManager();
@@ -87,14 +92,14 @@ export async function exportProjectAsZip(
   }
 
   // Combine linked and orphaned assets
-  const assets = [...linkedAssets, ...additionalAssets];
+  const allAssets = [...linkedAssets, ...additionalAssets];
 
   console.log('[exportProjectAsZip] Exporting project:', {
     id: project.id,
     name: project.name,
     linkedAssetCount: linkedAssets.length,
     orphanedAssetCount: additionalAssets.length,
-    totalAssetCount: assets.length
+    totalAssetCount: allAssets.length
   });
 
   // Create ZIP
@@ -129,7 +134,13 @@ export async function exportProjectAsZip(
     }
   };
 
-  zip.file('project.json', JSON.stringify(projectData, null, 2));
+  const projectJson = JSON.stringify(projectData, null, 2);
+  zip.file('project.json', projectJson);
+
+  const assets = options?.onlyUsedAssets ? assetsUsedByProject(projectJson, allAssets) : allAssets;
+  if (assets.length < allAssets.length) {
+    console.log(`[exportProjectAsZip] Leaving out ${allAssets.length - assets.length} files the story does not use`);
+  }
 
   // Add assets to ZIP in organized folders
   // Use unique filenames (assetId_filename) to prevent duplicates from overwriting each other
@@ -1245,6 +1256,36 @@ function updateAssetReferences(story: any, assetIdMap: Map<string, string>): any
   }
 
   return updated;
+}
+
+/**
+ * The files an exported story needs (2026-10-28: a group's 333 MB project
+ * held four unused 60 MB copies of one WAV and 130 unused pictures; the
+ * single-file HTML export ran out of memory). Generous on purpose: a file
+ * stays when its id appears anywhere in the project data (the player finds
+ * files by id only — not by name: copies of a file share its name), every
+ * font stays (fonts are chosen by family name), and so does every picture
+ * variant of a file that stays.
+ */
+export function assetsUsedByProject<T extends { id: string; type: string; variants?: Array<{ assetId: string }>; metadata?: unknown }>(
+  projectJson: string,
+  assets: T[],
+): T[] {
+  const keep = new Set(assets
+    .filter((a) => a.type === 'font' || projectJson.includes(a.id))
+    .map((a) => a.id));
+  const variantsOf = (a: T) => a.variants ?? (a.metadata as { variants?: Array<{ assetId: string }> } | undefined)?.variants ?? [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (const a of assets) {
+      if (!keep.has(a.id)) continue;
+      for (const v of variantsOf(a)) {
+        if (v?.assetId && !keep.has(v.assetId)) { keep.add(v.assetId); added = true; }
+      }
+    }
+  }
+  return assets.filter((a) => keep.has(a.id));
 }
 
 /**

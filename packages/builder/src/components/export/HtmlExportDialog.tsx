@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { X, Download, FileText, FolderOpen, Info, Eye, EyeOff, Settings, Globe, Sparkles } from 'lucide-react';
-import { downloadHtmlExport, previewStoryZip, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
+import { downloadHtmlExport, previewStoryZip, SINGLE_FILE_LIMIT_BYTES, singleFileTooLargeMessage, type HtmlExportOptions, type AIProvider } from '../../export/HtmlExporter';
 import { DEFAULT_RELAY_PATH } from '../../export/relayKit';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
@@ -69,7 +69,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   // and wait for the user to confirm before invoking the full export.
   // sizeWarning is null when no warning is active.
   type SizeWarning = {
-    tier: 'info' | 'warn';
+    tier: 'info' | 'warn' | 'too-big';
     zipMB: number;
     embeddedMB: number;
     storyZipBlob: Blob;
@@ -223,6 +223,10 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
         const storyZipBlob = await previewStoryZip(projectId, startBeatId || undefined);
         const zipMB = storyZipBlob.size / (1024 * 1024);
         const embeddedMB = zipMB * 4 / 3;
+        if (storyZipBlob.size > SINGLE_FILE_LIMIT_BYTES) {
+          setSizeWarning({ tier: 'too-big', zipMB, embeddedMB, storyZipBlob });
+          return;
+        }
         if (zipMB > 25) {
           setSizeWarning({ tier: 'warn', zipMB, embeddedMB, storyZipBlob });
           return;
@@ -830,17 +834,26 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           {sizeWarning && (
             <div
               className={`${
-                sizeWarning.tier === 'warn'
+                sizeWarning.tier !== 'info'
                   ? 'bg-orange-50 border-orange-200 text-orange-800'
                   : 'bg-blue-50 border-blue-200 text-blue-800'
               } border rounded-lg p-4 text-sm space-y-3`}
             >
               <div className="font-medium">
-                {sizeWarning.tier === 'warn'
+                {sizeWarning.tier === 'too-big'
+                  ? `Too big for a single file — ${sizeWarning.zipMB.toFixed(1)} MB story`
+                  : sizeWarning.tier === 'warn'
                   ? `Large single-file export — ${sizeWarning.zipMB.toFixed(1)} MB story (~${sizeWarning.embeddedMB.toFixed(1)} MB embedded as base64)`
                   : `Medium single-file export — ${sizeWarning.zipMB.toFixed(1)} MB story (~${sizeWarning.embeddedMB.toFixed(1)} MB embedded as base64)`}
               </div>
-              {sizeWarning.tier === 'warn' ? (
+              {sizeWarning.tier === 'too-big' ? (
+                <div className="space-y-2 text-xs leading-relaxed">
+                  <p>{singleFileTooLargeMessage(sizeWarning.storyZipBlob.size)}</p>
+                  <p>
+                    Folder export keeps the story in its own <code>story.asaps.zip</code> next to <code>index.html</code>, which works at any size.
+                  </p>
+                </div>
+              ) : sizeWarning.tier === 'warn' ? (
                 <div className="space-y-2 text-xs leading-relaxed">
                   <p>
                     Desktop browsers (Safari, Chrome, Firefox on macOS / Windows) will handle this fine — files up to ~58 MB have been confirmed to play on desktop Safari.
@@ -867,21 +880,21 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   type="button"
                   onClick={handleSwitchToFolder}
                   className={`px-3 py-1.5 text-xs font-medium rounded ${
-                    sizeWarning.tier === 'warn'
+                    sizeWarning.tier !== 'info'
                       ? 'bg-orange-600 text-white hover:bg-orange-700'
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
                   Switch to Folder export
                 </button>
-                <button
+                {sizeWarning.tier !== 'too-big' && <button
                   type="button"
                   onClick={handleConfirmSizeWarning}
                   disabled={exporting}
                   className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Continue with single-file
-                </button>
+                </button>}
                 <button
                   type="button"
                   onClick={handleCancelSizeWarning}

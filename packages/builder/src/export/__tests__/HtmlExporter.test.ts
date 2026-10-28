@@ -303,7 +303,7 @@ describe('exportAsHtml — errors & zip sourcing', () => {
   it('builds the story zip via the zip manager when none is precomputed', async () => {
     (exportProjectAsZip as any).mockResolvedValue(sfZip());
     await exportAsHtml('p1', baseOpts({ startBeatId: 'beat_3' }));
-    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', { overrideFirstBeatId: 'beat_3' });
+    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', { onlyUsedAssets: true, overrideFirstBeatId: 'beat_3' });
   });
 });
 
@@ -313,13 +313,13 @@ describe('previewStoryZip', () => {
     (exportProjectAsZip as any).mockResolvedValue(blob);
     const out = await previewStoryZip('p1', 'beat_9');
     expect(out).toBe(blob);
-    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', { overrideFirstBeatId: 'beat_9' });
+    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', { onlyUsedAssets: true, overrideFirstBeatId: 'beat_9' });
   });
 
-  it('passes undefined options when no startBeatId is given', async () => {
+  it('asks only for the files the story uses when no startBeatId is given', async () => {
     (exportProjectAsZip as any).mockResolvedValue(folderZip());
     await previewStoryZip('p1');
-    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', undefined);
+    expect(exportProjectAsZip).toHaveBeenCalledWith('p1', { onlyUsedAssets: true });
   });
 });
 

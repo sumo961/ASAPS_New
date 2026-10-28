@@ -1092,7 +1092,7 @@ export async function exportAsHtml(
  */
 async function createStoryZip(projectId: string, startBeatId?: string): Promise<Blob> {
   const { exportProjectAsZip } = await import('../utils/projectZipManager');
-  return exportProjectAsZip(projectId, startBeatId ? { overrideFirstBeatId: startBeatId } : undefined);
+  return exportProjectAsZip(projectId, { onlyUsedAssets: true, ...(startBeatId ? { overrideFirstBeatId: startBeatId } : {}) });
 }
 
 /**
@@ -1149,6 +1149,18 @@ async function createStoryZipFromData(originalZipBlob: Blob, translatedProjectDa
 }
 
 /**
+ * The largest story a single HTML file can carry. Embedded as base64 it
+ * grows by a third and the page is built as one string; well before a
+ * browser's string limit (about 512 MB) the window runs out of memory.
+ * Folder export has no such limit.
+ */
+export const SINGLE_FILE_LIMIT_BYTES = 200 * 1024 * 1024;
+
+export function singleFileTooLargeMessage(bytes: number): string {
+  return `This story is ${Math.round(bytes / (1024 * 1024))} MB — too big for a single HTML file (at most ${SINGLE_FILE_LIMIT_BYTES / (1024 * 1024)} MB). Choose Folder export, or make the story smaller (large sound files such as WAV recordings shrink a lot as MP3).`;
+}
+
+/**
  * Export as a single self-contained HTML file
  */
 async function exportAsSingleFile(
@@ -1156,6 +1168,10 @@ async function exportAsSingleFile(
   storyZipBlob: Blob,
   options: HtmlExportOptions
 ): Promise<HtmlExportResult> {
+  if (storyZipBlob.size > SINGLE_FILE_LIMIT_BYTES) {
+    throw new Error(singleFileTooLargeMessage(storyZipBlob.size));
+  }
+
   // Convert story to base64
   const storyArrayBuffer = await storyZipBlob.arrayBuffer();
   const storyBase64 = arrayBufferToBase64(storyArrayBuffer);
@@ -1399,13 +1415,22 @@ async function getPlayerScript(): Promise<string> {
 /**
  * Helper: Convert ArrayBuffer to base64
  */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  // In pieces: one character at a time, a 300 MB story built a 300 MB
+  // string before encoding it and the window ran out of memory.
+  // A multiple of 3 bytes per piece, so the pieces join without padding.
   const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const pieces: string[] = [];
+  const PIECE = 3 * 65536;
+  for (let start = 0; start < bytes.length; start += PIECE) {
+    const piece = bytes.subarray(start, start + PIECE);
+    let binary = '';
+    for (let i = 0; i < piece.length; i += 8192) {
+      binary += String.fromCharCode.apply(null, piece.subarray(i, i + 8192) as unknown as number[]);
+    }
+    pieces.push(btoa(binary));
   }
-  return btoa(binary);
+  return pieces.join('');
 }
 
 /**
@@ -1465,7 +1490,10 @@ export async function downloadHtmlExport(
   const { getProjectDataForExport, exportProjectAsZip } = await import('../utils/projectZipManager');
 
   // Get original story data
-  const originalZipBlob = await exportProjectAsZip(projectId);
+  const originalZipBlob = await exportProjectAsZip(projectId, { onlyUsedAssets: true });
+  if (originalZipBlob.size > SINGLE_FILE_LIMIT_BYTES) {
+    throw new Error(singleFileTooLargeMessage(originalZipBlob.size));
+  }
   const originalBase64 = arrayBufferToBase64(await originalZipBlob.arrayBuffer());
 
   // Process pre-made translations
