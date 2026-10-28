@@ -27,6 +27,7 @@ import {
   type RenpyAssetBundle,
   type RenpyConversionResult,
 } from '@asaps/core';
+import { archiveToZip, THEME_ARCHIVE_ACCEPT } from '../../utils/archiveToZip';
 
 interface RenpyThemeImporterProps {
   /** Called when import is complete */
@@ -72,8 +73,11 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
     setSelectedFile(file);
 
     try {
+      // RAR and 7z are unpacked into a ZIP first
+      const zipFile = await archiveToZip(file);
+
       // Validate ZIP
-      const validation = await validateRenpyZip(file);
+      const validation = await validateRenpyZip(zipFile);
 
       if (!validation.valid) {
         setError(validation.errors.join('\n'));
@@ -86,8 +90,16 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
       }
 
       // Extract assets
-      const extractedBundle = await extractRenpyAssets(file);
+      const extractedBundle = await extractRenpyAssets(zipFile);
+      if (extractedBundle.nothingUsable) {
+        setError(extractedBundle.nothingUsable);
+        setStep('error');
+        return;
+      }
       setBundle(extractedBundle);
+      if (extractedBundle.notices?.length) {
+        setWarnings((prev) => [...prev, ...extractedBundle.notices!]);
+      }
 
       // Set default theme name from metadata or filename
       const defaultName =
@@ -123,10 +135,10 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
       setIsDragging(false);
 
       const file = e.dataTransfer.files[0];
-      if (file && (file.name.endsWith('.zip') || file.type === 'application/zip')) {
+      if (file && (/\.(zip|rar|7z)$/i.test(file.name) || file.type === 'application/zip')) {
         handleFileSelect(file);
       } else {
-        setError('Please drop a ZIP file containing Ren\'Py theme files');
+        setError('Please drop a ZIP, RAR or 7z file containing Ren\'Py theme files');
       }
     },
     [handleFileSelect]
@@ -179,9 +191,10 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
           {step === 'upload' && (
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
-                Import a Ren'Py theme from a ZIP file. The importer will extract
-                colors, fonts, and UI graphics from your gui.rpy file and gui/
-                folder.
+                Import a Ren'Py theme from a ZIP, RAR or 7z file. The importer
+                takes colors, fonts and UI graphics from its .rpy files and
+                pictures — a whole Ren'Py project, a gui/ folder or a GUI kit's
+                pictures.
               </p>
 
               {/* Drop Zone */}
@@ -199,7 +212,7 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".zip,application/zip"
+                  accept={THEME_ARCHIVE_ACCEPT}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileSelect(file);
@@ -212,10 +225,10 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                   }`}
                 />
                 <p className="text-sm font-medium text-gray-700">
-                  Drop a Ren'Py theme ZIP here or click to browse
+                  Drop a Ren'Py theme (ZIP, RAR or 7z) here or click to browse
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Supports full Ren'Py projects or gui/ folder exports
+                  Full Ren'Py projects, gui/ folders or GUI kit pictures
                 </p>
               </div>
 

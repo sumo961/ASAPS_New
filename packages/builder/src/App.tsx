@@ -109,7 +109,7 @@ import { AIDebugModal } from './components/ai/AIDebugModal';
 import { MergeDialogTreesModal } from './components/tools/MergeDialogTreesModal';
 import { HtmlExportDialog } from './components/export/HtmlExportDialog';
 import { getThemeService } from './services/ThemeService';
-import { planThemeCopy, themeGraphicUrls } from './utils/themeGraphics';
+import { planThemeCopy, themeGraphicUrls, settingsWithoutAssets } from './utils/themeGraphics';
 import { applyGeneratedStory, type ApplyGeneratedStoryDeps } from './utils/applyGeneratedStory';
 import { BUILT_IN_THEMES, normalizeTranslationResources } from '@asaps/core';
 import { useVCSStatus } from './vcs/VCSStatusProvider';
@@ -5422,9 +5422,12 @@ function App() {
         await service.initialize();
         const plan = await planThemeCopy(currentThemeId, service, assetsRef.current);
         if (!plan || currentProjectRef2.current?.id !== projectId) return;
+        // Settings closed with Cancel meanwhile: the theme was put back.
+        if (currentThemeIdRef.current !== currentThemeId) return;
         const now = globalSettingsRef.current;
         if (!now || (!plan.themeGraphics && !now.themeGraphics)) return;
         for (const asset of plan.newAssets) await handleAssetAdd(asset);
+        if (currentThemeIdRef.current !== currentThemeId) return;
         const { themeGraphics: _old, ...rest } = now;
         applyGlobalSettingsChange((plan.themeGraphics ? { ...rest, themeGraphics: plan.themeGraphics } : rest) as GlobalSettings);
         if (plan.newAssets.length > 0) {
@@ -7318,7 +7321,29 @@ function App() {
           onClose={handleCloseSettings}
           assets={assets}
           themeId={currentThemeId}
-          onThemeChange={setCurrentThemeId}
+          onThemeChange={(themeId) => {
+            setCurrentThemeId(themeId);
+            // "No theme" (Custom, or the theme was deleted): the effect that
+            // saves the theme id skips undefined — it is also the value while
+            // a project loads — so this choice is saved here.
+            if (themeId === undefined && currentProject?.themeId) updateMetadata({ themeId: undefined });
+          }}
+          onRemoveThemeCopies={async (removed) => {
+            for (const asset of removed) await handleAssetRemove(asset.id);
+            const now = globalSettingsRef.current;
+            if (!now) return;
+            const cleaned = settingsWithoutAssets(now, removed, normalizeGlobalSettings(undefined).fonts);
+            if (cleaned !== now) applyGlobalSettingsChange(cleaned);
+          }}
+          onRevertTheme={(themeId, themeGraphics) => {
+            currentThemeIdRef.current = themeId;
+            setCurrentThemeId(themeId);
+            if (themeId === undefined && currentProject?.themeId) updateMetadata({ themeId: undefined });
+            const now = globalSettingsRef.current;
+            if (!now || now.themeGraphics === themeGraphics) return;
+            const { themeGraphics: _picked, ...rest } = now;
+            applyGlobalSettingsChange((themeGraphics ? { ...rest, themeGraphics } : rest) as GlobalSettings);
+          }}
           beats={state.beats.map(b => ({ id: b.id, name: b.name, type: b.type }))}
           assetsPath={currentProject?.assetsPath}
           onAssetsPathChange={(path) => {

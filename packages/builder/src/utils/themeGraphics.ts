@@ -44,7 +44,10 @@ export function pickThemeGraphics(theme: ThemeDefinition): { frame?: ThemeAssetR
     return undefined;
   };
   return {
-    frame: named('textbox-frame', 'textbox') ?? byId(theme.textBox?.frameAssetId) ?? graphics.find((g) => g.role === 'textbox-frame'),
+    // Never the namebox (the importer gives it the frame role too) or a
+    // full-screen overlay (role screen-overlay, not textbox-frame).
+    frame: named('textbox-frame', 'textbox') ?? byId(theme.textBox?.frameAssetId)
+      ?? graphics.find((g) => g.role === 'textbox-frame' && stem(g.filename).includes('textbox')),
     button: named('button-normal', 'choice_idle_background', 'idle_background') ?? byId(theme.button?.backgroundImageId),
     hover: named('button-hover', 'choice_hover_background', 'hover_background') ?? byId(theme.button?.hoverBackgroundImageId),
   };
@@ -145,4 +148,95 @@ export async function planThemeCopy(themeId: string, library: ThemeLibrary, proj
         }
       : undefined,
   };
+}
+
+/**
+ * The project's copies of a theme's pictures and fonts, found by their bytes
+ * (2026-10-28: deleting a theme left its copies in the project — 34 of 39
+ * theme files there unused). A copy carries no mark of where it came from
+ * once saved, but it is byte for byte the theme's file, so nothing the
+ * author added themselves is taken for one.
+ */
+export async function findThemeCopies(
+  themeId: string,
+  library: ThemeLibrary,
+  projectAssets: Asset[],
+  readProjectAsset: (asset: Asset) => Promise<Blob | null> = async (a) => (a.url ? (await fetch(a.url)).blob() : null),
+): Promise<Asset[]> {
+  const theme = await library.getResolvedTheme(themeId);
+  if (!theme) return [];
+  const refs = [...(theme.assets?.uiGraphics ?? []), ...(theme.assets?.fonts ?? [])];
+  const themeFiles: Blob[] = [];
+  for (const ref of refs) {
+    const blob = await library.loadThemeAsset(ref.id);
+    if (blob) themeFiles.push(blob);
+  }
+  const bytes = async (b: Blob): Promise<Uint8Array> => {
+    if (typeof b.arrayBuffer === 'function') return new Uint8Array(await b.arrayBuffer());
+    return new Uint8Array(await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(b);
+    }));
+  };
+  const same = (x: Uint8Array, y: Uint8Array) => x.length === y.length && x.every((v, i) => v === y[i]);
+  const copies: Asset[] = [];
+  for (const candidate of projectAssets) {
+    const matches = themeFiles.filter((f) => f.size === candidate.size);
+    if (matches.length === 0) continue;
+    const blob = await readProjectAsset(candidate);
+    if (!blob) continue;
+    const mine = await bytes(blob);
+    for (const f of matches) {
+      if (same(mine, await bytes(f))) { copies.push(candidate); break; }
+    }
+  }
+  return copies;
+}
+
+/** Project assets the current settings use: the Text Box pictures and the fonts named in Fonts. */
+export function assetsInUseBySettings(settings: GlobalSettings, projectAssets: Asset[]): Set<string> {
+  const used = new Set<string>();
+  const g = settings.themeGraphics;
+  for (const id of [g?.textboxFrameAssetId, g?.buttonAssetId, g?.buttonHoverAssetId]) if (id) used.add(id);
+  const families = new Set(
+    [settings.fonts?.titleFont, settings.fonts?.textFont, settings.fonts?.btnFont, settings.fonts?.buttonFont]
+      .filter((f): f is string => typeof f === 'string')
+      .map((f) => f.toLowerCase()),
+  );
+  for (const a of projectAssets) if (a.type === 'font' && families.has(stem(a.name))) used.add(a.id);
+  return used;
+}
+
+/**
+ * Settings after these project assets are gone: Text Box pictures that were
+ * among them are dropped, font settings that named one of the fonts go back
+ * to `defaultFonts`.
+ */
+export function settingsWithoutAssets(settings: GlobalSettings, removed: Asset[], defaultFonts: GlobalSettings['fonts']): GlobalSettings {
+  const ids = new Set(removed.map((a) => a.id));
+  const families = new Set(removed.filter((a) => a.type === 'font').map((a) => stem(a.name)));
+  let next = settings;
+  const g = settings.themeGraphics;
+  if (g && [g.textboxFrameAssetId, g.buttonAssetId, g.buttonHoverAssetId].some((id) => id && ids.has(id))) {
+    const kept = { ...g };
+    if (kept.textboxFrameAssetId && ids.has(kept.textboxFrameAssetId)) delete kept.textboxFrameAssetId;
+    if (kept.buttonAssetId && ids.has(kept.buttonAssetId)) delete kept.buttonAssetId;
+    if (kept.buttonHoverAssetId && ids.has(kept.buttonHoverAssetId)) delete kept.buttonHoverAssetId;
+    const { themeGraphics: _dropped, ...rest } = next;
+    next = (kept.textboxFrameAssetId || kept.buttonAssetId || kept.buttonHoverAssetId)
+      ? { ...rest, themeGraphics: kept } as GlobalSettings
+      : rest as GlobalSettings;
+  }
+  if (families.size > 0 && next.fonts) {
+    const fonts = { ...next.fonts };
+    const reset = <K extends 'titleFont' | 'textFont' | 'btnFont' | 'buttonFont'>(key: K) => {
+      const v = fonts[key];
+      if (typeof v === 'string' && families.has(v.toLowerCase())) (fonts as Record<string, unknown>)[key] = defaultFonts?.[key];
+    };
+    reset('titleFont'); reset('textFont'); reset('btnFont'); reset('buttonFont');
+    next = { ...next, fonts };
+  }
+  return next;
 }

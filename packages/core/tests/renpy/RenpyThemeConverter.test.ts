@@ -175,6 +175,29 @@ describe('convertRenpyToTheme', () => {
     const result = convertRenpyToTheme(bundle, { themeName: 'X' });
     expect(result.theme.colors.accent.hex).toBe('#ff0080');
   });
+
+  it('titles use the text font when the theme has no separate interface font', () => {
+    // Astrology UI: gui.text_font and gui.interface_text_font are both
+    // Times; the title used to fall to a generic system serif.
+    const bundle = emptyBundle();
+    bundle.fonts = [
+      { filename: 'times.ttf', role: 'dialog-font', data: new Blob() },
+      { filename: 'Cinzel-Medium.ttf', role: 'body-font', data: new Blob() },
+    ] as any;
+    const result = convertRenpyToTheme(bundle, { themeName: 'X' });
+    expect(result.theme.fonts.title.family).toBe('times');
+    expect(result.theme.fonts.body.family).toBe('times');
+  });
+
+  it('titles keep the interface font when there is one', () => {
+    const bundle = emptyBundle();
+    bundle.fonts = [
+      { filename: 'times.ttf', role: 'dialog-font', data: new Blob() },
+      { filename: 'Queen Serif.otf', role: 'title-font', data: new Blob() },
+    ] as any;
+    const result = convertRenpyToTheme(bundle, { themeName: 'X' });
+    expect(result.theme.fonts.title.family).toBe('Queen Serif');
+  });
 });
 
 describe('convertRenpyGuiToThemePreview', () => {

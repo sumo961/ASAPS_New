@@ -211,6 +211,40 @@ function parseBordersValue(value: string): [number, number, number, number] | un
 }
 
 /**
+ * Drop a trailing `# comment` that is outside quotes
+ * (`"fonts/Times.ttf" #"DejaVuSans.ttf"`).
+ */
+function stripTrailingComment(value: string): string {
+  let quote: string | null = null;
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i];
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === '#') {
+      return value.slice(0, i).trim();
+    }
+  }
+  return value.trim();
+}
+
+/**
+ * The value a define really holds, as far as it can be read without running
+ * Python: `gui.preference("font", "X.otf")` is a setting the player can
+ * change, with "X.otf" as its default; `gui.interface_text_font` names
+ * another define already read.
+ */
+function resolveDefineValue(value: string, raw: RenpyGuiData['raw']): string {
+  let v = stripTrailingComment(value);
+  const pref = v.match(/^gui\.preference\(\s*["'][^"']*["']\s*,\s*(.+?)\s*\)$/);
+  if (pref) v = pref[1].trim();
+  const ref = v.match(/^gui\.[a-z_]+$/i);
+  if (ref && raw[v.toLowerCase()] !== undefined) v = String(raw[v.toLowerCase()]);
+  return v;
+}
+
+/**
  * Map of gui variable names to their data location and parser
  */
 interface VariableMapping {
@@ -341,6 +375,15 @@ export function parseGuiRpy(content: string): RenpyGuiData {
       continue;
     }
 
+    // gui.init(width, height) sets the screen size; it sits in an
+    // `init python:` block, which is skipped below.
+    const init = trimmed.match(/^gui\.init\(\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    if (init) {
+      data.raw['gui.width'] = init[1];
+      data.raw['gui.height'] = init[2];
+      continue;
+    }
+
     // Check for block start (define, init, screen, etc.)
     if (trimmed.match(/^(define|init|screen|style|transform)\s+/)) {
       // Check if it's a single-line define with =
@@ -369,7 +412,7 @@ export function parseGuiRpy(content: string): RenpyGuiData {
     }
 
     const varName = match[1].toLowerCase();
-    const rawValue = match[2].trim();
+    const rawValue = resolveDefineValue(match[2], data.raw);
 
     // Look up mapping
     const mapping = VARIABLE_MAPPINGS[varName];
@@ -405,6 +448,92 @@ export function parseGuiRpy(content: string): RenpyGuiData {
   }
 
   return data;
+}
+
+/** A style's properties as written (`color "#D26143"` → color: '"#D26143"'). */
+export type RpyStyles = Record<string, Record<string, string>>;
+
+/**
+ * Read the `style name:` blocks of a .rpy file. Only plain `property value`
+ * lines are kept; a later definition of the same property wins.
+ */
+export function parseRpyStyles(content: string, into: RpyStyles = {}): RpyStyles {
+  let current: Record<string, string> | null = null;
+  let indent = 0;
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const lineIndent = line.search(/\S/);
+    const start = trimmed.match(/^style\s+([A-Za-z_][\w]*)(?:\s+is\s+[\w]+)?\s*:\s*(#.*)?$/);
+    if (start) {
+      current = into[start[1]] ?? (into[start[1]] = {});
+      indent = lineIndent;
+      continue;
+    }
+    if (current && lineIndent > indent) {
+      const prop = trimmed.match(/^([a-z_]+)\s+(.+)$/);
+      if (prop) current[prop[1]] = stripTrailingComment(prop[2]);
+      continue;
+    }
+    current = null;
+  }
+  return into;
+}
+
+/**
+ * What a theme's styles say about the story screen, over the gui defines:
+ * the dialogue's colour and font (style say_dialogue), the choice and button
+ * text colours, and — when gui.accent_color is not defined — the label
+ * colour, which Ren'Py's own screens draw in the accent colour. Templates
+ * that style screens directly (Scribbler UI) have no gui colours at all.
+ */
+export function applyRpyStyles(data: RenpyGuiData, styles: RpyStyles): RenpyGuiData {
+  const value = (v: string | undefined) => (v === undefined ? undefined : resolveDefineValue(v, data.raw));
+  const color = (v: string | undefined) => { const r = value(v); return r === undefined ? undefined : parseColorValue(r); };
+  const font = (v: string | undefined) => { const r = value(v); return r === undefined ? undefined : parseStringValue(r); };
+
+  const dialogue = styles.say_dialogue ?? {};
+  const dialogueColor = color(dialogue.color);
+  if (dialogueColor) data.colors.text = dialogueColor;
+  const dialogueFont = font(dialogue.font);
+  if (dialogueFont) data.fonts.textFont = dialogueFont;
+
+  const button = styles.button_text ?? {};
+  const choice = styles.choice_button_text ?? {};
+  const set = <K extends keyof RenpyGuiData['button']>(key: K, v: RenpyGuiData['button'][K] | undefined) => {
+    if (v !== undefined) data.button[key] = v;
+  };
+  set('textIdleColor', color(button.idle_color) ?? color(button.color));
+  set('textHoverColor', color(button.hover_color));
+  set('textSelectedColor', color(button.selected_color));
+  set('textInsensitiveColor', color(button.insensitive_color));
+  set('textFont', font(button.font));
+  const choiceIdle = color(choice.idle_color) ?? color(choice.color);
+  if (choiceIdle) data.choice.buttonTextIdleColor = choiceIdle;
+  const choiceHover = color(choice.hover_color);
+  if (choiceHover) data.choice.buttonTextHoverColor = choiceHover;
+  const choiceFont = font(choice.font);
+  if (choiceFont) data.choice.buttonTextFont = choiceFont;
+
+  if (!data.colors.accent) {
+    const label = color(styles.label_text?.color) ?? color(styles.gui_label_text?.color);
+    if (label) data.colors.accent = label;
+  }
+  return data;
+}
+
+/**
+ * A theme's gui data from all of its .rpy files: `define gui.…` lines
+ * wherever they are (gui.rpy wins — some templates keep them in
+ * styles.rpy), then its styles.
+ */
+export function parseRpySources(files: Array<{ path: string; content: string }>): RenpyGuiData {
+  const isGui = (p: string) => /(^|\/)gui\.rpy$/i.test(p);
+  const ordered = [...files].sort((a, b) => Number(isGui(a.path)) - Number(isGui(b.path)) || a.path.localeCompare(b.path));
+  const data = parseGuiRpy(ordered.map((f) => f.content).join('\n'));
+  const styles: RpyStyles = {};
+  for (const f of ordered) parseRpyStyles(f.content, styles);
+  return applyRpyStyles(data, styles);
 }
 
 /**

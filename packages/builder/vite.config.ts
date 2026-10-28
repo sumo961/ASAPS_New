@@ -21,6 +21,9 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(rootPkg.version),
     __BUILD_NUMBER__: JSON.stringify(buildData.build),
   },
+  // libarchive's worker (RAR/7z theme archives) is an ES module that finds
+  // its .wasm through import.meta.url.
+  worker: { format: 'es' },
   resolve: {
     alias: {
       '@': resolve(import.meta.dirname, './src')

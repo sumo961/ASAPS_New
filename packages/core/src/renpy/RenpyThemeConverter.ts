@@ -230,7 +230,9 @@ export function convertRenpyToTheme(
   }));
 
   // Find specific assets
-  const textboxAsset = graphicAssets.find((a) => a.role === 'textbox-frame');
+  // The frame is the theme's textbox picture — not its namebox (also mapped
+  // to textbox-frame) and not a full-screen overlay (role screen-overlay).
+  const textboxAsset = graphicAssets.find((a) => a.asset.role === 'textbox');
   // Look for dialog-font first, then body-font as fallback
   const dialogFont = fontAssets.find((f) => f.role === 'dialog-font') ||
                      fontAssets.find((f) => f.role === 'body-font');
@@ -254,8 +256,11 @@ export function convertRenpyToTheme(
   const titleTextSize = guiData.title?.textSize || guiData.fonts.titleTextSize || 75;
 
   // Get font family names from loaded assets (these are proper CSS font-family values)
-  // Fallback to 'serif' / 'sans-serif' if no asset was loaded
-  const titleFontFamily = titleFont?.fontFamily || 'serif';
+  // Fallback to 'serif' / 'sans-serif' if no asset was loaded.
+  // Title: the interface font (title-font), else the text font — a theme whose
+  // interface and text font are the same file (Astrology UI: Times for both)
+  // has no title-font, and the title fell to a generic system serif.
+  const titleFontFamily = titleFont?.fontFamily || dialogFont?.fontFamily || 'serif';
   const dialogFontFamily = dialogFont?.fontFamily || 'sans-serif';
   // Button font: prefer button-font asset, then title/interface font, then dialog font
   const buttonFontFamily = buttonFont?.fontFamily || titleFont?.fontFamily || dialogFont?.fontFamily || 'sans-serif';
@@ -315,8 +320,10 @@ export function convertRenpyToTheme(
 
   // Build button config
   const buttonBorders = guiData.button.borders || [6, 6, 6, 6];
-  const buttonTextIdleColor = guiData.button.textIdleColor || idleColor;
-  const buttonTextHoverColor = guiData.button.textHoverColor || hoverColor;
+  // ASAPS buttons on story screens are what Ren'Py shows as choice buttons:
+  // their colours first (Scribbler: choices #008DBF, menu buttons #00B1E1).
+  const buttonTextIdleColor = guiData.choice.buttonTextIdleColor || guiData.button.textIdleColor || idleColor;
+  const buttonTextHoverColor = guiData.choice.buttonTextHoverColor || guiData.button.textHoverColor || hoverColor;
 
   // Find button graphics from extracted assets
   const buttonNormalAsset = graphicAssets.find(g => g.role === 'button-normal');

@@ -81,6 +81,12 @@ export interface UseThemesResult {
 
   /** Clear theme selection and assets */
   clearSelection: () => void;
+
+  /** How many pictures and fonts a theme keeps in the library */
+  countThemeFiles: (themeId: string) => Promise<number>;
+
+  /** Remove a theme and all its pictures and fonts from the library */
+  deleteTheme: (themeId: string) => Promise<void>;
 }
 
 // ============================================================================
@@ -378,6 +384,18 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
     setThemeAssets(null);
   }, []);
 
+  const countThemeFiles = useCallback(async (themeId: string): Promise<number> => {
+    const service = getThemeService();
+    return (await service.listThemeAssets(themeId)).length;
+  }, []);
+
+  const deleteTheme = useCallback(async (themeId: string): Promise<void> => {
+    const service = getThemeService();
+    await service.deleteTheme(themeId);
+    if (selectedThemeId === themeId) clearSelection();
+    await refresh();
+  }, [selectedThemeId, clearSelection, refresh]);
+
   return {
     themes,
     selectedThemeId,
@@ -392,6 +410,8 @@ export function useThemes(initialThemeId?: string): UseThemesResult {
     isBuiltIn,
     loadThemeAssets,
     clearSelection,
+    countThemeFiles,
+    deleteTheme,
   };
 }
 

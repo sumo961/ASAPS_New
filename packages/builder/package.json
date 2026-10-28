@@ -30,6 +30,7 @@
     "idb": "^8.0.3",
     "immer": "^10.1.0",
     "jszip": "^3.10.1",
+    "libarchive.js": "^2.0.2",
     "lucide-react": "^0.454.0",
     "openai": "^4.77.0",
     "qrcode": "^1.5.4",

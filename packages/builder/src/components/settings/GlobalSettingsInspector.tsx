@@ -12,10 +12,11 @@ import { validateProjectAssets, type AssetValidationResult } from '../../utils/a
 import { MissingAssetsDialog } from './MissingAssetsDialog';
 import { ImageAssetField } from '../assets/ImageAssetField';
 import { framePictureStyle, usePictureSize } from '@asaps/renderer';
-import { normalizeSpeakerDisplay } from '../../utils/themeConverter';
+import { normalizeSpeakerDisplay, normalizeGlobalSettings } from '../../utils/themeConverter';
+import { findThemeCopies, assetsInUseBySettings, settingsWithoutAssets } from '../../utils/themeGraphics';
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
-import { notify } from '../../utils/notify';
+import { notify, confirmAction } from '../../utils/notify';
 
 // ONE canonical GlobalSettings type (UX-Eval §1.2 structural hazard): this
 // file used to declare its own copy, which App and a dozen other modules
@@ -33,6 +34,18 @@ interface GlobalSettingsInspectorProps {
   themeId?: string;
   /** Callback when theme is changed */
   onThemeChange?: (themeId: string | undefined) => void;
+  /**
+   * Closed without saving after a theme was picked or imported: put back the
+   * theme and theme pictures of the last save (the theme change itself takes
+   * effect at once — the project's picture copy follows it).
+   */
+  onRevertTheme?: (themeId: string | undefined, themeGraphics: GlobalSettings['themeGraphics']) => void;
+  /**
+   * A deleted theme's copies in this project go with it: remove these assets
+   * and clear the project's saved settings of references to them. (This
+   * window's unsaved edits stay unsaved; it clears its own copy itself.)
+   */
+  onRemoveThemeCopies?: (assets: Asset[]) => Promise<void> | void;
   /** Available beats for the first beat dropdown */
   beats?: Array<{ id: string; name: string; type: string }>;
   /** External assets folder path (Electron only, IndexedDB projects) */
@@ -61,7 +74,9 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onClose,
   assets = [],
   themeId: initialThemeId,
-  onThemeChange,
+  onThemeChange: onThemeChangeProp,
+  onRevertTheme,
+  onRemoveThemeCopies,
   beats = [],
   assetsPath,
   onAssetsPathChange,
@@ -156,7 +171,28 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     loadThemeAssets,
     themeAssets,
     clearSelection,
+    countThemeFiles,
+    deleteTheme,
   } = useThemes(initialThemeId);
+
+  // Picking or importing a theme takes effect at once (the project's picture
+  // copy follows it), its fonts, sizes and colours only on Save. Closing
+  // without saving left the new theme and pictures over the old settings
+  // (2026-10-28), so Cancel / ✕ put back the theme of the last save.
+  const savedThemeRef = React.useRef({ themeId: initialThemeId, themeGraphics: initialSettings.themeGraphics });
+  const pickedThemeIdRef = React.useRef(initialThemeId);
+  // An import still running when the window closes must not switch the
+  // theme afterwards, without its settings.
+  const closedRef = React.useRef(false);
+  useEffect(() => {
+    closedRef.current = false;
+    return () => { closedRef.current = true; };
+  }, []);
+  const onThemeChange = useCallback((themeId: string | undefined) => {
+    if (closedRef.current) return;
+    pickedThemeIdRef.current = themeId;
+    onThemeChangeProp?.(themeId);
+  }, [onThemeChangeProp]);
 
   // Load theme assets when initially opening with a theme
   useEffect(() => {
@@ -183,8 +219,70 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
     // Clear theme selection - keep current settings but disassociate from theme
     clearSelection(); // Clear local hook state (selectedThemeId, themeAssets)
     onThemeChange?.(undefined); // Update parent state
+    // Kept with Save Settings, put back with Cancel, like picking a theme
+    setHasChanges(true);
     setShowThemeDropdown(false);
   }, [clearSelection, onThemeChange]);
+
+  // Delete an imported or saved theme with its pictures and fonts, and its
+  // copies in this project (found by their bytes). Copies the project's
+  // current theme uses too stay — a re-imported kit shares its files — unless
+  // the current theme is the one deleted: then the dialog says so first.
+  const handleDeleteTheme = useCallback(async (theme: { id: string; name: string }) => {
+    setShowThemeDropdown(false);
+    const files = await countThemeFiles(theme.id);
+    const isCurrent = pickedThemeIdRef.current === theme.id || savedThemeRef.current.themeId === theme.id;
+    let copies: Asset[] = [];
+    try {
+      const service = getThemeService();
+      await service.initialize();
+      copies = await findThemeCopies(theme.id, service, assets);
+    } catch (err) {
+      console.warn('[GlobalSettings] Could not look for the theme\'s copies in this project:', err);
+    }
+    const keep = isCurrent ? new Set<string>() : assetsInUseBySettings(settings, assets);
+    const remove = copies.filter((a) => !keep.has(a.id));
+    const kept = copies.length - remove.length;
+    const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+    const ok = await confirmAction(isCurrent
+      ? {
+          title: `This project uses the theme "${theme.name}"`,
+          message: `Deleting it also removes its ${n(remove.length, 'picture and font file')} from this project — the text-box frame, button pictures and fonts you see now. Text boxes and buttons go back to plain colours, and the text to standard fonts. Other projects keep their copies.\n\nThis can't be undone. To use the theme again, import it again.`,
+          confirmLabel: 'Delete theme and its files',
+          destructive: true,
+        }
+      : {
+          title: `Delete the theme "${theme.name}"?`,
+          message: `It is removed from this computer's theme list${files > 0 ? ` with the ${n(files, 'file')} it brought` : ''}${remove.length > 0 ? `, and its ${n(remove.length, 'copy', 'copies')} in this project with it` : ''}.${kept > 0 ? ` ${n(kept, 'copy', 'copies')} that this project's current theme also uses ${kept === 1 ? 'stays' : 'stay'}.` : ''} Other projects keep their copies.\n\nThis can't be undone. To use the theme again, import it again.`,
+          confirmLabel: 'Delete theme',
+          destructive: true,
+        });
+    if (!ok) return;
+    try {
+      await deleteTheme(theme.id);
+    } catch (err) {
+      notify.error(`The theme "${theme.name}" could not be deleted.`, { detail: err instanceof Error ? err.message : String(err) });
+      return;
+    }
+    // The project no longer names a deleted theme, and Cancel never brings one back.
+    if (pickedThemeIdRef.current === theme.id) onThemeChange(undefined);
+    if (savedThemeRef.current.themeId === theme.id) {
+      savedThemeRef.current = { ...savedThemeRef.current, themeId: undefined };
+    }
+    if (remove.length > 0 && onRemoveThemeCopies) {
+      const defaults = normalizeGlobalSettings(undefined).fonts;
+      const cleaned = settingsWithoutAssets(settings, remove, defaults);
+      savedThemeRef.current = {
+        ...savedThemeRef.current,
+        themeGraphics: settingsWithoutAssets({ ...settings, themeGraphics: savedThemeRef.current.themeGraphics }, remove, defaults).themeGraphics,
+      };
+      setSettings(cleaned);
+      await onRemoveThemeCopies(remove);
+    }
+    notify.success(remove.length > 0
+      ? `Deleted the theme "${theme.name}" and its ${n(remove.length, 'copy', 'copies')} in this project.`
+      : `Deleted the theme "${theme.name}".`);
+  }, [countThemeFiles, deleteTheme, onThemeChange, onRemoveThemeCopies, assets, settings]);
 
   // Handle saving current settings as a theme
   const handleSaveAsTheme = useCallback(async () => {
@@ -353,7 +451,18 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
   const handleSave = () => {
     onUpdate(settings);
+    savedThemeRef.current = { themeId: pickedThemeIdRef.current, themeGraphics: settings.themeGraphics };
     setHasChanges(false);
+  };
+
+  const handleClose = () => {
+    const saved = savedThemeRef.current;
+    if (pickedThemeIdRef.current !== saved.themeId) {
+      if (onRevertTheme) onRevertTheme(saved.themeId, saved.themeGraphics);
+      else onThemeChangeProp?.(saved.themeId);
+    }
+    closedRef.current = true;
+    onClose();
   };
 
   const handleReset = async () => {
@@ -460,7 +569,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 hover:bg-gray-100 rounded"
           >
             <X className="w-5 h-5" />
@@ -532,18 +641,27 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                       Custom Themes
                     </div>
                     {themes.filter(t => t.source !== 'built-in').map(theme => (
-                      <button
-                        key={theme.id}
-                        onClick={() => handleThemeSelect(theme.id)}
-                        className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center gap-2"
-                      >
-                        {selectedThemeId === theme.id && (
-                          <Check className="w-4 h-4 text-blue-500" />
-                        )}
-                        <div className={selectedThemeId === theme.id ? 'font-medium' : ''}>
-                          <div className="text-sm">{theme.name}</div>
-                        </div>
-                      </button>
+                      <div key={theme.id} className="flex items-center hover:bg-blue-50">
+                        <button
+                          onClick={() => handleThemeSelect(theme.id)}
+                          className="flex-1 min-w-0 px-3 py-2 text-left flex items-center gap-2"
+                        >
+                          {selectedThemeId === theme.id && (
+                            <Check className="w-4 h-4 text-blue-500" />
+                          )}
+                          <div className={selectedThemeId === theme.id ? 'font-medium' : ''}>
+                            <div className="text-sm truncate">{theme.name}</div>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteTheme(theme)}
+                          className="p-2 mr-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          title={`Delete the theme "${theme.name}"…`}
+                          aria-label={`Delete the theme ${theme.name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </>
                 )}
@@ -3873,7 +3991,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
           
           <div className="flex gap-2">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded"
             >
               Cancel

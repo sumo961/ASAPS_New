@@ -6,7 +6,7 @@
  */
 
 import JSZip from 'jszip';
-import { RenpyGuiData, parseGuiRpy, parseOptionsRpy } from './RenpyGuiParser';
+import { RenpyGuiData, parseRpySources, parseOptionsRpy } from './RenpyGuiParser';
 
 /**
  * Extracted font asset
@@ -42,6 +42,9 @@ export interface RenpyGraphicAsset {
     | 'choice-hover'
     | 'slot-idle'
     | 'slot-hover'
+    /** A textbox.png the size of the screen: Ren'Py lays it over the whole
+     *  screen; it is not a frame to draw around a text box. */
+    | 'screen-overlay'
     | 'unknown';
   /** Full path in the ZIP */
   originalPath: string;
@@ -77,6 +80,10 @@ export interface RenpyAssetBundle {
   metadata: RenpyMetadata;
   /** Structure type detected */
   structureType: 'full-project' | 'gui-folder' | 'flat';
+  /** What the import could not take over as it is, for the import dialog */
+  notices?: string[];
+  /** Set when nothing in the ZIP can make a theme — why, for the import dialog */
+  nothingUsable?: string;
 }
 
 /**
@@ -204,7 +211,7 @@ function mapGraphicRole(
   const lowerFilename = filename.toLowerCase();
 
   // Textbox
-  if (lowerFilename === 'textbox.png' || lowerFilename.includes('textbox')) {
+  if (isTextboxName(filename)) {
     return 'textbox';
   }
 
@@ -239,6 +246,24 @@ function mapGraphicRole(
   }
 
   return 'unknown';
+}
+
+/**
+ * A text-box picture by its name: textbox.png, textbox_1.png, "Text & Name
+ * Box.png" (picture packs name them freely) — but not the quick-menu buttons
+ * drawn on it (textbox_save_button.png, textbox_menu.png).
+ */
+export function isTextboxName(filename: string): boolean {
+  const stem = filename.toLowerCase().replace(/\.[^.]+$/, '');
+  if (/button|menu|icon/.test(stem)) return false;
+  const squeezed = stem.replace(/[^a-z]/g, '');
+  return squeezed.includes('textbox') || /^text(and)?(name)?box/.test(squeezed);
+}
+
+/** Picture names Ren'Py GUI kits use for the parts ASAPS can take over. */
+function isGuiPictureName(filename: string): boolean {
+  const stem = filename.toLowerCase().replace(/\.[^.]+$/, '');
+  return isTextboxName(filename) || /^(choice_)?(idle|hover)_background$/.test(stem) || stem === 'namebox';
 }
 
 /**
@@ -302,6 +327,7 @@ export async function extractRenpyAssets(zipFile: File | Blob): Promise<RenpyAss
 
   // Process all files
   const entries = Object.entries(zip.files);
+  const rpyFiles: Array<{ path: string; content: string }> = [];
 
   for (const [path, file] of entries) {
     if (file.dir) continue;
@@ -314,14 +340,9 @@ export async function extractRenpyAssets(zipFile: File | Blob): Promise<RenpyAss
       continue;
     }
 
-    // Parse gui.rpy (only from game/ folder, not renpy/common/)
-    if (lowerPath.endsWith('gui.rpy') && !lowerPath.includes('/renpy/')) {
-      const content = await file.async('text');
-      guiData = parseGuiRpy(content);
-
-      // Detect resolution from gui data
-      const resolution = detectResolution(guiData);
-      metadata.resolution = resolution;
+    // The theme's .rpy files (not renpy/common/): gui defines and styles
+    if (lowerPath.endsWith('.rpy') && !lowerPath.includes('/renpy/')) {
+      rpyFiles.push({ path, content: await file.async('text') });
     }
 
     // Parse options.rpy for metadata
@@ -360,18 +381,82 @@ export async function extractRenpyAssets(zipFile: File | Blob): Promise<RenpyAss
     }
   }
 
+  if (rpyFiles.length > 0) {
+    guiData = parseRpySources(rpyFiles);
+    metadata.resolution = detectResolution(guiData);
+  }
+
   // Update font roles now that we have gui.rpy data
   for (const font of fonts) {
     font.role = mapFontRole(font.filename, guiData);
   }
+
+  const notices = await markScreenOverlays(uiGraphics, metadata.resolution);
+
+  // Nothing ASAPS can take over: no settings, no fonts, no frame and no
+  // choice-button pictures (picture packs with full-screen text boxes and
+  // buttons with their labels painted in — Blue Bubble GUI).
+  const hasFrame = uiGraphics.some((g) => g.role === 'textbox');
+  const hasChoicePictures = uiGraphics.some((g) => /^(choice_)?idle_background\.[a-z]+$/i.test(g.filename));
+  const nothingUsable = rpyFiles.length === 0 && fonts.length === 0 && !hasFrame && !hasChoicePictures
+    ? [
+        'This ZIP has pictures, but none ASAPS can use for a theme:',
+        uiGraphics.some((g) => g.role === 'screen-overlay')
+          ? 'its text box is a full-screen picture,'
+          : 'there is no text-box picture,',
+        'there are no choice-button pictures (choice_idle_background.png),',
+        'and there are no fonts or Ren\'Py settings (.rpy files).',
+        'Pictures from it can still be used one by one in Project Settings ▸ Text Box ▸ Pictures.',
+      ].join(' ')
+    : undefined;
 
   return {
     fonts,
     uiGraphics,
     guiData,
     metadata,
+    ...(notices.length > 0 ? { notices } : {}),
+    ...(nothingUsable ? { nothingUsable } : {}),
     structureType,
   };
+}
+
+/** Width and height from a PNG's header, without decoding the picture. */
+export async function readPngSize(data: Blob): Promise<{ width: number; height: number } | undefined> {
+  try {
+    const head = new Uint8Array(await data.slice(0, 24).arrayBuffer());
+    const png = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    if (head.length < 24 || png.some((b, i) => head[i] !== b)) return undefined;
+    const view = new DataView(head.buffer, head.byteOffset, head.byteLength);
+    return { width: view.getUint32(16), height: view.getUint32(20) };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A textbox picture as large as the screen is not a frame: some templates
+ * (Scribbler UI) draw their text area into a full-screen picture that Ren'Py
+ * lays over the whole screen. Drawn around each text box it was squeezed
+ * into a scrap; it is marked so it isn't used as the frame.
+ */
+async function markScreenOverlays(
+  graphics: RenpyGraphicAsset[],
+  screen: { width: number; height: number }
+): Promise<string[]> {
+  const notices: string[] = [];
+  for (const g of graphics) {
+    if (g.role !== 'textbox') continue;
+    const size = await readPngSize(g.data);
+    if (!size) continue;
+    if (size.width >= screen.width * 0.9 && size.height >= screen.height * 0.6) {
+      g.role = 'screen-overlay';
+      notices.push(
+        `${g.filename} is a full-screen picture (${size.width}×${size.height}) that Ren'Py lays over the whole screen, not a frame — it isn't used as the text-box frame. You can choose a frame in Project Settings ▸ Text Box ▸ Pictures.`
+      );
+    }
+  }
+  return notices;
 }
 
 /**
@@ -451,16 +536,19 @@ export async function extractRenpyAssetsPartial(
     raw: {},
   };
 
-  // First pass: parse gui.rpy if needed
+  // First pass: the theme's .rpy files if needed
   if (options.parseGui || options.extractFonts) {
+    const rpyFiles: Array<{ path: string; content: string }> = [];
     for (const [path, file] of Object.entries(zip.files)) {
-      if (path.toLowerCase().endsWith('gui.rpy')) {
-        const content = await file.async('text');
-        guiData = parseGuiRpy(content);
-        if (options.parseGui) {
-          result.guiData = guiData;
-        }
-        break;
+      const lower = path.toLowerCase();
+      if (!file.dir && lower.endsWith('.rpy') && !lower.includes('/renpy/')) {
+        rpyFiles.push({ path, content: await file.async('text') });
+      }
+    }
+    if (rpyFiles.length > 0) {
+      guiData = parseRpySources(rpyFiles);
+      if (options.parseGui) {
+        result.guiData = guiData;
       }
     }
   }
@@ -549,11 +637,15 @@ export async function validateRenpyZip(
     // Check for gui.rpy
     hasGuiRpy = paths.some((p) => p.toLowerCase().endsWith('gui.rpy'));
     if (!hasGuiRpy) {
-      warnings.push('No gui.rpy found - will use default theme values');
+      const hasOtherRpy = paths.some((p) => p.toLowerCase().endsWith('.rpy') && !p.toLowerCase().includes('/renpy/'));
+      warnings.push(hasOtherRpy
+        ? 'No gui.rpy found - colours and fonts are read from the theme\'s other .rpy files where they can be; check them after importing'
+        : 'No gui.rpy found - will use default theme values');
     }
 
     // Check for textbox
-    hasTextbox = paths.some((p) => p.toLowerCase().includes('textbox.png'));
+    const filenames = paths.filter((p) => !p.includes('__MACOSX') && isImageFile(p)).map((p) => p.split('/').pop() || '');
+    hasTextbox = filenames.some(isTextboxName);
     if (!hasTextbox) {
       warnings.push('No textbox.png found - will use default dialog box');
     }
@@ -564,8 +656,11 @@ export async function validateRenpyZip(
       warnings.push('No font files found - will use system fonts');
     }
 
-    // Check for at least some gui content
-    const hasAnyGuiContent = hasGuiRpy || hasTextbox || hasFonts;
+    // Check for at least some gui content. Picture packs (no .rpy, pictures
+    // in their own folders) count when they have Ren'Py GUI pictures.
+    const hasRpy = paths.some((p) => p.toLowerCase().endsWith('.rpy'));
+    const hasGuiPictures = filenames.some(isGuiPictureName);
+    const hasAnyGuiContent = hasGuiRpy || hasRpy || hasTextbox || hasFonts || hasGuiPictures;
     if (!hasAnyGuiContent) {
       errors.push('ZIP does not appear to contain any Ren\'Py theme files');
     }

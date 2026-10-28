@@ -30,9 +30,13 @@
 // Parser exports
 export {
   parseGuiRpy,
+  parseRpySources,
+  parseRpyStyles,
+  applyRpyStyles,
   parseOptionsRpy,
   detectResolution,
   type RenpyGuiData,
+  type RpyStyles,
 } from './RenpyGuiParser';
 
 // Asset extractor exports

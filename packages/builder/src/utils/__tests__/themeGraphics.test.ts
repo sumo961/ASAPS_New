@@ -4,7 +4,7 @@
  * window lacked its fonts, exports had none of it).
  */
 import { describe, it, expect } from 'vitest';
-import { pickThemeGraphics, planThemeCopy, themeGraphicUrls, type ThemeLibrary } from '../themeGraphics';
+import { pickThemeGraphics, planThemeCopy, themeGraphicUrls, findThemeCopies, assetsInUseBySettings, settingsWithoutAssets, type ThemeLibrary } from '../themeGraphics';
 
 const g = (id: string, role: string, filename: string) => ({ id, role, filename, mimeType: 'image/png' });
 
@@ -40,6 +40,19 @@ describe('pickThemeGraphics', () => {
     expect(p.frame?.filename).toBe('textbox.png');
     expect(p.button?.filename).toBe('choice_idle_background.png');
     expect(p.hover?.filename).toBe('choice_hover_background.png');
+  });
+
+  it('no frame from a namebox or a full-screen overlay (Scribbler UI)', () => {
+    const scribbler: any = {
+      meta: { id: 'scrib', name: 'Scribbler' },
+      textBox: {},
+      button: {},
+      assets: {
+        uiGraphics: [g('over', 'screen-overlay', 'textbox.png'), g('name', 'textbox-frame', 'namebox.png')],
+        fonts: [],
+      },
+    };
+    expect(pickThemeGraphics(scribbler).frame).toBeUndefined();
   });
 });
 
@@ -81,5 +94,45 @@ describe('themeGraphicUrls', () => {
     expect(urls?.buttonNormal).toBeUndefined();
     expect(urls?.buttonLayout).toEqual({ spacing: 23 });
     expect(themeGraphicUrls({} as any, [])).toBeNull();
+  });
+});
+
+describe('a deleted theme\'s copies in the project', () => {
+  const file = (text: string) => new Blob([text]);
+  const projectAsset = (id: string, name: string, type: string, text: string) =>
+    ({ id, name, type, size: new Blob([text]).size, url: `blob:${id}`, _text: text }) as any;
+  const themeWith: any = {
+    meta: { id: 'kit', name: 'Kit' },
+    assets: { uiGraphics: [g('t1', 'textbox-frame', 'textbox.png')], fonts: [{ id: 'f1', role: 'dialog-font', filename: 'Q.otf', mimeType: 'font/otf', fontFamily: 'Queen Serif' }] },
+  };
+  const lib: ThemeLibrary = {
+    getResolvedTheme: async () => themeWith,
+    loadThemeAsset: async (id) => file(id === 't1' ? 'FRAME-BYTES' : 'FONT-BYTES'),
+  };
+  const read = async (a: any) => file(a._text);
+
+  it('are found by their bytes, not by name or size alone', async () => {
+    const assets = [
+      projectAsset('a1', 'textbox.png', 'image', 'FRAME-BYTES'),          // the copy
+      projectAsset('a2', 'textbox.png', 'image', 'OTHER-BYTE!'),          // same name and size, other picture
+      projectAsset('a3', 'Queen Serif.otf', 'font', 'FONT-BYTES'),        // the font copy
+    ];
+    const copies = await findThemeCopies('kit', lib, assets, read);
+    expect(copies.map((a) => a.id)).toEqual(['a1', 'a3']);
+  });
+
+  it('knows which ones the current settings use', () => {
+    const assets = [projectAsset('a1', 'textbox.png', 'image', 'x'), projectAsset('a3', 'Queen Serif.otf', 'font', 'y'), projectAsset('a4', 'Other.ttf', 'font', 'z')];
+    const used = assetsInUseBySettings({ themeGraphics: { textboxFrameAssetId: 'a1' }, fonts: { titleFont: 'Queen Serif', textFont: 'Arial', btnFont: 'Arial' } } as any, assets);
+    expect([...used].sort()).toEqual(['a1', 'a3']);
+  });
+
+  it('settings drop references to removed files and their fonts go back to the defaults', () => {
+    const settings: any = { themeGraphics: { fromThemeId: 'kit', textboxFrameAssetId: 'a1', buttonAssetId: 'keep' }, fonts: { titleFont: 'Queen Serif', textFont: 'Arial', btnFont: 'Queen Serif' } };
+    const removed = [projectAsset('a1', 'textbox.png', 'image', 'x'), projectAsset('a3', 'Queen Serif.otf', 'font', 'y')];
+    const next = settingsWithoutAssets(settings, removed, { titleFont: 'Georgia', textFont: 'System', btnFont: 'System' } as any);
+    expect(next.themeGraphics).toEqual({ fromThemeId: 'kit', buttonAssetId: 'keep' });
+    expect(next.fonts).toMatchObject({ titleFont: 'Georgia', textFont: 'Arial', btnFont: 'System' });
+    expect(settingsWithoutAssets(settings, [], {} as any)).toBe(settings);
   });
 });
