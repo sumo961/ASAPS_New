@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import JSZip from 'jszip';
 
-vi.mock('libarchive.js/dist/worker-bundle.js?worker&url', () => ({ default: 'worker.js' }));
+vi.mock('../libarchiveWorker?worker&url', () => ({ default: 'worker.js' }));
+vi.mock('libarchive.js/dist/libarchive.wasm?url', () => ({ default: 'libarchive.wasm' }));
 
 import { archiveToZip, type ArchiveOpener } from '../archiveToZip';
 import { extractRenpyAssets } from '@asaps/core';
