@@ -38,15 +38,13 @@ describe('Text Box ▸ Pictures', () => {
     const field = screen.getByTestId('theme-frame-field');
     expect(within(field).getByText('textbox.png')).toBeTruthy();
     expect(screen.getByText('(with the frame picture)')).toBeTruthy();
-    expect((screen.getByLabelText('Space between buttons (px)') as HTMLInputElement).value).toBe('23');
   });
 
   it('removing the frame is saved as the author’s choice for the current theme', () => {
     const onUpdate = open({ fromThemeId: 'kit', textboxFrameAssetId: 'asset_frame' });
     fireEvent.click(within(screen.getByTestId('theme-frame-field')).getByLabelText('Remove the picture'));
-    fireEvent.change(screen.getByLabelText('Space between buttons (px)'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: /Save Settings/ }));
     expect(onUpdate).toHaveBeenCalled();
-    expect(onUpdate.mock.calls[0][0].themeGraphics).toEqual({ fromThemeId: 'builtin-ink-and-brass', buttonSpacing: 30 });
+    expect(onUpdate.mock.calls[0][0].themeGraphics).toEqual({ fromThemeId: 'builtin-ink-and-brass' });
   });
 });

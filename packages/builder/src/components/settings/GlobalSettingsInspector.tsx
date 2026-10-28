@@ -1736,7 +1736,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                 <div className="pt-2 border-t">
                   <h4 className="text-sm font-medium text-gray-700 mb-1">Pictures</h4>
                   <p className="text-xs text-gray-500 mb-3">
-                    A picture stretched over each text box, and pictures for the choice buttons, instead of the colours above. A Ren'Py theme brings its own; they are kept in the project's assets, so the editor, the Preview, exports and copies all show them.
+                    A frame picture around each text box (its decorated top and bottom edges keep their shape; long text sits between them), and pictures for the choice buttons, instead of the colours above. A Ren'Py theme brings its own; they are kept in the project's assets, so the editor, the Preview, exports and copies all show them.
                   </p>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-3" data-testid="theme-frame-field">
@@ -1767,19 +1767,6 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                         chooseLabel="Choose picture…"
                         modalTitle="Choose the button picture under the pointer"
                         assetSubType={null}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <label htmlFor="theme-button-spacing" className="text-sm text-gray-600">Space between buttons (px)</label>
-                      <input
-                        id="theme-button-spacing"
-                        type="number"
-                        min="0"
-                        max="200"
-                        placeholder="16"
-                        value={settings.themeGraphics?.buttonSpacing ?? ''}
-                        onChange={(e) => handleThemeGraphicsChange('buttonSpacing', e.target.value === '' ? undefined : Math.max(0, parseInt(e.target.value, 10) || 0))}
-                        className="w-24 px-2 py-1 border rounded text-sm"
                       />
                     </div>
                   </div>
