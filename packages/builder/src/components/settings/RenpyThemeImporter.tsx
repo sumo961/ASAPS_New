@@ -240,15 +240,15 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                 <ul className="space-y-1 text-gray-600">
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-green-500" />
-                    Full Ren'Py project (game/gui/ folder)
+                    A Ren'Py project or its gui/ folder
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-green-500" />
-                    GUI folder export (gui/ folder with textbox.png, etc.)
+                    GUI kits and picture packs (text box, name box, button pictures)
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-green-500" />
-                    Theme packs from itch.io or lemmasoft
+                    As a ZIP, RAR or 7z archive
                   </li>
                 </ul>
               </div>
@@ -361,7 +361,7 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                       )}
                       {Object.keys(bundle.guiData.colors).length === 0 && (
                         <div className="col-span-4 text-sm text-gray-500 py-2">
-                          No colors defined in gui.rpy (will use defaults)
+                          No colours found in the theme (will use defaults)
                         </div>
                       )}
                     </div>
@@ -488,11 +488,11 @@ export const RenpyThemeImporter: React.FC<RenpyThemeImporterProps> = ({
                         className="rounded"
                       />
                       <span className="text-sm text-gray-700">
-                        Use CSS border-image for textbox frame
+                        Use the theme's text-box picture as the frame
                       </span>
                     </label>
                     <p className="text-xs text-gray-500">
-                      Preserves original Ren'Py nine-patch visual fidelity
+                      Untick to keep plain text boxes in the theme's colours. You can still choose a frame later under Text Box ▸ Pictures.
                     </p>
 
                     {sizeEstimate && (

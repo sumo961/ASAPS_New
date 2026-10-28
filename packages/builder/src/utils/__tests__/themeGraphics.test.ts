@@ -54,6 +54,11 @@ describe('pickThemeGraphics', () => {
     };
     expect(pickThemeGraphics(scribbler).frame).toBeUndefined();
   });
+
+  it('no frame when the theme was imported without one', () => {
+    expect(pickThemeGraphics({ ...kit, textBox: {} }).frame).toBeUndefined();
+    expect(pickThemeGraphics({ ...kit, textBox: {} }).button?.filename).toBe('choice_idle_background.png');
+  });
 });
 
 describe('planThemeCopy', () => {

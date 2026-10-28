@@ -647,7 +647,7 @@ export async function validateRenpyZip(
     const filenames = paths.filter((p) => !p.includes('__MACOSX') && isImageFile(p)).map((p) => p.split('/').pop() || '');
     hasTextbox = filenames.some(isTextboxName);
     if (!hasTextbox) {
-      warnings.push('No textbox.png found - will use default dialog box');
+      warnings.push('No text-box picture found - will use the default dialog box');
     }
 
     // Check for fonts

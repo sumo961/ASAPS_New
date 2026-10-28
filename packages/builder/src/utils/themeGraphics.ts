@@ -44,10 +44,13 @@ export function pickThemeGraphics(theme: ThemeDefinition): { frame?: ThemeAssetR
     return undefined;
   };
   return {
-    // Never the namebox (the importer gives it the frame role too) or a
+    // Only when the theme has a frame (the importer leaves it out when asked
+    // to). Never the namebox (the importer gives it the frame role too) or a
     // full-screen overlay (role screen-overlay, not textbox-frame).
-    frame: named('textbox-frame', 'textbox') ?? byId(theme.textBox?.frameAssetId)
-      ?? graphics.find((g) => g.role === 'textbox-frame' && stem(g.filename).includes('textbox')),
+    frame: theme.textBox?.frameAssetId
+      ? named('textbox-frame', 'textbox') ?? byId(theme.textBox.frameAssetId)
+        ?? graphics.find((g) => g.role === 'textbox-frame' && stem(g.filename).includes('textbox'))
+      : undefined,
     button: named('button-normal', 'choice_idle_background', 'idle_background') ?? byId(theme.button?.backgroundImageId),
     hover: named('button-hover', 'choice_hover_background', 'hover_background') ?? byId(theme.button?.hoverBackgroundImageId),
   };
