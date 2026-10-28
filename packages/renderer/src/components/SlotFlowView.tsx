@@ -25,7 +25,7 @@
  * See project_responsive_layout_system memory for the full rationale.
  */
 
-import { framePictureStyle, usePictureSize, type PictureSize } from '../utils/framePicture';
+import { framePictureStyle, framePicturePadding, usePictureSize, type PictureSize } from '../utils/framePicture';
 import { readableLinkColor } from '../utils/linkColor';
 import React, { useState, useCallback, useEffect } from 'react';
 import type { SlotIntent, SlotIntentResolution, SlotAnimations, SlotAnimation, SlotAnchor, Location, AnimationPath } from '@asaps/core';
@@ -455,11 +455,19 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const vwU = (n: number): string => previewWidth ? `${((n * previewWidth) / 100).toFixed(1)}px` : `${n}vw`;
   // The text-box frame picture's decorated bands keep the picture's
   // proportions against the stage width (utils/framePicture.ts), never
-  // taller than in the picture itself.
+  // taller than in the picture itself. The stage's width, not the
+  // window's: the root is a size container (cqw), so the bands fit the
+  // Visual Editor's canvas and a Preview device preset too (2026-10-28:
+  // measured against the window they came out up to four times too tall).
   const frameSize = usePictureSize(theme.textboxFrameUrl);
   const frameOpts = {
     frameSize,
-    frameBand: (f: number, naturalPx: number) => `max(8px, min(${vwU(f * 100)}, ${naturalPx}px))`,
+    frameBand: (f: number, naturalPx: number) =>
+      `max(8px, min(${previewWidth ? vwU(f * 100) : `${(f * 100).toFixed(2)}cqw`}, ${naturalPx}px))`,
+    // The text-box padding shrinks with the stage below the design width.
+    framePadding: (px: number) => previewWidth
+      ? `${Math.round(Math.min(px, (px * previewWidth) / DESIGN_WIDTH))}px`
+      : `min(${px}px, ${((px * 100) / DESIGN_WIDTH).toFixed(3)}cqw)`,
   };
   const vhU = (n: number): string => previewHeight ? `${((n * previewHeight) / 100).toFixed(1)}px` : `${n}vh`;
   const grow = (k: number) => `max(0px, (${vwTerm} - ${DESIGN_WIDTH}px)) * ${k}`;
@@ -1061,6 +1069,8 @@ export const SlotFlowView: React.FC<SlotFlowViewProps> = ({
   const rootStyle: React.CSSProperties = {
     position: 'absolute',
     inset: 0,
+    // Size container: the frame picture's bands measure the stage (cqw).
+    containerType: 'inline-size',
     display: 'flex',
     flexDirection: isConversation ? 'row' : 'column',
     alignItems: isConversation ? 'flex-start' : undefined,
@@ -2848,7 +2858,7 @@ function buttonStyle(theme: RenderThemeSettings, fluid: string, hPad?: string, w
  */
 function textBoxCardStyle(
   theme: RenderThemeSettings,
-  opts: { isTitle: boolean; frameSize?: PictureSize; frameBand?: (fractionOfStageWidth: number, naturalPx: number) => string }
+  opts: { isTitle: boolean; frameSize?: PictureSize; frameBand?: (fractionOfStageWidth: number, naturalPx: number) => string; framePadding?: (px: number) => string }
 ): React.CSSProperties {
   const tb = theme.textBox;
   // Title slot honours `hideTitleTextBox` (VN splash style — title text
@@ -2866,10 +2876,11 @@ function textBoxCardStyle(
   // look. Padding still applies — the frame is sized 100% × 100% of
   // the card so its safe area must match the inner padding.
   if (theme.textboxFrameUrl) {
+    const band = opts.frameBand ?? ((f: number) => `${(f * 100).toFixed(2)}vw`);
     return {
-      ...framePictureStyle(theme.textboxFrameUrl, opts.frameSize, opts.frameBand ?? ((f) => `${(f * 100).toFixed(2)}vw`)),
+      ...framePictureStyle(theme.textboxFrameUrl, opts.frameSize, band),
       borderRadius: 0,
-      padding: `${tb.padding ?? 16}px`,
+      padding: framePicturePadding(opts.frameSize, band, tb.padding ?? 16, tb.padding ?? 16, opts.framePadding),
     };
   }
   const opacityFrac = Math.max(0, Math.min(1, (tb.opacity ?? 100) / 100));

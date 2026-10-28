@@ -3,7 +3,7 @@
  * stretched over a long text, the frame's decorated edges ran across it).
  */
 import { describe, it, expect } from 'vitest';
-import { framePictureStyle, FRAME_BAND } from '../../src/utils/framePicture';
+import { framePictureStyle, framePicturePadding, FRAME_BAND } from '../../src/utils/framePicture';
 
 describe('framePictureStyle', () => {
   it('keeps the top and bottom thirds in proportion and stretches only the middle', () => {
@@ -27,5 +27,26 @@ describe('framePictureStyle', () => {
     const style = framePictureStyle('blob:textbox', undefined, () => '0px');
     expect(style.backgroundImage).toBe('url(blob:textbox)');
     expect(style.backgroundSize).toBe('100% 100%');
+  });
+});
+
+describe('framePicturePadding', () => {
+  // The edge rule the fixed layout uses on a 1024 px stage.
+  const stage = (width: number) => (f: number, natural: number) => `${Math.round(Math.max(8, Math.min(natural, f * width)))}px`;
+  const elegant = { w: 1920, h: 310 };
+
+  it('takes the decorated edge off the top and bottom padding, keeps the sides (Elegant: 75 px padding)', () => {
+    expect(framePicturePadding(elegant, stage(1024), 75)).toBe('max(12px, calc(75px - 55px)) 75px');
+    expect(framePicturePadding(elegant, stage(1024), 40, 30)).toBe('max(12px, calc(40px - 55px)) 30px');
+  });
+
+  it('scales the padding the way the caller scales the stage (responsive: narrower than its design width)', () => {
+    const half = (px: number) => `${px / 2}px`;
+    expect(framePicturePadding(elegant, stage(512), 75, 75, half)).toBe('max(12px, calc(37.5px - 28px)) 37.5px');
+  });
+
+  it('keeps a small padding as the gap, and the padding unchanged while the picture loads', () => {
+    expect(framePicturePadding(elegant, stage(1024), 8)).toBe('max(8px, calc(8px - 55px)) 8px');
+    expect(framePicturePadding(undefined, stage(1024), 75)).toBe('75px 75px');
   });
 });

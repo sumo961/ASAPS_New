@@ -29,7 +29,7 @@ export { ConversationHistoryPanel, conversationTitle, type ConversationHistoryPa
 export { layoutScreenHuds, placementMap, computeStageFitScale, type HudBox, type HudPlacement, type HudCorner, type HudKind } from './utils/hudLayout';
 export { beatSuppressesScreenHuds, HUD_FREE_BEAT_TYPES, type HudVisibilityOptions } from './utils/hudVisibility';
 export { applyTextBoxBorder } from './utils/textBoxBorder';
-export { framePictureStyle, usePictureSize, FRAME_BAND, type PictureSize } from './utils/framePicture';
+export { framePictureStyle, framePicturePadding, usePictureSize, FRAME_BAND, type PictureSize } from './utils/framePicture';
 export { toMeterCounterData, resolveMeterFrame, completeMeterFrame, FALLBACK_METER_FRAME, type MeterCounterDef } from './utils/meterData';
 export { LEGACY_TEXT_LOCATION_NAME, TEXT_ALIAS_SLOT_NAMES, TEXT_ALIAS_BEAT_TYPES, isTextAliasSlot } from './utils/legacyTextAlias';
 export { harvestPickPropData, buildRuntimeInventoryItems, resolveItemDefinitionIcons, itemCatalogFor, type RuntimeInventoryEntry } from './utils/runtimeInventory';

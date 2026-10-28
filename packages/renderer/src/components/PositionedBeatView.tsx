@@ -1,4 +1,4 @@
-import { framePictureStyle, usePictureSize } from '../utils/framePicture';
+import { framePictureStyle, framePicturePadding, usePictureSize } from '../utils/framePicture';
 import React from 'react';
 import { pillSafeRadius } from '../utils/pillRadius';
 import ReactDOM from 'react-dom';
@@ -24,6 +24,10 @@ import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import { ChoicePicture, isPictureChoiceStyle, pictureChoiceLabel, type ChoicePictureStyle } from './ChoicePicture';
 import { revealBoundary } from '../utils/typewriterGranularity';
 import { thoughtBoxStyle } from '../utils/innerVoice';
+
+/** A frame picture's edge height on a fixed stage: the picture's share of the stage width, never taller than in the picture. */
+const stageFrameBand = (stageWidth: number) => (f: number, naturalPx: number) =>
+  `${Math.round(Math.max(8, Math.min(naturalPx, f * stageWidth)))}px`;
 
 // Default stage dimensions (can be overridden by project settings)
 const DEFAULT_STAGE_WIDTH = 1024;
@@ -4475,12 +4479,12 @@ const DialogElement: React.FC<{
         ...dimensionStyle,
         // Keep position from style (absolute) - scroll indicator is positioned within inner wrapper
         // Use frame image if available, otherwise use solid background
-        ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, (f, naturalPx) => `${Math.round(Math.max(8, Math.min(naturalPx, f * stageWidth)))}px`) : {
+        ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, stageFrameBand(stageWidth)) : {
           backgroundColor: bgColorWithOpacity,
           border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
         }),
         borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
-        padding: hideTextBox ? '0' : `${paddingVertical}px ${paddingHorizontal}px`,
+        padding: hideTextBox ? '0' : hasFrameImage ? framePicturePadding(frameSize, stageFrameBand(stageWidth), paddingVertical, paddingHorizontal) : `${paddingVertical}px ${paddingHorizontal}px`,
         fontSize: `${computedFontSize}px`,
         fontFamily: computedFont,
         color: theme.colors.textColor,
@@ -6196,11 +6200,11 @@ const FlexTextElement: React.FC<{
         style={{
           ...animationStyle,
           // Use frame image if available, otherwise use solid background
-          ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, (f, naturalPx) => `${Math.round(Math.max(8, Math.min(naturalPx, f * stageWidth)))}px`) : {
+          ...(hasFrameImage ? framePictureStyle(theme.textboxFrameUrl!, frameSize, stageFrameBand(stageWidth)) : {
             backgroundColor: bgWithOpacity,
             border: hideTextBox ? 'none' : `${theme.textBox.borderWidth}px solid ${theme.textBox.borderColor}`,
           }),
-          padding: hideTextBox ? '0' : `${padding}px`,
+          padding: hideTextBox ? '0' : hasFrameImage ? framePicturePadding(frameSize, stageFrameBand(stageWidth), padding) : `${padding}px`,
           borderRadius: hideTextBox || hasFrameImage ? '0' : `${theme.textBox.borderRadius}px`,
           fontSize: `${computedFontSize}px`,
           fontFamily: computedFont,

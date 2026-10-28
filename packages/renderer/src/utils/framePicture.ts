@@ -68,7 +68,7 @@ export function framePictureStyle(
       border: 'none',
     };
   }
-  const band = bandLength((size.h * FRAME_BAND) / size.w, Math.round(size.h * FRAME_BAND));
+  const band = frameBand(size, bandLength);
   const slice = `${(FRAME_BAND * 100).toFixed(3)}%`;
   return {
     backgroundColor: 'transparent',
@@ -79,4 +79,34 @@ export function framePictureStyle(
     borderImageSlice: `${slice} 0 fill`,
     borderImageRepeat: 'stretch',
   };
+}
+
+function frameBand(size: PictureSize, bandLength: (fractionOfStageWidth: number, naturalPx: number) => string): string {
+  return bandLength((size.h * FRAME_BAND) / size.w, Math.round(size.h * FRAME_BAND));
+}
+
+/**
+ * Padding for a box wearing the frame picture. A theme's text-box padding
+ * keeps the text clear of the frame's decorated edges (a Ren'Py theme's
+ * dialogue position — 75 px for the Elegant kit). Drawn as borders, those
+ * edges sit outside the padding, so the full padding on top of them put a
+ * wide empty band above and below the text (2026-10-28: "why is there
+ * that much space around the text"). The top and bottom padding lose the
+ * edge's height — the box is as tall as when the picture was stretched
+ * behind the padding — keeping a small gap. `scale` turns the authored
+ * padding into the length on screen: unchanged on a fixed stage; the
+ * responsive layout shrinks it on stages narrower than its design width,
+ * as the edges shrink. Until the picture's size is known it is stretched,
+ * and the padding applies unchanged.
+ */
+export function framePicturePadding(
+  size: PictureSize | undefined,
+  bandLength: (fractionOfStageWidth: number, naturalPx: number) => string,
+  vertical: number,
+  horizontal: number = vertical,
+  scale: (px: number) => string = (px) => `${px}px`,
+): string {
+  if (!size) return `${vertical}px ${horizontal}px`;
+  const gap = Math.min(vertical, 12);
+  return `max(${gap}px, calc(${scale(vertical)} - ${frameBand(size, bandLength)})) ${scale(horizontal)}`;
 }
