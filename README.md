@@ -22,8 +22,14 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.143** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.143 makes imported Ren'Py themes
+Current release: **v0.9.144** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.144 fits the text snugly in
+theme frames again**: since v0.9.143 the text in a Ren'Py theme's text-box
+frame had far too much space around it, and on phone-sized stages and in the
+Visual Editor the frame's decorated edges came out much too tall. The text
+now sits between the frame's edges as it did before, at every screen size.
+
+**v0.9.143 made imported Ren'Py themes
 look the same everywhere**: their text-box frame, button pictures and fonts
 are now part of the project, so the Visual Editor, the Preview, exports and
 your teammates' computers all show them — no theme install needed there.

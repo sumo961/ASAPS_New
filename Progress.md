@@ -1,15 +1,21 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.143, 2026-10-28)
+## 2026-10-28: Snug text in theme frames (v0.9.144)
 
 ### Overview
+A fix release for v0.9.143's 9-slice frames: the text in a theme's text-box frame had the theme's padding on top of the frame's decorated edges, and in responsive stages the edges were sized against the window instead of the stage. Text now sits between the edges as before, at every stage size.
+
+### Theme frames
 - **Too much space around the text in theme frames** (user report, Elegant GUI kit: "why is there that much space around the text in the textbox … this used to look like this"; Birka looked better). Two causes since the frame is drawn the way Ren'Py draws it (v0.9.143):
   1. The theme's text-box padding (the kit's dialogue position, 75 px for Elegant) used to sit inside a stretched picture; now the decorated edges are borders outside the padding, so the text got edge + full padding above and below. The top and bottom padding now lose the edge's height (at least a 12 px gap) — the box is as tall as before v0.9.143 (`framePicturePadding`, renderer utils/framePicture.ts; responsive, fixed and the Project Settings preview). Birka looked better only because its theme isn't installed on this computer, so it got the default 16 px.
   2. In the responsive layout the edges were measured against the window's width (vw), not the stage's — in the Visual Editor's canvas and with a Preview device preset they came out up to four times too tall (77 px on a 390 px phone stage). The stage is now a size container and the edges use cqw; the padding also shrinks with stages narrower than the 1024 px design width (phone portrait: 20 px edges, 29 px sides; one-line question 303×291 → 273×112). Fixed stages keep the authored padding at the sides.
   Verified headless with the Elegant kit at all five Preview presets (no overlap, boxes inside the stage) and in the Visual Editor.
 - Seen while testing, not changed: in the Preview, a click on the stage during an Info Text beat's choice delay can carry over to the next beat's choice (RED: Introduction → straight into the Grandma branch); and once "Story ended at Introduction — no outgoing connection" appeared after switching presets mid-beat. Not reproduced since.
 
-**Files modified:** packages/renderer/src/utils/framePicture.ts, packages/renderer/src/index.ts, packages/renderer/src/components/SlotFlowView.tsx, packages/renderer/src/components/PositionedBeatView.tsx, packages/builder/src/components/settings/GlobalSettingsInspector.tsx, packages/renderer/tests/utils/framePicture.test.ts
+- **User Guide**: the "Drawn the way Ren'Py draws them" paragraph now says the Text Box padding counts from the frame's outer edge and that edges and padding follow the stage size.
+- Release checks: RED played title → True Self Ending in the Preview; preset sweep clean at all five presets; single-file export at 1000×700 and 390×740 with frames inside the stage and no overlap.
+
+**Files modified:** packages/renderer/src/utils/framePicture.ts, packages/renderer/src/index.ts, packages/renderer/src/components/SlotFlowView.tsx, packages/renderer/src/components/PositionedBeatView.tsx, packages/builder/src/components/settings/GlobalSettingsInspector.tsx, packages/builder/public/player-web.js, docs/USER_GUIDE.md (header v0.9.144), packages/renderer/tests/utils/framePicture.test.ts
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.143*
+*Last revised against v0.9.144*
 
 ---
 
@@ -3819,7 +3819,7 @@ Prefer plain text boxes? Open **Advanced Options** in the import window and unti
 
 Switching to a theme without pictures stops using them; the files stay in Assets, so you can switch back or pick them again under [Settings → Text Box → Pictures](#text-box-pictures).
 
-**Drawn the way Ren'Py draws them.** A frame picture's decorated top and bottom edges keep their proportions, and your text sits between them. A long text makes only the plain middle of the frame taller — the decoration never stretches across the words — and the story scrolls as usual, with the bottom edge arriving at the end of the text. (Decoration on the *sides* of a frame, such as an emblem at the left, does stretch with long text, so frames with plain sides work best.)
+**Drawn the way Ren'Py draws them.** A frame picture's decorated top and bottom edges keep their proportions, and your text sits between them. A long text makes only the plain middle of the frame taller — the decoration never stretches across the words — and the story scrolls as usual, with the bottom edge arriving at the end of the text. (Decoration on the *sides* of a frame, such as an emblem at the left, does stretch with long text, so frames with plain sides work best.) The **Padding** under Settings → Text Box counts from the frame's outer edge: above and below the text, the decorated edge is part of that space (there is always at least a small gap), so the text sits snugly between the edges rather than far inside them. In responsive layouts the edges and padding grow and shrink with the stage, so a phone-sized stage gets slimmer edges.
 
 <a id="delete-theme"></a>
 **Deleting a theme.** Tried a few kits and want to tidy up? Open the **Theme:** menu and click the trash button next to a theme under *Custom Themes* (the ones you imported or saved). Built-in themes have no trash button and can't be deleted. ASAPS asks first and tells you what goes with the theme:
