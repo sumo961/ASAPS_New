@@ -22,8 +22,15 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.144** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.144 fits the text snugly in
+Current release: **v0.9.145** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.145 stops project folders from
+shuffling their pictures**: in a project shared through Git, pictures nobody
+touched kept appearing in Pending Changes as modified or as new `_2`/`_3`
+copies, because every first save after opening wrote all pictures again
+under fresh names. Saving now leaves the folder's pictures alone and only
+adds your new uploads, under names no other picture uses.
+
+**v0.9.144 fitted the text snugly in
 theme frames again**: since v0.9.143 the text in a Ren'Py theme's text-box
 frame had far too much space around it, and on phone-sized stages and in the
 Visual Editor the frame's decorated edges came out much too tall. The text

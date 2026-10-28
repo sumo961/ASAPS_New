@@ -1,14 +1,20 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.144, 2026-10-28)
+## 2026-10-28: Project folders keep their pictures (v0.9.145)
 
 ### Overview
+A fix release for teams sharing a project folder through Git: saving no longer rewrites and renames the folder's pictures, so Pending Changes shows only what you changed, and new uploads never take an existing picture's file name.
+
+### Project folders
 - **Project folders: pictures nobody touched kept showing up in Pending Changes** (Narrative-bullying group, two members, Windows; "a bunch of other assets keep appearing in the change panel every time … none of the assets that appear are mine"). Their manifest had six file names claimed by three records each: end-screen pictures uploaded three times under the same names, only the newest used by the story. Two causes:
   1. The first save after opening a folder wrote *every* asset again (the "already saved" list starts empty), and the serializer named them afresh in the local database's order. Records sharing a name took turns as `_2`, `_3`, `_2_2` — overwriting other pictures' files (shown as modified) and adding new copies (untracked), every session, on every computer. The manifest's id → file mapping changed with it, so a teammate could get the wrong picture on an end screen.
   2. A new upload named like a listed picture could take that picture's file name (the serializer only reserved names within the same save), which is how the shared names got into the manifest (commit "Fixed EndScreens": Default_Background.png overwritten by a new upload, three records now on it).
   Now `DirectoryAdapter.saveProject` reads the manifest first: assets it lists keep their file and are never rewritten from this computer's copy (the folder is the source); a listed file that's missing is put back at its path; only assets the manifest doesn't know are written, under names no listed file uses (`reservedAssetFilenames`, core DirectoryFormat). Replayed with the group's real manifest (116 assets, local order reversed, different local bytes): before 117 files rewritten on that save, after none. The 12 older records stay in the manifest unused (harmless).
 
-**Files modified:** packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/core/src/persistence/DirectoryFormat.ts, tests (DirectoryAdapter.assetNames)
+- Checked in a separate dev Electron (own profile) on a clone of the group's repository: with v0.9.144's adapter, Open Project Folder + Save produced exactly the reported list (six `_2` pictures and the manifest modified, twelve `_2_2`/`_3` copies untracked); with the fix only project.json's version stamp. Discarding those changes and reopening with the fix leaves the folder clean.
+- **User Guide**: new Common Hiccups entry "Pictures I didn't touch show up in Pending Changes" (cause, cleanup with Revert / the per-file delete button, how new uploads are named); the Pending Changes section now names the delete button and **Discard Untracked** for files never committed.
+
+**Files modified:** packages/builder/src/storage/adapters/DirectoryAdapter.ts, packages/core/src/persistence/DirectoryFormat.ts, docs/USER_GUIDE.md (header v0.9.145), tests (DirectoryAdapter.assetNames)
 
 ---
 

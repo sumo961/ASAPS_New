@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.144*
+*Last revised against v0.9.145*
 
 ---
 
@@ -4055,7 +4055,7 @@ Everything you've changed since your last commit. Each modified file appears wit
 
 - **Stage** an individual file (the green check) or **Stage All** at once.
 - **Unstage** anything you don't want to commit yet.
-- **Revert** to discard local changes (with a confirmation — this can't be undone).
+- **Revert** to discard local changes (with a confirmation — this can't be undone). New files that were never committed are removed with their delete button, or all at once with **Discard Untracked**.
 - Click a file to open a diff in the right pane and see exactly what changed.
 
 Below the file list, type a **commit message** and click **Commit** (or **Commit and Push** to send to GitHub in one step). If nothing's staged when you click Commit, ASAPS auto-stages everything currently changed for you — saves a click for the common "I want to commit everything" case.
@@ -4151,6 +4151,12 @@ This means a collaborator pushed something while you were working. Switch to the
 ### "Pull refused: project.json would be overwritten by merge"
 
 Older ASAPS versions rewrote `project.json` every time you opened or saved a project, just to update its timestamps — so Git saw a change on your computer and refused to pull over it. ASAPS no longer marks `project.json` as changed for that alone, and if an older version left such a timestamp-only change behind, the next **Pull** puts the file back automatically before pulling. Real changes to the project file (a new title, settings, clusters) are still yours to commit.
+
+### "Pictures I didn't touch show up in Pending Changes"
+
+They appear as modified, or as new copies whose names end in `_2`, `_3` or `_2_2`. Versions before v0.9.145 wrote all of a project folder's pictures again on the first save after opening it, and gave pictures that share a file name new numbered names. Since v0.9.145, pictures already in the folder are left alone.
+
+To clean up: update ASAPS (**Help ▸ Check for Updates…**), then in **Pending Changes** discard those picture changes and the change to `assets/_manifest.json` (**Revert** for modified files, the delete button for the new copies; **Discard Untracked** removes every new file at once, so use it only when none of them is yours), and open the project folder again. Pictures you upload from now on get a name no other picture in the folder uses (a second `End.png` becomes `End_2.png`, or the next free number) and show up as new files to commit.
 
 ### "I can't switch to another branch"
 
