@@ -22,8 +22,24 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.142** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.142 makes exported stories fast
+Current release: **v0.9.143** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.143 makes imported Ren'Py themes
+look the same everywhere**: their text-box frame, button pictures and fonts
+are now part of the project, so the Visual Editor, the Preview, exports and
+your teammates' computers all show them — no theme install needed there.
+Choose your own frame and button pictures in **Project Settings ▸ Text Box ▸
+Pictures**; button pictures now work in responsive layouts too, and frames
+keep their decorated edges in proportion instead of stretching across long
+text. **Import Ren'Py** reads many more kits: themes that keep their colours
+and fonts outside gui.rpy, plain picture packs, and RAR or 7z archives as
+well as ZIPs. Cancel in Project Settings now puts back the theme you last
+saved, and themes you no longer want can be deleted together with their
+pictures and fonts. HTML exports now leave out pictures and sounds the
+story never uses, so big projects export as a single file again instead of
+crashing the window. A freshly cloned project folder now shows its pictures,
+sounds and fonts the first time it is opened.
+
+**v0.9.142 made exported stories fast
 again**: stories with many pictures used to make the browser run out of
 memory and crawl (or crash) while loading; they now start in a few seconds.
 Export again to get the fix.
