@@ -118,6 +118,12 @@ export interface SerializeInput {
     metadata?: Record<string, any>;
     context?: string; // 'background', 'character', 'prop', etc.
   }>;
+  /**
+   * File names the folder's assets already use. New assets never take one
+   * (2026-10-28: an upload named like an existing picture overwrote its file,
+   * leaving two manifest entries on one path).
+   */
+  reservedAssetFilenames?: string[];
   /** Translation resources to include in the project */
   translations?: TranslationResource[];
   /** Translation manifest */
@@ -350,7 +356,7 @@ export function serializeToDirectory(input: SerializeInput): SerializeResult {
   //    haven't changed) the existing manifest on disk is preserved.
   let manifest = createEmptyManifest();
   if (input.assets && input.assets.length > 0) {
-    const existingNames = new Set<string>();
+    const existingNames = new Set<string>(input.reservedAssetFilenames ?? []);
 
     for (const asset of input.assets) {
       const folder = getAssetFolder(asset.type, asset.context);

@@ -269,7 +269,39 @@ export class DirectoryAdapter implements PersistenceAdapter {
     }
 
     console.log('[DirectoryAdapter] saveProject:', this.projectPath);
-    const input = this.projectToSerializeInput(project, assets);
+
+    // Assets the folder already lists keep their file, and it is never
+    // rewritten from this computer's copy (2026-10-28, Narrative-bullying
+    // group: the first save after opening wrote every asset again, naming
+    // them afresh in the local database's order — pictures uploaded twice
+    // under one name took turns as `_2`, `_3`, `_2_2`, overwriting other
+    // pictures' files and showing up as changes nobody made). Only assets
+    // the manifest doesn't know are written, under names no listed file uses;
+    // a listed file that is missing is put back at its path.
+    const manifestPath = joinPath(this.projectPath, 'assets', '_manifest.json');
+    let listed: DirectoryAssetManifest | null = null;
+    if (assets && assets.length > 0 && await api.fs.exists(manifestPath)) {
+      try {
+        listed = parseManifest(await this.createReader().readText(manifestPath));
+      } catch {
+        listed = null; // unreadable — write the assets as before
+      }
+    }
+    let newAssets = assets;
+    const missing: Array<{ path: string; blob: Blob }> = [];
+    if (listed) {
+      newAssets = [];
+      for (const a of assets!) {
+        const entry = listed.assets[a.id];
+        if (!entry) { newAssets.push(a); continue; }
+        const path = joinPath(this.projectPath, 'assets', ...(entry.folder ? [entry.folder] : []), entry.filename);
+        if (!await api.fs.exists(path)) missing.push({ path, blob: a.blob });
+      }
+    }
+    const input = {
+      ...this.projectToSerializeInput(project, newAssets),
+      ...(listed ? { reservedAssetFilenames: Object.values(listed.assets).map((e) => e.filename) } : {}),
+    };
     const { files, assetFiles } = serializeToDirectory(input);
 
     // VCS helper files that should only be created, never overwritten — except
@@ -307,7 +339,7 @@ export class DirectoryAdapter implements PersistenceAdapter {
       // Asset manifest: MERGE new entries into existing manifest instead of replacing.
       // serializeToDirectory only includes newly-added assets, so a naive overwrite
       // would delete all previously-saved assets from the manifest.
-      if (file.path === 'assets/_manifest.json' && assets && assets.length > 0) {
+      if (file.path === 'assets/_manifest.json' && newAssets && newAssets.length > 0) {
         if (await reader.exists(fullPath)) {
           const existingManifest = parseManifest(await reader.readText(fullPath));
           const newManifest = parseManifest(file.content);
@@ -343,11 +375,16 @@ export class DirectoryAdapter implements PersistenceAdapter {
     // Clean up orphaned beat files (beats deleted from the project)
     await this.cleanupOrphanedBeatFiles(files);
 
+    for (const m of missing) {
+      await api.fs.mkdir(parentDir(m.path));
+      await this.writeBytes(m.path, new Uint8Array(await m.blob.arrayBuffer()));
+    }
+
     // Write binary asset files
-    if (assets && assets.length > 0) {
+    if (newAssets && newAssets.length > 0) {
       // Build a quick lookup from assetId -> StoredAsset blob
       const blobMap = new Map<string, Blob>();
-      for (const a of assets) {
+      for (const a of newAssets) {
         blobMap.set(a.id, a.blob);
       }
 
