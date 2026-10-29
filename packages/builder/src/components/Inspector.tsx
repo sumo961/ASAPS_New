@@ -153,6 +153,8 @@ interface InspectorProps {
   /** Opens the AI "Develop character" dialog (host renders it). Seeded from
    *  the beat's scenario + "In this scene" notes by the npc-character control. */
   onDevelopCharacter?: (session: import('./characters/CharacterDevelopmentDialog').CharacterDevelopmentSession) => void;
+  /** Change this beat into another type, keeping its text and links (App.handleChangeBeatType). */
+  onChangeType?: (beatId: string, type: string) => void;
   // For counter/variable dropdowns
   characters?: Character[];
   /** Project emotion palette — passed down to ChoiceEffectsEditor so the
@@ -184,6 +186,7 @@ import { noteDeletion } from '../utils/deletedBeats';
 import { BeatPicker } from './common/BeatPicker';
 import { useBeatSuggestions } from '../utils/aiFeatures';
 import { usePersistedState } from '../utils/persistedState';
+import { changeableTypes, beatTypeLabel } from '../utils/changeBeatType';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
 
@@ -218,6 +221,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onAssetSelect,
   onOpenCharacterManager,
   onDevelopCharacter,
+  onChangeType,
   characters = [],
   emotionPalette,
   globalSettings,
@@ -1315,7 +1319,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Note: We need to re-sync when beat parameters change (e.g., after merging dialog trees).
   // The _version field is incremented in updateParameters() to trigger re-sync.
   // Also re-sync when translation language changes to overlay/remove translations.
-  }, [beat?.id, beat?.name, (beat as any)?._version, translationState.activeLanguage]);
+  }, [beat?.id, beat?.name, beat?.type, (beat as any)?._version, translationState.activeLanguage]);
 
   if (!beat || !localBeat) {
     return (
@@ -1860,8 +1864,22 @@ export const Inspector: React.FC<InspectorProps> = ({
               )}
             </div>
           </div>
-          <div className="text-sm text-gray-500">
-            {beat.type} • ID: {beat.id}
+          <div className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
+            <span>{beat.type} • ID: {beat.id}</span>
+            {onChangeType && changeableTypes(beat).length > 0 && (
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) onChangeType(beat.id, e.target.value); }}
+                className="ml-auto px-1.5 py-0.5 text-xs border border-gray-300 rounded bg-white text-gray-600"
+                title="Turn this beat into another type; its text and links come along"
+                aria-label="Change type"
+              >
+                <option value="">Change type…</option>
+                {changeableTypes(beat).map((t) => (
+                  <option key={t} value={t}>{beatTypeLabel(t)}</option>
+                ))}
+              </select>
+            )}
           </div>
           {/* Preview as: which character the editor shows for the roles this beat uses. */}
           {(() => {

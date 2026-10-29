@@ -448,7 +448,8 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       const clusterExtra = n.type === 'cluster'
         ? `:${n.data?.cluster?.name}:${n.data?.cluster?.mapAssetId || ''}:${n.data?.mapAssetUrl || ''}:${n.data?.cluster?.mapScale ?? ''}:${n.data?.cluster?.mapOpacity ?? ''}:${n.data?.cluster?.mapFit ?? ''}:${n.data?.cluster?.sound?.file || ''}:${n.data?.cluster?.sound?.volume ?? ''}:${n.data?.cluster?.sharedVisuals?.locations?.length || 0}:${n.data?.containedBeatCount}:${(n.style as any)?.width}x${(n.style as any)?.height}`
         : '';
-      return `${n.id}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
+      // The type too: Change type swaps in a new beat under the same id.
+      return `${n.id}:${n.data?.type || ''}:${n.position.x},${n.position.y}:${n.data?.selected}:${n.data?.expanded}:${n.data?.dialogExpanded ? 1 : 0}:${(n as any).parentNode || ''}:${n.hidden ? 1 : 0}${clusterExtra}`;
     }).join('|');
 
     if (fingerprint === prevNodeIdsRef.current) {

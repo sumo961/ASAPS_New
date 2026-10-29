@@ -87,7 +87,8 @@ import { useAIDebug } from './hooks/useAIDebug';
 import { getSavedAIConfig } from './hooks/useAI';
 import { useCommandManager } from './hooks/useCommandManager';
 import { getCommandManager } from './commands/CommandManager';
-import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { UpdateBeatCommand, AddBeatCommand, DeleteBeatCommand, MoveBeatCommand, MoveBeatInContainerCommand, ResizeClusterCommand, ReparentBeatCommand, ReplaceBeatCommand, type BeatStateMutations } from './commands/BeatCommands';
+import { changeBeatType, beatTypeLabel } from './utils/changeBeatType';
 import { containerSlotFor, ejectPosition } from './components/graph/clusterDrop';
 import { CLUSTER_HEADER_H } from './components/graph/graphStyle';
 import { reconcileLegacyMaxTokens } from './utils/aiConfigBudget';
@@ -407,6 +408,14 @@ function App() {
     resizeCluster: (id, w, h) => actions.resizeCluster?.(id, w, h),
     moveBeatToCluster: (id, clusterId) => actions.moveBeatToCluster(id, clusterId),
     removeBeatFromCluster: (id) => actions.removeBeatFromCluster(id),
+    replaceBeat: (beat) => {
+      // A fresh version number: the Inspector and the flowchart re-read a
+      // beat when it changes (same id, so they'd keep the old instance's data).
+      (beat as any)._version = ((beat as any)._version || 0) + 1;
+      actions.replaceBeat(beat);
+      // The Inspector and the flowchart follow the new instance.
+      setSelectedBeat((sel) => (sel?.id === beat.id ? beat : sel));
+    },
   };
 
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
@@ -3121,6 +3130,31 @@ function App() {
     if (cmds.length === 0) return;
     getCommandManager().execute(cmds.length === 1 ? cmds[0] : new BatchCommand(cmds, description));
     markChanged();
+  }, [state.beats, markChanged]);
+
+  /**
+   * Change a beat into another type (Inspector ▸ Change type): same id, its
+   * text and links carried across (utils/changeBeatType). Undoable; the
+   * notice names what the new type couldn't keep.
+   */
+  const handleChangeBeatType = useCallback(async (beatId: string, type: string) => {
+    const before = state.beats.find(b => b.id === beatId);
+    if (!before || before.type === type) return;
+    let result: ReturnType<typeof changeBeatType>;
+    try {
+      result = changeBeatType(before, type);
+    } catch (e) {
+      notify.error(`Could not change "${before.name || before.id}" into ${beatTypeLabel(type)}.`, { detail: errorMessage(e) });
+      return;
+    }
+    const cmd = new ReplaceBeatCommand(before, result.beat, stableMutations.current);
+    await getCommandManager().execute(cmd);
+    markChanged();
+    notify.success(`"${before.name || before.id}" is now ${beatTypeLabel(type)}.`, {
+      detail: result.losses.length ? `Not kept: ${result.losses.join('; ')}. Undo brings it back.` : undefined,
+      action: undoCommandAction(cmd),
+      ...(result.losses.length ? { durationMs: 12000 } : {}),
+    });
   }, [state.beats, markChanged]);
 
   // Handle bulk transformation changes - force UI refresh for affected beats
@@ -7162,6 +7196,7 @@ function App() {
               storyTitle={state.title}
               beat={selectedBeat}
               onUpdate={handleBeatUpdate}
+              onChangeType={handleChangeBeatType}
               onDelete={handleBeatDelete}
               describeDeleteImpact={describeDeleteImpact}
               allBeats={state.beats}

@@ -31,6 +31,8 @@ export interface BeatStateMutations {
   /** Cluster membership (drag-in / drag-out / ⏏). Optional: only App wires them. */
   moveBeatToCluster?: (beatId: string, clusterId: string) => void;
   removeBeatFromCluster?: (beatId: string) => void;
+  /** Swap in another instance under the same id (Change type). Optional: only App wires it. */
+  replaceBeat?: (beat: Beat) => void;
 }
 
 /**
@@ -41,6 +43,37 @@ export interface BeatPlacement {
   clusterId: string | null;
   x: number;
   y: number;
+}
+
+// ============================================================================
+// Replace Beat Command — a beat changed into another type, same id
+// ============================================================================
+
+export class ReplaceBeatCommand extends Command {
+  public readonly type = 'REPLACE_BEAT';
+  public description: string;
+
+  constructor(
+    private before: Beat,
+    private after: Beat,
+    private mutations: BeatStateMutations,
+    id?: string,
+  ) {
+    super(id);
+    this.description = `Change ${before.name || before.id} from ${before.type} to ${after.type}`;
+  }
+
+  execute(): void {
+    this.mutations.replaceBeat?.(this.after);
+  }
+
+  undo(): void {
+    this.mutations.replaceBeat?.(this.before);
+  }
+
+  protected serializeData(): any {
+    return { beatId: this.before.id, from: this.before.type, to: this.after.type };
+  }
 }
 
 // ============================================================================

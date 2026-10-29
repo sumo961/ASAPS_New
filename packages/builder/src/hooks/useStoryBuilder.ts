@@ -49,6 +49,8 @@ interface StoryBuilderActions {
   createBeat: (type: string, position?: { x: number; y: number }, options?: { id?: string; name?: string }) => Beat;
   addBeat: (type: string, position?: { x: number; y: number }, options?: { id?: string; name?: string }) => Beat;
   addExistingBeat: (beat: Beat) => void;
+  /** Put `beat` in place of the beat with its id (Change type): same place in the list and cluster. */
+  replaceBeat: (beat: Beat) => void;
   updateBeat: (beatId: string, updates: Partial<Beat>) => void;
   deleteBeat: (beatId: string) => void;
   moveBeat: (beatId: string, position: { x: number; y: number }) => void;
@@ -210,6 +212,20 @@ export function useStoryBuilder() {
       ...prev,
       beats: [...prev.beats, beat],
     }));
+  }, []);
+
+  const replaceBeat = useCallback((beat: Beat) => {
+    setState(prev => {
+      if (!prev.beats.some(b => b.id === beat.id)) return prev;
+      const links = (typeof beat.getConnections === 'function' ? beat.getConnections() : [])
+        .filter(c => c.targetId)
+        .map(c => ({ source: beat.id, target: c.targetId, label: c.label }));
+      return {
+        ...prev,
+        beats: prev.beats.map(b => (b.id === beat.id ? beat : b)),
+        connections: [...prev.connections.filter(c => c.source !== beat.id), ...links],
+      };
+    });
   }, []);
 
   // Story-merge: append a remapped batch of beats + their extracted
@@ -1331,6 +1347,7 @@ export function useStoryBuilder() {
     createBeat,
     addBeat,
     addExistingBeat,
+    replaceBeat,
     updateBeat,
     deleteBeat,
     moveBeat,
