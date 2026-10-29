@@ -45,6 +45,9 @@ export interface Location {
   // Transform properties for visual elements
   rotation?: number;  // Rotation in degrees
   scale?: number;     // Scale factor (1 = 100%)
+  /** Mirrored left↔right / upside down — a sprite facing the other way without a second picture (pictures, characters, props). */
+  flipX?: boolean;
+  flipY?: boolean;
   // Character-specific fields (for kind='character')
   characterId?: string;     // Reference to Character definition (modern)
   characterName?: string;   // Character name for ASML export and legacy import

@@ -2396,6 +2396,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
       // Add transform properties (rotation and scale)
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+      if (el.flipX) location.flipX = true;
+      if (el.flipY) location.flipY = true;
       if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
       // Add character-specific properties
@@ -2755,6 +2757,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
         // Add transform properties (rotation and scale)
         if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+        if (el.flipX) location.flipX = true;
+        if (el.flipY) location.flipY = true;
         if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
         // Add character-specific properties (for kind='character')
@@ -3156,6 +3160,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             width: loc.width,
             height: loc.height,
             rotation: loc.rotation ?? 0,
+            ...(loc.flipX ? { flipX: true } : {}),
+            ...(loc.flipY ? { flipY: true } : {}),
             scale: loc.scale ?? 1,
             visible: true,
             locked: false,
@@ -3330,6 +3336,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
             width: loc.width,
             height: loc.height,
             rotation: (loc as any).rotation ?? 0,
+            ...((loc as any).flipX ? { flipX: true } : {}),
+            ...((loc as any).flipY ? { flipY: true } : {}),
             scale: (loc as any).scale ?? 1,
             visible: true,
             locked: false,
@@ -3476,6 +3484,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
               width: loc.width,
               height: loc.height,
               rotation: loc.rotation ?? 0,
+              ...(loc.flipX ? { flipX: true } : {}),
+              ...(loc.flipY ? { flipY: true } : {}),
               scale: loc.scale ?? 1,
               visible: true,
               locked: false,
@@ -3618,6 +3628,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           width: loc.width,
           height: loc.height,
           rotation: loc.rotation ?? 0,
+          ...(loc.flipX ? { flipX: true } : {}),
+          ...(loc.flipY ? { flipY: true } : {}),
           scale: loc.scale ?? 1,
           visible: true,
           locked: false,
@@ -3836,6 +3848,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
           width: loc.width,
           height: loc.height,
           rotation: loc.rotation || 0,
+          ...(loc.flipX ? { flipX: true } : {}),
+          ...(loc.flipY ? { flipY: true } : {}),
           scale: loc.scale || 1,
           visible: true,
           locked: false,
@@ -4923,6 +4937,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
       // Add transform properties (rotation and scale)
       if (el.rotation !== undefined && el.rotation !== 0) location.rotation = el.rotation;
+      if (el.flipX) location.flipX = true;
+      if (el.flipY) location.flipY = true;
       if (el.scale !== undefined && el.scale !== 1) location.scale = el.scale;
 
       // Add font properties (only if explicitly overridden by user)

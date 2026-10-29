@@ -2114,6 +2114,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     playerCharacterName={playerCharacterName}
                     availableCounters={availableCounters}
                     availableVariables={availableVariables}
+                    availableInventoryItems={availableInventoryItems}
                     characterObjects={characters}
                     onDevelopCharacter={onDevelopCharacter}
                     translationSourceHints={

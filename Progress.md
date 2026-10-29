@@ -3,7 +3,11 @@
 ## Unreleased (since v0.9.146, 2026-10-29)
 
 ### Overview
-Work after v0.9.146: fixes found while testing the class-feedback release (Restart in the Preview, opening a beat, Movement Choice links).
+Work after v0.9.146: flipping pictures and picking known items (class feedback), and fixes found while testing the class-feedback release (Restart in the Preview, opening a beat, Movement Choice links).
+
+### Smaller class-feedback items
+- **Flip pictures in the Visual Editor** (#22: "it would be nice if it was possible to flip images … so that you don't have to make and import completely new sprites"). A character or prop on the stage has **Flip: ⇋ Left–right / ⇅ Upside down** under Rotation; one undo step each. Stored on the location as `flipX` / `flipY` (core `Location`), kept through every Visual Editor conversion, drawn by both layouts (PositionedBeatView, ResponsiveCharacterLayer) in the editor, the Preview and exports. An animation's waypoint flip (walking the other way) still wins while it plays. Checked headless on the bullying QA copy: Stan mirrored, undo puts him back.
+- **Add/Remove Inventory picks from the known items** (#24: "a way to create and store items … so you can be sure that one type of item [is used] instead of having to guess whether a PC got a correct sword"). The item field was free text; it now lists the items defined on characters and those the story already uses (the same list the condition editors had), with "+ New item…". A name that matches a known item except for case or spacing gets a hint ("Another beat or character calls it “Sword”. Use “Sword”"), since "Sword" and "sword" are two items to the engine (`utils/storyItems.ts closeItemName`). A project-wide item list with pictures, like the Characters, stays a design question.
 
 ### Fixes
 - **Opening a beat no longer changes it.** Selecting a beat that has a speaker set its *Show speaker* to "show" over "as the project says" (since March, so the tri-state select showed "show"). With the project default (names hidden), which beats showed their speaker then depended on which ones the author had happened to click, and every click was an undo step and an unsaved change. Choosing a speaker still turns it on, in the speaker field itself. Beats that were opened before keep the "show" they got. Checked headless: selecting three beats leaves the undo history empty and the project saved.
@@ -12,7 +16,7 @@ Work after v0.9.146: fixes found while testing the class-feedback release (Resta
 
 - **Movement Choice links are drawn once.** The flowchart drew every choice of a Movement Choice twice: once from the beat's links (MovementChoiceBeat makes one per choice) and once from a separate pass over its choices, which also lacked the violet guard styling of conditional choices. The extra pass is gone (randomTarget had the same doubling earlier); the regular pass draws Movement Choice links in their orange dashes. "Choose Your Path" in RED now has three edges instead of six.
 
-**Files modified:** packages/builder/src/components/graph/graphBuild.ts, packages/builder/src/components/Inspector.tsx, packages/core/src/engine/StoryEngine.ts, packages/builder/src/pages/PreviewWindow.tsx, packages/builder/public/player-web.js (rebuilt); tests (core StoryEngineRestart)
+**Files modified:** packages/core/src/types/index.ts, packages/renderer/src/components/PositionedBeatView.tsx, ResponsiveCharacterLayer.tsx, packages/builder/src/components/visual/VisualWorkspace.tsx, VisualBeatEditor.tsx, VisualPropertiesPanel.tsx, components/SchemaFormGenerator.tsx, utils/storyItems.ts (new), packages/builder/src/components/graph/graphBuild.ts, packages/builder/src/components/Inspector.tsx, packages/core/src/engine/StoryEngine.ts, packages/builder/src/pages/PreviewWindow.tsx, packages/builder/public/player-web.js (rebuilt); tests (core StoryEngineRestart)
 
 ---
 

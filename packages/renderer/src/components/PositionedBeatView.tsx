@@ -2553,8 +2553,10 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
   const transforms: string[] = [];
   const effectiveRotation = animatedPosition?.rotation ?? location.rotation;
   const effectiveScale = animatedPosition?.scale ?? location.scale;
-  const effectiveFlipX = animatedPosition?.flipX;
-  const effectiveFlipY = animatedPosition?.flipY;
+  // An animation's waypoint flip (walking the other way) wins over the
+  // flip the author set on the element.
+  const effectiveFlipX = animatedPosition?.flipX ?? location.flipX;
+  const effectiveFlipY = animatedPosition?.flipY ?? location.flipY;
 
   if (effectiveRotation) {
     transforms.push(`rotate(${effectiveRotation}deg)`);

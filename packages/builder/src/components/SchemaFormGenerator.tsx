@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle } from 'lucide-react';
+import { Variable, Box, Timer, User, ChevronDown, ChevronRight, Plus, Trash2, Shuffle, Package } from 'lucide-react';
+import { SmartNameDropdown } from '../editors/SmartNameDropdown';
+import { closeItemName } from '../utils/storyItems';
 import { VariableValueInput } from '../editors/VariableValueInput';
 import type { Beat } from '@asaps/core';
 import { describeMoodAxis } from '@asaps/core';
@@ -96,6 +98,8 @@ interface SchemaFormGeneratorProps {
   playerCharacterName?: string;
   // Available counters and variables for dropdowns
   availableCounters?: AvailableCounter[];
+  /** Items defined on characters and used in the story (Add/Remove Inventory's item). */
+  availableInventoryItems?: Array<{ name: string; displayName: string; characterName?: string }>;
   availableVariables?: AvailableVariable[];
   // Callbacks for special cases
   customRenderers?: Record<string, (param: string, def: ParameterDefinition) => React.ReactNode>;
@@ -259,6 +263,7 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
   characters = [],
   playerCharacterName,
   availableCounters = [],
+  availableInventoryItems = [],
   availableVariables = [],
   customRenderers = {},
   translationSourceHints,
@@ -1022,6 +1027,38 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               <p className="text-xs text-gray-500 mt-1">
                 Updates character's display name only (ID stays stable)
               </p>
+            </div>
+          );
+        }
+
+        // Add/Remove Inventory's item: pick from the items the project knows,
+        // or name a new one (class feedback, 2026-10-29: groups guessed
+        // whether it was "Sword" or "sword"). A new name that differs from a
+        // known one only in case or spacing gets a hint.
+        if (paramName === 'item' && beatType === 'addRemoveInventory') {
+          const known = availableInventoryItems.map((i) => i.name);
+          const close = typeof value === 'string' ? closeItemName(value, known) : undefined;
+          return (
+            <div key={paramName}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Package className="w-4 h-4 inline mr-1" />
+                {paramDef.ui?.label || 'Item'} {isRequired && <span className="text-red-500">*</span>}
+              </label>
+              <SmartNameDropdown
+                value={typeof value === 'string' ? value : ''}
+                onChange={(v) => onParameterChange(paramName, v || '')}
+                options={availableInventoryItems}
+                placeholder="e.g. Rusty Key"
+                newItemLabel="+ New item..."
+                noSelectionLabel="Select item..."
+                className="w-full"
+              />
+              {close && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Another beat or character calls it “{close}”.{' '}
+                  <button type="button" className="underline" onClick={() => onParameterChange(paramName, close)}>Use “{close}”</button>
+                </p>
+              )}
             </div>
           );
         }

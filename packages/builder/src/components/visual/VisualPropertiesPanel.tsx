@@ -2689,6 +2689,27 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </div>
                 </div>
 
+                {/* Flip — a sprite facing the other way without a second
+                    picture (class feedback, 2026-10-29). */}
+                {(selected.type === 'character' || selected.type === 'prop') && (
+                  <div>
+                    <label className="text-xs font-medium text-gray-700 mb-1 block">Flip</label>
+                    <div className="flex gap-2">
+                      {([['flipX', '⇋ Left–right'], ['flipY', '⇅ Upside down']] as const).map(([field, text]) => (
+                        <button
+                          key={field}
+                          type="button"
+                          onClick={() => onElementUpdate(selected.id, { [field]: !selected[field] } as Partial<VisualElement>)}
+                          aria-pressed={!!selected[field]}
+                          className={`flex-1 px-2 py-1 text-xs rounded border ${selected[field] ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                        >
+                          {text}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Z-Index — pixel stacking is meaningless in slot/spatial
                     (the engine resolves layer order from slot role and the
                     spatial vs flow split). Hidden there. */}

@@ -130,6 +130,9 @@ export interface VisualElement {
   height: number;
   rotation: number;
   scale: number;
+  /** Mirrored left↔right / upside down (pictures, characters, props). */
+  flipX?: boolean;
+  flipY?: boolean;
   visible: boolean;
   locked: boolean;
   name: string;
@@ -630,6 +633,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
       // Include transform properties
       rotation: el.rotation,
       scale: el.scale,
+      ...(el.flipX ? { flipX: true } : {}),
+      ...(el.flipY ? { flipY: true } : {}),
       // Character-specific fields
       characterId: el.characterId,
       characterName: el.characterName,

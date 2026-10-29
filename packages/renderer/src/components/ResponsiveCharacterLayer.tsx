@@ -490,7 +490,9 @@ export const ResponsiveCharacterLayer = forwardRef<ResponsiveCharacterLayerHandl
         const transformParts: string[] = [];
         if (effectiveScale !== 1) transformParts.push(`scale(${effectiveScale})`);
         if (effectiveRot !== 0) transformParts.push(`rotate(${effectiveRot}deg)`);
-        if (animPos?.flipX) transformParts.push('scaleX(-1)');
+        // A waypoint's flip wins over the one set on the element.
+        if (animPos?.flipX ?? loc.flipX) transformParts.push('scaleX(-1)');
+        if (loc.flipY) transformParts.push('scaleY(-1)');
         const transform = transformParts.length ? transformParts.join(' ') : undefined;
 
         const isSelected = !!editorMode && selectedElementName === loc.name;
