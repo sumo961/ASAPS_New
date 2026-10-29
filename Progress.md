@@ -22,6 +22,7 @@ From the game-design class feedback (34 responses): a Script view with all the s
 - **Story Beats can be folded away** (class feedback: "the actual window displaying the beats took up at most 1/4th of my screen"; "being able to resize or hide windows"): the panel's ‹ button folds it to a strip of beat icons (click one to select it, › to unfold). The Sidebar already had this view; it was never wired up.
 - **The overview map can be hidden** ("being able to hide the minimap in the bottom right"): a new button under the flowchart's zoom buttons.
 - **Wide Properties panel** ("text editors feeling cramped"): the button next to Properties widens the panel to 60 % of the window, and back. Dragging its edge leaves Wide from the width it has.
+- **A shorter header**: the AI menu, version-control status, voices, speech input and language moved from a row of their own into the empty right side of the title row (they wrap below the title on narrow windows). At 1440 px the header is 147 px tall instead of 190; their menus still open inside the window.
 - The Story Beats, Beat Types, overview map and Wide choices are remembered on this computer (`asaps_ui_sidebar_collapsed`, `asaps_ui_palette_collapsed`, `asaps_ui_minimap`, `asaps_ui_inspector_wide`).
 
 ### Playing

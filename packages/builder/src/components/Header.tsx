@@ -298,7 +298,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="bg-white border-b border-gray-200 px-4 py-2">
       {/* Row 1: Logo and Story Title - Draggable on Electron macOS */}
       <div
-        className="flex items-center justify-between mb-2"
+        className="flex flex-wrap items-center justify-between gap-y-2 mb-2"
         style={{
           paddingLeft: isElectronMac ? '64px' : undefined,
           // Make this row draggable for window movement on Electron
@@ -364,6 +364,370 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
           )}
         </div>
+          {/* AI, VCS, voices and language: this row's right side, not a row of their own (class feedback 2026-10-29: the header took a quarter of the screen) */}
+          <div className="flex items-center gap-3 flex-wrap justify-end" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+            {/* Left: AI + VCS */}
+            <div className="flex items-center space-x-2">
+              {/* AI Menu Button (App Preferences ▸ Show AI features) */}
+              {aiOn && (
+                <div className="relative">
+                  <button
+                    className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
+                    onClick={() => setShowAIMenu(!showAIMenu)}
+                    title="AI Tools"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+
+                  {/* AI Dropdown Menu */}
+                  {showAIMenu && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowAIMenu(false)}
+                      />
+                      <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                        {onIdeator && (
+                          <button
+                            onClick={() => {
+                              onIdeator();
+                              setShowAIMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                            title="Open Ideator — a conversational ideation tool that helps you shape a complex issue into a prompt before generating the story"
+                          >
+                            <Wand2 className="w-4 h-4" />
+                            Ideate with Ideator
+                          </button>
+                        )}
+                        {onCoDesigner && (
+                          <button
+                            onClick={() => {
+                              onCoDesigner();
+                              setShowAIMenu(false);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                            title="Open Co-Designer — a design-phase collaborator that works with you on the story currently open (deepen characters, sharpen choices, find where branches earn their keep)"
+                          >
+                            <Compass className="w-4 h-4" />
+                            Design with Co-Designer
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setShowStoryGenerator(true);
+                            setShowAIMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                          title="Generate a complete story structure from a description"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          Generate Story
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAIEditsLog(true);
+                            setShowAIMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3"
+                          title="Every edit an AI proposed for this project and what you decided — kept with the project"
+                        >
+                          <History className="w-4 h-4" />
+                          AI changes{aiEdits?.entries?.length ? ` (${aiEdits.entries.length})` : ''}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowBeatCreator(true);
+                            setShowAIMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                          title="Create a new beat by describing what you want in plain language"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Create Beat from Description
+                        </button>
+                        <div className="my-2 border-t border-gray-200" />
+                        <button
+                          onClick={() => {
+                            setShowAIConfig(true);
+                            setShowAIMenu(false);
+                          }}
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                          title="Set up your AI provider (Claude, OpenAI, or local Ollama)"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Configure AI
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* VCS Status (shown when project is under version control) */}
+              <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
+            </div>
+
+            {/* Right: TTS + Language + Translation Progress */}
+            <div className="flex items-center space-x-2">
+              {/* TTS Menu Button */}
+              <div className="relative">
+                <button
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                    ttsEnabled
+                      ? 'bg-teal-500 text-white hover:bg-teal-600'
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                  onClick={() => setShowTTSMenu(!showTTSMenu)}
+                  title={ttsEnabled ? 'TTS enabled' : 'TTS disabled'}
+                >
+                  {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                  TTS
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {/* TTS Dropdown Menu */}
+                {showTTSMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowTTSMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                      {/* Toggle TTS */}
+                      <button
+                        onClick={() => {
+                          const newEnabled = !ttsEnabled;
+                          setTtsEnabled(newEnabled);
+                          getTTSService().setEnabled(newEnabled);
+                          localStorage.setItem('asaps_tts_enabled', String(newEnabled));
+                          if (!newEnabled) getTTSService().stop();
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                      >
+                        {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                        {ttsEnabled ? 'Disable TTS' : 'Enable TTS'}
+                      </button>
+
+                      {/* Configure Provider */}
+                      <button
+                        onClick={() => {
+                          setShowTTSConfig(true);
+                          setShowTTSMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Configure Provider
+                      </button>
+
+                      {/* Character Voices section */}
+                      {ttsEnabled && speakers.length > 0 && (
+                        <>
+                          <div className="my-2 border-t border-gray-200" />
+                          <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            Character Voices{activeProviderName ? ` (${activeProviderName})` : ''}
+                          </div>
+                          {speakers.map(speaker => {
+                            const isPlayerCharacter = speaker === 'Interactor' || (playerCharacterName && speaker === playerCharacterName);
+                            const displayName = isPlayerCharacter
+                              ? (playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor')
+                              : speaker;
+                            return (
+                              <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
+                                <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '35%' }}>
+                                  {displayName}
+                                </span>
+                                <select
+                                  value={speakerVoices[speaker] || ''}
+                                  onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
+                                  className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
+                                >
+                                  <option value="">{isPlayerCharacter ? 'Silent' : 'Auto'}</option>
+                                  {availableVoices.map(v => (
+                                    <option key={v.id} value={v.id}>{v.name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => getTTSService().speak(`Hello, I am ${displayName}.`, speaker)}
+                                  className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
+                                  title={`Test ${displayName}'s voice`}
+                                >
+                                  Test
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* STT Menu Button */}
+              <div className="relative">
+                <button
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                    sttEnabled
+                      ? 'bg-rose-500 text-white hover:bg-rose-600'
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }`}
+                  onClick={() => setShowSTTMenu(!showSTTMenu)}
+                  title={sttEnabled ? 'STT enabled' : 'STT disabled'}
+                >
+                  {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                  STT
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {/* STT Dropdown Menu */}
+                {showSTTMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowSTTMenu(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                      {/* Toggle STT */}
+                      <button
+                        onClick={() => {
+                          const newEnabled = !sttEnabled;
+                          setSttEnabled(newEnabled);
+                          getSTTService().setEnabled(newEnabled);
+                          localStorage.setItem('asaps_stt_enabled', String(newEnabled));
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
+                      >
+                        {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                        {sttEnabled ? 'Disable STT' : 'Enable STT'}
+                      </button>
+
+                      {/* Configure Provider */}
+                      <button
+                        onClick={() => {
+                          setShowSTTConfig(true);
+                          setShowSTTMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Configure STT
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Language Selector */}
+              <LanguageSelector
+                sourceLanguage={translationState.sourceLanguage}
+                sourceLanguageName={getLanguageDisplayName(translationState.sourceLanguage)}
+                activeLanguage={translationState.activeLanguage}
+                translations={translationState.translations}
+                manifest={translationState.manifest}
+                onLanguageChange={translationActions.setActiveLanguage}
+                onGenerateTranslation={async (code, name) => {
+                  if (!currentProjectId) return;
+                  const savedConfig = getSavedAIConfig();
+                  if (!savedConfig?.apiKey) {
+                    notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
+                    return;
+                  }
+                  try {
+                    const projectData = await getProjectDataForExport(currentProjectId);
+                    const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
+                      'openai': 'openai',
+                      'claude': 'anthropic',
+                      'local': 'local',
+                    };
+                    const aiConfig = {
+                      provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
+                      apiKey: savedConfig.apiKey,
+                      baseUrl: savedConfig.baseUrl,
+                      model: savedConfig.model,
+                    };
+                    await translationActions.generateTranslation(projectData, code, name, aiConfig);
+                    // Trigger save so translation files get written to disk (visible to VCS)
+                    markChanged();
+                  } catch (e) {
+                    console.error('[Header] Translation generation failed:', e);
+                  }
+                }}
+                onCreateManualTranslation={async (code, name) => {
+                  if (!currentProjectId) return;
+                  try {
+                    const projectData = await getProjectDataForExport(currentProjectId);
+                    translationActions.createManualTranslation(projectData, code, name);
+                    // Trigger save so translation files get written to disk (visible to VCS)
+                    markChanged();
+                  } catch (e) {
+                    console.error('[Header] Manual translation creation failed:', e);
+                  }
+                }}
+                isGenerating={translationState.isGenerating}
+                onDeleteTranslation={(code) => {
+                  translationActions.deleteTranslation(code);
+                  markChanged();
+                }}
+                onContinueTranslation={async (code, name) => {
+                  if (!currentProjectId) return;
+                  const savedConfig = getSavedAIConfig();
+                  if (!savedConfig?.apiKey) {
+                    notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
+                    return;
+                  }
+                  try {
+                    const projectData = await getProjectDataForExport(currentProjectId);
+                    const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
+                      'openai': 'openai',
+                      'claude': 'anthropic',
+                      'local': 'local',
+                    };
+                    const aiConfig = {
+                      provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
+                      apiKey: savedConfig.apiKey,
+                      baseUrl: savedConfig.baseUrl,
+                      model: savedConfig.model,
+                    };
+                    await translationActions.continueTranslation(projectData, code, aiConfig);
+                    markChanged();
+                  } catch (e) {
+                    console.error('[Header] Continue translation failed:', e);
+                  }
+                }}
+              />
+
+              {/* Translation progress indicator */}
+              {translationState.isGenerating && (() => {
+                const { stringsTranslated, totalStrings, generationProgress } = translationState;
+                const pct = totalStrings > 0 ? Math.round((stringsTranslated / totalStrings) * 100) : 0;
+                return (
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded">
+                    <svg className="w-3.5 h-3.5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <div className="flex flex-col gap-0.5 min-w-[140px]">
+                      <span className="truncate">
+                        {generationProgress || 'Translating...'}
+                      </span>
+                      {totalStrings > 0 && (
+                        <div className="w-full h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
       </div>
 
       {/* Row 2: All action buttons. Wraps instead of overflowing: at 1280
@@ -844,371 +1208,6 @@ export const Header: React.FC<HeaderProps> = ({
               {previewWindowOpen ? 'Preview Open' : 'Preview'}
             </button>
           )}
-        </div>
-      </div>
-
-      {/* Row 3: AI, VCS, Language, Translation */}
-      <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
-        {/* Left: AI + VCS */}
-        <div className="flex items-center space-x-2">
-          {/* AI Menu Button (App Preferences ▸ Show AI features) */}
-          {aiOn && (
-            <div className="relative">
-              <button
-                className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
-                onClick={() => setShowAIMenu(!showAIMenu)}
-                title="AI Tools"
-              >
-                <Sparkles className="w-4 h-4" />
-                AI
-                <ChevronDown className="w-3 h-3" />
-              </button>
-
-              {/* AI Dropdown Menu */}
-              {showAIMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setShowAIMenu(false)}
-                  />
-                  <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                    {onIdeator && (
-                      <button
-                        onClick={() => {
-                          onIdeator();
-                          setShowAIMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                        title="Open Ideator — a conversational ideation tool that helps you shape a complex issue into a prompt before generating the story"
-                      >
-                        <Wand2 className="w-4 h-4" />
-                        Ideate with Ideator
-                      </button>
-                    )}
-                    {onCoDesigner && (
-                      <button
-                        onClick={() => {
-                          onCoDesigner();
-                          setShowAIMenu(false);
-                        }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
-                        title="Open Co-Designer — a design-phase collaborator that works with you on the story currently open (deepen characters, sharpen choices, find where branches earn their keep)"
-                      >
-                        <Compass className="w-4 h-4" />
-                        Design with Co-Designer
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setShowStoryGenerator(true);
-                        setShowAIMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                      title="Generate a complete story structure from a description"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      Generate Story
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowAIEditsLog(true);
-                        setShowAIMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3"
-                      title="Every edit an AI proposed for this project and what you decided — kept with the project"
-                    >
-                      <History className="w-4 h-4" />
-                      AI changes{aiEdits?.entries?.length ? ` (${aiEdits.entries.length})` : ''}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowBeatCreator(true);
-                        setShowAIMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                      title="Create a new beat by describing what you want in plain language"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Create Beat from Description
-                    </button>
-                    <div className="my-2 border-t border-gray-200" />
-                    <button
-                      onClick={() => {
-                        setShowAIConfig(true);
-                        setShowAIMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                      title="Set up your AI provider (Claude, OpenAI, or local Ollama)"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Configure AI
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* VCS Status (shown when project is under version control) */}
-          <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />
-        </div>
-
-        {/* Right: TTS + Language + Translation Progress */}
-        <div className="flex items-center space-x-2">
-          {/* TTS Menu Button */}
-          <div className="relative">
-            <button
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                ttsEnabled
-                  ? 'bg-teal-500 text-white hover:bg-teal-600'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
-              onClick={() => setShowTTSMenu(!showTTSMenu)}
-              title={ttsEnabled ? 'TTS enabled' : 'TTS disabled'}
-            >
-              {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              TTS
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {/* TTS Dropdown Menu */}
-            {showTTSMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowTTSMenu(false)}
-                />
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  {/* Toggle TTS */}
-                  <button
-                    onClick={() => {
-                      const newEnabled = !ttsEnabled;
-                      setTtsEnabled(newEnabled);
-                      getTTSService().setEnabled(newEnabled);
-                      localStorage.setItem('asaps_tts_enabled', String(newEnabled));
-                      if (!newEnabled) getTTSService().stop();
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
-                  >
-                    {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                    {ttsEnabled ? 'Disable TTS' : 'Enable TTS'}
-                  </button>
-
-                  {/* Configure Provider */}
-                  <button
-                    onClick={() => {
-                      setShowTTSConfig(true);
-                      setShowTTSMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Configure Provider
-                  </button>
-
-                  {/* Character Voices section */}
-                  {ttsEnabled && speakers.length > 0 && (
-                    <>
-                      <div className="my-2 border-t border-gray-200" />
-                      <div className="px-4 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        Character Voices{activeProviderName ? ` (${activeProviderName})` : ''}
-                      </div>
-                      {speakers.map(speaker => {
-                        const isPlayerCharacter = speaker === 'Interactor' || (playerCharacterName && speaker === playerCharacterName);
-                        const displayName = isPlayerCharacter
-                          ? (playerCharacterName ? `${playerCharacterName} (Player)` : 'Interactor')
-                          : speaker;
-                        return (
-                          <div key={speaker} className="px-4 py-1.5 flex items-center justify-between gap-2">
-                            <span className="text-sm text-gray-700 truncate flex-shrink-0" style={{ maxWidth: '35%' }}>
-                              {displayName}
-                            </span>
-                            <select
-                              value={speakerVoices[speaker] || ''}
-                              onChange={(e) => onSpeakerVoiceChange?.(speaker, e.target.value)}
-                              className="flex-1 text-xs px-2 py-1 border rounded bg-white min-w-0"
-                            >
-                              <option value="">{isPlayerCharacter ? 'Silent' : 'Auto'}</option>
-                              {availableVoices.map(v => (
-                                <option key={v.id} value={v.id}>{v.name}</option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => getTTSService().speak(`Hello, I am ${displayName}.`, speaker)}
-                              className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded flex-shrink-0"
-                              title={`Test ${displayName}'s voice`}
-                            >
-                              Test
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* STT Menu Button */}
-          <div className="relative">
-            <button
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                sttEnabled
-                  ? 'bg-rose-500 text-white hover:bg-rose-600'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
-              onClick={() => setShowSTTMenu(!showSTTMenu)}
-              title={sttEnabled ? 'STT enabled' : 'STT disabled'}
-            >
-              {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-              STT
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {/* STT Dropdown Menu */}
-            {showSTTMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowSTTMenu(false)}
-                />
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  {/* Toggle STT */}
-                  <button
-                    onClick={() => {
-                      const newEnabled = !sttEnabled;
-                      setSttEnabled(newEnabled);
-                      getSTTService().setEnabled(newEnabled);
-                      localStorage.setItem('asaps_stt_enabled', String(newEnabled));
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
-                  >
-                    {sttEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                    {sttEnabled ? 'Disable STT' : 'Enable STT'}
-                  </button>
-
-                  {/* Configure Provider */}
-                  <button
-                    onClick={() => {
-                      setShowSTTConfig(true);
-                      setShowSTTMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-700 transition-colors flex items-center gap-3"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Configure STT
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Language Selector */}
-          <LanguageSelector
-            sourceLanguage={translationState.sourceLanguage}
-            sourceLanguageName={getLanguageDisplayName(translationState.sourceLanguage)}
-            activeLanguage={translationState.activeLanguage}
-            translations={translationState.translations}
-            manifest={translationState.manifest}
-            onLanguageChange={translationActions.setActiveLanguage}
-            onGenerateTranslation={async (code, name) => {
-              if (!currentProjectId) return;
-              const savedConfig = getSavedAIConfig();
-              if (!savedConfig?.apiKey) {
-                notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
-                return;
-              }
-              try {
-                const projectData = await getProjectDataForExport(currentProjectId);
-                const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
-                  'openai': 'openai',
-                  'claude': 'anthropic',
-                  'local': 'local',
-                };
-                const aiConfig = {
-                  provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
-                  apiKey: savedConfig.apiKey,
-                  baseUrl: savedConfig.baseUrl,
-                  model: savedConfig.model,
-                };
-                await translationActions.generateTranslation(projectData, code, name, aiConfig);
-                // Trigger save so translation files get written to disk (visible to VCS)
-                markChanged();
-              } catch (e) {
-                console.error('[Header] Translation generation failed:', e);
-              }
-            }}
-            onCreateManualTranslation={async (code, name) => {
-              if (!currentProjectId) return;
-              try {
-                const projectData = await getProjectDataForExport(currentProjectId);
-                translationActions.createManualTranslation(projectData, code, name);
-                // Trigger save so translation files get written to disk (visible to VCS)
-                markChanged();
-              } catch (e) {
-                console.error('[Header] Manual translation creation failed:', e);
-              }
-            }}
-            isGenerating={translationState.isGenerating}
-            onDeleteTranslation={(code) => {
-              translationActions.deleteTranslation(code);
-              markChanged();
-            }}
-            onContinueTranslation={async (code, name) => {
-              if (!currentProjectId) return;
-              const savedConfig = getSavedAIConfig();
-              if (!savedConfig?.apiKey) {
-                notify.warning('Translation needs AI. Open AI \u2192 Configure AI and add an API key first.');
-                return;
-              }
-              try {
-                const projectData = await getProjectDataForExport(currentProjectId);
-                const providerMap: Record<string, 'openai' | 'anthropic' | 'custom' | 'local'> = {
-                  'openai': 'openai',
-                  'claude': 'anthropic',
-                  'local': 'local',
-                };
-                const aiConfig = {
-                  provider: providerMap[savedConfig.providerType || savedConfig.provider] || 'openai' as const,
-                  apiKey: savedConfig.apiKey,
-                  baseUrl: savedConfig.baseUrl,
-                  model: savedConfig.model,
-                };
-                await translationActions.continueTranslation(projectData, code, aiConfig);
-                markChanged();
-              } catch (e) {
-                console.error('[Header] Continue translation failed:', e);
-              }
-            }}
-          />
-
-          {/* Translation progress indicator */}
-          {translationState.isGenerating && (() => {
-            const { stringsTranslated, totalStrings, generationProgress } = translationState;
-            const pct = totalStrings > 0 ? Math.round((stringsTranslated / totalStrings) * 100) : 0;
-            return (
-              <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded">
-                <svg className="w-3.5 h-3.5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <div className="flex flex-col gap-0.5 min-w-[140px]">
-                  <span className="truncate">
-                    {generationProgress || 'Translating...'}
-                  </span>
-                  {totalStrings > 0 && (
-                    <div className="w-full h-1.5 bg-blue-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-600 rounded-full transition-all duration-300"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
 
