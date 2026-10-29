@@ -367,12 +367,15 @@ describe('buildGraphEdges', () => {
     expect(edges.map(e => e.label).sort()).toEqual(['False', 'True']);
   });
 
-  it('emits movementChoice edges per choice with labels', () => {
+  it('draws each movementChoice choice once, labelled, in the Movement Choice orange', () => {
+    // MovementChoiceBeat.getConnections gives one link per choice. A second
+    // emitter used to draw every choice again (2026-10-29).
     const edges = buildGraphEdges({
       beats: [
         beat({
           id: 'm1', type: 'movementChoice',
           params: { choices: [{ target: 'x1', text: 'North' }, { target: 'x2', text: 'South' }] },
+          connections: [{ targetId: 'x1', label: 'North' }, { targetId: 'x2', label: 'South' }],
         }),
         beat({ id: 'x1' }),
         beat({ id: 'x2' }),
@@ -381,6 +384,7 @@ describe('buildGraphEdges', () => {
       expandedDialogs: new Set(),
     });
     expect(edges.map(e => e.label)).toEqual(['North', 'South']);
+    expect(edges.every(e => (e.style as any)?.stroke === '#f59e0b')).toBe(true);
   });
 
   it('emits legacy single-node dialogTree choice edges when collapsed', () => {

@@ -517,38 +517,11 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
       // object-form branches and doubled every edge once branches could
       // carry weights/effects.
 
-      // Special handling for movementChoice beats - show all location choices
-      if (beat.type === 'movementChoice' && params.choices) {
-        params.choices.forEach((choice: any, index: number) => {
-          if (choice.target) {
-            // Include index to ensure unique IDs even when multiple choices target the same beat
-            const choiceEdgeId = `${beat.id}-movement-${index}-${choice.target}`;
-            const edge = createEdge(beat.id, choice.target, {
-                id: choiceEdgeId,
-                type: 'custom',
-                animated: false,
-                label: choice.text || choice.location || `Location ${index + 1}`,
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                },
-                style: {
-                  stroke: '#f59e0b', // Orange for movement choices (matches movementChoice badge)
-                  strokeWidth: 2,
-                  strokeDasharray: '5 5', // Dashed line for visual distinction
-                },
-                data: {
-                  isMovement: true,
-                },
-              });
-            if (edge && !edgeIds.has(edge.id)) {
-              edgeIds.add(edge.id);
-              allEdges.push(edge);
-            }
-          }
-        });
-      }
+      // movementChoice: its choices are ordinary links too (MovementChoiceBeat
+      // builds one per choice, labelled with its text), drawn by the regular
+      // connection pass below in the Movement Choice orange. A separate
+      // emitter here drew every choice a second time, without the guard
+      // styling (2026-10-29) — the same doubling randomTarget had.
 
       // Special handling for dialogTree beats - show all dialog choices
       // Helper to extract target from various formats
@@ -827,6 +800,8 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
         // A restart leads back into the story with state reset — drawn as
         // its own kind of link (dashed teal, "Restart"), not a way on.
         const isRestart = connection.role === 'restart';
+        // Movement Choice links keep their own look (orange, dashed).
+        const isMovement = beat.type === 'movementChoice';
         const edge = createEdge(beat.id, connection.targetId, {
           id: `conn-${beat.id}-${connection.targetId}`,
           type: 'custom',
@@ -839,9 +814,9 @@ export function buildGraphEdges(input: GraphEdgesInput): Edge[] {
             ...(isRestart ? { color: '#0d9488' } : {}),
           },
           style: {
-            stroke: isRestart ? '#0d9488' : guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : '#64748b',
+            stroke: isRestart ? '#0d9488' : guardConds ? '#8b5cf6' : connection.condition ? '#fbbf24' : isMovement ? '#f59e0b' : '#64748b',
             strokeWidth: 2,
-            ...(isRestart ? { strokeDasharray: '8 4' } : guardConds ? { strokeDasharray: '6 3' } : {}),
+            ...(isRestart ? { strokeDasharray: '8 4' } : guardConds ? { strokeDasharray: '6 3' } : isMovement ? { strokeDasharray: '5 5' } : {}),
           },
           data: {
             condition: guardConds ? undefined : connection.condition,
