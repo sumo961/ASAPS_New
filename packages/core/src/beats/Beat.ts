@@ -225,7 +225,15 @@ export abstract class Beat {
    * used to end there with the choices still on screen, all dead. Now
    * nothing happens and the choices stay; the Preview names the choice
    * (renderer state 'unlinkedChoice').
+   *
+   * A renderer that answers without a person — a test's mock, an automatic
+   * playthrough — would pick the same choice again at once and loop for
+   * ever (it filled the CI runner's memory). After UNLINKED_REPEAT_LIMIT
+   * unlinked picks in a row the beat ends as it used to; no player clicks
+   * a dead button that often.
    */
+  static readonly UNLINKED_REPEAT_LIMIT = 100;
+
   protected unlinkedChoice(renderer: IRenderer, choiceText: string | undefined): void {
     console.warn(`[Beat ${this.id}] Choice "${choiceText ?? ''}" is not linked to a beat — staying on "${this.name || this.id}".`);
     renderer.setState('unlinkedChoice', { beatId: this.id, beatName: this.name, choiceText: choiceText ?? '' });

@@ -180,6 +180,8 @@ export class MultiChoiceBeat extends Beat {
       renderer.setVisitedChoiceIds(context.getVisitedChoicesForBeat(this.id));
     }
 
+    // Unlinked choices picked in a row (Beat.UNLINKED_REPEAT_LIMIT).
+    let unlinkedPicks = 0;
     while (true) {
       const availableChoices = this.choicesFor(context).filter(choice => {
         if (!choice.conditions || choice.conditions.length === 0) return true;
@@ -237,9 +239,11 @@ export class MultiChoiceBeat extends Beat {
       }
 
       if (selected.target !== '__self__' && !this.targetFor(selected, context)) {
+        if (++unlinkedPicks > Beat.UNLINKED_REPEAT_LIMIT) return null;
         this.unlinkedChoice(renderer, selected.displayText || selected.text);
         continue;
       }
+      unlinkedPicks = 0;
 
       // effectsOncePerChoice: the choice stays selectable, its effects don't
       // re-fire. Read BEFORE marking.

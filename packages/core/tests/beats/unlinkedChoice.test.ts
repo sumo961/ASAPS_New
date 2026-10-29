@@ -79,4 +79,14 @@ describe('a choice not linked to a beat', () => {
     await expect(beat.execute(new StoryContext(), renderer)).resolves.toBe('next');
     expect(unlinkedCalls(renderer)).toEqual([]);
   });
+
+  it('a renderer that answers by itself (a test, an automatic playthrough) cannot loop for ever', async () => {
+    const beat = new MultiChoiceBeat({
+      id: 'mc', name: 'Stuck', type: 'multiChoice',
+      choices: [{ id: 'a', text: 'Nowhere', target: '' }],
+    } as any);
+    const renderer = rendererPicking(...Array(500).fill('a'));
+    await expect(beat.execute(new StoryContext(), renderer)).resolves.toBeNull();
+    expect((renderer.renderChoices as any).mock.calls.length).toBe(101);
+  });
 });

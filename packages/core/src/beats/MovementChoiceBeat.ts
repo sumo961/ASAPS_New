@@ -164,6 +164,8 @@ export class MovementChoiceBeat extends Beat {
     renderer.setState('spatialFit', this.spatialFit);
 
     // While loop supports __self__ target (return to choices)
+    // Unlinked choices picked in a row (Beat.UNLINKED_REPEAT_LIMIT).
+    let unlinkedPicks = 0;
     while (true) {
       // Filter choices based on conditions
       const availableChoices = this.choices.filter(choice => {
@@ -215,9 +217,11 @@ export class MovementChoiceBeat extends Beat {
       }
 
       if (selectedChoice && selectedChoice.target !== '__self__' && !selectedChoice.target) {
+        if (++unlinkedPicks > Beat.UNLINKED_REPEAT_LIMIT) return null;
         this.unlinkedChoice(renderer, selectedChoice.displayText || selectedChoice.text);
         continue;
       }
+      unlinkedPicks = 0;
 
       if (selectedChoice) {
         // effectsOncePerChoice: read BEFORE marking below.

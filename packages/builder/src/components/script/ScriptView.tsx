@@ -31,11 +31,13 @@ interface Props {
   onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
   onBeatsUpdate?: (edits: Array<{ beatId: string; updates: Partial<Beat> }>, description: string) => void;
   storyTitle?: string;
+  /** Written into the Markdown so a file can't be read into another project. */
+  projectId?: string;
 }
 
 const ALL = '__all__';
 
-export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, firstBeatId, onBeatSelect, onBeatUpdate, onBeatsUpdate, storyTitle }) => {
+export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, firstBeatId, onBeatSelect, onBeatUpdate, onBeatsUpdate, storyTitle, projectId }) => {
   const [scope, setScope] = usePersistedState<string>('asaps_ui_script_scope', ALL);
   const [showEmpty, setShowEmpty] = usePersistedState('asaps_ui_script_show_empty', false);
   const scopeValid = scope === ALL || clusters.some((c) => c.id === scope);
@@ -63,10 +65,16 @@ export const ScriptView: React.FC<Props> = ({ beats, clusters, selectedBeat, fir
   const saveMarkdown = () => {
     const title = [storyTitle, scopeName].filter(Boolean).join(' — ') || 'Script';
     const file = `${title.replace(/[\\/:*?"<>|]+/g, '').trim() || 'Script'}.md`;
-    downloadMarkdown(file, exportScriptMarkdown(rows, title));
+    downloadMarkdown(file, exportScriptMarkdown(rows, title, projectId));
   };
   const readMarkdown = async (file: File) => {
-    const result = importScriptMarkdown(await file.text(), beats);
+    const result = importScriptMarkdown(await file.text(), beats, projectId);
+    if (result.otherProject) {
+      notify.warning(`"${file.name}" was saved from another project, so nothing was changed.`, {
+        detail: 'Open the project it came from to read it back. (Each project has its own id; beats in different projects can share the same beat ids.)',
+      });
+      return;
+    }
     if (result.matched === 0 && result.changes.length === 0) {
       notify.warning(`No beat of this story found in "${file.name}".`, {
         detail: 'Update from Markdown reads files saved with Save as Markdown: each beat is a ## heading with its name.',

@@ -14,6 +14,12 @@
  *
  *   **Choice 1:** Visit Grandma
  *
+ * Under the title, the project's own id (`<!-- asaps-project:… -->`): beat
+ * ids like `beat_5` are only unique within one project, so a file read into
+ * another project could change the wrong beats. Reading refuses a file from
+ * another project; a file without the line (written by hand) is read by
+ * beat ids and names as before.
+ *
  * A beat whose only text is its Text is written as plain paragraphs.
  * Dialog Tree branches are nested quotes (`> `), one per branching level —
  * indentation would turn into code blocks in Markdown. ASAPS's own
@@ -36,21 +42,32 @@ export interface ScriptBeat {
 }
 
 const ID_COMMENT = /^<!--\s*asaps:(\S+?)\s*-->$/;
+const PROJECT_COMMENT = /^<!--\s*asaps-project:(\S+?)\s*-->$/;
 
 /** Does a field get written as plain paragraphs, without a label? */
 const plainText = (fields: ScriptField[]) => fields.length === 1 && fields[0].kind === 'text' && fields[0].label === 'Text';
 
 const quote = (depth: number) => (depth > 0 ? `${'> '.repeat(depth)}` : '');
 
-/** Keep text lines from being read as headings, id comments or field labels. */
-function escapeLine(line: string): string {
-  return /^(\s*>|#|<!--|\*\*[^*]+:\*\*|\\)/.test(line) ? `\\${line}` : line;
-}
-const unescapeLine = (line: string) => (line.startsWith('\\') ? line.slice(1) : line);
+/**
+ * Keep text lines from being read as headings, quotes, id comments or field
+ * labels: those get a backslash in front (and so does a line that already
+ * starts with backslashes before one of them, so it reads back the same).
+ * Other backslashes stay as written — ASAPS's `\*` for a literal asterisk
+ * is Markdown's too. Escaping every line that began with a backslash turned
+ * `\*sigh\*` into `\\*sigh\*`: a literal backslash, then italics that never
+ * closed (2026-10-29).
+ */
+const SYNTAX = /^(\s*>|#|<!--|\*\*[^*]+:\*\*)/;
+const needsEscape = (line: string): boolean => SYNTAX.test(line) || (line.startsWith('\\') && needsEscape(line.slice(1)));
+const escapeLine = (line: string) => (needsEscape(line) ? `\\${line}` : line);
+const unescapeLine = (line: string) => (line.startsWith('\\') && needsEscape(line.slice(1)) ? line.slice(1) : line);
 
-export function exportScriptMarkdown(rows: ReadonlyArray<ScriptBeat>, title?: string): string {
+export function exportScriptMarkdown(rows: ReadonlyArray<ScriptBeat>, title?: string, projectId?: string): string {
   const out: string[] = [];
-  if (title) out.push(`# ${title}`, '');
+  if (title) out.push(`# ${title}`);
+  if (projectId) out.push(`<!-- asaps-project:${projectId} -->`);
+  if (title || projectId) out.push('');
   for (const { beat, fields } of rows) {
     out.push(`## ${String(beat.name || beat.id).replace(/\n/g, ' ')}`, `<!-- asaps:${beat.id} -->`, '');
     if (plainText(fields)) {
@@ -86,6 +103,8 @@ export interface ScriptImport {
   mismatched: string[];
   /** How many beats were read. */
   matched: number;
+  /** The file was saved from another project (its id); nothing was read. */
+  otherProject?: string;
 }
 
 interface Section { heading: string; id?: string; lines: string[] }
@@ -157,7 +176,11 @@ function readFields(fields: ScriptField[], lines: string[]): string[] | null {
   return values.map((v) => trimBlankLines(v).map(unescapeLine).join('\n'));
 }
 
-export function importScriptMarkdown(md: string, beats: ReadonlyArray<any>): ScriptImport {
+export function importScriptMarkdown(md: string, beats: ReadonlyArray<any>, projectId?: string): ScriptImport {
+  const fileProject = md.replace(/\r\n?/g, '\n').split('\n').map((l) => PROJECT_COMMENT.exec(l.trim())?.[1]).find(Boolean);
+  if (fileProject && projectId && fileProject !== projectId) {
+    return { changes: [], unknown: [], mismatched: [], matched: 0, otherProject: fileProject };
+  }
   const byId = new Map(beats.map((b) => [b.id, b]));
   const byName = new Map<string, any[]>();
   for (const b of beats) {

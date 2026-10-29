@@ -268,6 +268,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             onBeatUpdate={onBeatUpdate}
             onBeatsUpdate={onBeatsUpdate}
             storyTitle={storyTitle}
+            projectId={projectId}
           />
         ) : activeView === 'visual' ? (
           <div className="h-full w-full">

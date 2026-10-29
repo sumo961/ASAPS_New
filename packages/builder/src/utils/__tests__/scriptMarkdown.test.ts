@@ -28,6 +28,16 @@ describe('script Markdown', () => {
     expect(back).toMatchObject({ changes: [], unknown: [], mismatched: [], matched: 3 });
   });
 
+  it('leaves ASAPS\'s \\* alone, so the asterisks stay literal in Markdown too', () => {
+    const beats = [
+      make('v', 'Vic', 'dialogTree', { dialogTree: { id: 'r', speaker: 'Vic', text: '\\*sigh\\* "...fine."', choices: [{ id: 'a', text: 'Sorry.' }] } }),
+      make('t', 'Odd lines', 'infoText', { text: '\\# a literal backslash-hash\n\\\\> two backslashes and a quote' }),
+    ];
+    const md = exportScriptMarkdown(rows(beats));
+    expect(md).toContain('**Vic:** \\*sigh\\* "...fine."');
+    expect(importScriptMarkdown(md, beats).changes).toEqual([]);
+  });
+
   it('writes readable Markdown: headings with hidden ids, labels, branches as quotes', () => {
     const md = exportScriptMarkdown(rows(story()), 'Rainy Day');
     expect(md).toContain('# Rainy Day\n\n## Introduction\n<!-- asaps:intro -->\n\nRain.\n\n\\# Not a heading');
@@ -61,4 +71,13 @@ describe('script Markdown', () => {
     expect(back.unknown).toEqual(['A beat that is not in the project']);
     expect(back.changes).toEqual([]);
   });
+
+  it('names its project, and will not be read into another one (beat ids repeat across projects)', () => {
+    const beats = story();
+    const md = exportScriptMarkdown(rows(beats), 'Rainy Day', 'proj_abc123').replace('Rain.', 'Heavy rain.');
+    expect(md.startsWith('# Rainy Day\n<!-- asaps-project:proj_abc123 -->\n\n## Introduction')).toBe(true);
+    expect(importScriptMarkdown(md, beats, 'proj_other')).toMatchObject({ otherProject: 'proj_abc123', changes: [], matched: 0 });
+    expect(importScriptMarkdown(md, beats, 'proj_abc123').changes).toHaveLength(1);
+  });
 });
+
