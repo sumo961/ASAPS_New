@@ -704,7 +704,36 @@ export interface IPermissionManager {
  * Builder Preview: Pass the AIService from useAI() hook
  * Player App: Configure AI settings and set the service on the renderer
  */
+/**
+ * A Free Layout beat's screen, as the beat hands it to the renderer: its
+ * stage elements (locations) with the words for each, and which of them
+ * are buttons.
+ */
+export interface FreeLayoutScreen {
+  locations: Location[];
+  /** The words of each text box and text button, by element (location) name, placeholders filled in. */
+  texts: Record<string, string>;
+  /** The buttons on show (conditions already checked): the choice id and the element it is. */
+  buttons: Array<{ id: string; locationName: string }>;
+  /** Seconds before the screen answers FREE_LAYOUT_TIMEOUT by itself; 0 = no timer. */
+  duration: number;
+  /** No buttons and no timer: a click anywhere answers FREE_LAYOUT_NEXT. */
+  clickAnywhere: boolean;
+  /** The project's layout mode: 'fixed' draws the stage in pixels, 'responsive' places by percent. */
+  layoutMode?: 'fixed' | 'responsive';
+}
+/** What renderFreeLayout answers when the timer runs out. */
+export const FREE_LAYOUT_TIMEOUT = '__timeout__';
+/** What renderFreeLayout answers for a click anywhere. */
+export const FREE_LAYOUT_NEXT = '__next__';
+
 export interface IRenderer {
+  /**
+   * Show a Free Layout beat and wait: a button's choice id, FREE_LAYOUT_TIMEOUT
+   * or FREE_LAYOUT_NEXT. Optional — a renderer without it shows the buttons
+   * as choices (renderChoices) or the text with a Continue button.
+   */
+  renderFreeLayout?(screen: FreeLayoutScreen): Promise<string>;
   // Core rendering methods (with optional locations for positioned rendering)
   renderTitleScreen(title: string, author: string, buttonText: string, locations?: Location[]): Promise<void>;
   renderText(text: string, buttonText: string, locations?: Location[]): Promise<void>;

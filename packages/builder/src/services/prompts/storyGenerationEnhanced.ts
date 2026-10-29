@@ -132,6 +132,9 @@ const BEAT_TYPE_GUIDE = `
 - After the pick, write "@player" (or "@companion" …) as speaker or AI-conversation npcName, and \${@player.name} / \${@player.they} in text — never duplicate branches per character.
 - Same layouts, effects and conditions as multiChoice; a choice's own effects run AFTER the cast, so an effect with character "@player" lands on the one just chosen.
 
+**freeLayout** - "Free Layout": a screen the AUTHOR lays out by hand in the Visual Editor (text boxes, buttons, pictures and characters placed freely; each button leads on like a choice)
+- Do NOT generate it: it is empty until someone places its elements, and a generated one would show nothing. Use infoText for text, multiChoice for choices, pickProp / movementChoice for clickable pictures. Authors can turn those into a Free Layout later with Change type.
+
 **dialogTree** - Multi-turn NPC dialogue with nested choices (for back-and-forth conversation)
 - Use this when the player needs a real back-and-forth with an NPC: ask a question, NPC responds, player picks a follow-up, NPC responds again, etc. The nesting is the value.
 - Use multiChoice instead for one-shot choice screens (no follow-up turn).

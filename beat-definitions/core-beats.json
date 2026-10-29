@@ -187,6 +187,29 @@
         "effects": "effect[]?"
       },
       "notes": "pitch is vertical angle (-90 to 90), yaw is horizontal angle (-180 to 180). target is the beat ID to navigate to when clicked. locationName optionally references a hotspot, prop, or character from beat.locations by name. soundEffect plays when this hotspot is selected."
+    },
+    "freeLayoutButton": {
+      "description": "A button on a Free Layout beat: an element the author placed on the stage (a text button, or a picture marked clickable) that leads on like a Multi Choice choice.",
+      "schema": {
+        "id": "string",
+        "locationName": "string",
+        "text": "string",
+        "displayText": "string?",
+        "target": "string",
+        "conditions": "condition[]?",
+        "effects": "effect[]?",
+        "soundEffect": "string?"
+      },
+      "notes": "locationName is the name of the stage element (beat.locations) this button is — the link between the choice and what the player sees and clicks. text is the button's label (unused for a clickable picture); displayText is the translated label. target, conditions (hide the button until they match), effects and soundEffect work exactly as on a multiChoiceOption."
+    },
+    "freeLayoutText": {
+      "description": "The words of a text box placed by hand on a Free Layout beat.",
+      "schema": {
+        "locationName": "string",
+        "text": "string",
+        "displayText": "string?"
+      },
+      "notes": "locationName is the stage element's name; text supports the usual formatting (**bold**, *italic*, ${variable} placeholders); displayText is the translated text."
     }
   },
   "conditionTypes": {
@@ -929,8 +952,14 @@
             "control": "select",
             "label": "Lines without a reply move on",
             "options": [
-              { "value": "click", "label": "when the player clicks Continue" },
-              { "value": "auto", "label": "by themselves after reading time" }
+              {
+                "value": "click",
+                "label": "when the player clicks Continue"
+              },
+              {
+                "value": "auto",
+                "label": "by themselves after reading time"
+              }
             ]
           }
         },
@@ -1365,6 +1394,72 @@
           "Mid-story: 'Who do you take with you?' casts the companion role, and the AI conversation partner is @companion"
         ]
       }
+    },
+    "freeLayout": {
+      "category": "visible",
+      "displayName": "Free Layout",
+      "icon": "🧩",
+      "description": "A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; an optional timer goes on by itself; with neither, a click anywhere goes on.",
+      "connectionType": "multiple",
+      "locations": [],
+      "parameters": {
+        "texts": {
+          "type": "array<freeLayoutText>",
+          "required": false,
+          "description": "The words of each text box, keyed to its stage element by locationName."
+        },
+        "choices": {
+          "type": "array<freeLayoutButton>",
+          "required": false,
+          "description": "The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions."
+        },
+        "duration": {
+          "type": "number",
+          "required": false,
+          "default": 0,
+          "min": 0,
+          "description": "Seconds before the beat goes on by itself to timerTarget. 0 = no timer.",
+          "ui": {
+            "label": "Go on by itself after (seconds, 0 = never)"
+          }
+        },
+        "timerTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Where the beat goes when its timer runs out (only with duration > 0).",
+          "ui": {
+            "control": "beat-ref",
+            "label": "When time runs out, go to",
+            "emptyLabel": "Nowhere yet"
+          }
+        },
+        "nextTarget": {
+          "type": "string",
+          "required": false,
+          "description": "Where a click anywhere leads — used only while the beat has no buttons and no timer.",
+          "ui": {
+            "control": "beat-ref",
+            "label": "Next (click anywhere), go to",
+            "emptyLabel": "Nowhere yet"
+          }
+        },
+        "markVisited": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Dim buttons the player already picked and stop them being picked again."
+        },
+        "effectsOncePerChoice": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "A button's effects fire only the first time it is picked; the button stays clickable."
+        }
+      },
+      "transitions": true,
+      "sound": true,
+      "renderer": "freeLayout",
+      "_authoringNote": "Made in the Visual Editor, not generated: generators should use the other beat types. The stage elements are beat.locations (kind text / button / prop / character); texts and choices refer to them by locationName. Fixed-layout projects draw the stage in pixels, scaled to fit; responsive projects place every element by its xPercent/yPercent/widthPercent/heightPercent and let text reflow."
     },
     "movementChoice": {
       "category": "visible",

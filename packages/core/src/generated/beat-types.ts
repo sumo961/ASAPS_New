@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-22T02:52:31.295Z
+ * Generated: 2026-10-29T23:12:12.203Z
  */
 
 // ============================================
@@ -140,6 +140,29 @@ export interface PanoramaHotspot {
   target: string;
   conditions?: Condition[];
   effects?: Effect[];
+}
+
+/**
+ * A button on a Free Layout beat: an element the author placed on the stage (a text button, or a picture marked clickable) that leads on like a Multi Choice choice.
+ */
+export interface FreeLayoutButton {
+  id: string;
+  locationName: string;
+  text: string;
+  displayText?: string;
+  target: string;
+  conditions?: Condition[];
+  effects?: Effect[];
+  soundEffect?: string;
+}
+
+/**
+ * The words of a text box placed by hand on a Free Layout beat.
+ */
+export interface FreeLayoutText {
+  locationName: string;
+  text: string;
+  displayText?: string;
 }
 
 // ============================================
@@ -336,6 +359,28 @@ export interface ChooseCharacterParameters {
   explainHuds?: boolean | undefined;
   /** Keep this beat's shape on every device (fixed-frame island, decision C 2026-08-31). When true, a mobile/cover player letterboxes this beat at its authored aspect instead of cover-cropping it — nothing is cut off, at the cost of bars. Use for compositions designed as a frame (title cards, illustrated spreads, precisely staged scenes). Default false: the beat crops like the rest of the story. */
   fixedFrame?: boolean | undefined;
+}
+
+/**
+ * Free Layout - A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; an optional timer goes on by itself; with neither, a click anywhere goes on.
+ * Category: visible
+ * Connection Type: multiple
+ */
+export interface FreeLayoutParameters {
+  /** The words of each text box, keyed to its stage element by locationName. */
+  texts?: FreeLayoutText[] | undefined;
+  /** The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions. */
+  choices?: FreeLayoutButton[] | undefined;
+  /** Seconds before the beat goes on by itself to timerTarget. 0 = no timer. */
+  duration?: number | undefined;
+  /** Where the beat goes when its timer runs out (only with duration > 0). */
+  timerTarget?: string | undefined;
+  /** Where a click anywhere leads — used only while the beat has no buttons and no timer. */
+  nextTarget?: string | undefined;
+  /** Dim buttons the player already picked and stop them being picked again. */
+  markVisited?: boolean | undefined;
+  /** A button's effects fire only the first time it is picked; the button stays clickable. */
+  effectsOncePerChoice?: boolean | undefined;
 }
 
 /**
@@ -1318,6 +1363,7 @@ export type BeatType =
   | 'dialogTree'
   | 'multiChoice'
   | 'chooseCharacter'
+  | 'freeLayout'
   | 'movementChoice'
   | 'pickProp'
   | 'videoBeat'
@@ -1358,6 +1404,7 @@ export interface BeatParameterMap {
   'dialogTree': DialogTreeParameters;
   'multiChoice': MultiChoiceParameters;
   'chooseCharacter': ChooseCharacterParameters;
+  'freeLayout': FreeLayoutParameters;
   'movementChoice': MovementChoiceParameters;
   'pickProp': PickPropParameters;
   'videoBeat': VideoBeatParameters;

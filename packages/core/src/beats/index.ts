@@ -5,6 +5,7 @@ export { TitleScreenBeat } from './TitleScreenBeat';
 export { MovementChoiceBeat } from './MovementChoiceBeat';
 export { MultiChoiceBeat, isMultiChoiceLike, MULTI_CHOICE_LIKE_TYPES } from './MultiChoiceBeat';
 export { ChooseCharacterBeat } from './ChooseCharacterBeat';
+export { FreeLayoutBeat } from './FreeLayoutBeat';
 export { PickPropBeat } from './PickPropBeat';
 export { ConditionBeat } from './ConditionBeat';
 export { EndScreenBeat } from './EndScreenBeat';
