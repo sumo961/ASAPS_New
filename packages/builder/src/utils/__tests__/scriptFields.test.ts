@@ -24,15 +24,28 @@ describe('scriptFields', () => {
     ]);
   });
 
-  it('Dialog Tree: every line with who says it, replies indented under the line they answer', () => {
+  it('Dialog Tree: every line with who says it; a single reply stays at the line\'s level', () => {
     const beat = make('d', 'dialogTree', { parameters: { dialogTree: {
       id: 'r', speaker: 'Ann', text: 'Hi.',
       choices: [{ id: 'c', text: 'Why?', dialogNode: { id: 'n', speaker: 'Ann', text: 'Because.', choices: [] } }],
     } } });
     expect(scriptFields(beat).map((f) => [f.path, f.label, f.depth, f.kind])).toEqual([
       ['dialogTree.text', 'Ann', 0, 'line'],
-      ['dialogTree.choices[0].text', 'Reply', 1, 'reply'],
-      ['dialogTree.choices[0].dialogNode.text', 'Ann', 2, 'line'],
+      ['dialogTree.choices[0].text', 'Reply', 0, 'reply'],
+      ['dialogTree.choices[0].dialogNode.text', 'Ann', 0, 'line'],
+    ]);
+  });
+
+  it('Dialog Tree: replies indent where the conversation branches, with what follows them', () => {
+    const beat = make('d', 'dialogTree', { parameters: { dialogTree: {
+      id: 'r', speaker: 'Ann', text: 'Tea or coffee?',
+      choices: [
+        { id: 'a', text: 'Tea', dialogNode: { id: 'n1', speaker: 'Ann', text: 'Good.', choices: [{ id: 'a2', text: 'Thanks' }] } },
+        { id: 'b', text: 'Coffee' },
+      ],
+    } } });
+    expect(scriptFields(beat).map((f) => [f.value, f.depth])).toEqual([
+      ['Tea or coffee?', 0], ['Tea', 1], ['Good.', 1], ['Thanks', 1], ['Coffee', 1],
     ]);
   });
 

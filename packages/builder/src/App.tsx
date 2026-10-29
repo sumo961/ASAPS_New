@@ -3101,6 +3101,28 @@ function App() {
     markChanged();
   }, [state.beats, selectedBeat, markChanged]);
 
+  /**
+   * Several beats changed at once, as one undo step (the Script view's
+   * Update from Markdown). Same snapshot rule as handleBeatUpdate.
+   */
+  const handleBeatsUpdate = useCallback((edits: Array<{ beatId: string; updates: Partial<Beat> }>, description: string) => {
+    const cmds = edits.flatMap(({ beatId, updates }) => {
+      const currentBeat = state.beats.find(b => b.id === beatId);
+      if (!currentBeat) return [];
+      const oldValues: Record<string, any> = {};
+      for (const key of Object.keys(updates)) {
+        const val = key === 'parameters' && typeof (currentBeat as any).getParameters === 'function'
+          ? (currentBeat as any).getParameters()
+          : (currentBeat as any)[key];
+        oldValues[key] = (val && typeof val === 'object') ? structuredClone(val) : val;
+      }
+      return [new UpdateBeatCommand(beatId, oldValues, updates as any, stableMutations.current)];
+    });
+    if (cmds.length === 0) return;
+    getCommandManager().execute(cmds.length === 1 ? cmds[0] : new BatchCommand(cmds, description));
+    markChanged();
+  }, [state.beats, markChanged]);
+
   // Handle bulk transformation changes - force UI refresh for affected beats
   const handleTransformationChangesApplied = useCallback((affectedBeatIds: string[]) => {
     console.log('[App] Transformation changes applied to beats:', affectedBeatIds);
@@ -6957,6 +6979,8 @@ function App() {
             selectedCluster={selectedCluster}
             onBeatSelect={handleBeatSelect}
             onBeatUpdate={handleBeatUpdate}
+            onBeatsUpdate={handleBeatsUpdate}
+            storyTitle={state.title}
             onClusterSelect={handleClusterSelect}
             onBeatMove={handleBeatMove}
             onBeatAdd={handleBeatAdd}

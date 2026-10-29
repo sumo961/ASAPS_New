@@ -21,7 +21,11 @@ export interface ScriptField {
   /** Shown next to the text: "Text", "Choice 2", a speaker's name, "Reply"… */
   label: string;
   value: string;
-  /** Indent level (Dialog Tree replies and the lines answering them). */
+  /**
+   * Indent level: how many branching points of a Dialog Tree lead here. As in
+   * the Dialog Tree editor, replies indent only where a line has more than
+   * one, so a long back-and-forth stays flat.
+   */
   depth: number;
   /** A line a character says, a line the player picks, or plain text. */
   kind: 'text' | 'line' | 'reply' | 'choice';
@@ -67,7 +71,10 @@ export function scriptFields(beat: any): ScriptField[] {
     const walk = (node: any, path: string, depth: number) => {
       if (!node || typeof node !== 'object') return;
       add(`${path}.text`, str(node.speaker) || 'Character', node.text, 'line', depth);
-      (Array.isArray(node.choices) ? node.choices : []).forEach((c: any, i: number) => {
+      const choices: any[] = Array.isArray(node.choices) ? node.choices : [];
+      const branches = choices.filter((c) => c && c.continue !== true).length > 1;
+      const inner = depth + (branches ? 1 : 0);
+      choices.forEach((c: any, i: number) => {
         if (!c) return;
         // A continue step ("Then another character speaks") has no player
         // line: the next line follows at the same level. Writing text into
@@ -76,8 +83,8 @@ export function scriptFields(beat: any): ScriptField[] {
           if (c.dialogNode) walk(c.dialogNode, `${path}.choices[${i}].dialogNode`, depth);
           return;
         }
-        add(`${path}.choices[${i}].text`, 'Reply', c.text, 'reply', depth + 1);
-        if (c.dialogNode) walk(c.dialogNode, `${path}.choices[${i}].dialogNode`, depth + 2);
+        add(`${path}.choices[${i}].text`, 'Reply', c.text, 'reply', inner);
+        if (c.dialogNode) walk(c.dialogNode, `${path}.choices[${i}].dialogNode`, inner);
       });
     };
     walk(p.dialogTree, 'dialogTree', 0);

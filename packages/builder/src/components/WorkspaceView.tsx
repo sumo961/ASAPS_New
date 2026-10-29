@@ -25,6 +25,10 @@ interface WorkspaceViewProps {
   onBeatSelect: (beat: Beat) => void;
   onBeatMove: (beatId: string, position: { x: number; y: number }) => void;
   onBeatUpdate?: (beatId: string, updates: Partial<Beat>) => void;
+  /** Several beats at once, one undo step (Script ▸ Update from Markdown). */
+  onBeatsUpdate?: (edits: Array<{ beatId: string; updates: Partial<Beat> }>, description: string) => void;
+  /** For the Script view's Markdown export. */
+  storyTitle?: string;
   onClusterSelect: (cluster: Cluster | null) => void;
   onBeatAdd: (type: string, position: { x: number; y: number }, cluster?: { clusterId: string; x: number; y: number }) => void;
   onClusterExpandCollapse: (clusterId: string) => void;
@@ -145,6 +149,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onRevertBeat,
   onLinkOutput,
   onUpdateVenueBeacons,
+  onBeatsUpdate,
+  storyTitle,
 }) => {
   // Persisted: the workspace tab an author lives in shouldn't reset each launch
   const [activeView, setActiveView] = usePersistedState<'flowchart' | 'visual' | 'script' | 'knowledgeGraph'>('asaps_ui_workspace_view', 'flowchart');
@@ -260,6 +266,8 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
             selectedBeat={selectedBeat}
             onBeatSelect={onBeatSelect}
             onBeatUpdate={onBeatUpdate}
+            onBeatsUpdate={onBeatsUpdate}
+            storyTitle={storyTitle}
           />
         ) : activeView === 'visual' ? (
           <div className="h-full w-full">
