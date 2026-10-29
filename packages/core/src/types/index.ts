@@ -715,6 +715,8 @@ export interface FreeLayoutScreen {
   texts: Record<string, string>;
   /** The buttons on show (conditions already checked): the choice id and the element it is. */
   buttons: Array<{ id: string; locationName: string }>;
+  /** Elements of buttons whose conditions aren't met: not shown at all. */
+  hidden: string[];
   /** Seconds before the screen answers FREE_LAYOUT_TIMEOUT by itself; 0 = no timer. */
   duration: number;
   /** No buttons and no timer: a click anywhere answers FREE_LAYOUT_NEXT. */

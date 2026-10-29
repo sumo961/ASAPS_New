@@ -102,6 +102,7 @@ export class FreeLayoutBeat extends Beat {
           locations,
           texts,
           buttons: buttons.map((b) => ({ id: b.id, locationName: b.locationName })),
+          hidden: this.choices.filter((c) => !buttons.includes(c)).map((c) => c.locationName),
           duration: this.duration,
           clickAnywhere: this.clickAnywhere,
           layoutMode: renderer.getState('projectLayoutMode') === 'responsive' ? 'responsive' : 'fixed',

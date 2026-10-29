@@ -5385,6 +5385,13 @@ export function createPositionedElementData(
     let picture: PositionedElementData['picture'];
     const markVisited = content.markVisited || false;
 
+    // Free Layout: an element is a button when one of the beat's buttons
+    // names it (locationName); its words came in as location.content.
+    if (beatType === 'freeLayout' && Array.isArray(content.buttons)) {
+      const button = content.buttons.find((b: any) => b.locationName === location.name);
+      if (button) actionId = button.id;
+    }
+
     // For movementChoice: match location.name to choice properties with multiple fallbacks
     if (beatType === 'movementChoice' && content.choices && Array.isArray(content.choices)) {
       // First priority: match by locationName field (explicit association set in builder)

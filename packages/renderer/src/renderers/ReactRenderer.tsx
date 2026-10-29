@@ -1,4 +1,4 @@
-import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike, FREE_LAYOUT_NEXT, FREE_LAYOUT_TIMEOUT } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import React from 'react';
@@ -6,7 +6,8 @@ import ReactDOM from 'react-dom/client';
 import { BaseRenderer } from './BaseRenderer';
 import { getAudioManager } from '../audio/AudioManager';
 import { computeStageFitScale } from '../utils/hudLayout';
-import type { Location, AnimationPath, SlotIntent, DialogExchange } from '@asaps/core';
+import type { Location, AnimationPath, SlotIntent, DialogExchange, FreeLayoutScreen } from '@asaps/core';
+import { placeByPercent } from '../utils/freeLayoutPlacement';
 import { applyTextBoxBorder } from '../utils/textBoxBorder';
 
 /** One piece of a line read aloud: whose voice reads it. */
@@ -2633,6 +2634,71 @@ export class ReactRenderer extends BaseRenderer {
    * This is now the SAME rendering used by the visual editor!
    * Protected so child classes can use it
    */
+  /**
+   * A Free Layout beat (FreeLayoutBeat): its hand-placed elements with their
+   * words, waiting for one of its buttons, its timer, or — with neither — a
+   * click anywhere. Fixed projects draw the stage in pixels, scaled to fit
+   * (the hand-placed path every beat uses); responsive projects draw the
+   * same elements at the real stage size, each placed and sized by percent,
+   * so text wraps inside its box — redrawn when the stage changes size.
+   */
+  async renderFreeLayout(screen: FreeLayoutScreen): Promise<string> {
+    const hidden = new Set(screen.hidden);
+    const ids = new Set(screen.buttons.map((b) => b.id));
+    const shown = screen.locations
+      .filter((l) => !hidden.has(l.name))
+      .map((l) => (l.kind === 'text' || l.kind === 'button' ? ({ ...l, content: screen.texts[l.name] ?? '' } as Location) : l));
+    const content = { buttons: screen.buttons, markVisited: this.getState('markVisited') || false };
+    const responsive = screen.layoutMode === 'responsive';
+    const authored = { width: this.context.width, height: this.context.height };
+
+    const draw = () => {
+      if (!responsive) {
+        void this.renderPositionedBeat('freeLayout', content, shown, false);
+        return;
+      }
+      const box = this.context.container?.getBoundingClientRect();
+      const width = Math.round(this.viewportOverride?.width ?? box?.width ?? authored.width) || authored.width;
+      const height = Math.round(this.viewportOverride?.height ?? box?.height ?? authored.height) || authored.height;
+      void this.renderPositionedBeat('freeLayout', content, shown.map((l) => placeByPercent(l, authored, { width, height })), false, undefined, true, { width, height });
+    };
+    draw();
+
+    return new Promise<string>((resolve) => {
+      let done = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const container = this.context.container;
+      const onStageClick = (e: MouseEvent) => {
+        // A click on one of the beat's own buttons is handled by the button.
+        if ((e.target as HTMLElement | null)?.closest?.('button, [role="button"]')) return;
+        accept(FREE_LAYOUT_NEXT);
+      };
+      const onResize = () => { if (!done) draw(); };
+      const finish = (id: string) => {
+        if (done) return;
+        done = true;
+        if (timer) clearTimeout(timer);
+        if (screen.clickAnywhere) container?.removeEventListener('click', onStageClick);
+        if (responsive) window.removeEventListener('resize', onResize);
+        if (this.resolveAction === accept) this.resolveAction = null;
+        resolve(id);
+      };
+      // Only the beat's own answers count. A click the engine sends
+      // (__timer_interrupt__ …) passes through; any other click is a click
+      // anywhere when that leads on, else ignored — handleAction clears the
+      // pending answer after the call, so arm it again.
+      const accept = (id: string) => {
+        if (ids.has(id) || id.startsWith('__')) { finish(id); return; }
+        if (screen.clickAnywhere) { finish(FREE_LAYOUT_NEXT); return; }
+        queueMicrotask(() => { if (!done) this.resolveAction = accept; });
+      };
+      this.resolveAction = accept;
+      if (screen.duration > 0) timer = setTimeout(() => finish(FREE_LAYOUT_TIMEOUT), screen.duration * 1000);
+      if (screen.clickAnywhere) container?.addEventListener('click', onStageClick);
+      if (responsive) window.addEventListener('resize', onResize);
+    });
+  }
+
   protected renderPositionedBeat(
     beatType: string,
     content: Record<string, any>,
@@ -2650,7 +2716,9 @@ export class ReactRenderer extends BaseRenderer {
      * existing absolute-path beats into responsive flow on any caller
      * that hasn't yet been audited.
      */
-    authorPositioned: boolean = true
+    authorPositioned: boolean = true,
+    /** Draw at this stage size instead of the project's (Free Layout in a responsive project: the real stage, unscaled). */
+    stageSize?: { width: number; height: number },
   ): Promise<string> {
     // Chrome-free beats (title screens by default) suppress every screen HUD.
     // Recomputed here rather than remembered, so it can't survive a beat change.
@@ -2860,9 +2928,9 @@ export class ReactRenderer extends BaseRenderer {
       // Render using the shared PositionedBeatView component
       // NOTE: previewMode=false uses absolute positioning from Visual Editor
       // with smart collision detection for auto-height text boxes
-      // Use project's stage dimensions from context
-      const stageWidth = this.context.width;
-      const stageHeight = this.context.height;
+      // Use project's stage dimensions from context (or the size asked for)
+      const stageWidth = stageSize?.width ?? this.context.width;
+      const stageHeight = stageSize?.height ?? this.context.height;
       const disableScaling = this.getState('disableScaling') as boolean | undefined;
 
       // Determine scaling mode for mobile

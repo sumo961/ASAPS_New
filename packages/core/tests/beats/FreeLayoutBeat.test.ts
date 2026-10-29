@@ -60,6 +60,7 @@ describe('FreeLayoutBeat', () => {
     const { r, shown } = renderer('b1');
     await beat.execute(new StoryContext(), r);
     expect(shown[0].buttons.map((b) => b.id)).toEqual(['b1']);
+    expect(shown[0].hidden).toEqual(['Lamp']);
   });
 
   it('the timer goes on by itself; with no buttons and no timer a click anywhere goes on', async () => {
