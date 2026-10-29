@@ -3,12 +3,14 @@
 ## Unreleased (since v0.9.146, 2026-10-29)
 
 ### Overview
-Work after v0.9.146.
+Work after v0.9.146: two Preview and Inspector fixes found while testing the class-feedback release.
 
 ### Fixes
 - **Opening a beat no longer changes it.** Selecting a beat that has a speaker set its *Show speaker* to "show" over "as the project says" (since March, so the tri-state select showed "show"). With the project default (names hidden), which beats showed their speaker then depended on which ones the author had happened to click, and every click was an undo step and an unsaved change. Choosing a speaker still turns it on, in the speaker field itself. Beats that were opened before keep the "show" they got. Checked headless: selecting three beats leaves the undo history empty and the project saved.
 
-**Files modified:** packages/builder/src/components/Inspector.tsx
+- **Restart in the middle of a story no longer leaves the old run going.** The Preview reuses one story engine: `stop()` only cleared `running`, and the next `start()` set it again at once, while the old run still waited inside a beat (for a click). When Restart cleared the stage, that wait ended and the old run carried on next to the new one: the Debug label followed one run and the stage the other (the label said "Choose Your Path" over the title screen; after Begin Journey, "Introduction" over Choose Your Path's choices). Each `start()` now has a run number; a run that was replaced stops when it wakes, without touching the story's state or reporting an ending (StoryEngine), and only the current run's Preview clean-up runs. Resuming after a pause had the same double run and is fixed with it. Checked headless: Restart from the Introduction shows the title in both label and stage, and the story then plays to its ending; Restart after an ending still works.
+
+**Files modified:** packages/builder/src/components/Inspector.tsx, packages/core/src/engine/StoryEngine.ts, packages/builder/src/pages/PreviewWindow.tsx, packages/builder/public/player-web.js (rebuilt); tests (core StoryEngineRestart)
 
 ---
 

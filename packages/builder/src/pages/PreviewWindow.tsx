@@ -719,6 +719,7 @@ export const PreviewWindow: React.FC = () => {
   const loadingTranslationsRef = useRef<Map<string, string>>(new Map());
   const isElectronRef = useRef<boolean>(false);
   const stateChangeUnsubscribeRef = useRef<(() => void) | null>(null); // Cleanup previous listener
+  const previewRunRef = useRef(0); // Which startPreview() is current (Restart)
   const handleRestartRef = useRef<((beatId?: string, preset?: StatePreset | null, pauseOnStart?: boolean) => void) | null>(null);
   const navigatedBeatIdRef = useRef<string | null>(null); // Track manually navigated beat to prevent STORY_UPDATE from overwriting
 
@@ -1884,6 +1885,9 @@ export const PreviewWindow: React.FC = () => {
     setStartBlockedReason(null);
     setEndedNotice(null);
     stopRequestedRef.current = false;
+    // A Restart starts a new run while the old one is still waiting inside a
+    // beat; when the old one returns, its clean-up must not touch this one.
+    const myRun = ++previewRunRef.current;
 
     try {
       // Stop any previous run and clear renderer
@@ -2451,20 +2455,23 @@ export const PreviewWindow: React.FC = () => {
     } catch (error) {
       console.error('[PreviewWindow] Preview error:', error);
     } finally {
-      setIsRunning(false);
-      // The run loop resolving WITHOUT a Stop/Pause request means the story
-      // ended on its own. Ending anywhere but an endScreen is almost always
-      // a dead end the author should know about.
-      if (!stopRequestedRef.current && engineRef.current) {
-        try {
-          const lastId = engineRef.current.getContext().getCurrentBeatId();
-          const lastBeat = lastId ? story?.getBeat(lastId) : null;
-          if (lastBeat && lastBeat.type !== 'endScreen') {
-            setEndedNotice(
-              `Story ended at "${lastBeat.name || lastId}" — this beat has no outgoing connection. Wire it onward in the flowchart (or make it an End Screen).`
-            );
-          }
-        } catch { /* engine already torn down — nothing to report */ }
+      // Only the current run cleans up (a Restart's old run returns later).
+      if (myRun === previewRunRef.current) {
+        setIsRunning(false);
+        // The run loop resolving WITHOUT a Stop/Pause request means the story
+        // ended on its own. Ending anywhere but an endScreen is almost always
+        // a dead end the author should know about.
+        if (!stopRequestedRef.current && engineRef.current) {
+          try {
+            const lastId = engineRef.current.getContext().getCurrentBeatId();
+            const lastBeat = lastId ? story?.getBeat(lastId) : null;
+            if (lastBeat && lastBeat.type !== 'endScreen') {
+              setEndedNotice(
+                `Story ended at "${lastBeat.name || lastId}" — this beat has no outgoing connection. Wire it onward in the flowchart (or make it an End Screen).`
+              );
+            }
+          } catch { /* engine already torn down — nothing to report */ }
+        }
       }
     }
   }, [story, previewData, startBeatId, selectedPreset, soundEnabled]);

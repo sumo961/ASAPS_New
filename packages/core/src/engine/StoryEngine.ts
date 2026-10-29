@@ -11,6 +11,16 @@ export class StoryEngine extends EventEmitter {
   private paused: boolean = false;
   private currentBeatId: string | null = null;
   private timerInterruptBeat: string | null = null;
+  /**
+   * Which run of start() is current. stop() only clears `running`, and the
+   * next start() sets it again at once — while the old run's loop still
+   * waits inside a beat (for a click, a timer). When that wait ended (the
+   * Preview's Restart clears the stage), the old loop found `running` true
+   * and went on next to the new one: the Debug label followed one run, the
+   * stage the other (2026-10-29). A loop whose run was replaced now stops
+   * when it wakes, without touching the story's state.
+   */
+  private run = 0;
 
   /**
    * v0.9.48+ — `opts.mockMode` forces the StoryContext to use the
@@ -65,11 +75,13 @@ export class StoryEngine extends EventEmitter {
     }
 
     this.running = true;
+    const run = ++this.run;
+    const current = () => run === this.run;
     this.currentBeatId = startBeatId || this.story.getFirstBeatId();
     // Keep context in sync for save/load
     this.context.setCurrentBeatId(this.currentBeatId);
 
-    while (this.running && this.currentBeatId) {
+    while (this.running && current() && this.currentBeatId) {
       // Check for timer interrupts
       if (this.timerInterruptBeat) {
         this.currentBeatId = this.timerInterruptBeat;
@@ -85,6 +97,9 @@ export class StoryEngine extends EventEmitter {
       try {
         console.log(`[StoryEngine] Executing beat ${this.currentBeatId} (type: ${beat.type})`);
         const nextBeatId = await beat.execute(this.context, this.renderer);
+        // Replaced by a newer start() while this beat waited: that run owns
+        // the story now.
+        if (!current()) return;
         console.log(`[StoryEngine] Beat ${this.currentBeatId} returned nextBeatId:`, JSON.stringify(nextBeatId));
 
         // Check for restart signal (backward compatibility)
@@ -107,12 +122,14 @@ export class StoryEngine extends EventEmitter {
           this.context.setCurrentBeatId(this.currentBeatId);
         }
       } catch (error) {
+        if (!current()) return;
         console.error('Story execution error:', error);
         this.running = false;
         throw error;
       }
     }
 
+    if (!current()) return;
     this.emit('storyEnded');
   }
 
