@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.145** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.145 stops project folders from
+Current release: **v0.9.146** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.146 is the class-feedback
+release**: a new **Script** tab shows the whole story's text on one page in
+reading order, editable in place, and saves it as Markdown to write in
+Obsidian or Google Docs and read it back. Draw a link by dragging from one
+beat onto another (a beat with several choices asks which one), search any
+beat picker by typing, and turn a beat into another type without losing its
+text and links. Fold away Story Beats, hide the overview map, widen the
+Properties panel, and enjoy a shorter header. App Preferences can hide every
+AI feature, or just the beat suggestions. A choice that isn't linked yet no
+longer stops the story.
+
+**v0.9.145 stopped project folders from
 shuffling their pictures**: in a project shared through Git, pictures nobody
 touched kept appearing in Pending Changes as modified or as new `_2`/`_3`
 copies, because every first save after opening wrote all pictures again

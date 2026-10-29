@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.145*
+*Last revised against v0.9.146*
 
 ---
 
@@ -256,12 +256,24 @@ Let's take a tour of your system-building workspace. Don't worry about memorizin
 
 ## The Header Bar
 
-The header spans the top of the screen in three rows:
+The header spans the top of the screen in two rows. (It used to take three; since v0.9.146 the AI, version-control, voice, speech-input and language buttons share the title row, which leaves more of the screen for your story.)
 
-**Row 1 -- Branding and Title:**
+**Row 1 -- Title, AI, Voices and Language:**
 The ASAPS logo, version number (displayed as `v{version}.{buildNumber}`, e.g., v0.9.64.115), and a large text field where you can type or edit your project's title directly. Next to the title you'll see a small **layout-mode pill** — green *Responsive layout* or amber *Fixed canvas* — that reflects the project's authoring contract. Click it to jump to **Settings → Project → Layout Mode**, where you can switch (with a one-shot migrator preview). See [Responsive vs Fixed Layout](#responsive-vs-fixed-layout) for what the two modes actually mean.
 
 When you've made changes that haven't been saved yet, an amber **● Unsaved** pill appears immediately to the right of the layout pill — a friendly nudge so you don't have to glance down at the Save button to know where you stand.
+
+The right side of the same row holds:
+
+| Button | What it Does |
+|--------|--------------|
+| **AI** | Dropdown: Ideate with Ideator, Design with Co-Designer, Generate Story, AI changes, Create Beat from Description, Configure AI. Not there? It is hidden when **Show AI features** is off in App Preferences — see [Working without AI](#working-without-ai) |
+| **VCS Status** | Git status, next to the AI button (only visible for directory projects under version control) |
+| **TTS** | Text-to-Speech toggle and configuration (speaker icon) |
+| **STT** | Speech-to-Text toggle and configuration (microphone icon) |
+| **Source (English)** | Language selector for translations (far right) |
+
+On a narrow window these buttons wrap onto a line of their own below the title, and their menus still open inside the window.
 
 **Row 2 -- Main Controls:** (On a narrower window, around 1280 pixels wide, this row wraps: the right-hand group moves onto its own line below the left-hand one, so Debug and Preview are always reachable.)
 
@@ -273,7 +285,7 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
 | **Export** | Dropdown, organised by what the recipient does: **Publish for players** (a playable standalone HTML story), **Share for editing** (the complete project as one `.asaps` file — ASML 2.0, JSON, native — or a template `.asapst`), and a **Legacy** group for ASML 1.0 XML (frozen serialization; newer features are not included) |
-| **Tools** | Dropdown: App Preferences… (settings for this computer), Change with AI, Merge DialogTrees |
+| **Tools** | Dropdown: App Preferences… (settings for this computer), Change with AI, Merge DialogTrees, Recently deleted beats… |
 
 | Right Side | What it Does |
 |------------|--------------|
@@ -284,16 +296,6 @@ When you've made changes that haven't been saved yet, an amber **● Unsaved** p
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
 
-**Row 3 -- AI, TTS/STT, and Language:**
-
-| Button | What it Does |
-|--------|--------------|
-| **AI** | Dropdown: Ideate with Ideator, Design with Co-Designer, Generate Story, AI changes, Create Beat from Description, Configure AI |
-| **VCS Status** | Git status (only visible for directory projects under version control) |
-| **TTS** | Text-to-Speech toggle and configuration (speaker icon, right side) |
-| **STT** | Speech-to-Text toggle and configuration (microphone icon, right side) |
-| **Source (English)** | Language selector for translations (far right) |
-
 ## The Left Sidebar: Beat List
 
 This is your system's table of contents. Every beat you create appears here.
@@ -302,12 +304,13 @@ This is your system's table of contents. Every beat you create appears here.
 - **Search Box** - Filter beats by name (useful when you have dozens!)
 - **Add Cluster** - Organize related beats into folders
 - **Beat List** - All your beats, draggable for reordering
+- **Fold it away** - The **‹** button next to *Story Beats* folds the panel into a narrow strip of beat icons, so the flowchart gets the room. Click an icon to select that beat, or **›** to unfold the panel again
 
 **Pro Tip:** Drag beats into clusters to keep things organized. A mystery might have clusters for "Act 1," "Investigation Scenes," "Suspect Interrogations," and "Endings."
 
 ## The Center: Canvas Views
 
-This is where system building happens. Toggle between two views:
+This is where system building happens. The tabs above the canvas switch between three views: **Flowchart** (the structure), **Visual Editor** (how one beat looks; the tab appears when a visual beat is selected) and **Script** (all the words). Each one shows the same story, so a change in one is there in the others at once.
 
 ### Flowchart View (The Bird's Eye)
 
@@ -316,6 +319,7 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 - Spotting dead ends and unreachable beats
 - Reorganizing the possibility space
 - Dragging in new beats from the palette
+- Wiring beats together by [drawing links](#drawing-links)
 
 ![Flowchart View](images/01-main-interface.png)
 *The Flowchart view shows your system's structure*
@@ -332,6 +336,19 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 **Who plays a role.** A beat that decides who plays a [role](#roles) — a Choose Your Character beat, or a choice with a **Cast Role** effect — carries a small **🎭 @role** badge (for example *🎭 @confidant*), so you can see at a glance where the story casts its people.
 
 The small count strip above the canvas (**Beats · Clusters · Connections**) counts exactly these arrows: one per pair of beats that are linked, restart links included.
+
+<a id="drawing-links"></a>
+**Drawing a link.** You can wire beats right in the flowchart. Every beat has a small dot on its right edge: press on it, drag, and let go anywhere on the beat that should come next (or on a line inside an expanded Dialog Tree).
+
+- **A beat with one way on** — an Info Text, a Title Screen, a Duration Screen and the other single-link beats — is linked at once. If it already led somewhere, the new link replaces the old one; any effects you put on that link stay.
+- **A beat with several ways on** asks which one. A small menu opens where you dropped the link — *"Link from Choose Your Path to Rushed Visit — which one?"* — listing the beat's outputs: its choices (numbered, with their text), a Condition Check's *If true* / *If false*, a timer's *Continue* / *When time runs out*, a keypad's *Right code* / *Too many tries*, a Dialog Tree's lines without a reply. Outputs that aren't linked yet come first, marked *not linked yet*; linked ones show where they lead now, and picking one moves it to the new beat. Use the mouse, or the arrow keys and **Enter**; **Escape** (or a click elsewhere) closes the menu without changing anything.
+- **Every drawn link is one Undo step**, and the Properties panel shows it straight away, exactly as if you had picked the target there.
+- A few beat types keep their links in the Properties panel only: AI Condition categories, AR Scene anchors and AI Dialog Tree exits. Drag from one of those and ASAPS tells you so. A beat with nothing to link yet (a Multi Choice without choices, say) asks you to add a choice first.
+
+![Dragging a link from the Movement Choice "Choose Your Path" onto "Rushed Visit": a menu asks which of the three choices the link is for, each showing where it leads now](images/97-draw-link-menu.png)
+*Drop a link from a beat with several choices and ASAPS asks which choice it is for. Each row shows where that choice leads now.*
+
+**More room for the graph.** The zoom buttons in the flowchart's bottom-left corner end with a button that hides the **overview map** (the small map of the whole graph in the bottom-right corner) and brings it back. Together with folding away [Story Beats](#the-left-sidebar-beat-list) and the Beat Types palette, a big story can have most of the screen. ASAPS remembers these choices on this computer.
 
 ![A restart link in the flowchart: the End Screen's dashed teal ↺ Restart arrow leads back to the Title Screen](images/73-restart-link-flowchart.png)
 *The End Screen's Restart button leads back to the Title Screen — drawn as a dashed teal **↺ Restart** link, next to the ordinary grey links.*
@@ -361,6 +378,61 @@ When a **translation language** is active, the Visual Editor overlays translated
 ![Visual Editor](images/06-visual-editor.png)
 *The Visual Editor lets you design how beats appear*
 
+<a id="script-view"></a>
+### Script View (The Page)
+
+Sometimes you just want to write. The **Script** tab puts all of your story's text on one page, like a manuscript, so you can read it through and change words without opening beats one by one.
+
+**Reading order.** The page starts at your story's first beat and follows the links: each branch is read to its end before the next one begins, and beats that no link reaches come last. Each beat appears as a card with its name and type, and shows only the text you write for players — titles, Info Text, questions, choices (the label players read), Dialog Tree lines, hotspot labels, an AI Conversation's opening line, credits. Matching keywords and AI prompts are left out: they're instructions, not prose.
+
+**Dialog Trees read like a script.** Every line names who says it, and the player's answers are marked *→ Reply*. Replies are indented only where a line has more than one, so a long back-and-forth stays flat and readable; a *Then another character speaks* step simply shows the next line. In a very deep conversation the indent stops growing after six branchings, and the line's label shows how many branchings deep it is instead (for example *7 ›*).
+
+**Write in place.** Click any text and type. A field is saved when you leave it, and each saved field is one Undo step, made exactly as if you had typed it in the Properties panel. Changed your mind while typing? **Escape** puts back what was there.
+
+**Finding your way.**
+- **Show** — *The whole story*, or just one cluster.
+- **Beats without text** — tick it to list logic beats and other beats with nothing to read (they're hidden by default).
+- The count on the right (for example *25 beats · 1,224 words*) covers what is shown.
+- Click a beat's name to select it, for example to open it in the Properties panel. Select a beat somewhere else and the Script view scrolls to it.
+
+![The Script view: "Show: The whole story", the "Beats without text" checkbox, the beat and word count, and the Save as Markdown / Update from Markdown buttons above two Dialog Tree beats. Grandma's lines are labelled with her name, and the player's two replies are marked → Reply](images/96-script-view.png)
+*The Script view. Grandma's lines carry her name; the player's two possible answers are marked → Reply.*
+
+<a id="script-markdown"></a>
+#### Writing elsewhere: Save as Markdown / Update from Markdown
+
+Prefer Obsidian, Google Docs, or your favourite text editor? Take the text with you and bring it back.
+
+1. In the Script view, choose what to take (the whole story or one cluster) and click **Save as Markdown**. ASAPS saves a `.md` file named after your story.
+2. Write in any editor. Change words freely, but leave the headings and the bold labels as they are.
+3. Back in ASAPS, click **Update from Markdown…** and pick the file. A review lists every text that would change, the old version struck through with the new one below it. Click **Update N texts** to apply them, or **Cancel**.
+
+The whole update is **one Undo step**, so if the result isn't what you wanted, Ctrl/Cmd+Z takes all of it back.
+
+**What the file looks like.** Under the story's title, a hidden comment names the project. Each beat is a `##` heading with its id in a hidden comment (Obsidian's reading view doesn't show them), followed by its fields:
+
+```markdown
+# Red: A Modern Tale
+<!-- asaps-project:… -->
+
+## Choose Your Path
+<!-- asaps:beat_choice_path -->
+
+**Question:** What matters more right now?
+
+**Choice 1:** Visit Grandma (family comes first)
+```
+
+A beat whose only text is its Text is written as plain paragraphs, without a label. Dialog Tree branches are nested quotes (`>`, one per branching level), because indented text would turn into code blocks in Markdown. ASAPS's own `**bold**`, `*italic*` and `\*` (a literal asterisk) are Markdown already and come through unchanged. A text line that would look like a heading, quote or label gets a backslash in front, which is taken off again on the way back.
+
+**What Update from Markdown will and won't do.**
+- It finds each beat by the id in its comment. If an editor dropped the comments (copying through Google Docs can), it finds the beat by its name instead, as long as no other beat has the same name.
+- It only changes **text that's already in the story**. A beat whose lines no longer match — you added or removed a choice or a dialog line, or renamed a label — is listed under **Left as they are** and not touched; make those changes in the editor. Headings for beats the story doesn't have are listed under **Not in this story**: new beats aren't made from Markdown.
+- It only reads a file back into **the project it came from**. Beat ids such as `beat_5` repeat from project to project, so a file saved from another project is refused rather than changing the wrong beats.
+- If nothing changed, the review says so and there's nothing to apply.
+
+> **Tip for groups:** one person can export a cluster, the team edits it together in a shared document, and the final text comes back in one reviewed step — while the structure stays safely in ASAPS.
+
 ## The Right Sidebar: Inspector
 
 When you select a beat, the Inspector shows everything about it:
@@ -373,11 +445,36 @@ When you select a beat, the Inspector shows everything about it:
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
+**Need more room to write?** The small expand button next to the **Properties** heading makes the panel wide (60 % of the window); click it again to make it narrow. Dragging the panel's edge also works, and leaves the wide setting from the width you dragged it to. ASAPS remembers wide or narrow on this computer.
+
+![The top of the Properties panel: the Properties heading with the expand button on the right, the beat's type and ID, and the Change type… menu](images/98-properties-header-wide-change-type.png)
+*The expand button widens the panel; **Change type…** turns the beat into another kind of beat.*
+
+<a id="change-beat-type"></a>
+**Change type… — turn a beat into another kind of beat.** Started with an Info Text and realised it should be a choice? Under the Properties heading, next to the beat's type and ID, the **Change type…** menu turns the beat into another type without rebuilding it. It works between **Info Text**, **Explanation**, **Duration Screen**, **End Screen**, **Multi Choice**, **Movement Choice**, **Pick Prop** and **Dialog Tree**.
+
+- **What stays:** the beat's ID — so every link *to* it keeps working — and its name, place in the flowchart, cluster, speaker, background, sound, notes, and every setting both types have.
+- **Between text beats** (Info Text, Explanation, Duration Screen, End Screen) the text and the onward link stay, effects included.
+- **Between choice beats** (Multi Choice, Movement Choice, Pick Prop) every choice comes along with its target, effects, conditions and sound.
+- **Text beat → choice beat:** the text becomes the question, and its link becomes the first choice (*Continue*). **Choice beat → text beat:** the question becomes the text, and the first choice's link becomes the beat's link.
+- **Dialog Tree:** its first line becomes the text or question, and its replies the choices — and the other way round.
+
+The change is **one Undo step**. The notice that confirms it (*"Hallway 3" is now Multi Choice · Undo*) also names anything the new type couldn't keep: the other choices when a choice beat becomes a text beat, the deeper part of a conversation, the Visual Editor layout when the kind of beat changes, or settings the new type doesn't have (only ones you had actually set). If you don't like what you see, Undo brings it all back.
+
 Many fields carry a short grey note underneath that says what the setting does, and some empty text fields show an example of what to type. When a setting is new to you, that note is a good first stop.
 
 **Preview as.** When the selected beat refers to a [role](#roles) — a speaker such as *@ The confidant*, or text like `${@confidant.name}` — a small **Preview as** bar appears at the top of the Inspector with one picker per role. It only changes what the Visual Editor shows while you write (and who the Preview starts with); the story itself is untouched.
 
-**Links are always picked, never typed.** Every setting that names another beat — a link's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target* — is a dropdown of your story's beats. If a stored beat has since been deleted, the picker keeps showing it as missing so you can spot and fix it.
+<a id="beat-picker"></a>
+**Links are always picked, never typed — and you can search.** Every setting that names another beat — a link's or choice's target, an AI Summary's *Restart at*, a Set Timer's expiry target, a Keypad's *Fail Target Beat*, an AR Scene's *Fallback beat*, an AI Condition's *Fallback Target*, a Dialog Tree line's next line, Hyper Text links, conditions and requirements, **Project Settings → First Beat**, the export's start beat — uses the same searchable beat picker. (Or skip the picker entirely and [draw the link in the flowchart](#drawing-links).)
+
+- Click the picker (or just start typing on it) and a search field opens. Type a few words: every word has to appear in the beat's name, ID or type, so *hall multi* finds the Multi Choice called *Hallway 3*. Beats with the same name are easy to tell apart, because each row shows the beat's type.
+- **Arrow keys** move through the list, **Enter** picks, **Escape** closes without changing anything.
+- In a project with more than ten beats, the five beats you picked most recently are listed first under **Picked recently** while the search is empty.
+- If a stored beat has since been deleted, the picker shows it as *(missing beat)* so you can spot and fix it.
+
+![The beat picker open on an Info Text's Target Beat: "grandma dialog" typed in the search field, and three Dialog Tree beats listed, each with its type on the right](images/99-beat-picker-search.png)
+*Type a few words to narrow the list; each row shows the beat's type.*
 
 **Effects on a single link.** On a beat with one way on (an Info Text, a Title Screen…), the **Connections** section has a small **When the player continues (optional)** box under the target. Effects you add there — start a counter, record which route was taken, nudge a feeling — run as the player leaves the beat by that link. It's the same effect editor that choices use.
 
@@ -397,7 +494,7 @@ The palette is organized into four top-level groups, each split into smaller sub
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
 - **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, **Set GPS Location**, Set Timer, Update Affect).
 
-AI-powered variants sit immediately after their non-AI sibling so they're easy to find. The device-aware beats — **QR Scan**, **AR Scene**, and **Web View** — are regular, fully supported beats: each one has been through a full hands-on verification round on real hardware (they graduated from their earlier experimental phase in v0.9.84–v0.9.85, and no beat on the palette carries an experimental flag anymore). They're documented in detail in [Part 3](#part-3-understanding-beats).
+AI-powered variants sit immediately after their non-AI sibling so they're easy to find, marked with a small **AI** tag. (With **Show AI features** off in App Preferences, they're left out of the palette; see [Working without AI](#working-without-ai).) The device-aware beats — **QR Scan**, **AR Scene**, and **Web View** — are regular, fully supported beats: each one has been through a full hands-on verification round on real hardware (they graduated from their earlier experimental phase in v0.9.84–v0.9.85, and no beat on the palette carries an experimental flag anymore). They're documented in detail in [Part 3](#part-3-understanding-beats).
 
 We'll explore every beat type in detail in [Part 3](#part-3-understanding-beats).
 
@@ -649,6 +746,9 @@ Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's que
 
 In a responsive project the Visual Editor's left panel offers a **Layout Template** — *Stacked (prompt + buttons)*, *Conversation (side-by-side)*, *Chat - Single Bubble*, or *Custom (drag-place)*. Like Dialog Tree, a Conversation layout falls back to stacked on phone-width stages. To set one choice apart (say, a *Leave* button in a corner), pin it from the Elements tab; see [Per-button pins](#per-button-pins-action-slot).
 
+<a id="unlinked-choices"></a>
+**A choice that isn't linked yet.** Sketching a scene, you'll often play it before every choice leads somewhere. That's fine: picking a choice with no target simply does nothing. The choices stay on screen and the player can pick another one. The choice's effects don't run and it isn't counted as taken. In the Preview Window an amber notice says which choice still needs a target (*"Go to the mall" isn't linked to a beat yet, so nothing happens. Pick where it leads in the Properties panel of "Choose Your Path".*); it goes away at the next beat. Exported stories behave the same way, without the notice. This holds for Multi Choice, Choose Your Character and Movement Choice. (Dialog Trees have their own rule: a line with no reply and no target ends the conversation and follows the beat's own link.)
+
 **When to Use:** Quick decisions, quiz questions, "which way?" moments that don't need a conversation.
 
 ---
@@ -666,7 +766,7 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 **Key Settings:**
 - **Role** - Which role the pick fills (from Project Settings → Roles; a new beat starts on the `player` role). Picking a role while the beat has no choices yet fills them in for you. **Add a choice for each character of this role** does the same on demand: one choice per character, labelled with their name and the first sentence of their description; choices you have already edited are kept.
 - **Question** - The prompt above the buttons ("Who will you be?")
-- **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go. The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
+- **Choices** - Each with a **character**, a label (leave it empty to show the character's name), a **description**, and a target. Usually every choice goes to the same beat: the story stays one story, and later beats refer to the role. A choice without a target simply goes where the other choices go (only if no choice has a target yet does nothing happen — see [A choice that isn't linked yet](#unlinked-choices)). The Inspector flags a choice that has no character yet. *Show only if…* conditions work as in Multi Choice — a character can unlock on a second playthrough.
 - **Show options as** - *Buttons* (the default), *Pictures with names* or *Pictures only*. With pictures, each choice is a card showing the character's portrait (the portrait of their current variant, if it has one), with the name and description under it, or the picture alone. *Pictures only* still gives the name to screen readers and shows it with the description when the pointer rests on a card. Once a picture style is chosen, each choice in the Inspector gets a small picture row showing what the card will use. **Other picture…** there uses any image instead of the portrait, for example a full-figure drawing (the button then reads **Change**); ✕ goes back to the portrait. A character without any picture gets a card with their initial and name.
 - Layouts, effects, speaker and revisit settings are the same as [Multi Choice](#multi-choice). A choice's own effects run *after* the character is cast, so an effect aimed at *@ The player* lands on the person just chosen.
 
@@ -689,6 +789,8 @@ Perfect for exploration! Display a scene and let interactors choose where to go.
 - **Main Text** - Description of current location
 - **Destinations** - Places the interactor can go, each with a target beat, optional conditions (a locked door that only opens once you hold the key — see [Earned options](#conditional-choices)), and optional effects
 - **Revisit behaviour** - the same *Block and dim visited choices* / *Effects fire only on first pick* pair as Dialog Tree, under Show Advanced Options — see [What happens on a second visit?](#revisit-policy)
+
+A destination with no target yet does nothing when picked, and the other destinations stay available — see [A choice that isn't linked yet](#unlinked-choices).
 
 **When to Use:** Exploration games, room-by-room adventures, maps.
 
@@ -2407,12 +2509,38 @@ This is especially useful for AI-content beats — `onlineContent`, `aiInfoText`
 
 ASAPS Modern includes AI assistance to help you build narrative systems. Think of it as a collaborative partner for content generation and design suggestions.
 
-![AI Menu](images/07-ai-menu.png)
+![The AI menu open from the purple AI button on the header's title row: Ideate with Ideator, Design with Co-Designer, Generate Story, AI changes, Create Beat from Description, Configure AI](images/07-ai-menu.png)
 *The AI tools menu*
+
+Every AI feature is optional. Nothing in ASAPS needs AI to build, play or export a story, and you can hide the AI tools completely — see [Working without AI](#working-without-ai) below.
+
+<a id="working-without-ai"></a>
+## Working without AI
+
+Not planning to use AI, or teaching a class that shouldn't? Open **Tools → App Preferences…** and switch off **Show AI features**. This hides:
+
+- the **AI** menu in the header
+- **Tools → Change with AI**, and the *Change with AI* tab of Find & Change (the panel becomes *Find & Replace*)
+- the beat suggestions at the bottom of the Properties panel, **Develop character with AI** and the Character Manager's **Generate with AI** card, and the Dialog Tree's **AI Generate**
+- the AI translation buttons
+- **Ask AI** and the AI fixes in the [review banner](#after-generation-the-review-banner) (the rule-based proposals stay)
+- the **Build from a prompt** and **Co-write with AI** cards when you start a new project
+- the AI beat types in the Beat Types palette
+- the AI settings and on-the-fly translation in the HTML export (the exported story then carries no AI setup), and the suggested AI setup in Project Settings
+- in App Preferences itself, the AI provider, web search and Claude Desktop rows
+
+Your stories are not changed. AI beats that are already in a project stay in the flowchart, can still be edited, and still play in the Preview. Switch **Show AI features** back on at any time and everything returns.
+
+**Just the beat suggestions.** While the AI features are on, a second switch, **Beat suggestions**, hides only the AI's next-beat suggestions at the bottom of the Properties panel. They take up room on every beat, so you can turn them off and keep the AI menu and the other AI tools.
+
+Both switches are settings of this computer (not of the project), are on by default, and every open ASAPS window follows a change straight away.
+
+![App Preferences with the Show AI features and Beat suggestions switches at the top, both on, above the AI provider, web search, voices, speech input and Claude Desktop rows](images/100-app-preferences-ai-switches.png)
+*Tools → App Preferences…: **Show AI features** and, below it, **Beat suggestions**.*
 
 ## Setting Up AI
 
-1. Click **AI** in the header (bottom-left, purple gradient button)
+1. Click **AI** in the header (the purple button on the right of the title row)
 2. Select **Configure AI** from the dropdown
 3. Choose your provider:
    - **Claude** - Anthropic's AI (recommended; default model: **claude-sonnet-5**). The whole Claude 5 family works — type `claude-opus-5` or `claude-fable-5` into the Model field if you prefer; older Claude 4.x models keep working when named explicitly.
@@ -2713,9 +2841,11 @@ Untick anything you don't want and click **Apply N selected**, or **Dismiss** th
 Stuck on what should happen next?
 
 1. Select a beat in the flowchart
-2. In the Inspector panel (right side), find the **AI Suggestions** section at the bottom
-3. Click **Get Suggestions** -- AI analyzes your story context and offers options
-4. Accept a suggestion or ask for alternatives
+2. In the Inspector panel (right side), find the **Suggest Next Beat** section at the bottom
+3. Click **Suggest Next Beats** -- AI analyzes your story context and offers options
+4. Add the suggestion you like, or ask again for different ones
+
+Don't want them taking up room on every beat? Switch off **Beat suggestions** in **Tools → App Preferences…** — the rest of the AI tools stay (see [Working without AI](#working-without-ai)).
 
 ## Natural Language Beat Creation
 
@@ -4237,7 +4367,7 @@ ASAPS Modern maintains a full undo/redo history for beat operations:
 - **Ctrl/Cmd+Shift+Z** - Redo
 - The **History dropdown** (next to undo/redo buttons) shows recent operations
 
-Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer. The undo stack persists for the current session.
+Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, links drawn in the flowchart, text edited in the Script view, an Update from Markdown (one step for the whole file), Change type…, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer. The undo stack persists for the current session.
 
 <a id="find-and-change"></a>
 ## Find & Change
@@ -4250,6 +4380,8 @@ One panel for every bulk edit. Click **Find & Change** in the header (or press *
 - **Change with AI** — describe the change in plain language and let the AI apply it across the project. Opens directly with **Ctrl/Cmd+Shift+F** (also **Tools → Change with AI**).
 
 Both tabs keep their state when you close and reopen the panel — a search you were in the middle of, or an AI conversation in progress, is still there.
+
+With **Show AI features** switched off in App Preferences, the panel is called **Find & Replace** and has only the Find tab (see [Working without AI](#working-without-ai)).
 
 ### Find
 
@@ -4294,8 +4426,10 @@ Create localized versions of your story with AI-assisted translation:
 
 Bulk operations accessible from the **Tools** dropdown in the header:
 
-- **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F)
+- **App Preferences…** - Settings for this computer: AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
+- **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F; hidden when Show AI features is off)
 - **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
+- **Recently deleted beats…** - Bring back beats deleted in the last 30 days (see [Recently deleted beats](#recently-deleted-beats))
 
 The **Auto-Arrange** button is available directly on the flowchart canvas (bottom-left controls). The **Debug** button in the header provides reachability analysis, path analysis, and logic validation.
 
@@ -4307,7 +4441,7 @@ The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a 
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
-- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, and the Claude Desktop (MCP) integration.
+- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
 - **Updates and quitting** - When an update has downloaded, ASAPS offers **Restart Now** or **Later**. Restarting — like quitting — first finishes saving your open project, so nothing in flight is lost. In the rare case something still can't be saved, ASAPS asks before going on: *"Some changes could not be saved."* Choose **Restart and install** (or **Close anyway** when you're just quitting) to go ahead without those changes, or **Cancel** to keep working and save first — a postponed update installs the next time you quit.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 - **When a link won't open** - Help → Documentation, Report a Bug…, Known Issues, the **Open Releases Page** button (offered when an update can't download), and other web links you click in ASAPS all open in your web browser. If your computer declines to open one (usually because no default browser is set), ASAPS shows **Couldn't open your browser** with the address and a **Copy Link** button, so you can paste it into any browser yourself. If it keeps happening on Windows, set a default browser under **Settings › Apps › Default apps**, and make sure you're not running ASAPS as administrator.
@@ -4388,6 +4522,9 @@ Quick reference for all beat types.
 | Ctrl/Cmd + Click | Add a beat to the selection, or take it out (flowchart) |
 | Ctrl/Cmd + C / V | Copy the selected beats / paste them in the middle of the flowchart; links between the copied beats come along |
 | Ctrl/Cmd + D | Duplicate the selected beats (flowchart) |
+| Drag from a beat's right-edge dot | Draw a link to the beat you drop on (flowchart); in the "which one?" menu, arrow keys + Enter pick, Escape cancels |
+| Typing on a beat picker | Opens its search; arrow keys move, Enter picks, Escape closes |
+| Escape (Script view) | Put back the text of the field you're editing |
 | Shift + Click | Multi-select elements (Visual Editor) |
 
 ---
@@ -4508,6 +4645,8 @@ Quick reference for all beat types.
 
 **NPC Auto-Exit** - A Dialog Tree feature where a dialog node automatically advances to a target beat after the NPC speaks, without showing choices to the player.
 
+**Script View** - The canvas tab that shows all of a story's text on one page in reading order, editable in place, and can save it as Markdown and read edits back. See [Script View](#script-view).
+
 **Session Timeline** - An automatic log of significant events during story playback, including beat transitions, player choices, AI outputs, and branching decisions.
 
 **Markdown-Lite** - Lightweight text formatting supported in text boxes and choice buttons: `**bold**`, `*italic*`, `~~strikethrough~~`, `==highlight==`, line breaks, and backslash escapes (`\*` shows an asterisk).
@@ -4573,6 +4712,15 @@ Export regularly as ASAPS Project (.zip). These files contain everything needed 
 
 ### Can I import from Twine?
 Yes! Use Import → Import Twine (HTML). SugarCube format is supported, though complex macros may need manual adjustment.
+
+### I clicked a choice in the Preview and nothing happened. Is it broken?
+Most likely that choice isn't linked to a beat yet. The Preview shows an amber notice naming it; pick where it leads in the beat's Properties panel, or [draw the link in the flowchart](#drawing-links). The other choices keep working in the meantime — see [A choice that isn't linked yet](#unlinked-choices).
+
+### Can I use ASAPS without any AI?
+Yes. Switch off **Show AI features** in **Tools → App Preferences…** and every AI button, menu and AI beat type is hidden; your stories don't change. See [Working without AI](#working-without-ai).
+
+### Can I write my story's text in another editor?
+Yes. In the [Script view](#script-view), **Save as Markdown** gives you a file for Obsidian, Google Docs or any text editor, and **Update from Markdown…** brings your edits back after showing you every change. See [Writing elsewhere](#script-markdown).
 
 ### Do AI features require an API key?
 AI features can work with cloud services (Claude or OpenAI) which require an API key and may incur costs. However, you can also use **local LLMs via Ollama** for free -- story generation may not work as well with smaller local models, but it's usable for many features.
