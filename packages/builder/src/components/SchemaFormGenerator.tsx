@@ -9,6 +9,7 @@ import { CounterOwnerPicker } from './CounterOwnerPicker';
 import { GpsPointCurator } from './visual/GpsPointCurator';
 import { FormattingToolbar } from './FormattingToolbar';
 import { ImageAssetField } from './assets/ImageAssetField';
+import { BeatPicker } from './common/BeatPicker';
 import { useProjectRoles, roleOptionLabel } from '../contexts/RolesContext';
 
 // Type definitions for beat schema
@@ -374,18 +375,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
               </label>
-              <select
+              <BeatPicker
                 value={value || ''}
-                onChange={(e) => onParameterChange(paramName, e.target.value)}
+                onChange={(targetId) => onParameterChange(paramName, targetId)}
+                beats={availableTargets}
+                emptyLabel="-- Select target (optional) --"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="">-- Select target (optional) --</option>
-                {availableTargets.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.name || target.id}
-                  </option>
-                ))}
-              </select>
+              />
               {(paramDef.ui?.help || paramDef.description) && (
                 <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
               )}
@@ -603,19 +599,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {paramDef.ui.label || label} {isRequired && <span className="text-red-500">*</span>}
               </label>
-              <select
+              <BeatPicker
                 value={current}
-                onChange={(e) => handleChange(e.target.value || undefined)}
+                onChange={(targetId) => handleChange(targetId || undefined)}
+                beats={availableTargets}
+                emptyLabel={paramDef.ui.emptyLabel || 'None'}
                 className={`w-full px-3 py-2 border rounded-lg text-sm ${current && !known ? 'border-red-400 text-red-700' : 'border-gray-300'}`}
-              >
-                <option value="">{paramDef.ui.emptyLabel || 'None'}</option>
-                {current && !known && <option value={current}>{current} (missing beat)</option>}
-                {availableTargets.map((target) => (
-                  <option key={target.id} value={target.id}>
-                    {target.name || target.id} ({target.type})
-                  </option>
-                ))}
-              </select>
+              />
               {!current && paramDef.ui.requiredWhen && parameters[paramDef.ui.requiredWhen] !== false && (
                 <p className="text-xs text-red-600 mt-1">{paramDef.ui.missingHint || 'Pick a beat.'}</p>
               )}
@@ -1216,18 +1206,13 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {paramDef.ui?.label || label} {isRequired && <span className="text-red-500">*</span>}
             </label>
-            <select
+            <BeatPicker
               value={value || ''}
-              onChange={(e) => onParameterChange(paramName, e.target.value || undefined)}
+              onChange={(targetId) => onParameterChange(paramName, targetId || undefined)}
+              beats={availableTargets}
+              emptyLabel="None (optional)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="">None (optional)</option>
-              {availableTargets.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name || target.id} ({target.type})
-                </option>
-              ))}
-            </select>
+            />
             {(paramDef.ui?.help || paramDef.description) && (
               <p className="text-xs text-gray-500 mt-1">{paramDef.ui?.help || paramDef.description}</p>
             )}
@@ -1521,22 +1506,17 @@ export const SchemaFormGenerator: React.FC<SchemaFormGeneratorProps> = ({
                               {fieldLabel}
                               {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
                             </label>
-                            <select
+                            <BeatPicker
                               value={fieldValue || ''}
-                              onChange={(e) => {
+                              onChange={(targetId) => {
                                 const newItems = [...items];
-                                newItems[index] = { ...item, [fieldName]: e.target.value };
+                                newItems[index] = { ...item, [fieldName]: targetId };
                                 onParameterChange(paramName, newItems);
                               }}
+                              beats={availableTargets}
+                              emptyLabel="Select target..."
                               className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
-                            >
-                              <option value="">Select target...</option>
-                              {availableTargets.map((target) => (
-                                <option key={target.id} value={target.id}>
-                                  {target.name || target.id}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           </div>
                         );
                       }

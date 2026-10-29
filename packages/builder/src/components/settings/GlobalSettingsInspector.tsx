@@ -17,11 +17,13 @@ import { findThemeCopies, assetsInUseBySettings, settingsWithoutAssets } from '.
 import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
 import { notify, confirmAction } from '../../utils/notify';
+import { useAIFeatures } from '../../utils/aiFeatures';
 
 // ONE canonical GlobalSettings type (UX-Eval §1.2 structural hazard): this
 // file used to declare its own copy, which App and a dozen other modules
 // imported instead of storage/types — the two had diverged twice.
 import type { GlobalSettings } from '../../storage/types';
+import { BeatPicker } from '../common/BeatPicker';
 
 /** The frame's edge height in the Text Box preview, a stage about 760 px wide (as the story draws it). */
 const previewFrameBand = (f: number, naturalPx: number) => `${Math.round(Math.max(8, Math.min(naturalPx, f * 760)))}px`;
@@ -88,6 +90,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
   onRequestLayoutModeChange,
   resolvedLayoutMode,
 }) => {
+  const aiOn = useAIFeatures();
   const [settings, setSettings] = useState<GlobalSettings>(() => {
     // Normalize speakerDisplay on load to migrate old format to new
     if (initialSettings.speakerDisplay && !initialSettings.speakerDisplay.nameStyle) {
@@ -909,7 +912,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   author's AI configuration, never with keys; a collaborator
                   who opens the story without an AI setup of their own
                   starts from it. */}
-              {settings.ai && (settings.ai.provider || settings.ai.providerType || settings.ai.model) && (
+              {aiOn && settings.ai && (settings.ai.provider || settings.ai.providerType || settings.ai.model) && (
                 <div className="p-3 border rounded-lg bg-purple-50 border-purple-200 flex items-start gap-3">
                   <div className="flex-1 text-sm">
                     <div className="font-medium text-gray-800">Suggested AI setup for this story</div>
@@ -3916,18 +3919,13 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     First Beat (for testing)
                   </label>
-                  <select
+                  <BeatPicker
                     value={settings.debug.firstbeat}
-                    onChange={(e) => handleChange('debug', 'firstbeat', e.target.value)}
+                    onChange={(targetId) => handleChange('debug', 'firstbeat', targetId)}
+                    beats={beats}
+                    emptyLabel="Story default (auto-detect)"
                     className="w-full px-3 py-2 border rounded"
-                  >
-                    <option value="">Story default (auto-detect)</option>
-                    {beats.map(beat => (
-                      <option key={beat.id} value={beat.id}>
-                        {beat.name || beat.id} ({beat.type})
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <p className="text-xs text-gray-500 mt-1">
                     Override the starting beat for testing specific sections
                   </p>

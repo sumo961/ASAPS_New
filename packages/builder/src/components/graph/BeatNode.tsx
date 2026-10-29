@@ -179,10 +179,11 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
           ⚠
         </div>
       )}
+      {/* A drawn link can end here (or anywhere on the beat), never start. */}
       <Handle
         type="target"
         position={Position.Left}
-        isConnectable={false}
+        isConnectableStart={false}
         style={{
           background: data.color || '#94a3b8',
           width: 12,
@@ -261,11 +262,14 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         </div>
       )}
 
+      {/* Drag from here onto another beat to link them (GraphEditor.onConnectEnd). */}
       <Handle
         type="source"
         position={Position.Right}
-        isConnectable={false}
+        isConnectableEnd={false}
+        title="Drag onto another beat to link it"
         style={{
+          cursor: 'crosshair',
           background: data.color || '#94a3b8',
           width: 12,
           height: 12,

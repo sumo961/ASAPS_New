@@ -426,6 +426,8 @@ export const PreviewWindow: React.FC = () => {
   // show a visible "story ended here" notice instead of a silent stop,
   // which reads as a dead click on beats with no outgoing connection.
   const [endedNotice, setEndedNotice] = useState<string | null>(null);
+  // A choice the author hasn't linked yet was clicked: the beat stays, this says which choice.
+  const [unlinkedNotice, setUnlinkedNotice] = useState<string | null>(null);
   const stopRequestedRef = useRef(false);
   const [currentBeat, setCurrentBeat] = useState<Beat | null>(null);
 
@@ -2141,19 +2143,26 @@ export const PreviewWindow: React.FC = () => {
       };
       context.on('beatChanged', onBeatChanged);
 
-      const unsubscribe = (rendererRef.current as any).onStateChange?.('currentBeatInfo', (beatInfo: { id: string; name: string; type: string } | null) => {
+      const unsubscribeBeat = (rendererRef.current as any).onStateChange?.('currentBeatInfo', (beatInfo: { id: string; name: string; type: string } | null) => {
         if (beatInfo) {
           const beat = story.getBeat(beatInfo.id);
           setCurrentBeat(beat || null);
+          setUnlinkedNotice(null);
           // Update debug info when beat changes
           updateDebugInfo();
         }
       });
+      const unsubscribeUnlinked = (rendererRef.current as any).onStateChange?.('unlinkedChoice', (info: { beatName?: string; choiceText: string } | undefined) => {
+        if (info) {
+          setUnlinkedNotice(`"${info.choiceText}" isn't linked to a beat yet, so nothing happens. Pick where it leads in the Properties panel of "${info.beatName || 'this beat'}".`);
+        }
+      });
 
       // Store unsubscribe function to clean up on next start
-      if (unsubscribe) {
-        stateChangeUnsubscribeRef.current = unsubscribe;
-      }
+      stateChangeUnsubscribeRef.current = () => {
+        unsubscribeBeat?.();
+        unsubscribeUnlinked?.();
+      };
 
       // Subscribe to context events for state updates
       context.on('variableChanged', updateDebugInfo);
@@ -3352,6 +3361,16 @@ export const PreviewWindow: React.FC = () => {
               {startBlockedReason && (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-red-600 text-white text-sm shadow-lg">
                   {startBlockedReason}
+                </div>
+              )}
+              {unlinkedNotice && isRunning && (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[60] max-w-[80%] px-3 py-2 rounded bg-amber-500 text-white text-sm shadow-lg flex items-start gap-2">
+                  <span>{unlinkedNotice}</span>
+                  <button
+                    onClick={() => setUnlinkedNotice(null)}
+                    className="font-bold px-1 hover:opacity-70"
+                    title="Dismiss"
+                  >×</button>
                 </div>
               )}
               {endedNotice && !isRunning && (

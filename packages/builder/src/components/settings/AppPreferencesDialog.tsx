@@ -5,19 +5,20 @@
  * project could see different players or exports, it belongs to the
  * project".
  *
- * One place for: AI provider, voices (TTS), speech input (STT), web search,
+ * One place for: showing or hiding the AI features, AI provider, voices (TTS), speech input (STT), web search,
  * where keys are stored, and — desktop only — automatic updates and the
  * Claude Desktop (MCP) integration. The provider rows open the existing
  * configuration dialogs rather than duplicating them.
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Volume2, Mic, Search, RefreshCw, Plug, Lock } from 'lucide-react';
+import { X, Sparkles, Lightbulb, Volume2, Mic, Search, RefreshCw, Plug, Lock } from 'lucide-react';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { getSavedSTTConfig } from '../../hooks/useSTT';
 import { getSavedBraveApiKey } from '../ai/ideator/braveConfig';
 import { keyStorageNote } from '../../utils/keyStorageNote';
+import { useAIFeatures, setAIFeaturesEnabled, useBeatSuggestionsSetting, setBeatSuggestionsEnabled } from '../../utils/aiFeatures';
 
 export interface AppPreferencesDialogProps {
   isOpen: boolean;
@@ -87,6 +88,8 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
   // Re-read summaries whenever the dialog opens (keys may have changed in a
   // provider dialog opened from here).
   const [tick, setTick] = useState(0);
+  const aiOn = useAIFeatures();
+  const suggestionsOn = useBeatSuggestionsSetting();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -158,16 +161,36 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
         <div className="px-5 py-2">
           <Row
             icon={<Sparkles className="w-4 h-4" />}
-            title="AI provider"
-            summary={ai ? `${label(ai.providerType || ai.provider)}${ai.model ? ` · ${ai.model}` : ''}${ai.apiKey || ai.providerType === 'local' ? '' : ' · no key'}` : 'Not set up'}
-            action={configureBtn(openThen(onOpenAIConfig))}
+            title="Show AI features"
+            summary={aiOn
+              ? 'The AI menu and AI buttons are shown.'
+              : 'Hidden. AI Conversation beats already in a story still play.'}
+            action={<Toggle checked={aiOn} onChange={setAIFeaturesEnabled} label="Show AI features" />}
           />
-          <Row
-            icon={<Search className="w-4 h-4" />}
-            title="Web search for the Ideator"
-            summary={brave ? 'Brave Search key saved' : 'Off — add a Brave Search key in the AI configuration'}
-            action={configureBtn(openThen(onOpenAIConfig), brave ? 'Change…' : 'Add key…')}
-          />
+          {aiOn && (
+            <>
+              <Row
+                icon={<Lightbulb className="w-4 h-4" />}
+                title="Beat suggestions"
+                summary={suggestionsOn
+                  ? 'The AI suggests next beats at the bottom of the Properties panel.'
+                  : 'Hidden. The other AI tools stay.'}
+                action={<Toggle checked={suggestionsOn} onChange={setBeatSuggestionsEnabled} label="Beat suggestions" />}
+              />
+              <Row
+                icon={<Sparkles className="w-4 h-4" />}
+                title="AI provider"
+                summary={ai ? `${label(ai.providerType || ai.provider)}${ai.model ? ` · ${ai.model}` : ''}${ai.apiKey || ai.providerType === 'local' ? '' : ' · no key'}` : 'Not set up'}
+                action={configureBtn(openThen(onOpenAIConfig))}
+              />
+              <Row
+                icon={<Search className="w-4 h-4" />}
+                title="Web search for the Ideator"
+                summary={brave ? 'Brave Search key saved' : 'Off — add a Brave Search key in the AI configuration'}
+                action={configureBtn(openThen(onOpenAIConfig), brave ? 'Change…' : 'Add key…')}
+              />
+            </>
+          )}
           <Row
             icon={<Volume2 className="w-4 h-4" />}
             title="Voices (text to speech)"
@@ -188,12 +211,14 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
               action={<Toggle checked={autoUpdate} onChange={setUpdates} label="Check for updates automatically" />}
             />
           )}
-          <Row
-            icon={<Plug className="w-4 h-4" />}
-            title="Claude Desktop integration (MCP)"
-            summary="Lets Claude Desktop send generated stories into this app."
-            action={<Toggle checked={mcpEnabled} onChange={setMcp} label="Claude Desktop integration" />}
-          />
+          {aiOn && (
+            <Row
+              icon={<Plug className="w-4 h-4" />}
+              title="Claude Desktop integration (MCP)"
+              summary="Lets Claude Desktop send generated stories into this app."
+              action={<Toggle checked={mcpEnabled} onChange={setMcp} label="Claude Desktop integration" />}
+            />
+          )}
         </div>
 
         <div className="px-5 py-3 bg-gray-50 rounded-b-xl flex items-start gap-2 text-xs text-gray-600">

@@ -10,6 +10,7 @@ import { Globe, Plus, Sparkles, PenLine, AlertTriangle, ChevronDown, Play, Trash
 import type { TranslationResource, TranslationManifest } from '@asaps/core';
 import { COMMON_LANGUAGES, ALL_LANGUAGES } from '../../utils/languageCatalog';
 import { confirmAction } from '../../utils/notify';
+import { useAIFeatures } from '../../utils/aiFeatures';
 
 /**
  * Get filtered suggestions for the custom language search.
@@ -114,6 +115,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   onDeleteTranslation,
   onContinueTranslation,
 }) => {
+  const aiOn = useAIFeatures();
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [customSearch, setCustomSearch] = useState('');
@@ -224,7 +226,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                 </button>
                 {/* Per-language action buttons */}
                 <span className="flex items-center gap-0.5 flex-shrink-0">
-                  {completeness < 100 && onContinueTranslation && (
+                  {aiOn && completeness < 100 && onContinueTranslation && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -292,9 +294,11 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                   className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
                 <div className="pt-1 text-[10px] text-gray-400 flex items-center gap-3">
-                  <span className="flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-blue-500" /> AI translates for you
-                  </span>
+                  {aiOn && (
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-blue-500" /> AI translates for you
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <PenLine className="w-3 h-3 text-green-600" /> Manual — you write the text
                   </span>
@@ -307,18 +311,20 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                   className="px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-gray-50"
                 >
                   <span className="flex-1 text-gray-700">{lang.name}</span>
-                  <button
-                    onClick={() => {
-                      onGenerateTranslation(lang.code, lang.name);
-                      setShowAddMenu(false);
-                      setShowDropdown(false);
-                    }}
-                    className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
-                    title="Generate AI translation"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI
-                  </button>
+                  {aiOn && (
+                    <button
+                      onClick={() => {
+                        onGenerateTranslation(lang.code, lang.name);
+                        setShowAddMenu(false);
+                        setShowDropdown(false);
+                      }}
+                      className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
+                      title="Generate AI translation"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      AI
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       onCreateManualTranslation(lang.code, lang.name);
@@ -354,19 +360,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                                 {custom.name}
                                 <span className="text-xs text-gray-400 ml-1">({custom.code})</span>
                               </span>
-                              <button
-                                onClick={() => {
-                                  onGenerateTranslation(custom.code, custom.name);
-                                  setShowAddMenu(false);
-                                  setShowDropdown(false);
-                                  setCustomSearch('');
-                                }}
-                                className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
-                                title="Generate AI translation"
-                              >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                AI
-                              </button>
+                              {aiOn && (
+                                <button
+                                  onClick={() => {
+                                    onGenerateTranslation(custom.code, custom.name);
+                                    setShowAddMenu(false);
+                                    setShowDropdown(false);
+                                    setCustomSearch('');
+                                  }}
+                                  className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
+                                  title="Generate AI translation"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  AI
+                                </button>
+                              )}
                               <button
                                 onClick={() => {
                                   onCreateManualTranslation(custom.code, custom.name);
@@ -398,19 +406,21 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                           {lang.name}
                           <span className="text-xs text-gray-400 ml-1">({lang.code})</span>
                         </span>
-                        <button
-                          onClick={() => {
-                            onGenerateTranslation(lang.code, lang.name);
-                            setShowAddMenu(false);
-                            setShowDropdown(false);
-                            setCustomSearch('');
-                          }}
-                          className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
-                          title="Generate AI translation"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          AI
-                        </button>
+                        {aiOn && (
+                          <button
+                            onClick={() => {
+                              onGenerateTranslation(lang.code, lang.name);
+                              setShowAddMenu(false);
+                              setShowDropdown(false);
+                              setCustomSearch('');
+                            }}
+                            className="px-1.5 py-0.5 rounded hover:bg-blue-100 text-blue-600 flex items-center gap-1 text-xs"
+                            title="Generate AI translation"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            AI
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             onCreateManualTranslation(lang.code, lang.name);

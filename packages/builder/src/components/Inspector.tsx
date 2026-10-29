@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Beat, synthesizeEffectsFromLegacyParams, suggestDurationSeconds, DEFAULT_TARGET_TIMEOUT_TYPES, isMultiChoiceLike, normalizeRoles, linesMoveOnByThemselves, normalizeDialogTreeLayoutTemplate } from '@asaps/core';
 import { VariableValueInput } from '../editors/VariableValueInput';
-import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2 } from 'lucide-react';
+import { X, Save, Trash2, Copy, Info, Plus, Link, Unlink, MapPin, Package, Settings, AlertCircle, MessageSquare, Image, Palette, Music, Volume2, Timer, Variable, Box, StickyNote, ChevronDown, ChevronRight, Globe, ShieldCheck, Maximize2, Minimize2 } from 'lucide-react';
 import beatDefinitions from '../../../../beat-definitions/core-beats.json';
 import { DialogTreeEditor } from '../editors/DialogTreeEditor';
 import { HyperTextEditor } from '../editors/HyperTextEditor';
@@ -181,6 +181,9 @@ import { RoleHolderConditionFields } from '../editors/RoleHolderConditionFields'
 import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { noteDeletion } from '../utils/deletedBeats';
+import { BeatPicker } from './common/BeatPicker';
+import { useBeatSuggestions } from '../utils/aiFeatures';
+import { usePersistedState } from '../utils/persistedState';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
 
@@ -290,15 +293,24 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandleRef = useRef<HTMLDivElement>(null);
 
+  // Wide: room for long texts and dialog trees (class feedback, 2026-10-29:
+  // "text editors feeling cramped"). The dragged width is kept for narrow.
+  const [wide, setWide] = usePersistedState('asaps_ui_inspector_wide', false);
+  const wideWidth = typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.6) : 900;
   // Use external width if provided, otherwise internal
-  const inspectorWidth = externalWidth ?? internalWidth;
+  const inspectorWidth = wide ? Math.max(wideWidth, externalWidth ?? internalWidth) : (externalWidth ?? internalWidth);
   const maxWidth = typeof window !== 'undefined' ? window.innerWidth * 0.5 : 600;
 
   // Resize handlers
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    // Dragging the edge sets the width by hand: leave Wide from where it is.
+    if (wide) {
+      setWide(false);
+      if (!onWidthChange) setInternalWidth(Math.min(maxWidth, inspectorWidth));
+    }
     setIsResizing(true);
-  }, []);
+  }, [wide, setWide, onWidthChange, maxWidth, inspectorWidth]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -338,6 +350,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     return stored ? parseInt(stored, 10) : null;
   });
   const suggestionsAreaRef = useRef<HTMLDivElement>(null);
+  const showSuggestions = useBeatSuggestions();
   const suggestionsDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const handleSuggestionsResizeStart = useCallback((e: React.MouseEvent) => {
@@ -1830,9 +1843,22 @@ export const Inspector: React.FC<InspectorProps> = ({
         <div className="flex-shrink-0 p-4 border-b border-gray-200">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-semibold text-gray-800">Properties</h2>
-            {hasChanges && (
-              <span className="text-xs text-orange-500 font-medium">Unsaved changes</span>
-            )}
+            <div className="flex items-center gap-2">
+              {hasChanges && (
+                <span className="text-xs text-orange-500 font-medium">Unsaved changes</span>
+              )}
+              {!useVisualEditorWidth && (
+                <button
+                  type="button"
+                  onClick={() => setWide(!wide)}
+                  className="p-1 rounded hover:bg-gray-100 text-gray-500"
+                  title={wide ? 'Make the Properties panel narrow again' : 'Make the Properties panel wide'}
+                  aria-pressed={wide}
+                >
+                  {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+              )}
+            </div>
           </div>
           <div className="text-sm text-gray-500">
             {beat.type} • ID: {beat.id}
@@ -3444,22 +3470,15 @@ export const Inspector: React.FC<InspectorProps> = ({
                           {(localBeat.parameters?.value ?? 60) === 0 ? 'Not needed when clearing a timer' : 'Beat to jump to when timer expires'}
                         </span>
                       </label>
-                      <select
+                      <BeatPicker
                         value={localBeat.parameters?.timerTarget || ''}
-                        onChange={(e) => {
-                          const targetId = e.target.value;
+                        onChange={(targetId) => {
                           handleParameterChange('timerTarget', targetId);
                         }}
+                        beats={availableTargets}
+                        emptyLabel="Select target beat..."
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-
-                        <option value="">Select target beat...</option>
-                        {availableTargets.map(target => (
-                          <option key={target.id} value={target.id}>
-                            {target.name} ({target.type})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     <div className="border-t pt-3 mt-3">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3468,10 +3487,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                           Beat to continue to immediately (timer runs in background)
                         </span>
                       </label>
-                      <select
+                      <BeatPicker
                         value={localBeat.connections?.find((c: any) => c.label !== 'Timer Target')?.targetId || ''}
-                        onChange={(e) => {
-                          const targetId = e.target.value;
+                        onChange={(targetId) => {
 
                           const timerConn = localBeat.connections?.find((c: any) => c.label === 'Timer Target');
                           const newConnections: { targetId: string; label: string }[] = [];
@@ -3494,15 +3512,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                           // Rebuild connections immediately when continue target changes
                           rebuildConnectionsAndUpdate(updatedBeat);
                         }}
+                        beats={availableTargets}
+                        emptyLabel="Select next beat..."
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-                        <option value="">Select next beat...</option>
-                        {availableTargets.map(target => (
-                          <option key={target.id} value={target.id}>
-                            {target.name} ({target.type})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                     {/* Timer HUD override */}
                     <div className="border-t pt-3 mt-3">
@@ -3566,18 +3579,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <div className="flex items-end gap-2">
                             <div className="flex-1">
                               <label className="block text-xs text-gray-600 mb-1">Branch {index + 1}</label>
-                              <select
+                              <BeatPicker
                                 value={branch.target || ''}
-                                onChange={(e) => setBranch(index, { target: e.target.value })}
+                                onChange={(targetId) => setBranch(index, { target: targetId })}
+                                beats={availableTargets}
+                                emptyLabel="Select target beat..."
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                              >
-                                <option value="">Select target beat...</option>
-                                {availableTargets.map(target => (
-                                  <option key={target.id} value={target.id}>
-                                    {target.name} ({target.type})
-                                  </option>
-                                ))}
-                              </select>
+                              />
                             </div>
                             <div className="w-20">
                               <label className="block text-xs text-gray-600 mb-1" title="Relative likelihood: 2 = twice as likely as 1; 0 = never">Weight</label>
@@ -3782,18 +3790,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                               Beat to go to when max attempts reached
                             </span>
                           </label>
-                          <select
+                          <BeatPicker
                             value={localBeat.parameters?.failTarget || ''}
-                            onChange={(e) => handleParameterChange('failTarget', e.target.value)}
+                            onChange={(targetId) => handleParameterChange('failTarget', targetId)}
+                            beats={availableTargets}
+                            emptyLabel="None (stay on keypad)"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">None (stay on keypad)</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.type})
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                       </>
                     )}
@@ -4263,18 +4266,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                             );
                           })()}
 
-                          <select
+                          <BeatPicker
                             value={hotspot.target || ''}
-                            onChange={(e) => handleUpdateHotspot(index, 'target', e.target.value)}
+                            onChange={(targetId) => handleUpdateHotspot(index, 'target', targetId)}
+                            beats={availableTargets}
+                            emptyLabel="Select target beat..."
                             className="w-full px-2 py-1 text-sm border rounded"
-                          >
-                            <option value="">Select target beat...</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.id})
-                              </option>
-                            ))}
-                          </select>
+                          />
 
                           {/* Guard (B1a): shown on this choice's edge in the flowchart */}
                           <div className="p-2 bg-violet-50/60 rounded">
@@ -4687,19 +4685,14 @@ export const Inspector: React.FC<InspectorProps> = ({
                             );
                           })()}
 
-                          <select
+                          <BeatPicker
                             value={choice.target || ''}
-                            onChange={(e) => handleUpdateChoice(index, 'target', e.target.value)}
+                            onChange={(targetId) => handleUpdateChoice(index, 'target', targetId)}
+                            beats={availableTargets}
+                            emptyLabel="Select target beat..."
+                            extraOptions={[{ value: '__self__', label: '↩ Return to initial choices' }]}
                             className="w-full px-2 py-1 text-sm border rounded"
-                          >
-                            <option value="">Select target beat...</option>
-                            <option value="__self__">↩ Return to initial choices</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.id})
-                              </option>
-                            ))}
-                          </select>
+                          />
                           
                           {/* Guard (B1a): shown on this choice's edge in the flowchart */}
                           <div className="p-2 bg-violet-50/60 rounded">
@@ -4981,18 +4974,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                         <label className="block text-xs font-medium text-gray-600 mb-0.5">
                           Default target — used on Continue / timeout / skip
                         </label>
-                        <select
+                        <BeatPicker
                           value={localBeat.parameters?.defaultTarget || ''}
-                          onChange={(e) => handleParameterChange('defaultTarget', e.target.value || undefined)}
+                          onChange={(targetId) => handleParameterChange('defaultTarget', targetId || undefined)}
+                          beats={availableTargets}
+                          emptyLabel="— none (uses graph connection) —"
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                        >
-                          <option value="">— none (uses graph connection) —</option>
-                          {availableTargets.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name ? `${t.name} (${t.id})` : t.id}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                     </div>
                   );
@@ -5336,18 +5324,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                             );
                           })()}
 
-                          <select
+                          <BeatPicker
                             value={prop.target || ''}
-                            onChange={(e) => handleUpdateProp(index, 'target', e.target.value)}
+                            onChange={(targetId) => handleUpdateProp(index, 'target', targetId)}
+                            beats={availableTargets}
+                            emptyLabel="Select target beat..."
                             className="w-full px-2 py-1 text-sm border rounded"
-                          >
-                            <option value="">Select target beat...</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.id})
-                              </option>
-                            ))}
-                          </select>
+                          />
                           
                           {/* Guard (B1a): shown on this prop's edge in the flowchart */}
                           <div className="p-2 bg-violet-50/60 rounded">
@@ -5429,10 +5412,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                               jumps directly (use the QR generator below to track such jumps as dashed edges).
                             </p>
                           )}
-                          <select
+                          <BeatPicker
                             value={localBeat.connections?.[0]?.targetId || ''}
-                            onChange={(e) => {
-                              const targetId = e.target.value;
+                            onChange={(targetId) => {
                               // Keep the link's other fields (its effects)
                               // when only the target changes.
                               const prior = localBeat.connections?.[0] || {};
@@ -5448,15 +5430,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                               // Rebuild connections immediately when target changes
                               rebuildConnectionsAndUpdate(updatedBeat);
                             }}
+                            beats={availableTargets}
+                            emptyLabel="Select target beat..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Select target beat...</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.type})
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                         {beat.type === 'endScreen' && localBeat.parameters?.showRestart !== false && localBeat.parameters?.reset && (
                           <p className="text-xs text-gray-500 leading-snug -mt-1">
@@ -5509,10 +5486,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                           <label className="block text-xs text-gray-600 mb-1">
                             True Target <span className="text-red-500">*</span>
                           </label>
-                          <select
+                          <BeatPicker
                             value={localBeat.parameters?.trueTarget || localBeat.connections?.find((c: any) => c.label === 'true')?.targetId || ''}
-                            onChange={(e) => {
-                              const targetId = e.target.value;
+                            onChange={(targetId) => {
                               // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'true') || [];
                               const updatedBeat = {
@@ -5531,25 +5507,19 @@ export const Inspector: React.FC<InspectorProps> = ({
                               // Rebuild connections immediately when true target changes
                               rebuildConnectionsAndUpdate(updatedBeat);
                             }}
+                            beats={availableTargets}
+                            emptyLabel="Select target..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Select target...</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.type})
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
 
                         <div>
                           <label className="block text-xs text-gray-600 mb-1">
                             False Target{localBeat.parameters?.conditionType === 'timer' ? <span className="text-red-500"> *</span> : ' (Optional)'}
                           </label>
-                          <select
+                          <BeatPicker
                             value={localBeat.parameters?.falseTarget || localBeat.connections?.find((c: any) => c.label === 'false')?.targetId || ''}
-                            onChange={(e) => {
-                              const targetId = e.target.value;
+                            onChange={(targetId) => {
                               // Update both parameters and connections for consistency
                               const otherConns = localBeat.connections?.filter((c: any) => c.label !== 'false') || [];
                               const updatedBeat = {
@@ -5568,15 +5538,10 @@ export const Inspector: React.FC<InspectorProps> = ({
                               // Rebuild connections immediately when false target changes
                               rebuildConnectionsAndUpdate(updatedBeat);
                             }}
+                            beats={availableTargets}
+                            emptyLabel="Select target..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                          >
-                            <option value="">Select target...</option>
-                            {availableTargets.map(target => (
-                              <option key={target.id} value={target.id}>
-                                {target.name} ({target.type})
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
                       </div>
                     )}
@@ -5616,22 +5581,17 @@ export const Inspector: React.FC<InspectorProps> = ({
                           Beat to automatically advance to after delay
                         </span>
                       </label>
-                      <select
+                      <BeatPicker
                         value={localBeat.defaultTarget || ''}
-                        onChange={(e) => {
-                          handleChange('defaultTarget', e.target.value || undefined);
+                        onChange={(targetId) => {
+                          handleChange('defaultTarget', targetId || undefined);
                           // The delay field shows what is stored — store the 5 s it shows.
-                          if (e.target.value && !(localBeat.defaultTargetDelay > 0)) handleChange('defaultTargetDelay', 5);
+                          if (targetId && !(localBeat.defaultTargetDelay > 0)) handleChange('defaultTargetDelay', 5);
                         }}
+                        beats={availableTargets}
+                        emptyLabel="No auto-advance"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                      >
-                        <option value="">No auto-advance</option>
-                        {availableTargets.map(target => (
-                          <option key={target.id} value={target.id}>
-                            {target.name} ({target.type})
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
 
                     {localBeat.defaultTarget && !DEFAULT_TARGET_TIMEOUT_TYPES.has(getCanonicalBeatType(beat.type)) && (
@@ -5893,56 +5853,60 @@ export const Inspector: React.FC<InspectorProps> = ({
 
         {/* Fixed Footer Actions - Delete button only (Save is handled by central Save button in header) */}
         <div className="flex-shrink-0 border-t border-gray-200 bg-white">
-          {/* Row-resize divider: drag to trade height between the properties
-              column above and the AI-suggestions area below (finding 9). */}
-          <div
-            onMouseDown={handleSuggestionsResizeStart}
-            onDoubleClick={resetSuggestionsHeight}
-            className="h-1.5 -mt-1 cursor-row-resize hover:bg-purple-300 transition-colors"
-            title="Drag to resize the suggestions area — double-click to reset"
-          />
-          {/* AI Beat Suggestions */}
-          <div
-            ref={suggestionsAreaRef}
-            className="p-4 border-b border-gray-200"
-            style={suggestionsHeight != null ? { height: suggestionsHeight, overflowY: 'auto' } : undefined}
-          >
-            <BeatSuggestions
-              currentBeat={beat as any}
-              allBeats={allBeats as any}
-              storyMetadata={{
-                // Real title (was hardcoded 'Current Story'); no genre —
-                // beatDef.category was 'visible'/'invisible', not a genre.
-                title: storyTitle || 'Untitled Story',
-              }}
-              onAddBeat={(suggestion) => {
-                if (!onBeatAdd) {
-                  console.warn('[Inspector] onBeatAdd not provided');
-                  return;
-                }
+          {showSuggestions && (
+            <>
+              {/* Row-resize divider: drag to trade height between the properties
+                  column above and the AI-suggestions area below (finding 9). */}
+              <div
+                onMouseDown={handleSuggestionsResizeStart}
+                onDoubleClick={resetSuggestionsHeight}
+                className="h-1.5 -mt-1 cursor-row-resize hover:bg-purple-300 transition-colors"
+                title="Drag to resize the suggestions area — double-click to reset"
+              />
+              {/* AI Beat Suggestions */}
+              <div
+                ref={suggestionsAreaRef}
+                className="p-4 border-b border-gray-200"
+                style={suggestionsHeight != null ? { height: suggestionsHeight, overflowY: 'auto' } : undefined}
+              >
+                <BeatSuggestions
+                  currentBeat={beat as any}
+                  allBeats={allBeats as any}
+                  storyMetadata={{
+                    // Real title (was hardcoded 'Current Story'); no genre —
+                    // beatDef.category was 'visible'/'invisible', not a genre.
+                    title: storyTitle || 'Untitled Story',
+                  }}
+                  onAddBeat={(suggestion) => {
+                    if (!onBeatAdd) {
+                      console.warn('[Inspector] onBeatAdd not provided');
+                      return;
+                    }
 
-                // Create beat from AI suggestion
-                // Position it to the right of current beat
-                const position = beat ? {
-                  x: (beat.x || 0) + 300,
-                  y: (beat.y || 0)
-                } : undefined;
+                    // Create beat from AI suggestion
+                    // Position it to the right of current beat
+                    const position = beat ? {
+                      x: (beat.x || 0) + 300,
+                      y: (beat.y || 0)
+                    } : undefined;
 
-                const newBeat = onBeatAdd(suggestion.beatType, position);
+                    const newBeat = onBeatAdd(suggestion.beatType, position);
 
-                // If suggestion has parameters, update the beat
-                if (suggestion.parameters && Object.keys(suggestion.parameters).length > 0) {
-                  onUpdate(newBeat.id, { ...suggestion.parameters });
-                }
+                    // If suggestion has parameters, update the beat
+                    if (suggestion.parameters && Object.keys(suggestion.parameters).length > 0) {
+                      onUpdate(newBeat.id, { ...suggestion.parameters });
+                    }
 
-                // Auto-connect if we have a source beat
-                if (beat && onConnect) {
-                  onConnect(beat.id, newBeat.id);
-                }
-              }}
-              count={3}
-            />
-          </div>
+                    // Auto-connect if we have a source beat
+                    if (beat && onConnect) {
+                      onConnect(beat.id, newBeat.id);
+                    }
+                  }}
+                  count={3}
+                />
+              </div>
+            </>
+          )}
 
           <div className="p-4 space-y-2">
             <button

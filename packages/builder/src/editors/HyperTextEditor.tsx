@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Link, X, Palette, Underline as UnderlineIcon } from 'lucide-react';
 import { Beat } from '@asaps/core';
 import { notify } from '../utils/notify';
+import { BeatPicker } from '../components/common/BeatPicker';
 
 /**
  * Word-based hyperlink format (canonical storage format)
@@ -349,18 +350,13 @@ export const HyperTextEditor: React.FC<HyperTextEditorProps> = ({
                     <label className="block text-xs text-gray-600 mb-1">
                       Target Beat <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <BeatPicker
                       value={link.targetBeatId}
-                      onChange={(e) => handleUpdateLink(index, { targetBeatId: e.target.value })}
+                      onChange={(targetId) => handleUpdateLink(index, { targetBeatId: targetId })}
+                      beats={availableBeats}
+                      emptyLabel="Select target..."
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                    >
-                      <option value="">Select target...</option>
-                      {availableBeats.map(beat => (
-                        <option key={beat.id} value={beat.id}>
-                          {beat.name} ({beat.type})
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   {/* Style Controls */}

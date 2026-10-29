@@ -128,6 +128,8 @@ import { notify, confirmAction, errorMessage } from './utils/notify';
 import { undoCommandAction } from './utils/undoNotice';
 import { resolveExportSpeech } from './utils/exportSpeech';
 import { machineStorage } from './utils/machineStorage';
+import { useAIFeatures } from './utils/aiFeatures';
+import { usePersistedState } from './utils/persistedState';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -408,9 +410,14 @@ function App() {
   };
 
   const [selectedBeat, setSelectedBeat] = useState<Beat | null>(null);
+  // App Preferences ▸ Show AI features.
+  const aiOn = useAIFeatures();
   const [beatRefreshKey, setBeatRefreshKey] = useState(0); // Increments to force visual editor refresh
   const [selectedCluster, setSelectedCluster] = useState<Cluster | null>(null);
-  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  // Panels the author folded away stay folded (class feedback, 2026-10-29:
+  // "the window displaying the beats took up at most 1/4 of my screen").
+  const [paletteCollapsed, setPaletteCollapsed] = usePersistedState('asaps_ui_palette_collapsed', false);
+  const [sidebarCollapsed, setSidebarCollapsed] = usePersistedState('asaps_ui_sidebar_collapsed', false);
   const [showCharacterManager, setShowCharacterManager] = useState(false);
   const characterSelectionCallbackRef = useRef<((character: Character) => void) | null>(null);
   const [showAssetManager, setShowAssetManager] = useState(false);
@@ -6892,8 +6899,8 @@ function App() {
           context={importIssues.context ?? 'import'}
           proposals={importIssues.proposals ?? []}
           findings={importIssues.findings ?? []}
-          onAskAI={handleAskAI}
-          aiFix={aiFix}
+          onAskAI={aiOn ? handleAskAI : undefined}
+          aiFix={aiOn ? aiFix : null}
           onAcceptAIFix={handleAcceptAIFix}
           onRejectAIFix={handleRejectAIFix}
           onCancelAIFix={handleCancelAIFix}
@@ -6911,6 +6918,8 @@ function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           beats={state.beats}
           clusters={state.clusters || []}
           selectedBeat={selectedBeat}
@@ -7121,6 +7130,7 @@ function App() {
             onViewBeatDiff={handleViewBeatDiff}
             onViewBeatHistory={handleViewBeatHistory}
             onRevertBeat={handleRevertBeat}
+            onLinkOutput={handleBeatUpdate}
           />
 
           {selectedBeat && (
@@ -7141,7 +7151,7 @@ function App() {
               onAssetRemove={handleAssetRemove}
               onAssetUpdate={handleAssetUpdate}
               onOpenCharacterManager={handleOpenCharacterManager}
-              onDevelopCharacter={setDevelopCharSession}
+              onDevelopCharacter={aiOn ? setDevelopCharSession : undefined}
               characters={characters}
               emotionPalette={emotionPalette}
               globalSettings={globalSettings}
@@ -7189,7 +7199,7 @@ function App() {
                 onCharacterCreated={handleCharacterCreated}
                 emotionPalette={emotionPalette}
                 onEmotionPaletteChange={setEmotionPalette}
-                onGenerateWithAI={() => setDevelopCharSession({ seed: {}, askFirst: true })}
+                onGenerateWithAI={aiOn ? () => setDevelopCharSession({ seed: {}, askFirst: true }) : undefined}
                 hudOverlays={(globalSettings as any).hudOverlays}
               />
             </div>

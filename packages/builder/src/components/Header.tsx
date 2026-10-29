@@ -20,6 +20,7 @@ import { useTranslationState, useTranslationActions } from '../contexts/Translat
 import { VCSStatusBar } from './vcs/VCSStatusBar';
 import { getProjectDataForExport } from '../utils/projectZipManager';
 import { getSavedAIConfig } from '../hooks/useAI';
+import { useAIFeatures } from '../utils/aiFeatures';
 import { useTTS } from '../hooks/useTTS';
 import { getTTSService } from '../services/tts';
 import { useSTT } from '../hooks/useSTT';
@@ -192,6 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [showAIEditsLog, setShowAIEditsLog] = useState(false);
   const [showBeatCreator, setShowBeatCreator] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
+  const aiOn = useAIFeatures();
   const [showImportMenu, setShowImportMenu] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
@@ -713,8 +715,8 @@ export const Header: React.FC<HeaderProps> = ({
                       <Settings className="w-4 h-4" />
                       App Preferences…
                     </button>
-                    {(onHelperCommands || onMergeDialogTrees) && <div className="my-1 border-t border-gray-100" />}
-                    {onHelperCommands && (
+                    {((aiOn && onHelperCommands) || onMergeDialogTrees) && <div className="my-1 border-t border-gray-100" />}
+                    {aiOn && onHelperCommands && (
                       <button
                         onClick={() => {
                           onHelperCommands();
@@ -849,101 +851,103 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
         {/* Left: AI + VCS */}
         <div className="flex items-center space-x-2">
-          {/* AI Menu Button */}
-          <div className="relative">
-            <button
-              className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
-              onClick={() => setShowAIMenu(!showAIMenu)}
-              title="AI Tools"
-            >
-              <Sparkles className="w-4 h-4" />
-              AI
-              <ChevronDown className="w-3 h-3" />
-            </button>
+          {/* AI Menu Button (App Preferences ▸ Show AI features) */}
+          {aiOn && (
+            <div className="relative">
+              <button
+                className="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-medium hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1.5"
+                onClick={() => setShowAIMenu(!showAIMenu)}
+                title="AI Tools"
+              >
+                <Sparkles className="w-4 h-4" />
+                AI
+                <ChevronDown className="w-3 h-3" />
+              </button>
 
-            {/* AI Dropdown Menu */}
-            {showAIMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowAIMenu(false)}
-                />
-                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  {onIdeator && (
+              {/* AI Dropdown Menu */}
+              {showAIMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowAIMenu(false)}
+                  />
+                  <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
+                    {onIdeator && (
+                      <button
+                        onClick={() => {
+                          onIdeator();
+                          setShowAIMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                        title="Open Ideator — a conversational ideation tool that helps you shape a complex issue into a prompt before generating the story"
+                      >
+                        <Wand2 className="w-4 h-4" />
+                        Ideate with Ideator
+                      </button>
+                    )}
+                    {onCoDesigner && (
+                      <button
+                        onClick={() => {
+                          onCoDesigner();
+                          setShowAIMenu(false);
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
+                        title="Open Co-Designer — a design-phase collaborator that works with you on the story currently open (deepen characters, sharpen choices, find where branches earn their keep)"
+                      >
+                        <Compass className="w-4 h-4" />
+                        Design with Co-Designer
+                      </button>
+                    )}
                     <button
                       onClick={() => {
-                        onIdeator();
+                        setShowStoryGenerator(true);
                         setShowAIMenu(false);
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                      title="Open Ideator — a conversational ideation tool that helps you shape a complex issue into a prompt before generating the story"
+                      title="Generate a complete story structure from a description"
                     >
-                      <Wand2 className="w-4 h-4" />
-                      Ideate with Ideator
+                      <Sparkles className="w-4 h-4" />
+                      Generate Story
                     </button>
-                  )}
-                  {onCoDesigner && (
                     <button
                       onClick={() => {
-                        onCoDesigner();
+                        setShowAIEditsLog(true);
                         setShowAIMenu(false);
                       }}
-                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3"
-                      title="Open Co-Designer — a design-phase collaborator that works with you on the story currently open (deepen characters, sharpen choices, find where branches earn their keep)"
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3"
+                      title="Every edit an AI proposed for this project and what you decided — kept with the project"
                     >
-                      <Compass className="w-4 h-4" />
-                      Design with Co-Designer
+                      <History className="w-4 h-4" />
+                      AI changes{aiEdits?.entries?.length ? ` (${aiEdits.entries.length})` : ''}
                     </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setShowStoryGenerator(true);
-                      setShowAIMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                    title="Generate a complete story structure from a description"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Generate Story
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAIEditsLog(true);
-                      setShowAIMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3"
-                    title="Every edit an AI proposed for this project and what you decided — kept with the project"
-                  >
-                    <History className="w-4 h-4" />
-                    AI changes{aiEdits?.entries?.length ? ` (${aiEdits.entries.length})` : ''}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowBeatCreator(true);
-                      setShowAIMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                    title="Create a new beat by describing what you want in plain language"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Create Beat from Description
-                  </button>
-                  <div className="my-2 border-t border-gray-200" />
-                  <button
-                    onClick={() => {
-                      setShowAIConfig(true);
-                      setShowAIMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
-                    title="Set up your AI provider (Claude, OpenAI, or local Ollama)"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Configure AI
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                    <button
+                      onClick={() => {
+                        setShowBeatCreator(true);
+                        setShowAIMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                      title="Create a new beat by describing what you want in plain language"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Create Beat from Description
+                    </button>
+                    <div className="my-2 border-t border-gray-200" />
+                    <button
+                      onClick={() => {
+                        setShowAIConfig(true);
+                        setShowAIMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors flex items-center gap-3"
+                      title="Set up your AI provider (Claude, OpenAI, or local Ollama)"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Configure AI
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* VCS Status (shown when project is under version control) */}
           <VCSStatusBar panelOpen={vcsPanelOpen} onTogglePanel={onToggleVCSPanel} onInitRepo={onInitRepo} />

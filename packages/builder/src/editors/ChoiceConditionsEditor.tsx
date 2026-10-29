@@ -17,6 +17,7 @@ import { SmartNameDropdown } from './SmartNameDropdown';
 import { summarizeConditions } from '../utils/conditionSummary';
 import { RoleHolderConditionFields } from './RoleHolderConditionFields';
 import { useProjectRoles } from '../contexts/RolesContext';
+import { BeatPicker } from '../components/common/BeatPicker';
 
 interface AvailableOption {
   name: string;
@@ -325,16 +326,13 @@ export const ChoiceConditionsEditor: React.FC<ChoiceConditionsEditorProps> = ({
 
             {gate === 'visitedBeat' && (
               <>
-                <select
+                <BeatPicker
                   value={cond.beatId ?? ''}
-                  onChange={e => update(i, { beatId: e.target.value })}
+                  onChange={(targetId) => update(i, { beatId: targetId })}
+                  beats={allBeats}
+                  emptyLabel="Select beat…"
                   className="flex-1 min-w-0 px-1.5 py-1 border border-gray-300 rounded text-xs bg-white"
-                >
-                  <option value="">Select beat…</option>
-                  {allBeats.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
+                />
                 <select
                   value={cond.operator === 'not' ? 'not' : 'visited'}
                   onChange={e => update(i, { operator: e.target.value === 'not' ? 'not' : '==' })}

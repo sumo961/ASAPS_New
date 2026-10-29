@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Folder, Trash2, Clock, Calendar, Search, Grid, List, Archive, CheckSquare, Square, FileText, Sparkles, Wand2, Download } from 'lucide-react';
+import { useAIFeatures } from '../utils/aiFeatures';
 import { usePersistence, useProject } from '../contexts/PersistenceContext';
 import { TemplateShelf } from './TemplateGallery';
 import type { Project } from '../storage/types';
@@ -592,6 +593,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
   onCurrentProjectDeleted,
 }) => {
   const { storage } = usePersistence();
+  const aiOn = useAIFeatures();
   const { updateMetadata, delete: deleteProjectFromContext } = useProject();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -951,7 +953,7 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Start a new project
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className={`grid grid-cols-2 ${aiOn ? 'sm:grid-cols-4' : ''} gap-3`}>
               <button
                 type="button"
                 onClick={onCreateProject}
@@ -964,43 +966,48 @@ export const ProjectLibrary: React.FC<ProjectLibraryProps> = ({
                 </div>
               </button>
 
-              <button
-                type="button"
-                onClick={onOpenStoryFromPrompt}
-                disabled={!onOpenStoryFromPrompt}
-                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
-                title={onOpenStoryFromPrompt
-                  ? 'Describe your idea in a sentence and the AI drafts the rest'
-                  : 'Coming soon — describe your idea in a sentence and the AI drafts the rest'}
-              >
-                <Wand2 className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">Build from a prompt</div>
-                <div className="text-xs text-gray-600 leading-snug">
-                  Your prompt → AI drafts the rest
-                </div>
-                {!onOpenStoryFromPrompt && (
-                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
-                )}
-              </button>
+              {/* App Preferences ▸ Show AI features */}
+              {aiOn && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onOpenStoryFromPrompt}
+                    disabled={!onOpenStoryFromPrompt}
+                    className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                    title={onOpenStoryFromPrompt
+                      ? 'Describe your idea in a sentence and the AI drafts the rest'
+                      : 'Coming soon — describe your idea in a sentence and the AI drafts the rest'}
+                  >
+                    <Wand2 className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
+                    <div className="text-sm font-semibold text-gray-900">Build from a prompt</div>
+                    <div className="text-xs text-gray-600 leading-snug">
+                      Your prompt → AI drafts the rest
+                    </div>
+                    {!onOpenStoryFromPrompt && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                    )}
+                  </button>
 
-              <button
-                type="button"
-                onClick={onOpenIdeator}
-                disabled={!onOpenIdeator}
-                className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
-                title={onOpenIdeator
-                  ? 'Develop your idea in a conversation with an AI agent'
-                  : 'Coming soon — develop your idea in a conversation with an AI agent'}
-              >
-                <Sparkles className="w-6 h-6 text-emerald-500 group-hover:scale-110 transition-transform" />
-                <div className="text-sm font-semibold text-gray-900">Co-write with AI</div>
-                <div className="text-xs text-gray-600 leading-snug">
-                  Develop your idea in conversation
-                </div>
-                {!onOpenIdeator && (
-                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    onClick={onOpenIdeator}
+                    disabled={!onOpenIdeator}
+                    className="flex flex-col items-start gap-2 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                    title={onOpenIdeator
+                      ? 'Develop your idea in a conversation with an AI agent'
+                      : 'Coming soon — develop your idea in a conversation with an AI agent'}
+                  >
+                    <Sparkles className="w-6 h-6 text-emerald-500 group-hover:scale-110 transition-transform" />
+                    <div className="text-sm font-semibold text-gray-900">Co-write with AI</div>
+                    <div className="text-xs text-gray-600 leading-snug">
+                      Develop your idea in conversation
+                    </div>
+                    {!onOpenIdeator && (
+                      <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                    )}
+                  </button>
+                </>
+              )}
 
               <button
                 type="button"

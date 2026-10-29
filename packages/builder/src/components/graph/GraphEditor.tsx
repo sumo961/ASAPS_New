@@ -26,6 +26,10 @@ import { CLUSTER_HEADER_H } from './graphStyle';
 import { resolveBeatDrop, toContentRelative, clusterAt } from './clusterDrop';
 import { confirmBeatDelete, confirmBeatsDelete, describeManyBeatsDelete, MANY_BEATS } from '../../utils/confirmBeatDelete';
 import { noteDeletion } from '../../utils/deletedBeats';
+import { linkOutputs, type LinkOutput } from '../../utils/linkOutputs';
+import { notify } from '../../utils/notify';
+import { LinkOutputMenu } from './LinkOutputMenu';
+import { usePersistedState } from '../../utils/persistedState';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -92,6 +96,12 @@ interface GraphEditorProps {
   onViewBeatDiff?: (beatId: string) => void;
   onViewBeatHistory?: (beatId: string) => void;
   onRevertBeat?: (beatId: string) => void;
+  /**
+   * A link drawn in the flowchart: point one of the beat's outputs at
+   * another beat (App's undoable handleBeatUpdate). Without it, beats can't
+   * be linked by dragging.
+   */
+  onLinkOutput?: (beatId: string, updates: Record<string, any>) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -148,8 +158,11 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   onViewBeatDiff,
   onViewBeatHistory,
   onRevertBeat,
+  onLinkOutput,
 }) => {
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  // The overview map in the corner can be hidden (class feedback, 2026-10-29).
+  const [showMinimap, setShowMinimap] = usePersistedState('asaps_ui_minimap', true);
   const vcs = useVCSStatus();
   const vcsActive = vcs && vcs.initialized && vcs.type !== 'none';
 
@@ -168,6 +181,60 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   selectedBeatIdRef.current = selectedBeat?.id ?? null;
   const beatsRef = useRef(beats);
   beatsRef.current = beats;
+
+  // Drawing a link (class feedback, 2026-10-29): drag from a beat's right
+  // handle onto another beat. One output → linked at once; several → the
+  // author picks which (LinkOutputMenu).
+  const linkFromRef = useRef<string | null>(null);
+  const [linkMenu, setLinkMenu] = useState<{
+    x: number; y: number; fromId: string; toId: string; outputs: LinkOutput[];
+  } | null>(null);
+  const beatName = useCallback((id: string) => {
+    const b = beatsRef.current.find((x) => x.id === id);
+    return b?.name || id;
+  }, []);
+  const applyLink = useCallback((fromId: string, toId: string, output: LinkOutput) => {
+    setLinkMenu(null);
+    if (output.target === toId) return;
+    onLinkOutput?.(fromId, output.updatesFor(toId));
+  }, [onLinkOutput]);
+  const onConnectStart = useCallback((_e: unknown, params: { nodeId: string | null }) => {
+    linkFromRef.current = params.nodeId;
+  }, []);
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
+    const fromId = linkFromRef.current;
+    linkFromRef.current = null;
+    if (!fromId || !onLinkOutput) return;
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!point) return;
+    // Dropped anywhere on a beat — its handle or its body.
+    const el = document.elementFromPoint(point.clientX, point.clientY)?.closest('.react-flow__node');
+    // A line inside an expanded Dialog Tree (dlg:<beat id>:<path>) counts as its beat.
+    const nodeId = el?.getAttribute('data-id') ?? '';
+    const toId = nodeId.startsWith('dlg:') ? nodeId.split(':')[1] : nodeId;
+    const from = beatsRef.current.find((b) => b.id === fromId);
+    const to = toId ? beatsRef.current.find((b) => b.id === toId) : undefined;
+    if (!from || !to) return;
+    if (to.id === from.id) {
+      notify.info('Drop the link on another beat.');
+      return;
+    }
+    const outputs = linkOutputs(from);
+    if (outputs === null) {
+      notify.info(`"${from.name || from.id}" is linked in its Properties panel; its links can't be drawn yet.`);
+      return;
+    }
+    if (outputs.length === 0) {
+      notify.info(`"${from.name || from.id}" has nothing to link yet. Add a choice in its Properties panel first.`);
+      return;
+    }
+    if (outputs.length === 1) {
+      applyLink(from.id, to.id, outputs[0]);
+      return;
+    }
+    setLinkMenu({ x: point.clientX + 8, y: point.clientY + 8, fromId: from.id, toId: to.id, outputs });
+  }, [onLinkOutput, applyLink]);
+
   // Set when a selection comes from a click in the graph itself: the beat is
   // already in view, and re-centring (and re-zooming) under the pointer
   // moved the next beat the author was about to ⌘-click.
@@ -964,6 +1031,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         // dialog nodes/edges handle stacking instead.
         elevateNodesOnSelect={false}
         deleteKeyCode={null}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        nodesConnectable={!!onLinkOutput}
+        connectionRadius={40}
         onNodeContextMenu={onNodeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
         onPaneClick={closeContextMenu}
@@ -1013,15 +1084,49 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
               </svg>
             </ControlButton>
           )}
+          <ControlButton
+            onClick={() => setShowMinimap(!showMinimap)}
+            title={showMinimap ? 'Hide the overview map' : 'Show the overview map'}
+            aria-pressed={showMinimap}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: 14, height: 14, maxWidth: '100%', maxHeight: '100%', opacity: showMinimap ? 1 : 0.45 }}
+            >
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <rect x="12" y="11" width="6" height="5" rx="1" />
+            </svg>
+          </ControlButton>
         </Controls>
-        <MiniMap
-          nodeStrokeColor={miniMapNodeColor}
-          nodeColor={miniMapNodeColor}
-          nodeBorderRadius={8}
-          pannable
-          zoomable
-        />
+        {showMinimap && (
+          <MiniMap
+            nodeStrokeColor={miniMapNodeColor}
+            nodeColor={miniMapNodeColor}
+            nodeBorderRadius={8}
+            pannable
+            zoomable
+          />
+        )}
       </ReactFlow>
+
+      {linkMenu && (
+        <LinkOutputMenu
+          x={linkMenu.x}
+          y={linkMenu.y}
+          fromName={beatName(linkMenu.fromId)}
+          toName={beatName(linkMenu.toId)}
+          outputs={linkMenu.outputs}
+          nameOf={beatName}
+          onPick={(o) => applyLink(linkMenu.fromId, linkMenu.toId, o)}
+          onCancel={() => setLinkMenu(null)}
+        />
+      )}
 
       {/* Context Menu */}
       {contextMenu && (

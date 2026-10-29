@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Keyboard } from 'lucide-react';
+import { useAIFeatures } from '../utils/aiFeatures';
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean;
@@ -7,6 +8,7 @@ interface KeyboardShortcutsModalProps {
 }
 
 export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ isOpen, onClose }) => {
+  const aiOn = useAIFeatures();
   if (!isOpen) return null;
 
   const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -33,7 +35,7 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({ 
       { keys: `${modKey} + Shift + C`, action: 'Characters' },
       { keys: `${modKey} + ,`, action: 'Story settings' },
       { keys: `${modKey} + F`, action: 'Search & replace' },
-      { keys: `${modKey} + Shift + F`, action: 'Transformations (bulk edit)' },
+      ...(aiOn ? [{ keys: `${modKey} + Shift + F`, action: 'Change with AI (bulk edit)' }] : []),
       { keys: `${modKey} + Shift + A`, action: 'Auto-arrange beats' },
       { keys: '?', action: 'This overview' },
     ]},

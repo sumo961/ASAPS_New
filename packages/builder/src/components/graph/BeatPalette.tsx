@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import beatDefinitions from '../../../../../beat-definitions/core-beats.json';
+import { useAIFeatures } from '../../utils/aiFeatures';
 
 interface BeatPaletteProps {
   collapsed?: boolean;
@@ -198,7 +199,7 @@ function isAi(beatType: string): boolean {
  * Build the per-type metadata from the schema. Returns a Map keyed by
  * beat type so the taxonomy can look up display data efficiently.
  */
-function buildBeatTypeMap(): Map<string, BeatType> {
+function buildBeatTypeMap(withAi: boolean): Map<string, BeatType> {
   const schemaBeats = beatDefinitions.beatTypes as Record<string, {
     category: string;
     displayName: string;
@@ -210,6 +211,8 @@ function buildBeatTypeMap(): Map<string, BeatType> {
   for (const [type, def] of Object.entries(schemaBeats)) {
     if (EXCLUDED_BEATS.has(type)) continue;
     const ai = isAi(type);
+    // App Preferences ▸ Show AI features off: no AI beats to add.
+    if (ai && !withAi) continue;
     const category = def.category;
     const color = BEAT_COLORS[type]
       || (ai ? '#7c3aed' : CATEGORY_FALLBACK_COLOR.logic);
@@ -229,7 +232,8 @@ function buildBeatTypeMap(): Map<string, BeatType> {
 }
 
 export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onToggleCollapse }) => {
-  const beatMap = useMemo(() => buildBeatTypeMap(), []);
+  const aiOn = useAIFeatures();
+  const beatMap = useMemo(() => buildBeatTypeMap(aiOn), [aiOn]);
 
   // Resolve the taxonomy into actual beat-type entries. Beats listed in
   // the taxonomy but missing from the schema are silently skipped (so

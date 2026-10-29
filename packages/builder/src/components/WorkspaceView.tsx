@@ -4,7 +4,8 @@ import { Beat, Cluster, ContainerBeatPosition } from '@asaps/core';
 import { Canvas } from './Canvas';
 import { VisualWorkspace } from './visual/VisualWorkspace';
 import { KnowledgeGraphView } from './knowledgeGraph/KnowledgeGraphView';
-import { Map, Palette, Share2 } from 'lucide-react';
+import { ScriptView } from './script/ScriptView';
+import { Map, Palette, Share2, FileText } from 'lucide-react';
 import type { Character } from '../types/character';
 import type { GlobalSettings } from '../storage/types';
 import type { ThemeAssetUrls } from '../hooks/useThemes';
@@ -81,6 +82,8 @@ interface WorkspaceViewProps {
   onViewBeatDiff?: (beatId: string) => void;
   onViewBeatHistory?: (beatId: string) => void;
   onRevertBeat?: (beatId: string) => void;
+  /** A link drawn in the flowchart (GraphEditor). */
+  onLinkOutput?: (beatId: string, updates: Record<string, any>) => void;
 }
 
 export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
@@ -140,10 +143,11 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
   onViewBeatDiff,
   onViewBeatHistory,
   onRevertBeat,
+  onLinkOutput,
   onUpdateVenueBeacons,
 }) => {
   // Persisted: the workspace tab an author lives in shouldn't reset each launch
-  const [activeView, setActiveView] = usePersistedState<'flowchart' | 'visual' | 'knowledgeGraph'>('asaps_ui_workspace_view', 'flowchart');
+  const [activeView, setActiveView] = usePersistedState<'flowchart' | 'visual' | 'script' | 'knowledgeGraph'>('asaps_ui_workspace_view', 'flowchart');
 
   const showKnowledgeGraph = globalSettings?.features?.showKnowledgeGraph === true;
 
@@ -190,6 +194,19 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
           </button>
         )}
         
+        <button
+          onClick={() => setActiveView('script')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-all ${
+            activeView === 'script'
+              ? 'border-blue-500 text-blue-600 bg-blue-50'
+              : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+          }`}
+          title="All the story's text on one page, to read and write"
+        >
+          <FileText className="w-4 h-4 inline mr-2" />
+          Script
+        </button>
+
         {showKnowledgeGraph && (
           <button
             onClick={() => setActiveView('knowledgeGraph')}
@@ -236,6 +253,14 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               globalSettings={globalSettings}
             />
           </div>
+        ) : activeView === 'script' ? (
+          <ScriptView
+            beats={beats}
+            clusters={clusters}
+            selectedBeat={selectedBeat}
+            onBeatSelect={onBeatSelect}
+            onBeatUpdate={onBeatUpdate}
+          />
         ) : activeView === 'visual' ? (
           <div className="h-full w-full">
             <VisualWorkspace
@@ -308,6 +333,7 @@ export const WorkspaceView: React.FC<WorkspaceViewProps> = ({
               onViewBeatDiff={onViewBeatDiff}
               onViewBeatHistory={onViewBeatHistory}
               onRevertBeat={onRevertBeat}
+              onLinkOutput={onLinkOutput}
             />
           </div>
         )}

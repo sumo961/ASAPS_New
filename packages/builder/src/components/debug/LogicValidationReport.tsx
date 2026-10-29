@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Info, CheckCircle, FileText, Package, GitMerge, ChevronDown, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import type { Story } from '@asaps/core';
 import { validateStoryLogic, type LogicIssue, type LogicValidationResult } from '../../utils/storyLogicValidator';
+import { useAIFeatures } from '../../utils/aiFeatures';
 
 interface LogicValidationReportProps {
   story: Story;
@@ -123,6 +124,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   story,
   onHighlightBeat
 }) => {
+  const aiOn = useAIFeatures();
   const [expandedHubs, setExpandedHubs] = useState<Set<string>>(new Set());
   const allBeats = useMemo(() => story.getAllBeats(), [story]);
 
@@ -194,7 +196,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
   return (
     <div className="space-y-6">
       {/* AI Notice */}
-      <div className="flex items-start gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm">
+      {aiOn && <div className="flex items-start gap-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm">
         <Sparkles className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
         <div>
           <strong className="text-purple-700">Pattern-based analysis</strong>
@@ -204,7 +206,7 @@ export const LogicValidationReport: React.FC<LogicValidationReportProps> = ({
             to enable enhanced story analysis features.
           </p>
         </div>
-      </div>
+      </div>}
 
       {/* Summary */}
       <div className="bg-gray-50 rounded-lg p-4">

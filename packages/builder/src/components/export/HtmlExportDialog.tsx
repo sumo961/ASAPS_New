@@ -11,6 +11,8 @@ import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { useTranslationState } from '../../contexts/TranslationContext';
 import { buildManifestEntry, type TranslationResource } from '@asaps/core';
 import { recommendWebExportMode } from '../../export/webExportMode';
+import { BeatPicker } from '../common/BeatPicker';
+import { useAIFeatures } from '../../utils/aiFeatures';
 
 interface HtmlExportDialogProps {
   isOpen: boolean;
@@ -62,6 +64,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [usingGlobalConfig, setUsingGlobalConfig] = useState(false);
   const [enableAIOnTheFly, setEnableAIOnTheFly] = useState(false);
+  // With the AI features hidden (App Preferences) the export carries no AI
+  // setup: no key, no on-the-fly translation.
+  const aiOn = useAIFeatures();
+  useEffect(() => {
+    if (!aiOn) { setEnableAI(false); setEnableAIOnTheFly(false); }
+  }, [aiOn]);
   const [showSessionLog, setShowSessionLog] = useState(false);
   const [includedTranslations, setIncludedTranslations] = useState<Set<string>>(new Set());
   // Pre-export size-warning gate. When the dialog is in 'single-file'
@@ -360,18 +368,12 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Start beat
               </label>
-              <select
+              <BeatPicker
                 value={startBeatId}
-                onChange={(e) => setStartBeatId(e.target.value)}
+                onChange={setStartBeatId}
+                beats={availableBeats}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                {availableBeats.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name ? `${b.name}` : b.id}
-                    {b.type ? ` (${b.type})` : ''}
-                  </option>
-                ))}
-              </select>
+              />
               <p className="text-xs text-gray-500 mt-1">
                 The published story will begin here. Defaults to your current
                 selection in the builder; you can change it for this export
@@ -422,241 +424,243 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
           </div>
 
           {/* AI Settings */}
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableAI}
-                onChange={(e) => setEnableAI(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-              />
-              <div>
-                <div className="font-medium text-gray-900">Enable AI Features</div>
-                <div className="text-sm text-gray-500">
-                  {relayModeUi
-                    ? 'No key in the page — a relay you deploy holds it'
-                    : aiApiKey
-                      ? 'API key will be embedded in export'
-                      : 'Players will be prompted for API key if story uses AI beats'
-                  }
-                </div>
-              </div>
-            </label>
-
-            {/* AI Configuration - shown when AI is enabled */}
-            {enableAI && (
-              <div className="ml-7 space-y-3 border-l-2 border-blue-200 pl-4">
-                {usingGlobalConfig && (
-                  <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 mb-2">
-                    <Settings className="w-3.5 h-3.5" />
-                    Pre-filled from global AI settings — edit to override
-                  </div>
-                )}
-                <div className="text-sm text-gray-600 mb-2">
-                  Optionally embed your API key so players don't need to configure it:
-                </div>
-
-                {/* Provider Selection */}
+          {aiOn && (
+            <div className="space-y-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableAI}
+                  onChange={(e) => setEnableAI(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                />
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    AI Provider
-                  </label>
-                  <select
-                    value={aiProvider}
-                    onChange={(e) => { setAiProvider(e.target.value as AIProvider); setUsingGlobalConfig(false); }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="openai">OpenAI (GPT-5.2)</option>
-                    <option value="anthropic">Anthropic (Claude)</option>
-                    <option value="custom">Custom (OpenAI-compatible)</option>
-                    <option value="local">Local LLM (self-hosted server)</option>
-                  </select>
+                  <div className="font-medium text-gray-900">Enable AI Features</div>
+                  <div className="text-sm text-gray-500">
+                    {relayModeUi
+                      ? 'No key in the page — a relay you deploy holds it'
+                      : aiApiKey
+                        ? 'API key will be embedded in export'
+                        : 'Players will be prompted for API key if story uses AI beats'
+                    }
+                  </div>
                 </div>
+              </label>
 
-                {/* Base URL - required for local/custom, optional for others */}
-                {(aiProvider === 'custom' || aiProvider === 'local') && (
+              {/* AI Configuration - shown when AI is enabled */}
+              {enableAI && (
+                <div className="ml-7 space-y-3 border-l-2 border-blue-200 pl-4">
+                  {usingGlobalConfig && (
+                    <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 mb-2">
+                      <Settings className="w-3.5 h-3.5" />
+                      Pre-filled from global AI settings — edit to override
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-600 mb-2">
+                    Optionally embed your API key so players don't need to configure it:
+                  </div>
+
+                  {/* Provider Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Base URL {aiProvider === 'local' ? '' : ''}
+                      AI Provider
                     </label>
-                    <input
-                      type="text"
-                      value={aiBaseUrl}
-                      onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
-                      placeholder={
-                        aiProvider === 'local'
-                          ? 'http://localhost:8080/v1'
-                          : 'https://api.example.com/v1'
-                      }
+                    <select
+                      value={aiProvider}
+                      onChange={(e) => { setAiProvider(e.target.value as AIProvider); setUsingGlobalConfig(false); }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {aiProvider === 'local'
-                        ? 'URL of your local LLM server (llama.cpp, Ollama, etc.)'
-                        : 'OpenAI-compatible API endpoint (Azure OpenAI, proxy, etc.)'
-                      }
-                    </p>
+                    >
+                      <option value="openai">OpenAI (GPT-5.2)</option>
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="custom">Custom (OpenAI-compatible)</option>
+                      <option value="local">Local LLM (self-hosted server)</option>
+                    </select>
                   </div>
-                )}
 
-                {/* AI access mode — public deployments should use the relay
-                    so the key never ships in the page. Relay upstreams are
-                    fixed to the official endpoints, so it's only offered for
-                    openai/anthropic (local/custom talk to their own URLs). */}
-                {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">AI access</label>
-                    <div className="flex gap-2 text-sm" role="radiogroup" aria-label="AI access mode">
-                      {([
-                        ['embed', 'Embed my API key', 'Key ships inside the HTML — private sharing only'],
-                        ['relay', 'Use a relay (recommended for public hosting)', 'No key in the page; a small server function you deploy next to the story holds it'],
-                      ] as const).map(([kind, label, hint]) => (
-                        <button
-                          key={kind}
-                          type="button"
-                          title={hint}
-                          onClick={() => setAiAccess(kind)}
-                          className={`flex-1 px-3 py-2 rounded-lg border text-left ${
-                            aiAccess === kind
-                              ? 'border-blue-500 bg-blue-50 text-blue-900'
-                              : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Relay settings */}
-                {relayModeUi && (
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Relay URL</label>
-                      <input
-                        type="text"
-                        value={aiProxyUrl}
-                        onChange={(e) => setAiProxyUrl(e.target.value)}
-                        placeholder={DEFAULT_RELAY_PATH}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Default works when the relay is deployed with the story (Netlify).
-                        Point it at another site's relay only if that relay allows it.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-                      <div className="text-xs text-emerald-800 flex-1">
-                        The export is ONE deploy-ready zip: your story as index.html plus the relay function and README-RELAY.md, which walks through three deploy paths — browser-only (GitHub + Netlify), Netlify CLI, or a shared relay for many stories. Plain drag-and-drop alone skips functions.
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* API Key Input - not shown for local or relay mode */}
-                {aiProvider !== 'local' && !relayModeUi && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      API Key {aiApiKey ? '' : '(optional)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        value={aiApiKey}
-                        onChange={(e) => { setAiApiKey(e.target.value); setUsingGlobalConfig(false); }}
-                        placeholder={
-                          aiProvider === 'openai' ? 'sk-...' :
-                          aiProvider === 'anthropic' ? 'sk-ant-...' :
-                          'Enter API key'
-                        }
-                        className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-                      >
-                        {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {aiApiKey && (
-                      <p className="text-xs text-amber-600 mt-1">
-                        Warning: API key will be visible in the exported HTML source code
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Advanced toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="text-xs text-blue-600 hover:text-blue-700"
-                >
-                  {showAdvanced ? '− Hide advanced options' : '+ Show advanced options'}
-                </button>
-
-                {/* Advanced options */}
-                {showAdvanced && (
-                  <div className="space-y-3">
-                    {/* Base URL override for OpenAI/Anthropic */}
-                    {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Base URL Override
-                        </label>
-                        <input
-                          type="text"
-                          value={aiBaseUrl}
-                          onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
-                          placeholder={
-                            aiProvider === 'openai'
-                              ? 'https://api.openai.com/v1 (default)'
-                              : 'https://api.anthropic.com/v1 (default)'
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          For proxies or enterprise endpoints. Leave empty for default.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Model override */}
+                  {/* Base URL - required for local/custom, optional for others */}
+                  {(aiProvider === 'custom' || aiProvider === 'local') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Model Override
+                        Base URL {aiProvider === 'local' ? '' : ''}
                       </label>
                       <input
                         type="text"
-                        value={aiModel}
-                        onChange={(e) => { setAiModel(e.target.value); setUsingGlobalConfig(false); }}
+                        value={aiBaseUrl}
+                        onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
                         placeholder={
-                          aiProvider === 'openai' ? 'gpt-6-astra (default)' :
-                          aiProvider === 'anthropic' ? 'claude-sonnet-5 (default)' :
-                          aiProvider === 'local' ? 'llama-3, mistral, etc.' :
-                          'model-name'
+                          aiProvider === 'local'
+                            ? 'http://localhost:8080/v1'
+                            : 'https://api.example.com/v1'
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
                       />
                       <p className="text-xs text-gray-500 mt-1">
-                        Leave empty to use provider's default model
+                        {aiProvider === 'local'
+                          ? 'URL of your local LLM server (llama.cpp, Ollama, etc.)'
+                          : 'OpenAI-compatible API endpoint (Azure OpenAI, proxy, etc.)'
+                        }
                       </p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Internet access warning */}
-                {aiApiKey && aiProvider !== 'local' && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
-                    <strong>Note:</strong> This story will require internet access to use AI features.
-                    {mode === 'single-file' && ' Players opening the file locally will need to be online.'}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                  {/* AI access mode — public deployments should use the relay
+                      so the key never ships in the page. Relay upstreams are
+                      fixed to the official endpoints, so it's only offered for
+                      openai/anthropic (local/custom talk to their own URLs). */}
+                  {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">AI access</label>
+                      <div className="flex gap-2 text-sm" role="radiogroup" aria-label="AI access mode">
+                        {([
+                          ['embed', 'Embed my API key', 'Key ships inside the HTML — private sharing only'],
+                          ['relay', 'Use a relay (recommended for public hosting)', 'No key in the page; a small server function you deploy next to the story holds it'],
+                        ] as const).map(([kind, label, hint]) => (
+                          <button
+                            key={kind}
+                            type="button"
+                            title={hint}
+                            onClick={() => setAiAccess(kind)}
+                            className={`flex-1 px-3 py-2 rounded-lg border text-left ${
+                              aiAccess === kind
+                                ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Relay settings */}
+                  {relayModeUi && (
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Relay URL</label>
+                        <input
+                          type="text"
+                          value={aiProxyUrl}
+                          onChange={(e) => setAiProxyUrl(e.target.value)}
+                          placeholder={DEFAULT_RELAY_PATH}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Default works when the relay is deployed with the story (Netlify).
+                          Point it at another site's relay only if that relay allows it.
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                        <div className="text-xs text-emerald-800 flex-1">
+                          The export is ONE deploy-ready zip: your story as index.html plus the relay function and README-RELAY.md, which walks through three deploy paths — browser-only (GitHub + Netlify), Netlify CLI, or a shared relay for many stories. Plain drag-and-drop alone skips functions.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* API Key Input - not shown for local or relay mode */}
+                  {aiProvider !== 'local' && !relayModeUi && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        API Key {aiApiKey ? '' : '(optional)'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={aiApiKey}
+                          onChange={(e) => { setAiApiKey(e.target.value); setUsingGlobalConfig(false); }}
+                          placeholder={
+                            aiProvider === 'openai' ? 'sk-...' :
+                            aiProvider === 'anthropic' ? 'sk-ant-...' :
+                            'Enter API key'
+                          }
+                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                        >
+                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {aiApiKey && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          Warning: API key will be visible in the exported HTML source code
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Advanced toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    {showAdvanced ? '− Hide advanced options' : '+ Show advanced options'}
+                  </button>
+
+                  {/* Advanced options */}
+                  {showAdvanced && (
+                    <div className="space-y-3">
+                      {/* Base URL override for OpenAI/Anthropic */}
+                      {(aiProvider === 'openai' || aiProvider === 'anthropic') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Base URL Override
+                          </label>
+                          <input
+                            type="text"
+                            value={aiBaseUrl}
+                            onChange={(e) => { setAiBaseUrl(e.target.value); setUsingGlobalConfig(false); }}
+                            placeholder={
+                              aiProvider === 'openai'
+                                ? 'https://api.openai.com/v1 (default)'
+                                : 'https://api.anthropic.com/v1 (default)'
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            For proxies or enterprise endpoints. Leave empty for default.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Model override */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Model Override
+                        </label>
+                        <input
+                          type="text"
+                          value={aiModel}
+                          onChange={(e) => { setAiModel(e.target.value); setUsingGlobalConfig(false); }}
+                          placeholder={
+                            aiProvider === 'openai' ? 'gpt-6-astra (default)' :
+                            aiProvider === 'anthropic' ? 'claude-sonnet-5 (default)' :
+                            aiProvider === 'local' ? 'llama-3, mistral, etc.' :
+                            'model-name'
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Leave empty to use provider's default model
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Internet access warning */}
+                  {aiApiKey && aiProvider !== 'local' && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                      <strong>Note:</strong> This story will require internet access to use AI features.
+                      {mode === 'single-file' && ' Players opening the file locally will need to be online.'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Translations Section */}
           <div className="space-y-3">
@@ -724,7 +728,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
             )}
 
             {/* AI On-the-Fly Translation */}
-            <label className={`flex items-start gap-3 cursor-pointer ${!hasAIConfig ? 'opacity-50' : ''}`}>
+            {aiOn && <label className={`flex items-start gap-3 cursor-pointer ${!hasAIConfig ? 'opacity-50' : ''}`}>
               <input
                 type="checkbox"
                 checked={enableAIOnTheFly}
@@ -749,7 +753,7 @@ export const HtmlExportDialog: React.FC<HtmlExportDialogProps> = ({
                   </div>
                 )}
               </div>
-            </label>
+            </label>}
           </div>
 
           {/* Read-aloud option — a PROJECT setting (saved with the story),

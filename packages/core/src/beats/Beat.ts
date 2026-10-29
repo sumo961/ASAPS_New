@@ -218,6 +218,19 @@ export abstract class Beat {
   abstract getParameters(): Record<string, any>;
   abstract updateParameters(params: Record<string, any>): void;
 
+  /**
+   * The player took a choice the author hasn't linked to a beat yet
+   * (2026-10-29, class feedback: "If you press a player choice that's not
+   * connected to a beat, the program stops letting you click"). The run
+   * used to end there with the choices still on screen, all dead. Now
+   * nothing happens and the choices stay; the Preview names the choice
+   * (renderer state 'unlinkedChoice').
+   */
+  protected unlinkedChoice(renderer: IRenderer, choiceText: string | undefined): void {
+    console.warn(`[Beat ${this.id}] Choice "${choiceText ?? ''}" is not linked to a beat — staying on "${this.name || this.id}".`);
+    renderer.setState('unlinkedChoice', { beatId: this.id, beatName: this.name, choiceText: choiceText ?? '' });
+  }
+
   async execute(context: StoryContext, renderer: IRenderer): Promise<string | null> {
     try {
       // Gate check: evaluate declared requirements before any side effects.

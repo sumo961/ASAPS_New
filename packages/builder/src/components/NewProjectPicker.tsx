@@ -14,6 +14,7 @@
  */
 import React from 'react';
 import { FileText, Wand2, Sparkles, LayoutTemplate, X } from 'lucide-react';
+import { useAIFeatures } from '../utils/aiFeatures';
 
 export interface NewProjectPickerProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
   onPickIdeator,
   onPickTemplate,
 }) => {
+  const aiOn = useAIFeatures();
   if (!isOpen) return null;
 
   const pick = (action: () => void) => {
@@ -63,7 +65,7 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`p-6 grid grid-cols-1 sm:grid-cols-2 ${aiOn ? 'lg:grid-cols-4' : ''} gap-4`}>
           <button
             type="button"
             onClick={() => pick(onPickEmpty)}
@@ -76,43 +78,48 @@ export const NewProjectPicker: React.FC<NewProjectPickerProps> = ({
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => onPickPrompt && pick(onPickPrompt)}
-            disabled={!onPickPrompt}
-            className="flex flex-col items-start gap-2 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
-            title={onPickPrompt
-              ? 'Describe your idea in a sentence and the AI drafts the rest'
-              : 'Configure an AI provider first (AI → Configure AI)'}
-          >
-            <Wand2 className="w-7 h-7 text-purple-500 group-hover:scale-110 transition-transform" />
-            <div className="text-base font-semibold text-gray-900">Build from a prompt</div>
-            <div className="text-sm text-gray-600 leading-snug">
-              Your prompt → AI drafts the rest
-            </div>
-            {!onPickPrompt && (
-              <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
-            )}
-          </button>
+          {/* App Preferences ▸ Show AI features */}
+          {aiOn && (
+            <>
+              <button
+                type="button"
+                onClick={() => onPickPrompt && pick(onPickPrompt)}
+                disabled={!onPickPrompt}
+                className="flex flex-col items-start gap-2 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                title={onPickPrompt
+                  ? 'Describe your idea in a sentence and the AI drafts the rest'
+                  : 'Configure an AI provider first (AI → Configure AI)'}
+              >
+                <Wand2 className="w-7 h-7 text-purple-500 group-hover:scale-110 transition-transform" />
+                <div className="text-base font-semibold text-gray-900">Build from a prompt</div>
+                <div className="text-sm text-gray-600 leading-snug">
+                  Your prompt → AI drafts the rest
+                </div>
+                {!onPickPrompt && (
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                )}
+              </button>
 
-          <button
-            type="button"
-            onClick={() => onPickIdeator && pick(onPickIdeator)}
-            disabled={!onPickIdeator}
-            className="flex flex-col items-start gap-2 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
-            title={onPickIdeator
-              ? 'Develop your idea in a conversation with an AI agent'
-              : 'Configure an AI provider first (AI → Configure AI)'}
-          >
-            <Sparkles className="w-7 h-7 text-emerald-500 group-hover:scale-110 transition-transform" />
-            <div className="text-base font-semibold text-gray-900">Co-write with AI</div>
-            <div className="text-sm text-gray-600 leading-snug">
-              Develop your idea in conversation
-            </div>
-            {!onPickIdeator && (
-              <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
-            )}
-          </button>
+              <button
+                type="button"
+                onClick={() => onPickIdeator && pick(onPickIdeator)}
+                disabled={!onPickIdeator}
+                className="flex flex-col items-start gap-2 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition text-left group disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-gray-200 disabled:hover:bg-white relative"
+                title={onPickIdeator
+                  ? 'Develop your idea in a conversation with an AI agent'
+                  : 'Configure an AI provider first (AI → Configure AI)'}
+              >
+                <Sparkles className="w-7 h-7 text-emerald-500 group-hover:scale-110 transition-transform" />
+                <div className="text-base font-semibold text-gray-900">Co-write with AI</div>
+                <div className="text-sm text-gray-600 leading-snug">
+                  Develop your idea in conversation
+                </div>
+                {!onPickIdeator && (
+                  <span className="absolute top-2 right-2 text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">SOON</span>
+                )}
+              </button>
+            </>
+          )}
 
           {onPickTemplate && (
             <button

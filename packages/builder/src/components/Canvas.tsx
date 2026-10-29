@@ -60,6 +60,8 @@ interface CanvasProps {
   onViewBeatDiff?: (beatId: string) => void;
   onViewBeatHistory?: (beatId: string) => void;
   onRevertBeat?: (beatId: string) => void;
+  /** A link drawn in the flowchart (GraphEditor). */
+  onLinkOutput?: (beatId: string, updates: Record<string, any>) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -107,6 +109,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   onViewBeatDiff,
   onViewBeatHistory,
   onRevertBeat,
+  onLinkOutput,
 }) => {
   const handleBeatMove = (beatId: string, x: number, y: number) => {
     onBeatMove(beatId, { x, y });
@@ -186,6 +189,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           onViewBeatDiff={onViewBeatDiff}
           onViewBeatHistory={onViewBeatHistory}
           onRevertBeat={onRevertBeat}
+          onLinkOutput={onLinkOutput}
         />
       </div>
       

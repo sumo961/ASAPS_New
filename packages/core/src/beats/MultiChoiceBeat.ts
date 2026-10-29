@@ -236,6 +236,11 @@ export class MultiChoiceBeat extends Beat {
         break;
       }
 
+      if (selected.target !== '__self__' && !this.targetFor(selected, context)) {
+        this.unlinkedChoice(renderer, selected.displayText || selected.text);
+        continue;
+      }
+
       // effectsOncePerChoice: the choice stays selectable, its effects don't
       // re-fire. Read BEFORE marking.
       const alreadyChosen = this.effectsOncePerChoice

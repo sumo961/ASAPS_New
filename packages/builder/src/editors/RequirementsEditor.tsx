@@ -7,6 +7,7 @@
  * fallbackTarget (or just logs a warning if none is set).
  */
 
+import { BeatPicker } from '../components/common/BeatPicker';
 import { RoleHolderConditionFields } from './RoleHolderConditionFields';
 import React from 'react';
 import { VariableValueInput, valueForPickedVariable } from './VariableValueInput';
@@ -460,18 +461,13 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
             )}
 
             {t === 'visitedBeat' && (
-              <select
+              <BeatPicker
                 value={(cond as any).beatId || ''}
-                onChange={e => updateCondition(idx, { beatId: e.target.value } as any)}
+                onChange={(targetId) => updateCondition(idx, { beatId: targetId } as any)}
+                beats={allBeats}
+                emptyLabel="Select beat…"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-              >
-                <option value="">Select beat…</option>
-                {allBeats.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.name || b.id} ({b.id})
-                  </option>
-                ))}
-              </select>
+              />
             )}
 
             {t === 'roleHolder' && (
@@ -857,20 +853,15 @@ export const RequirementsEditor: React.FC<RequirementsEditorProps> = ({
               <label className="block text-[11px] font-medium text-gray-700 mb-0.5">
                 If unmet, redirect to
               </label>
-              <select
+              <BeatPicker
                 value={req.fallbackTarget || ''}
-                onChange={e =>
-                  update(idx, { fallbackTarget: e.target.value || undefined })
+                onChange={(targetId) =>
+                  update(idx, { fallbackTarget: targetId || undefined })
                 }
+                beats={allBeats}
+                emptyLabel="— no redirect (log warning only) —"
                 className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
-              >
-                <option value="">— no redirect (log warning only) —</option>
-                {allBeats.map(b => (
-                  <option key={b.id} value={b.id}>
-                    {b.name || b.id} ({b.id})
-                  </option>
-                ))}
-              </select>
+              />
             </div>
 
             {/* Severity */}

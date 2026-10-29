@@ -15,6 +15,7 @@
 
 import React from 'react';
 import { X, Search, Wand2 } from 'lucide-react';
+import { useAIFeatures } from '../utils/aiFeatures';
 
 export type FindChangeTab = 'find' | 'change';
 
@@ -37,16 +38,19 @@ export const FindChangePanel: React.FC<FindChangePanelProps> = ({
   findContent,
   changeContent,
 }) => {
+  // With the AI features hidden there is only the Find tab.
+  const aiOn = useAIFeatures();
+  const shown: FindChangeTab = aiOn ? tab : 'find';
   const tabBtn = (value: FindChangeTab, icon: React.ReactNode, label: string) => (
     <button
       onClick={() => onTabChange(value)}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-sm font-medium border-b-2 transition-colors ${
-        tab === value
+        shown === value
           ? 'border-blue-500 text-blue-700 bg-white'
           : 'border-transparent text-gray-500 hover:text-gray-700'
       }`}
       role="tab"
-      aria-selected={tab === value}
+      aria-selected={shown === value}
     >
       {icon}
       {label}
@@ -69,18 +73,18 @@ export const FindChangePanel: React.FC<FindChangePanelProps> = ({
       {/* pt-10 pushes below Electron's macOS title-bar drag region */}
       <div className="flex-shrink-0 px-4 pt-10 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Find &amp; Change</h2>
+          <h2 className="text-lg font-semibold">{aiOn ? 'Find & Change' : 'Find & Replace'}</h2>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded" title="Close (Esc)">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="flex gap-1 mt-2" role="tablist">
           {tabBtn('find', <Search className="w-4 h-4" />, 'Find')}
-          {tabBtn('change', <Wand2 className="w-4 h-4" />, 'Change with AI')}
+          {aiOn && tabBtn('change', <Wand2 className="w-4 h-4" />, 'Change with AI')}
         </div>
       </div>
-      <div className={tab === 'find' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>{findContent}</div>
-      <div className={tab === 'change' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>{changeContent}</div>
+      <div className={shown === 'find' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>{findContent}</div>
+      <div className={shown === 'change' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>{changeContent}</div>
     </div>
   );
 };

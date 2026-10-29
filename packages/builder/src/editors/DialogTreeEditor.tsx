@@ -39,6 +39,8 @@ import { assignSpeakerColorSlots, hashSpeakerSlot, speakerColorKey } from '../ut
 import { TextFieldWithVariables } from './TextFieldWithVariables';
 import type { AvailableCounter, AvailableVariable, AvailableInventoryItem } from '../hooks/useAvailableCountersAndVariables';
 import { dialogTreePhaseCount } from '../utils/dialogTreePhases';
+import { BeatPicker } from '../components/common/BeatPicker';
+import { useAIFeatures } from '../utils/aiFeatures';
 
 interface DialogNode {
   id: string;
@@ -204,6 +206,7 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
   const [canvasFocusedNodeId, setCanvasFocusedNodeId] = useState<string>('root');
   const [editingNode, setEditingNode] = useState<{node: DialogNode, path: string[]} | null>(null);
   const [showAIDialog, setShowAIDialog] = useState(false);
+  const aiOn = useAIFeatures();
   const [aiScene, setAiScene] = useState('');
   const [aiCharacter, setAiCharacter] = useState('');
   const [aiGoal, setAiGoal] = useState('');
@@ -1126,10 +1129,10 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                       {(!hasNestedDialog || isCollapsible) && (
                         <div className="mt-2 flex gap-1.5 items-center">
                           <span className="text-xs text-gray-600 flex-shrink-0">→</span>
-                          <select
+                          <BeatPicker
                             value={displayTarget || ''}
-                            onChange={(e) => {
-                              if (e.target.value === '__nested__') {
+                            onChange={(targetId) => {
+                              if (targetId === '__nested__') {
                                 createNestedDialog(path, index);
                               } else if (isCollapsible) {
                                 // Update the nested choice's target
@@ -1137,29 +1140,22 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
                                   ...choice.dialogNode!,
                                   choices: [{
                                     ...choice.dialogNode!.choices[0],
-                                    target: e.target.value || undefined
+                                    target: targetId || undefined
                                   }]
                                 };
                                 updateChoiceAtPath(path, index, { dialogNode: updatedDialogNode });
                               } else {
-                                updateChoiceAtPath(path, index, { target: e.target.value || undefined });
+                                updateChoiceAtPath(path, index, { target: targetId || undefined });
                               }
                             }}
                             className="flex-1 min-w-0 px-2 py-1 text-xs border rounded bg-white"
-                          >
-                            <option value="">Select action...</option>
-                            {!isCollapsible && (
-                              <option value="__nested__">➕ Add NPC response...</option>
-                            )}
-                            <option value="__self__">↩ Return to initial choices</option>
-                            <optgroup label="Connect to beat">
-                              {allBeats?.map(beat => (
-                                <option key={beat.id} value={beat.id}>
-                                  → {beat.name} ({beat.id})
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
+                            beats={allBeats}
+                            emptyLabel="Select action..."
+                            extraOptions={[
+                              ...(!isCollapsible ? [{ value: '__nested__', label: '➕ Add NPC response...' }] : []),
+                              { value: '__self__', label: '↩ Return to initial choices' },
+                            ]}
+                          />
                         </div>
                       )}
                     </div>
@@ -1395,22 +1391,17 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
               <p className="text-xs text-gray-500 mb-1">
                 If set and no choices exist, the NPC delivers this message and auto-advances.
               </p>
-              <select
+              <BeatPicker
                 value={node.target || ''}
-                onChange={(e) => {
-                  const updated = { ...node, target: e.target.value || undefined };
+                onChange={(targetId) => {
+                  const updated = { ...node, target: targetId || undefined };
                   setEditingNode({ node: updated, path });
                 }}
                 className="w-full px-2 py-1 border rounded text-sm"
-              >
-                <option value="">None (player must click a choice)</option>
-                <option value="__self__">↩ Return to initial choices</option>
-                <optgroup label="Connect to beat">
-                  {allBeats?.map(beat => (
-                    <option key={beat.id} value={beat.id}>→ {beat.name} ({beat.id})</option>
-                  ))}
-                </optgroup>
-              </select>
+                beats={allBeats}
+                emptyLabel="None (player must click a choice)"
+                extraOptions={[{ value: '__self__', label: '↩ Return to initial choices' }]}
+              />
             </div>
 
             {/* Buttons */}
@@ -1470,14 +1461,14 @@ export const DialogTreeEditor: React.FC<DialogTreeEditorProps> = ({
           })()}
         </h3>
         <div className="flex gap-1">
-          <button
+          {aiOn && <button
             onClick={() => setShowAIDialog(true)}
             className="px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded hover:from-purple-600 hover:to-pink-600 transition-colors flex items-center gap-1 text-xs font-medium"
             title="Generate dialog with AI"
           >
             <Sparkles className="w-3 h-3" />
             AI Generate
-          </button>
+          </button>}
           <button
             onClick={exportAsText}
             className="px-2 py-1 hover:bg-gray-100 rounded flex items-center gap-1 text-xs text-gray-700"

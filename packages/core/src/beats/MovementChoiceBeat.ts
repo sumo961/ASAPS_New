@@ -214,6 +214,11 @@ export class MovementChoiceBeat extends Beat {
         );
       }
 
+      if (selectedChoice && selectedChoice.target !== '__self__' && !selectedChoice.target) {
+        this.unlinkedChoice(renderer, selectedChoice.displayText || selectedChoice.text);
+        continue;
+      }
+
       if (selectedChoice) {
         // effectsOncePerChoice: read BEFORE marking below.
         const alreadyChosen = this.effectsOncePerChoice

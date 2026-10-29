@@ -16,6 +16,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Plus, X, MapPin, Wifi, Crosshair } from 'lucide-react';
 import type { Effect } from '@asaps/core';
 import { ChoiceEffectsEditor } from './ChoiceEffectsEditor';
+import { BeatPicker } from '../components/common/BeatPicker';
 
 export interface XRLocationEntry {
   id: string;
@@ -417,18 +418,13 @@ export const XRLocationsEditor: React.FC<XRLocationsEditorProps> = ({
             <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
               Target beat (where to advance when this location resolves) *
             </label>
-            <select
+            <BeatPicker
               value={loc.target || ''}
-              onChange={(e) => updateLocation(index, { target: e.target.value })}
+              onChange={(targetId) => updateLocation(index, { target: targetId })}
+              beats={availableTargets}
+              emptyLabel="— select a beat —"
               className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-            >
-              <option value="">— select a beat —</option>
-              {availableTargets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name ? `${t.name} (${t.id})` : t.id}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Effects bundle */}
