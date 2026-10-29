@@ -1298,14 +1298,12 @@ export const Inspector: React.FC<InspectorProps> = ({
         }
       }
 
-      // Auto-enable showSpeaker for beats with a non-default speaker assigned
-      if (beatData.speaker && beatData.showSpeaker == null) {
-        beatData.showSpeaker = true;
-        if (onUpdate && beat) {
-          onUpdate(beat.id, { showSpeaker: true });
-        }
-      }
-
+      // Opening a beat changes nothing in it. It used to set "show the
+      // speaker" on every beat with a speaker it opened, over "as the project
+      // says": which beats showed their speaker then depended on which ones
+      // the author had clicked, and each click was an undo step and an
+      // unsaved change (2026-10-29). Choosing a speaker still turns it on
+      // (SchemaFormGenerator, control 'speaker').
       setLocalBeat(beatData);
       setHasChanges(false);
       setValidationErrors([]);

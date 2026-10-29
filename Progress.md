@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.146, 2026-10-29)
+
+### Overview
+Work after v0.9.146.
+
+### Fixes
+- **Opening a beat no longer changes it.** Selecting a beat that has a speaker set its *Show speaker* to "show" over "as the project says" (since March, so the tri-state select showed "show"). With the project default (names hidden), which beats showed their speaker then depended on which ones the author had happened to click, and every click was an undo step and an unsaved change. Choosing a speaker still turns it on, in the speaker field itself. Beats that were opened before keep the "show" they got. Checked headless: selecting three beats leaves the undo history empty and the project saved.
+
+**Files modified:** packages/builder/src/components/Inspector.tsx
+
+---
+
 ## 2026-10-29: The class-feedback release (v0.9.146)
 
 ### Overview
