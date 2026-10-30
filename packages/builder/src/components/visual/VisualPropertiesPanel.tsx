@@ -61,12 +61,22 @@ interface VisualPropertiesPanelProps {
   layoutMode?: 'absolute' | 'slot' | 'spatial';
   backgroundAssetId?: string;
   elements: VisualElement[];
+  /**
+   * Free Layout beats: the words on text boxes and buttons, and which
+   * pictures and characters are buttons, are the beat's (utils/freeLayoutElements).
+   */
+  freeLayout?: {
+    wordsFor: (el: VisualElement) => string | undefined;
+    setWords: (el: VisualElement, text: string) => void;
+    isClickable: (el: VisualElement) => boolean;
+    setClickable: (el: VisualElement, on: boolean) => void;
+  };
   selectedElements: string[];
   onBackgroundSelect: () => void;
   onElementSelect: (elementId: string | null) => void;
   onElementUpdate: (elementId: string, updates: Partial<VisualElement>) => void;
   onElementDelete: (elementId: string) => void;
-  onElementAdd: (type: 'character' | 'prop' | 'text' | 'hotspot' | 'meter') => void;
+  onElementAdd: (type: 'character' | 'prop' | 'text' | 'hotspot' | 'meter' | 'button') => void;
   onElementReorder: (elementId: string, direction: 'up' | 'down') => void;
   onSelectAsset?: (assetType: 'background' | 'character' | 'prop' | 'sound', callback: (asset: Asset) => void) => void;
   assets: Asset[];
@@ -175,6 +185,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
   layoutMode = 'absolute',
   backgroundAssetId,
   elements,
+  freeLayout,
   selectedElements,
   onBackgroundSelect,
   onElementSelect,
@@ -1640,6 +1651,17 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   <Type className="w-3 h-3" />
                   Text
                 </button>
+                {/* Free Layout: a text button that leads on like a choice */}
+                {freeLayout && (
+                  <button
+                    onClick={() => onElementAdd('button')}
+                    className="px-2 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 flex items-center justify-center gap-1"
+                    title="A button that leads on: choose where in the Properties panel, or draw a link in the flowchart"
+                  >
+                    <MousePointer className="w-3 h-3" />
+                    Button
+                  </button>
+                )}
                 {/* Show Hotspot button for movementChoice, pickProp, and panorama beats */}
                 {(beatType === 'movementChoice' || beatType === 'pickProp' || beatType === 'panorama') && (
                   <button
@@ -2763,6 +2785,27 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   />
                 </div>
 
+                {/* Free Layout: the words on a text box or button */}
+                {freeLayout && (selected.type === 'text' || selected.type === 'button') && (
+                  <FreeLayoutWords
+                    key={selected.id}
+                    label={selected.type === 'button' ? 'Button text' : 'Text'}
+                    value={freeLayout.wordsFor(selected) ?? ''}
+                    onCommit={(text) => freeLayout.setWords(selected, text)}
+                  />
+                )}
+                {/* Free Layout: a picture or character can be a button */}
+                {freeLayout && (selected.type === 'prop' || selected.type === 'character') && (
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={freeLayout.isClickable(selected)}
+                      onChange={(e) => freeLayout.setClickable(selected, e.target.checked)}
+                    />
+                    Clickable — works as a button
+                  </label>
+                )}
+
                 {/* Asset Controls - Only for character and prop elements */}
                 {(selected.type === 'character' || selected.type === 'prop') && (
                   <div>
@@ -3337,6 +3380,23 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+/** The words on a Free Layout text box or button; saved when the field is left (one undo step). */
+const FreeLayoutWords: React.FC<{ label: string; value: string; onCommit: (text: string) => void }> = ({ label, value, onCommit }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <div>
+      <label className="text-xs font-medium text-gray-700 mb-1 block">{label}</label>
+      <textarea
+        rows={label === 'Text' ? 3 : 1}
+        value={draft ?? value}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => { if (draft !== null && draft !== value) onCommit(draft); setDraft(null); }}
+        className="w-full px-2 py-1 text-sm border border-gray-300 rounded resize-y"
+      />
     </div>
   );
 };

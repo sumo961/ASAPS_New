@@ -220,6 +220,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const beatTypeIcons: Record<string, string> = {
+    freeLayout: '🧩',
     // Visible beats
     titleScreen: '🎬',
     infoText: '📝',

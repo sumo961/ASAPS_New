@@ -67,6 +67,25 @@ export function scriptFields(beat: any): ScriptField[] {
     });
   }
 
+  // Free Layout: the words on its text boxes and text buttons. Entries whose
+  // element was deleted (kept for Undo) and clickable pictures have none.
+  if (type === 'freeLayout') {
+    const locs: any[] = beat?.locations instanceof Map
+      ? Array.from(beat.locations.values())
+      : Object.values(beat?.locations || {});
+    const kindOf = new Map(locs.map((l) => [l?.name, l?.kind || l?.type]));
+    const words = (list: unknown, field: 'texts' | 'choices', kind: string, label: string, as: ScriptField['kind']) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((e: any, i: number) => {
+        if (!e || kindOf.get(e.locationName) !== kind) return;
+        const f = typeof e.displayText === 'string' && e.displayText ? 'displayText' : 'text';
+        add(`${field}[${i}].${f}`, `${label} (${e.locationName})`, e[f], as);
+      });
+    };
+    words(p.texts, 'texts', 'text', 'Text', 'text');
+    words(p.choices, 'choices', 'button', 'Button', 'choice');
+  }
+
   if (type === 'dialogTree' && p.dialogTree) {
     const walk = (node: any, path: string, depth: number) => {
       if (!node || typeof node !== 'object') return;

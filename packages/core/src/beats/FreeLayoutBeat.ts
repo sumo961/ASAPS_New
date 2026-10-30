@@ -60,8 +60,9 @@ export class FreeLayoutBeat extends Beat {
     if (params.texts !== undefined) this.texts = Array.isArray(params.texts) ? params.texts : [];
     if (params.choices !== undefined) this.choices = Array.isArray(params.choices) ? params.choices : [];
     if (params.duration !== undefined) this.duration = Number(params.duration) > 0 ? Number(params.duration) : 0;
-    if (params.timerTarget !== undefined) this.timerTarget = params.timerTarget || undefined;
-    if (params.nextTarget !== undefined) this.nextTarget = params.nextTarget || undefined;
+    // A link set to nowhere comes as undefined: the key says it was given.
+    if ('timerTarget' in params) this.timerTarget = params.timerTarget || undefined;
+    if ('nextTarget' in params) this.nextTarget = params.nextTarget || undefined;
     if (params.markVisited !== undefined) this.markVisited = !!params.markVisited;
     if (params.effectsOncePerChoice !== undefined) this.effectsOncePerChoice = !!params.effectsOncePerChoice;
     if (params.node !== undefined) this.node = params.node;
@@ -69,14 +70,26 @@ export class FreeLayoutBeat extends Beat {
     if (params.showSpeaker !== undefined) this.showSpeaker = params.showSpeaker;
   }
 
+  /**
+   * The buttons whose element is on the stage. A button whose element was
+   * deleted stays in `choices` — unused — so the Visual Editor's Undo brings
+   * back its link with the element.
+   */
+  get liveChoices(): FreeLayoutButton[] {
+    // By the element's name, not the Map key: some loaders key locations by
+    // the element's id (the Preview did — every button looked deleted).
+    const names = new Set(Array.from(this.locations.values()).map((l) => l?.name));
+    return this.choices.filter((c) => !!c?.locationName && names.has(c.locationName));
+  }
+
   /** "Next" (click anywhere) applies only while the beat has no buttons and no timer. */
   get clickAnywhere(): boolean {
-    return this.choices.length === 0 && this.duration <= 0;
+    return this.liveChoices.length === 0 && this.duration <= 0;
   }
 
   getConnections(): Array<{ targetId: string; label?: string; condition?: any }> {
     const out: Array<{ targetId: string; label?: string; condition?: any }> = [];
-    for (const c of this.choices) {
+    for (const c of this.liveChoices) {
       if (c.target && c.target !== '__self__') out.push({ targetId: c.target, label: c.text || c.locationName || c.id, condition: c.conditions });
     }
     if (this.duration > 0 && this.timerTarget) out.push({ targetId: this.timerTarget, label: 'When time runs out' });
@@ -92,7 +105,8 @@ export class FreeLayoutBeat extends Beat {
     const locations = Array.from(this.locations.values());
     let unlinkedPicks = 0;
     while (true) {
-      const buttons = this.choices.filter((c) => !c.conditions?.length || c.conditions.every((cond) => context.checkCondition(cond)));
+      const live = this.liveChoices;
+      const buttons = live.filter((c) => !c.conditions?.length || c.conditions.every((cond) => context.checkCondition(cond)));
       const texts: Record<string, string> = {};
       for (const t of this.texts) if (t?.locationName) texts[t.locationName] = this.processText(t.displayText || t.text || '', context);
       for (const b of buttons) if (b.locationName) texts[b.locationName] = this.processText(b.displayText || b.text || '', context);
@@ -102,7 +116,7 @@ export class FreeLayoutBeat extends Beat {
           locations,
           texts,
           buttons: buttons.map((b) => ({ id: b.id, locationName: b.locationName })),
-          hidden: this.choices.filter((c) => !buttons.includes(c)).map((c) => c.locationName),
+          hidden: live.filter((c) => !buttons.includes(c)).map((c) => c.locationName),
           duration: this.duration,
           clickAnywhere: this.clickAnywhere,
           layoutMode: renderer.getState('projectLayoutMode') === 'responsive' ? 'responsive' : 'fixed',

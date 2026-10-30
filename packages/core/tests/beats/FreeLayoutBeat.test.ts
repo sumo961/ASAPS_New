@@ -87,7 +87,7 @@ describe('FreeLayoutBeat', () => {
   });
 
   it('its links: each button, the timer only with a timer, Next only with neither', () => {
-    const withButtons = make({ choices: [{ id: 'b1', locationName: 'Door', text: 'Leave', target: 'x' }], nextTarget: 'n', timerTarget: 't' });
+    const withButtons = make({ choices: [{ id: 'b1', locationName: 'Door', text: 'Leave', target: 'x' }], nextTarget: 'n', timerTarget: 't' }, stage);
     expect(withButtons.getConnections().map((c) => [c.targetId, c.label])).toEqual([['x', 'Leave']]);
     const timed = make({ duration: 3, timerTarget: 't', nextTarget: 'n' });
     expect(timed.getConnections().map((c) => [c.targetId, c.label])).toEqual([['t', 'When time runs out']]);
@@ -99,11 +99,40 @@ describe('FreeLayoutBeat', () => {
     expect(beatLinks(timed.toJSON()).map((l) => l.target)).toEqual(['t']);
   });
 
+  it('a button whose element was deleted stays, unused, so Undo can bring back its link', async () => {
+    const beat = make({ choices: [{ id: 'gone', locationName: 'Old Door', text: 'Leave', target: 'x' }], nextTarget: 'n' }, stage);
+    expect(beat.liveChoices).toEqual([]);
+    expect(beat.clickAnywhere).toBe(true);
+    expect(beat.getConnections().map((c) => c.targetId)).toEqual(['n']);
+    expect(beatLinks(beat.toJSON()).map((l) => l.target)).toEqual(['n']);
+    const { r, shown } = renderer(FREE_LAYOUT_NEXT);
+    await expect(beat.execute(new StoryContext(), r)).resolves.toBe('n');
+    expect(shown[0].buttons).toEqual([]);
+    expect(beat.getParameters().choices).toHaveLength(1);
+  });
+
+  it('finds its elements by name even when the locations are keyed by element id', async () => {
+    const beat = make({ choices: [{ id: 'b1', locationName: 'Door', text: 'Leave', target: 'x' }] }, stage);
+    beat.locations.clear();
+    stage.forEach((l, i) => beat.locations.set(`element_${i}`, l as any));
+    expect(beat.liveChoices.map((c) => c.id)).toEqual(['b1']);
+    const { r, shown } = renderer('b1');
+    await beat.execute(new StoryContext(), r);
+    expect(shown[0].texts.Door).toBe('Leave');
+  });
+
   it('keeps its settings through saving and loading', () => {
     const beat = make({ texts: [{ locationName: 'Sign', text: 'Hi' }], choices: [{ id: 'b1', locationName: 'Door', text: 'Go', target: 'x' }], duration: 4, timerTarget: 't', markVisited: true }, stage);
     const copy = new FreeLayoutBeat(beat.toJSON());
     expect(copy.getParameters()).toMatchObject({ texts: [{ locationName: 'Sign', text: 'Hi' }], choices: [{ id: 'b1', target: 'x' }], duration: 4, timerTarget: 't', markVisited: true });
     expect([...copy.locations.keys()]).toEqual(['Sign', 'Door', 'Lamp']);
+  });
+
+  it('a link set to nowhere is cleared', () => {
+    const beat = make({ duration: 3, timerTarget: 't', nextTarget: 'n' });
+    beat.updateParameters({ ...beat.getParameters(), timerTarget: undefined, nextTarget: undefined });
+    expect(beat.getParameters()).toMatchObject({ timerTarget: undefined, nextTarget: undefined });
+    expect(beat.getConnections()).toEqual([]);
   });
 
   it('a renderer without renderFreeLayout shows the buttons as choices', async () => {

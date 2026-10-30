@@ -278,6 +278,18 @@ function extractBeatStrings(beat: any, prefix: string, strings: Record<string, s
       }
       break;
 
+    case 'freeLayout':
+      // Its text boxes and text buttons; translated into displayText, which
+      // the beat shows before text (a clickable picture has no words).
+      for (const field of ['texts', 'choices'] as const) {
+        if (!Array.isArray(params[field])) continue;
+        params[field].forEach((e: any, j: number) => {
+          const words = e?.displayText || e?.text;
+          if (words) strings[`${prefix}.parameters.${field}.${j}.displayText`] = words;
+        });
+      }
+      break;
+
     case 'pickProp':
       if (Array.isArray(params.props)) {
         for (let j = 0; j < params.props.length; j++) {

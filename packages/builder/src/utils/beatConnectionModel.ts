@@ -6,5 +6,5 @@
  */
 export const PARAMETER_DERIVED_TYPES: ReadonlySet<string> = new Set([
   'dialogTree', 'pickProp', 'movementChoice', 'multiChoice', 'chooseCharacter',
-  'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget',
+  'aiDialogTree', 'aiCondition', 'setTimer', 'randomTarget', 'freeLayout',
 ]);

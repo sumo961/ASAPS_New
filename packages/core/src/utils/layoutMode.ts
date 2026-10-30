@@ -11,6 +11,7 @@
 export type LayoutMode = 'fixed' | 'responsive';
 
 export interface LayoutModeBeat {
+  type?: string;
   locations?: Map<string, unknown> | Record<string, unknown> | unknown[];
 }
 
@@ -18,6 +19,10 @@ export interface LayoutModeBeat {
 export function inferLayoutMode(beats?: ReadonlyArray<LayoutModeBeat> | null): LayoutMode {
   if (!beats || beats.length === 0) return 'responsive';
   const anyBaked = beats.some((b) => {
+    // A Free Layout is placed by hand in every project; its elements say
+    // nothing about the project's mode (adding one flipped a responsive
+    // project to fixed, 2026-10-29).
+    if (b.type === 'freeLayout') return false;
     const locs = b.locations;
     if (!locs) return false;
     if (locs instanceof Map) return locs.size > 0;

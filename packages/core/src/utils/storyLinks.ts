@@ -198,9 +198,17 @@ export function beatLinks(beat: any): StoryLink[] {
   if (typeof p.falseConnection === 'string') push(out, id, p.falseConnection, 'condition-false', 'false', false, 'falseConnection');
   else push(out, id, p.falseConnection?.target, 'condition-false', 'false', false, 'falseConnection.target');
 
+  // freeLayout: only buttons whose stage element exists count — one whose
+  // element was deleted is kept (unused) for the Visual Editor's Undo.
+  const freeElements = beat.type === 'freeLayout'
+    ? new Set((Array.isArray(beat.locations) ? beat.locations : []).map((l: any) => l?.name))
+    : null;
+  const freeLive = (choice: any) => !freeElements || (!!choice?.locationName && freeElements.has(choice.locationName));
+
   // Choice-based beats. randomTarget's choices may be bare strings.
   if (Array.isArray(p.choices)) {
     p.choices.forEach((choice: any, i: number) => {
+      if (!freeLive(choice)) return;
       if (typeof choice === 'string') {
         push(out, id, choice, 'random', `Random ${i + 1}`, false, `choices[${i}]`);
       } else if (choice) {
@@ -230,7 +238,7 @@ export function beatLinks(beat: any): StoryLink[] {
   // FreeLayoutBeat.getConnections.
   const freeTimer = Number(p.duration) > 0;
   if (beat.type !== 'freeLayout' || freeTimer) push(out, id, p.timerTarget, 'timer', undefined, false, 'timerTarget');
-  if (beat.type === 'freeLayout' && !freeTimer && !(Array.isArray(p.choices) && p.choices.length > 0)) {
+  if (beat.type === 'freeLayout' && !freeTimer && !(Array.isArray(p.choices) && p.choices.some(freeLive))) {
     push(out, id, p.nextTarget, 'param-target', 'Next', false, 'nextTarget');
   }
   push(out, id, p.restartConnection?.target, 'restart', 'Restart', false, 'restartConnection.target');

@@ -75,6 +75,24 @@ describe('renderFreeLayout', () => {
   });
 });
 
+describe('renderFreeLayout in a responsive project', () => {
+  const placedLeft = (root: HTMLElement, text: string) => {
+    let e: HTMLElement | null | undefined = findText(root, text);
+    while (e && e.style.position !== 'absolute') e = e.parentElement;
+    return e?.style.left;
+  };
+
+  it('places by percent on the stage it is shown on, and again when the stage changes size', async () => {
+    const { renderer, container } = setup();
+    const placed = stage.map((l) => ({ ...l, xPercent: 50, yPercent: 50, widthPercent: 20, heightPercent: 10 }) as Location);
+    renderer.setViewportOverride({ width: 400, height: 800 });
+    void renderer.renderFreeLayout(screen({ locations: placed, layoutMode: 'responsive' }));
+    await vi.waitFor(() => expect(placedLeft(container, 'Leave')).toBe('200px'));
+    renderer.setViewportOverride({ width: 1000, height: 600 });
+    await vi.waitFor(() => expect(placedLeft(container, 'Leave')).toBe('500px'));
+  });
+});
+
 describe('placeByPercent', () => {
   it('uses the percent position and size on the stage it is drawn on', () => {
     const loc = { name: 'a', kind: 'text', x: 0, y: 0, width: 0, height: 0, xPercent: 10, yPercent: 50, widthPercent: 40, heightPercent: 20 } as Location;

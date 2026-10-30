@@ -57,6 +57,24 @@ describe('scriptFields', () => {
     expect(scriptFields(beat).map((f) => [f.label, f.depth, f.kind])).toEqual([['Ann', 0, 'line'], ['Bo', 0, 'line']]);
   });
 
+  it('Free Layout: the words on its text boxes and buttons, not on deleted elements or clickable pictures', () => {
+    const beat = make('f', 'freeLayout', {
+      locations: [
+        { name: 'Sign', kind: 'text', x: 0, y: 0, width: 100, height: 40 },
+        { name: 'Door', kind: 'button', x: 0, y: 50, width: 100, height: 40 },
+        { name: 'Lamp', kind: 'prop', x: 0, y: 100, width: 40, height: 40 },
+      ],
+      parameters: {
+        texts: [{ locationName: 'Sign', text: 'Quiet hall.' }, { locationName: 'Gone', text: 'Old words' }],
+        choices: [{ id: 'b1', locationName: 'Door', text: 'Leave', target: 'x' }, { id: 'b2', locationName: 'Lamp', text: '', target: 'y' }],
+      },
+    });
+    expect(scriptFields(beat).map((f) => [f.path, f.label, f.value, f.kind])).toEqual([
+      ['texts[0].text', 'Text (Sign)', 'Quiet hall.', 'text'],
+      ['choices[0].text', 'Button (Door)', 'Leave', 'choice'],
+    ]);
+  });
+
   it('an AI beat\'s prompt is not script text', () => {
     expect(scriptFields(make('ai', 'aiInfoText', { parameters: { prompt: 'Describe the room' } }))).toEqual([]);
   });

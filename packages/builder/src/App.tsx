@@ -3142,7 +3142,7 @@ function App() {
     if (!before || before.type === type) return;
     let result: ReturnType<typeof changeBeatType>;
     try {
-      result = changeBeatType(before, type);
+      result = changeBeatType(before, type, { width: projectSettings?.width || 1024, height: projectSettings?.height || 768 });
     } catch (e) {
       notify.error(`Could not change "${before.name || before.id}" into ${beatTypeLabel(type)}.`, { detail: errorMessage(e) });
       return;
@@ -3155,7 +3155,7 @@ function App() {
       action: undoCommandAction(cmd),
       ...(result.losses.length ? { durationMs: 12000 } : {}),
     });
-  }, [state.beats, markChanged]);
+  }, [state.beats, markChanged, projectSettings]);
 
   // Handle bulk transformation changes - force UI refresh for affected beats
   const handleTransformationChangesApplied = useCallback((affectedBeatIds: string[]) => {

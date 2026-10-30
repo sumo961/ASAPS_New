@@ -125,6 +125,22 @@ export function linkOutputs(beat: Beat): LinkOutput[] | null {
       return [storedLink('Right code'), paramOutput('failTarget', 'Too many tries', params.failTarget)];
     case 'aiConversation':
       return [paramOutput('fallbackExitTarget', 'When the conversation ends', params.fallbackExitTarget)];
+    case 'freeLayout': {
+      // Its buttons whose element is on the stage (FreeLayoutBeat.liveChoices),
+      // then the timer, or — with neither — a click anywhere.
+      // By the element's name (FreeLayoutBeat.liveChoices), not the Map key.
+      const onStage = new Set(Array.from((b.locations as Map<string, any> | undefined)?.values?.() ?? []).map((l: any) => l?.name));
+      const outs: LinkOutput[] = [];
+      (Array.isArray(params.choices) ? params.choices : []).forEach((c: any, i: number) => {
+        if (c?.locationName && onStage.has(c.locationName)) {
+          outs.push(paramOutput(`choices[${i}].target`, `${outs.length + 1} · ${short(c.text) || c.locationName}`, c.target));
+        }
+      });
+      const timed = Number(params.duration) > 0;
+      if (timed) outs.push(paramOutput('timerTarget', 'When time runs out', params.timerTarget));
+      if (!timed && outs.length === 0) outs.push(paramOutput('nextTarget', 'Next (click anywhere)', params.nextTarget));
+      return outs;
+    }
     case 'dialogTree':
       return dialogOutputs(params, paramOutput);
     default:

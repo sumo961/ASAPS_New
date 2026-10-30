@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-29T23:12:12.203Z
+ * Generated: 2026-10-30T00:17:39.816Z
  */
 
 // ============================================
@@ -148,6 +148,7 @@ export interface PanoramaHotspot {
 export interface FreeLayoutButton {
   id: string;
   locationName: string;
+  elementId?: string;
   text: string;
   displayText?: string;
   target: string;
@@ -161,6 +162,7 @@ export interface FreeLayoutButton {
  */
 export interface FreeLayoutText {
   locationName: string;
+  elementId?: string;
   text: string;
   displayText?: string;
 }

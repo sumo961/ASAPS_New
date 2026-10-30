@@ -12,4 +12,10 @@ describe('resolveProjectLayoutMode', () => {
     expect(resolveProjectLayoutMode(undefined, [{ locations: [{}] }])).toBe('fixed');
     expect(resolveProjectLayoutMode(undefined, null)).toBe('responsive');
   });
+
+  it('a Free Layout beat, placed by hand in every project, does not make a project fixed', () => {
+    expect(inferLayoutMode([{ type: 'freeLayout', locations: [{ name: 'Text' }] } as any, { type: 'infoText' } as any])).toBe('responsive');
+    expect(inferLayoutMode([{ type: 'freeLayout', locations: [{ name: 'Text' }] } as any, { type: 'infoText', locations: [{ name: 'text' }] } as any])).toBe('fixed');
+  });
 });
+

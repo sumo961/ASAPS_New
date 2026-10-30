@@ -573,6 +573,13 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
                 if (params.choices[j].description) strings[prefix + '.parameters.choices.' + j + '.description'] = params.choices[j].description;
               }
             }
+            // Free Layout text boxes (its buttons are the choices above)
+            if (Array.isArray(params.texts)) {
+              for (var j = 0; j < params.texts.length; j++) {
+                var words = params.texts[j] && (params.texts[j].displayText || params.texts[j].text);
+                if (words) strings[prefix + '.parameters.texts.' + j + '.displayText'] = words;
+              }
+            }
             // PickProp
             if (beat.type === 'pickProp' && Array.isArray(params.props)) {
               for (var j = 0; j < params.props.length; j++) {

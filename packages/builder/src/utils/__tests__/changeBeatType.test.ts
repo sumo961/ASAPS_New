@@ -74,9 +74,72 @@ describe('changeBeatType', () => {
     expect(losses.join(' ')).toMatch(/Variations/i);
   });
 
+  it('Multi Choice → Free Layout: a text box with the question and a button for each choice, laid out on the stage', () => {
+    const choices = [
+      { id: 'a', text: 'Run', target: 'x', effects: [{ type: 'counter', name: 'fear', operation: 'add', value: 1 }] },
+      { id: 'b', text: 'Hide', target: 'y' },
+    ];
+    const { beat, losses } = changeBeatType(make('multiChoice', { parameters: { question: 'Now?', choices } }), 'freeLayout', { width: 1000, height: 500 });
+    const p = beat.getParameters();
+    const locs = [...beat.locations.values()];
+    expect(locs.map((l: any) => [l.name, l.kind])).toEqual([['Text', 'text'], ['Button', 'button'], ['Button 2', 'button']]);
+    expect(locs.every((l: any) => l.x >= 0 && l.y >= 0 && l.x + l.width <= 1000 && l.y + l.height <= 500)).toBe(true);
+    expect(p.texts).toMatchObject([{ locationName: 'Text', elementId: locs[0].id, text: 'Now?' }]);
+    expect(p.choices).toMatchObject([
+      { id: 'a', locationName: 'Button', elementId: locs[1].id, text: 'Run', target: 'x', effects: [{ name: 'fear' }] },
+      { id: 'b', locationName: 'Button 2', text: 'Hide', target: 'y' },
+    ]);
+    expect(targets(beat)).toEqual(['x', 'y']);
+    // A Free Layout shows no speaker's name.
+    expect(losses).toEqual(['its Speaker (Free Layout has no such setting)']);
+  });
+
+  it('Info Text → Free Layout: its link is a button with its button text', () => {
+    const { beat, losses } = changeBeatType(make('infoText', { parameters: { text: 'Rain.', buttonText: 'Go inside' }, connections: [{ targetId: 'next', label: '' }] }), 'freeLayout');
+    expect(beat.getParameters().choices).toMatchObject([{ text: 'Go inside', target: 'next', locationName: 'Button' }]);
+    expect(targets(beat)).toEqual(['next']);
+    expect(losses.join(' ')).not.toContain('Button Text');
+  });
+
+  it('Free Layout → Multi Choice: the first text box is asked, the buttons are the choices; other text boxes are named', () => {
+    const before = make('freeLayout', {
+      locations: [
+        { name: 'Sign', kind: 'text', x: 0, y: 0, width: 100, height: 40 },
+        { name: 'Note', kind: 'text', x: 0, y: 50, width: 100, height: 40 },
+        { name: 'Door', kind: 'button', x: 0, y: 100, width: 100, height: 40 },
+        { name: 'Lamp', kind: 'prop', x: 0, y: 150, width: 40, height: 40 },
+      ],
+      parameters: {
+        texts: [{ locationName: 'Sign', text: 'Where now?' }, { locationName: 'Note', text: 'A note.' }],
+        choices: [
+          { id: 'd', locationName: 'Door', text: 'Leave', target: 'x' },
+          { id: 'l', locationName: 'Lamp', text: '', target: 'y' },
+          { id: 'gone', locationName: 'Deleted', text: 'Old', target: 'z' },
+        ],
+      },
+    });
+    const { beat, losses } = changeBeatType(before, 'multiChoice');
+    expect(beat.getParameters().question).toBe('Where now?');
+    expect(beat.getParameters().choices).toMatchObject([{ id: 'd', text: 'Leave', target: 'x' }, { id: 'l', text: 'Lamp', target: 'y' }]);
+    expect(losses.join(' ')).toContain('“A note.”');
+    expect(losses.join(' ')).toContain('layout in the Visual Editor');
+  });
+
+  it('Free Layout → Info Text: the button\'s words go on the beat\'s own button', () => {
+    const before = make('freeLayout', {
+      locations: [{ name: 'Text', kind: 'text', x: 0, y: 0, width: 100, height: 40 }, { name: 'Button', kind: 'button', x: 0, y: 50, width: 100, height: 40 }],
+      parameters: { texts: [{ locationName: 'Text', text: 'Rain.' }], choices: [{ id: 'c', locationName: 'Button', text: 'Go inside', target: 'next' }] },
+    });
+    const { beat, losses } = changeBeatType(before, 'infoText');
+    expect(beat.getParameters()).toMatchObject({ text: 'Rain.', buttonText: 'Go inside' });
+    expect(targets(beat)).toEqual(['next']);
+    expect(losses.join(' ')).not.toContain('button text');
+  });
+
   it('only the beat types it can carry across are offered', () => {
     expect(changeableTypes(make('infoText', {}))).toContain('multiChoice');
     expect(changeableTypes(make('infoText', {}))).not.toContain('infoText');
+    expect(changeableTypes(make('infoText', {}))).toContain('freeLayout');
     expect(changeableTypes(make('setVariable', {}))).toEqual([]);
   });
 });

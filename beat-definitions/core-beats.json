@@ -193,6 +193,7 @@
       "schema": {
         "id": "string",
         "locationName": "string",
+        "elementId": "string?",
         "text": "string",
         "displayText": "string?",
         "target": "string",
@@ -200,16 +201,17 @@
         "effects": "effect[]?",
         "soundEffect": "string?"
       },
-      "notes": "locationName is the name of the stage element (beat.locations) this button is — the link between the choice and what the player sees and clicks. text is the button's label (unused for a clickable picture); displayText is the translated label. target, conditions (hide the button until they match), effects and soundEffect work exactly as on a multiChoiceOption."
+      "notes": "locationName is the name of the stage element (beat.locations) this button is — the link between the choice and what the player sees and clicks. text is the button's label (unused for a clickable picture); displayText is the translated label. target, conditions (hide the button until they match), effects and soundEffect work exactly as on a multiChoiceOption. elementId is the Visual Editor element's id, so renaming the element keeps the link; a button whose element was deleted stays (unused) so Undo brings back its link too."
     },
     "freeLayoutText": {
       "description": "The words of a text box placed by hand on a Free Layout beat.",
       "schema": {
         "locationName": "string",
+        "elementId": "string?",
         "text": "string",
         "displayText": "string?"
       },
-      "notes": "locationName is the stage element's name; text supports the usual formatting (**bold**, *italic*, ${variable} placeholders); displayText is the translated text."
+      "notes": "locationName is the stage element's name; text supports the usual formatting (**bold**, *italic*, ${variable} placeholders); displayText is the translated text. elementId is the Visual Editor element's id, so renaming the element keeps the link; a button whose element was deleted stays (unused) so Undo brings back its link too."
     }
   },
   "conditionTypes": {
@@ -1406,12 +1408,18 @@
         "texts": {
           "type": "array<freeLayoutText>",
           "required": false,
-          "description": "The words of each text box, keyed to its stage element by locationName."
+          "description": "The words of each text box, keyed to its stage element by locationName.",
+          "ui": {
+            "hidden": true
+          }
         },
         "choices": {
           "type": "array<freeLayoutButton>",
           "required": false,
-          "description": "The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions."
+          "description": "The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions.",
+          "ui": {
+            "label": "Buttons"
+          }
         },
         "duration": {
           "type": "number",

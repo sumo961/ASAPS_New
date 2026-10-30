@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Beat, Cluster, type Location, type AnimationPath, type SharedVisualContent, computeDialogTreeLayout, type DialogTreeLayoutTheme, DEFAULT_DIALOG_TREE_THEME, calculateTextBoxDimensions, calculateButtonDimensions, calculateDialogDimensions, DIALOG_CHAT_RESPONSE_DELAY } from '@asaps/core';
 import { VisualBeatEditor, VisualElement } from './VisualBeatEditor';
+import { syncFreeLayoutParams, wordsFor, withWords, isClickable, withClickable } from '../../utils/freeLayoutElements';
 import { choiceStateOptionsAsync, visibleChoiceIds, choiceConditionSummary, type ChoiceStateOption } from '../../utils/dialogChoiceVisibility';
 import { XRMapEditor } from './XRMapEditor';
 import { XRFloorPlanEditor } from './XRFloorPlanEditor';
@@ -1790,11 +1791,20 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     : previewCharacterResolver;
   // Fixed canvas: show the look on the character element, but never store
   // it — an edit on the canvas writes the element's own state back.
-  const shownElements = dialogLooks
+  const lookedElements = dialogLooks
     ? visualElements.map(el => (el.type === 'character' && el.characterId && dialogLooks[el.characterId]
         ? { ...el, stateId: dialogLooks[el.characterId] }
         : el))
     : visualElements;
+  // Free Layout: the words on its text boxes and buttons are the beat's
+  // (texts / choices) — shown here, never stored on the element.
+  const freeLayoutParams = beat?.type === 'freeLayout' ? beat.getParameters() : null;
+  const shownElements = freeLayoutParams
+    ? lookedElements.map(el => {
+        const words = wordsFor(freeLayoutParams, el);
+        return words === undefined ? el : { ...el, text: words, content: words };
+      })
+    : lookedElements;
   const withOwnStates = (elements: VisualElement[]): VisualElement[] => dialogLooks
     ? elements.map(el => {
         if (el.type !== 'character' || !el.characterId || !dialogLooks[el.characterId]) return el;
@@ -2445,6 +2455,11 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       const stageH = projectSettings?.height || 768;
       syncPanoramaHotspotsFromElements(elements, targetBeat, stageW, stageH);
     }
+    // Free Layout: every text box and button has its words and link entry.
+    if (targetBeat.type === 'freeLayout') {
+      const next = syncFreeLayoutParams(targetBeat.getParameters(), elements);
+      if (next) targetBeat.updateParameters(next);
+    }
   }, [projectSettings]);
 
   /**
@@ -2697,6 +2712,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
   // Save changes when switching to a different beat - MUST run before load
   const prevBeatIdRef = useRef(beat?.id);
+  // Change type keeps the id: the type tells the loaders the beat is new.
+  const prevBeatTypeRef = useRef(beat?.type);
 
   useEffect(() => {
     // If beat ID is changing and we had unsaved changes, save to the PREVIOUS beat first
@@ -3095,7 +3112,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     const stageHeight = projectSettings?.height || 768;
 
     // Check if beat changed - always reload when switching to a different beat
-    const beatChanged = prevBeatIdRef.current !== beat.id;
+    const beatChanged = prevBeatIdRef.current !== beat.id || prevBeatTypeRef.current !== beat.type;
 
     // Check if choices changed - force reload when choices are added,
     // removed or reordered, or the "Show as" state changes
@@ -3230,6 +3247,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     setHasChanges(false);
     prevPhaseIdRef.current = selectedPhaseId;
     prevBeatIdRef.current = beat.id;
+    prevBeatTypeRef.current = beat.type;
     prevChoicesCountRef.current = currentChoicesCount;
     prevChoicesSigRef.current = choicesSig;
 
@@ -4321,10 +4339,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
 
     // Update prevBeatIdRef for non-dialogTree beats (dialogTree updates in phase loading effect)
     prevBeatIdRef.current = beat.id;
+    prevBeatTypeRef.current = beat.type;
 
     // Reset parameter tracking so second useEffect will run for this beat
     prevParamsRef.current = '';
-  }, [beat?.id]);
+    // Change type keeps the beat's id: reload its elements for the new type.
+  }, [beat?.id, beat?.type]);
 
   // Sync visual elements with current parameters when they change
   // This ensures that when parameters change in the Inspector, the visual elements update
@@ -5013,6 +5033,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
       if (closeEl?.text !== undefined) updatedParams.creditsCloseText = closeEl.text;
     }
 
+    // Free Layout: every text box and button keeps its words and link entry.
+    if (beat.type === 'freeLayout') {
+      const fl = syncFreeLayoutParams(updatedParams, visualElements);
+      if (fl) { updatedParams.texts = fl.texts; updatedParams.choices = fl.choices; }
+    }
+
     // Save visual data to parameters
     beat.updateParameters(updatedParams);
 
@@ -5315,6 +5341,12 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                 }
                 backgroundAssetId={backgroundAssetId}
                 elements={visualElements}
+                freeLayout={beat?.type === 'freeLayout' && onBeatUpdate ? {
+                  wordsFor: (el) => wordsFor(beat.getParameters(), el),
+                  setWords: (el, text) => onBeatUpdate(beat.id, { parameters: withWords(beat.getParameters(), el, text) } as any),
+                  isClickable: (el) => isClickable(beat.getParameters(), el),
+                  setClickable: (el, on) => onBeatUpdate(beat.id, { parameters: withClickable(beat.getParameters(), el, on) } as any),
+                } : undefined}
                 selectedElements={selectedElementIds}
                 onBackgroundSelect={handleBackgroundSelect}
                 onElementSelect={(id: string | null) => {
@@ -5665,29 +5697,42 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                   const elementId = isPanorama ? `hotspot_${Date.now()}` : `element_${Date.now()}`;
 
                   // For text and hotspot types, create element immediately
+                  const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+                  // Elements are stored by name: a Free Layout's second "Text"
+                  // must not overwrite its first (and its words with it).
+                  const uniqueName = (() => {
+                    const taken = new Set(visualElements.map(e => e.name));
+                    if (!taken.has(typeLabel)) return typeLabel;
+                    let n = 2;
+                    while (taken.has(`${typeLabel} ${n}`)) n++;
+                    return `${typeLabel} ${n}`;
+                  })();
                   const newElement: VisualElement = {
                     id: elementId,
                     type,
-                    name: isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : type.charAt(0).toUpperCase() + type.slice(1),
+                    name: isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : (beat.type === 'freeLayout' ? uniqueName : typeLabel),
                     x: Math.floor(stageWidth / 2) - 50,
                     y: Math.floor(stageHeight / 2) - 50,
                     z: visualElements.length,
-                    width: type === 'text' ? 200 : (isPanorama ? 120 : 100),
-                    height: type === 'text' ? 40 : (isPanorama ? 80 : 100),
+                    width: type === 'text' ? 200 : type === 'button' ? 160 : (isPanorama ? 120 : 100),
+                    height: type === 'text' ? 40 : type === 'button' ? 48 : (isPanorama ? 80 : 100),
                     rotation: 0,
                     scale: 1,
                     visible: true,
                     locked: false,
-                    text: type === 'text' ? 'New Text' : (isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : undefined),
+                    text: type === 'text' ? 'New Text' : type === 'button' ? 'New Button' : (isPanorama ? `Hotspot ${(beat.getParameters().hotspots || []).length + 1}` : undefined),
                     // Font is left undefined to use theme default
                     font: undefined,
-                    fontSize: (type === 'text' || type === 'hotspot') ? 16 : undefined,
-                    textAlign: (type === 'text' || type === 'hotspot') ? 'center' : undefined,
+                    fontSize: (type === 'text' || type === 'hotspot' || type === 'button') ? 16 : undefined,
+                    textAlign: (type === 'text' || type === 'hotspot' || type === 'button') ? 'center' : undefined,
                   };
                   const afterElements = [...visualElements, newElement];
                   setVisualElements(afterElements);
                   setSelectedElementIds([newElement.id]);
                   setHasChanges(true);
+                  // A Free Layout's new text box or button is on the beat at once,
+                  // so the flowchart and drawn links see its button right away.
+                  if (beat.type === 'freeLayout') syncElementsToBeatLocations(afterElements, beat);
 
                   // For panorama beats, also create a corresponding PanoramaHotspot entry
                   if (isPanorama) {

@@ -1101,6 +1101,8 @@ export class ReactRenderer extends BaseRenderer {
    *  compute their fluid sizes from THESE dimensions instead of raw vw/vh
    *  (which reference the window, not the clamped preview frame). */
   protected viewportOverride: { width: number; height: number } | undefined;
+  /** Redraws the Free Layout screen on show at the stage's new size (responsive projects). */
+  private redrawFreeLayout: (() => void) | undefined;
   protected timerHudOverrideText: string | undefined;  // Per-beat static time display override
   protected timerHudState: { remainingTime: number; totalTime: number } | undefined;  // Timer HUD time state (separate from progress bar)
   private timerHudStateListeners: Set<(state: typeof this.timerHudState) => void> = new Set();
@@ -2464,6 +2466,7 @@ export class ReactRenderer extends BaseRenderer {
 
   setViewportOverride(v: { width: number; height: number } | undefined): void {
     this.viewportOverride = v;
+    this.redrawFreeLayout?.();
   }
 
   setTimerHudConfig(config: import('../components/TimerHudDisplay').TimerHudConfig | undefined): void {
@@ -2652,15 +2655,24 @@ export class ReactRenderer extends BaseRenderer {
     const responsive = screen.layoutMode === 'responsive';
     const authored = { width: this.context.width, height: this.context.height };
 
+    let drawnAt = '';
     const draw = () => {
       if (!responsive) {
         void this.renderPositionedBeat('freeLayout', content, shown, false);
         return;
       }
-      const box = this.context.container?.getBoundingClientRect();
-      const width = Math.round(this.viewportOverride?.width ?? box?.width ?? authored.width) || authored.width;
-      const height = Math.round(this.viewportOverride?.height ?? box?.height ?? authored.height) || authored.height;
-      void this.renderPositionedBeat('freeLayout', content, shown.map((l) => placeByPercent(l, authored, { width, height })), false, undefined, true, { width, height });
+      // The stage's layout size — not getBoundingClientRect, which is after
+      // any zoom around it (the Preview shows the stage scaled down).
+      const el = this.context.container;
+      const width = Math.round(this.viewportOverride?.width ?? el?.clientWidth ?? authored.width) || authored.width;
+      const height = Math.round(this.viewportOverride?.height ?? el?.clientHeight ?? authored.height) || authored.height;
+      if (drawnAt === `${width}x${height}`) return;
+      drawnAt = `${width}x${height}`;
+      // Words keep the share of their box they were given: the box's area
+      // changes by width × height ratio, so the font by its square root —
+      // kept readable on a phone, and not blown up on a wall screen.
+      const fontScale = Math.max(0.5, Math.min(2, Math.sqrt((width / authored.width) * (height / authored.height))));
+      void this.renderPositionedBeat('freeLayout', content, shown.map((l) => placeByPercent(l, authored, { width, height })), false, undefined, true, { width, height }, fontScale);
     };
     draw();
 
@@ -2673,13 +2685,20 @@ export class ReactRenderer extends BaseRenderer {
         if ((e.target as HTMLElement | null)?.closest?.('button, [role="button"]')) return;
         accept(FREE_LAYOUT_NEXT);
       };
-      const onResize = () => { if (!done) draw(); };
+      // The stage's size changes with the window and with the Preview's
+      // device sizes — watch the stage itself, not the window.
+      const redraw = () => { if (!done) draw(); };
+      if (responsive) this.redrawFreeLayout = redraw;
+      const resizeWatch = responsive && container && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(redraw)
+        : undefined;
       const finish = (id: string) => {
         if (done) return;
         done = true;
         if (timer) clearTimeout(timer);
         if (screen.clickAnywhere) container?.removeEventListener('click', onStageClick);
-        if (responsive) window.removeEventListener('resize', onResize);
+        resizeWatch?.disconnect();
+        if (this.redrawFreeLayout === redraw) this.redrawFreeLayout = undefined;
         if (this.resolveAction === accept) this.resolveAction = null;
         resolve(id);
       };
@@ -2695,7 +2714,7 @@ export class ReactRenderer extends BaseRenderer {
       this.resolveAction = accept;
       if (screen.duration > 0) timer = setTimeout(() => finish(FREE_LAYOUT_TIMEOUT), screen.duration * 1000);
       if (screen.clickAnywhere) container?.addEventListener('click', onStageClick);
-      if (responsive) window.addEventListener('resize', onResize);
+      if (container) resizeWatch?.observe(container);
     });
   }
 
@@ -2719,6 +2738,8 @@ export class ReactRenderer extends BaseRenderer {
     authorPositioned: boolean = true,
     /** Draw at this stage size instead of the project's (Free Layout in a responsive project: the real stage, unscaled). */
     stageSize?: { width: number; height: number },
+    /** Font size multiplier instead of the mobile one (Free Layout in a responsive project: follows the stage). */
+    fontScale?: number,
   ): Promise<string> {
     // Chrome-free beats (title screens by default) suppress every screen HUD.
     // Recomputed here rather than remembered, so it can't survive a beat change.
@@ -2988,7 +3009,7 @@ export class ReactRenderer extends BaseRenderer {
               fictionalTimeText={this.fictionalTimeText}
               onSubscribeFictionalTimeText={(listener) => this.subscribeToFictionalTimeText(listener)}
               externalBackground={useMobileBg}
-              mobileFontScale={this.mobileFontScale}
+              mobileFontScale={fontScale ?? this.mobileFontScale}
               speakerName={(() => {
                 const beatOverride = this.getState('showSpeaker') as boolean | undefined;
                 const globalShowNames = this.theme?.speakerDisplay?.showNames ?? false;

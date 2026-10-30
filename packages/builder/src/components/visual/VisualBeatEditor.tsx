@@ -677,7 +677,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
    * the Elements list and are never written back as authored positions.
    */
   const locationsWithDefaults: Location[] = React.useMemo(() => {
-    if (isPanoramaBeat || !beatType) return locationsForRenderer;
+    // A Free Layout shows exactly what was placed — it has no default boxes.
+    if (isPanoramaBeat || !beatType || beatType === 'freeLayout') return locationsForRenderer;
     if (locationsForRenderer.length === 0) return locationsForRenderer;
     try {
       const defaults = generateDefaultLocations(

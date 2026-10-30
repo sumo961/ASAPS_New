@@ -2130,6 +2130,74 @@ export const Inspector: React.FC<InspectorProps> = ({
                   />
                 )}
 
+                {/* Free Layout: where each button leads. The buttons themselves
+                    are made, placed and worded in the Visual Editor; a button
+                    whose element was deleted is kept (for Undo) but not listed. */}
+                {beat.type === 'freeLayout' && (() => {
+                  const onStage = new Set(Array.from(beat.locations?.values() || []).map((l: any) => l.name));
+                  const buttons = ((localBeat.parameters?.choices || []) as any[])
+                    .map((choice, index) => ({ choice, index }))
+                    .filter(({ choice }) => onStage.has(choice.locationName));
+                  return (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-gray-700">Buttons</div>
+                      {buttons.length === 0 && (
+                        <p className="text-xs text-gray-500">
+                          No buttons yet. Add a Button in the Visual Editor, or make a picture or character clickable there.
+                        </p>
+                      )}
+                      {buttons.map(({ choice, index }) => (
+                        <div key={choice.id || index} className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                          <div className="text-xs font-medium text-gray-600 truncate" title={choice.locationName}>
+                            {choice.text?.trim() ? `“${choice.text.trim()}”` : choice.locationName}
+                          </div>
+                          <BeatPicker
+                            value={choice.target || ''}
+                            onChange={(targetId) => handleUpdateChoice(index, 'target', targetId)}
+                            beats={availableTargets}
+                            emptyLabel="Nowhere yet"
+                            className="w-full px-2 py-1 text-sm border rounded"
+                          />
+                          <div className="p-2 bg-violet-50/60 rounded">
+                            <ChoiceConditionsEditor
+                              value={choice.conditions}
+                              onChange={(conds) => handleUpdateChoice(index, 'conditions', conds)}
+                              allBeats={allBeats}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                              characters={characters}
+                            />
+                          </div>
+                          <div className="p-2 bg-blue-50 rounded space-y-2">
+                            <div className="text-xs font-medium text-blue-700">Effects (Optional)</div>
+                            <ChoiceEffectsEditor
+                              effects={choice.effects || []}
+                              onChange={(newEffects) => handleUpdateChoice(index, 'effects', newEffects)}
+                              availableCounters={availableCounters}
+                              availableVariables={availableVariables}
+                              availableInventoryItems={availableInventoryItems}
+                              availableCharacters={characters}
+                              emotionPalette={emotionPalette}
+                              compact
+                            />
+                            <div className="mt-2 pt-2 border-t border-blue-200">
+                              <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
+                              <input
+                                type="text"
+                                value={choice.soundEffect || ''}
+                                onChange={(e) => handleUpdateChoice(index, 'soundEffect', e.target.value)}
+                                placeholder="Sound file (e.g., click.mp3)"
+                                className="w-full px-2 py-1 text-xs border rounded"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 {/* Speaker group for beat types excluded from full SchemaFormGenerator */}
                 {['dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'keypad', 'panorama'].includes(beat.type) && (() => {
                   const def = getBeatDefinition(beat.type);

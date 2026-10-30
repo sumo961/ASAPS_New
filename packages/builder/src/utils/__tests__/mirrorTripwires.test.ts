@@ -94,6 +94,7 @@ describe('translation extractor mirror', () => {
     { id: 'b16', type: 'onlineContent', parameters: { displayTemplate: 'dt', errorMessage: 'e' } },
     { id: 'b17', type: 'aiInfoText', parameters: { fallbackText: 'fb' } },
     { id: 'b18', type: 'aiConversation', parameters: { openingLine: 'ol', helperText: 'h', doneButtonText: 'd' } },
+    { id: 'b19', type: 'freeLayout', parameters: { texts: [{ locationName: 'Sign', text: 'sign' }], choices: [{ id: 'c', locationName: 'Door', text: 'door' }] } },
   ];
   const fixture = { project: { globalSettings: {}, story: { beats } } };
 

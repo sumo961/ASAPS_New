@@ -830,6 +830,10 @@ export function adjustElementsForCollisions(
   beatType?: string,
   reservedHudRects?: ReservedHudRect[]
 ): PositionedElementData[] {
+  // A Free Layout is laid out by hand: what the author placed is where it
+  // goes — no stacking, re-flowing or aligning of buttons (they were moved
+  // into a column under the text, 2026-10-29).
+  if (beatType === 'freeLayout') return elements;
   const padding = theme.textBox.padding || 20;
 
   // Separate text and button elements
@@ -1747,12 +1751,21 @@ export const PositionedBeatView: React.FC<PositionedBeatViewProps> = ({
   const prevElementsRef = React.useRef<PositionedElementData[] | null>(null);
 
   // Track if elements changed this render - if so, force animations to incomplete
-  // This prevents the flash where button appears briefly then disappears when changing beats
-  const elementsChanged = prevElementsRef.current !== null && prevElementsRef.current !== elements;
+  // This prevents the flash where button appears briefly then disappears when changing beats.
+  // Only a change of WORDS counts: the same text moved or resized (a Free
+  // Layout redrawn for a new stage size) isn't typed again, so waiting for
+  // it to finish typing kept the buttons hidden for good (2026-10-29).
+  const textKey = (list: PositionedElementData[] | null) =>
+    (list || []).map((el) => `${el.location.name}\u0000${el.content ?? ''}`).join('\u0001');
+  const prevTextKeyRef = React.useRef<string | null>(null);
+  const currentTextKey = `${beatId ?? ''}\u0002${textKey(elements)}`;
+  const elementsChanged = prevElementsRef.current !== null && prevElementsRef.current !== elements
+    && prevTextKeyRef.current !== currentTextKey;
   if (elementsChanged) {
     animationCompleteCountRef.current = 0;
   }
   prevElementsRef.current = elements;
+  prevTextKeyRef.current = currentTextKey;
 
   // The effective animation complete state - false if elements just changed
   const effectiveAnimationsComplete = elementsChanged ? false : animationsComplete;
@@ -2729,7 +2742,7 @@ const PositionedElement: React.FC<PositionedElementProps> = ({
         const lines = availW > 0 ? Math.max(1, Math.ceil(textWidth / availW)) : 1;
         // border-box: total height = content + padding + border
         const neededH = Math.ceil(lines * lineHeight + btnPaddingV * 2 + borderWidth * 2);
-        smartBtnDims.height = location.manuallyResized
+        smartBtnDims.height = location.manuallyResized || beatType === 'freeLayout'
           ? Math.max(location.height, neededH)
           : neededH;
       }
@@ -3412,8 +3425,11 @@ const TextElement: React.FC<{
   // Use element's font if set (user override), otherwise use theme default
   const computedFont = location.font ? getFontFamily(location.font) : defaultFont;
 
-  // Use theme padding or calculate based on box size
-  const padding = theme.textBox.padding;
+  // Use theme padding or calculate based on box size. A Free Layout box
+  // drawn smaller on a small stage keeps its padding in proportion.
+  const padding = beatType === 'freeLayout' && mobileFontScale < 1
+    ? Math.round(theme.textBox.padding * mobileFontScale)
+    : theme.textBox.padding;
 
   // Convert opacity from 0-100 to 0-1
   const opacityValue = theme.textBox.opacity / 100;
@@ -3461,7 +3477,8 @@ const TextElement: React.FC<{
 
   let dimensionStyle: React.CSSProperties;
   let needsScroll = false;
-  if (location.manuallyResized) {
+  // A Free Layout box is the size it was drawn, like a resized one.
+  if (location.manuallyResized || beatType === 'freeLayout') {
     // User manually resized: use stored dimensions as minimum, allow growth
     // for content — but never below the authored height, and never past the
     // button area / stage bottom.
