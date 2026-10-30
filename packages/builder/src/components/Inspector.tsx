@@ -780,6 +780,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
 
     // Directly add to the beat's locations Map
+    // Undo takes the beat back to before this element was added.
+    const before = beatSnapshot(beat);
     beat.locations.set(finalName, newHotspot as any);
 
     // Notify VE to add the element to its live state
@@ -808,7 +810,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setLocationUpdateTrigger(prev => prev + 1);
 
     // Use rebuildConnectionsAndUpdate to persist the changes
-    rebuildConnectionsAndUpdate(updatedBeat);
+    rebuildConnectionsAndUpdate(updatedBeat, before);
   };
 
   // P3-3c-4 — spatial-hotspot controls (NEW path, distinct from the
@@ -953,6 +955,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
 
     // Directly add to the beat's locations Map
+    // Undo takes the beat back to before this element was added.
+    const before = beatSnapshot(beat);
     beat.locations.set(finalName, newHotspot as any);
 
     // Notify VE to add the element to its live state
@@ -981,7 +985,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setLocationUpdateTrigger(prev => prev + 1);
 
     // Use rebuildConnectionsAndUpdate to persist the changes
-    rebuildConnectionsAndUpdate(updatedBeat);
+    rebuildConnectionsAndUpdate(updatedBeat, before);
   };
 
   // Update a field on a panorama hotspot (mirrors handleUpdateChoice for hotspots array)
@@ -1039,6 +1043,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     };
 
     // Directly add to the beat's locations Map
+    // Undo takes the beat back to before this element was added.
+    const before = beatSnapshot(beat);
     beat.locations.set(finalName, newLocation as any);
 
     // Notify VE to add the element to its live state
@@ -1067,7 +1073,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     setLocationUpdateTrigger(prev => prev + 1);
 
     // Use rebuildConnectionsAndUpdate to persist the changes
-    rebuildConnectionsAndUpdate(updatedBeat);
+    rebuildConnectionsAndUpdate(updatedBeat, before);
   };
 
   // Get beat content for visual editor
@@ -1549,12 +1555,14 @@ export const Inspector: React.FC<InspectorProps> = ({
   };
 
   // Helper function to rebuild connections from local state and immediately update
-  const rebuildConnectionsAndUpdate = (updatedLocalBeat?: any) => {
+  const rebuildConnectionsAndUpdate = (updatedLocalBeat?: any, earlier?: Record<string, any>) => {
     if (!beat || !onUpdate) return;
 
     const beatToUpdate = updatedLocalBeat || localBeat;
     // The edit is written onto the beat below: keep how it was, for Undo.
-    const before = beatSnapshot(beat);
+    // A caller that changed the beat already (added a stage element) passes
+    // the copy it took first.
+    const before = earlier ?? beatSnapshot(beat);
 
     // When a translation language is active, localBeat.parameters contains
     // translated text overlays. We must restore source text before updating
@@ -5318,6 +5326,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                                       assetId: selectedAssetId,
                                     };
                                     // Persist to beat.locations (for when VE mounts later)
+                                    // Undo takes the beat back to before this element was added.
+                                    const before = beatSnapshot(beat);
                                     beat.locations.set(finalName, newLocation as any);
                                     // Notify VE to add the element to its live state
                                     window.dispatchEvent(new CustomEvent('asaps:addElementToStage', {
@@ -5329,7 +5339,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                       parameters: { ...localBeat.parameters, props: newProps }
                                     };
                                     setLocalBeat(updatedBeat);
-                                    rebuildConnectionsAndUpdate(updatedBeat);
+                                    rebuildConnectionsAndUpdate(updatedBeat, before);
                                   }
                                 } else {
                                   newProps[index] = { ...newProps[index], locationName: '', assetId: undefined };

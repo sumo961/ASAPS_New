@@ -3,12 +3,14 @@
 ## Unreleased (since v0.9.148, 2026-10-30)
 
 ### Overview
-Work after v0.9.148: the speaker picker follows light and dark.
+Work after v0.9.148: the speaker picker follows light and dark; Undo takes back a hotspot or picture made from the Properties panel.
 
 ### Fixes
 - **The speaker picker is light in light mode.** The Speaker field (Properties panel, Dialog Tree editor, inventory and AI-character fields — `CharacterRefField`) was drawn with fixed dark colours from the start, a dark box in the light panels around it. Its colours are now CSS variables on the field: a light set normally, the old dark set in dark mode (`useIsDark`). Checked headless on RED: the field and its dropdown are light.
 
-**Files modified:** packages/builder/src/components/characters/CharacterRefField.tsx
+- **Undo takes back a hotspot or picture made from the Properties panel.** "New" next to a Movement Choice choice (and the same for a Pick Prop option, a panorama hotspot, or a picture chosen for a prop) put the element on the beat before the undo step's "before" copy was taken, so Undo put the choice back but left the element. The copy is now taken first (`rebuildConnectionsAndUpdate(beat, before)`). The open Visual Editor keeps its own element list and only reloads on another beat, so it now follows the beat for elements the Properties panel added: Undo takes them off the stage, Redo puts them back (matched by element id, as another element can carry the same name; acting only when the beat gains or loses one, so its own write-backs can't loop it). Checked headless on RED's Choose Your Path: New, Undo, Redo, Undo show 2, 1, 2, 1 of the choice's name on the stage, the beat's locations follow, and the page stays responsive. A first version matched by name and took the choice's own element with it, and hung the page; neither is in the commit.
+
+**Files modified:** packages/builder/src/components/characters/CharacterRefField.tsx, components/Inspector.tsx, components/visual/VisualWorkspace.tsx
 
 ---
 

@@ -1537,6 +1537,33 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     };
   }, []);
 
+  // Elements the Inspector added, by name. Its add is one undo step on the
+  // beat (locations included), which this editor's own element list doesn't
+  // hear about: follow the beat when it changes, so Undo takes the element
+  // off the stage and Redo puts it back.
+  const inspectorAddedRef = useRef(new Map<string, VisualElement>());
+  // Which of them the beat had when last looked: act only when that changes
+  // (an undo or redo), never on the beat changes this editor makes itself.
+  const inspectorAddedSeenRef = useRef('');
+  useEffect(() => { inspectorAddedRef.current.clear(); inspectorAddedSeenRef.current = ''; }, [beat?.id]);
+  useEffect(() => {
+    const added = inspectorAddedRef.current;
+    if (!beat || added.size === 0) return;
+    const inBeat = new Set(Array.from(beat.locations?.values() || []).map((l) => l?.name));
+    const seen = [...added.keys()].map((name) => `${name}:${inBeat.has(name) ? 1 : 0}`).join('|');
+    if (seen === inspectorAddedSeenRef.current) return;
+    inspectorAddedSeenRef.current = seen;
+    const current = visualElementsRef.current;
+    // By the element's id: another element can share its name (a choice's
+    // words), and must stay.
+    const onStage = new Set(current.map((el) => el.id));
+    const gone = [...added.values()].filter((el) => !inBeat.has(el.name) && onStage.has(el.id)).map((el) => el.id);
+    const back = [...added.values()].filter((el) => inBeat.has(el.name) && !onStage.has(el.id));
+    if (gone.length === 0 && back.length === 0) return;
+    setVisualElements([...current.filter((el) => !gone.includes(el.id)), ...back]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beat?.id, (beat as any)?._version]);
+
   // Listen for elements added from the Inspector (hotspots, props via image asset selection)
   useEffect(() => {
     const handler = (e: Event) => {
@@ -1564,6 +1591,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
         const afterElements = [...visualElementsRef.current, newElement];
         setVisualElements(afterElements);
         setHasChanges(true);
+        inspectorAddedRef.current.set(newElement.name, newElement);
 
         // Update beat.locations with actual dimensions
         if (beatRef.current) {
