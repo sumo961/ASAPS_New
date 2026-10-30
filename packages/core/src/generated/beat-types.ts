@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-30T00:17:39.816Z
+ * Generated: 2026-10-30T01:30:08.304Z
  */
 
 // ============================================
@@ -364,7 +364,7 @@ export interface ChooseCharacterParameters {
 }
 
 /**
- * Free Layout - A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; an optional timer goes on by itself; with neither, a click anywhere goes on.
+ * Free Layout - A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; the beat's auto-advance (defaultTarget after defaultTargetDelay seconds, with its countdown) goes on by itself; with neither, a click anywhere goes on.
  * Category: visible
  * Connection Type: multiple
  */
@@ -373,16 +373,14 @@ export interface FreeLayoutParameters {
   texts?: FreeLayoutText[] | undefined;
   /** The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions. */
   choices?: FreeLayoutButton[] | undefined;
-  /** Seconds before the beat goes on by itself to timerTarget. 0 = no timer. */
-  duration?: number | undefined;
-  /** Where the beat goes when its timer runs out (only with duration > 0). */
-  timerTarget?: string | undefined;
-  /** Where a click anywhere leads — used only while the beat has no buttons and no timer. */
+  /** Where a click anywhere leads — used only while the beat has no buttons and no auto-advance timer. */
   nextTarget?: string | undefined;
   /** Dim buttons the player already picked and stop them being picked again. */
   markVisited?: boolean | undefined;
   /** A button's effects fire only the first time it is picked; the button stays clickable. */
   effectsOncePerChoice?: boolean | undefined;
+  /** Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation. */
+  explainHuds?: boolean | undefined;
 }
 
 /**

@@ -2459,6 +2459,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
     if (targetBeat.type === 'freeLayout') {
       const next = syncFreeLayoutParams(targetBeat.getParameters(), elements);
       if (next) targetBeat.updateParameters(next);
+      // The Properties panel lists the buttons on the stage: tell it.
+      window.dispatchEvent(new CustomEvent('asaps:freeLayoutElementsChanged', { detail: { beatId: targetBeat.id } }));
     }
   }, [projectSettings]);
 
@@ -5501,6 +5503,10 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     if (beat.locations.has(locationKey)) {
                       beat.locations.delete(locationKey);
                       console.log(`[VisualWorkspace] Removed "${locationKey}" from beat.locations (now ${beat.locations.size} locations)`);
+                    }
+                    // A Free Layout's button goes from the Properties panel with it.
+                    if (beat.type === 'freeLayout') {
+                      window.dispatchEvent(new CustomEvent('asaps:freeLayoutElementsChanged', { detail: { beatId: beat.id } }));
                     }
 
                     // For panorama beats, also remove the corresponding PanoramaHotspot entry

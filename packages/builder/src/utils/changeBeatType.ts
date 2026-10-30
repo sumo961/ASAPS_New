@@ -82,7 +82,7 @@ function read(beat: any, json: any): Content {
       target: c.target, effects: c.effects, conditions: c.conditions, soundEffect: c.soundEffect,
     }));
     const words = texts.map((t: any) => t.displayText || t.text || '');
-    return { text: words[0] || '', link: options.length ? undefined : (p.nextTarget || p.timerTarget), options, speaker: beat.speaker, nested: [], moreTexts: words.slice(1).filter(Boolean) };
+    return { text: words[0] || '', link: options.length ? undefined : p.nextTarget, options, speaker: beat.speaker, nested: [], moreTexts: words.slice(1).filter(Boolean) };
   }
   // Dialog Tree: its first line, and the replies to it.
   const root = p.dialogTree || {};

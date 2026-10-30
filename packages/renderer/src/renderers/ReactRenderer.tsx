@@ -1,4 +1,4 @@
-import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike, FREE_LAYOUT_NEXT, FREE_LAYOUT_TIMEOUT } from '@asaps/core';
+import { uiString, isPresetSound, getPresetSound, splitVoicedSegments, isMultiChoiceLike, FREE_LAYOUT_NEXT } from '@asaps/core';
 import { pillSafeRadius } from '../utils/pillRadius';
 import { renderMarkdownLite, markdownLiteToPlain } from '../utils/markdownLite';
 import React from 'react';
@@ -2639,7 +2639,7 @@ export class ReactRenderer extends BaseRenderer {
    */
   /**
    * A Free Layout beat (FreeLayoutBeat): its hand-placed elements with their
-   * words, waiting for one of its buttons, its timer, or — with neither — a
+   * words, waiting for one of its buttons, its auto-advance timer, or — with neither — a
    * click anywhere. Fixed projects draw the stage in pixels, scaled to fit
    * (the hand-placed path every beat uses); responsive projects draw the
    * same elements at the real stage size, each placed and sized by percent,
@@ -2678,7 +2678,6 @@ export class ReactRenderer extends BaseRenderer {
 
     return new Promise<string>((resolve) => {
       let done = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
       const container = this.context.container;
       const onStageClick = (e: MouseEvent) => {
         // A click on one of the beat's own buttons is handled by the button.
@@ -2695,7 +2694,6 @@ export class ReactRenderer extends BaseRenderer {
       const finish = (id: string) => {
         if (done) return;
         done = true;
-        if (timer) clearTimeout(timer);
         if (screen.clickAnywhere) container?.removeEventListener('click', onStageClick);
         resizeWatch?.disconnect();
         if (this.redrawFreeLayout === redraw) this.redrawFreeLayout = undefined;
@@ -2712,7 +2710,6 @@ export class ReactRenderer extends BaseRenderer {
         queueMicrotask(() => { if (!done) this.resolveAction = accept; });
       };
       this.resolveAction = accept;
-      if (screen.duration > 0) timer = setTimeout(() => finish(FREE_LAYOUT_TIMEOUT), screen.duration * 1000);
       if (screen.clickAnywhere) container?.addEventListener('click', onStageClick);
       if (container) resizeWatch?.observe(container);
     });

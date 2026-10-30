@@ -1,12 +1,12 @@
 /**
  * ReactRenderer.renderFreeLayout — a Free Layout beat's hand-placed screen:
  * the words on its text boxes and buttons, a click on one of its buttons,
- * its timer, a click anywhere; and the responsive placement by percent.
+ * a click anywhere; and the responsive placement by percent.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { ReactRenderer } from '../../src/renderers/ReactRenderer';
 import { placeByPercent } from '../../src/utils/freeLayoutPlacement';
-import { FREE_LAYOUT_NEXT, FREE_LAYOUT_TIMEOUT, type FreeLayoutScreen, type Location } from '@asaps/core';
+import { FREE_LAYOUT_NEXT, type FreeLayoutScreen, type Location } from '@asaps/core';
 
 const stage: Location[] = [
   { name: 'Sign', kind: 'text', x: 20, y: 20, width: 400, height: 80 } as Location,
@@ -29,7 +29,6 @@ const screen = (over: Partial<FreeLayoutScreen> = {}): FreeLayoutScreen => ({
   texts: { Sign: 'The hall is quiet.', Door: 'Leave', Window: 'Look out' },
   buttons: [{ id: 'b_door', locationName: 'Door' }, { id: 'b_window', locationName: 'Window' }],
   hidden: [],
-  duration: 0,
   clickAnywhere: false,
   ...over,
 });
@@ -61,9 +60,11 @@ describe('renderFreeLayout', () => {
     await expect(answer).resolves.toBe('b_door');
   });
 
-  it('goes on by itself when the timer runs out', async () => {
+  it('gives way when the beat\'s auto-advance timer runs out', async () => {
     const { renderer } = setup();
-    await expect(renderer.renderFreeLayout(screen({ duration: 0.05 }))).resolves.toBe(FREE_LAYOUT_TIMEOUT);
+    const answer = renderer.renderFreeLayout(screen());
+    renderer.cancelPendingAction();
+    await expect(answer).resolves.toBe('__timer_interrupt__');
   });
 
   it('with no buttons and no timer, a click anywhere goes on', async () => {

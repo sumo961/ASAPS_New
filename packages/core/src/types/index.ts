@@ -717,22 +717,18 @@ export interface FreeLayoutScreen {
   buttons: Array<{ id: string; locationName: string }>;
   /** Elements of buttons whose conditions aren't met: not shown at all. */
   hidden: string[];
-  /** Seconds before the screen answers FREE_LAYOUT_TIMEOUT by itself; 0 = no timer. */
-  duration: number;
   /** No buttons and no timer: a click anywhere answers FREE_LAYOUT_NEXT. */
   clickAnywhere: boolean;
   /** The project's layout mode: 'fixed' draws the stage in pixels, 'responsive' places by percent. */
   layoutMode?: 'fixed' | 'responsive';
 }
-/** What renderFreeLayout answers when the timer runs out. */
-export const FREE_LAYOUT_TIMEOUT = '__timeout__';
 /** What renderFreeLayout answers for a click anywhere. */
 export const FREE_LAYOUT_NEXT = '__next__';
 
 export interface IRenderer {
   /**
-   * Show a Free Layout beat and wait: a button's choice id, FREE_LAYOUT_TIMEOUT
-   * or FREE_LAYOUT_NEXT. Optional — a renderer without it shows the buttons
+   * Show a Free Layout beat and wait: a button's choice id or FREE_LAYOUT_NEXT
+   * (or `__timer_interrupt__` when the beat's auto-advance runs out). Optional — a renderer without it shows the buttons
    * as choices (renderChoices) or the text with a Continue button.
    */
   renderFreeLayout?(screen: FreeLayoutScreen): Promise<string>;

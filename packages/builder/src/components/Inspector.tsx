@@ -470,6 +470,20 @@ export const Inspector: React.FC<InspectorProps> = ({
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
 
+  // A Free Layout's buttons and text boxes are made in the Visual Editor,
+  // which writes their entries straight onto the beat: take those in.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { beatId } = (e as CustomEvent).detail || {};
+      if (!beat || beat.id !== beatId) return;
+      const p = beat.getParameters();
+      setLocalBeat((prev: any) => prev ? { ...prev, parameters: { ...prev.parameters, texts: p.texts, choices: p.choices } } : prev);
+      setLocationUpdateTrigger((n) => n + 1);
+    };
+    window.addEventListener('asaps:freeLayoutElementsChanged', handler);
+    return () => window.removeEventListener('asaps:freeLayoutElementsChanged', handler);
+  }, [beat]);
+
   // Get available hotspots and props from beat.locations for MovementChoice/PickProp association
   // Dependencies include locations.size and activeTab to refresh when locations change or tab switches
   // Recompute on every render — beat.locations is a Map mutated externally by the VE,

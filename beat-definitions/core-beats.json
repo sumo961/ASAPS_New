@@ -1401,7 +1401,7 @@
       "category": "visible",
       "displayName": "Free Layout",
       "icon": "🧩",
-      "description": "A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; an optional timer goes on by itself; with neither, a click anywhere goes on.",
+      "description": "A screen the author lays out by hand in the Visual Editor: text boxes, buttons, pictures and characters wherever they should be. Each button (or clickable picture) leads on like a choice; the beat's auto-advance (defaultTarget after defaultTargetDelay seconds, with its countdown) goes on by itself; with neither, a click anywhere goes on.",
       "connectionType": "multiple",
       "locations": [],
       "parameters": {
@@ -1421,30 +1421,10 @@
             "label": "Buttons"
           }
         },
-        "duration": {
-          "type": "number",
-          "required": false,
-          "default": 0,
-          "min": 0,
-          "description": "Seconds before the beat goes on by itself to timerTarget. 0 = no timer.",
-          "ui": {
-            "label": "Go on by itself after (seconds, 0 = never)"
-          }
-        },
-        "timerTarget": {
-          "type": "string",
-          "required": false,
-          "description": "Where the beat goes when its timer runs out (only with duration > 0).",
-          "ui": {
-            "control": "beat-ref",
-            "label": "When time runs out, go to",
-            "emptyLabel": "Nowhere yet"
-          }
-        },
         "nextTarget": {
           "type": "string",
           "required": false,
-          "description": "Where a click anywhere leads — used only while the beat has no buttons and no timer.",
+          "description": "Where a click anywhere leads — used only while the beat has no buttons and no auto-advance timer.",
           "ui": {
             "control": "beat-ref",
             "label": "Next (click anywhere), go to",
@@ -1462,6 +1442,19 @@
           "required": false,
           "default": false,
           "description": "A button's effects fire only the first time it is picked; the button stays clickable."
+        },
+        "explainHuds": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Annotate the screen HUDs when this beat is entered. The beat is held inert until the interactor acknowledges, so they can't click past the explanation.",
+          "ui": {
+            "control": "checkbox",
+            "label": "Explain HUDs on entry",
+            "group": "Explanation",
+            "tier": "advanced",
+            "help": "Draws callouts over the live HUDs the first time this beat is reached."
+          }
         }
       },
       "transitions": true,

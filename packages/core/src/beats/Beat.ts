@@ -20,6 +20,7 @@ import { isRoleRef, rolePlaceholderText } from '../engine/roles';
  */
 export const DEFAULT_TARGET_TIMEOUT_TYPES: ReadonlySet<string> = new Set([
   'titleScreen', 'infoText', 'dialogTree', 'movementChoice', 'pickProp', 'hyperText', 'inputText', 'videoBeat',
+  'freeLayout',
 ]);
 
 /**

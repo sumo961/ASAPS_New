@@ -233,11 +233,10 @@ export function beatLinks(beat: any): StoryLink[] {
 
   if (p.dialogTree) walkDialog(p.dialogTree, id, out);
 
-  // freeLayout: the timer's link counts only with a timer, and "Next" (a
-  // click anywhere) only while there are no buttons and no timer — as
-  // FreeLayoutBeat.getConnections.
-  const freeTimer = Number(p.duration) > 0;
-  if (beat.type !== 'freeLayout' || freeTimer) push(out, id, p.timerTarget, 'timer', undefined, false, 'timerTarget');
+  push(out, id, p.timerTarget, 'timer', undefined, false, 'timerTarget');
+  // freeLayout: "Next" (a click anywhere) only while there are no buttons and
+  // no auto-advance timer — as FreeLayoutBeat.clickAnywhere.
+  const freeTimer = !!(beat.defaultTarget || p.defaultTarget) && Number(beat.defaultTargetDelay ?? p.defaultTargetDelay) > 0;
   if (beat.type === 'freeLayout' && !freeTimer && !(Array.isArray(p.choices) && p.choices.some(freeLive))) {
     push(out, id, p.nextTarget, 'param-target', 'Next', false, 'nextTarget');
   }
