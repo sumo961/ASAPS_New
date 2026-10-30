@@ -130,13 +130,32 @@ export interface AvailableInventoryItem {
 /**
  * Collect all inventory items from all characters
  */
-export function useAvailableInventoryItems(characters: Character[]): AvailableInventoryItem[] {
+const NO_ITEMS: ReadonlyArray<{ name: string; displayName?: string }> = [];
+
+export function useAvailableInventoryItems(
+  characters: Character[],
+  /** The project's items (Characters ▸ Items): listed first; a character's item of the same name isn't repeated. */
+  projectItems: ReadonlyArray<{ name: string; displayName?: string }> = NO_ITEMS,
+): AvailableInventoryItem[] {
   return useMemo(() => {
     const items: AvailableInventoryItem[] = [];
+    const inProject = new Set<string>();
+    projectItems.forEach((item) => {
+      if (!item?.name || inProject.has(item.name)) return;
+      inProject.add(item.name);
+      items.push({
+        name: item.name,
+        displayName: item.displayName || item.name,
+        characterId: '',
+        characterName: '',
+        fullName: item.displayName && item.displayName !== item.name ? `${item.displayName} (${item.name})` : item.name,
+      });
+    });
 
     characters.forEach((character) => {
       if (character.inventory && Array.isArray(character.inventory)) {
         character.inventory.forEach((item: InventoryItem) => {
+          if (inProject.has(item.name)) return;
           items.push({
             name: item.name,
             displayName: item.displayName || item.name,
@@ -149,7 +168,7 @@ export function useAvailableInventoryItems(characters: Character[]): AvailableIn
     });
 
     return items;
-  }, [characters]);
+  }, [characters, projectItems]);
 }
 
 /**

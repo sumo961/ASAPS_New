@@ -524,6 +524,17 @@ const AI_TRANSLATION_SECTION = `<div class="ai-section">
           }
         }
 
+        // The project's items — mirrors StoryTranslator.ts (labels and
+        // descriptions, not the matching name).
+        var gItems = project.project && project.project.globalSettings && project.project.globalSettings.items;
+        if (Array.isArray(gItems)) {
+          for (var gi = 0; gi < gItems.length; gi++) {
+            var gLabel = gItems[gi] && (gItems[gi].displayName || gItems[gi].name);
+            if (gLabel) strings['project.globalSettings.items.' + gi + '.displayName'] = gLabel;
+            if (gItems[gi] && gItems[gi].description) strings['project.globalSettings.items.' + gi + '.description'] = gItems[gi].description;
+          }
+        }
+
         // HUD overlay labels (timer / countdown meter)
         var hud = project.project && project.project.globalSettings && project.project.globalSettings.hudOverlays;
         if (hud) {

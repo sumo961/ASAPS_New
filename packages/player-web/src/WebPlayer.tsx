@@ -443,7 +443,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
           return {
             items: buildRuntimeInventoryItems(
               runtimeInventory,
-              resolveItemDefinitionIcons(itemCatalogFor(character, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
+              resolveItemDefinitionIcons(itemCatalogFor(character, chars, (playerRef.current?.getGlobalSettings?.() as any)?.items), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
               harvest,
             ),
             config: character.inventoryFrame,
@@ -967,7 +967,7 @@ export const WebPlayer: React.FC<WebPlayerProps> = ({
         inventoryItems: c.inventoryFrame
           ? buildRuntimeInventoryItems(
             (ctx as any).getCharacterInventoryEntries?.(c.id) || [],
-            resolveItemDefinitionIcons(itemCatalogFor(c, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
+            resolveItemDefinitionIcons(itemCatalogFor(c, chars, gsNow?.items), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url, { dropBlobUrls: true }),
             inventoryHarvest(),
           )
           : [],

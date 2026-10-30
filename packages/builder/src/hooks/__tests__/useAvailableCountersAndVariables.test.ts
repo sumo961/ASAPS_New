@@ -112,3 +112,11 @@ describe('derived counters are annotated, not filtered', () => {
     expect(result.current[3].derivedWriteReason).toContain('Nudge Mood');
   });
 });
+
+describe('useAvailableInventoryItems with the project items', () => {
+  it('lists the project items first and does not repeat a character item of the same name', () => {
+    const chars = [{ id: 'c', name: 'Ann', inventory: [{ name: 'sword', displayName: 'Sword' }, { name: 'rope', displayName: 'Rope' }] }] as any;
+    const { result } = renderHook(() => useAvailableInventoryItems(chars, [{ name: 'sword', displayName: 'Old Sword' }]));
+    expect(result.current.map((i) => [i.name, i.fullName])).toEqual([['sword', 'Old Sword (sword)'], ['rope', 'Ann: Rope']]);
+  });
+});

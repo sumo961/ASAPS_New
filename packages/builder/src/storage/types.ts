@@ -359,6 +359,14 @@ export interface GlobalSettings {
   roles?: CastRole[];
 
   /**
+   * The project's items (Characters ▸ Items): name, picture and description
+   * of each item, whoever ends up holding it. Item pickers offer them first;
+   * the player shows an item from its holder's own record, then from here,
+   * then from other characters' records.
+   */
+  items?: import('../types/character').ItemDefinition[];
+
+  /**
    * Player-facing UI labels ("Continue", "Inventory", …) overriding the
    * built-in defaults; translated via project.globalSettings.uiStrings.*.
    * Used by the translator and Preview, previously undeclared.

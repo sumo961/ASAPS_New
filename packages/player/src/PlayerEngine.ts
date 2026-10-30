@@ -1086,7 +1086,7 @@ export class PlayerEngine extends EventEmitter<PlayerEvents> {
         // Authored items give labels and pictures; their pictures are asset
         // ids here (builder blob URLs don't survive the export).
         const itemDefinitions = resolveItemDefinitionIcons(
-          itemCatalogFor(character, characters),
+          itemCatalogFor(character, characters, (this.globalSettings as any)?.items),
           (assetId: string) => this.assetMap.get(assetId),
           { dropBlobUrls: true },
         );

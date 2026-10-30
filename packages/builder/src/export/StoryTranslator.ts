@@ -125,6 +125,17 @@ export function extractTranslatableStrings(projectData: any): Record<string, str
 
   // HUD overlay labels
   const globalSettings = projectData.project?.globalSettings;
+
+  // The project's items (Characters ▸ Items): what players read, as for a
+  // character's items. NOT item.name — that is the matching key.
+  const projectItems = globalSettings?.items;
+  if (Array.isArray(projectItems)) {
+    for (let j = 0; j < projectItems.length; j++) {
+      const label = projectItems[j]?.displayName || projectItems[j]?.name;
+      if (label) strings[`project.globalSettings.items.${j}.displayName`] = label;
+      if (projectItems[j]?.description) strings[`project.globalSettings.items.${j}.description`] = projectItems[j].description;
+    }
+  }
   const hudOverlays = globalSettings?.hudOverlays;
   if (hudOverlays) {
     const G = 'project.globalSettings.hudOverlays';

@@ -60,4 +60,16 @@ describe('itemCatalogFor', () => {
     const items = buildRuntimeInventoryItems([{ name: 'Fish', quantity: 1 }], itemCatalogFor(harald, [harald, storage]), harvestPickPropData([], () => undefined));
     expect(items[0]).toMatchObject({ displayName: 'Fish', icon: 'fish.png' });
   });
+
+  it("uses the project's item before another character's, and the owner's own before both", () => {
+    const project = [{ name: 'Fish', displayName: 'Silver Fish', icon: 'silver.png' }, { name: 'Key', displayName: 'Brass Key' }];
+    const harald = { id: 'h', inventory: [{ name: 'Key', displayName: "Harald's Key" }] };
+    const storage = { id: 's', inventory: [{ name: 'Fish', displayName: 'Fish', icon: 'fish.png' }] };
+    const items = buildRuntimeInventoryItems(
+      [{ name: 'Fish', quantity: 1 }, { name: 'Key', quantity: 1 }],
+      itemCatalogFor(harald, [harald, storage], project),
+      harvestPickPropData([], () => undefined),
+    );
+    expect(items.map((i) => [i.displayName, i.icon])).toEqual([['Silver Fish', 'silver.png'], ["Harald's Key", '']]);
+  });
 });

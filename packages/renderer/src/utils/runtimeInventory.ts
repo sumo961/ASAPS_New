@@ -114,15 +114,16 @@ function inventoryImagesOf(beat: any): Array<[string, string]> {
 
 /**
  * The item records to show a character's items with: their own list first,
- * then every other character's (stories often keep a "storage" character as
- * a catalogue of items that others pick up). The first record per name wins.
+ * then the project's items (Characters ▸ Items), then every other
+ * character's (stories often kept a "storage" character as a catalogue of
+ * items that others pick up). The first record per name wins.
  */
-export function itemCatalogFor(owner: any, characters: any[]): any[] {
+export function itemCatalogFor(owner: any, characters: any[], projectItems: any[] = []): any[] {
   const own = Array.isArray(owner?.inventory) ? owner.inventory : [];
   const others = (characters || [])
     .filter((c: any) => c && c !== owner && c.id !== owner?.id)
     .flatMap((c: any) => (Array.isArray(c.inventory) ? c.inventory : []));
-  return [...own, ...others];
+  return [...own, ...(Array.isArray(projectItems) ? projectItems : []), ...others];
 }
 
 /**

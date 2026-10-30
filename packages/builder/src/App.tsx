@@ -5466,6 +5466,16 @@ function App() {
     globalSettingsMutationsRef.current.setGlobalSettings = applyGlobalSettingsChange;
   }, [applyGlobalSettingsChange]);
 
+  /** Characters ▸ Items: the project's item list, one undo step per change. */
+  const handleProjectItemsChange = useCallback((items: NonNullable<GlobalSettings['items']>) => {
+    const oldSettings = globalSettingsRef.current ?? globalSettings;
+    const newSettings = { ...oldSettings, items } as GlobalSettings;
+    applyGlobalSettingsChange(newSettings);
+    getCommandManager().pushWithoutExecute(new UpdateGlobalSettingsCommand(
+      oldSettings, newSettings, globalSettingsMutationsRef.current, 'Change items',
+    ));
+  }, [globalSettings, applyGlobalSettingsChange]);
+
   // The theme's pictures and fonts go into the project once — when a theme
   // is applied, or when a project whose theme is in this computer's library
   // opens without them — so the editor, the Preview, exports and other
@@ -7261,6 +7271,8 @@ function App() {
                 onEmotionPaletteChange={setEmotionPalette}
                 onGenerateWithAI={aiOn ? () => setDevelopCharSession({ seed: {}, askFirst: true }) : undefined}
                 hudOverlays={(globalSettings as any).hudOverlays}
+                items={globalSettings.items || []}
+                onItemsChange={handleProjectItemsChange}
               />
             </div>
           </div>

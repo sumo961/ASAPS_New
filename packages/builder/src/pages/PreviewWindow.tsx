@@ -666,7 +666,7 @@ export const PreviewWindow: React.FC = () => {
         inventoryItems: c.inventoryFrame
           ? buildRuntimeInventoryItems(
             (ctx as any).getCharacterInventoryEntries?.(c.id) || [],
-            resolveItemDefinitionIcons(itemCatalogFor(c, chars), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url),
+            resolveItemDefinitionIcons(itemCatalogFor(c, chars, (previewDataRef.current?.settings as any)?.items), (assetId: string) => assetsList.find((a: any) => a.id === assetId)?.url),
             inventoryHarvest(),
           )
           : [],
@@ -1420,7 +1420,7 @@ export const PreviewWindow: React.FC = () => {
         );
         const itemData = buildRuntimeInventoryItems(
           runtimeInventory,
-          resolveItemDefinitionIcons(itemCatalogFor(character, pd?.characters || []), (assetId: string) => pd?.assets?.find(a => a.id === assetId)?.url),
+          resolveItemDefinitionIcons(itemCatalogFor(character, pd?.characters || [], (pd?.settings as any)?.items), (assetId: string) => pd?.assets?.find(a => a.id === assetId)?.url),
           harvest,
         );
 

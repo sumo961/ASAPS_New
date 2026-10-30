@@ -35,6 +35,20 @@ describe('StoryTranslator', () => {
       expect(strings['project.story.metadata.title']).toBe('Murder Mystery');
     });
 
+    it('extracts the project items\' labels and descriptions, not their matching names', () => {
+      const data = createProjectData({
+        globalSettings: { items: [
+          { id: 'i1', name: 'sword', displayName: 'Old Sword', description: 'Rusty but sharp' },
+          { id: 'i2', name: 'key' },
+        ] },
+      });
+      const strings = extractTranslatableStrings(data);
+      expect(strings['project.globalSettings.items.0.displayName']).toBe('Old Sword');
+      expect(strings['project.globalSettings.items.0.description']).toBe('Rusty but sharp');
+      expect(strings['project.globalSettings.items.1.displayName']).toBe('key');
+      expect(Object.keys(strings).some((k) => k.endsWith('.name') && k.includes('items'))).toBe(false);
+    });
+
     it('should return empty when no story exists', () => {
       const strings = extractTranslatableStrings({ project: {} });
 

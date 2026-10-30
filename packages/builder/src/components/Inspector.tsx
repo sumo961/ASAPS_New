@@ -403,7 +403,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   // These are the declared sets (from characters + globalSettings).
   const declaredCounters = useAvailableCounters(characters);
   const declaredVariables = useAvailableVariables(globalSettings || null);
-  const declaredInventoryItems = useAvailableInventoryItems(characters);
+  const declaredInventoryItems = useAvailableInventoryItems(characters, (globalSettings as any)?.items);
 
   // Many stories (including AI-generated ones) reference items/counters/variables
   // without declaring them up-front on a character or in global settings. Scan

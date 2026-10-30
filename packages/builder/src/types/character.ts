@@ -493,6 +493,13 @@ export interface InventoryItem {
   maxStack?: number;
 }
 
+/**
+ * An item as the project defines it (Characters ▸ Items): what it is called,
+ * looks like and says, whoever holds it. A character's own item record
+ * (InventoryItem) is the same thing plus how many that character starts with.
+ */
+export type ItemDefinition = Omit<InventoryItem, 'quantity'>;
+
 export interface VisualEffect {
   type: 'filter' | 'overlay' | 'particle';
   properties: Record<string, any>;

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import {
+  Package,
   Plus,
   Search,
   Grid,
@@ -17,7 +18,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { Character, CHARACTER_TEMPLATES } from '../../types/character';
+import { Character, CHARACTER_TEMPLATES, type ItemDefinition } from '../../types/character';
+import { ProjectItemsPanel } from './ProjectItemsPanel';
 import { CharacterCard } from './CharacterCard';
 import { CharacterEditor } from './CharacterEditor';
 import type { HudOverlaySettings } from './HudLayoutPreview';
@@ -79,6 +81,9 @@ interface CharacterManagerProps {
    *  preview so screen-docked frames are shown flowing clear of the
    *  timer / countdown chrome configured in General Settings. */
   hudOverlays?: HudOverlaySettings;
+  /** The project's items (the Items tab). Without onItemsChange there is no Items tab. */
+  items?: ItemDefinition[];
+  onItemsChange?: (items: ItemDefinition[]) => void;
 }
 
 
@@ -94,7 +99,25 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
   onEmotionPaletteChange,
   onGenerateWithAI,
   hudOverlays,
+  items = [],
+  onItemsChange,
 }) => {
+  const [view, setView] = useState<'characters' | 'items'>('characters');
+  const tabs = onItemsChange && !selectionMode ? (
+    <div className="flex items-center gap-1 ml-2" role="tablist">
+      {(['characters', 'items'] as const).map(v => (
+        <button
+          key={v}
+          role="tab"
+          aria-selected={view === v}
+          onClick={() => setView(v)}
+          className={`px-2 py-1 text-sm rounded ${view === v ? 'bg-blue-100 text-blue-800 font-medium' : 'text-gray-600 hover:bg-gray-100'}`}
+        >
+          {v === 'characters' ? `Characters (${initialCharacters.length})` : `Items (${items.length})`}
+        </button>
+      ))}
+    </div>
+  ) : null;
   // Only use selection management from the hook
   const characters: Character[] = initialCharacters;
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
@@ -359,6 +382,19 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
     }
   };
 
+  if (view === 'items' && onItemsChange && !selectionMode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center gap-2 p-4 border-b">
+          <Package className="w-5 h-5" />
+          <h2 className="text-lg font-semibold">Items</h2>
+          {tabs}
+        </div>
+        <ProjectItemsPanel items={items} onItemsChange={onItemsChange} characters={characters} assets={assets} onAssetAdd={onAssetAdd} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -368,9 +404,11 @@ export const CharacterManager: React.FC<CharacterManagerProps> = ({
           <h2 className="text-lg font-semibold">
             {selectionMode ? 'Select a Character' : 'Characters'}
           </h2>
-          <span className="px-2 py-1 text-xs bg-gray-100 rounded-full">
-            {characters.length}
-          </span>
+          {tabs ?? (
+            <span className="px-2 py-1 text-xs bg-gray-100 rounded-full">
+              {characters.length}
+            </span>
+          )}
           {selectionMode && (
             <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
               Click to add to stage

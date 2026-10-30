@@ -46,6 +46,7 @@ import { useTranslationState } from '../../contexts/TranslationContext';
 import { DirectAssetUpload } from '../assets/DirectAssetUpload';
 import { confirmAction } from '../../utils/notify';
 import { AssetSelectionModal } from '../assets/AssetSelectionModal';
+import { ItemFields } from './ItemFields';
 import { getUiTier, setUiTier } from '../../utils/uiTier';
 
 /**
@@ -1450,152 +1451,22 @@ export const CharacterEditor: React.FC<CharacterEditorProps> = ({
 
       <div className="space-y-2">
         {editedCharacter.inventory.map((item, index) => (
-          <div key={item.id} className="border rounded-lg p-3">
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <input
-                type="text"
-                value={item.name}
-                onChange={(e) => {
-                  const newInventory = [...editedCharacter.inventory];
-                  newInventory[index] = { ...item, name: e.target.value };
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="px-2 py-1 border rounded text-sm"
-                placeholder="Internal name"
-              />
-              <input
-                type="text"
-                value={item.displayName}
-                onChange={(e) => {
-                  const newInventory = [...editedCharacter.inventory];
-                  newInventory[index] = { ...item, displayName: e.target.value };
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="px-2 py-1 border rounded text-sm"
-                placeholder="Display name"
-              />
-            </div>
-            {/* Image and Description row */}
-            <div className="flex items-center gap-2 mb-2">
-              {/* Item Image/Icon */}
-              <div className="flex items-center gap-2 shrink-0">
-                {(() => {
-                  const resolvedUrl = resolveImageUrl(item.assetId, item.icon, assets);
-                  return resolvedUrl ? (
-                    <img
-                      src={resolvedUrl}
-                      alt={item.displayName}
-                      className="w-10 h-10 object-cover rounded border"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-gray-200 rounded border flex items-center justify-center">
-                      <Package className="w-5 h-5 text-gray-400" />
-                    </div>
-                  );
-                })()}
-                <button
-                  onClick={() => setShowAssetPicker(`inventory_${item.id}`)}
-                  className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
-                >
-                  {item.icon || item.assetId ? 'Change' : 'Add Image'}
-                </button>
-                {(item.icon || item.assetId) && (
-                  <button
-                    onClick={() => {
-                      const newInventory = [...editedCharacter.inventory];
-                      newInventory[index] = { ...item, icon: '', assetId: undefined };
-                      setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                    }}
-                    className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                    title="Remove image"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-              <input
-                type="text"
-                value={item.description}
-                onChange={(e) => {
-                  const newInventory = [...editedCharacter.inventory];
-                  newInventory[index] = { ...item, description: e.target.value };
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="flex-1 px-2 py-1 border rounded text-sm"
-                placeholder="Description"
-              />
-            </div>
-            {/* Quantity, Category, Stackable, Delete row */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">Qty:</label>
-              <input
-                type="number"
-                value={item.quantity}
-                min={1}
-                onChange={(e) => {
-                  const newInventory = [...editedCharacter.inventory];
-                  newInventory[index] = { ...item, quantity: Math.max(1, Number(e.target.value) || 1) };
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="w-16 px-2 py-1 border rounded text-sm"
-              />
-              <select
-                value={item.category}
-                onChange={(e) => {
-                  const newInventory = [...editedCharacter.inventory];
-                  newInventory[index] = { ...item, category: e.target.value };
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="px-2 py-1 border rounded text-sm"
-              >
-                <option value="misc">Misc</option>
-                <option value="weapon">Weapon</option>
-                <option value="armor">Armor</option>
-                <option value="consumable">Consumable</option>
-                <option value="quest">Quest</option>
-                <option value="key">Key</option>
-              </select>
-              <label className="flex items-center gap-1 text-sm">
-                <input
-                  type="checkbox"
-                  checked={item.stackable}
-                  onChange={(e) => {
-                    const newInventory = [...editedCharacter.inventory];
-                    newInventory[index] = { ...item, stackable: e.target.checked };
-                    setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                  }}
-                />
-                Stackable
-              </label>
-              {item.stackable && (
-                <>
-                  <label className="text-xs text-gray-500">Max:</label>
-                  <input
-                    type="number"
-                    value={item.maxStack ?? 99}
-                    min={1}
-                    onChange={(e) => {
-                      const newInventory = [...editedCharacter.inventory];
-                      newInventory[index] = { ...item, maxStack: Math.max(1, Number(e.target.value) || 99) };
-                      setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                    }}
-                    className="w-16 px-2 py-1 border rounded text-sm"
-                    title="Max stack size"
-                  />
-                </>
-              )}
-              <div className="flex-1" />
-              <button
-                onClick={() => {
-                  const newInventory = editedCharacter.inventory.filter((_, i) => i !== index);
-                  setEditedCharacter({ ...editedCharacter, inventory: newInventory });
-                }}
-                className="p-1 text-red-500 hover:bg-red-50 rounded"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          <ItemFields
+            key={item.id}
+            item={item}
+            showQuantity
+            assets={assets}
+            onChange={(patch) => {
+              const newInventory = [...editedCharacter.inventory];
+              newInventory[index] = { ...item, ...patch } as InventoryItem;
+              setEditedCharacter({ ...editedCharacter, inventory: newInventory });
+            }}
+            onRemove={() => {
+              const newInventory = editedCharacter.inventory.filter((_, i) => i !== index);
+              setEditedCharacter({ ...editedCharacter, inventory: newInventory });
+            }}
+            onPickImage={() => setShowAssetPicker(`inventory_${item.id}`)}
+          />
         ))}
       </div>
 
