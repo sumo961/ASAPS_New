@@ -2416,7 +2416,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                             };
                             return (
                               <div className="grid grid-cols-2 gap-2">
-                                <div>
+                                <div className="min-w-0">
                                   <label className="text-xs text-gray-600">X %</label>
                                   <div className="flex items-center gap-1">
                                     <input
@@ -2426,7 +2426,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                       step={0.5}
                                       value={xPct}
                                       onChange={(e) => updateXPct(parseFloat(e.target.value))}
-                                      className="flex-1"
+                                      className="flex-1 min-w-0"
                                     />
                                     <DraftNumberInput
                                       min={xLim.min}
@@ -2435,11 +2435,11 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                       precision={1}
                                       value={xPct}
                                       onCommit={updateXPct}
-                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                      className="w-14 flex-shrink-0 px-1 py-1 text-xs border border-gray-300 rounded text-center"
                                     />
                                   </div>
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                   <label className="text-xs text-gray-600">Y %</label>
                                   <div className="flex items-center gap-1">
                                     <input
@@ -2449,7 +2449,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                       step={0.5}
                                       value={yPct}
                                       onChange={(e) => updateYPct(parseFloat(e.target.value))}
-                                      className="flex-1"
+                                      className="flex-1 min-w-0"
                                     />
                                     <DraftNumberInput
                                       min={yLim.min}
@@ -2458,7 +2458,7 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                                       precision={1}
                                       value={yPct}
                                       onCommit={updateYPct}
-                                      className="w-14 px-1 py-1 text-xs border border-gray-300 rounded text-center"
+                                      className="w-14 flex-shrink-0 px-1 py-1 text-xs border border-gray-300 rounded text-center"
                                     />
                                   </div>
                                 </div>
