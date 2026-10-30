@@ -3,7 +3,14 @@
 ## Unreleased (since v0.9.148, 2026-10-30)
 
 ### Overview
-Work after v0.9.148: the speaker picker follows light and dark; Undo takes back a hotspot or picture made from the Properties panel. The User Guide starts with installing, a 15-minute tutorial and Common Hiccups.
+Work after v0.9.148: fonts made for easier reading, for the builder and for stories; the speaker picker follows light and dark; Undo takes back a hotspot or picture made from the Properties panel. The User Guide starts with installing, a 15-minute tutorial and Common Hiccups.
+
+### Easier-to-read fonts (class feedback: "dyslexia-friendly font")
+- Three free fonts (SIL Open Font License, from Fontsource 5.3.0, Latin subset) ship in `public/fonts/reading` with their licences: **Lexend**, **Atkinson Hyperlegible** and **OpenDyslexic**. The research doesn't single out one font as better for dyslexic readers, so the choice is the reader's.
+- **The builder:** Tools ▸ App Preferences ▸ **Reading font** (Standard or one of the three) is a setting of this computer like Appearance, and every open window follows it (`utils/readingFont.ts`, regular and bold faces; OpenDyslexic drawn at 88 % so panels keep their fit). The story's stage (`keep-colors`) keeps the standard font, so the Visual Editor and the Preview still show what players get.
+- **Stories:** Project Settings ▸ Fonts offers them under **Easier to read (added to the project)** for the title, text and button fonts. Choosing one copies the font into the project as a font asset (`OpenDyslexic.woff2`), so it goes along with the project and works through the custom-font path that already exists: the Preview, .asaps files, HTML exports and the player. The three duplicated font menus are one `FontSelect` now.
+- Checked headless on a fresh project: OpenDyslexic for the text font is added and chosen, the Preview plays "The storm has passed." in it, the HTML export (served, 1100×700) loads it from the story and plays in it, and an .asaps round trip keeps the file. The builder was checked in all three fonts. Tests in `utils/__tests__/readingFont.test.ts`.
+- User Guide: to add with the release (App Preferences ▸ Reading font; Project Settings ▸ Fonts).
 
 ### User Guide (class feedback: "a 15-minute tutorial", "installing and setup first", "Common Hiccups easier to find")
 - **Installing ASAPS** now opens Part 1: where to download, which file for Mac / Windows / Linux, what to do when Windows says *"Windows protected your PC"* (the installer isn't signed by a known publisher), the first start, the optional setup in App Preferences (light or dark, AI or no AI, voices) and how updates arrive.
@@ -17,7 +24,7 @@ Work after v0.9.148: the speaker picker follows light and dark; Undo takes back 
 
 - **Undo takes back a hotspot or picture made from the Properties panel.** "New" next to a Movement Choice choice (and the same for a Pick Prop option, a panorama hotspot, or a picture chosen for a prop) put the element on the beat before the undo step's "before" copy was taken, so Undo put the choice back but left the element. The copy is now taken first (`rebuildConnectionsAndUpdate(beat, before)`). The open Visual Editor keeps its own element list and only reloads on another beat, so it now follows the beat for elements the Properties panel added: Undo takes them off the stage, Redo puts them back (matched by element id, as another element can carry the same name; acting only when the beat gains or loses one, so its own write-backs can't loop it). Checked headless on RED's Choose Your Path: New, Undo, Redo, Undo show 2, 1, 2, 1 of the choice's name on the stage, the beat's locations follow, and the page stays responsive. A first version matched by name and took the choice's own element with it, and hung the page; neither is in the commit.
 
-**Files modified:** docs/USER_GUIDE.md, packages/builder/src/components/settings/AppPreferencesDialog.tsx, packages/builder/src/components/characters/CharacterRefField.tsx, components/Inspector.tsx, components/visual/VisualWorkspace.tsx
+**Files modified:** docs/USER_GUIDE.md, packages/builder/src/components/settings/AppPreferencesDialog.tsx, packages/builder/src/components/characters/CharacterRefField.tsx, components/Inspector.tsx, components/visual/VisualWorkspace.tsx, components/settings/GlobalSettingsInspector.tsx, main.tsx, utils/readingFont.ts (new), utils/__tests__/readingFont.test.ts (new), packages/builder/public/fonts/reading/ (new)
 
 ---
 

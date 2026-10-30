@@ -7,6 +7,7 @@ import { VCSStatusProvider } from './vcs/VCSStatusProvider';
 import { NoticeHost } from './components/feedback/NoticeHost';
 import './styles/main.css';
 import { initAppearance } from './utils/appearance';
+import { initReadingFont } from './utils/readingFont';
 
 /**
  * Bridge component that connects persistence (save) to VCS.
@@ -42,6 +43,8 @@ const isPreviewWindow = typeof window !== 'undefined' && window.location.hash ==
 
 // Light or dark (App Preferences ▸ Appearance), before the first paint.
 initAppearance();
+// Reading font (App Preferences ▸ Appearance), likewise.
+initReadingFont();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

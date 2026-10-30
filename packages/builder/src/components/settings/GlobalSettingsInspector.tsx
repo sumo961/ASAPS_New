@@ -18,6 +18,9 @@ import { COMMON_LANGUAGES } from '../../utils/languageCatalog';
 import { usePersistedState } from '../../utils/persistedState';
 import { notify, confirmAction } from '../../utils/notify';
 import { useAIFeatures } from '../../utils/aiFeatures';
+import { useProjectAssets } from '../../contexts/ProjectAssetsContext';
+import type { FontDefinition } from '../../utils/fontRegistry';
+import { READING_FONTS, readingFontFile } from '../../utils/readingFont';
 
 // ONE canonical GlobalSettings type (UX-Eval §1.2 structural hazard): this
 // file used to declare its own copy, which App and a dozen other modules
@@ -28,6 +31,50 @@ import { BeatPicker } from '../common/BeatPicker';
 /** The frame's edge height in the Text Box preview, a stage about 760 px wide (as the story draws it). */
 const previewFrameBand = (f: number, naturalPx: number) => `${Math.round(Math.max(8, Math.min(naturalPx, f * 760)))}px`;
 
+
+/** Value of a reading font the project doesn't have yet; choosing it adds the file. */
+const READING_PREFIX = 'reading:';
+
+/**
+ * A font for titles, text or buttons: the built-in fonts, the project's own,
+ * and the reading-friendly fonts that ship with ASAPS, offered until the
+ * project has its copy (then they are among its own).
+ */
+const FontSelect: React.FC<{
+  value: string;
+  fonts: FontDefinition[];
+  onChange: (value: string) => void;
+}> = ({ value, fonts, onChange }) => {
+  const custom = fonts.filter(f => f.type === 'custom');
+  const reading = READING_FONTS.filter(r => !custom.some(f => f.displayName === r.name));
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 border rounded">
+      {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
+      {value && !fonts.some(f => f.displayName === value) && (
+        <optgroup label="Theme Font">
+          <option value={value}>{value}</option>
+        </optgroup>
+      )}
+      {fonts.filter(f => f.type === 'builtin').map(font => (
+        <option key={font.id} value={font.displayName}>{font.displayName}</option>
+      ))}
+      {custom.length > 0 && (
+        <optgroup label="Custom Fonts">
+          {custom.map(font => (
+            <option key={font.id} value={font.displayName}>{font.displayName}</option>
+          ))}
+        </optgroup>
+      )}
+      {reading.length > 0 && (
+        <optgroup label="Easier to read (added to the project)">
+          {reading.map(r => (
+            <option key={r.id} value={`${READING_PREFIX}${r.id}`}>{r.name}</option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  );
+};
 
 interface GlobalSettingsInspectorProps {
   settings: GlobalSettings;
@@ -394,6 +441,35 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
 
   // Get current theme name
   const currentThemeName = themes.find(t => t.id === selectedThemeId)?.name || 'Custom';
+
+  // A reading-friendly font is copied into the project when first chosen, so
+  // it plays in the Preview, exports and the player like any font added in
+  // Assets.
+  const { onAssetAdd } = useProjectAssets();
+  const chooseFont = async (field: 'titleFont' | 'textFont' | 'btnFont', value: string) => {
+    const def = value.startsWith(READING_PREFIX) ? READING_FONTS.find(r => `${READING_PREFIX}${r.id}` === value) : undefined;
+    if (!def) {
+      handleChange('fonts', field, value);
+      return;
+    }
+    try {
+      if (!onAssetAdd) throw new Error('This window cannot add files to the project.');
+      const file = await readingFontFile(def);
+      const added = await onAssetAdd({
+        id: `asset_${Date.now()}_${def.id}`,
+        name: file.name,
+        type: 'font',
+        url: URL.createObjectURL(file),
+        file,
+        size: file.size,
+        uploadedAt: new Date(),
+      });
+      if (!added) return;
+      handleChange('fonts', field, def.name);
+    } catch (err) {
+      notify.error(`${def.name} could not be added to the project.`, { detail: err instanceof Error ? err.message : String(err) });
+    }
+  };
 
   const handleChange = (category: keyof GlobalSettings, field: string | undefined, value: any) => {
     if (field === undefined) {
@@ -1558,28 +1634,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Title Font
                   </label>
-                  <select
-                    value={settings.fonts.titleFont}
-                    onChange={(e) => handleChange('fonts', 'titleFont', e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  >
-                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
-                    {settings.fonts.titleFont && !fonts.some(f => f.displayName === settings.fonts.titleFont) && (
-                      <optgroup label="Theme Font">
-                        <option value={settings.fonts.titleFont}>{settings.fonts.titleFont}</option>
-                      </optgroup>
-                    )}
-                    {fonts.filter(f => f.type === 'builtin').map(font => (
-                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                    ))}
-                    {fonts.filter(f => f.type === 'custom').length > 0 && (
-                      <optgroup label="Custom Fonts">
-                        {fonts.filter(f => f.type === 'custom').map(font => (
-                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  <FontSelect value={settings.fonts.titleFont} fonts={fonts} onChange={(v) => chooseFont('titleFont', v)} />
                 </div>
 
                 <div>
@@ -1600,28 +1655,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Text Font
                   </label>
-                  <select
-                    value={settings.fonts.textFont}
-                    onChange={(e) => handleChange('fonts', 'textFont', e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  >
-                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
-                    {settings.fonts.textFont && !fonts.some(f => f.displayName === settings.fonts.textFont) && (
-                      <optgroup label="Theme Font">
-                        <option value={settings.fonts.textFont}>{settings.fonts.textFont}</option>
-                      </optgroup>
-                    )}
-                    {fonts.filter(f => f.type === 'builtin').map(font => (
-                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                    ))}
-                    {fonts.filter(f => f.type === 'custom').length > 0 && (
-                      <optgroup label="Custom Fonts">
-                        {fonts.filter(f => f.type === 'custom').map(font => (
-                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  <FontSelect value={settings.fonts.textFont} fonts={fonts} onChange={(v) => chooseFont('textFont', v)} />
                 </div>
 
                 <div>
@@ -1642,28 +1676,7 @@ export const GlobalSettingsInspector: React.FC<GlobalSettingsInspectorProps> = (
                   <label className="block text-sm font-medium text-gray-600 mb-1">
                     Button Font
                   </label>
-                  <select
-                    value={settings.fonts.btnFont}
-                    onChange={(e) => handleChange('fonts', 'btnFont', e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  >
-                    {/* Theme font (from imported theme) - show first if it's a custom font not in the list */}
-                    {settings.fonts.btnFont && !fonts.some(f => f.displayName === settings.fonts.btnFont) && (
-                      <optgroup label="Theme Font">
-                        <option value={settings.fonts.btnFont}>{settings.fonts.btnFont}</option>
-                      </optgroup>
-                    )}
-                    {fonts.filter(f => f.type === 'builtin').map(font => (
-                      <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                    ))}
-                    {fonts.filter(f => f.type === 'custom').length > 0 && (
-                      <optgroup label="Custom Fonts">
-                        {fonts.filter(f => f.type === 'custom').map(font => (
-                          <option key={font.id} value={font.displayName}>{font.displayName}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  <FontSelect value={settings.fonts.btnFont} fonts={fonts} onChange={(v) => chooseFont('btnFont', v)} />
                 </div>
 
                 <div>

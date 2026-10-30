@@ -12,7 +12,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Lightbulb, Volume2, Mic, Search, RefreshCw, Plug, Lock, Moon } from 'lucide-react';
+import { X, Sparkles, Lightbulb, Volume2, Mic, Search, RefreshCw, Plug, Lock, Moon, Type } from 'lucide-react';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { getSavedSTTConfig } from '../../hooks/useSTT';
@@ -20,6 +20,7 @@ import { getSavedBraveApiKey } from '../ai/ideator/braveConfig';
 import { keyStorageNote } from '../../utils/keyStorageNote';
 import { useAIFeatures, setAIFeaturesEnabled, useBeatSuggestionsSetting, setBeatSuggestionsEnabled } from '../../utils/aiFeatures';
 import { useAppearance, setAppearance, type Appearance } from '../../utils/appearance';
+import { READING_FONTS, useReadingFont, setReadingFont, type ReadingFont } from '../../utils/readingFont';
 
 export interface AppPreferencesDialogProps {
   isOpen: boolean;
@@ -98,6 +99,20 @@ const AppearancePicker: React.FC<{ value: Appearance }> = ({ value }) => (
   </div>
 );
 
+const ReadingFontPicker: React.FC<{ value: ReadingFont }> = ({ value }) => (
+  <select
+    aria-label="Reading font"
+    value={value}
+    onChange={(e) => setReadingFont(e.target.value as ReadingFont)}
+    className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white text-gray-700 flex-shrink-0"
+  >
+    <option value="standard">Standard</option>
+    {READING_FONTS.map((f) => (
+      <option key={f.id} value={f.id}>{f.name}</option>
+    ))}
+  </select>
+);
+
 export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
   isOpen,
   onClose,
@@ -115,6 +130,8 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
   const aiOn = useAIFeatures();
   const suggestionsOn = useBeatSuggestionsSetting();
   const appearance = useAppearance();
+  const readingFont = useReadingFont();
+  const readingFontDef = READING_FONTS.find((f) => f.id === readingFont);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -189,6 +206,12 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
             title="Appearance"
             summary={appearance === 'system' ? 'Light or dark as the computer is set.' : appearance === 'dark' ? 'Dark. The story keeps its own colours.' : 'Light.'}
             action={<AppearancePicker value={appearance} />}
+          />
+          <Row
+            icon={<Type className="w-4 h-4" />}
+            title="Reading font"
+            summary={readingFontDef ? readingFontDef.about : 'Standard. A story’s font is in Project Settings.'}
+            action={<ReadingFontPicker value={readingFont} />}
           />
           <Row
             icon={<Sparkles className="w-4 h-4" />}
