@@ -2756,8 +2756,9 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                     meaningful in fixed/absolute mode; the responsive
                     flow doesn't run collision detection. A Dialog Tree's
                     choice buttons are a stack placed under the text, so
-                    there is nothing to lock: no checkbox for them. */}
-                {layoutMode === 'absolute' && !(dialogStackDrawn && selected.type === 'button' && /^choice_\d+$/.test(selected.id)) && (
+                    there is nothing to lock: no checkbox for them. Nothing
+                    on a Free Layout is ever moved, so none there either. */}
+                {layoutMode === 'absolute' && !freeLayout && !(dialogStackDrawn && selected.type === 'button' && /^choice_\d+$/.test(selected.id)) && (
                   <label className="flex items-center gap-2 text-xs text-gray-700">
                     <input
                       type="checkbox"
