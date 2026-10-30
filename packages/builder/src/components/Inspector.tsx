@@ -132,7 +132,8 @@ interface InspectorProps {
   /** Real story title for AI context (beat suggestions) */
   storyTitle?: string;
   beat: Beat | null;
-  onUpdate: (beatId: string, updates: Partial<Beat>) => void;
+  /** `before`: the beat as it was, when the panel has already written the edit onto it (for Undo). */
+  onUpdate: (beatId: string, updates: Partial<Beat>, before?: Record<string, any>) => void;
   onDelete: (beatId: string) => void;
   /** One sentence naming what a delete would break — appended to the confirm. */
   describeDeleteImpact?: (beatIds: string[]) => string | null;
@@ -192,6 +193,7 @@ import { usePersistedState } from '../utils/persistedState';
 import { changeableTypes, beatTypeLabel } from '../utils/changeBeatType';
 import { supportsBackgroundImage } from '../utils/visualBeatTypes';
 import { dialogChatMode, presentationModePatch, DIALOG_CHAT_RESPONSE_DELAY } from '../utils/dialogPresentation';
+import { beatSnapshot } from '../utils/beatSnapshot';
 
 const MIN_INSPECTOR_WIDTH = 280;
 const MULTI_CHOICE_OWNED_FIELDS = {
@@ -1551,6 +1553,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!beat || !onUpdate) return;
 
     const beatToUpdate = updatedLocalBeat || localBeat;
+    // The edit is written onto the beat below: keep how it was, for Undo.
+    const before = beatSnapshot(beat);
 
     // When a translation language is active, localBeat.parameters contains
     // translated text overlays. We must restore source text before updating
@@ -1671,11 +1675,11 @@ export const Inspector: React.FC<InspectorProps> = ({
     // beat.connections (Object.assign in the store would persist them).
     if (parameterDerivedTypes.has(beat.type)) {
       const { connections: _ignored, ...beatWithoutConnections } = beat as any;
-      onUpdate(beat.id, beatWithoutConnections);
+      onUpdate(beat.id, beatWithoutConnections, before);
     } else {
       // Links derived from parameters (derivedFrom) are shown, not stored.
       const updatedConnections = (beat.getConnections ? beat.getConnections() : []).filter((c: any) => !c.derivedFrom);
-      onUpdate(beat.id, { ...beat, connections: updatedConnections });
+      onUpdate(beat.id, { ...beat, connections: updatedConnections }, before);
     }
 
     // Reset hasChanges since we just saved
@@ -1690,6 +1694,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
     
     if (beat) {
+      // The edit is written onto the beat below: keep how it was, for Undo.
+      const before = beatSnapshot(beat);
       beat.name = localBeat.name;
       beat.cluster = localBeat.cluster;
       beat.defaultTarget = localBeat.defaultTarget || undefined;
@@ -1773,11 +1779,11 @@ export const Inspector: React.FC<InspectorProps> = ({
       // beat.connections (Object.assign in the store would persist them).
       if (parameterDerivedTypes.has(beat.type)) {
         const { connections: _ignored, ...beatWithoutConnections } = beat as any;
-        onUpdate(beat.id, beatWithoutConnections);
+        onUpdate(beat.id, beatWithoutConnections, before);
       } else {
         // Links derived from parameters (derivedFrom) are shown, not stored.
         const updatedConnections = (beat.getConnections ? beat.getConnections() : []).filter((c: any) => !c.derivedFrom);
-        onUpdate(beat.id, { ...beat, connections: updatedConnections });
+        onUpdate(beat.id, { ...beat, connections: updatedConnections }, before);
       }
       setHasChanges(false);
       setValidationErrors([]);

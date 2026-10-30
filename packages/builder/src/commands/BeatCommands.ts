@@ -239,8 +239,10 @@ export class UpdateBeatCommand extends Command {
       return;
     }
 
-    // Merge the new values
+    // Merge the new values; a key the first edit didn't touch keeps the
+    // second edit's "before", so undoing the pair restores it too.
     this.newValues = { ...this.newValues, ...command.newValues };
+    this.oldValues = { ...command.oldValues, ...this.oldValues };
 
     // Update description
     const changedKeys = Object.keys(this.newValues).join(', ');

@@ -303,12 +303,15 @@ export function useStoryBuilder() {
           }
 
           // Update beat properties while maintaining the Beat instance
+          // (never its _version: an undo restoring an old one would hide the change)
+          const version = (beat as any)._version || 0;
+          delete (updates as any)._version;
           Object.assign(beat, updates);
 
           // Increment _version to signal to React that the beat has changed
           // This is necessary because Object.assign mutates in place, keeping the same reference
           // Components using beat in their key (e.g., VisualWorkspace) will detect this change
-          (beat as any)._version = ((beat as any)._version || 0) + 1;
+          (beat as any)._version = version + 1;
 
           return beat;
         }

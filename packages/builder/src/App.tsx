@@ -131,6 +131,7 @@ import { resolveExportSpeech } from './utils/exportSpeech';
 import { machineStorage } from './utils/machineStorage';
 import { useAIFeatures } from './utils/aiFeatures';
 import { usePersistedState } from './utils/persistedState';
+import { beatSnapshot, mapsAsEntries } from './utils/beatSnapshot';
 
 // Type declaration for Electron API exposed by preload
 declare global {
@@ -3075,9 +3076,25 @@ function App() {
     setSelectedCluster(cluster);
   }, []);
 
-  const handleBeatUpdate = useCallback((beatId: string, updates: Partial<Beat>) => {
+  const handleBeatUpdate = useCallback((beatId: string, updates: Partial<Beat>, before?: Record<string, any>) => {
     const currentBeat = state.beats.find(b => b.id === beatId);
     if (!currentBeat) return;
+
+    // The Properties panel writes its edit onto the beat first and sends how
+    // the beat was: undo restores that (fields + parameters), redo the beat
+    // as it is now. Snapshotting the already-edited beat made Undo a no-op.
+    if (before) {
+      const { _version: _v, ...after } = beatSnapshot(currentBeat);
+      void _v;
+      const same = (a: any, b: any) => JSON.stringify(a, mapsAsEntries) === JSON.stringify(b, mapsAsEntries);
+      const changed = Object.keys(after).filter(k => !same(after[k], before[k]));
+      if (changed.length === 0) return;
+      const pick = (from: Record<string, any>) => Object.fromEntries([...changed, 'parameters'].filter(k => k in from).map(k => [k, from[k]]));
+      getCommandManager().execute(new UpdateBeatCommand(beatId, pick(before), pick(after), stableMutations.current));
+      if (selectedBeat?.id === beatId) setSelectedBeat(currentBeat);
+      markChanged();
+      return;
+    }
 
     // Snapshot current values for the fields being updated (for undo)
     // structuredClone preserves Map, Set, Date etc. unlike JSON.parse(JSON.stringify())
