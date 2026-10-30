@@ -442,11 +442,15 @@ function checkForUpdatesManually(): void {
   }
 
   autoUpdater.checkForUpdates().then((result) => {
-    if (!result || !result.updateInfo) {
+    // A newer version shows its own dialog (`update-available`). The result
+    // always carries the latest release's info, newer or not, so ask
+    // isUpdateAvailable — testing updateInfo meant this never showed.
+    if (!result?.isUpdateAvailable) {
       dialog.showMessageBox(mainWindow!, {
         type: 'info',
         title: 'No Updates',
         message: 'You are already running the latest version.',
+        detail: `ASAPS Builder ${app.getVersion()}`,
       });
     }
   }).catch((err) => {
