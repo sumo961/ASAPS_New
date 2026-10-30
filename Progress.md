@@ -1,5 +1,17 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.148, 2026-10-30)
+
+### Overview
+Work after v0.9.148: the speaker picker follows light and dark.
+
+### Fixes
+- **The speaker picker is light in light mode.** The Speaker field (Properties panel, Dialog Tree editor, inventory and AI-character fields — `CharacterRefField`) was drawn with fixed dark colours from the start, a dark box in the light panels around it. Its colours are now CSS variables on the field: a light set normally, the old dark set in dark mode (`useIsDark`). Checked headless on RED: the field and its dropdown are light.
+
+**Files modified:** packages/builder/src/components/characters/CharacterRefField.tsx
+
+---
+
 ## 2026-10-30: The items and dark-mode release (v0.9.148)
 
 ### Overview

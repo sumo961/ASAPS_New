@@ -26,6 +26,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Character } from '../../types/character';
+import { useIsDark } from '../../utils/appearance';
 
 export interface CharacterRefFieldValue {
   /** Canonical Character.id when linked. */
@@ -214,9 +215,10 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
 
   const isLinked = !!linkedCharacter;
   const isDanglingRef = !!value.characterRef && !linkedCharacter;
+  const dark = useIsDark();
 
   return (
-    <div ref={wrapperRef} style={wrapperStyle} data-testid={testId}>
+    <div ref={wrapperRef} style={{ ...wrapperStyle, ...(dark ? DARK : LIGHT) }} data-testid={testId}>
       <div style={{ ...inputRowStyle, opacity: disabled ? 0.5 : 1 }}>
         {isLinked && !isEditing && (
           <span style={{ ...chipStyle, backgroundColor: linkedCharacter.color || '#334155' }}>
@@ -332,12 +334,25 @@ export const CharacterRefField: React.FC<CharacterRefFieldProps> = ({
 // Styles (match the inline-style convention used elsewhere in components/vcs)
 // ============================================================================
 
+// The field sits in light panels (Properties, Dialog Tree editor) and follows
+// App Preferences ▸ Appearance; it was drawn dark everywhere before.
+const LIGHT = {
+  '--crf-field': '#ffffff', '--crf-border': '#d1d5db', '--crf-text': '#111827',
+  '--crf-menu': '#ffffff', '--crf-menu-border': '#e5e7eb', '--crf-shadow': 'rgba(0,0,0,0.12)',
+  '--crf-muted': '#6b7280', '--crf-badge': '#f3f4f6', '--crf-link': '#2563eb',
+} as React.CSSProperties;
+const DARK = {
+  '--crf-field': '#0f172a', '--crf-border': '#334155', '--crf-text': '#e2e8f0',
+  '--crf-menu': '#1e293b', '--crf-menu-border': '#334155', '--crf-shadow': 'rgba(0,0,0,0.4)',
+  '--crf-muted': '#64748b', '--crf-badge': '#0f172a', '--crf-link': '#60a5fa',
+} as React.CSSProperties;
+
 const wrapperStyle: React.CSSProperties = { position: 'relative', width: '100%' };
 const inputRowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6,
   padding: '4px 6px',
-  background: '#0f172a',
-  border: '1px solid #334155',
+  background: 'var(--crf-field)',
+  border: '1px solid var(--crf-border)',
   borderRadius: 4,
   minHeight: 30,
   boxSizing: 'border-box',
@@ -347,7 +362,7 @@ const inputStyle: React.CSSProperties = {
   background: 'transparent',
   border: 'none',
   outline: 'none',
-  color: '#e2e8f0',
+  color: 'var(--crf-text)',
   fontSize: 13,
   padding: '2px 0',
 };
@@ -382,10 +397,10 @@ const dropdownStyle: React.CSSProperties = {
   position: 'absolute',
   top: 'calc(100% + 4px)',
   left: 0, right: 0,
-  background: '#1e293b',
-  border: '1px solid #334155',
+  background: 'var(--crf-menu)',
+  border: '1px solid var(--crf-menu-border)',
   borderRadius: 6,
-  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+  boxShadow: '0 8px 24px var(--crf-shadow)',
   zIndex: 1000,
   maxHeight: 320,
   overflowY: 'auto',
@@ -395,7 +410,7 @@ const sectionHeaderStyle: React.CSSProperties = {
   fontSize: 10,
   textTransform: 'uppercase',
   letterSpacing: 0.5,
-  color: '#64748b',
+  color: 'var(--crf-muted)',
   padding: '6px 12px 2px',
   fontWeight: 600,
 };
@@ -407,33 +422,33 @@ const optionStyle: React.CSSProperties = {
   padding: '6px 12px',
   background: 'transparent',
   border: 'none',
-  color: '#e2e8f0',
+  color: 'var(--crf-text)',
   cursor: 'pointer',
   fontSize: 13,
   textAlign: 'left',
 };
-const subtleStyle: React.CSSProperties = { color: '#64748b', fontSize: 11 };
+const subtleStyle: React.CSSProperties = { color: 'var(--crf-muted)', fontSize: 11 };
 const countBadgeStyle: React.CSSProperties = {
   fontSize: 10,
-  color: '#94a3b8',
-  background: '#0f172a',
+  color: 'var(--crf-muted)',
+  background: 'var(--crf-badge)',
   padding: '1px 6px',
   borderRadius: 8,
 };
 const emptyHintStyle: React.CSSProperties = {
   padding: '6px 12px',
   fontSize: 12,
-  color: '#64748b',
+  color: 'var(--crf-muted)',
   fontStyle: 'italic',
 };
 const dividerStyle: React.CSSProperties = {
   height: 1,
-  background: '#334155',
+  background: 'var(--crf-menu-border)',
   margin: '4px 0',
 };
 const defineLinkStyle: React.CSSProperties = {
   ...optionStyle,
-  color: '#60a5fa',
+  color: 'var(--crf-link)',
   fontSize: 12,
 };
 const pinnedIconStyle: React.CSSProperties = { color: '#fbbf24', width: 14, textAlign: 'center' };
