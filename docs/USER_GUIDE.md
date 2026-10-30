@@ -19,7 +19,7 @@ As the creators of Tale of Tales put it:
 Think of this guide as your companion in learning to think like a system builder. We'll start with the basics and work our way up to advanced techniques. No prior experience required—just bring your imagination and a willingness to think differently about narrative.
 
 **What's Inside:**
-- [Part 1: Getting Started](#part-1-getting-started) - The paradigm shift and first steps
+- [Part 1: Getting Started](#part-1-getting-started) - Installing, a 15-minute tutorial, and [Common Hiccups](#common-hiccups)
 - [Part 2: The Interface](#part-2-the-interface) - Your creative workspace explained
 - [Part 3: Understanding Beats](#part-3-understanding-beats) - The building blocks of your system
 - [Part 4: Characters & Assets](#part-4-characters--assets) - Bringing your world to life
@@ -37,6 +37,32 @@ Think of this guide as your companion in learning to think like a system builder
 ---
 
 # Part 1: Getting Started
+
+<a id="installing"></a>
+## Installing ASAPS
+
+ASAPS is a desktop app for macOS, Windows and Linux. It's free, and installing it takes a couple of minutes.
+
+**1. Download it.** Go to the [latest release on GitHub](https://github.com/sumo961/ASAPS_New/releases/latest) and, under **Assets**, pick the file for your computer:
+
+| Your computer | Download | Then |
+|---|---|---|
+| **Mac** (Intel or Apple Silicon) | `ASAPS-Builder-<version>-universal.dmg` | Open it and drag **ASAPS Builder** into **Applications**. Start it from there. |
+| **Windows** (64-bit) | `ASAPS-Builder-Setup-<version>.exe` | Run it and follow the steps; you can choose where it goes. |
+| **Linux** (64-bit, beta) | `ASAPS-Builder-<version>-amd64.deb` or `…-x86_64.AppImage` | On Ubuntu or Debian: `sudo apt install ./ASAPS-Builder-<version>-amd64.deb`. Elsewhere, make the AppImage executable and start it (on Ubuntu 24.04 and later, start it with `--no-sandbox`, or use the .deb). |
+
+**2. Start it the first time.** On a Mac it opens like any other app. On Windows, the installer isn't signed by a known publisher yet, so Windows may show *"Windows protected your PC"*: click **More info**, then **Run anyway**. You only see this once.
+
+**3. Pick where to start.** ASAPS opens with the project browser: an **Empty project**, one of the **templates** (finished little stories you can take apart), or a file someone sent you. If this is your first time, follow [Your First 15 Minutes](#first-15-minutes) below.
+
+**4. Set up what you need — all of it optional.** Everything lives in **Tools → App Preferences…**:
+
+- **Light or dark** — see [Light or dark](#dark-mode).
+- **AI** — ASAPS works fully without AI. If you want the AI tools, add a provider and key ([Setting Up AI](#setting-up-ai)); if you never will, switch **Show AI features** off and the AI buttons go away ([Working without AI](#working-without-ai)).
+- **Voices and speech input** — only needed if your story reads text aloud or listens to the player ([Text-to-Speech](#text-to-speech-tts)).
+
+**Updates:** when a new version is out, ASAPS tells you as it starts and offers to download it; it's installed when you restart (or the next time you quit). **Help → Check for Updates…** checks right away. Your projects stay where they are. (On Linux, only the AppImage updates itself; with the .deb, install the new .deb.)
+
 
 ## What is ASAPS Modern?
 
@@ -67,34 +93,131 @@ This means:
 ![Main Interface](images/01-main-interface.png)
 *The ASAPS Modern interface: your system-building workspace*
 
-## Your First 5 Minutes
+<a id="first-15-minutes"></a>
+## Your First 15 Minutes: A Small Story
 
-Let's get you building right away. When you launch ASAPS Modern for the very first time, you'll see a starter system with three connected beats:
+The quickest way to learn ASAPS is to build something small from start to finish. In this tutorial you'll make **The Lighthouse**: a short story with a title, an opening, one decision and two endings. You'll use the four things you do all the time — add a beat, write in it, link it, and play it.
 
 ```
-[Title Screen] → [Introduction] → [The End]
-      ↑_______________________________|  (Restart)
+[Title Screen] → [Introduction] → [At the door] ─ Climb the stairs → [The lamp room] → [The End]
+                                                └ Walk away ───────→ [Back in the village]
 ```
 
-The End Screen's **Play Again** button already leads back to the title screen, so the starter plays through and round again from the first minute.
+### Step 1: Start a new project (2 minutes)
 
-This is the skeleton of a simple linear experience. Your job? Transform it into something with possibilities.
+Click **New** in the toolbar (or, in the project browser, **Empty project**). Name it *The Lighthouse*, leave **Responsive** selected and click **Create Project**.
 
-### Quick Exercise: Your First Edit
+Your project starts with three beats already linked: **Title Screen → Introduction → The End**. The End's **Play Again** button leads back to the title, so the starter already plays from beginning to end.
 
-1. **Click the "Introduction" beat** in the flowchart (the center area)
-2. **Look right** - the Inspector panel shows the beat's properties
-3. **Find the "Text" field** and replace the placeholder with:
-   ```
-   You wake up in a room you don't recognize.
-   The walls are covered in old photographs.
-   None of the faces are familiar.
+### Step 2: Give it a title (1 minute)
 
-   What do you do?
-   ```
-4. **Click "Preview"** (top right) to see your change
+Click **Title Screen** in the flowchart. The **Properties** panel on the right shows its settings. Set:
 
-You just edited your first beat. That's the core workflow: select something, change its properties, preview the result. But notice—right now this is still a linear experience. The real magic happens when you add **choices** and **branches**.
+- **Title**: *The Lighthouse*
+- **Author**: your name
+- **Button Text**: *Begin*
+
+ASAPS saves your work on its own every half minute, and whenever you click **Save**. Until then, an **Unsaved** badge sits next to the project's name.
+
+### Step 3: Write the opening (2 minutes)
+
+Click **Introduction** and replace its **Text** with:
+
+```
+The storm has passed. The lighthouse on the rocks is dark,
+and the keeper hasn't been seen in the village for three days.
+You have walked out along the causeway to find out why.
+```
+
+### Step 4: Add a decision (3 minutes)
+
+On the right of the flowchart is the **Beat Types** palette. Drag **Multi Choice** from it onto an empty spot of the flowchart, just below Introduction, and let go. The new beat is selected; in its Properties:
+
+- Change **Name** to *At the door*.
+- Change **Question** to *The door is open. What do you do?*
+- Under **Choices**, click **+ Add** twice and write *Climb the stairs* and *Walk back to the village*.
+
+A red box now says *Choice 1 needs a target*. That's a to-do list, not an error: the choices don't lead anywhere yet. You'll fix that in Step 6.
+
+### Step 5: Add the two outcomes (2 minutes)
+
+Drag two more beats from the palette:
+
+- An **Info Text**. Name it *The lamp room* and give it a text, for example *At the top, the keeper is asleep beside the cold lamp. You light it. Far out at sea, a ship turns towards the harbour.*
+- An **End Screen**. Name it *Back in the village* and set its **Message** to *You never learn what happened at the lighthouse.* Set **Restart leads to** to *Title Screen*, so **Play Again** starts the story over.
+
+### Step 6: Link everything (3 minutes)
+
+Every beat has a small dot on its right edge. Press on it, drag, and let go on the beat that should come next:
+
+1. From **Introduction** onto **At the door**. (This replaces its old link to The End.)
+2. From **At the door** onto **The lamp room**. A Multi Choice has several ways on, so a small menu asks which one: pick **Climb the stairs**.
+3. From **At the door** onto **Back in the village**, and pick **Walk back to the village**.
+4. From **The lamp room** onto **The End**.
+
+The red box is gone. (Prefer menus? Each choice's **Select target beat…** picker does the same; type a few letters to find a beat. More in [Drawing a link](#drawing-links).)
+
+Want to check a link from the other side? Click a beat: **Reached from** at the top of Properties lists every beat that leads to it.
+
+### Step 7: Play it (2 minutes)
+
+Click **Preview** (top right). A window opens with your story; click **Start Preview**. Read, click **Begin**, make the decision, reach an ending, and click **Play Again** to try the other way. Edit something while the Preview is open and **Restart** it to see the change.
+
+### Step 8: Read it through and share it (1 minute)
+
+- Click the **Script** tab above the flowchart: the whole story on one page, in reading order, and you can edit the words right there.
+- To let someone play it, use **Export → Web page (HTML)…**: one file that opens in any browser, nothing to install.
+- To keep a backup, or give the project to someone who has ASAPS, use **Export → Project file (.asaps)**.
+
+**That's the whole loop:** add, write, link, play. Everything else in this guide adds to one of those four. Good next steps:
+
+- [Conditions and effects](#conditional-choices) — choices that remember what the player did.
+- [Characters](#characters) — speakers, portraits, moods and inventories.
+- [The Visual Editor](#part-5-visual-design) — backgrounds, pictures and layout.
+- The **templates** in the project browser — small finished stories to take apart.
+
+<a id="common-hiccups"></a>
+## Common Hiccups
+
+Something not doing what you expected? These are the questions people ask most in their first weeks.
+
+**I clicked a choice in the Preview and nothing happened.**
+The choice doesn't lead anywhere yet. The Preview shows an amber notice naming it. Link it in the flowchart or pick its target in Properties. See [A choice that isn't linked yet](#unlinked-choices).
+
+**There's a red "Please fix the following" box in Properties.**
+It lists what the beat still needs, such as a choice without a target. Your story still plays; the box goes away once the list is done.
+
+**I added a beat but the story never gets there.**
+A beat is only reached through a link. Click it: if **Reached from** says *no links yet*, nothing leads to it. Draw a link to it from the beat before.
+
+**My new beat vanished from the flowchart.**
+It's probably just off-screen. Click it in the **Story Beats** list on the left to select it, or use the **fit view** button (the square) in the flowchart's bottom-left corner to see everything.
+
+**I can't find the beat type I need.**
+The palette shows the ten most-used beats first. Click **All beat types (36)** under them for the rest. AI beat types only appear while **Show AI features** is on in App Preferences.
+
+**Did my work get saved?**
+If the toolbar says **Saved**, yes. ASAPS saves on its own every half minute and when you click **Save**. Still, keep a backup now and then: **Export → Project file (.asaps)**. In the browser version, projects live in the browser's storage, which the browser can clear, so a backup matters even more there.
+
+**I undid something by mistake.**
+**Redo** (⌘/Ctrl+Shift+Z, or the arrow next to Undo) brings it back. Deleted a beat? **Tools → Recently deleted beats…** keeps them too.
+
+**The "AI Not Configured" box takes up room.**
+Either set up a provider ([Setting Up AI](#setting-up-ai)) or switch off **Show AI features** (or just **Beat suggestions**) in **Tools → App Preferences…**.
+
+**The AI works at home but not on a work or school computer.**
+Many organisations filter internet traffic, and some block AI services. ASAPS then can't reach the provider. Ask your IT department, or use a local model ([Setting Up AI](#setting-up-ai)).
+
+**Windows says "Windows protected your PC" when I install.**
+Click **More info**, then **Run anyway**. See [Installing ASAPS](#installing).
+
+**A sound or video doesn't play.**
+See the [FAQ](#appendix-d-faq) entry on audio and video formats.
+
+**Version control (Git) is acting up.**
+Push rejected, merge conflicts, missing assets after a clone: see [Common Hiccups & How to Fix Them](#common-hiccups--how-to-fix-them) in Part 9.
+
+Still stuck? The [FAQ](#appendix-d-faq) has more, and **Help → Report a Bug…** sends us the details.
 
 <a id="project-organization"></a>
 ## Finding Your Way Around Your Projects
@@ -4791,6 +4914,8 @@ Quick reference for all beat types.
 
 # Appendix D: FAQ
 
+*Just getting started? [Common Hiccups](#common-hiccups) in Part 1 covers the questions people ask most in their first weeks.*
+
 ### How do I undo a mistake?
 Press Ctrl/Cmd+Z or click the Undo button in the header. ASAPS Modern maintains full undo history.
 
@@ -4804,10 +4929,10 @@ Only if you have the rights! Use royalty-free assets or create your own. Several
 Check file format compatibility. MP3 and MP4 have the broadest support. Also verify the asset is properly linked.
 
 ### How do I back up my work?
-Export regularly as ASAPS Project (.zip). These files contain everything needed to restore your project.
+Use **Export → Project file (.asaps)** now and then. The file holds everything: beats, characters, assets and settings. Open it with **Open → Open Project File…** to get the project back. (Desktop projects also live as folders on disk, and [version control](#part-9-version-control--collaboration) keeps a full history.)
 
 ### Can I import from Twine?
-Yes! Use Import → Import Twine (HTML). SugarCube format is supported, though complex macros may need manual adjustment.
+Yes! Use **Open → Twine (HTML)**. SugarCube format is supported, though complex macros may need manual adjustment.
 
 ### I clicked a choice in the Preview and nothing happened. Is it broken?
 Most likely that choice isn't linked to a beat yet. The Preview shows an amber notice naming it; pick where it leads in the beat's Properties panel, or [draw the link in the flowchart](#drawing-links). The other choices keep working in the meantime — see [A choice that isn't linked yet](#unlinked-choices).

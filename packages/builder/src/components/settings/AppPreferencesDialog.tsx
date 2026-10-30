@@ -238,7 +238,7 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
             <Row
               icon={<RefreshCw className="w-4 h-4" />}
               title="Check for updates automatically"
-              summary="New versions download in the background and install when you quit."
+              summary="When a new version is out, ASAPS offers it as it starts; it installs when you restart or quit."
               action={<Toggle checked={autoUpdate} onChange={setUpdates} label="Check for updates automatically" />}
             />
           )}
