@@ -2145,8 +2145,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                 )}
 
                 {/* Free Layout: where each button leads. The buttons themselves
-                    are made, placed and worded in the Visual Editor; a button
-                    whose element was deleted is kept (for Undo) but not listed. */}
+                    are made, placed, worded and given their click sound in the
+                    Visual Editor; a button whose element was deleted is kept
+                    (for Undo) but not listed. */}
                 {beat.type === 'freeLayout' && (() => {
                   const onStage = new Set(Array.from(beat.locations?.values() || []).map((l: any) => l.name));
                   const buttons = ((localBeat.parameters?.choices || []) as any[])
@@ -2195,16 +2196,6 @@ export const Inspector: React.FC<InspectorProps> = ({
                               emotionPalette={emotionPalette}
                               compact
                             />
-                            <div className="mt-2 pt-2 border-t border-blue-200">
-                              <div className="text-xs font-medium text-blue-700 mb-1">Sound Effect (Optional)</div>
-                              <input
-                                type="text"
-                                value={choice.soundEffect || ''}
-                                onChange={(e) => handleUpdateChoice(index, 'soundEffect', e.target.value)}
-                                placeholder="Sound file (e.g., click.mp3)"
-                                className="w-full px-2 py-1 text-xs border rounded"
-                              />
-                            </div>
                           </div>
                         </div>
                       ))}

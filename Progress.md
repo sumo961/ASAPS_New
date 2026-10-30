@@ -1,5 +1,19 @@
 # ASAPS Modern - Progress Log
 
+## Unreleased (since v0.9.147, 2026-10-30)
+
+### Overview
+Work after v0.9.147: a Free Layout button's sound now lives in one place, the Visual Editor's Click Sound, and a clickable picture keeps its link when it is unticked and ticked again.
+
+### Free Layout
+- **One sound per button, set in the Visual Editor.** A Free Layout button had two sound fields: *Click Sound* in the Visual Editor (with presets, the project's sounds and a preview) and a typed *Sound Effect* in Properties ▸ Buttons; with both set, a click played both. A clickable picture or character had only the typed one. Now **Click Sound** shows for a picture or character once *Clickable — works as a button* is ticked (text buttons had it already), and Properties ▸ Buttons keeps only where a button leads, its conditions and effects. A Sound Effect saved with v0.9.147 moves onto its element when the story loads (if the element has no Click Sound of its own) and is played only for an element without one, so nothing plays twice. Change type carries a choice's Sound Effect to the new button's Click Sound and back. Multi Choice is unchanged: its buttons aren't placed elements, so the sound stays on the choice. Checked headless on the RED copy: the Click Sound field hides when Clickable is unticked and comes back with the sound chosen; a real click on the picture plays Soft Click, then stops the auto-advance timer and leads to At the Mall.
+- **Unticking Clickable no longer loses the picture's link.** Unticking removed the picture's button with its link, conditions and effects, and ticking it again made a new, unlinked one. The button is now parked (`parkedButtons`, outside the story's links) and comes back as it was.
+- The User Guide's Free Layout section (Properties ▸ Buttons, Sound Effect) gets updated with the release.
+
+**Files modified:** packages/builder/src/components/visual/VisualPropertiesPanel.tsx, components/Inspector.tsx, utils/freeLayoutElements.ts, utils/changeBeatType.ts, packages/core/src/beats/FreeLayoutBeat.ts, generated/beat-types.ts, beat-definitions/core-beats.json, packages/builder/public/player-web.js (rebuilt); tests (core FreeLayoutBeat, builder freeLayoutElements (new), changeBeatType)
+
+---
+
 ## 2026-10-30: The Free Layout release (v0.9.147)
 
 ### Overview

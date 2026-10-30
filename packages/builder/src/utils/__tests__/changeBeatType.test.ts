@@ -94,6 +94,16 @@ describe('changeBeatType', () => {
     expect(losses).toEqual(['its Speaker (Free Layout has no such setting)']);
   });
 
+  it('a choice\'s sound becomes its button\'s Click Sound, and back', () => {
+    const before = make('multiChoice', { parameters: { question: 'Now?', choices: [{ id: 'a', text: 'Run', target: 'x', soundEffect: 'preset:soft-click' }] } });
+    const { beat } = changeBeatType(before, 'freeLayout');
+    const button = [...beat.locations.values()].find((l: any) => l.kind === 'button') as any;
+    expect(button.sound).toBe('preset:soft-click');
+    expect(beat.getParameters().choices[0].soundEffect).toBeUndefined();
+    const back = changeBeatType(beat, 'multiChoice').beat;
+    expect(back.getParameters().choices[0].soundEffect).toBe('preset:soft-click');
+  });
+
   it('Info Text → Free Layout: its link is a button with its button text', () => {
     const { beat, losses } = changeBeatType(make('infoText', { parameters: { text: 'Rain.', buttonText: 'Go inside' }, connections: [{ targetId: 'next', label: '' }] }), 'freeLayout');
     expect(beat.getParameters().choices).toMatchObject([{ text: 'Go inside', target: 'next', locationName: 'Button' }]);

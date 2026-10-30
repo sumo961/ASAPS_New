@@ -3,7 +3,7 @@
  * DO NOT EDIT MANUALLY - Run 'npm run generate:types' to regenerate
  * 
  * Schema Version: 2.17.0
- * Generated: 2026-10-30T01:30:08.304Z
+ * Generated: 2026-10-30T02:46:40.141Z
  */
 
 // ============================================
@@ -373,6 +373,8 @@ export interface FreeLayoutParameters {
   texts?: FreeLayoutText[] | undefined;
   /** The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions. */
   choices?: FreeLayoutButton[] | undefined;
+  /** Buttons of pictures or characters that were made clickable and then unticked: kept with their link, conditions and effects for when they are clickable again. Not part of the story's links. */
+  parkedButtons?: FreeLayoutButton[] | undefined;
   /** Where a click anywhere leads — used only while the beat has no buttons and no auto-advance timer. */
   nextTarget?: string | undefined;
   /** Dim buttons the player already picked and stop them being picked again. */

@@ -132,6 +132,11 @@ describe('FreeLayoutBeat', () => {
     const copy = new FreeLayoutBeat(beat.toJSON());
     expect(copy.getParameters()).toMatchObject({ texts: [{ locationName: 'Sign', text: 'Hi' }], choices: [{ id: 'b1', target: 'x' }], markVisited: true });
     expect([copy.defaultTarget, copy.defaultTargetDelay]).toEqual(['later', 5]);
+    // A picture's button kept while it isn't clickable survives too, outside the links.
+    const parked = make({ parkedButtons: [{ id: 'p', locationName: 'Lamp', text: '', target: 'cellar' }] }, stage);
+    const parkedCopy = new FreeLayoutBeat(parked.toJSON());
+    expect(parkedCopy.getParameters().parkedButtons).toMatchObject([{ id: 'p', target: 'cellar' }]);
+    expect(beatLinks(parkedCopy.toJSON()).map((l) => l.target)).not.toContain('cellar');
     expect([...copy.locations.keys()]).toEqual(['Sign', 'Door', 'Lamp']);
   });
 
@@ -140,6 +145,26 @@ describe('FreeLayoutBeat', () => {
     beat.updateParameters({ ...beat.getParameters(), nextTarget: undefined });
     expect(beat.getParameters()).toMatchObject({ nextTarget: undefined });
     expect(beat.getConnections()).toEqual([]);
+  });
+
+  it('a button\'s sound is its element\'s click sound; an old Sound Effect moves onto the element', async () => {
+    const elements = () => [
+      { name: 'Door', kind: 'button', x: 0, y: 0, width: 100, height: 40 },
+      { name: 'Lamp', kind: 'prop', x: 0, y: 50, width: 40, height: 40, sound: 'preset:soft-click' },
+    ];
+    const beat = make({ choices: [
+      { id: 'd', locationName: 'Door', text: 'Leave', target: 'x', soundEffect: 'door.mp3' },
+      { id: 'l', locationName: 'Lamp', text: '', target: 'y', soundEffect: 'lamp.mp3' },
+      { id: 'g', locationName: 'Gone', text: 'Old', target: 'z', soundEffect: 'old.mp3' },
+    ] }, elements());
+    const loc = (name: string) => [...beat.locations.values()].find((l: any) => l.name === name) as any;
+    expect(loc('Door').sound).toBe('door.mp3');
+    expect(loc('Lamp').sound).toBe('preset:soft-click');
+    expect(beat.choices.map((c) => c.soundEffect)).toEqual([undefined, undefined, 'old.mp3']);
+    // The renderer plays the element's sound on click; the beat adds nothing.
+    const { r } = renderer('d');
+    await beat.execute(new StoryContext(), r);
+    expect(r.playSound).not.toHaveBeenCalled();
   });
 
   it('a renderer without renderFreeLayout shows the buttons as choices', async () => {

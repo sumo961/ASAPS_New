@@ -75,11 +75,14 @@ function read(beat: any, json: any): Content {
   if (family === 'free') {
     // What is on its stage: text boxes by name, buttons with their words —
     // a clickable picture by its name. Entries kept for Undo are not.
-    const kindOf = new Map((Array.isArray(json.locations) ? json.locations : []).map((l: any) => [l?.name, l?.kind]));
+    const stage: any[] = Array.isArray(json.locations) ? json.locations : [];
+    const kindOf = new Map(stage.map((l: any) => [l?.name, l?.kind]));
+    // A button's click sound is its element's.
+    const soundOf = new Map(stage.map((l: any) => [l?.name, l?.soundAssetId || l?.sound]));
     const texts = (Array.isArray(p.texts) ? p.texts : []).filter((t: any) => t && kindOf.get(t.locationName) === 'text');
     const options: Option[] = (Array.isArray(p.choices) ? p.choices : []).filter((c: any) => c && kindOf.has(c.locationName)).map((c: any) => ({
       id: c.id, text: c.displayText || c.text || c.locationName || '',
-      target: c.target, effects: c.effects, conditions: c.conditions, soundEffect: c.soundEffect,
+      target: c.target, effects: c.effects, conditions: c.conditions, soundEffect: soundOf.get(c.locationName) || c.soundEffect,
     }));
     const words = texts.map((t: any) => t.displayText || t.text || '');
     return { text: words[0] || '', link: options.length ? undefined : p.nextTarget, options, speaker: beat.speaker, nested: [], moreTexts: words.slice(1).filter(Boolean) };
@@ -110,8 +113,10 @@ function write(type: string, c: Content, base: Record<string, any>, stage: Stage
     parameters.texts = [{ locationName: textName, elementId: locations[0].id, text: c.text }];
     parameters.choices = options.map((o, i) => ({
       id: o.id || `choice_${i + 1}`, locationName: buttonNames[i], elementId: locations[i + 1].id, text: o.text, target: o.target || '',
-      ...(o.effects ? { effects: o.effects } : {}), ...(o.conditions ? { conditions: o.conditions } : {}), ...(o.soundEffect ? { soundEffect: o.soundEffect } : {}),
+      ...(o.effects ? { effects: o.effects } : {}), ...(o.conditions ? { conditions: o.conditions } : {}),
     }));
+    // A choice's sound becomes its button's Click Sound.
+    options.forEach((o, i) => { if (o.soundEffect) (locations[i + 1] as any).sound = o.soundEffect; });
     return { parameters, connections, losses, locations };
   }
 

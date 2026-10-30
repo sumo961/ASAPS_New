@@ -49,13 +49,27 @@ export function isClickable(params: Params, el: ElementLike): boolean {
   return (el.type === 'prop' || el.type === 'character') && !!findEntry(params.choices || [], el);
 }
 
-/** The parameters with a picture or character made a button, or a plain picture again. */
+/**
+ * The parameters with a picture or character made a button, or a plain
+ * picture again. Unticked, its button (link, conditions, effects) is parked
+ * in `parkedButtons`, out of the story's links, and comes back when ticked.
+ */
 export function withClickable(params: Params, el: ElementLike, on: boolean): Params {
   const choices: any[] = [...(params.choices || [])];
+  const parked: any[] = [...(params.parkedButtons || [])];
   const entry = findEntry(choices, el);
-  if (on && !entry) choices.push({ id: newButtonId(), locationName: elementKey(el), elementId: el.id, text: '', target: '' });
-  if (!on && entry) choices.splice(choices.indexOf(entry), 1);
-  return { ...params, choices };
+  if (on && !entry) {
+    const back = findEntry(parked, el);
+    if (back) parked.splice(parked.indexOf(back), 1);
+    choices.push(back
+      ? { ...back, locationName: elementKey(el), elementId: el.id }
+      : { id: newButtonId(), locationName: elementKey(el), elementId: el.id, text: '', target: '' });
+  }
+  if (!on && entry) {
+    choices.splice(choices.indexOf(entry), 1);
+    parked.push(entry);
+  }
+  return { ...params, choices, parkedButtons: parked };
 }
 
 /**

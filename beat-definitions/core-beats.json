@@ -201,7 +201,7 @@
         "effects": "effect[]?",
         "soundEffect": "string?"
       },
-      "notes": "locationName is the name of the stage element (beat.locations) this button is — the link between the choice and what the player sees and clicks. text is the button's label (unused for a clickable picture); displayText is the translated label. target, conditions (hide the button until they match), effects and soundEffect work exactly as on a multiChoiceOption. elementId is the Visual Editor element's id, so renaming the element keeps the link; a button whose element was deleted stays (unused) so Undo brings back its link too."
+      "notes": "locationName is the name of the stage element (beat.locations) this button is — the link between the choice and what the player sees and clicks. text is the button's label (unused for a clickable picture); displayText is the translated label. target, conditions (hide the button until they match) and effects work exactly as on a multiChoiceOption. A button's click sound is its element's (the location's sound, the Visual Editor's Click Sound); soundEffect is read only from older projects and moved onto the element on load. elementId is the Visual Editor element's id, so renaming the element keeps the link; a button whose element was deleted stays (unused) so Undo brings back its link too."
     },
     "freeLayoutText": {
       "description": "The words of a text box placed by hand on a Free Layout beat.",
@@ -1419,6 +1419,14 @@
           "description": "The buttons (text buttons and clickable pictures), each keyed to its stage element by locationName, with its own target, effects and conditions.",
           "ui": {
             "label": "Buttons"
+          }
+        },
+        "parkedButtons": {
+          "type": "array<freeLayoutButton>",
+          "required": false,
+          "description": "Buttons of pictures or characters that were made clickable and then unticked: kept with their link, conditions and effects for when they are clickable again. Not part of the story's links.",
+          "ui": {
+            "hidden": true
           }
         },
         "nextTarget": {

@@ -3254,8 +3254,10 @@ export const VisualPropertiesPanel: React.FC<VisualPropertiesPanelProps> = ({
                   </>
                 )}
 
-                {/* Click Sound Section - For interactive elements (outside font controls block so hotspots can access it) */}
-                {(selected.type === 'button' || selected.type === 'text' || selected.type === 'dialog' || selected.type === 'hotspot') && (
+                {/* Click Sound Section - For interactive elements (outside font controls block so hotspots can access it).
+                    A Free Layout picture or character that is a button has one too: its sound is the element's. */}
+                {(selected.type === 'button' || selected.type === 'text' || selected.type === 'dialog' || selected.type === 'hotspot'
+                  || (freeLayout && (selected.type === 'prop' || selected.type === 'character') && freeLayout.isClickable(selected))) && (
                   <div className="mt-4">
                     <label className="text-xs font-medium text-gray-700 mb-2 block">
                       Click Sound

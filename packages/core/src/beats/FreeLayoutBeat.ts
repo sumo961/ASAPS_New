@@ -22,6 +22,8 @@ import { migrateChoiceEffects } from '../migration/effectsMigration';
 export class FreeLayoutBeat extends Beat {
   public texts: FreeLayoutText[];
   public choices: FreeLayoutButton[];
+  /** Buttons of pictures no longer clickable: kept, with their link, for when they are again. */
+  public parkedButtons: FreeLayoutButton[];
   public nextTarget?: string;
   public markVisited: boolean;
   public effectsOncePerChoice: boolean;
@@ -31,16 +33,38 @@ export class FreeLayoutBeat extends Beat {
     const p: Partial<FreeLayoutParameters> = { ...(config.parameters || {}), ...config };
     this.texts = Array.isArray(p.texts) ? p.texts : [];
     this.choices = Array.isArray(p.choices) ? p.choices : [];
+    this.parkedButtons = Array.isArray((p as any).parkedButtons) ? (p as any).parkedButtons : [];
     this.nextTarget = p.nextTarget || undefined;
     this.markVisited = !!p.markVisited;
     this.effectsOncePerChoice = !!p.effectsOncePerChoice;
     this.choices.forEach((c) => migrateChoiceEffects(c as any));
+    this.moveSoundsToElements();
+  }
+
+  /**
+   * A button's click sound is its element's (the Visual Editor's Click
+   * Sound). v0.9.147 also had a Sound Effect on the button: move it onto an
+   * element that has no sound of its own. One whose element is gone stays.
+   */
+  private moveSoundsToElements(): void {
+    for (const c of this.choices) {
+      if (!c?.soundEffect) continue;
+      const loc = this.elementOf(c);
+      if (!loc) continue;
+      if (!loc.sound && !(loc as any).soundAssetId) loc.sound = c.soundEffect;
+      delete c.soundEffect;
+    }
+  }
+
+  private elementOf(c: FreeLayoutButton) {
+    return Array.from(this.locations.values()).find((l) => l?.name === c.locationName);
   }
 
   getParameters(): Record<string, any> {
     return {
       texts: this.texts,
       choices: this.choices,
+      parkedButtons: this.parkedButtons,
       nextTarget: this.nextTarget,
       markVisited: this.markVisited,
       effectsOncePerChoice: this.effectsOncePerChoice,
@@ -53,6 +77,7 @@ export class FreeLayoutBeat extends Beat {
   updateParameters(params: Record<string, any>): void {
     if (params.texts !== undefined) this.texts = Array.isArray(params.texts) ? params.texts : [];
     if (params.choices !== undefined) this.choices = Array.isArray(params.choices) ? params.choices : [];
+    if (params.parkedButtons !== undefined) this.parkedButtons = Array.isArray(params.parkedButtons) ? params.parkedButtons : [];
     // A link set to nowhere comes as undefined: the key says it was given.
     if ('nextTarget' in params) this.nextTarget = params.nextTarget || undefined;
     if (params.markVisited !== undefined) this.markVisited = !!params.markVisited;
@@ -145,7 +170,9 @@ export class FreeLayoutBeat extends Beat {
         choiceContext: this.texts.map((t) => t.text).join(' ').slice(0, 200),
       });
       if (selected.effects?.length && !alreadyChosen) selected.effects.forEach((e) => context.applyEffect(e));
-      if (selected.soundEffect && renderer.playSound) await renderer.playSound({ file: selected.soundEffect });
+      // The element plays its own click sound; an old Sound Effect only where it has none.
+      const element = this.elementOf(selected);
+      if (selected.soundEffect && !element?.sound && renderer.playSound) await renderer.playSound({ file: selected.soundEffect });
       if (selected.target === '__self__') continue;
       return selected.target;
     }
