@@ -22,8 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.147** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.147 is the Free Layout release**:
+Current release: **v0.9.148** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.148 is the items and dark-mode
+release**: a story can keep its own list of items (Characters ▸ Items), with
+the name and picture players see, so every beat uses the same sword. App
+Preferences ▸ Appearance switches the builder to dark, or follows your
+system, while your story keeps its own colours. The Beat Types palette shows
+the ten common beats first, the Properties panel shows which beats lead to
+the one you're on, and hovering a beat in the flowchart picks out its links.
+Pending Changes can stage or discard several files at once. Undo works again
+for edits in the Properties panel, and Check for Updates… now tells you when
+you're on the latest version.
+
+**v0.9.147 was the Free Layout release**:
 a new beat type lets you lay out a screen by hand in the Visual Editor, with
 text boxes, buttons, pictures and characters wherever you want them. Each
 button, or a picture you make clickable, leads on like a choice, with its own

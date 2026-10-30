@@ -2,7 +2,7 @@
 
 **Your Complete Guide to Building Interactive Narrative Systems**
 
-*Last revised against v0.9.146*
+*Last revised against v0.9.148*
 
 ---
 
@@ -285,16 +285,22 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
 | **Export** | Dropdown, organised by what the recipient does: **Publish for players** (a playable standalone HTML story), **Share for editing** (the complete project as one `.asaps` file — ASML 2.0, JSON, native — or a template `.asapst`), and a **Legacy** group for ASML 1.0 XML (frozen serialization; newer features are not included) |
-| **Tools** | Dropdown: App Preferences… (settings for this computer), Change with AI, Merge DialogTrees, Recently deleted beats… |
+| **Tools** | Dropdown: App Preferences… (settings for this computer, light or dark among them), Change with AI, Merge DialogTrees, Recently deleted beats… |
 
 | Right Side | What it Does |
 |------------|--------------|
 | **Find & Change** | Find & replace, and AI bulk changes (slate button, Ctrl/Cmd+F) — see [Find & Change](#find-and-change) |
-| **Characters** | Create and manage your cast (blue button) |
+| **Characters** | Create and manage your cast, and the story's list of [items](#project-items) (blue button) |
 | **Assets** | Manage images, sounds, videos, fonts (orange button) |
 | **Project Settings** | Everything that travels with this project — stage, fonts, colours, HUDs (purple button, ⌘/Ctrl+,). Where this guide says **Settings → …**, it means this panel |
 | **Debug** | Testing and troubleshooting tools (gray button) |
 | **Preview** | Test your system (green button) |
+
+<a id="dark-mode"></a>
+**Light or dark.** Prefer a dark screen, or working late? Open **Tools → App Preferences…** and pick **Appearance: Light**, **Dark** or **As the system** (which follows your computer's own setting, also when it changes during the day). Every open ASAPS window switches at once, the Preview included. Your story keeps its own colours: the stage in the Visual Editor and in the Preview looks the same in both modes, so what you see is what your players get. Appearance is a setting of this computer, not of the project.
+
+![The builder in dark mode: dark panels, menus and Properties around the Visual Editor, while the story's stage in the middle keeps its own colours](images/107-dark-mode-visual-editor.png)
+*Dark mode darkens the builder around your story; the stage keeps the story's own colours.*
 
 ## The Left Sidebar: Beat List
 
@@ -332,6 +338,8 @@ See your entire system structure as a graph. Beats appear as boxes, connections 
 - **Dashed green "after N s"** — a beat's *default target*, drawn only when it can actually fire: on a timed auto-advance, or as **"default"** when it is the beat's only exit. A default target that could never act is not drawn.
 - **Links a beat derives from one of its settings** — a keypad's **"Wrong code"**, an AI Condition's **"Fallback"**, an AR Scene's **"Skip / no anchor"** — appear as links like any other, even though you set them as fields in the Inspector.
 - **Random Target branches** are labelled *Random 1*, *Random 2*… with their weight when it isn't 1 (for example *Random 2 (×3)*).
+
+**Where does this beat lead?** In a busy flowchart, rest the pointer on a beat: its outgoing links are drawn thicker, on top, with bold labels, and every other link fades. Move the pointer away and everything goes back. Only the drawing changes, nothing in your story. (To see the links coming *in* to a beat, look at **Reached from** in the [Properties panel](#reached-from).)
 
 **Who plays a role.** A beat that decides who plays a [role](#roles) — a Choose Your Character beat, or a choice with a **Cast Role** effect — carries a small **🎭 @role** badge (for example *🎭 @confidant*), so you can see at a glance where the story casts its people.
 
@@ -445,6 +453,12 @@ When you select a beat, the Inspector shows everything about it:
 
 The Inspector changes based on what you've selected. Select a Dialog Tree and you'll see choice options. Select a Video Beat and you'll see playback settings.
 
+<a id="reached-from"></a>
+**Reached from: the way in.** Under the beat's type and ID, **Reached from:** lists every beat that links here, one button each, with the link's words next to it (a choice's text, or *auto-advance* for a timer). Click a button to jump to that beat and edit the link there. A beat reached from many places shows six and a **+N more** button for the rest; a beat nothing links to yet says *no links yet*. Unless it's your story's first beat, that is a quick way to spot a scene players can't reach.
+
+![The top of the Properties panel for the beat "Reflection": Reached from lists FreeLayout 26 (auto-advance), FreeLayout 26 (Wait here), Better Late Than Never (Continue), Small Talk (Continue) and Heart to Heart](images/104-properties-reached-from.png)
+*"Reflection" is reached from four beats; one of them leads here twice, by a button and by its timer.*
+
 **Need more room to write?** The small expand button next to the **Properties** heading makes the panel wide (60 % of the window); click it again to make it narrow. Dragging the panel's edge also works, and leaves the wide setting from the width you dragged it to. ASAPS remembers wide or narrow on this computer.
 
 ![The top of the Properties panel: the Properties heading with the expand button on the right, the beat's type and ID, and the Change type… menu](images/98-properties-header-wide-change-type.png)
@@ -486,9 +500,14 @@ Many fields carry a short grey note underneath that says what the setting does, 
 
 ## The Beat Palette (Right Side)
 
-Your beat shopping catalog, docked to the right edge of the flowchart. Drag any beat type onto the canvas to add it to your system. Click the collapse arrow to hide it when you need more canvas space.
+Your beat shopping catalog, docked to the right edge of the flowchart. Drag any beat type onto the canvas to add it to your system. Click the collapse arrow to hide it when you need more canvas space; the folded strip still shows an icon for every beat type.
 
-The palette is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need:
+**The ten beats most stories are made of come first.** The palette opens with a short list: **Title Screen**, **Info Text**, **Multi Choice**, **Dialog Tree**, **Free Layout**, **Movement Choice**, **Duration Screen**, **End Screen**, **Condition Check** and **Set Variable/Counter**. You can build a whole story from these. When you need something more, click **All beat types (36)** below them to open the full list; click it again to go back to the short one. ASAPS remembers your choice on this computer. (The number counts the beat types you can add; with **Show AI features** off it is smaller.)
+
+![The Beat Types palette: Title Screen, Info Text, Multi Choice, Dialog Tree, Free Layout, Movement Choice, Duration Screen, End Screen, Condition Check and Set Variable/Counter, then the link "All beat types (36)"](images/105-beat-types-palette.png)
+*The short list, with the full list one click away.*
+
+The full list is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need. (When this guide says a beat is in, say, the palette's **Multi Choice → Spatial** group, it means this full list.)
 
 - **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**).
 - **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, **Choose Your Character**, Dialog Tree, AI Dialog Tree, Pick Prop, **Free Layout**), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
@@ -736,7 +755,7 @@ Like every effect, it works on dialog lines, links and random branches as well a
 
 **Purpose:** One question, several buttons — the simplest decision point.
 
-Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's question on top, a row of response buttons below, each leading to its own beat. When a decision doesn't need a back-and-forth, this is the lighter beat to reach for. You'll find it in the palette's **Multi Choice → Buttons** group next to Dialog Tree.
+Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's question on top, a row of response buttons below, each leading to its own beat. When a decision doesn't need a back-and-forth, this is the lighter beat to reach for. You'll find it in the palette's short list, right above Dialog Tree (and in the full list's **Multi Choice → Buttons** group).
 
 **Key Settings:**
 - **Question** - The prompt above the buttons (supports the same light formatting as Info Text)
@@ -785,14 +804,18 @@ In a fixed layout with hand-placed buttons, the description shows when the point
 
 **Purpose:** A screen you lay out by hand — words, buttons and pictures exactly where you want them.
 
-Most beats arrange their text and buttons for you. A Free Layout hands you a blank stage instead: put a text box in the top corner, a signpost picture on the left, two buttons at the bottom, a character who can be clicked. It's the beat for title cards with a twist, comic-style panels, a map with clickable places, or any screen whose look matters as much as its words. You'll find it in the palette's **Multi Choice → Buttons** group, with the 🧩 icon.
+Most beats arrange their text and buttons for you. A Free Layout hands you a blank stage instead: put a text box in the top corner, a signpost picture on the left, two buttons at the bottom, a character who can be clicked. It's the beat for title cards with a twist, comic-style panels, a map with clickable places, or any screen whose look matters as much as its words. You'll find it in the palette's short list, with the 🧩 icon (and in the full list's **Multi Choice → Buttons** group).
 
 **Building the screen (Visual Editor).** Select the beat and open the **Visual Editor**. At the top of the **Elements** list, **Character**, **Prop**, **Text** and **Button** add an element to the stage; drag it into place and pull its corners to size it. The words go straight on the element: select a text box or a button, and type in its **Text** or **Button text** field in the left panel. A picture or character can be a button too: select it and tick **Clickable — works as a button**.
 
-![The Visual Editor on a Free Layout beat: the Elements list with Character, Prop, Text and Button, the selected button's Button text "Take the stairs" in the left panel, the stage with a text box "The lobby is empty. Where now?" and two buttons, and the Properties panel's Buttons list with where each button leads](images/101-free-layout-visual-editor.png)
-*Write the words on the stage in the Visual Editor (left); say where each button leads in the Properties panel (right).*
+**A button's sound** is set here too: a selected button, or a picture or character once **Clickable** is ticked, has a **Click Sound** further down the left panel. Pick one of the presets (listen first with the speaker icon) or one of your project's sounds under **Custom**. Each button has one sound, and it plays when the player clicks it.
 
-**Where the buttons lead (Properties panel).** Under **Buttons**, the Properties panel lists every button on the stage, named by its words (a clickable picture by its name). Each one has the same editors as a Multi Choice choice: where it **leads to** (the [searchable beat picker](#beat-picker)), **Show only if…** conditions (a button whose conditions don't match isn't shown — see [Earned options](#conditional-choices)), **Effects** and a **Sound Effect**. You can also [draw the links in the flowchart](#drawing-links). Add or delete a button in the Visual Editor and the list follows at once. A button that isn't linked yet behaves like any [choice that isn't linked yet](#unlinked-choices): clicking it does nothing, and the screen stays up.
+Changed your mind about a clickable picture? Untick **Clickable** and it's an ordinary picture again; tick it again later and it comes back as the same button, with where it led, its conditions and its effects. **Layer (Z-Index)** decides what sits in front when elements overlap. There is no **Lock position** on a Free Layout: nothing there is ever moved out of the way, so there's nothing to lock.
+
+![The Visual Editor on a Free Layout beat: in the left panel the selected button's Button text "Take the stairs" and, below it, Click Sound with its presets; the stage with a text box "The lobby is empty. Where now?" and two buttons; and the Properties panel's Buttons list with where each button leads, its Show only if… and its Effects](images/101-free-layout-visual-editor.png)
+*Write the words and pick the click sound in the Visual Editor (left); say where each button leads in the Properties panel (right).*
+
+**Where the buttons lead (Properties panel).** Under **Buttons**, the Properties panel lists every button on the stage, named by its words (a clickable picture by its name). Each one has the same editors as a Multi Choice choice: where it **leads to** (the [searchable beat picker](#beat-picker)), **Show only if…** conditions (a button whose conditions don't match isn't shown — see [Earned options](#conditional-choices)) and **Effects**. (Its sound is the **Click Sound** you set in the Visual Editor.) You can also [draw the links in the flowchart](#drawing-links). Add or delete a button in the Visual Editor and the list follows at once. A button that isn't linked yet behaves like any [choice that isn't linked yet](#unlinked-choices): clicking it does nothing, and the screen stays up.
 
 **Timers and "click anywhere".** A Free Layout has no timer of its own; it uses the same **Auto-Advance Settings** as other beats (under **Show Advanced Options**): a **Default Target Beat**, the **Auto-Advance Delay**, **Show countdown timer to player**, and the countdown meter. If the screen has no buttons and no timer, a click anywhere moves on to the beat chosen in **Next (click anywhere), go to** — handy for a full-screen picture or a chapter card.
 
@@ -1394,9 +1417,9 @@ Give characters items or take them away. Items can be transferred between charac
 - Remove item from character
 - Transfer item from one character to another
 
-**Item — pick it, don't guess it.** To the story, "Sword" and "sword" are two different items, so a key picked up as *Rusty Key* won't open a door that checks for *rusty key*. The **Item** field helps you stay consistent: it lists the items your story already knows (those in your characters' [inventory lists](#character-inventory) and those other beats already use), so you can pick the one you mean. For an item that's new to the story, choose **+ New item...** and type its name. If a name you type differs from a known item only in capitals or spacing, a small note says so (*Another beat or character calls it "Sword". Use "Sword"*) — click **Use "Sword"** to switch to it.
+**Item — pick it, don't guess it.** To the story, "Sword" and "sword" are two different items, so a key picked up as *Rusty Key* won't open a door that checks for *rusty key*. The **Item** field helps you stay consistent: it lists the items your story already knows (the story's own [Items](#project-items) first, then those in your characters' [inventory lists](#character-inventory) and those other beats already use), so you can pick the one you mean. For an item that's new to the story, choose **+ New item...** and type its name. If a name you type differs from a known item only in capitals or spacing, a small note says so (*Another beat or character calls it "Sword". Use "Sword"*) — click **Use "Sword"** to switch to it.
 
-**Item picture.** Click **Choose picture…** to pick (or upload) the picture the inventory shows for the item; **Change** swaps it and the small **×** removes it. Pick it once: the picture belongs to the item's name, so every other beat or effect that adds or hands over the same item shows it too. You need it for items that are new to the story. An item that already has a picture in a character's [inventory list](#character-inventory) (any character's, not only the one who holds it) or that is picked up through a [Pick Prop](#pick-prop) beat keeps that picture: it wins over the one chosen here. The **Add Inventory** and **Remove Inventory** effects on choices, dialog lines and links have the same small **Picture** button.
+**Item picture.** Click **Choose picture…** to pick (or upload) the picture the inventory shows for the item; **Change** swaps it and the small **×** removes it. Pick it once: the picture belongs to the item's name, so every other beat or effect that adds or hands over the same item shows it too. You need it for items that are new to the story. An item that already has a picture in the story's [Items](#project-items) or in a character's [inventory list](#character-inventory) (any character's, not only the one who holds it), or that is picked up through a [Pick Prop](#pick-prop) beat, keeps that picture: it wins over the one chosen here. The **Add Inventory** and **Remove Inventory** effects on choices, dialog lines and links have the same small **Picture** button.
 
 ![The Inspector for an Inventory Management beat: Action "Add to Inventory", Item "sweets", Quantity 1, Character "player", and Item picture showing Sweets.png with Change and × buttons.](images/87-inventory-item-picture.png)
 *An Inventory Management beat that gives the player sweets, with the picture the inventory shows for them.*
@@ -1806,10 +1829,33 @@ What can this character carry?
 2. Click **Add Item** for each item the character starts with, and give it an internal name, a display name, a picture (**Add Image**), a description and a quantity. Inventory beats, effects and conditions refer to the item by its internal name.
 3. To show the items on screen, tick **Enable** under **Inventory Frame (HUD Overlay)** and choose where the panel sits and how it looks (item size, columns, style)
 
-The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it. An item that isn't on this character's list borrows its record from another character who lists it, so a "storage" character can describe items that others pick up.
+The character has these items from the start of the story; the player's character carries them in the player's inventory, so *player has …* conditions see them. They come back when the story restarts (or when an End Screen resets the inventory). During the story, use Inventory beats (or Add Inventory effects) to give or take items. The inventory panel always shows what the character **carries right now**: an item appears when it is given and disappears when it is taken, and the name and picture come from this list when the item is on it. An item that isn't on this character's list takes its record from the story's [Items](#project-items) list, and failing that from another character who lists it.
 
 ![The Preview: the Wolf, now angry, says "Sweets? Then hand them over. NOW!" with the replies Never! and Here, take them.; in the bottom-right corner the inventory panel shows the sweets' picture.](images/90-angry-wolf-inventory.png)
 *Play in the Preview: the sweets the player was given appear in the inventory panel, and the Wolf shows the angry look his line asked for.*
+
+<a id="project-items"></a>
+### The Story's Items
+
+Is it *sword*, *Sword* or *old sword*? When the hero picks up a sword in one scene and a guard checks for it three scenes later, both have to use the same name. The story's own item list keeps that simple: every item, once, whoever ends up holding it.
+
+Open **Characters** and switch to the **Items** tab (next to **Characters**). Click **Add Item** for each thing in your story and fill in:
+
+- the **internal name**: the name beats, effects and conditions match the item by,
+- the **display name** players see, and a **picture** (**Add Image**),
+- a **description**,
+- a **category** (Misc, Weapon, Armor, Consumable, Quest or Key) and whether it's **Stackable** (and up to how many).
+
+These are the same fields as an item in a character's [Inventory](#character-inventory), without the quantity: who has how many is still set on the character (what they start with) or by the story (Inventory beats and effects). Each field you change is one Undo step, and the display names and descriptions are [translated](#multi-language-translation) with the rest of the story.
+
+![Characters ▸ Items: a short explanation, the Add Item button, and one item with the internal name "sword", the display name "Old Sword", an Add Image button, the description "Rusty but sharp", the category Misc and the Stackable checkbox](images/106-characters-items-tab.png)
+*An item defined once for the whole story.*
+
+**Already keeping a "storage" character?** Some stories gave their items to a character nobody meets, just to have them listed somewhere. If your characters' inventories hold items the Items tab doesn't have yet, a **Bring in N items from characters** button copies them over (each name once). The characters keep their own copies.
+
+**Where the list helps.** The item fields in [Inventory Management](#inventory-management) beats, in the Add/Remove Inventory effects and in item conditions offer the story's items first, so you pick the item instead of retyping it.
+
+**Which record a player sees.** When the story plays, an item's name and picture come from the holder's own inventory list if the item is there, otherwise from the story's Items, otherwise from another character who lists it. So a character can still have their own version of an item, and everyone else gets the story's.
 
 ### Speaker Portraits
 
@@ -2439,8 +2485,8 @@ Each character placement includes:
 <a id="flip-pictures"></a>
 **Facing the other way: Flip.** Need your character to look left instead of right, or a prop turned upside down? No need to draw and import a second picture. Select the character or prop, and under **Rotation** use the **Flip** buttons: **⇋ Left–right** mirrors it, **⇅ Upside down** turns it over. Click again to flip it back; each click is one Undo step. The flip shows in the Visual Editor, the Preview and exported stories. (While a [waypoint animation](#waypoint-animations) that walks the character the other way is playing, the animation decides which way they face.)
 
-![The Visual Editor's properties for a selected picture: Rotation, then Flip with the buttons Left–right and Upside down, Layer, Lock position, Name, and the ticked checkbox "Clickable — works as a button" that a Free Layout adds](images/102-visual-editor-flip-clickable.png)
-*Flip sits right under Rotation. On a [Free Layout](#free-layout), pictures and characters also get **Clickable — works as a button**.*
+![The Visual Editor's properties for a selected picture on a Free Layout: Rotation, then Flip with the buttons Left–right and Upside down, Layer, Name, the ticked checkbox "Clickable — works as a button", the picture, and Click Sound with Soft Click selected](images/102-visual-editor-flip-clickable.png)
+*Flip sits right under Rotation. On a [Free Layout](#free-layout), pictures and characters also get **Clickable — works as a button**, and a clickable one gets a **Click Sound**.*
 
 <a id="partly-off-stage"></a>
 **Partly off the stage is fine.** A figure cropped by the edge of the frame, a branch that reaches in from the left, a prop peeking up from the bottom: you can drag an element (or nudge it with the arrow keys, Shift for 10 px steps) past any edge of the stage. ASAPS only stops it when about 24 px are left on the stage, so there is always a strip to grab and pull it back. The **X** and **Y** fields take negative numbers too, for example *X: −40*. In a responsive project, where characters and props are placed by **X %** and **Y %** of the stage, the same holds: type *−15* or pull the slider past 0, down to where about 24 px are left on stage.
@@ -2579,8 +2625,8 @@ Your stories are not changed. AI beats that are already in a project stay in the
 
 Both switches are settings of this computer (not of the project), are on by default, and every open ASAPS window follows a change straight away.
 
-![App Preferences with the Show AI features and Beat suggestions switches at the top, both on, above the AI provider, web search, voices, speech input and Claude Desktop rows](images/100-app-preferences-ai-switches.png)
-*Tools → App Preferences…: **Show AI features** and, below it, **Beat suggestions**.*
+![App Preferences: Appearance (Light, Dark, As the system) at the top, then the Show AI features and Beat suggestions switches, both on, above the AI provider, web search, voices, speech input and Claude Desktop rows](images/100-app-preferences-ai-switches.png)
+*Tools → App Preferences…: **Show AI features** and, below it, **Beat suggestions**, under [Appearance](#dark-mode).*
 
 ## Setting Up AI
 
@@ -4230,6 +4276,7 @@ Everything you've changed since your last commit. Each modified file appears wit
 - **Stage** an individual file (the green check) or **Stage All** at once.
 - **Unstage** anything you don't want to commit yet.
 - **Revert** to discard local changes (with a confirmation — this can't be undone). New files that were never committed are removed with their delete button, or all at once with **Discard Untracked**.
+- **Several files at once:** tick the box in front of each file under **Changes** (the box in the **Changes** header ticks them all). The header then offers **Stage (N)** and **Discard (N)** for the ticked files. Discard asks once and lists each file with what will happen to it: changed files go back to how they were at the last commit, and new files that were never committed are deleted. This can't be undone; afterwards the project reloads from disk.
 - Click a file to open a diff in the right pane and see exactly what changed.
 
 Below the file list, type a **commit message** and click **Commit** (or **Commit and Push** to send to GitHub in one step). If nothing's staged when you click Commit, ASAPS auto-stages everything currently changed for you — saves a click for the common "I want to commit everything" case.
@@ -4411,7 +4458,7 @@ ASAPS Modern maintains a full undo/redo history for beat operations:
 - **Ctrl/Cmd+Shift+Z** - Redo
 - The **History dropdown** (next to undo/redo buttons) shows recent operations
 
-Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, links drawn in the flowchart, text edited in the Script view, an Update from Markdown (one step for the whole file), Change type…, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer. The undo stack persists for the current session.
+Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, links drawn in the flowchart, text edited in the Script view, an Update from Markdown (one step for the whole file), Change type…, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer, and changes to the story's [Items](#project-items). The undo stack persists for the current session.
 
 <a id="find-and-change"></a>
 ## Find & Change
@@ -4470,7 +4517,7 @@ Create localized versions of your story with AI-assisted translation:
 
 Bulk operations accessible from the **Tools** dropdown in the header:
 
-- **App Preferences…** - Settings for this computer: AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
+- **App Preferences…** - Settings for this computer: [light or dark](#dark-mode), AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
 - **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F; hidden when Show AI features is off)
 - **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
 - **Recently deleted beats…** - Bring back beats deleted in the last 30 days (see [Recently deleted beats](#recently-deleted-beats))
@@ -4485,8 +4532,8 @@ The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a 
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
-- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
-- **Updates and quitting** - When an update has downloaded, ASAPS offers **Restart Now** or **Later**. Restarting — like quitting — first finishes saving your open project, so nothing in flight is lost. In the rare case something still can't be saved, ASAPS asks before going on: *"Some changes could not be saved."* Choose **Restart and install** (or **Close anyway** when you're just quitting) to go ahead without those changes, or **Cancel** to keep working and save first — a postponed update installs the next time you quit.
+- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: light or dark [appearance](#dark-mode), AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
+- **Updates and quitting** - **Help → Check for Updates…** looks for a newer version; when there is none, it says *You are already running the latest version* and names the version you have. When an update has downloaded, ASAPS offers **Restart Now** or **Later**. Restarting — like quitting — first finishes saving your open project, so nothing in flight is lost. In the rare case something still can't be saved, ASAPS asks before going on: *"Some changes could not be saved."* Choose **Restart and install** (or **Close anyway** when you're just quitting) to go ahead without those changes, or **Cancel** to keep working and save first — a postponed update installs the next time you quit.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 - **When a link won't open** - Help → Documentation, Report a Bug…, Known Issues, the **Open Releases Page** button (offered when an update can't download), and other web links you click in ASAPS all open in your web browser. If your computer declines to open one (usually because no default browser is set), ASAPS shows **Couldn't open your browser** with the address and a **Copy Link** button, so you can paste it into any browser yourself. If it keeps happening on Windows, set a default browser under **Settings › Apps › Default apps**, and make sure you're not running ASAPS as administrator.
 
@@ -4508,7 +4555,7 @@ Quick reference for all beat types.
 | Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, picture, target, conditions, effects), show options as (buttons / pictures with names / pictures only), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
-| Free Layout | A screen laid out by hand | text boxes, buttons, props and characters placed in the Visual Editor (words typed on the elements; pictures/characters can be *Clickable — works as a button*), Buttons (each with leads to, Show only if… conditions, effects, sound effect), Next (click anywhere) target (used only with no buttons and no timer), auto-advance (default target, delay, countdown), markVisited, effectsOncePerChoice, explainHuds; fixed: drawn as placed and scaled; responsive: places and sizes kept as shares of the stage, words resize |
+| Free Layout | A screen laid out by hand | text boxes, buttons, props and characters placed in the Visual Editor (words typed on the elements; pictures/characters can be *Clickable — works as a button*; each button's Click Sound), Buttons in Properties (each with leads to, Show only if… conditions, effects), Next (click anywhere) target (used only with no buttons and no timer), auto-advance (default target, delay, countdown), markVisited, effectsOncePerChoice, explainHuds; fixed: drawn as placed and scaled; responsive: places and sizes kept as shares of the stage, words resize |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip, captions (cue rows: start/end/text, auto-translated into per-language subtitles), captionsEnabled, videoTranslations (per-language video override) |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
@@ -4613,6 +4660,8 @@ Quick reference for all beat types.
 **IDN** - Interactive Digital Narrative. A narrative expression implemented as a dynamic computational system that changes due to input from interactors.
 
 **Inspector** - The panel showing properties of the selected element.
+
+**Items (the story's)** - The project-wide list of items under Characters ▸ Items: each item once, with the name beats and conditions use, the name and picture players see, a description, category and stacking. Item pickers offer these first. See [The Story's Items](#project-items).
 
 **Instantiation** - What happens when an interactor engages with a protostory—a specific narrative emerges from the possibilities.
 
