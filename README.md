@@ -22,9 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.148** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.148 is the items and dark-mode
-release**: a story can keep its own list of items (Characters ▸ Items), with
+Current release: **v0.9.149** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.149 is the easier-reading
+release**: three free fonts made for easier reading — Lexend, Atkinson
+Hyperlegible and OpenDyslexic — come with ASAPS. Tools ▸ App Preferences ▸
+Reading font puts the builder's own screens in one of them, and Project
+Settings ▸ Fonts offers them for a story's titles, text and buttons, so
+players get them in the Preview, exports and the player too. The User Guide
+now starts with installing ASAPS, a 15-minute first story and a list of
+common hiccups. Undo now also takes back a hotspot or picture made from the
+Properties panel, the speaker picker is light in light mode, and the last
+light spots in dark mode are gone.
+
+**v0.9.148 was the items and dark-mode release**: a story can keep its own list of items (Characters ▸ Items), with
 the name and picture players see, so every beat uses the same sword. App
 Preferences ▸ Appearance switches the builder to dark, or follows your
 system, while your story keeps its own colours. The Beat Types palette shows

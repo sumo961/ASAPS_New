@@ -58,6 +58,7 @@ ASAPS is a desktop app for macOS, Windows and Linux. It's free, and installing i
 **4. Set up what you need — all of it optional.** Everything lives in **Tools → App Preferences…**:
 
 - **Light or dark** — see [Light or dark](#dark-mode).
+- **A font that's easier to read** — see [Reading font](#reading-font).
 - **AI** — ASAPS works fully without AI. If you want the AI tools, add a provider and key ([Setting Up AI](#setting-up-ai)); if you never will, switch **Show AI features** off and the AI buttons go away ([Working without AI](#working-without-ai)).
 - **Voices and speech input** — only needed if your story reads text aloud or listens to the player ([Text-to-Speech](#text-to-speech-tts)).
 
@@ -408,7 +409,7 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 | **Save** | Save your project (green button) |
 | **Open** | Dropdown: open ASAPS project files (`.asaps` / `.asapst` / zip — added to your projects and opened), merge a story into the current project, or *import from other formats* (ASML XML, Twine HTML — genuine conversions) |
 | **Export** | Dropdown, organised by what the recipient does: **Publish for players** (a playable standalone HTML story), **Share for editing** (the complete project as one `.asaps` file — ASML 2.0, JSON, native — or a template `.asapst`), and a **Legacy** group for ASML 1.0 XML (frozen serialization; newer features are not included) |
-| **Tools** | Dropdown: App Preferences… (settings for this computer, light or dark among them), Change with AI, Merge DialogTrees, Recently deleted beats… |
+| **Tools** | Dropdown: App Preferences… (settings for this computer, light or dark and the reading font among them), Change with AI, Merge DialogTrees, Recently deleted beats… |
 
 | Right Side | What it Does |
 |------------|--------------|
@@ -424,6 +425,17 @@ On a narrow window these buttons wrap onto a line of their own below the title, 
 
 ![The builder in dark mode: dark panels, menus and Properties around the Visual Editor, while the story's stage in the middle keeps its own colours](images/107-dark-mode-visual-editor.png)
 *Dark mode darkens the builder around your story; the stage keeps the story's own colours.*
+
+<a id="reading-font"></a>
+**A font that's easier to read.** Letters that swim or swap places? In **Tools → App Preferences…**, just below Appearance, **Reading font** puts the builder's own screens — menus, panels, Properties, the flowchart — in one of three free fonts made for easier reading:
+
+| Reading font | What it's like |
+|---|---|
+| **Lexend** | Plain, evenly spaced letters. |
+| **Atkinson Hyperlegible** | Letters hard to confuse: I, l, 1, O, 0. |
+| **OpenDyslexic** | Weighted bottoms keep b, d, p, q apart. |
+
+Research hasn't found one font that's best for every reader with dyslexia — people differ — so try them and keep the one that feels easiest, or go back to **Standard**. Like Appearance, it's a setting of this computer, and every open ASAPS window follows it at once. It doesn't change your story: the stage in the Visual Editor and in the Preview keeps the story's fonts. To give your *players* one of these fonts, choose it in [Settings → Fonts](#story-fonts).
 
 ## The Left Sidebar: Beat List
 
@@ -2748,7 +2760,7 @@ Your stories are not changed. AI beats that are already in a project stay in the
 
 Both switches are settings of this computer (not of the project), are on by default, and every open ASAPS window follows a change straight away.
 
-![App Preferences: Appearance (Light, Dark, As the system) at the top, then the Show AI features and Beat suggestions switches, both on, above the AI provider, web search, voices, speech input and Claude Desktop rows](images/100-app-preferences-ai-switches.png)
+![App Preferences: Appearance (Light, Dark, As the system) and Reading font (Standard) at the top, then the Show AI features and Beat suggestions switches, both on, above the AI provider, web search, voices, speech input and Claude Desktop rows](images/100-app-preferences-ai-switches.png)
 *Tools → App Preferences…: **Show AI features** and, below it, **Beat suggestions**, under [Appearance](#dark-mode).*
 
 ## Setting Up AI
@@ -4022,12 +4034,15 @@ Use sprite sheets for frame-by-frame animation:
 - Text box colors
 - Background color
 
+<a id="story-fonts"></a>
 **Settings → Fonts:**
 - Default fonts for titles, body, buttons
 - Font sizes
 - Line height
 
 Your own fonts (TrueType `.ttf`, OpenType `.otf`, `.woff` or `.woff2`) go into the project through **Assets → Fonts**. They then appear in these font menus under their file name (*Windows Regular.ttf* becomes **Windows Regular**), and they are used in the Visual Editor, the Preview Window and every export. Check that the font's licence lets you share it, since the font file travels with an exported story.
+
+**Fonts that are easier to read.** The Title, Text and Button font menus also have a group **Easier to read (added to the project)** with Lexend, Atkinson Hyperlegible and OpenDyslexic — the same free fonts as the builder's [Reading font](#reading-font). Choosing one copies the font into the project's Assets (as *OpenDyslexic.woff2*, for example); from then on it's listed under **Custom Fonts** like any font you added, and it travels with the story: the Preview, `.asaps` files, HTML exports and the player all show it. Click **Save Settings** to keep your choice, as with any other font. These fonts cover Western European letters (Latin-1); for other scripts, add a font that has them through **Assets → Fonts**. No font is best for every reader, so if you're writing for readers with dyslexia, you might ask them which one they like.
 
 **Settings → Text Box:**
 - Text box appearance: corners, padding, borders, position
@@ -4640,7 +4655,7 @@ Create localized versions of your story with AI-assisted translation:
 
 Bulk operations accessible from the **Tools** dropdown in the header:
 
-- **App Preferences…** - Settings for this computer: [light or dark](#dark-mode), AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
+- **App Preferences…** - Settings for this computer: [light or dark](#dark-mode), a [reading font](#reading-font) for the builder, AI and voice providers, keys, updates, Claude Desktop, and the [Show AI features / Beat suggestions](#working-without-ai) switches
 - **Change with AI** - Opens the Change tab of [Find & Change](#find-and-change) (also Ctrl/Cmd+Shift+F; hidden when Show AI features is off)
 - **Merge DialogTrees** - Combine multiple DialogTree beats into a nested conversation
 - **Recently deleted beats…** - Bring back beats deleted in the last 30 days (see [Recently deleted beats](#recently-deleted-beats))
@@ -4655,7 +4670,7 @@ The ASAPS Desktop app (built with Electron) runs on macOS and Windows, and as a 
 - **Native file dialogs** - Save/open using OS file picker
 - **Git integration** - Full VCS support (see Part 9)
 - **Local file access** - Direct read/write without browser limitations
-- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: light or dark [appearance](#dark-mode), AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
+- **Two kinds of settings** - **Project Settings** (⌘, or the purple header button) holds everything saved with the project — stage size, fonts, colors, HUDs, whether an exported player reads text aloud — so everyone who opens or exports it gets the same result. **App Preferences** (Tools → App Preferences…, or ⌘⌥, in the app menu) holds what belongs to this computer: light or dark [appearance](#dark-mode), the builder's [reading font](#reading-font), AI, voice and speech-input providers with their keys, the Brave web-search key, automatic updates, the Claude Desktop (MCP) integration, and whether the AI features and beat suggestions are shown at all.
 - **Updates and quitting** - **Help → Check for Updates…** looks for a newer version; when there is none, it says *You are already running the latest version* and names the version you have. When an update has downloaded, ASAPS offers **Restart Now** or **Later**. Restarting — like quitting — first finishes saving your open project, so nothing in flight is lost. In the rare case something still can't be saved, ASAPS asks before going on: *"Some changes could not be saved."* Choose **Restart and install** (or **Close anyway** when you're just quitting) to go ahead without those changes, or **Cancel** to keep working and save first — a postponed update installs the next time you quit.
 - **Report a bug** - **Help → Report a Bug…** opens a bug report on GitHub in your browser with the app version, build number, operating system and runtime already filled in. You describe what happened and submit it there; nothing is sent until you do, and no project content is included. **Help → Known Issues** lists the open bug reports.
 - **When a link won't open** - Help → Documentation, Report a Bug…, Known Issues, the **Open Releases Page** button (offered when an update can't download), and other web links you click in ASAPS all open in your web browser. If your computer declines to open one (usually because no default browser is set), ASAPS shows **Couldn't open your browser** with the address and a **Copy Link** button, so you can paste it into any browser yourself. If it keeps happening on Windows, set a default browser under **Settings › Apps › Default apps**, and make sure you're not running ASAPS as administrator.
@@ -4939,6 +4954,9 @@ Most likely that choice isn't linked to a beat yet. The Preview shows an amber n
 
 ### Can I use ASAPS without any AI?
 Yes. Switch off **Show AI features** in **Tools → App Preferences…** and every AI button, menu and AI beat type is hidden; your stories don't change. See [Working without AI](#working-without-ai).
+
+### Is there a dyslexia-friendly font?
+Yes, three of them: Lexend, Atkinson Hyperlegible and OpenDyslexic. For the builder itself, pick one under **Tools → App Preferences… → Reading font** ([Reading font](#reading-font)); for your players, choose one in **Settings → Fonts** ([Fonts that are easier to read](#story-fonts)). Readers differ in which helps most, so it's worth trying more than one.
 
 ### Can I write my story's text in another editor?
 Yes. In the [Script view](#script-view), **Save as Markdown** gives you a file for Obsidian, Google Docs or any text editor, and **Update from Markdown…** brings your edits back after showing you every change. See [Writing elsewhere](#script-markdown).
