@@ -196,7 +196,9 @@ export function darkStylesheet(): string {
     out.push(rule(names.flatMap((n) => [sel(n), sel(n, 'hover')]), `border-color: ${color};`));
     out.push(rule(greys.map((g) => `.divide-${g}-${shade} > :not([hidden]) ~ :not([hidden])`), `border-color: ${color};`));
   }
-  out.push(rule(['.bg-white\\/80', '.bg-white\\/90', '.bg-white\\/95'], 'background-color: rgba(32,35,41,0.92);'));
+  // Translucent white panels (the opacity variants the components use).
+  out.push(rule(['60', '70', '80', '90', '95'].map((o) => sel(`bg-white/${o}`)), 'background-color: rgba(32,35,41,0.92);'));
+  out.push(rule(greys.map((g) => sel(`bg-${g}-100/80`)), `background-color: ${SURFACE['100']};`));
 
   // The flowchart's own controls (ReactFlow 11 has no dark mode of its own).
   out.push(rule(['.react-flow__controls-button'], `background: ${SURFACE['100']}; border-bottom-color: ${BORDER['200']}; color: ${TEXT['700']}; fill: ${TEXT['700']};`));
@@ -208,8 +210,8 @@ export function darkStylesheet(): string {
 
   for (const [hue, h] of Object.entries(HUES)) {
     const tint = (a: number) => `background-color: rgba(${h.rgb},${a});`;
-    out.push(rule([sel(`bg-${hue}-50`), sel(`bg-${hue}-50/60`), sel(`bg-${hue}-50/50`)], tint(0.1)));
-    out.push(rule([sel(`bg-${hue}-100`)], tint(0.18)));
+    out.push(rule([sel(`bg-${hue}-50`), ...['30', '40', '50', '60', '95'].map((o) => sel(`bg-${hue}-50/${o}`))], tint(0.1)));
+    out.push(rule([sel(`bg-${hue}-100`), sel(`bg-${hue}-100/50`)], tint(0.18)));
     out.push(rule([sel(`bg-${hue}-200`)], tint(0.28)));
     out.push(rule([sel(`bg-${hue}-50`, 'hover'), sel(`bg-${hue}-50`, 'group-hover')], tint(0.16)));
     out.push(rule([sel(`bg-${hue}-100`, 'hover'), sel(`bg-${hue}-100`, 'group-hover')], tint(0.24)));
@@ -221,7 +223,7 @@ export function darkStylesheet(): string {
     for (const [shade, color] of text) {
       out.push(rule([sel(`text-${hue}-${shade}`), sel(`text-${hue}-${shade}`, 'hover'), sel(`text-${hue}-${shade}`, 'group-hover')], `color: ${color};`));
     }
-    out.push(rule([sel(`border-${hue}-100`), sel(`border-${hue}-200`), sel(`border-${hue}-200/60`)], `border-color: rgba(${h.rgb},0.32);`));
+    out.push(rule([sel(`border-${hue}-100`), sel(`border-${hue}-200`), sel(`border-${hue}-200/60`), sel(`border-${hue}-200/70`)], `border-color: rgba(${h.rgb},0.32);`));
     out.push(rule([sel(`border-${hue}-300`), sel(`border-${hue}-300`, 'hover')], `border-color: rgba(${h.rgb},0.5);`));
   }
   return out.join('\n');
