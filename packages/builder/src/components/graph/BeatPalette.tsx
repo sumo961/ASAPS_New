@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import beatDefinitions from '../../../../../beat-definitions/core-beats.json';
 import { useAIFeatures } from '../../utils/aiFeatures';
+import { usePersistedState } from '../../utils/persistedState';
 
 interface BeatPaletteProps {
   collapsed?: boolean;
@@ -192,6 +193,16 @@ const TAXONOMY: Array<{
   },
 ];
 
+/**
+ * The beats most stories are made of, shown first (class feedback: "too
+ * many beat types"; "make less different types of beats"). Every other
+ * type is one click away under "All beat types", grouped as above.
+ */
+const COMMON = [
+  'titleScreen', 'infoText', 'multiChoice', 'dialogTree', 'freeLayout',
+  'movementChoice', 'durScreen', 'endScreen', 'conditionBeat', 'setVariable',
+];
+
 function isAi(beatType: string): boolean {
   return beatType.startsWith('ai') || beatType === 'onlineContent' || beatType === 'inputImage';
 }
@@ -235,6 +246,11 @@ function buildBeatTypeMap(withAi: boolean): Map<string, BeatType> {
 export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onToggleCollapse }) => {
   const aiOn = useAIFeatures();
   const beatMap = useMemo(() => buildBeatTypeMap(aiOn), [aiOn]);
+  const [showAll, setShowAll] = usePersistedState('asaps_ui_palette_all_types', false);
+  const commonBeats = useMemo(
+    () => COMMON.map(t => beatMap.get(t)).filter((b): b is BeatType => !!b),
+    [beatMap],
+  );
 
   // Resolve the taxonomy into actual beat-type entries. Beats listed in
   // the taxonomy but missing from the schema are silently skipped (so
@@ -321,7 +337,25 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
         )}
       </div>
 
-      <div className="space-y-4">
+      {!showAll && (
+        <div className="grid grid-cols-1 gap-1.5">
+          {commonBeats.map(beat => (
+            <BeatTile key={beat.type} beat={beat} onDragStart={onDragStart} />
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setShowAll(!showAll)}
+        className="w-full mt-3 mb-1 flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+        title={showAll ? 'Show only the beats most stories use' : 'Show every beat type, grouped by what the player does'}
+      >
+        {showAll ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        {showAll ? 'All beat types' : `All beat types (${beatMap.size})`}
+      </button>
+
+      {showAll && (
+      <div className="space-y-4 mt-2">
         {resolvedTaxonomy.map(group => (
           <div key={group.key}>
             <h4
@@ -362,6 +396,7 @@ export const BeatPalette: React.FC<BeatPaletteProps> = ({ collapsed = false, onT
           </div>
         )}
       </div>
+      )}
 
       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
         <p className="text-xs text-blue-700">

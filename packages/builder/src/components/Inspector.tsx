@@ -137,6 +137,8 @@ interface InspectorProps {
   /** One sentence naming what a delete would break — appended to the confirm. */
   describeDeleteImpact?: (beatIds: string[]) => string | null;
   allBeats?: Beat[];
+  /** Select another beat (the incoming links' jump buttons). */
+  onSelectBeat?: (beatId: string) => void;
   onConnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onDisconnect?: (sourceBeatId: string, targetBeatId: string) => void;
   onBeatAdd?: (type: string, position?: { x: number; y: number }) => Beat;
@@ -184,6 +186,7 @@ import { rolesReferencedIn } from '../utils/rolePreview';
 import { confirmBeatDelete } from '../utils/confirmBeatDelete';
 import { noteDeletion } from '../utils/deletedBeats';
 import { BeatPicker } from './common/BeatPicker';
+import { incomingLinks } from '../utils/storyLinks';
 import { useBeatSuggestions } from '../utils/aiFeatures';
 import { usePersistedState } from '../utils/persistedState';
 import { changeableTypes, beatTypeLabel } from '../utils/changeBeatType';
@@ -208,6 +211,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   onDelete,
   describeDeleteImpact,
   allBeats = [],
+  onSelectBeat,
   onConnect,
   onDisconnect,
   onBeatAdd,
@@ -466,6 +470,8 @@ export const Inspector: React.FC<InspectorProps> = ({
       onOpenCharacterManager();
     }
   }, [onOpenCharacterManager]);
+
+  const [showAllIncoming, setShowAllIncoming] = useState(false);
 
   // Force re-render trigger for when we modify beat.locations directly
   const [locationUpdateTrigger, setLocationUpdateTrigger] = useState(0);
@@ -1893,6 +1899,35 @@ export const Inspector: React.FC<InspectorProps> = ({
               </select>
             )}
           </div>
+          {/* Reached from: the beats whose links lead here, each a jump to that beat. */}
+          {onSelectBeat && (() => {
+            const incoming = incomingLinks(allBeats || [], beat.id);
+            const nameOf = (id: string) => (allBeats || []).find(b => b.id === id)?.name || id;
+            const SHOWN = 6;
+            const list = showAllIncoming ? incoming : incoming.slice(0, SHOWN);
+            return (
+              <div className="mt-2 flex flex-wrap items-center gap-1 text-xs" aria-label="Links to this beat">
+                <span className="text-gray-500 mr-1">Reached from:</span>
+                {incoming.length === 0 && <span className="text-gray-400 italic">no links yet</span>}
+                {list.map(({ source, label }) => (
+                  <button
+                    key={`${source}:${label ?? ''}`}
+                    type="button"
+                    onClick={() => onSelectBeat(source)}
+                    className="max-w-full truncate px-1.5 py-0.5 rounded border border-gray-300 bg-white text-gray-700 hover:bg-blue-50 hover:border-blue-300"
+                    title={`Go to “${nameOf(source)}”${label ? ` — its link “${label}”` : ''}`}
+                  >
+                    {nameOf(source)}{label ? <span className="text-gray-400"> · {label.length > 24 ? `${label.slice(0, 23)}…` : label}</span> : null}
+                  </button>
+                ))}
+                {incoming.length > SHOWN && (
+                  <button type="button" onClick={() => setShowAllIncoming(v => !v)} className="text-blue-700 hover:underline">
+                    {showAllIncoming ? 'fewer' : `+${incoming.length - SHOWN} more`}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
           {/* Preview as: which character the editor shows for the roles this beat uses. */}
           {(() => {
             const used = [...rolesReferencedIn({ speaker: localBeat.speaker, characterRef: localBeat.characterRef, parameters: localBeat.parameters })];

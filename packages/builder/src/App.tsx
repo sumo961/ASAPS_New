@@ -7200,6 +7200,7 @@ function App() {
               onDelete={handleBeatDelete}
               describeDeleteImpact={describeDeleteImpact}
               allBeats={state.beats}
+              onSelectBeat={(id) => { const b = state.beats.find(x => x.id === id); if (b) handleBeatSelect(b); }}
               onConnect={actions.connectBeats}
               onDisconnect={actions.disconnectBeats}
               onBeatAdd={actions.addBeat}

@@ -22,3 +22,28 @@ export function flowchartLinkCount(beats: ReadonlyArray<any>): number {
   );
   return dedupeWalkLinks(links).filter((l) => ids.has(l.target)).length;
 }
+
+/**
+ * The links that lead to a beat, by the beat they start from (class
+ * feedback: edit a beat's incoming links from that beat). Same rules as the
+ * flowchart: a default target only when it can fire, one entry per source
+ * and label, not the beat's links to itself.
+ */
+export function incomingLinks(beats: ReadonlyArray<any>, targetId: string): Array<{ source: string; label?: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ source: string; label?: string }> = [];
+  for (const b of beats) {
+    const beat = typeof b?.toJSON === 'function' ? b.toJSON() : b;
+    if (!beat || beat.id === targetId) continue;
+    for (const l of walkBeatLinks(beat)) {
+      if (l.target !== targetId) continue;
+      if (l.via === 'default-target' && !defaultTargetIsLive(beat)) continue;
+      const label = l.via === 'default-target' ? 'auto-advance' : l.label?.trim() || undefined;
+      const key = `${l.source}\u0000${label ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ source: l.source, label });
+    }
+  }
+  return out;
+}

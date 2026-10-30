@@ -8,7 +8,7 @@
  * ignorant of hotspots and QR jumps. These tests pin the union.
  */
 import { describe, it, expect } from 'vitest';
-import { beatLinks, storyLinks, dedupeLinks, beatTargetIds } from '../storyLinks';
+import { beatLinks, storyLinks, dedupeLinks, beatTargetIds, incomingLinks } from '../storyLinks';
 
 describe('beatLinks — one beat, every shape', () => {
   it('reads the builder-native connections array, both spellings', () => {
@@ -233,5 +233,23 @@ describe('conditionBeat exits in the normalize pipeline\'s string-alias form (20
   it('reads trueConnection / falseConnection when they are bare ids', () => {
     const links = beatLinks({ id: 'g', type: 'conditionBeat', parameters: { conditionType: 'counter', trueConnection: 'yes', falseConnection: 'no' } });
     expect(links.map(l => [l.target, l.via, l.path])).toEqual([['yes', 'condition-true', 'trueConnection'], ['no', 'condition-false', 'falseConnection']]);
+  });
+});
+
+describe('incomingLinks', () => {
+  it('lists the beats whose links lead here, with each link\'s label, once each', () => {
+    const beats = [
+      { id: 'hall', type: 'multiChoice', parameters: { choices: [{ id: 'a', text: 'Run', target: 'yard' }, { id: 'b', text: 'Hide', target: 'cellar' }] } },
+      { id: 'cellar', type: 'infoText', parameters: {}, connections: [{ targetId: 'yard' }, { targetId: 'yard' }] },
+      { id: 'yard', type: 'infoText', parameters: {}, connections: [{ targetId: 'yard' }] },
+      { id: 'clock', type: 'infoText', parameters: {}, defaultTarget: 'yard', defaultTargetDelay: 5 },
+      { id: 'idle', type: 'conditionBeat', parameters: {}, defaultTarget: 'elsewhere' },
+    ];
+    expect(incomingLinks(beats, 'yard')).toEqual([
+      { source: 'hall', label: 'Run' },
+      { source: 'cellar', label: undefined },
+      { source: 'clock', label: 'auto-advance' },
+    ]);
+    expect(incomingLinks(beats, 'nowhere')).toEqual([]);
   });
 });
