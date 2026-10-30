@@ -420,6 +420,20 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   const [nodesState, setNodes, onNodesChange] = useNodesState(nodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(edges);
 
+  // Hovering a beat picks out where it leads (class feedback: "hovering a
+  // beat highlights its outgoing lines"): its links drawn thicker and on
+  // top, the rest faded. Only the drawing changes, not the edges.
+  const [hoveredBeatId, setHoveredBeatId] = useState<string | null>(null);
+  const drawnEdges = useMemo(() => {
+    if (!hoveredBeatId || !edgesState.some(e => e.source === hoveredBeatId)) return edgesState;
+    return edgesState.map(e => {
+      const width = Number((e.style as any)?.strokeWidth ?? 2);
+      return e.source === hoveredBeatId
+        ? { ...e, zIndex: 1000, style: { ...e.style, strokeWidth: width + 2, opacity: 1 }, labelStyle: { ...e.labelStyle, fontWeight: 700 } }
+        : { ...e, style: { ...e.style, opacity: 0.2 }, labelStyle: { ...e.labelStyle, opacity: 0.2 }, labelBgStyle: { ...e.labelBgStyle, opacity: 0.2 } };
+    });
+  }, [edgesState, hoveredBeatId]);
+
   // (The old "clear ReactFlow selection when a clustered beat is selected"
   // workaround is gone: clustered beats ARE ReactFlow nodes now, so there is
   // only one selection system.)
@@ -1013,8 +1027,10 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
       {/* Clean minimal viewport - prepare for final render test */}
       <ReactFlow
         nodes={nodesState}
-        edges={edgesState}
+        edges={drawnEdges}
         onNodesChange={onNodesChange}
+        onNodeMouseEnter={(_, node) => setHoveredBeatId(node.id)}
+        onNodeMouseLeave={() => setHoveredBeatId(null)}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
