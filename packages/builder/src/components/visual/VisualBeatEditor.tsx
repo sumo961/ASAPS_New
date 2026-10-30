@@ -1355,6 +1355,8 @@ export const VisualBeatEditor: React.FC<VisualBeatEditorProps> = ({
         >
           <div
             data-stage
+            // The story's own colours: dark mode leaves the stage alone.
+            className="keep-colors"
             style={{
               transform: `scale(${zoom})`,
               transformOrigin: 'center center',

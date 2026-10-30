@@ -3314,7 +3314,7 @@ export const PreviewWindow: React.FC = () => {
             }}
           >
             <div
-              className={`relative bg-white shadow-lg transition-all duration-200 ${
+              className={`keep-colors relative bg-white shadow-lg transition-all duration-200 ${
                 (isPaused || isWaitingToStart) ? 'ring-4 ring-amber-400 ring-offset-2' : ''
               }`}
               /* One sizing rule for both cases: render the stage at its true

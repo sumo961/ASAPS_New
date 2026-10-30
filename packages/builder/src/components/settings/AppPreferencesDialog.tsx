@@ -5,20 +5,21 @@
  * project could see different players or exports, it belongs to the
  * project".
  *
- * One place for: showing or hiding the AI features, AI provider, voices (TTS), speech input (STT), web search,
+ * One place for: light or dark, showing or hiding the AI features, AI provider, voices (TTS), speech input (STT), web search,
  * where keys are stored, and — desktop only — automatic updates and the
  * Claude Desktop (MCP) integration. The provider rows open the existing
  * configuration dialogs rather than duplicating them.
  */
 
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Lightbulb, Volume2, Mic, Search, RefreshCw, Plug, Lock } from 'lucide-react';
+import { X, Sparkles, Lightbulb, Volume2, Mic, Search, RefreshCw, Plug, Lock, Moon } from 'lucide-react';
 import { getSavedAIConfig } from '../../hooks/useAI';
 import { getSavedTTSConfig } from '../../hooks/useTTS';
 import { getSavedSTTConfig } from '../../hooks/useSTT';
 import { getSavedBraveApiKey } from '../ai/ideator/braveConfig';
 import { keyStorageNote } from '../../utils/keyStorageNote';
 import { useAIFeatures, setAIFeaturesEnabled, useBeatSuggestionsSetting, setBeatSuggestionsEnabled } from '../../utils/aiFeatures';
+import { useAppearance, setAppearance, type Appearance } from '../../utils/appearance';
 
 export interface AppPreferencesDialogProps {
   isOpen: boolean;
@@ -74,6 +75,29 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
   </button>
 );
 
+const APPEARANCES: Array<{ value: Appearance; label: string }> = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'As the system' },
+];
+
+const AppearancePicker: React.FC<{ value: Appearance }> = ({ value }) => (
+  <div role="radiogroup" aria-label="Appearance" className="flex rounded-lg border border-gray-300 overflow-hidden flex-shrink-0">
+    {APPEARANCES.map((a) => (
+      <button
+        key={a.value}
+        type="button"
+        role="radio"
+        aria-checked={value === a.value}
+        onClick={() => setAppearance(a.value)}
+        className={`px-2.5 py-1.5 text-xs font-medium ${value === a.value ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+      >
+        {a.label}
+      </button>
+    ))}
+  </div>
+);
+
 export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
   isOpen,
   onClose,
@@ -90,6 +114,7 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
   const [tick, setTick] = useState(0);
   const aiOn = useAIFeatures();
   const suggestionsOn = useBeatSuggestionsSetting();
+  const appearance = useAppearance();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -159,6 +184,12 @@ export const AppPreferencesDialog: React.FC<AppPreferencesDialogProps> = ({
         </div>
 
         <div className="px-5 py-2">
+          <Row
+            icon={<Moon className="w-4 h-4" />}
+            title="Appearance"
+            summary={appearance === 'system' ? 'Light or dark as the computer is set.' : appearance === 'dark' ? 'Dark. The story keeps its own colours.' : 'Light.'}
+            action={<AppearancePicker value={appearance} />}
+          />
           <Row
             icon={<Sparkles className="w-4 h-4" />}
             title="Show AI features"

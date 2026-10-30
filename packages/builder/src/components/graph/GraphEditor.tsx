@@ -30,6 +30,7 @@ import { linkOutputs, type LinkOutput } from '../../utils/linkOutputs';
 import { notify } from '../../utils/notify';
 import { LinkOutputMenu } from './LinkOutputMenu';
 import { usePersistedState } from '../../utils/persistedState';
+import { useIsDark } from '../../utils/appearance';
 
 // Asset type for looking up URLs
 interface Asset {
@@ -918,6 +919,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
   }, [nodesState]);
 
   // Memoized MiniMap color callback to prevent re-creation on every render
+  const dark = useIsDark();
   const miniMapNodeColor = useCallback((node: Node) => node.data?.color || '#94a3b8', []);
 
   // Debug viewport controller using only the reactFlowInstance
@@ -1078,7 +1080,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
         fitView={!savedViewportRef.current}
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
       >
-        <Background color="#aaa" gap={16} />
+        <Background color={dark ? '#3d424b' : '#aaa'} gap={16} />
         <Controls showInteractive={false}>
           {/* Auto-arrange button as first control */}
           {onAutoLayout && (
@@ -1126,6 +1128,7 @@ export const GraphEditor: React.FC<GraphEditorProps> = ({
             nodeStrokeColor={miniMapNodeColor}
             nodeColor={miniMapNodeColor}
             nodeBorderRadius={8}
+            maskColor={dark ? 'rgba(15,17,20,0.6)' : undefined}
             pannable
             zoomable
           />

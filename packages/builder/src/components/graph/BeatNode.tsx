@@ -6,6 +6,7 @@ import { TranslationStaleIndicator } from '../translation/TranslationStaleIndica
 import { dialogTreePhaseCount } from '../../utils/dialogTreePhases';
 import { beatTypeIcons, DEFAULT_BEAT_ICON } from './graphStyle';
 import { beatCastRoles } from '../../utils/roleFindings';
+import { useIsDark } from '../../utils/appearance';
 
 interface BeatNodeData {
   beat: Beat;
@@ -81,6 +82,7 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
   
   // Determine if this node is truly selected (either ReactFlow selected or data.selected)
   const isSelected = selected || data.selected;
+  const dark = useIsDark();
 
   const fullLabel = data.label || 'Unnamed Beat';
   const displayLabel = truncateTitle(fullLabel);
@@ -107,16 +109,16 @@ export const BeatNode = memo<NodeProps<BeatNodeData>>(({ data, selected }) => {
         ? '#dc2626'  // red-600 for past-visited beats
         : isSelected
           ? '#06b6d4'
-          : '#d1d5db';
+          : dark ? '#4b515b' : '#d1d5db';
   const bgColor = data.highlighted
-    ? '#fef9c3'
+    ? (dark ? '#3f3510' : '#fef9c3')
     : data.pwCurrent
-      ? '#fecaca'  // red-200 (brighter) — stands out in the trace
+      ? (dark ? '#5c1a1a' : '#fecaca')  // red-200 (brighter) — stands out in the trace
       : data.pwVisited
-        ? '#fee2e2'  // red-50/100 for past beats
+        ? (dark ? '#3d1717' : '#fee2e2')  // red-50/100 for past beats
         : isSelected
-          ? '#ecfeff'
-          : 'white';
+          ? (dark ? '#123a44' : '#ecfeff')
+          : (dark ? '#2b2f36' : 'white');
 
   return (
     <div

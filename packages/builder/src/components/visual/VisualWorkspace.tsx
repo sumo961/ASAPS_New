@@ -7184,7 +7184,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       style={{ width: devW * effScale, height: devH * effScale }}
                     >
                       <div
-                        className="relative bg-black shadow-xl ring-2 ring-amber-400/80"
+                        className="keep-colors relative bg-black shadow-xl ring-2 ring-amber-400/80"
                         data-slotflow-stage="true"
                         style={{
                           width: devW,
@@ -7198,7 +7198,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                     </div>
                   ) : (
                     // "Editor" preset — fill the area, truly responsive to it.
-                    <div className="relative w-full h-full bg-black shadow-xl ring-2 ring-amber-400/80" data-slotflow-stage="true">
+                    <div className="keep-colors relative w-full h-full bg-black shadow-xl ring-2 ring-amber-400/80" data-slotflow-stage="true">
                       {previewInner}
                     </div>
                   )}

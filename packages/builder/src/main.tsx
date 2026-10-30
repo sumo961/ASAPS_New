@@ -6,6 +6,7 @@ import { TranslationProvider } from './contexts/TranslationContext';
 import { VCSStatusProvider } from './vcs/VCSStatusProvider';
 import { NoticeHost } from './components/feedback/NoticeHost';
 import './styles/main.css';
+import { initAppearance } from './utils/appearance';
 
 /**
  * Bridge component that connects persistence (save) to VCS.
@@ -38,6 +39,9 @@ function VCSBridge({ children }: { children: React.ReactNode }) {
 // own autosave looked like an external change to the PW's watcher and
 // raised the "files changed outside ASAPS" alert with ~120 files listed.
 const isPreviewWindow = typeof window !== 'undefined' && window.location.hash === '#/preview-window';
+
+// Light or dark (App Preferences ▸ Appearance), before the first paint.
+initAppearance();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
