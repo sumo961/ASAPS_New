@@ -35,6 +35,8 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     return () => window.removeEventListener('asaps:focusCommitInput', focus);
   }, []);
   const [isCommitting, setIsCommitting] = useState(false);
+  // Files ticked under Changes, for Stage / Discard on several at once.
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [showIdentityForm, setShowIdentityForm] = useState(false);
   const [identityName, setIdentityName] = useState('');
   const [identityEmail, setIdentityEmail] = useState('');
@@ -94,6 +96,36 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
     if (confirmed) {
       await vcs.cleanUntrackedFiles(files);
     }
+  }, [vcs]);
+
+  /**
+   * Discard several files at once: changed files go back to their last
+   * commit, new (untracked) ones are deleted. One question for all of them.
+   */
+  const handleDiscardPicked = useCallback(async (files: GitFileStatus[]) => {
+    if (!vcs || files.length === 0) return;
+    const tracked = files.filter(f => f.status !== '?').map(f => f.path);
+    const untracked = files.filter(f => f.status === '?').map(f => f.path);
+    const list = files.slice(0, 10).map(f => `${f.status === '?' ? 'delete' : 'revert'}  ${f.path}`).join('\n  ');
+    const more = files.length > 10 ? `\n  ...and ${files.length - 10} more` : '';
+    const what = [
+      tracked.length ? `${tracked.length === 1 ? '1 changed file goes' : `${tracked.length} changed files go`} back to the last commit` : '',
+      untracked.length ? `${untracked.length === 1 ? '1 new file is' : `${untracked.length} new files are`} deleted (never committed)` : '',
+    ].filter(Boolean).join('; ');
+    const confirmed = await confirmAction({
+      title: `Discard ${files.length === 1 ? '1 file' : `${files.length} files`}?`,
+      message: `${what}. This cannot be undone.\n\n  ${list}${more}`,
+      confirmLabel: `Discard ${files.length === 1 ? '1 file' : `${files.length} files`}`,
+      destructive: true,
+    });
+    if (!confirmed) return;
+    let changed = false;
+    if (tracked.length) changed = (await vcs.revertFiles(tracked)).success || changed;
+    if (untracked.length && vcs.cleanUntrackedFiles) { await vcs.cleanUntrackedFiles(untracked); changed = true; }
+    setPicked(new Set());
+    // As for a single revert: reload the project from disk so the in-memory
+    // story isn't saved back over the discarded files.
+    if (changed) window.dispatchEvent(new CustomEvent('asaps:git-reset'));
   }, [vcs]);
 
   /**
@@ -192,6 +224,13 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
   const staged = vcs.stagedFiles;
   const unstaged = vcs.unstagedFiles;
   const untrackedFiles = unstaged.filter(f => f.status === '?');
+  // Ticked files that are still listed (a refresh drops the rest).
+  const pickedFiles = unstaged.filter(f => picked.has(f.path));
+  const togglePicked = (path: string) => setPicked(prev => {
+    const next = new Set(prev);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    return next;
+  });
 
   const renderFileRow = (file: GitFileStatus, isStaged: boolean) => {
     const info = statusIcons[file.status] || { icon: file.status, color: '#94a3b8' };
@@ -229,6 +268,15 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
         }}
         className="hover:bg-slate-800"
       >
+        {!isStaged && (
+          <input
+            type="checkbox"
+            checked={picked.has(file.path)}
+            onChange={() => togglePicked(file.path)}
+            style={{ flexShrink: 0, margin: 0 }}
+            aria-label={`Select ${file.path}`}
+          />
+        )}
         <span
           style={{
             width: 16,
@@ -319,9 +367,36 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
         {unstaged.length > 0 && (
           <div>
             <div style={sectionHeaderStyle}>
-              <span>Changes ({unstaged.length})</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={pickedFiles.length === unstaged.length}
+                  ref={(el) => { if (el) el.indeterminate = pickedFiles.length > 0 && pickedFiles.length < unstaged.length; }}
+                  onChange={() => setPicked(pickedFiles.length === unstaged.length ? new Set() : new Set(unstaged.map(f => f.path)))}
+                  style={{ margin: 0 }}
+                  aria-label="Select all changes"
+                />
+                <span>Changes ({unstaged.length})</span>
+              </label>
               <div style={{ display: 'flex', gap: 4 }}>
-                {untrackedFiles.length > 0 && (
+                {pickedFiles.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => handleDiscardPicked(pickedFiles)}
+                      style={{ ...smallBtnStyle, color: '#f87171', borderColor: '#7f1d1d' }}
+                      title="Changed files go back to the last commit; new files are deleted"
+                    >
+                      Discard ({pickedFiles.length})
+                    </button>
+                    <button
+                      onClick={async () => { await handleStage(pickedFiles.map(f => f.path)); setPicked(new Set()); }}
+                      style={smallBtnStyle}
+                    >
+                      Stage ({pickedFiles.length})
+                    </button>
+                  </>
+                )}
+                {pickedFiles.length === 0 && untrackedFiles.length > 0 && (
                   <button
                     onClick={() => handleDiscardUntracked(untrackedFiles.map(f => f.path))}
                     style={{ ...smallBtnStyle, color: '#f87171', borderColor: '#7f1d1d' }}
@@ -329,12 +404,14 @@ export const PendingChangesTab: React.FC<PendingChangesTabProps> = ({ onViewDiff
                     Discard Untracked
                   </button>
                 )}
-                <button
-                  onClick={() => handleStage(unstaged.map(f => f.path))}
-                  style={smallBtnStyle}
-                >
-                  Stage All
-                </button>
+                {pickedFiles.length === 0 && (
+                  <button
+                    onClick={() => handleStage(unstaged.map(f => f.path))}
+                    style={smallBtnStyle}
+                  >
+                    Stage All
+                  </button>
+                )}
               </div>
             </div>
             {unstaged.map(f => renderFileRow(f, false))}
