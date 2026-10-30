@@ -383,7 +383,7 @@ When a **translation language** is active, the Visual Editor overlays translated
 
 Sometimes you just want to write. The **Script** tab puts all of your story's text on one page, like a manuscript, so you can read it through and change words without opening beats one by one.
 
-**Reading order.** The page starts at your story's first beat and follows the links: each branch is read to its end before the next one begins, and beats that no link reaches come last. Each beat appears as a card with its name and type, and shows only the text you write for players — titles, Info Text, questions, choices (the label players read), Dialog Tree lines, hotspot labels, an AI Conversation's opening line, credits. Matching keywords and AI prompts are left out: they're instructions, not prose.
+**Reading order.** The page starts at your story's first beat and follows the links: each branch is read to its end before the next one begins, and beats that no link reaches come last. Each beat appears as a card with its name and type, and shows only the text you write for players — titles, Info Text, questions, choices (the label players read), Dialog Tree lines, the words on a [Free Layout](#free-layout)'s text boxes and buttons, hotspot labels, an AI Conversation's opening line, credits. Matching keywords and AI prompts are left out: they're instructions, not prose.
 
 **Dialog Trees read like a script.** Every line names who says it, and the player's answers are marked *→ Reply*. Replies are indented only where a line has more than one, so a long back-and-forth stays flat and readable; a *Then another character speaks* step simply shows the next line. In a very deep conversation the indent stops growing after six branchings, and the line's label shows how many branchings deep it is instead (for example *7 ›*).
 
@@ -451,13 +451,14 @@ The Inspector changes based on what you've selected. Select a Dialog Tree and yo
 *The expand button widens the panel; **Change type…** turns the beat into another kind of beat.*
 
 <a id="change-beat-type"></a>
-**Change type… — turn a beat into another kind of beat.** Started with an Info Text and realised it should be a choice? Under the Properties heading, next to the beat's type and ID, the **Change type…** menu turns the beat into another type without rebuilding it. It works between **Info Text**, **Explanation**, **Duration Screen**, **End Screen**, **Multi Choice**, **Movement Choice**, **Pick Prop** and **Dialog Tree**.
+**Change type… — turn a beat into another kind of beat.** Started with an Info Text and realised it should be a choice? Under the Properties heading, next to the beat's type and ID, the **Change type…** menu turns the beat into another type without rebuilding it. It works between **Info Text**, **Explanation**, **Duration Screen**, **End Screen**, **Multi Choice**, **Movement Choice**, **Pick Prop**, **Dialog Tree** and **Free Layout**.
 
 - **What stays:** the beat's ID — so every link *to* it keeps working — and its name, place in the flowchart, cluster, speaker, background, sound, notes, and every setting both types have.
 - **Between text beats** (Info Text, Explanation, Duration Screen, End Screen) the text and the onward link stay, effects included.
 - **Between choice beats** (Multi Choice, Movement Choice, Pick Prop) every choice comes along with its target, effects, conditions and sound.
 - **Text beat → choice beat:** the text becomes the question, and its link becomes the first choice (*Continue*). **Choice beat → text beat:** the question becomes the text, and the first choice's link becomes the beat's link.
 - **Dialog Tree:** its first line becomes the text or question, and its replies the choices — and the other way round.
+- **Into a [Free Layout](#free-layout):** ASAPS lays the screen out for you: a text box with the text or question across the stage, and a button for each choice at its foot (a text beat's link becomes one button, worded like the beat's button). Then open the Visual Editor and move things where you want them. **Out of a Free Layout:** its first text box becomes the text or question, and its buttons become the choices (or, for a text beat, the link). Any further text boxes can't come along, and the notice says so.
 
 The change is **one Undo step**. The notice that confirms it (*"Hallway 3" is now Multi Choice · Undo*) also names anything the new type couldn't keep: the other choices when a choice beat becomes a text beat, the deeper part of a conversation, the Visual Editor layout when the kind of beat changes, or settings the new type doesn't have (only ones you had actually set). If you don't like what you see, Undo brings it all back.
 
@@ -478,7 +479,7 @@ Many fields carry a short grey note underneath that says what the setting does, 
 
 **Effects on a single link.** On a beat with one way on (an Info Text, a Title Screen…), the **Connections** section has a small **When the player continues (optional)** box under the target. Effects you add there — start a counter, record which route was taken, nudge a feeling — run as the player leaves the beat by that link. It's the same effect editor that choices use.
 
-**Default target and Auto-Advance.** Under **Show Advanced Options**, the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video) offer **Auto-Advance Settings**: pick a **Default Target Beat** and an **Auto-Advance Delay (seconds)**, and the beat moves on by itself after that time if the player hasn't. On beat types that never auto-advance the section only appears when a default target is already stored, and says what it does there: it is used only when the beat has no other link.
+**Default target and Auto-Advance.** Under **Show Advanced Options**, the beat types that can auto-advance (Title Screen, Info Text, Dialog Tree, Movement Choice, Pick Prop, Hyper Text, Input Text, Video, Free Layout) offer **Auto-Advance Settings**: pick a **Default Target Beat** and an **Auto-Advance Delay (seconds)**, and the beat moves on by itself after that time if the player hasn't. On beat types that never auto-advance the section only appears when a default target is already stored, and says what it does there: it is used only when the beat has no other link.
 
 ![Inspector Panel](images/05-inspector-panel.png)
 *The Inspector panel shows properties of the selected beat. The Speaker section uses a unified [Character combobox](#character-combobox) — pick a defined Character, type a free-text name, or leave blank for the narrator. The Dialog Tree Editor opens inline on dialog beats; click it to author choices, per-node speakers, and choice effects.*
@@ -490,7 +491,7 @@ Your beat shopping catalog, docked to the right edge of the flowchart. Drag any 
 The palette is organized into four top-level groups, each split into smaller sub-groups so you can scan for what you need:
 
 - **Single Choice** — beats where the interactor reads, watches, or inputs something and then continues forward on a single path. Includes a **Display** sub-group (Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen) and an **Input** sub-group (Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**).
-- **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, **Choose Your Character**, Dialog Tree, AI Dialog Tree, Pick Prop), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
+- **Multi Choice** — beats where the interactor picks one of several paths. Includes **Buttons** (Multi Choice, **Choose Your Character**, Dialog Tree, AI Dialog Tree, Pick Prop, **Free Layout**), **Input** (AI Conversation), **Spatial** (Movement Choice, 360 Panorama, GPS Location, Indoor Location), and **In-text** (Hyper Text).
 - **Timed** — beats that auto-advance after a duration with no user input required (Duration Screen, AI Duration Screen, Video Beat).
 - **Logic** — invisible beats that branch or mutate state behind the scenes (Condition Check, AI Condition, Set Variable/Counter, Inventory Management, Random Target, **Set GPS Location**, Set Timer, Update Affect).
 
@@ -747,7 +748,7 @@ Multi Choice is Dialog Tree without the nesting: an NPC line or a narrator's que
 In a responsive project the Visual Editor's left panel offers a **Layout Template** — *Stacked (prompt + buttons)*, *Conversation (side-by-side)*, *Chat - Single Bubble*, or *Custom (drag-place)*. Like Dialog Tree, a Conversation layout falls back to stacked on phone-width stages. To set one choice apart (say, a *Leave* button in a corner), pin it from the Elements tab; see [Per-button pins](#per-button-pins-action-slot).
 
 <a id="unlinked-choices"></a>
-**A choice that isn't linked yet.** Sketching a scene, you'll often play it before every choice leads somewhere. That's fine: picking a choice with no target simply does nothing. The choices stay on screen and the player can pick another one. The choice's effects don't run and it isn't counted as taken. In the Preview Window an amber notice says which choice still needs a target (*"Go to the mall" isn't linked to a beat yet, so nothing happens. Pick where it leads in the Properties panel of "Choose Your Path".*); it goes away at the next beat. Exported stories behave the same way, without the notice. This holds for Multi Choice, Choose Your Character and Movement Choice. (Dialog Trees have their own rule: a line with no reply and no target ends the conversation and follows the beat's own link.)
+**A choice that isn't linked yet.** Sketching a scene, you'll often play it before every choice leads somewhere. That's fine: picking a choice with no target simply does nothing. The choices stay on screen and the player can pick another one. The choice's effects don't run and it isn't counted as taken. In the Preview Window an amber notice says which choice still needs a target (*"Go to the mall" isn't linked to a beat yet, so nothing happens. Pick where it leads in the Properties panel of "Choose Your Path".*); it goes away at the next beat. Exported stories behave the same way, without the notice. This holds for Multi Choice, Choose Your Character, Movement Choice and the buttons on a [Free Layout](#free-layout). (Dialog Trees have their own rule: a line with no reply and no target ends the conversation and follows the beat's own link.)
 
 **When to Use:** Quick decisions, quiz questions, "which way?" moments that don't need a conversation.
 
@@ -776,6 +777,41 @@ A Multi Choice whose buttons are people. Each choice names a character, and pick
 In a fixed layout with hand-placed buttons, the description shows when the pointer rests on a button instead of as a second line (a placed button keeps its size). Picture cards fill the box you placed: a tall box is a card, and a box sized for a text button shows a small picture beside the name. **Reset Layout** in the Visual Editor lays the choices out as a row of cards.
 
 **When to Use:** Story openings where the interactor picks a protagonist; any moment that decides who fills a part for the rest of the story.
+
+---
+
+<a id="free-layout"></a>
+### Free Layout
+
+**Purpose:** A screen you lay out by hand — words, buttons and pictures exactly where you want them.
+
+Most beats arrange their text and buttons for you. A Free Layout hands you a blank stage instead: put a text box in the top corner, a signpost picture on the left, two buttons at the bottom, a character who can be clicked. It's the beat for title cards with a twist, comic-style panels, a map with clickable places, or any screen whose look matters as much as its words. You'll find it in the palette's **Multi Choice → Buttons** group, with the 🧩 icon.
+
+**Building the screen (Visual Editor).** Select the beat and open the **Visual Editor**. At the top of the **Elements** list, **Character**, **Prop**, **Text** and **Button** add an element to the stage; drag it into place and pull its corners to size it. The words go straight on the element: select a text box or a button, and type in its **Text** or **Button text** field in the left panel. A picture or character can be a button too: select it and tick **Clickable — works as a button**.
+
+![The Visual Editor on a Free Layout beat: the Elements list with Character, Prop, Text and Button, the selected button's Button text "Take the stairs" in the left panel, the stage with a text box "The lobby is empty. Where now?" and two buttons, and the Properties panel's Buttons list with where each button leads](images/101-free-layout-visual-editor.png)
+*Write the words on the stage in the Visual Editor (left); say where each button leads in the Properties panel (right).*
+
+**Where the buttons lead (Properties panel).** Under **Buttons**, the Properties panel lists every button on the stage, named by its words (a clickable picture by its name). Each one has the same editors as a Multi Choice choice: where it **leads to** (the [searchable beat picker](#beat-picker)), **Show only if…** conditions (a button whose conditions don't match isn't shown — see [Earned options](#conditional-choices)), **Effects** and a **Sound Effect**. You can also [draw the links in the flowchart](#drawing-links). Add or delete a button in the Visual Editor and the list follows at once. A button that isn't linked yet behaves like any [choice that isn't linked yet](#unlinked-choices): clicking it does nothing, and the screen stays up.
+
+**Timers and "click anywhere".** A Free Layout has no timer of its own; it uses the same **Auto-Advance Settings** as other beats (under **Show Advanced Options**): a **Default Target Beat**, the **Auto-Advance Delay**, **Show countdown timer to player**, and the countdown meter. If the screen has no buttons and no timer, a click anywhere moves on to the beat chosen in **Next (click anywhere), go to** — handy for a full-screen picture or a chapter card.
+
+**Second visits.** **Block and dim visited choices** dims buttons the player already picked, and **Effects fire only on first pick** lets a button's effects count only the first time — the same pair as on Multi Choice (see [What happens on a second visit?](#revisit-policy)). **Explain HUDs on entry** works as on other beats.
+
+![The same Free Layout in the Preview: the countdown bar along the top, the text box "The lobby is empty. Where now?" and the two buttons "Take the stairs" and "Wait here" where the author placed them](images/103-free-layout-preview.png)
+*In the Preview. The green bar at the top is the auto-advance countdown.*
+
+**On different screens.** A Free Layout follows your project's [layout mode](#responsive-vs-fixed-layout):
+- **Fixed canvas:** the stage is drawn exactly as you placed it and scaled to fit the player's window, like every hand-placed beat.
+- **Responsive:** every element keeps its place and size as a share of the stage, so a button placed in the bottom-right corner stays in the bottom-right corner on a phone. The words (and the padding inside text boxes) shrink or grow with the stage, within reason, and a box grows taller when its words need more room. Nothing is moved out of the way: what you placed is where it shows. On a phone, short button words keep the buttons the same height — try your screen at the Preview's **Phone** sizes.
+
+**Words everywhere.** The words on a Free Layout's text boxes and buttons appear in the [Script view](#script-view) (labelled with the element's name), travel out to Markdown and back, and are offered for [translation](#multi-language-translation) like any other text.
+
+**Turning an existing beat into one.** Already wrote the scene as an Info Text, a Multi Choice or a Dialog Tree? [Change type…](#change-beat-type) turns it into a Free Layout with a text box and buttons laid out for you, ready to rearrange — and back again.
+
+Free Layout screens are made by hand: AI story generation doesn't create them.
+
+**When to Use:** Screens whose look carries the story: illustrated title or chapter cards, comic panels, clickable maps and scenes, a "who do you talk to?" screen where the characters themselves are the buttons.
 
 ---
 
@@ -1357,6 +1393,8 @@ Give characters items or take them away. Items can be transferred between charac
 - Add item to character's inventory
 - Remove item from character
 - Transfer item from one character to another
+
+**Item — pick it, don't guess it.** To the story, "Sword" and "sword" are two different items, so a key picked up as *Rusty Key* won't open a door that checks for *rusty key*. The **Item** field helps you stay consistent: it lists the items your story already knows (those in your characters' [inventory lists](#character-inventory) and those other beats already use), so you can pick the one you mean. For an item that's new to the story, choose **+ New item...** and type its name. If a name you type differs from a known item only in capitals or spacing, a small note says so (*Another beat or character calls it "Sword". Use "Sword"*) — click **Use "Sword"** to switch to it.
 
 **Item picture.** Click **Choose picture…** to pick (or upload) the picture the inventory shows for the item; **Change** swaps it and the small **×** removes it. Pick it once: the picture belongs to the item's name, so every other beat or effect that adds or hands over the same item shows it too. You need it for items that are new to the story. An item that already has a picture in a character's [inventory list](#character-inventory) (any character's, not only the one who holds it) or that is picked up through a [Pick Prop](#pick-prop) beat keeps that picture: it wins over the one chosen here. The **Add Inventory** and **Remove Inventory** effects on choices, dialog lines and links have the same small **Picture** button.
 
@@ -2333,7 +2371,7 @@ The migrator preview lists the per-beat changes so you can see what will happen 
 
 ### Which beats render through slot mode?
 
-The slot system covers most of the visible beat catalogue: Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen, Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**, Multi Choice, Hyper Text, Duration Screen, AI Duration Screen, Video Beat, and AI Conversation. AI Dialog Tree carries the slot scaffolding too. Self-contained slot **roles** — `camera` (QR Scan), `webview` (Web View), `ar` (AR Scene), and `imageInput` (Input Image) — mount their elements via `SlotFlowView`. If you're authoring in Responsive mode, these beats reflow cleanly across desktop, tablet, and phone viewports out of the box; use the Preview Window's Viewport switcher (Fit / Desktop / Tablet / Phone) to sanity-check.
+The slot system covers most of the visible beat catalogue: Title Screen, Info Text, AI Info Text, AI Summary, Online Content, **Web View**, End Screen, Input Text, **Input Image**, Keypad, **QR Scan**, **AR Scene**, Multi Choice, Hyper Text, Duration Screen, AI Duration Screen, Video Beat, and AI Conversation. AI Dialog Tree carries the slot scaffolding too. Self-contained slot **roles** — `camera` (QR Scan), `webview` (Web View), `ar` (AR Scene), and `imageInput` (Input Image) — mount their elements via `SlotFlowView`. (A [Free Layout](#free-layout) is the exception by design: you place its elements by hand, and in a responsive project each one keeps its place and size as a share of the stage.) If you're authoring in Responsive mode, these beats reflow cleanly across desktop, tablet, and phone viewports out of the box; use the Preview Window's Viewport switcher (Fit / Desktop / Tablet / Phone) to sanity-check.
 
 ### Authoring affordances that change with the mode
 
@@ -2398,6 +2436,12 @@ Each character placement includes:
 - Which appearance to show
 - Layer order (z-index)
 
+<a id="flip-pictures"></a>
+**Facing the other way: Flip.** Need your character to look left instead of right, or a prop turned upside down? No need to draw and import a second picture. Select the character or prop, and under **Rotation** use the **Flip** buttons: **⇋ Left–right** mirrors it, **⇅ Upside down** turns it over. Click again to flip it back; each click is one Undo step. The flip shows in the Visual Editor, the Preview and exported stories. (While a [waypoint animation](#waypoint-animations) that walks the character the other way is playing, the animation decides which way they face.)
+
+![The Visual Editor's properties for a selected picture: Rotation, then Flip with the buttons Left–right and Upside down, Layer, Lock position, Name, and the ticked checkbox "Clickable — works as a button" that a Free Layout adds](images/102-visual-editor-flip-clickable.png)
+*Flip sits right under Rotation. On a [Free Layout](#free-layout), pictures and characters also get **Clickable — works as a button**.*
+
 <a id="partly-off-stage"></a>
 **Partly off the stage is fine.** A figure cropped by the edge of the frame, a branch that reaches in from the left, a prop peeking up from the bottom: you can drag an element (or nudge it with the arrow keys, Shift for 10 px steps) past any edge of the stage. ASAPS only stops it when about 24 px are left on the stage, so there is always a strip to grab and pull it back. The **X** and **Y** fields take negative numbers too, for example *X: −40*. In a responsive project, where characters and props are placed by **X %** and **Y %** of the stage, the same holds: type *−15* or pull the slider past 0, down to where about 24 px are left on stage.
 
@@ -2422,7 +2466,7 @@ On a fixed canvas, ASAPS keeps buttons readable when the story plays (in the Pre
 
 That suits most scenes. When you want a button exactly where you put it — on top of a picture, or overlapping the text on purpose — select it and tick **Lock position** in the properties panel. A locked button never moves; the other buttons still make room around it.
 
-Lock position only appears in fixed-canvas projects (responsive layouts arrange buttons themselves), and it matters for beats such as Movement Choice and Pick Prop. **Multi Choice** buttons always stay exactly where you put them, so they never need it. **Dialog Tree** buttons form a stack under the text box instead (see [Dialog-Tree Choices](#dialog-choices-visual-editor)), so they don't show the checkbox.
+Lock position only appears in fixed-canvas projects (responsive layouts arrange buttons themselves), and it matters for beats such as Movement Choice and Pick Prop. **Multi Choice** buttons always stay exactly where you put them, so they never need it, and neither does anything on a [Free Layout](#free-layout): nothing there is ever moved out of the way. **Dialog Tree** buttons form a stack under the text box instead (see [Dialog-Tree Choices](#dialog-choices-visual-editor)), so they don't show the checkbox.
 
 ### Hotspots: Invisible Click Zones
 
@@ -4416,7 +4460,7 @@ Create localized versions of your story with AI-assisted translation:
 - Translations are stored alongside the story data
 - **Staleness detection** highlights translations that may be outdated when the source text changes
 
-**Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, and an AI Conversation's scripted opening line. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
+**Everything the player sees translates (v0.9.71+).** Translation coverage isn't limited to your authored beat text — since v0.9.71 *all* player-facing text follows the active language, in the Preview Window and in exports alike. That includes the pieces that used to be easy to miss: the inventory HUD title and hints, the AI loading messages ("Thinking…", "…is getting ready to speak"), runtime UI chrome like Continue/Play Again/Credits fallbacks and input placeholders, Multi Choice choice labels, the words on a [Free Layout](#free-layout)'s text boxes and buttons, and an AI Conversation's scripted opening line. One deliberate exception: the Input Image beat's **AI Analysis Prompt** stays in the source language, because it's an instruction to the AI rather than player-facing text.
 
 **Linked characters stay linked (v0.9.110).** When an AI Dialog Tree's **NPC Character** is a defined character, it isn't offered for translation: it's a link, not text, and translating it would turn it into a plain name (and cut the character's description off from the AI). The character's name is translated once, through its [display-name translations](#character-name-translations). A free-text NPC name is still translated like any other text.
 
@@ -4464,6 +4508,7 @@ Quick reference for all beat types.
 | Choose Your Character | Pick who to be (or who comes along) | role, question, choices (each with character, label, description, picture, target, conditions, effects), show options as (buttons / pictures with names / pictures only), choiceDelay, layout template (responsive), markVisited, effectsOncePerChoice |
 | Movement Choice | Navigation | description, destinations (each with target, conditions, effects), markVisited, effectsOncePerChoice |
 | Pick Prop | Item selection | prompt, props (each with target, conditions, effects), display mode, markVisited, effectsOncePerChoice |
+| Free Layout | A screen laid out by hand | text boxes, buttons, props and characters placed in the Visual Editor (words typed on the elements; pictures/characters can be *Clickable — works as a button*), Buttons (each with leads to, Show only if… conditions, effects, sound effect), Next (click anywhere) target (used only with no buttons and no timer), auto-advance (default target, delay, countdown), markVisited, effectsOncePerChoice, explainHuds; fixed: drawn as placed and scaled; responsive: places and sizes kept as shares of the stage, words resize |
 | Duration Screen | Timed display | text, duration, show timer, textVariations (optional) |
 | Video Beat | Video playback | video asset, autoplay, controls, skip, captions (cue rows: start/end/text, auto-translated into per-language subtitles), captionsEnabled, videoTranslations (per-language video override) |
 | Input Text | Text entry | prompt, placeholder, validation, save target |
@@ -4488,7 +4533,7 @@ Quick reference for all beat types.
 | Condition Check | Branching | condition type (counter, counterCompare, timer, inventory, variable, fictionalTime, mood, emotion, trait, sentiment, goal, characterVariant, roleHolder, gpsProximity, indoorProximity, permissionGranted), per-type fields, true target, false target; optional **More conditions** with **all (AND)** / **any (OR)**. (Per-beat *Requirements* — see [Per-Beat Requirements](#condition-beats) — additionally support a `visitedBeat` check.) |
 | Random Target | Randomization | branches, each with target, weight (0 = never; % of playthroughs shown) and optional effects that run when that branch is drawn |
 | Set Timer | Timed events | timer name, duration, expiration target |
-| Inventory Management | Item management | action (add/remove/transfer), item, quantity, character, item picture |
+| Inventory Management | Item management | action (add/remove/transfer), item (picked from the items the story knows, or + New item...; a near-duplicate name gets a hint), quantity, character, item picture |
 | Update Affect | Mood / sentiment / emotion drift, bookmarks, reflections, goal & variant flips | `effects[]` — multi-row Effect array, same shape and editor as a choice's effects (templates, palette auto-complete, live summary, bookmark snapshots). Legacy single-row fields still load and run for older projects. |
 
 ## AI Runtime Beats
@@ -4561,6 +4606,8 @@ Quick reference for all beat types.
 
 **Flowchart** - The visual graph showing beats and their connections.
 
+**Free Layout** - A visible beat laid out by hand in the Visual Editor: text boxes, buttons, pictures and characters placed anywhere on the stage, with the words typed on the elements. Buttons (and pictures or characters marked *Clickable*) lead on like choices. See [Free Layout](#free-layout).
+
 **Hotspot** - An invisible clickable area on the visual stage.
 
 **IDN** - Interactive Digital Narrative. A narrative expression implemented as a dynamic computational system that changes due to input from interactors.
@@ -4607,7 +4654,7 @@ Quick reference for all beat types.
 
 **Earned option** - A choice, destination, or prop with a *Show only if…* condition, so it appears only once the story state allows it (a visited beat, an item held, a variable or counter value, or a character's feeling toward someone). The alternative to duplicating a whole menu with and without the option. See [Earned options](#conditional-choices).
 
-**Effects fire only on first pick** - Per-beat checkbox (`effectsOncePerChoice`) on Dialog Tree, Multi Choice, Movement Choice, and Pick Prop: choices stay selectable on revisits, but their effects apply only the first time. The re-readable-but-once-scored middle ground between a plain repeatable choice and *Block and dim visited choices*. See [What happens on a second visit?](#revisit-policy).
+**Effects fire only on first pick** - Per-beat checkbox (`effectsOncePerChoice`) on Dialog Tree, Multi Choice, Movement Choice, Pick Prop, and Free Layout: choices stay selectable on revisits, but their effects apply only the first time. The re-readable-but-once-scored middle ground between a plain repeatable choice and *Block and dim visited choices*. See [What happens on a second visit?](#revisit-policy).
 
 **Compact HUD strip** - On phone-sized stages, the slim tap-to-expand bar each corner's screen-docked HUDs fold into (initials + micro-bar per metered character, item counts, mood tokens). Controlled by **General Settings → HUDs → Compact HUD on phones** (Auto / Always / Never). See [On phones — the compact HUD strip](#counter-binding).
 

@@ -22,9 +22,18 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.146** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.146 is the class-feedback
-release**: a new **Script** tab shows the whole story's text on one page in
+Current release: **v0.9.147** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.147 is the Free Layout release**:
+a new beat type lets you lay out a screen by hand in the Visual Editor, with
+text boxes, buttons, pictures and characters wherever you want them. Each
+button, or a picture you make clickable, leads on like a choice, with its own
+conditions and effects; the usual auto-advance timer and countdown work on it
+too. In a responsive project the screen keeps its proportions on every device
+and the words resize with it. Change type turns an existing beat into a Free
+Layout and back. You can also flip pictures in the Visual Editor, and Add/Remove
+Inventory now offers the items your story already knows.
+
+**v0.9.146 was the class-feedback release**: a new **Script** tab shows the whole story's text on one page in
 reading order, editable in place, and saves it as Markdown to write in
 Obsidian or Google Docs and read it back. Draw a link by dragging from one
 beat onto another (a beat with several choices asks which one), search any

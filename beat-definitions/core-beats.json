@@ -1435,13 +1435,19 @@
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "Dim buttons the player already picked and stop them being picked again."
+          "description": "Dim buttons the player already picked and stop them being picked again.",
+          "ui": {
+            "label": "Block and dim visited choices"
+          }
         },
         "effectsOncePerChoice": {
           "type": "boolean",
           "required": false,
           "default": false,
-          "description": "A button's effects fire only the first time it is picked; the button stays clickable."
+          "description": "A button's effects fire only the first time it is picked; the button stays clickable.",
+          "ui": {
+            "label": "Effects fire only on first pick"
+          }
         },
         "explainHuds": {
           "type": "boolean",
