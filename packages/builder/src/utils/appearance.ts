@@ -199,6 +199,11 @@ export function darkStylesheet(): string {
   // Translucent white panels (the opacity variants the components use).
   out.push(rule(['60', '70', '80', '90', '95'].map((o) => sel(`bg-white/${o}`)), 'background-color: rgba(32,35,41,0.92);'));
   out.push(rule(greys.map((g) => sel(`bg-${g}-100/80`)), `background-color: ${SURFACE['100']};`));
+  // Grey gradients (a character card without a portrait).
+  for (const shade of ['50', '100', '200']) {
+    out.push(rule(greys.map((g) => `.from-${g}-${shade}`), `--tw-gradient-from: ${SURFACE[shade]} var(--tw-gradient-from-position); --tw-gradient-to: transparent var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);`));
+    out.push(rule(greys.map((g) => `.to-${g}-${shade}`), `--tw-gradient-to: ${SURFACE[shade]} var(--tw-gradient-to-position);`));
+  }
 
   // The flowchart's own controls (ReactFlow 11 has no dark mode of its own).
   out.push(rule(['.react-flow__controls-button'], `background: ${SURFACE['100']}; border-bottom-color: ${BORDER['200']}; color: ${TEXT['700']}; fill: ${TEXT['700']};`));

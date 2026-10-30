@@ -3,7 +3,7 @@
 ## Unreleased (since v0.9.148, 2026-10-30)
 
 ### Overview
-Work after v0.9.148: fonts made for easier reading, for the builder and for stories; the speaker picker follows light and dark; Undo takes back a hotspot or picture made from the Properties panel. The User Guide starts with installing, a 15-minute tutorial and Common Hiccups.
+Work after v0.9.148: fonts made for easier reading, for the builder and for stories; the speaker picker, the character pads and the last light spots follow dark mode; Undo takes back a hotspot or picture made from the Properties panel. The User Guide starts with installing, a 15-minute tutorial and Common Hiccups.
 
 ### Easier-to-read fonts (class feedback: "dyslexia-friendly font")
 - Three free fonts (SIL Open Font License, from Fontsource 5.3.0, Latin subset) ship in `public/fonts/reading` with their licences: **Lexend**, **Atkinson Hyperlegible** and **OpenDyslexic**. The research doesn't single out one font as better for dyslexic readers, so the choice is the reader's.
@@ -20,11 +20,12 @@ Work after v0.9.148: fonts made for easier reading, for the builder and for stor
 - App Preferences' update switch no longer says new versions "download in the background": ASAPS offers them and asks first.
 
 ### Fixes
+- **Dark mode's last light spots.** The character pads (mood and interpersonal stance, in the character editor's Affect tab and the affect panel) drew with fixed light colours; they now take a light or dark set from `components/characters/padColors.ts` (`useIsDark`), with fainter quadrant tints in dark. A character card without a portrait kept its light grey gradient: the dark stylesheet now maps grey gradient stops (`from-/to-gray-50/100/200`). The Visual Editor's "gap" grip sits on the stage, out of the stylesheet's reach, and now turns dark too. Checked headless in dark mode on a new Merchant character and a Multi Choice in the Visual Editor.
 - **The speaker picker is light in light mode.** The Speaker field (Properties panel, Dialog Tree editor, inventory and AI-character fields — `CharacterRefField`) was drawn with fixed dark colours from the start, a dark box in the light panels around it. Its colours are now CSS variables on the field: a light set normally, the old dark set in dark mode (`useIsDark`). Checked headless on RED: the field and its dropdown are light.
 
 - **Undo takes back a hotspot or picture made from the Properties panel.** "New" next to a Movement Choice choice (and the same for a Pick Prop option, a panorama hotspot, or a picture chosen for a prop) put the element on the beat before the undo step's "before" copy was taken, so Undo put the choice back but left the element. The copy is now taken first (`rebuildConnectionsAndUpdate(beat, before)`). The open Visual Editor keeps its own element list and only reloads on another beat, so it now follows the beat for elements the Properties panel added: Undo takes them off the stage, Redo puts them back (matched by element id, as another element can carry the same name; acting only when the beat gains or loses one, so its own write-backs can't loop it). Checked headless on RED's Choose Your Path: New, Undo, Redo, Undo show 2, 1, 2, 1 of the choice's name on the stage, the beat's locations follow, and the page stays responsive. A first version matched by name and took the choice's own element with it, and hung the page; neither is in the commit.
 
-**Files modified:** docs/USER_GUIDE.md, packages/builder/src/components/settings/AppPreferencesDialog.tsx, packages/builder/src/components/characters/CharacterRefField.tsx, components/Inspector.tsx, components/visual/VisualWorkspace.tsx, components/settings/GlobalSettingsInspector.tsx, main.tsx, utils/readingFont.ts (new), utils/__tests__/readingFont.test.ts (new), packages/builder/public/fonts/reading/ (new)
+**Files modified:** docs/USER_GUIDE.md, packages/builder/src/components/settings/AppPreferencesDialog.tsx, packages/builder/src/components/characters/CharacterRefField.tsx, components/Inspector.tsx, components/visual/VisualWorkspace.tsx, components/settings/GlobalSettingsInspector.tsx, main.tsx, utils/readingFont.ts (new), utils/__tests__/readingFont.test.ts (new), packages/builder/public/fonts/reading/ (new), components/characters/MoodPad.tsx, components/characters/StancePad.tsx, components/characters/padColors.ts (new), utils/appearance.ts
 
 ---
 

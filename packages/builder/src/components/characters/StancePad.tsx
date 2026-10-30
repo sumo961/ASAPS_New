@@ -15,6 +15,8 @@
  */
 
 import React, { useCallback, useRef } from 'react';
+import { useIsDark } from '../../utils/appearance';
+import { padColors } from './padColors';
 import type { InterpersonalStance } from '../../services/prompts/interpersonalStance';
 
 export interface StancePadProps {
@@ -42,6 +44,7 @@ export const StancePad: React.FC<StancePadProps> = ({
   warmth, dominance, onChange, traitsPosition, derived = false,
   size = 220, title, subtitle, showLabels = true, testId,
 }) => {
+  const c = padColors(useIsDark());
   const interactive = typeof onChange === 'function';
   const padRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
@@ -86,7 +89,7 @@ export const StancePad: React.FC<StancePadProps> = ({
 
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }} data-testid={testId}>
-      {title && <div style={titleStyle}>{title}</div>}
+      {title && <div style={{ ...titleStyle, color: c.label }}>{title}</div>}
       <svg
         ref={padRef}
         viewBox="0 0 100 100"
@@ -97,7 +100,7 @@ export const StancePad: React.FC<StancePadProps> = ({
         onPointerUp={onUp}
         onPointerCancel={onUp}
         style={{
-          background: '#fafafa',
+          background: c.background,
           borderRadius: 4,
           touchAction: 'none',
           cursor: interactive ? 'crosshair' : 'default',
@@ -105,53 +108,53 @@ export const StancePad: React.FC<StancePadProps> = ({
         }}
       >
         {/* Leary's rose: square frame + inscribed circle */}
-        <rect x={0} y={0} width={100} height={100} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.5} />
-        <circle cx={50} cy={50} r={48} fill="#fafafa" stroke="#d1d5db" strokeWidth={0.5} />
+        <rect x={0} y={0} width={100} height={100} fill={c.frame} stroke={c.frameStroke} strokeWidth={0.5} />
+        <circle cx={50} cy={50} r={48} fill={c.circle} stroke={c.circleStroke} strokeWidth={0.5} />
 
         {/* Quadrant tints: hostile (cold-dominant) red, leading (warm-dominant)
             amber, withdrawn (cold-submissive) blue, cooperative (warm-
             submissive) green — same faintness as MoodPad. */}
-        <path d="M 50 50 L 0 50 L 0 0 Z"     fill="#fee2e2" opacity={0.25} />
-        <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fef3c7" opacity={0.25} />
-        <path d="M 50 50 L 0 50 L 0 100 Z"   fill="#dbeafe" opacity={0.25} />
-        <path d="M 50 50 L 100 50 L 100 100 Z" fill="#dcfce7" opacity={0.25} />
+        <path d="M 50 50 L 0 50 L 0 0 Z"     fill="#fee2e2" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fef3c7" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 0 50 L 0 100 Z"   fill="#dbeafe" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 100 50 L 100 100 Z" fill="#dcfce7" opacity={c.tintOpacity} />
 
         {/* Axis cross */}
-        <line x1={2} y1={50} x2={98} y2={50} stroke="#9ca3af" strokeWidth={0.4} />
-        <line x1={50} y1={2} x2={50} y2={98} stroke="#9ca3af" strokeWidth={0.4} />
+        <line x1={2} y1={50} x2={98} y2={50} stroke={c.axis} strokeWidth={0.4} />
+        <line x1={50} y1={2} x2={50} y2={98} stroke={c.axis} strokeWidth={0.4} />
 
         {showLabels && (
           <>
             {/* Axis words at the cardinals */}
-            <text x={50} y={8}   textAnchor="middle" fontSize={6.2} fontWeight={500} fill="#4b5563">dominant</text>
-            <text x={50} y={97}  textAnchor="middle" fontSize={6.2} fontWeight={500} fill="#4b5563">submissive</text>
-            <text x={2.5} y={52} textAnchor="start"  fontSize={6.2} fontWeight={500} fill="#4b5563">cold</text>
-            <text x={97.5} y={52} textAnchor="end"   fontSize={6.2} fontWeight={500} fill="#4b5563">warm</text>
+            <text x={50} y={8}   textAnchor="middle" fontSize={6.2} fontWeight={500} fill={c.labelStrong}>dominant</text>
+            <text x={50} y={97}  textAnchor="middle" fontSize={6.2} fontWeight={500} fill={c.labelStrong}>submissive</text>
+            <text x={2.5} y={52} textAnchor="start"  fontSize={6.2} fontWeight={500} fill={c.labelStrong}>cold</text>
+            <text x={97.5} y={52} textAnchor="end"   fontSize={6.2} fontWeight={500} fill={c.labelStrong}>warm</text>
             {/* Leary octant labels in the quadrant corners */}
-            <text x={13} y={19} textAnchor="start" fontSize={5.2} fill="#b91c1c" opacity={0.85} fontStyle="italic">hostile</text>
-            <text x={87} y={19} textAnchor="end"   fontSize={5.2} fill="#b45309" opacity={0.85} fontStyle="italic">leading</text>
-            <text x={13} y={87} textAnchor="start" fontSize={5.2} fill="#1d4ed8" opacity={0.85} fontStyle="italic">withdrawn</text>
-            <text x={87} y={87} textAnchor="end"   fontSize={5.2} fill="#15803d" opacity={0.85} fontStyle="italic">cooperative</text>
+            <text x={13} y={19} textAnchor="start" fontSize={5.2} fill={c.quadrants[0]} opacity={0.85} fontStyle="italic">hostile</text>
+            <text x={87} y={19} textAnchor="end"   fontSize={5.2} fill={c.quadrants[1]} opacity={0.85} fontStyle="italic">leading</text>
+            <text x={13} y={87} textAnchor="start" fontSize={5.2} fill={c.quadrants[2]} opacity={0.85} fontStyle="italic">withdrawn</text>
+            <text x={87} y={87} textAnchor="end"   fontSize={5.2} fill={c.quadrants[3]} opacity={0.85} fontStyle="italic">cooperative</text>
           </>
         )}
 
         {/* Trait-derived ghost marker (hollow) */}
         {showTraitsDot && traitsDot && (
           <g>
-            <circle cx={traitsDot.x} cy={traitsDot.y} r={2.4} fill="none" stroke="#9ca3af" strokeWidth={1} strokeDasharray="1.5 1" />
-            <text x={traitsDot.x + 3.4} y={traitsDot.y + 1.7} fontSize={4.8} fill="#6b7280" style={{ pointerEvents: 'none' }}>traits</text>
+            <circle cx={traitsDot.x} cy={traitsDot.y} r={2.4} fill="none" stroke={c.axis} strokeWidth={1} strokeDasharray="1.5 1" />
+            <text x={traitsDot.x + 3.4} y={traitsDot.y + 1.7} fontSize={4.8} fill={c.label} style={{ pointerEvents: 'none' }}>traits</text>
           </g>
         )}
 
         {/* Stance dot — hollow when merely derived from traits, solid when authored */}
         {derived ? (
-          <circle cx={dot.x} cy={dot.y} r={3} fill="#ffffff" stroke="#111827" strokeWidth={1.1} strokeDasharray="2 1" />
+          <circle cx={dot.x} cy={dot.y} r={3} fill={c.dotRing} stroke={c.dot} strokeWidth={1.1} strokeDasharray="2 1" />
         ) : (
-          <circle cx={dot.x} cy={dot.y} r={3} fill="#111827" stroke="#ffffff" strokeWidth={0.9} />
+          <circle cx={dot.x} cy={dot.y} r={3} fill={c.dot} stroke={c.dotRing} strokeWidth={0.9} />
         )}
       </svg>
-      {subtitle && <div style={subtitleStyle}>{subtitle}</div>}
-      <div style={readoutStyle}>
+      {subtitle && <div style={{ ...subtitleStyle, color: c.labelStrong }}>{subtitle}</div>}
+      <div style={{ ...readoutStyle, color: c.labelStrong }}>
         <span>w {warmth >= 0 ? '+' : ''}{warmth.toFixed(2)}</span>
         <span style={{ marginLeft: 10 }}>d {dominance >= 0 ? '+' : ''}{dominance.toFixed(2)}</span>
       </div>
@@ -166,6 +169,6 @@ function clampUnit(v: number): number {
   return v === 0 ? 0 : v;
 }
 
-const titleStyle: React.CSSProperties = { fontSize: 12, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
-const subtitleStyle: React.CSSProperties = { fontSize: 13, color: '#4b5563', marginTop: 5, fontStyle: 'italic', textAlign: 'center' };
-const readoutStyle: React.CSSProperties = { fontSize: 12, fontFamily: 'monospace', color: '#374151', marginTop: 3 };
+const titleStyle: React.CSSProperties = { fontSize: 12, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
+const subtitleStyle: React.CSSProperties = { fontSize: 13, marginTop: 5, fontStyle: 'italic', textAlign: 'center' };
+const readoutStyle: React.CSSProperties = { fontSize: 12, fontFamily: 'monospace', marginTop: 3 };

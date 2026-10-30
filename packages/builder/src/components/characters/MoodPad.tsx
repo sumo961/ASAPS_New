@@ -18,6 +18,8 @@
  */
 
 import React, { useCallback, useRef } from 'react';
+import { useIsDark } from '../../utils/appearance';
+import { padColors } from './padColors';
 import type { EmotionDefinition } from '@asaps/core';
 
 export interface MoodPadProps {
@@ -46,6 +48,7 @@ export const MoodPad: React.FC<MoodPadProps> = ({
   valence, arousal, onChange, palette, size = 180,
   title, subtitle, showLabels = true, testId,
 }) => {
+  const c = padColors(useIsDark());
   const interactive = typeof onChange === 'function';
   const padRef = useRef<SVGSVGElement | null>(null);
   const draggingRef = useRef(false);
@@ -86,7 +89,7 @@ export const MoodPad: React.FC<MoodPadProps> = ({
 
   return (
     <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }} data-testid={testId}>
-      {title && <div style={titleStyle}>{title}</div>}
+      {title && <div style={{ ...titleStyle, color: c.label }}>{title}</div>}
       <svg
         ref={padRef}
         viewBox="0 0 100 100"
@@ -97,7 +100,7 @@ export const MoodPad: React.FC<MoodPadProps> = ({
         onPointerUp={onUp}
         onPointerCancel={onUp}
         style={{
-          background: '#fafafa',
+          background: c.background,
           borderRadius: 4,
           touchAction: 'none',
           cursor: interactive ? 'crosshair' : 'default',
@@ -105,18 +108,18 @@ export const MoodPad: React.FC<MoodPadProps> = ({
         }}
       >
         {/* Russell's circumplex: square frame + inscribed unit circle */}
-        <rect x={0} y={0} width={100} height={100} fill="#ffffff" stroke="#e5e7eb" strokeWidth={0.5} />
-        <circle cx={50} cy={50} r={48} fill="#fafafa" stroke="#d1d5db" strokeWidth={0.5} />
+        <rect x={0} y={0} width={100} height={100} fill={c.frame} stroke={c.frameStroke} strokeWidth={0.5} />
+        <circle cx={50} cy={50} r={48} fill={c.circle} stroke={c.circleStroke} strokeWidth={0.5} />
 
         {/* Quadrant tints — extremely faint so the dot stays the focal point */}
-        <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fef3c7" opacity={0.25} />
-        <path d="M 50 50 L 0 50 L 0 0 Z" fill="#fee2e2" opacity={0.25} />
-        <path d="M 50 50 L 0 50 L 0 100 Z" fill="#dbeafe" opacity={0.25} />
-        <path d="M 50 50 L 100 50 L 100 100 Z" fill="#dcfce7" opacity={0.25} />
+        <path d="M 50 50 L 100 50 L 100 0 Z" fill="#fef3c7" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 0 50 L 0 0 Z" fill="#fee2e2" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 0 50 L 0 100 Z" fill="#dbeafe" opacity={c.tintOpacity} />
+        <path d="M 50 50 L 100 50 L 100 100 Z" fill="#dcfce7" opacity={c.tintOpacity} />
 
         {/* Axis cross */}
-        <line x1={2} y1={50} x2={98} y2={50} stroke="#9ca3af" strokeWidth={0.4} />
-        <line x1={50} y1={2} x2={50} y2={98} stroke="#9ca3af" strokeWidth={0.4} />
+        <line x1={2} y1={50} x2={98} y2={50} stroke={c.axis} strokeWidth={0.4} />
+        <line x1={50} y1={2} x2={50} y2={98} stroke={c.axis} strokeWidth={0.4} />
 
         {/* Emotion markers */}
         {palette?.map((e) => {
@@ -125,12 +128,12 @@ export const MoodPad: React.FC<MoodPadProps> = ({
           if (Math.abs(e.weightToValence) < 0.05 && Math.abs(e.weightToArousal) < 0.05) return null;
           return (
             <g key={e.name}>
-              <circle cx={p.x} cy={p.y} r={1.6} fill="#a78bfa" opacity={0.85} />
+              <circle cx={p.x} cy={p.y} r={1.6} fill={c.marker} opacity={0.85} />
               <text
                 x={p.x + 2.6}
                 y={p.y + 1.4}
                 fontSize={4}
-                fill="#6d28d9"
+                fill={c.markerText}
                 style={{ pointerEvents: 'none' }}
               >
                 {e.name}
@@ -142,18 +145,18 @@ export const MoodPad: React.FC<MoodPadProps> = ({
         {/* Axis labels */}
         {showLabels && (
           <>
-            <text x={50} y={6.5} textAnchor="middle" fontSize={4.5} fill="#6b7280">excited</text>
-            <text x={50} y={97}  textAnchor="middle" fontSize={4.5} fill="#6b7280">calm</text>
-            <text x={3}  y={51.5} textAnchor="start" fontSize={4.5} fill="#6b7280">sad</text>
-            <text x={97} y={51.5} textAnchor="end"   fontSize={4.5} fill="#6b7280">happy</text>
+            <text x={50} y={6.5} textAnchor="middle" fontSize={4.5} fill={c.label}>excited</text>
+            <text x={50} y={97}  textAnchor="middle" fontSize={4.5} fill={c.label}>calm</text>
+            <text x={3}  y={51.5} textAnchor="start" fontSize={4.5} fill={c.label}>sad</text>
+            <text x={97} y={51.5} textAnchor="end"   fontSize={4.5} fill={c.label}>happy</text>
           </>
         )}
 
         {/* Mood dot */}
-        <circle cx={dot.x} cy={dot.y} r={2.6} fill="#111827" stroke="#ffffff" strokeWidth={0.8} />
+        <circle cx={dot.x} cy={dot.y} r={2.6} fill={c.dot} stroke={c.dotRing} strokeWidth={0.8} />
       </svg>
-      {subtitle && <div style={subtitleStyle}>{subtitle}</div>}
-      <div style={readoutStyle}>
+      {subtitle && <div style={{ ...subtitleStyle, color: c.label }}>{subtitle}</div>}
+      <div style={{ ...readoutStyle, color: c.labelStrong }}>
         <span>v {valence >= 0 ? '+' : ''}{valence.toFixed(2)}</span>
         <span style={{ marginLeft: 10 }}>a {arousal >= 0 ? '+' : ''}{arousal.toFixed(2)}</span>
       </div>
@@ -169,6 +172,6 @@ function clampUnit(v: number): number {
   return v === 0 ? 0 : v;
 }
 
-const titleStyle: React.CSSProperties = { fontSize: 11, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
-const subtitleStyle: React.CSSProperties = { fontSize: 11, color: '#6b7280', marginTop: 4, fontStyle: 'italic', textAlign: 'center' };
-const readoutStyle: React.CSSProperties = { fontSize: 10, fontFamily: 'monospace', color: '#374151', marginTop: 2 };
+const titleStyle: React.CSSProperties = { fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 };
+const subtitleStyle: React.CSSProperties = { fontSize: 11, marginTop: 4, fontStyle: 'italic', textAlign: 'center' };
+const readoutStyle: React.CSSProperties = { fontSize: 10, fontFamily: 'monospace', marginTop: 2 };

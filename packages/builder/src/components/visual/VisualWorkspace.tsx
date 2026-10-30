@@ -75,6 +75,7 @@ import { notifyUndoable } from '../../utils/undoNotice';
 import { isMultiChoiceLike } from '@asaps/core';
 import { useRolePreview } from '../../contexts/RolesContext';
 import { previewRoles } from '../../utils/rolePreview';
+import { useIsDark } from '../../utils/appearance';
 
 
 /**
@@ -1009,6 +1010,8 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
   // so the preview reflows per-frame WITHOUT spamming the undo stack; a
   // single setAnchor commit fires on pointer-up.
   const [slotGapDrag, setSlotGapDrag] = useState<{ startY: number; startGap: number; gap: number } | null>(null);
+  // The gap grip sits on the stage (keep-colors), out of dark mode's reach.
+  const isDark = useIsDark();
   // Viewport scale: 'fit' shrinks a larger-than-editor device rect to show
   // the whole composition; 'one' = 1:1 actual pixels (scroll); 'auto' picks
   // fit only when the rect exceeds the editor area. Measured editor area
@@ -7025,7 +7028,7 @@ export const VisualWorkspace: React.FC<VisualWorkspaceProps> = ({
                       });
                     }}
                     className={`absolute left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-1 px-3 h-5 rounded-full select-none touch-none cursor-ns-resize ${
-                      slotGapDrag ? 'bg-blue-500 text-white' : 'bg-white/70 text-black/70 hover:bg-white/90'
+                      slotGapDrag ? 'bg-blue-500 text-white' : isDark ? 'bg-gray-900/70 text-white/80 hover:bg-gray-900/90' : 'bg-white/70 text-black/70 hover:bg-white/90'
                     }`}
                     style={{ bottom: 6 }}
                   >
