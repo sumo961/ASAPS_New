@@ -2548,7 +2548,7 @@ Click the **layout-mode pill** in the header (green *Responsive layout* or amber
 - **Fixed → Responsive** clears baked pixel positions and infers slot intent from them, so beats fall back to schema-driven slot/spatial layout. Best for projects that have only ever used the default layouts.
 - **Responsive → Fixed** bakes the current schema-default positions into explicit pixel `locations[]` entries on each beat, so you can hand-tune them as pixel coordinates.
 
-The migrator preview lists the per-beat changes so you can see what will happen before committing. Either direction is destructive in the sense that the previous shape isn't preserved — back up (or commit to git) before switching if you might want to revert.
+The migrator preview lists the per-beat changes so you can see what will happen before committing. The switch is one undo step: **Undo** right after it puts the mode and every migrated beat back as they were. Once you've opened another project (the Undo history starts empty there), the previous shape isn't kept, so back up (or commit to git) before switching if you might want to revert later.
 
 ### Which beats render through slot mode?
 
@@ -2632,6 +2632,8 @@ Your project's colours, text box and fonts live in [Project Settings](#global-se
 Each row shows the project's value until you change it. Rows you've changed turn bold, and the section's header counts them (*2 changed*). The **↺** button next to a row puts that one back to the project setting; **Use the project's look for everything** puts them all back. Every change can be undone, and picking a colour is one undo step.
 
 The next beat goes back to the project's look, so nothing carries over by accident. The Visual Editor, the Preview Window and exported stories all show the beat's look. A font size you give a single text element in the Visual Editor still wins over both the beat's and the project's size. When your theme draws the text box with a frame picture (an imported Ren'Py theme, say), the picture is the box, so **Colour** and **Opacity** have nothing to fill, as with the project's own colours. To give one beat a plain box instead (a flashback, say, or a beat whose picture already frames the text), set **Frame picture** to *Off on this beat (plain box)*: that beat draws a simple box, and its **Colour** and **Opacity** fill it. (360 Panorama beats don't have this section.)
+
+You can also ask the [Co-Designer](#co-designer) for a beat's look (*"make the dream sequence dark, with no box behind the text"*); it proposes the change as a card for you to apply, as one undo step. Stories injected from Claude Desktop can carry a beat's look too.
 
 ### Positioning Characters
 
@@ -3078,6 +3080,7 @@ When a suggestion is concrete enough, the Co-Designer turns it into a **proposal
 
 - **Wording** — rewrite a beat's text, or **reword a single choice** without touching what it does
 - **Settings** — change a beat's parameters, or add a design note to a beat
+- **A beat's look** — give one beat its own colours, text box, buttons or fonts, show or hide its text-box border, or return it to the project's look (the same settings as [This beat's look](#this-beats-look) in the Visual Editor)
 - **New material** — **add a beat** (linked from and to the beats it names), **add a choice** to a menu or to a node deep inside a dialog tree
 - **A new version of a beat** — the new beat (same type or a different one) is placed **side by side** with the old one; every link that led into the old beat now leads to the new one, and any entry requirement carries over. The old beat stays in your story, renamed *"… (replaced)"*, so you can play both versions and delete the one you don't want. (The story's start beat can't be replaced this way.)
 - **Wiring** — what a choice **does** (its effects), when a choice is **shown** (its visibility conditions), what a beat **requires** before it can be entered (its entry gate, with a fallback), the effects on a **link** a player continues along, and a Random Target branch's **effects and weight**
@@ -3506,13 +3509,13 @@ These are advice only: nothing changes at runtime. The analysis explores the sam
 ### Story Logic
 
 ![Debug Tools — Story Logic tab](images/33-debug-story-logic.png)
-*The Story Logic tab: hub beats reachable from several paths, and a Line Without Exit warning: Grandma's last line has no replies and no exit link, with the fix it suggests.*
+*The Story Logic tab: hub beats with how many states players arrive in and what differs, e.g. someone's trust and who plays a role.*
 
-Pattern-based validation that runs on the project's structure:
-- **Hub Beat Analysis** — beats reachable from multiple paths. Each hub gets a card with its incoming-path count and a reminder to check that the text doesn't assume a specific player state.
-- **Warnings / Info** — text that assumes something the player may not have ("with the evidence you gathered…") without a check on the way in (a Condition beat, a choice that only shows under conditions, or a requirement), Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. The scene ends on such a line and goes on by the beat's own link, or the story stops there if the beat has none; give the line an exit link (or replies) so the scene says where it goes.
+Story Logic looks for places where your text might not hold for every player. It works from the same simulation as Path Analysis, so it knows the states players actually arrive in:
+- **Hub Beat Analysis** — beats that the way you take reaches in different states: with or without an item, a variable set or not, someone's trust higher or lower, a different character in a role. Each hub gets a card with how many states players arrive in; expand it to see what differs, in words (*with or without notebook*, *Tomas's trust → player 0 to 0.9*, *@confidant: Ingrid / Tomas*), the beat's text, and its ways in (click a beat name to highlight it on the flowchart). Differences the story starts with, such as a variant drawn at random, don't make a hub. A beat reached from several places, always in the same state, isn't a hub: its text holds for everyone. A beat Path Analysis never reaches counts as a hub when more than one beat links to it, and its card counts *ways in* instead of states.
+- **Warnings / Info** — text that assumes something the player may not have ("with the key", "the evidence you gathered…") is checked against every state players arrive in. If all of them hold something named like it (an item *Brass key*, a variable *hasKey*, a counter *clues* above 0), there's nothing to report. If only some do, you get a warning (*1 of the 2 states players arrive in hold nothing named like "key"*); if none do, an info note, since the story may track it under another name. For a beat Path Analysis never reaches, the check falls back to the links: it looks for a check on the way in (a Condition beat, a choice that only shows under conditions, or a requirement with a fallback; a requirement without a fallback doesn't stop anyone, the beat plays anyway). The list also flags Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. The scene ends on such a line and goes on by the beat's own link, or the story stops there if the beat has none; give the line an exit link (or replies) so the scene says where it goes.
 
-> Story Logic uses keyword pattern matching for now. AI-powered semantic analysis (where an LLM reads each hub beat in context and flags continuity issues) is on the roadmap — when an AI provider is configured, the panel offers richer warnings.
+> Story Logic uses keyword patterns and the states Path Analysis finds; it doesn't use AI. It reads your text for familiar phrases, so it can miss an assumption worded differently, or flag one the story keeps under another name. Treat its findings as places worth a second look.
 
 <a id="verification-kits"></a>
 ## Verification Example Kits
@@ -4642,7 +4645,7 @@ ASAPS Modern maintains a full undo/redo history for beat operations:
 - **Ctrl/Cmd+Shift+Z** - Redo
 - The **History dropdown** (next to undo/redo buttons) shows recent operations
 
-Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, links drawn in the flowchart, text edited in the Script view, an Update from Markdown (one step for the whole file), Change type…, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer, and changes to the story's [Items](#project-items). The undo stack persists for the current session.
+Supported operations: edit beat properties and parameters (every Inspector field), add beats, delete beats, move beats, links drawn in the flowchart, text edited in the Script view, an Update from Markdown (one step for the whole file), Change type…, Visual Editor layout changes, and changes applied from the review banner or the Co-Designer, and changes to the story's [Items](#project-items). The undo history lasts while the project is open (also through a Layout Mode switch, which is one step); opening another project starts it empty, so Undo never reaches into a project you've left.
 
 <a id="find-and-change"></a>
 ## Find & Change
@@ -4817,7 +4820,7 @@ Quick reference for all beat types.
 
 **Connection** - A link between beats defining possible transitions in the experience.
 
-**Co-Designer** - The AI design partner for an existing story (**AI → Design with Co-Designer**). It discusses the open project with you and proposes concrete, individually selectable changes — text, choices, wiring (effects, visibility conditions, entry gates, link and random-branch effects), new beats, side-by-side new versions of a beat, characters — which you apply, each undoable. See [Refine Your Story with the Co-Designer](#co-designer).
+**Co-Designer** - The AI design partner for an existing story (**AI → Design with Co-Designer**). It discusses the open project with you and proposes concrete, individually selectable changes — text, choices, wiring (effects, visibility conditions, entry gates, link and random-branch effects), a beat's own look, new beats, side-by-side new versions of a beat, characters — which you apply, each undoable. See [Refine Your Story with the Co-Designer](#co-designer).
 
 **Restart Link** - The link from an End Screen's or AI Summary's *Play Again* button to the beat where a replay begins. Drawn in the flowchart as a dashed teal **↺ Restart** arrow; required while the Restart button is shown.
 

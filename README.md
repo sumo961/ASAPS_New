@@ -22,9 +22,19 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.152** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.152 is the save-before-switching
-release**: edits you made in the half minute before opening another project
+Current release: **v0.9.153** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.153 is the story-logic release**:
+the Debug window's Story Logic tab now knows what players arrive with. A hub
+is a beat players reach in different states, and its card says what differs —
+with or without an item, someone's trust from 0 to 0.8, who plays a role — so
+you can check its text holds for every way in. Text that assumes the key is
+flagged only when some way in arrives without one. The Co-Designer (and Claude
+Desktop) can now give a beat its own look. Fixed: Undo no longer carries over
+into the next project, Undo of a switch between Responsive and Fixed canvas
+switches back, cloning a repository saves your work first, and Path Analysis
+no longer reports some dead ends that aren't there.
+
+**v0.9.152 was the save-before-switching release**: edits you made in the half minute before opening another project
 are no longer lost — the project you leave is now saved first, whether you
 switch from the Projects menu, the start window, a template, Open or a
 dropped file. A beat's look can also turn off the theme's text-box frame
