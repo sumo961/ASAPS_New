@@ -3335,7 +3335,7 @@ When previewing from a beat other than the start, ASAPS Modern intelligently ana
    - A badge indicates if the path includes typed input
 4. Select a preset to load that state; the preview restarts paused so you can look before you play
 
-**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant — likewise a [role](#roles) drawn at random is explored once per character, and paths that cast a role differently stay separate presets. A story that tests the built-in [playthrough](#keep-across-restarts) is explored as a first run and as a replay, so a returning player's state can show up as a preset of its own.
+**Every beat, feelings included.** Presets are found for every reachable beat, however deep in the story, and they carry the whole state a player would have — variables, counters, inventory, visited beats *and* characters' feelings (mood and sentiments), played through the story's real effects and conditions. Every way on that the flowchart draws is followed (every Free Layout button, a Set Timer's *time runs out* link, each QR code), and a choice hidden by its conditions is only taken where the player would see it. Items end up where the story put them: the player starts with the player's own items, in the right numbers, and items or counters that belong to another character go to that character. Random branches, AI conditions and location beats are explored on every side, and characters with randomly drawn variants are explored once per variant — likewise a [role](#roles) drawn at random is explored once per character, and paths that cast a role differently stay separate presets. A story that tests the built-in [playthrough](#keep-across-restarts) is explored as a first run and as a replay, so a returning player's state can show up as a preset of its own.
 
 **Only the states that play differently.** A long story can reach a beat by hundreds of routes. The list is condensed: two paths become one preset when nothing ahead of this beat — no condition, choice guard, entry requirement or `${…}` text placeholder — would come out differently. What's left is the handful of states worth testing. The **↻** button in the menu header re-runs the analysis after you've edited the story.
 
@@ -3428,9 +3428,9 @@ Click the **Debug** button in the header to open the **Debug Tools** window. It 
 ![Debug Tools — Reachability tab](images/31-debug-reachability.png)
 *The Reachability tab shows total beats, how many are reachable from start, how many are orphaned, and any warnings detected. Click a beat to highlight it on the main flowchart.*
 
-Finds beats that can never be reached — orphaned content with no paths leading to it. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
+Finds beats that can never be reached — orphaned content with no paths leading to it. It follows every link the flowchart draws, including every Free Layout button, a Set Timer's *time runs out* link, QR codes and requirement fallbacks. The summary cards count Total, Reachable, Unreachable, and Orphaned beats. Expand the *Reachable Beats* and *Warnings* sections to drill into the specifics. Each unreachable beat says why in a sentence (nothing links to it, every way in has a condition that can never be met, every beat that links to it is unreachable itself, or a Condition beat never takes the branch to it), followed by suggested fixes where the analysis has one. Clicking a beat in the list highlights it in the main builder flowchart.
 
-A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable counts as set when anything in the story can set it: an effect on a choice, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**.
+A beat also counts as unreachable when every way in is guarded by a condition that can never be true, such as a test of a variable that nothing in the story sets. A variable counts as set when anything in the story can set it: an effect on a choice or a Free Layout button, a dialog line, a link or a random branch, a Set Variable beat, or an input the player types. A variable with a default value in Project Settings counts as set too, and so does the built-in **playthrough**.
 
 ### Path Analysis
 
@@ -3443,6 +3443,14 @@ Enumerates the possible journeys through your story. Three modes:
 - **Backward** — given a target ending, which paths lead to it.
 
 The summary shows *Outcomes*, *Total Paths*, *Unique Endings*, *Reachable Beats*, and how long the analysis took. Each outcome can be expanded to inspect the specific beat sequence and decision points. The query box at the top lets you filter by state ("`adult > 7`", "`has axe`", "`visits beat-123`") so you can ask, "show me only the paths where the player ends up with the axe."
+
+The analysis plays the story the way a player would: it follows every link the flowchart draws, only takes a choice when its conditions would show it, sends the player to a requirement's fallback when the requirement isn't met, and keeps track of how many of an item the player holds and which character holds what. Each outcome carries a label saying how the path ends:
+
+- **Ending** — it reaches an End Screen or an AI Summary.
+- **Dead End** — the player is stuck: the beat has no way on, or every choice is hidden by its conditions. A very long path that the analysis stops following is marked this way too.
+- **Cycle** — the path comes back round to where it has already been, with nothing new to find, for example a hub where every choice has already been tried. The choices are still on screen, so the player can leave the way they came; it's a loop, not a trap.
+
+When some outcomes aren't endings, the *Outcomes* card breaks the count down (for example *3 endings + 2 cycles*).
 
 
 #### Story Warnings
@@ -3466,7 +3474,7 @@ These are advice only: nothing changes at runtime. The analysis explores the sam
 
 Pattern-based validation that runs on the project's structure:
 - **Hub Beat Analysis** — beats reachable from multiple paths. Each hub gets a card with its incoming-path count and a reminder to check that the text doesn't assume a specific player state.
-- **Warnings / Info** — text that assumes something the player may not have ("with the evidence you gathered…") without a condition check on the way in, Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. The scene ends on such a line and goes on by the beat's own link, or the story stops there if the beat has none; give the line an exit link (or replies) so the scene says where it goes.
+- **Warnings / Info** — text that assumes something the player may not have ("with the evidence you gathered…") without a check on the way in (a Condition beat, a choice that only shows under conditions, or a requirement), Pick Prop items that no beat describes, and **Line Without Exit**: a Dialog Tree line with no replies and no exit link. The scene ends on such a line and goes on by the beat's own link, or the story stops there if the beat has none; give the line an exit link (or replies) so the scene says where it goes.
 
 > Story Logic uses keyword pattern matching for now. AI-powered semantic analysis (where an LLM reads each hub beat in context and flags continuity issues) is on the roadmap — when an AI provider is configured, the panel offers richer warnings.
 

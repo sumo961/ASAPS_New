@@ -1,9 +1,9 @@
 # ASAPS Modern - Progress Log
 
-## Unreleased (since v0.9.149, 2026-10-31)
+## 2026-10-31: The path-analysis release (v0.9.150)
 
 ### Overview
-The debug tools (Reachability, Path Analysis, the Debug window's path tree, Story Logic) and the Preview's "Start as if…" presets now play a story the way the engine does. Prompted by a Free Layout story whose Path Analysis stopped at the Free Layout every time; an audit of the analyzers against everything added since mid-October found a dozen more gaps.
+Released as v0.9.150, the path-analysis release. The debug tools (Reachability, Path Analysis, the Debug window's path tree, Story Logic) and the Preview's "Start as if…" presets now play a story the way the engine does: every Free Layout button, a Set Timer's "time runs out" link and QR codes are followed; choice conditions, requirement fallbacks, Condition Check AND/OR, item quantities and per-character counters and items are respected; exhausted hubs read as cycles. Prompted by a Free Layout story whose Path Analysis stopped at the Free Layout every time; an audit of the analyzers against everything added since mid-October found a dozen more gaps.
 
 ### Debug tools follow the engine (user report: "debug functions and path analysis did not fully understand" Free Layout)
 - **One shared walk.** `analysis/analysisLinks.ts` (new) says which links the analyzers follow out of a beat (its own links plus auto-advance, requirement fallbacks, a Set Timer's "time runs out" target and a QR scan's codes) and which beat types branch (`CHOICE_BEAT_TYPES` / `SINGLE_LINK_BEAT_TYPES`). Reachability, the simulator, StoryWarnings, the constraint and backward analyzers, PathTree and the Debug window's tree view all use it. Before, each kept its own copy of the choice-beat list. **Free Layout** was on none of them, so Path Analysis followed only its first button. Set Timer's "time runs out" link and QR codes weren't followed at all.
@@ -28,9 +28,12 @@ The debug tools (Reachability, Path Analysis, the Debug window's path tree, Stor
 - Checked:
   - On the reporter's story "Free Layout New": before their fix, Reachability rightly reported the two beats that only linked to each other. Path Analysis now reaches The End through the Free Layout (42 variations); before, every path stopped at the Free Layout. After their fix nothing is unreachable.
   - The Debug window, headless: Reachability, Path Analysis (Forward and Tree) and Story Logic all render.
-  - Suites: core 3067, builder 3126.
+  - Suites: core 3067, builder 3126, renderer 717.
+  - Release check: The Oil Lamp and The Last Ferry played to an ending in the Preview; The Last Ferry's "On the stairs" offers 8 "Start as if…" states (40 paths), and starting from "Via Jonas → Keep going → engine room" opens with Jonas cast and Tomas trusting him, then plays to "a friend on the strait".
+- **User Guide** (release audit): presets follow every drawn link and give the player only their own items; Reachability follows every link the flowchart draws and counts Free Layout button effects; Path Analysis explains how it plays the story and what *Ending*, *Dead End* and *Cycle* mean; Story Logic names the checks that count.
+- Left for later: a path the analysis stops following at its length limit (300 beats) is labelled *Dead End*, although the panel has a *Depth Limit* badge the simulator never uses; Tree mode shows no *Cycle* badge.
 
-**Files modified:** packages/core/src/analysis/analysisLinks.ts (new), analysis/StateSimulationAnalyzer.ts, analysis/ReachabilityAnalyzer.ts, analysis/StoryWarnings.ts, analysis/ConstraintPathAnalyzer.ts, analysis/BackwardAnalyzer.ts, analysis/PathTree.ts, analysis/index.ts, engine/StoryContext.ts, types/index.ts, utils/storyLinks.ts, tests/analysis/StateSimulationCoverage.test.ts (new), tests/analysis/choiceBeatTypes.test.ts (new), tests/analysis/StateSimulationRoles.test.ts, tests/utils/storyLinksParity.test.ts; packages/builder/src/services/PathBasedPresetGenerator.ts, pages/PreviewWindow.tsx, components/debug/PathTreeView.tsx, utils/storyLogicValidator.ts, services/__tests__/presetInventory.test.ts (new), utils/__tests__/storyLogicValidator.test.ts
+**Files modified:** packages/core/src/analysis/analysisLinks.ts (new), analysis/StateSimulationAnalyzer.ts, analysis/ReachabilityAnalyzer.ts, analysis/StoryWarnings.ts, analysis/ConstraintPathAnalyzer.ts, analysis/BackwardAnalyzer.ts, analysis/PathTree.ts, analysis/index.ts, engine/StoryContext.ts, types/index.ts, utils/storyLinks.ts, tests/analysis/StateSimulationCoverage.test.ts (new), tests/analysis/choiceBeatTypes.test.ts (new), tests/analysis/StateSimulationRoles.test.ts, tests/utils/storyLinksParity.test.ts; packages/builder/src/services/PathBasedPresetGenerator.ts, pages/PreviewWindow.tsx, components/debug/PathTreeView.tsx, utils/storyLogicValidator.ts, services/__tests__/presetInventory.test.ts (new), utils/__tests__/storyLogicValidator.test.ts; docs/USER_GUIDE.md, README.md, package.json, apps/builder-desktop/package.json
 
 ---
 

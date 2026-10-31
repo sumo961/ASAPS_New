@@ -22,9 +22,20 @@ The User Guide covers:
 
 ## ⚠️ Development Status
 
-Current release: **v0.9.149** — this is a **beta**. Core functionality works
-and new features arrive frequently. **v0.9.149 is the easier-reading
-release**: three free fonts made for easier reading — Lexend, Atkinson
+Current release: **v0.9.150** — this is a **beta**. Core functionality works
+and new features arrive frequently. **v0.9.150 is the path-analysis
+release**: the Debug window's Reachability, Path Analysis and Story Logic
+now play a story the way the Preview does. Path Analysis follows every
+button of a Free Layout (it used to follow only the first), a Set Timer's
+"time runs out" link and QR codes, and it respects what decides a real
+playthrough: choices hidden by their conditions, requirements that send
+the player elsewhere, a Condition Check's extra conditions, how many of an
+item the player holds, and each character's own counters and items. A
+choice beat whose options have all been tried is now marked as a cycle,
+not a dead end, and the Preview's "Start as if…" presets give the player
+only their own items.
+
+**v0.9.149 was the easier-reading release**: three free fonts made for easier reading — Lexend, Atkinson
 Hyperlegible and OpenDyslexic — come with ASAPS. Tools ▸ App Preferences ▸
 Reading font puts the builder's own screens in one of them, and Project
 Settings ▸ Fonts offers them for a story's titles, text and buttons, so
